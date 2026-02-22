@@ -28,6 +28,7 @@
         <module>services/product-service</module>
         <module>services/quote-service</module>
         <module>services/ai-service</module>
+        <module>services/pricing-ai-rules-service</module>
     </modules>
 
     <properties>

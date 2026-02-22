@@ -1,0 +1,46 @@
+package com.opencrm.pricingairules.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+rule "Calculate ARR"
+salience 420
+when
+    $quote: QuoteFact(subscriptionType == "ANNUAL")
+    eval($quote.getDecimal("monthlyPrice") != null)
+then
+    BigDecimal monthly = $quote.getDecimal("monthlyPrice");
+    BigDecimal arr = monthly.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
+    $quote.setDecimal("arr", arr);
+end
+
+rule "Calculate TCV"
+salience 419
+when
+    $quote: QuoteFact(durationInMonths > 0)
+    eval($quote.getDecimal("monthlyPrice") != null)
+then
+    BigDecimal monthly = $quote.getDecimal("monthlyPrice");
+    BigDecimal tcv = monthly.multiply(BigDecimal.valueOf($quote.getDurationInMonths()))
+        .setScale(2, RoundingMode.HALF_UP);
+    $quote.setDecimal("tcv", tcv);
+    if ($quote.getBasePrice() == null) {
+        $quote.setBasePrice(tcv);
+    }
+    if ($quote.getFinalPrice() == null) {
+        $quote.setFinalPrice($quote.getBasePrice());
+    }
+end
+
+rule "Calculate ACV"
+salience 418
+when
+    $quote: QuoteFact(durationInMonths > 0)
+    eval($quote.getDecimal("monthlyPrice") != null)
+then
+    BigDecimal monthly = $quote.getDecimal("monthlyPrice");
+    BigDecimal acv = monthly.multiply(BigDecimal.valueOf($quote.getDurationInMonths()))
+        .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+    $quote.setDecimal("acv", acv);
+end

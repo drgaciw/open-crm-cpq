@@ -1,0 +1,370 @@
+# AI Prompts Configuration
+# Phase 1: Externalized Prompts for Spring AI
+
+ai:
+  prompts:
+    categories:
+      # Rule Analysis Prompts
+      rule-analysis:
+        system: |
+          You are an expert in analyzing business requirements for pricing rules.
+          Break down complex pricing requirements into core components that can be implemented in Drools rules.
+          Your analysis should be thorough, accurate, and actionable.
+        prompts:
+          analyze-requirement: |
+            Analyze the following business requirement for a pricing rule:
+
+            {requirement}
+
+            Provide a structured analysis in JSON format with the following fields:
+            - conditions: Array of condition strings that must be met
+            - actions: Array of action strings to be performed
+            - requiredInputs: Array of required input data fields
+            - expectedOutputs: Array of expected output fields
+            - dependencies: Array of dependencies on other rules or data
+            - businessContext: String describing the business context
+
+            {format}
+
+          extract-conditions: |
+            From this business requirement, extract all conditions that must be evaluated:
+
+            {requirement}
+
+            Return as a JSON array of condition strings.
+            {format}
+
+          identify-dependencies: |
+            Identify any dependencies this rule has on other rules or external data:
+
+            {requirement}
+
+            Existing rules: {existingRules}
+
+            Return as JSON array of dependency objects with fields: name, type, reason.
+            {format}
+
+      # Rule Generation Prompts
+      rule-generation:
+        system: |
+          You are an expert Drools rule developer.
+          Create precise, efficient, and accurate Drools rules based on business requirements and analysis.
+          Follow Drools best practices for performance and maintainability.
+        prompts:
+          generate-rule: |
+            Create a Drools rule based on this business requirement:
+
+            {businessRequirement}
+
+            Analysis of requirements:
+            - Conditions: {conditions}
+            - Actions: {actions}
+            - Required inputs: {requiredInputs}
+            - Expected outputs: {expectedOutputs}
+
+            Generate a complete Drools rule that:
+            1. Has a descriptive name based on the business requirement
+            2. Uses proper DRL syntax and indentation
+            3. Includes appropriate data types
+            4. Orders conditions for efficiency (most restrictive first)
+            5. Includes inline documentation
+            6. Follows the pattern:
+               ```
+               rule "Rule Name"
+                   when
+                       // conditions
+                   then
+                       // actions
+               end
+               ```
+
+            Return ONLY the Drools rule code, no explanation.
+
+          generate-with-patterns: |
+            Create a Drools rule using these common patterns:
+
+            Business Requirement: {businessRequirement}
+
+            Suggested Patterns:
+            {patterns}
+
+            Analysis: {analysis}
+
+            Generate the complete rule incorporating these patterns.
+            Return ONLY the Drools rule code.
+
+      # Test Generation Prompts
+      test-generation:
+        system: |
+          You are an expert in testing Drools rules.
+          Create comprehensive test cases that validate rule functionality across various scenarios including edge cases.
+        prompts:
+          generate-tests: |
+            Create test cases for the following Drools rule:
+
+            ```
+            {ruleContent}
+            ```
+
+            Rule Analysis:
+            - Conditions: {conditions}
+            - Actions: {actions}
+            - Required inputs: {requiredInputs}
+            - Expected outputs: {expectedOutputs}
+
+            Generate {testCount} test cases in JSON format with this structure:
+            ```json
+            [
+              {
+                "id": "test-1",
+                "description": "Test description",
+                "category": "positive|negative|edge|boundary",
+                "input": {
+                  "field1": "value1",
+                  "field2": "value2"
+                },
+                "expectedOutput": {
+                  "field1": "expectedValue1"
+                },
+                "expectedRuleFired": true
+              }
+            ]
+            ```
+
+            Include:
+            1. Positive tests (conditions met, rule fires)
+            2. Negative tests (conditions not met, rule doesn't fire)
+            3. Edge cases (boundary values, nulls, extremes)
+            4. Business scenario tests
+
+            {format}
+
+          generate-coverage-tests: |
+            Generate comprehensive test cases with {coverageLevel} coverage for:
+
+            ```
+            {ruleContent}
+            ```
+
+            Coverage levels:
+            - basic: 3-5 tests covering happy path and one edge case
+            - standard: 8-12 tests covering positive, negative, and edges
+            - comprehensive: 15-25 tests covering all paths and boundaries
+
+            Return JSON array of test cases.
+            {format}
+
+      # Rule Optimization Prompts
+      optimization:
+        system: |
+          You are an expert in optimizing Drools rules for performance.
+          Your task is to generate specific optimization recommendations that improve rule execution speed,
+          memory efficiency, and maintainability while preserving functionality.
+        prompts:
+          optimize-rule: |
+            Optimize the following Drools rule for better performance:
+
+            ```
+            {ruleContent}
+            ```
+
+            Current Performance Metrics:
+            - Execution time: {executionTime}ms
+            - Memory usage: {memoryUsage}MB
+            - Condition evaluations: {conditionEvaluations}
+            - Cache hit rate: {cacheHitRate}
+
+            Focus on:
+            1. Condition ordering for fail-fast evaluation
+            2. Removing redundant conditions
+            3. Simplifying complex expressions
+            4. Improving pattern matching efficiency
+            5. Reducing memory allocations
+
+            Return ONLY the optimized rule code, no explanation.
+
+          generate-recommendations: |
+            Generate optimization recommendations for this Drools rule:
+
+            ```
+            {ruleContent}
+            ```
+
+            Performance Issues:
+            {issues}
+
+            Performance Metrics:
+            {metrics}
+
+            For each issue, provide a recommendation in JSON format:
+            ```json
+            [
+              {
+                "type": "CONSTRAINT_REORDERING|PATTERN_RESTRUCTURING|EXPRESSION_SIMPLIFICATION|INDEX_OPTIMIZATION",
+                "description": "Detailed description",
+                "expectedImprovementPercent": 15.5,
+                "confidenceScore": 0.85,
+                "originalRuleSegment": "original code",
+                "optimizedRuleSegment": "optimized code",
+                "reasoningSteps": ["step 1", "step 2"]
+              }
+            ]
+            ```
+
+            {format}
+
+      # Performance Analysis Prompts
+      performance-analysis:
+        system: |
+          You are an expert in analyzing and optimizing Drools rules.
+          You specialize in detecting performance issues in rules based on their structure and metrics.
+        prompts:
+          analyze-performance: |
+            Analyze this Drools rule for potential performance issues:
+
+            ```
+            {ruleContent}
+            ```
+
+            Performance Metrics:
+            - Average Execution Time: {averageExecutionTimeMs} ms
+            - P95 Execution Time: {p95ExecutionTimeMs} ms
+            - P99 Execution Time: {p99ExecutionTimeMs} ms
+            - Average Condition Evaluations: {averageConditionEvaluations}
+            - Cache Hit Rate: {cacheHitRate}
+            - Alpha Network Efficiency: {alphaNetworkEfficiency}
+            - Beta Network Efficiency: {betaNetworkEfficiency}
+
+            Pattern Matching Costs:
+            {patternMatchingCosts}
+
+            Identify specific performance issues and return as JSON:
+            ```json
+            [
+              {
+                "issueType": "EXCESSIVE_PATTERN_MATCHING|INEFFICIENT_CONSTRAINT_ORDER|COMPLEX_EXPRESSION|POOR_SELECTIVITY",
+                "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+                "description": "Issue description",
+                "impact": 0.7,
+                "suggestedFixes": ["fix 1", "fix 2"],
+                "affectedPatterns": ["pattern 1"]
+              }
+            ]
+            ```
+
+            {format}
+
+          compare-versions: |
+            Compare the performance of these two rule versions:
+
+            Original Rule:
+            ```
+            {originalRule}
+            ```
+
+            Optimized Rule:
+            ```
+            {optimizedRule}
+            ```
+
+            Original Metrics:
+            {originalMetrics}
+
+            Optimized Metrics:
+            {optimizedMetrics}
+
+            Provide analysis of improvements and any regressions.
+            Return structured JSON analysis.
+            {format}
+
+      # Sequential Thinking Prompts
+      sequential-thinking:
+        system: |
+          You are a logical sequential thinker that breaks complex tasks into clear, systematic steps.
+          For each step, provide focused analysis and reasoning that builds on previous steps.
+        prompts:
+          step-template: |
+            I need to think through this step by step.
+
+            Current thinking step: {thought}
+
+            This is thought #{thoughtNumber} of {totalThoughts}.
+
+            {isRevision}
+            {nextStepInfo}
+
+            Provide a clear, focused response for this thinking step.
+
+          revision-template: |
+            This is a revision of thought #{revisesThought}.
+            Previous thought had issues that need to be reconsidered.
+
+          final-step-info: |
+            This is the final step in my reasoning process. Provide a complete conclusion.
+
+          next-step-info: |
+            After this thought, I'll need to continue with the next step.
+
+      # Rule Validation Prompts
+      validation:
+        system: |
+          You are an expert in Drools rule validation.
+          Identify syntax errors, semantic issues, and potential runtime problems.
+        prompts:
+          validate-syntax: |
+            Validate the syntax and semantics of this Drools rule:
+
+            ```
+            {ruleContent}
+            ```
+
+            Check for:
+            1. Syntax errors (missing keywords, brackets, etc.)
+            2. Semantic errors (type mismatches, undefined variables)
+            3. Best practice violations
+            4. Potential runtime issues
+
+            Return validation result as JSON:
+            ```json
+            {
+              "isValid": true|false,
+              "errors": [{"line": 5, "message": "error description", "severity": "ERROR"}],
+              "warnings": [{"line": 10, "message": "warning description", "severity": "WARNING"}],
+              "suggestions": ["suggestion 1", "suggestion 2"]
+            }
+            ```
+
+            {format}
+
+      # Rule Documentation Prompts
+      documentation:
+        system: |
+          You are an expert technical writer specializing in Drools rule documentation.
+        prompts:
+          generate-documentation: |
+            Generate comprehensive documentation for this Drools rule:
+
+            ```
+            {ruleContent}
+            ```
+
+            Include:
+            1. Purpose and business logic
+            2. Input requirements
+            3. Output description
+            4. Conditions explanation
+            5. Actions explanation
+            6. Usage examples
+            7. Related rules
+
+            Format as Markdown.
+
+          generate-comments: |
+            Add inline comments to this Drools rule to explain the logic:
+
+            ```
+            {ruleContent}
+            ```
+
+            Return the rule with appropriate comments added.
+
