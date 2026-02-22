@@ -1,0 +1,463 @@
+package com.opencrm.quote.quote;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.exception.BusinessException;
+import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.quote.client.PricingServiceClient;
+import com.opencrm.quote.event.QuoteAcceptedEvent;
+import com.opencrm.quote.event.QuoteEventPublisher;
+import com.opencrm.quote.lineitem.QuoteLineItem;
+import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class QuoteService {
+
+    private final QuoteRepository quoteRepository;
+    private final QuoteMapper quoteMapper;
+    private final QuoteNumberGenerator quoteNumberGenerator;
+    private final QuoteEventPublisher eventPublisher;
+    private final QuoteLineItemRepository quoteLineItemRepository;
+    private final PricingServiceClient pricingServiceClient;
+    private final ObjectMapper objectMapper;
+
+    private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
+
+    public QuoteDto create(QuoteCreateRequest request) {
+        log.debug("Creating quote for customer: {}", request.getCustomerExternalId());
+
+        Quote quote = quoteMapper.toEntity(request);
+        quote.setQuoteNumber(quoteNumberGenerator.generate());
+
+        if (request.getDealType() == null) {
+            quote.setDealType(DealType.NEW);
+        }
+        if (request.getDurationInMonths() == null) {
+            quote.setDurationInMonths(12);
+        }
+
+        Quote saved = quoteRepository.save(quote);
+        log.info("Created quote: {}", saved.getQuoteNumber());
+
+        return quoteMapper.toDto(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public QuoteDto getById(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+        return quoteMapper.toDto(quote);
+    }
+
+    @Transactional(readOnly = true)
+    public QuoteDto getByQuoteNumber(String quoteNumber) {
+        Quote quote = quoteRepository.findByQuoteNumberAndDeletedFalse(quoteNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote with number: " + quoteNumber));
+        return quoteMapper.toDto(quote);
+    }
+
+    public QuoteDto update(Long id, QuoteUpdateRequest request) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
+            throw new BusinessException(
+                    "Quote can only be edited in DRAFT or REJECTED status. Current: " + quote.getStatus(),
+                    "QUOTE_NOT_EDITABLE"
+            );
+        }
+
+        quoteMapper.updateEntity(request, quote);
+        Quote updated = quoteRepository.save(quote);
+        log.info("Updated quote: {}", updated.getQuoteNumber());
+
+        return quoteMapper.toDto(updated);
+    }
+
+    public void delete(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() == QuoteStatus.ACCEPTED) {
+            throw new BusinessException("Cannot delete an accepted quote", "QUOTE_ACCEPTED_NO_DELETE");
+        }
+
+        quote.softDelete();
+        quoteRepository.save(quote);
+        log.info("Deleted quote: {}", quote.getQuoteNumber());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuoteDto> list(Pageable pageable, QuoteStatus status, DealType dealType, String customerExternalId) {
+        Specification<Quote> spec = QuoteSpecifications.notDeleted();
+
+        if (status != null) {
+            spec = spec.and(QuoteSpecifications.hasStatus(status));
+        }
+        if (dealType != null) {
+            spec = spec.and(QuoteSpecifications.hasDealType(dealType));
+        }
+        if (customerExternalId != null) {
+            spec = spec.and(QuoteSpecifications.hasCustomerExternalId(customerExternalId));
+        }
+
+        Page<Quote> quotes = quoteRepository.findAll(spec, pageable);
+        return quotes.map(quoteMapper::toDto);
+    }
+
+    public QuoteDto submitForReview(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.DRAFT) {
+            throw new BusinessException("Only draft quotes can be submitted for review", "INVALID_STATUS_TRANSITION");
+        }
+
+        if (quote.getLineItems().isEmpty()) {
+            throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
+        }
+
+        quote.setStatus(QuoteStatus.IN_REVIEW);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} submitted for review", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto approve(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.PENDING_APPROVAL && quote.getStatus() != QuoteStatus.IN_REVIEW) {
+            throw new BusinessException("Quote must be in review or pending approval to approve", "INVALID_STATUS_TRANSITION");
+        }
+
+        quote.setStatus(QuoteStatus.APPROVED);
+        quote.setApprovalState(ApprovalState.APPROVED);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} approved", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto reject(Long id, String reason) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.PENDING_APPROVAL && quote.getStatus() != QuoteStatus.IN_REVIEW) {
+            throw new BusinessException("Quote must be in review or pending approval to reject", "INVALID_STATUS_TRANSITION");
+        }
+
+        quote.setStatus(QuoteStatus.REJECTED);
+        quote.setApprovalState(ApprovalState.REJECTED);
+        if (reason != null) {
+            quote.setNotes(quote.getNotes() != null ? quote.getNotes() + "\nRejection: " + reason : "Rejection: " + reason);
+        }
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} rejected", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto send(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.APPROVED) {
+            throw new BusinessException("Only approved quotes can be sent", "INVALID_STATUS_TRANSITION");
+        }
+
+        quote.setStatus(QuoteStatus.SENT);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} sent", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto accept(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.SENT) {
+            throw new BusinessException("Only sent quotes can be accepted", "INVALID_STATUS_TRANSITION");
+        }
+
+        quote.setStatus(QuoteStatus.ACCEPTED);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} accepted", saved.getQuoteNumber());
+
+        eventPublisher.publishQuoteAccepted(QuoteAcceptedEvent.builder()
+                .quoteNumber(saved.getQuoteNumber())
+                .quoteUuid(saved.getUuid())
+                .customerExternalId(saved.getCustomerExternalId())
+                .dealExternalId(saved.getDealExternalId())
+                .dealType(saved.getDealType().name())
+                .totalAmount(saved.getTotalAmount())
+                .arr(saved.getArr())
+                .tcv(saved.getTcv())
+                .acv(saved.getAcv())
+                .currency(saved.getCurrency())
+                .durationInMonths(saved.getDurationInMonths())
+                .acceptedAt(Instant.now())
+                .build());
+
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto expire(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() != QuoteStatus.SENT) {
+            throw new BusinessException("Only sent quotes can expire", "INVALID_STATUS_TRANSITION");
+        }
+
+        quote.setStatus(QuoteStatus.EXPIRED);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} expired", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto cancel(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if (quote.getStatus() == QuoteStatus.ACCEPTED) {
+            throw new BusinessException("Cannot cancel an accepted quote", "CANNOT_CANCEL_ACCEPTED");
+        }
+
+        quote.setStatus(QuoteStatus.CANCELLED);
+        Quote saved = quoteRepository.save(quote);
+        log.info("Quote {} cancelled", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    public QuoteDto clone(Long id) {
+        Quote original = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        Quote cloned = Quote.builder()
+                .quoteNumber(quoteNumberGenerator.generate())
+                .name(original.getName() + " (Copy)")
+                .description(original.getDescription())
+                .customerExternalId(original.getCustomerExternalId())
+                .dealExternalId(original.getDealExternalId())
+                .status(QuoteStatus.DRAFT)
+                .dealType(original.getDealType())
+                .subscriptionType(original.getSubscriptionType())
+                .currency(original.getCurrency())
+                .region(original.getRegion())
+                .durationInMonths(original.getDurationInMonths())
+                .startDate(original.getStartDate())
+                .endDate(original.getEndDate())
+                .notes(original.getNotes())
+                .build();
+
+        Quote saved = quoteRepository.save(cloned);
+        log.info("Cloned quote {} to {}", original.getQuoteNumber(), saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    /**
+     * Calculate quote pricing by invoking pricing-service and persisting results.
+     */
+    public QuoteDto calculate(Long id) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        if (lineItems.isEmpty()) {
+            throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
+        }
+
+        Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
+        JsonNode pricingApiResponse;
+        try {
+            pricingApiResponse = pricingServiceClient.executePricing(pricingContext);
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call pricing service: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "PRICING_SERVICE_UNAVAILABLE"
+            );
+        }
+
+        JsonNode wrapperSuccessNode = pricingApiResponse.path("success");
+        if (!wrapperSuccessNode.asBoolean(false)) {
+            throw new BusinessException(
+                    pricingApiResponse.path("message").asText("Pricing execution failed"),
+                    "PRICING_EXECUTION_FAILED"
+            );
+        }
+
+        JsonNode pricingData = pricingApiResponse.path("data");
+        if (!pricingData.path("success").asBoolean(false)) {
+            throw new BusinessException(
+                    pricingData.path("errorMessage").asText("Pricing execution failed"),
+                    "PRICING_EXECUTION_FAILED"
+            );
+        }
+
+        Map<String, ArrayDeque<JsonNode>> pricingResultByLine = indexLineResults(pricingData.path("lineResults"));
+
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (QuoteLineItem lineItem : lineItems) {
+            String key = lineKey(lineItem.getProductExternalId(), lineItem.getLineItemType());
+            ArrayDeque<JsonNode> queue = pricingResultByLine.get(key);
+            JsonNode lineResult = queue != null ? queue.pollFirst() : null;
+
+            if (lineResult == null) {
+                throw new BusinessException(
+                        "Pricing result missing for line item " + lineItem.getProductExternalId(),
+                        "PRICING_RESULT_MISMATCH"
+                );
+            }
+
+            BigDecimal quantity = BigDecimal.valueOf(lineItem.getQuantity());
+            BigDecimal listPrice = decimalValue(lineResult.path("listPrice"), lineItem.getListPrice());
+            BigDecimal unitPrice = decimalValue(lineResult.path("unitPrice"), listPrice);
+            BigDecimal lineDiscount = decimalValue(lineResult.path("discountAmount"), BigDecimal.ZERO);
+            BigDecimal lineFinal = decimalValue(
+                    lineResult.path("finalPrice"),
+                    unitPrice.multiply(quantity)
+            );
+            BigDecimal netUnit = quantity.signum() > 0
+                    ? lineFinal.divide(quantity, 4, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            lineItem.setListPrice(listPrice);
+            lineItem.setUnitPrice(unitPrice);
+            lineItem.setDiscountRate(decimalValue(lineResult.path("discountRate"), BigDecimal.ZERO));
+            lineItem.setDiscountAmount(lineDiscount);
+            lineItem.setNetPrice(netUnit);
+            lineItem.setExtendedAmount(lineFinal);
+
+            JsonNode explanationCodes = lineResult.path("explanationCodes");
+            if (explanationCodes.isArray() && !explanationCodes.isEmpty()) {
+                lineItem.setPricingExplanationCode(explanationCodes.get(0).asText());
+            } else {
+                lineItem.setPricingExplanationCode(null);
+            }
+
+            subtotal = subtotal.add(listPrice.multiply(quantity));
+            totalDiscount = totalDiscount.add(lineDiscount);
+            totalAmount = totalAmount.add(lineFinal);
+        }
+
+        quoteLineItemRepository.saveAll(lineItems);
+
+        quote.setSubtotal(subtotal);
+        quote.setTotalDiscount(totalDiscount);
+        quote.setTotalAmount(totalAmount);
+
+        JsonNode financialMetrics = pricingData.path("financialMetrics");
+        quote.setArr(decimalValue(financialMetrics.path("arr"), quote.getArr()));
+        quote.setTcv(decimalValue(financialMetrics.path("tcv"), quote.getTcv()));
+        quote.setAcv(decimalValue(financialMetrics.path("acv"), quote.getAcv()));
+
+        String approvalState = pricingData.path("approvalState").asText(null);
+        if (approvalState != null && !approvalState.isBlank()) {
+            try {
+                quote.setApprovalState(ApprovalState.valueOf(approvalState));
+            } catch (IllegalArgumentException ignored) {
+                log.warn("Unknown approval state from pricing service: {}", approvalState);
+            }
+        }
+
+        quote.setApprovalTier(pricingData.path("approvalTier").asText(null));
+
+        JsonNode waterfall = pricingData.path("waterfall");
+        if (!waterfall.isMissingNode() && !waterfall.isNull()) {
+            try {
+                quote.setPricingWaterfallJson(objectMapper.writeValueAsString(waterfall));
+            } catch (JsonProcessingException ex) {
+                log.warn("Unable to serialize pricing waterfall for quote {}: {}", quote.getQuoteNumber(), ex.getMessage());
+            }
+        }
+
+        Quote saved = quoteRepository.save(quote);
+        log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    private Map<String, Object> buildPricingContext(Quote quote, List<QuoteLineItem> lineItems) {
+        List<Map<String, Object>> contextLineItems = lineItems.stream()
+                .map(item -> {
+                    Map<String, Object> line = new HashMap<>();
+                    line.put("productExternalId", item.getProductExternalId());
+                    line.put("lineItemType", item.getLineItemType());
+                    line.put("quantity", item.getQuantity());
+                    return line;
+                })
+                .toList();
+
+        Map<String, Object> context = new HashMap<>();
+        context.put("customerExternalId", quote.getCustomerExternalId());
+        context.put("quoteExternalId", quote.getQuoteNumber());
+        context.put("lineItems", contextLineItems);
+        context.put("region", quote.getRegion());
+        context.put("currency", quote.getCurrency());
+        context.put("durationInMonths", quote.getDurationInMonths());
+        context.put("subscriptionType", quote.getSubscriptionType());
+        return context;
+    }
+
+    private Map<String, ArrayDeque<JsonNode>> indexLineResults(JsonNode lineResults) {
+        Map<String, ArrayDeque<JsonNode>> indexed = new HashMap<>();
+        if (!lineResults.isArray()) {
+            return indexed;
+        }
+
+        for (JsonNode lineResult : lineResults) {
+            String key = lineKey(
+                    lineResult.path("productExternalId").asText(null),
+                    lineResult.path("lineItemType").asText(null)
+            );
+            indexed.computeIfAbsent(key, ignored -> new ArrayDeque<>()).addLast(lineResult);
+        }
+        return indexed;
+    }
+
+    private String lineKey(String productExternalId, String lineItemType) {
+        return (Objects.toString(productExternalId, "") + "::" + Objects.toString(lineItemType, "")).toLowerCase();
+    }
+
+    private BigDecimal decimalValue(JsonNode node, BigDecimal fallback) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return fallback;
+        }
+
+        String raw = node.asText(null);
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+
+        try {
+            return new BigDecimal(raw);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+}

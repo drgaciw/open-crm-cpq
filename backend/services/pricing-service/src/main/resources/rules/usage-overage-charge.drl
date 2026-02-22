@@ -1,0 +1,19 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+rule "Usage Overage Charge"
+salience 610
+when
+    $quote: QuoteFact($meta: metadata)
+    eval($quote.getInt("includedUnits") < $quote.getInt("actualUnits"))
+then
+    int includedUnits = $quote.getInt("includedUnits");
+    int actualUnits = $quote.getInt("actualUnits");
+    int overageUnits = actualUnits - includedUnits;
+    BigDecimal overageRate = $quote.getDecimal("overageRate");
+    BigDecimal overageAmount = overageRate.multiply(BigDecimal.valueOf(overageUnits));
+    $quote.setDecimal("overageAmount", overageAmount);
+    $quote.setString("explanationCode", "USAGE_OVERAGE_APPLIED");
+end

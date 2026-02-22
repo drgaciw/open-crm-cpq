@@ -1,0 +1,20 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import com.opencrm.rules.model.CustomerFact;
+import java.math.BigDecimal;
+
+rule "Renewal Uplift and Retention Offer"
+salience 530
+when
+    $quote: QuoteFact(customer != null, $cust: customer)
+    eval("RENEWAL".equals($quote.getString("dealType")))
+then
+    BigDecimal baseUplift = new BigDecimal("0.08");
+    if ($cust.getChurnScore() != null && $cust.getChurnScore() > 70) {
+        baseUplift = new BigDecimal("0.03");
+        $quote.setString("retentionOffer", "ENABLE_12M_PRICE_PROTECTION");
+    }
+    $quote.setDecimal("renewalUpliftPct", baseUplift);
+    $quote.setString("explanationCode", "RENEWAL_UPLIFT_POLICY");
+end

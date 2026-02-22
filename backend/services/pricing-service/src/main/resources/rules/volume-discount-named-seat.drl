@@ -1,0 +1,20 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteLineItemFact;
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+rule "Named Seat Volume Discount"
+salience 620
+when
+    $qli: QuoteLineItemFact(lineItemType == "SAAS_SEAT_NAMED", $qty: quantity, $list: listPrice)
+    $quote: QuoteFact(this == $qli.quote, durationInMonths >= 12)
+then
+    BigDecimal discount = BigDecimal.ZERO;
+    if ($qty >= 1000) discount = new BigDecimal("0.18");
+    else if ($qty >= 500) discount = new BigDecimal("0.12");
+    else if ($qty >= 100) discount = new BigDecimal("0.07");
+
+    $qli.setDiscountRate(discount);
+    $qli.setFinalPrice($list.multiply(BigDecimal.ONE.subtract(discount)));
+end

@@ -1,0 +1,16 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+rule "Perpetual to SaaS Migration Credit"
+salience 560
+when
+    $quote: QuoteFact()
+    eval($quote.getBoolean("hasPerpetualEntitlement") && $quote.getBoolean("migrationProgramActive"))
+then
+    BigDecimal credit = $quote.getDecimal("perpetualBookValue")
+        .multiply(new BigDecimal("0.30"));
+    $quote.setDecimal("migrationCredit", credit);
+    $quote.setString("explanationCode", "MIGRATION_CREDIT_30");
+end

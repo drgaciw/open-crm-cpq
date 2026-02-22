@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Quote Proposal</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 40px; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+        .header h1 { color: #2563eb; font-size: 24px; margin: 0; }
+        .header .quote-number { color: #666; font-size: 14px; margin-top: 5px; }
+        .section { margin-bottom: 25px; }
+        .section h2 { color: #2563eb; font-size: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+        .info-grid { display: table; width: 100%; }
+        .info-row { display: table-row; }
+        .info-label { display: table-cell; font-weight: bold; padding: 4px 10px 4px 0; width: 150px; color: #555; }
+        .info-value { display: table-cell; padding: 4px 0; }
+        table.line-items { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.line-items th { background-color: #2563eb; color: white; text-align: left; padding: 8px; font-size: 11px; }
+        table.line-items td { border-bottom: 1px solid #e5e7eb; padding: 8px; font-size: 11px; }
+        table.line-items tr:nth-child(even) { background-color: #f9fafb; }
+        .totals { margin-top: 20px; text-align: right; }
+        .totals table { margin-left: auto; }
+        .totals td { padding: 4px 10px; }
+        .totals .total-label { font-weight: bold; color: #555; }
+        .totals .grand-total { font-size: 16px; color: #2563eb; font-weight: bold; border-top: 2px solid #2563eb; }
+        .footer { margin-top: 40px; text-align: center; color: #999; font-size: 10px; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Quote Proposal</h1>
+        <div class="quote-number" th:text="${quote.quoteNumber}">Q-20260101-0001</div>
+    </div>
+
+    <div class="section">
+        <h2>Quote Details</h2>
+        <div class="info-grid">
+            <div class="info-row">
+                <span class="info-label">Quote Name:</span>
+                <span class="info-value" th:text="${quote.name}">Enterprise License</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Customer:</span>
+                <span class="info-value" th:text="${quote.customerExternalId}">CUST-001</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Deal Type:</span>
+                <span class="info-value" th:text="${quote.dealType}">NEW</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Currency:</span>
+                <span class="info-value" th:text="${quote.currency}">USD</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Duration:</span>
+                <span class="info-value" th:text="${quote.durationInMonths + ' months'}">12 months</span>
+            </div>
+            <div class="info-row" th:if="${quote.startDate}">
+                <span class="info-label">Start Date:</span>
+                <span class="info-value" th:text="${quote.startDate}">2026-01-01</span>
+            </div>
+            <div class="info-row" th:if="${quote.endDate}">
+                <span class="info-label">End Date:</span>
+                <span class="info-value" th:text="${quote.endDate}">2026-12-31</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Line Items</h2>
+        <table class="line-items">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>Qty</th>
+                    <th>List Price</th>
+                    <th>Discount</th>
+                    <th>Net Price</th>
+                    <th>Extended</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="item, iter : ${lineItems}">
+                    <td th:text="${iter.index + 1}">1</td>
+                    <td th:text="${item.productName}">Product Name</td>
+                    <td th:text="${item.productType}">SAAS</td>
+                    <td th:text="${item.quantity}">10</td>
+                    <td th:text="'$' + ${#numbers.formatDecimal(item.listPrice, 1, 2)}">$100.00</td>
+                    <td th:text="${item.discountRate != null ? (#numbers.formatDecimal(item.discountRate * 100, 1, 1) + '%') : '0%'}">0%</td>
+                    <td th:text="'$' + ${#numbers.formatDecimal(item.netPrice != null ? item.netPrice : item.listPrice, 1, 2)}">$100.00</td>
+                    <td th:text="'$' + ${#numbers.formatDecimal(item.extendedAmount != null ? item.extendedAmount : 0, 1, 2)}">$1,000.00</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="totals">
+        <table>
+            <tr>
+                <td class="total-label">Subtotal:</td>
+                <td th:text="'$' + ${#numbers.formatDecimal(quote.subtotal, 1, 2)}">$0.00</td>
+            </tr>
+            <tr>
+                <td class="total-label">Discount:</td>
+                <td th:text="'-$' + ${#numbers.formatDecimal(quote.totalDiscount, 1, 2)}">-$0.00</td>
+            </tr>
+            <tr>
+                <td class="total-label">Tax:</td>
+                <td th:text="'$' + ${#numbers.formatDecimal(quote.totalTax, 1, 2)}">$0.00</td>
+            </tr>
+            <tr class="grand-total">
+                <td class="total-label">Total:</td>
+                <td th:text="'$' + ${#numbers.formatDecimal(quote.totalAmount, 1, 2)}">$0.00</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section" th:if="${quote.notes}">
+        <h2>Notes</h2>
+        <p th:text="${quote.notes}">No notes.</p>
+    </div>
+
+    <div class="footer">
+        <p>Generated by Open CRM CPQ | This quote is valid for 30 days from the date of issue.</p>
+    </div>
+</body>
+</html>

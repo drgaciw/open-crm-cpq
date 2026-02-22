@@ -1,0 +1,15 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+rule "Route Approval for Margin Exception"
+salience 930
+when
+    $quote: QuoteFact(finalPrice != null, basePrice != null)
+    eval($quote.getDecimal("estimatedMarginPct").compareTo(new BigDecimal("0.35")) < 0)
+then
+    $quote.setString("approvalState", "PENDING");
+    $quote.setString("approvalTier", "DEAL_DESK");
+    $quote.setString("explanationCode", "MARGIN_BELOW_FLOOR");
+end

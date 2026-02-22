@@ -1,0 +1,15 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteLineItemFact;
+import java.math.BigDecimal;
+
+rule "Perpetual Maintenance Price"
+salience 580
+when
+    $qli: QuoteLineItemFact(lineItemType == "ONPREM_PERPETUAL", $licensePrice: listPrice)
+then
+    BigDecimal maintenancePct = new BigDecimal("0.22");
+    BigDecimal maintenanceAmount = $licensePrice.multiply(maintenancePct);
+    $qli.setDecimal("maintenanceAmount", maintenanceAmount);
+    $qli.setString("maintenanceTier", "STANDARD");
+end

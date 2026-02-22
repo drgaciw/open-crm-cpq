@@ -1,0 +1,17 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteLineItemFact;
+import java.math.BigDecimal;
+
+rule "Core License Pack Floor"
+salience 590
+when
+    $qli: QuoteLineItemFact(lineItemType == "ONPREM_CORE")
+    eval($qli.getInt("coreCount") > 0)
+then
+    int coreCount = $qli.getInt("coreCount");
+    int minPack = 16;
+    int billableCores = ((coreCount + minPack - 1) / minPack) * minPack;
+    $qli.setInt("billableCores", billableCores);
+    $qli.setString("explanationCode", "CORE_PACK_ROUND_UP");
+end

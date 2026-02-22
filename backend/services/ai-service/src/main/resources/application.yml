@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: ai-service
+  
+  # Redis State Store
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  
+  # DB for Audit Logger
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:opencrm}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    hikari:
+      schema: ai
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ai
+
+  # Azure OpenAI Configuration
+  ai:
+    azure:
+      openai:
+        api-key: ${AZURE_OPENAI_API_KEY:mock-key}
+        endpoint: ${AZURE_OPENAI_ENDPOINT:https://mock-endpoint.openai.azure.com}
+        chat:
+          options:
+            deployment-name: gpt-4o
+
+server:
+  port: 8086
+
+logging:
+  level:
+    com.opencrm.ai: DEBUG

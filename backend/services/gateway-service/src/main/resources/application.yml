@@ -1,0 +1,195 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+        - name: RequestRateLimiter
+          args:
+            key-resolver: "#{@clientKeyResolver}"
+            redis-rate-limiter.replenishRate: ${RATE_LIMIT_REPLENISH_RATE:50}
+            redis-rate-limiter.burstCapacity: ${RATE_LIMIT_BURST_CAPACITY:100}
+            redis-rate-limiter.requestedTokens: ${RATE_LIMIT_REQUESTED_TOKENS:1}
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:4200"
+              - "https://*.azurewebsites.net"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      routes:
+        # CRM Service routes (use direct URI for MVP, lb:// for production with service discovery)
+        - id: crm-service
+          uri: ${CRM_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/activities/**
+          filters:
+            - CircuitBreaker=name=crmCircuitBreaker,fallbackUri=forward:/fallback/crm
+
+        # Pricing Service routes
+        - id: pricing-service
+          uri: ${PRICING_SERVICE_URI:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**,/api/v1/price-books/**
+          filters:
+            - CircuitBreaker=name=pricingCircuitBreaker,fallbackUri=forward:/fallback/pricing
+
+        # Product Service routes
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
+          filters:
+            - CircuitBreaker=name=productCircuitBreaker,fallbackUri=forward:/fallback/product
+
+        # Quote Service routes
+        - id: quote-service
+          uri: ${QUOTE_SERVICE_URI:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/quotes/**
+          filters:
+            - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
+
+        # Communication Service routes
+        - id: communication-service
+          uri: ${COMMUNICATION_SERVICE_URI:lb://communication-service}
+          predicates:
+            - Path=/api/v1/emails/**,/api/v1/calls/**,/api/v1/templates/**
+          filters:
+            - CircuitBreaker=name=communicationCircuitBreaker,fallbackUri=forward:/fallback/communication
+
+        # AI Service routes
+        - id: ai-service
+          uri: ${AI_SERVICE_URI:lb://ai-service}
+          predicates:
+            - Path=/api/v1/ai/**,/api/v1/copilot/**
+          filters:
+            - CircuitBreaker=name=aiCircuitBreaker,fallbackUri=forward:/fallback/ai
+
+  # Redis for rate limiting and caching
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  # Security configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AZURE_AD_B2C_ISSUER_URI:https://login.microsoftonline.com/common/v2.0}
+          jwk-set-uri: ${AZURE_AD_B2C_JWK_SET_URI:https://login.microsoftonline.com/common/discovery/v2.0/keys}
+
+security:
+  csrf:
+    allowed-origins:
+      - "http://localhost:4200"
+      - "https://*.azurewebsites.net"
+
+# Azure AD B2C Configuration
+azure:
+  activedirectory:
+    b2c:
+      enabled: ${AZURE_AD_B2C_ENABLED:false}
+      base-uri: ${AZURE_AD_B2C_BASE_URI:}
+      tenant-id: ${AZURE_AD_B2C_TENANT_ID:}
+      client-id: ${AZURE_AD_B2C_CLIENT_ID:}
+      client-secret: ${AZURE_AD_B2C_CLIENT_SECRET:}
+
+# Resilience4j Circuit Breaker
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+    instances:
+      crmCircuitBreaker:
+        baseConfig: default
+      pricingCircuitBreaker:
+        baseConfig: default
+      productCircuitBreaker:
+        baseConfig: default
+      quoteCircuitBreaker:
+        baseConfig: default
+      communicationCircuitBreaker:
+        baseConfig: default
+      aiCircuitBreaker:
+        baseConfig: default
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+    gateway:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.90, 0.95, 0.99
+      slo:
+        http.server.requests: 50ms, 100ms, 200ms, 500ms
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: DEBUG
+    com.opencrm: DEBUG
+
+---
+# Development profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  cloud:
+    gateway:
+      routes:
+        - id: crm-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/activities/**
+
+        - id: pricing-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**,/api/v1/price-books/**
+
+        - id: product-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
+
+        - id: quote-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/quotes/**

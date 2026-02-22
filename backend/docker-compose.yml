@@ -1,0 +1,250 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: opencrm-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opencrm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: opencrm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-opencrm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: opencrm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CRM Service
+  crm-service:
+    build:
+      context: ./services/crm-service
+      dockerfile: Dockerfile
+    container_name: opencrm-crm-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=crm
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_FLYWAY_SCHEMAS: crm
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER:-opencrm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SECURITY_OPEN: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # Pricing Service
+  pricing-service:
+    build:
+      context: ./services/pricing-service
+      dockerfile: Dockerfile
+    container_name: opencrm-pricing-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_FLYWAY_SCHEMAS: pricing
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER:-opencrm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SECURITY_OPEN: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # Product Service
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    container_name: opencrm-product-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=product
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_FLYWAY_SCHEMAS: product
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER:-opencrm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SECURITY_OPEN: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # Quote Service
+  quote-service:
+    build:
+      context: ./services/quote-service
+      dockerfile: Dockerfile
+    container_name: opencrm-quote-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=quote
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_FLYWAY_SCHEMAS: quote
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER:-opencrm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SECURITY_OPEN: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PRICING_SERVICE_URL: http://pricing-service:8082
+      PRODUCT_SERVICE_URL: http://product-service:8083
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pricing-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # API Gateway Service
+  gateway-service:
+    build:
+      context: ./services/gateway-service
+      dockerfile: Dockerfile
+    container_name: opencrm-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      CRM_SERVICE_URI: http://crm-service:8081
+      PRICING_SERVICE_URI: http://pricing-service:8082
+      PRODUCT_SERVICE_URI: http://product-service:8083
+      QUOTE_SERVICE_URI: http://quote-service:8084
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AZURE_AD_B2C_ENABLED: "false"
+    depends_on:
+      crm-service:
+        condition: service_healthy
+      pricing-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      quote-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: opencrm-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@opencrm.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: opencrm-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8085:8081"
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: opencrm-network

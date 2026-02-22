@@ -1,0 +1,39 @@
+package com.opencrm.quote.quote;
+
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class QuoteUpdateRequest {
+
+    @Size(max = 255, message = "Name must not exceed 255 characters")
+    private String name;
+
+    private String description;
+
+    private String dealExternalId;
+
+    private String subscriptionType;
+
+    @Size(max = 3)
+    private String currency;
+
+    @Size(max = 20)
+    private String region;
+
+    private Integer durationInMonths;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
+
+    private String notes;
+}

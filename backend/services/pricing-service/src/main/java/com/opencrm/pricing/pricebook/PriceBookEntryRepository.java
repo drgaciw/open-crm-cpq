@@ -1,0 +1,27 @@
+package com.opencrm.pricing.pricebook;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository for PriceBookEntry entity.
+ */
+@Repository
+public interface PriceBookEntryRepository extends JpaRepository<PriceBookEntry, Long> {
+
+    Optional<PriceBookEntry> findByIdAndDeletedFalse(Long id);
+
+    Optional<PriceBookEntry> findByIdAndPriceBookIdAndDeletedFalse(Long id, Long priceBookId);
+
+    List<PriceBookEntry> findByPriceBookIdAndDeletedFalse(Long priceBookId);
+
+    Page<PriceBookEntry> findByPriceBookIdAndDeletedFalse(Long priceBookId, Pageable pageable);
+
+    Optional<PriceBookEntry> findByPriceBookIdAndProductExternalIdAndDeletedFalse(
+            Long priceBookId, String productExternalId);
+}
