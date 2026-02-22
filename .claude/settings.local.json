@@ -58,7 +58,12 @@
       "Bash(export:*)",
       "Bash(bash mvnw clean compile:*)",
       "Bash(powershell:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(git clone:*)",
+      "Bash(test:*)",
+      "Bash(python3:*)",
+      "Bash(./mvnw.cmd:*)",
+      "Bash(mvnw.cmd:*)"
     ]
   }
 }
