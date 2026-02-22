@@ -179,6 +179,7 @@ export class DealFormComponent implements OnInit {
       name: ['', Validators.required],
       amount: [null],
       stage: ['PROSPECTING'],
+      probability: [10, [Validators.min(0), Validators.max(100)]],
       expectedCloseDate: [null],
       contactSearch: [''],
       orgSearch: [''],
@@ -193,7 +194,7 @@ export class DealFormComponent implements OnInit {
         const d = this.dealService.selectedDeal();
         if (d) {
           this.form.patchValue({
-            name: d.name, amount: d.amount, stage: d.stage,
+            name: d.name, amount: d.amount, stage: d.stage, probability: d.probability,
             expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
             contactSearch: d.primaryContactName ?? '', orgSearch: d.organizationName ?? '',
             description: d.description,

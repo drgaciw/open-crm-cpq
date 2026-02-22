@@ -31,7 +31,6 @@ public class QuoteDocument extends BaseEntity {
     @Builder.Default
     private String contentType = "application/pdf";
 
-    @Lob
     @Column(name = "content")
     private byte[] content;
 

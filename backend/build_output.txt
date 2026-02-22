@@ -1,0 +1,316 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Open CRM Backend                                                   [pom]
+[INFO] Common Library                                                     [jar]
+[INFO] Security Library                                                   [jar]
+[INFO] Rules Engine Library                                               [jar]
+[INFO] CRM Service                                                        [jar]
+[INFO] Gateway Service                                                    [jar]
+[INFO] Pricing Service                                                    [jar]
+[INFO] Product Service                                                    [jar]
+[INFO] Quote Service                                                      [jar]
+[INFO] AI Service                                                         [jar]
+[INFO] 
+[INFO] --------------------< com.opencrm:open-crm-backend >--------------------
+[INFO] Building Open CRM Backend 1.0.0-SNAPSHOT                          [1/10]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ open-crm-backend ---
+[INFO] 
+[INFO] -------------------------< com.opencrm:common >-------------------------
+[INFO] Building Common Library 1.0.0-SNAPSHOT                            [2/10]
+[INFO]   from libs\common\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ common ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\common\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ common ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\common\src\main\resources
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\common\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ common ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 4 source files with javac [debug release 21] to target\classes
+[WARNING] The following options were not recognized by any processor: '[mapstruct.defaultComponentModel]'
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ common ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\common\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ common ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ common ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ common ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\common\target\common-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ common ---
+[INFO] 
+[INFO] ------------------------< com.opencrm:security >------------------------
+[INFO] Building Security Library 1.0.0-SNAPSHOT                          [3/10]
+[INFO]   from libs\security\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ security ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\security\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ security ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\security\src\main\resources
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\security\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ security ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 2 source files with javac [debug release 21] to target\classes
+[WARNING] The following options were not recognized by any processor: '[mapstruct.defaultComponentModel]'
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ security ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\security\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ security ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ security ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ security ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\security\target\security-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ security ---
+[INFO] 
+[INFO] ----------------------< com.opencrm:rules-engine >----------------------
+[INFO] Building Rules Engine Library 1.0.0-SNAPSHOT                      [4/10]
+[INFO]   from libs\rules-engine\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ rules-engine ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\rules-engine\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ rules-engine ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\rules-engine\src\main\resources
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\rules-engine\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ rules-engine ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 20 source files with javac [debug release 21] to target\classes
+[WARNING] The following options were not recognized by any processor: '[mapstruct.defaultComponentModel]'
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ rules-engine ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\rules-engine\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ rules-engine ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ rules-engine ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ rules-engine ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\libs\rules-engine\target\rules-engine-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ rules-engine ---
+[INFO] 
+[INFO] ----------------------< com.opencrm:crm-service >-----------------------
+[INFO] Building CRM Service 1.0.0-SNAPSHOT                               [5/10]
+[INFO]   from services\crm-service\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ crm-service ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\services\crm-service\target
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (prepare-agent) @ crm-service ---
+[INFO] argLine set to -javaagent:C:\\Users\\dgorn\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.11\\org.jacoco.agent-0.8.11-runtime.jar=destfile=C:\\Users\\dgorn\\my-code\\open-crm-cpq\\backend\\services\\crm-service\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ crm-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ crm-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 46 source files with javac [debug release 21] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ crm-service ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ crm-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 10 source files with javac [debug release 21] to target\test-classes
+[WARNING] The following options were not recognized by any processor: '[mapstruct.defaultComponentModel]'
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ crm-service ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (report) @ crm-service ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ crm-service ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\services\crm-service\target\crm-service-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ crm-service ---
+[INFO] Replacing main artifact C:\Users\dgorn\my-code\open-crm-cpq\backend\services\crm-service\target\crm-service-1.0.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to C:\Users\dgorn\my-code\open-crm-cpq\backend\services\crm-service\target\crm-service-1.0.0-SNAPSHOT.jar.original
+[INFO] 
+[INFO] --------------------< com.opencrm:gateway-service >---------------------
+[INFO] Building Gateway Service 1.0.0-SNAPSHOT                           [6/10]
+[INFO]   from services\gateway-service\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ gateway-service ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\services\gateway-service\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ gateway-service ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ gateway-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 5 source files with javac [debug release 21] to target\classes
+[WARNING] The following options were not recognized by any processor: '[mapstruct.defaultComponentModel]'
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ gateway-service ---
+[INFO] skip non existing resourceDirectory C:\Users\dgorn\my-code\open-crm-cpq\backend\services\gateway-service\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ gateway-service ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ gateway-service ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ gateway-service ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\services\gateway-service\target\gateway-service-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ gateway-service ---
+[INFO] Replacing main artifact C:\Users\dgorn\my-code\open-crm-cpq\backend\services\gateway-service\target\gateway-service-1.0.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to C:\Users\dgorn\my-code\open-crm-cpq\backend\services\gateway-service\target\gateway-service-1.0.0-SNAPSHOT.jar.original
+[INFO] 
+[INFO] --------------------< com.opencrm:pricing-service >---------------------
+[INFO] Building Pricing Service 1.0.0-SNAPSHOT                           [7/10]
+[INFO]   from services\pricing-service\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ pricing-service ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\services\pricing-service\target
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (prepare-agent) @ pricing-service ---
+[INFO] argLine set to -javaagent:C:\\Users\\dgorn\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.11\\org.jacoco.agent-0.8.11-runtime.jar=destfile=C:\\Users\\dgorn\\my-code\\open-crm-cpq\\backend\\services\\pricing-service\\target\\jacoco.exec
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ pricing-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 10 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ pricing-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 66 source files with javac [debug release 21] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ pricing-service ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ pricing-service ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ pricing-service ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jacoco:0.8.11:report (report) @ pricing-service ---
+[INFO] Skipping JaCoCo execution due to missing execution data file.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ pricing-service ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\services\pricing-service\target\pricing-service-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ pricing-service ---
+[INFO] Replacing main artifact C:\Users\dgorn\my-code\open-crm-cpq\backend\services\pricing-service\target\pricing-service-1.0.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to C:\Users\dgorn\my-code\open-crm-cpq\backend\services\pricing-service\target\pricing-service-1.0.0-SNAPSHOT.jar.original
+[INFO] 
+[INFO] --------------------< com.opencrm:product-service >---------------------
+[INFO] Building Product Service 1.0.0-SNAPSHOT                           [8/10]
+[INFO]   from services\product-service\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ product-service ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\services\product-service\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ product-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ product-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 59 source files with javac [debug release 21] to target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ product-service ---
+[INFO] Copying 2 resources from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ product-service ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.1.2:test (default-test) @ product-service ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.3.0:jar (default-jar) @ product-service ---
+[INFO] Building jar: C:\Users\dgorn\my-code\open-crm-cpq\backend\services\product-service\target\product-service-1.0.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.2.2:repackage (repackage) @ product-service ---
+[INFO] Replacing main artifact C:\Users\dgorn\my-code\open-crm-cpq\backend\services\product-service\target\product-service-1.0.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to C:\Users\dgorn\my-code\open-crm-cpq\backend\services\product-service\target\product-service-1.0.0-SNAPSHOT.jar.original
+[INFO] 
+[INFO] ---------------------< com.opencrm:quote-service >----------------------
+[INFO] Building Quote Service 1.0.0-SNAPSHOT                             [9/10]
+[INFO]   from services\quote-service\pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ quote-service ---
+[INFO] Deleting C:\Users\dgorn\my-code\open-crm-cpq\backend\services\quote-service\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ quote-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ quote-service ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 48 source files with javac [debug release 21] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/Users/dgorn/my-code/open-crm-cpq/backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteNumberGenerator.java:[6,44] package org.springframework.retry.annotation does not exist
+[ERROR] /C:/Users/dgorn/my-code/open-crm-cpq/backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteNumberGenerator.java:[20,6] cannot find symbol
+  symbol:   class Retryable
+  location: class com.opencrm.quote.quote.QuoteNumberGenerator
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Open CRM Backend 1.0.0-SNAPSHOT:
+[INFO] 
+[INFO] Open CRM Backend ................................... SUCCESS [  0.139 s]
+[INFO] Common Library ..................................... SUCCESS [  4.250 s]
+[INFO] Security Library ................................... SUCCESS [  2.141 s]
+[INFO] Rules Engine Library ............................... SUCCESS [  2.408 s]
+[INFO] CRM Service ........................................ SUCCESS [  8.012 s]
+[INFO] Gateway Service .................................... SUCCESS [  2.300 s]
+[INFO] Pricing Service .................................... SUCCESS [  4.429 s]
+[INFO] Product Service .................................... SUCCESS [  4.111 s]
+[INFO] Quote Service ...................................... FAILURE [  3.204 s]
+[INFO] AI Service ......................................... SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  31.524 s
+[INFO] Finished at: 2026-02-22T07:14:43-06:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project quote-service: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/dgorn/my-code/open-crm-cpq/backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteNumberGenerator.java:[6,44] package org.springframework.retry.annotation does not exist
+[ERROR] /C:/Users/dgorn/my-code/open-crm-cpq/backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteNumberGenerator.java:[20,6] cannot find symbol
+[ERROR]   symbol:   class Retryable
+[ERROR]   location: class com.opencrm.quote.quote.QuoteNumberGenerator
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :quote-service

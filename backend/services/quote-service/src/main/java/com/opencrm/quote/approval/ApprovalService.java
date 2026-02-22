@@ -109,9 +109,9 @@ public class ApprovalService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ApprovalRequestDto> getPendingApprovals(Pageable pageable) {
-        return approvalRepository.findByStatusAndDeletedFalse(ApprovalStatus.PENDING, pageable)
-                .map(this::toDto);
+    public List<ApprovalRequestDto> getPendingApprovals() {
+        return approvalRepository.findByStatusAndDeletedFalse(ApprovalStatus.PENDING)
+                .stream().map(this::toDto).toList();
     }
 
     private ApprovalRequestDto toDto(ApprovalRequest a) {

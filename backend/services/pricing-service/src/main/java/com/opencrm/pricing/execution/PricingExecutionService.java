@@ -185,7 +185,7 @@ public class PricingExecutionService {
 
             return result;
 
-        } catch (ResourceNotFoundException | BusinessException e) {
+        } catch (BusinessException e) {
             throw e; // Let GlobalExceptionHandler map to proper HTTP status
         } catch (Exception e) {
             long executionTime = System.currentTimeMillis() - startTime;
