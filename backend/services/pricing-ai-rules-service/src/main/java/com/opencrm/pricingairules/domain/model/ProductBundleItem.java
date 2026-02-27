@@ -1,25 +1,18 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.ZonedDateTime;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "product_bundle_item", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductBundleItem {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_bundle_item_seq")
-    @SequenceGenerator(name = "product_bundle_item_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class ProductBundleItem extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "bundle_id", nullable = false)
@@ -31,12 +24,4 @@ public class ProductBundleItem {
 
     @Column(name = "quantity")
     private Integer quantity;
-
-    @Column(name = "created_at", updatable = false)
-    private ZonedDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = ZonedDateTime.now();
-    }
 }
