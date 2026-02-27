@@ -102,6 +102,9 @@ spring:
   jpa:
     show-sql: true
 
+security:
+  open: true
+
 logging:
   level:
     com.opencrm.pricingairules: DEBUG

@@ -38,6 +38,10 @@ then
     if (finalPrice.compareTo(minCommitment) < 0) {
         $quote.setFinalPrice(minCommitment);
         $quote.setDecimal("minimumCommitment", minCommitment);
-        $quote.setString("explanationCode", "ACV_MIN_COMMITMENT");
+        String existingCode = $quote.getString("explanationCode");
+        String newCode = (existingCode != null && !existingCode.isEmpty())
+            ? existingCode + "+ACV_MIN_COMMITMENT"
+            : "ACV_MIN_COMMITMENT";
+        $quote.setString("explanationCode", newCode);
     }
 end

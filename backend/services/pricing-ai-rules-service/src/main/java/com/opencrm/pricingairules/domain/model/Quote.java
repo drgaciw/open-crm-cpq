@@ -1,32 +1,26 @@
 package com.opencrm.pricingairules.domain.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "quote", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Quote {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "quote_seq")
-    @SequenceGenerator(name = "quote_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class Quote extends BaseEntity {
 
     @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
@@ -110,29 +104,13 @@ public class Quote {
     @Embedded
     private CustomerFeedback customerFeedback;
 
-    @Column(name = "created_at", updatable = false)
-    private ZonedDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private ZonedDateTime updatedAt;
-
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<QuoteLineItem> lineItems = new ArrayList<>();
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = ZonedDateTime.now();
-        updatedAt = ZonedDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = ZonedDateTime.now();
-    }
 
     /**
      * Get the total price of this quote
-     * 
+     *
      * @return the total price
      */
     public double getTotalPrice() {
@@ -146,7 +124,7 @@ public class Quote {
 
     /**
      * Get the discount amount for this quote
-     * 
+     *
      * @return the discount amount
      */
     public double getDiscountAmount() {

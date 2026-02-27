@@ -1,10 +1,9 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -13,16 +12,12 @@ import java.util.List;
 
 @Entity
 @Table(name = "rule_optimization", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class RuleOptimization {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_optimization_seq")
-    @SequenceGenerator(name = "rule_optimization_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class RuleOptimization extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "rule_id")
@@ -47,17 +42,10 @@ public class RuleOptimization {
     @Column(name = "applied")
     private Boolean applied;
 
-    @OneToMany(mappedBy = "optimization", cascade = CascadeType.ALL)
-    private List<OptimizationMetrics> metrics = new ArrayList<>();
-
-    @Column(name = "created_at", updatable = false)
-    private ZonedDateTime createdAt;
-
     @Column(name = "applied_at")
     private ZonedDateTime appliedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = ZonedDateTime.now();
-    }
+    @OneToMany(mappedBy = "optimization", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<OptimizationMetrics> metrics = new ArrayList<>();
 }
