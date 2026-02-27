@@ -1,27 +1,21 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "product_bundle", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductBundle {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_bundle_seq")
-    @SequenceGenerator(name = "product_bundle_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class ProductBundle extends BaseEntity {
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -36,22 +30,6 @@ public class ProductBundle {
     private String status;
 
     @OneToMany(mappedBy = "bundle", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<ProductBundleItem> bundleItems = new ArrayList<>();
-
-    @Column(name = "created_at", updatable = false)
-    private ZonedDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private ZonedDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = ZonedDateTime.now();
-        updatedAt = ZonedDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = ZonedDateTime.now();
-    }
 }

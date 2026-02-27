@@ -1,25 +1,18 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.ZonedDateTime;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "customer", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Customer {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "customer_seq")
-    @SequenceGenerator(name = "customer_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class Customer extends BaseEntity {
 
     @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
@@ -41,21 +34,4 @@ public class Customer {
 
     @Column(name = "churn_score")
     private Double churnScore;
-
-    @Column(name = "created_at", updatable = false)
-    private ZonedDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private ZonedDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = ZonedDateTime.now();
-        updatedAt = ZonedDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = ZonedDateTime.now();
-    }
 }

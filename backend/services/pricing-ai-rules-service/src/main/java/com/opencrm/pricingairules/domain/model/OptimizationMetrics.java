@@ -1,26 +1,20 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
 
 @Entity
 @Table(name = "optimization_metrics", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OptimizationMetrics {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "optimization_metrics_seq")
-    @SequenceGenerator(name = "optimization_metrics_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class OptimizationMetrics extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "optimization_id", nullable = false)
@@ -34,12 +28,4 @@ public class OptimizationMetrics {
 
     @Column(name = "improvement_pct", precision = 5, scale = 2)
     private BigDecimal improvementPct;
-
-    @Column(name = "tested_at", updatable = false)
-    private ZonedDateTime testedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        testedAt = ZonedDateTime.now();
-    }
 }

@@ -1,25 +1,18 @@
 package com.opencrm.pricingairules.domain.model;
 
+import com.opencrm.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.ZonedDateTime;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "rule_execution_metrics", schema = "pricing_ai_rules")
-@Data
-@Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class RuleExecutionMetrics {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_execution_metrics_seq")
-    @SequenceGenerator(name = "rule_execution_metrics_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
-    private Long id;
+@SuperBuilder
+public class RuleExecutionMetrics extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "rule_id")
@@ -41,12 +34,4 @@ public class RuleExecutionMetrics {
 
     @Column(name = "error_message")
     private String errorMessage;
-
-    @Column(name = "execution_date", updatable = false)
-    private ZonedDateTime executionDate;
-
-    @PrePersist
-    protected void onCreate() {
-        executionDate = ZonedDateTime.now();
-    }
 }
