@@ -669,40 +669,60 @@ The full 16-month roadmap (Section 9) is the long-term plan. **This MVP ships fi
 - OpenAPI/Swagger UI for all endpoints
 - Unit tests (80%+ service layer) + integration tests (TestContainers)
 - Docker Compose: all services running with one command
+- **Angular frontend (Nx monorepo):** CRM app with Dashboard, Contacts, Organizations, Leads, Deals views
+  - Nx monorepo workspace at `frontend/` (Angular 19+, standalone components)
+  - Feature libs: `crm/contacts`, `crm/leads`, `crm/deals`, `crm/organizations`, `crm/dashboard`
+  - Shared libs: `shared/models` (TypeScript interfaces), `shared/data-access` (HTTP services, interceptors)
+  - Material Design UI with responsive layout, search, pagination, sorting
+  - Deal Kanban board (pipeline view by stage)
+  - Proxied to Gateway at `:8080` in development
 
 **Out of Scope (deferred to later phases):**
 - Azure cloud infrastructure (local Docker only)
-- Angular frontend (API-first; Swagger UI is the initial "UI")
 - Communication service (Twilio, email, WhatsApp)
 - CPQ engine (products, pricing, quotes)
 - AI agents
 - Elasticsearch (use PostgreSQL `pg_trgm` for MVP search)
 - Kafka/Service Bus (synchronous REST between services for MVP)
 - Customer portal, admin console
+- NgRx global state management (services use Angular Signals for MVP)
 
 ### MVP Architecture
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                    Docker Compose                        │
-│                                                          │
-│  ┌──────────────┐    ┌──────────────┐                   │
-│  │   Swagger UI  │    │   pgAdmin    │                   │
-│  │   (auto)      │    │  :5050       │                   │
-│  └──────┬───────┘    └──────────────┘                   │
-│         │                                                │
-│  ┌──────▼───────┐    ┌──────────────┐                   │
-│  │   Gateway     │───>│  CRM Service │                   │
-│  │   :8080       │    │  :8081       │                   │
-│  └──────────────┘    └──────┬───────┘                   │
-│                             │                            │
-│            ┌────────────────┼────────────────┐          │
-│            │                │                │          │
-│     ┌──────▼──────┐ ┌──────▼──────┐         │          │
-│     │ PostgreSQL  │ │    Redis    │         │          │
-│     │ :5432       │ │    :6379   │         │          │
-│     └─────────────┘ └─────────────┘         │          │
-└────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                      Docker Compose                          │
+│                                                              │
+│  ┌──────────────────┐    ┌────────────┐  ┌──────────────┐  │
+│  │  Angular CRM App │    │ Swagger UI │  │   pgAdmin    │  │
+│  │  (npx nx serve)  │    │  (auto)    │  │  :5050       │  │
+│  │  :4200  [dev]    │    └─────┬──────┘  └──────────────┘  │
+│  └────────┬─────────┘         │                             │
+│           │ /api/v1/**        │                             │
+│  ┌────────▼───────────────────▼──┐    ┌──────────────┐     │
+│  │         Gateway Service        │───>│  CRM Service │     │
+│  │         :8080                  │    │  :8081       │     │
+│  └───────────────────────────────┘    └──────┬───────┘     │
+│                                              │              │
+│               ┌──────────────────────────────┤             │
+│               │                              │             │
+│     ┌─────────▼───┐              ┌───────────▼───┐        │
+│     │ PostgreSQL  │              │    Redis       │        │
+│     │ :5432       │              │    :6379       │        │
+│     └─────────────┘              └───────────────┘        │
+└────────────────────────────────────────────────────────────┘
+
+Angular Nx Monorepo structure (frontend/):
+  apps/crm                    → Main SPA (port 4200)
+  libs/crm/dashboard          → Dashboard with KPI cards & pipeline chart
+  libs/crm/contacts           → Contact list, detail, form
+  libs/crm/organizations      → Organization list, detail, form
+  libs/crm/leads              → Lead list, detail, form, lifecycle actions
+  libs/crm/deals              → Deal list, kanban board, detail, form
+  libs/shared/models          → TypeScript interfaces (mirrors backend DTOs)
+  libs/shared/data-access     → HTTP services, interceptors, loading/notification
+  libs/shared/ui              → Reusable UI components
+  libs/shared/utils           → Utility functions
 ```
 
 ### MVP API Endpoints
@@ -752,43 +772,85 @@ Dashboard:
 ### MVP Sprint Plan
 
 **Sprint 1 (Week 1-2): Foundation + Contact/Org APIs**
-- [ ] Flyway migration scripts (CRM schema)
-- [ ] application.yml for crm-service (DB, Redis, OpenAPI)
-- [ ] Contact: Repository, DTO, Mapper, Service, Controller
-- [ ] Organization: Repository, DTO, Mapper, Service, Controller
-- [ ] Global exception handler (@ControllerAdvice)
-- [ ] Unit tests for service layer
-- [ ] Integration tests with TestContainers
+- [x] Flyway migration scripts (CRM schema) ✅
+- [x] application.yml for crm-service (DB, Redis, OpenAPI) ✅
+- [x] Contact: Repository, DTO, Mapper, Service, Controller ✅
+- [x] Organization: Repository, DTO, Mapper, Service, Controller ✅
+- [x] Global exception handler (@ControllerAdvice) ✅
+- [ ] Unit tests for service layer (integration tests exist; unit tests with mocks needed)
+- [x] Integration tests with TestContainers ✅
 - [ ] Verify: `docker compose up` → Swagger UI shows endpoints
 
 **Sprint 2 (Week 3-4): Lead + Deal APIs**
-- [ ] Lead: Repository, DTO, Mapper, Service, Controller
-- [ ] Lead lifecycle endpoints (contact, qualify, convert, lose)
-- [ ] Deal: Repository, DTO, Mapper, Service, Controller
-- [ ] Deal pipeline endpoints (advance, win, lose)
-- [ ] Lead-to-Deal conversion logic
+- [x] Lead: Repository, DTO, Mapper, Service, Controller ✅
+- [x] Lead lifecycle endpoints (contact, qualify, convert, lose) ✅
+- [x] Deal: Repository, DTO, Mapper, Service, Controller ✅
+- [x] Deal pipeline endpoints (advance, win, lose) ✅
+- [x] Lead-to-Deal conversion logic ✅
 - [ ] Search/filter with Spring Data Specifications
-- [ ] Unit + integration tests
+- [x] Unit + integration tests (integration done; unit tests pending) ✅
 
 **Sprint 3 (Week 5-6): Gateway + Polish + Deploy**
-- [ ] Gateway Service: routing config to CRM Service
+- [x] Gateway Service: routing config to CRM Service ✅
 - [ ] JWT validation in Gateway (dev-mode token issuer)
-- [ ] Redis caching on read endpoints
-- [ ] Dashboard aggregate endpoints
+- [x] Redis caching on read endpoints (`@Cacheable` configured) ✅
+- [ ] Dashboard aggregate endpoints (`/api/v1/dashboard/pipeline`, `/api/v1/dashboard/lead-stats`)
 - [ ] API documentation polish (descriptions, examples)
-- [ ] Docker Compose: full stack runs with `docker compose up`
+- [ ] Docker Compose: full stack runs with `docker compose up` (add crm-service + gateway)
 - [ ] README with setup instructions
 - [ ] Performance baseline (response times, throughput)
 
+**Sprint 4 (Week 7-8): Angular Frontend — Core Views**
+- [x] Nx monorepo workspace (`frontend/`) initialized with Angular 19+ ✅
+- [x] Shared library scaffolding: `shared/models`, `shared/data-access`, `shared/ui`, `shared/utils` ✅
+- [x] TypeScript model interfaces mirroring backend DTOs ✅
+- [x] HTTP base service with signals, pagination, error handling ✅
+- [x] API proxy configuration (`proxy.conf.json` → Gateway :8080) ✅
+- [x] Shell layout: sidebar navigation, toolbar ✅
+- [x] App routing wired to feature libraries ✅
+- [x] Contacts: list (search, sort, paginate), detail, create/edit form ✅
+- [x] Organizations: list (search, sort, paginate), detail, create/edit form ✅
+- [ ] Wire `@CacheEvict` on all update/delete service methods (backend)
+
+**Sprint 5 (Week 9-10): Angular Frontend — Lead & Deal Pipeline**
+- [x] Leads: list with status-tab filter, search, sort, paginate ✅
+- [x] Lead: detail view with lifecycle action buttons (Contact, Qualify, Convert, Lose) ✅
+- [x] Lead: create/edit form ✅
+- [x] Deals: list view with filter by stage ✅
+- [x] Deals: Kanban board grouped by pipeline stage ✅
+- [x] Deals: detail view with advance/win/lose actions ✅
+- [x] Deals: create/edit form ✅
+- [ ] Lead-to-Deal conversion UI flow (trigger convert, navigate to new deal)
+
+**Sprint 6 (Week 11-12): Angular Frontend — Dashboard + Integration + E2E**
+- [x] Dashboard: KPI summary cards (total deals, pipeline value, recent leads, won value) ✅
+- [x] Dashboard: pipeline breakdown bar chart by stage ✅
+- [x] Dashboard: recent deals and recent leads tables ✅
+- [ ] Unit tests for Angular services (`ContactService`, `LeadService`, `DealService`)
+- [ ] Component tests for list and form components (Vitest + Angular Testing Library)
+- [ ] Docker Compose: add Angular dev container or build step
+- [ ] End-to-end smoke test: create org → contact → lead → qualify → convert → deal won (UI)
+- [ ] README frontend quickstart (`npm install`, `npx nx serve crm`)
+
 ### MVP Definition of Done
 
+**Backend**
 - [ ] All 20+ API endpoints functional and documented in Swagger
-- [ ] Lead full lifecycle works: create → contact → qualify → convert → deal won
+- [ ] Lead full lifecycle works via API: create → contact → qualify → convert → deal won
 - [ ] 80%+ unit test coverage on service layer
 - [ ] Integration tests pass with TestContainers
-- [ ] `docker compose up` starts the entire stack
+- [ ] `docker compose up` starts the entire backend stack (Gateway, CRM, PostgreSQL, Redis)
 - [ ] API response times < 100ms (p95) for CRUD operations
 - [ ] No N+1 query issues (verified with SQL logging)
+
+**Frontend**
+- [ ] `npx nx serve crm` launches Angular app connected to the backend via Gateway
+- [ ] Dashboard shows live data from CRM API
+- [ ] Full lead lifecycle can be executed end-to-end from the UI
+- [ ] Deal Kanban board reflects live pipeline stages
+- [ ] All CRUD views functional for Contacts, Organizations, Leads, Deals
+- [ ] Angular unit tests pass (`npx nx test crm`)
+- [ ] No console errors when navigating the full app flow
 
 ---
 
