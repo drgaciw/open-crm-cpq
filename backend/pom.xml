@@ -29,6 +29,15 @@
         <module>services/quote-service</module>
         <module>services/ai-service</module>
         <module>services/pricing-ai-rules-service</module>
+        <module>shared</module>
+        <module>product-catalog</module>
+        <module>configuration-engine</module>
+        <module>pricing-engine</module>
+        <module>quote-management</module>
+        <module>approval-routing</module>
+        <module>document-generation</module>
+        <module>contract-asset-management</module>
+        <module>api-gateway</module>
     </modules>
 
     <properties>
