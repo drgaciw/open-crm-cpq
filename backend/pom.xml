@@ -29,6 +29,7 @@
         <module>services/quote-service</module>
         <module>services/ai-service</module>
         <module>services/pricing-ai-rules-service</module>
+        <module>services/product-config-mgmt</module>
     </modules>
 
     <properties>
