@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.opencrm.common.grpc";
+option java_outer_classname = "PricingProto";
+
+package pricing;
+
+// Pricing service for synchronous price calculation
+service PricingService {
+  rpc CalculatePrice(PriceRequest) returns (PriceResponse);
+  rpc CalculateQuoteTotal(QuoteTotalRequest) returns (QuoteTotalResponse);
+}
+
+message PriceRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+  string currency_code = 3;
+  map<string, string> configuration = 4;
+  string customer_id = 5;
+}
+
+message PriceResponse {
+  string price_amount = 1;  // BigDecimal as string
+  string currency_code = 2;
+  string discount_amount = 3;  // BigDecimal as string
+  string final_amount = 4;  // BigDecimal as string
+  bool approval_required = 5;
+  string approval_reason = 6;
+}
+
+message QuoteTotalRequest {
+  string quote_id = 1;
+  repeated LineItem line_items = 2;
+}
+
+message LineItem {
+  string line_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+  string unit_price = 4;  // BigDecimal as string
+  string discount_percentage = 5;  // BigDecimal as string
+}
+
+message QuoteTotalResponse {
+  string subtotal = 1;  // BigDecimal as string
+  string total_discount = 2;  // BigDecimal as string
+  string tax_amount = 3;  // BigDecimal as string
+  string total_amount = 4;  // BigDecimal as string
+  string currency_code = 5;
+}

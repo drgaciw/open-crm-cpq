@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: contract-asset-management
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cpq_contract
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: contract-asset-management
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# Resilience4j rate limiter for ERP ACL
+resilience4j:
+  ratelimiter:
+    instances:
+      erpSync:
+        limit-for-period: 10
+        limit-refresh-period: 1s
+        timeout-duration: 5s
+
+server:
+  port: 8086
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
