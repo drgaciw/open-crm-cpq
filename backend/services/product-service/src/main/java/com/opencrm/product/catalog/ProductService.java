@@ -1,7 +1,13 @@
 package com.opencrm.product.catalog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.cpq.shared.event.ProductRetiredEvent;
+import com.opencrm.cpq.shared.kafka.CpqTopics;
+import com.opencrm.cpq.shared.outbox.OutboxEvent;
+import com.opencrm.cpq.shared.outbox.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -11,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,6 +27,8 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
     public ProductDto create(ProductCreateRequest request) {
         log.debug("Creating product with SKU: {}", request.getSku());
@@ -128,6 +138,41 @@ public class ProductService {
         product.setStatus(ProductStatus.DEPRECATED);
         Product updated = productRepository.save(product);
         log.info("Deprecated product ID: {}", id);
+        return productMapper.toDto(updated);
+    }
+
+    /**
+     * Retire a product. Valid transitions: ACTIVE→RETIRED or DEPRECATED→RETIRED.
+     * Publishes a ProductRetiredEvent via the Transactional Outbox pattern.
+     */
+    @CacheEvict(value = {"products", "products-by-sku"}, allEntries = true)
+    public ProductDto retire(Long id, String reasonCode) {
+        Product product = productRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+
+        if (product.getStatus() != ProductStatus.ACTIVE && product.getStatus() != ProductStatus.DEPRECATED) {
+            throw new BusinessException(
+                    "Only ACTIVE or DEPRECATED products can be retired (current: " + product.getStatus() + ")",
+                    "INVALID_STATUS_TRANSITION");
+        }
+
+        product.setStatus(ProductStatus.RETIRED);
+        Product updated = productRepository.save(product);
+
+        // Transactional Outbox: persist event in same transaction
+        ProductRetiredEvent event = new ProductRetiredEvent(
+                updated.getUuid(), Instant.now(), reasonCode);
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEvent outboxEvent = new OutboxEvent(
+                    "Product", updated.getUuid(),
+                    "ProductRetired", CpqTopics.PRODUCT_STATUS_RETIRED, payload);
+            outboxRepository.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException("Failed to serialize product retired event", "SERIALIZATION_ERROR");
+        }
+
+        log.info("Retired product ID: {} with reason: {}", id, reasonCode);
         return productMapper.toDto(updated);
     }
 }

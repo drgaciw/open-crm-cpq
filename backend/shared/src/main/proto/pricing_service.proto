@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package com.opencrm.cpq.grpc;
+
+option java_package = "com.opencrm.cpq.grpc";
+option java_outer_classname = "PricingServiceProto";
+option java_multiple_files = true;
+
+// gRPC service for low-latency Config→Pricing sync calls.
+// Per CPQ framework: gRPC is the required transport for internal sync calls
+// between Configuration Engine and Pricing Engine.
+
+service PricingGrpcService {
+  // Calculate price for a single configuration line item
+  rpc CalculatePrice (PriceRequest) returns (PriceResponse);
+
+  // Validate a discount against margin policies
+  rpc ValidateDiscount (DiscountValidationRequest) returns (DiscountValidationResponse);
+}
+
+message PriceRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+  string currency_code = 3;
+  string customer_id = 4;
+  string price_book_id = 5;
+  map<string, string> configuration_attributes = 6;
+}
+
+message PriceResponse {
+  string product_id = 1;
+  string list_price_amount = 2;  // String to preserve BigDecimal precision
+  string net_price_amount = 3;
+  string currency_code = 4;
+  repeated PriceAdjustment adjustments = 5;
+  bool requires_approval = 6;
+}
+
+message PriceAdjustment {
+  string rule_name = 1;
+  string adjustment_type = 2;   // DISCOUNT, SURCHARGE, OVERRIDE
+  string adjustment_amount = 3; // String for BigDecimal precision
+  string description = 4;
+}
+
+message DiscountValidationRequest {
+  string quote_id = 1;
+  string line_id = 2;
+  string requested_discount_percent = 3; // String for BigDecimal
+  string product_id = 4;
+  string customer_id = 5;
+}
+
+message DiscountValidationResponse {
+  bool approved = 1;
+  string max_allowed_discount = 2;  // String for BigDecimal
+  string margin_delta = 3;
+  bool requires_manual_approval = 4;
+  string reason = 5;
+}

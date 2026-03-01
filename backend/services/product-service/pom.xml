@@ -25,6 +25,17 @@
             <groupId>com.opencrm</groupId>
             <artifactId>security</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.opencrm</groupId>
+            <artifactId>cpq-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
 
         <!-- Spring Web -->
         <dependency>

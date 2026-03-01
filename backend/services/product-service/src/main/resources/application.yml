@@ -30,10 +30,20 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
   cache:
     type: redis
     redis:
       time-to-live: 600000
+
+cpq:
+  outbox:
+    poll-interval-ms: 1000
 
 springdoc:
   api-docs:
