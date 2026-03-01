@@ -1,5 +1,8 @@
 package com.opencrm.product.catalog;
 
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,6 +24,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     public ProductDto create(ProductCreateRequest request) {
         log.debug("Creating product with SKU: {}", request.getSku());
@@ -128,6 +134,32 @@ public class ProductService {
         product.setStatus(ProductStatus.DEPRECATED);
         Product updated = productRepository.save(product);
         log.info("Deprecated product ID: {}", id);
+        return productMapper.toDto(updated);
+    }
+    
+    @CacheEvict(value = {"products", "products-by-sku"}, allEntries = true)
+    public ProductDto retire(Long id, String reason) {
+        Product product = productRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+
+        // Use state machine method
+        product.retire(reason);
+        Product updated = productRepository.save(product);
+        
+        // Publish event via Transactional Outbox
+        ProductRetiredEvent event = new ProductRetiredEvent(
+                updated.getId().toString(),
+                updated.getRetiredAt(),
+                reason
+        );
+        outboxEventPublisher.publish(
+                "Product",
+                updated.getId().toString(),
+                KafkaTopics.PRODUCT_STATUS_RETIRED,
+                event
+        );
+        
+        log.info("Retired product ID: {} with reason: {}", id, reason);
         return productMapper.toDto(updated);
     }
 }

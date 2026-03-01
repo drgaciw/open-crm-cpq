@@ -3,6 +3,8 @@ package com.opencrm.quote.quote;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
@@ -43,6 +45,7 @@ public class QuoteService {
     private final QuoteLineItemRepository quoteLineItemRepository;
     private final PricingServiceClient pricingServiceClient;
     private final ObjectMapper objectMapper;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -459,5 +462,44 @@ public class QuoteService {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+    
+    /**
+     * Accept a quote and publish event via Transactional Outbox.
+     * Ensures synchronized totals before acceptance.
+     */
+    public QuoteDto acceptQuote(Long id) {
+        log.debug("Accepting quote ID: {}", id);
+        
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+        
+        // Recalculate totals to ensure synchronization
+        quote.recalculateTotals();
+        
+        // Use state machine method
+        quote.accept();
+        
+        Quote saved = quoteRepository.save(quote);
+        
+        // Publish event via Transactional Outbox
+        com.opencrm.common.event.dto.QuoteAcceptedEvent event = 
+                new com.opencrm.common.event.dto.QuoteAcceptedEvent(
+                        saved.getQuoteNumber(),
+                        saved.getAcceptedAt(),
+                        saved.getCustomerExternalId(),
+                        saved.getTotalAmount(),
+                        saved.getCurrency()
+                );
+        
+        outboxEventPublisher.publish(
+                "Quote",
+                saved.getQuoteNumber(),
+                KafkaTopics.QUOTE_STATUS_ACCEPTED,
+                event
+        );
+        
+        log.info("Accepted quote: {}", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
     }
 }

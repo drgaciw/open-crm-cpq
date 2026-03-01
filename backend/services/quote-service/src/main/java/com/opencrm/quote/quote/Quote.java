@@ -1,6 +1,7 @@
 package com.opencrm.quote.quote;
 
 import com.opencrm.common.entity.BaseEntity;
+import com.opencrm.common.valueobject.Money;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,6 +9,7 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,4 +120,53 @@ public class Quote extends BaseEntity {
     @SQLRestriction("is_deleted = false")
     @Builder.Default
     private List<QuoteLineItem> lineItems = new ArrayList<>();
+    
+    @Column(name = "accepted_at")
+    private Instant acceptedAt;
+    
+    /**
+     * Synchronized total calculation - ensures quote totals match line item sums.
+     * Constitutional requirement: totals must remain mathematically synchronized.
+     */
+    public void recalculateTotals() {
+        Money subtotalMoney = Money.zero(currency);
+        Money discountMoney = Money.zero(currency);
+        
+        for (QuoteLineItem item : lineItems) {
+            if (!item.isDeleted()) {
+                Money lineTotal = Money.of(item.getUnitPrice(), currency).multiply(item.getQuantity());
+                Money lineDiscount = lineTotal.percentage(item.getDiscountPercentage());
+                
+                subtotalMoney = subtotalMoney.add(lineTotal);
+                discountMoney = discountMoney.add(lineDiscount);
+            }
+        }
+        
+        Money taxMoney = subtotalMoney.subtract(discountMoney).percentage(BigDecimal.valueOf(10)); // 10% tax
+        Money totalMoney = subtotalMoney.subtract(discountMoney).add(taxMoney);
+        
+        this.subtotal = subtotalMoney.getAmount();
+        this.totalDiscount = discountMoney.getAmount();
+        this.totalTax = taxMoney.getAmount();
+        this.totalAmount = totalMoney.getAmount();
+    }
+    
+    /**
+     * State machine transition to ACCEPTED status.
+     */
+    public void accept() {
+        if (status != QuoteStatus.DRAFT && status != QuoteStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException("Can only accept quotes in DRAFT or PENDING_APPROVAL status");
+        }
+        this.status = QuoteStatus.ACCEPTED;
+        this.acceptedAt = Instant.now();
+    }
+    
+    /**
+     * Helper method to get Money objects for totals.
+     */
+    @Transient
+    public Money getTotalAmountMoney() {
+        return Money.of(totalAmount, currency);
+    }
 }

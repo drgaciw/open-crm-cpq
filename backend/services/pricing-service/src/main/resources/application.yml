@@ -37,6 +37,16 @@ spring:
     redis:
       time-to-live: 600000
       cache-null-values: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# gRPC server configuration
+grpc:
+  server:
+    port: 9090
 
 springdoc:
   api-docs:
