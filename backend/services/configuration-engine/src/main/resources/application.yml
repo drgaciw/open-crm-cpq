@@ -30,7 +30,7 @@ grpc:
       negotiationType: plaintext
 
 server:
-  port: 8082
+  port: 8088
 
 management:
   endpoints:

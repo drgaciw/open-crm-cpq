@@ -24,7 +24,7 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 server:
-  port: 8084
+  port: 8085
 
 management:
   endpoints:

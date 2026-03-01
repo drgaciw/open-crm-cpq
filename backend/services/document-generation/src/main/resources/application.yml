@@ -27,7 +27,7 @@ spring:
         queue-capacity: 100
 
 server:
-  port: 8085
+  port: 8086
 
 management:
   endpoints:
