@@ -100,6 +100,15 @@ public class ProductController {
         return ApiResponse.success(product, "Product deprecated successfully");
     }
 
+    @PostMapping("/{id}/retire")
+    @Operation(summary = "Retire a product (publishes cpq.product.status.retired event)")
+    public ApiResponse<ProductDto> retire(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        ProductDto product = productService.retire(id, reason);
+        return ApiResponse.success(product, "Product retired successfully");
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a product (soft delete)")

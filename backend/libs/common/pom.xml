@@ -52,6 +52,13 @@
             <version>${mapstruct.version}</version>
         </dependency>
 
+        <!-- Kafka (optional - for OutboxRelayPublisher) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Apache Commons -->
         <dependency>
             <groupId>org.apache.commons</groupId>

@@ -65,6 +65,38 @@ spring:
           filters:
             - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
 
+        # Configuration Engine routes
+        - id: configuration-engine
+          uri: ${CONFIGURATION_ENGINE_URI:http://localhost:8088}
+          predicates:
+            - Path=/api/v1/configurations/**
+          filters:
+            - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+
+        # Approval Routing routes
+        - id: approval-routing
+          uri: ${APPROVAL_ROUTING_URI:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/approvals/**
+          filters:
+            - CircuitBreaker=name=approvalCircuitBreaker,fallbackUri=forward:/fallback/approval
+
+        # Document Generation routes
+        - id: document-generation
+          uri: ${DOCUMENT_GENERATION_URI:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/documents/**
+          filters:
+            - CircuitBreaker=name=documentCircuitBreaker,fallbackUri=forward:/fallback/document
+
+        # Contract/Asset Management routes
+        - id: contract-asset-management
+          uri: ${CONTRACT_ASSET_MANAGEMENT_URI:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/subscriptions/**
+          filters:
+            - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
+
         # Communication Service routes
         - id: communication-service
           uri: ${COMMUNICATION_SERVICE_URI:lb://communication-service}
@@ -135,6 +167,14 @@ resilience4j:
       communicationCircuitBreaker:
         baseConfig: default
       aiCircuitBreaker:
+        baseConfig: default
+      configurationCircuitBreaker:
+        baseConfig: default
+      approvalCircuitBreaker:
+        baseConfig: default
+      documentCircuitBreaker:
+        baseConfig: default
+      contractCircuitBreaker:
         baseConfig: default
 
 # Actuator endpoints

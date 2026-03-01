@@ -29,6 +29,10 @@
         <module>services/quote-service</module>
         <module>services/ai-service</module>
         <module>services/pricing-ai-rules-service</module>
+        <module>services/configuration-engine</module>
+        <module>services/approval-routing</module>
+        <module>services/document-generation</module>
+        <module>services/contract-asset-management</module>
     </modules>
 
     <properties>
@@ -61,6 +65,14 @@
 
         <!-- Azure -->
         <spring-cloud-azure.version>5.8.0</spring-cloud-azure.version>
+
+        <!-- Kafka -->
+        <kafka.version>3.6.1</kafka.version>
+
+        <!-- gRPC -->
+        <grpc.version>1.60.1</grpc.version>
+        <protobuf.version>3.25.1</protobuf.version>
+        <grpc-spring-boot-starter.version>3.0.0.RELEASE</grpc-spring-boot-starter.version>
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
