@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package com.cpq.shared;
+
+option java_package = "com.cpq.shared.grpc";
+option java_multiple_files = true;
+
+// Empty shared.proto file to satisfy imports
+// This can be expanded with common message types as needed
