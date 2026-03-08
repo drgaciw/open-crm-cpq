@@ -1,4 +1,4 @@
-package com.opencrm.ai.agent.subscription;
+package com.opencrm.ai.agent.governance;
 
 import com.opencrm.ai.agent.AgentRequest;
 import com.opencrm.ai.agent.AgentResponse;
@@ -7,22 +7,22 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import java.util.Map;
 
-@Service("cpq-agent-021")
-public class UsagebasedPricingAgent implements CpqAgent {
+@Service("cpq-agent-024")
+public class MultiLevelApprovalRoutingAgent implements CpqAgent {
 
     @Override
     public String getAgentId() {
-        return "cpq-agent-021";
+        return "cpq-agent-024";
     }
 
     @Override
     public String getName() {
-        return "Usage-Based Pricing Agent";
+        return "Multi-Level Approval Routing Agent";
     }
 
     @Override
     public String getDescription() {
-        return "Metered/usage pricing and overage calculations";
+        return "Routing quotes for approval based on amount, discount, or margin";
     }
 
     @Override
@@ -32,7 +32,7 @@ public class UsagebasedPricingAgent implements CpqAgent {
             @Override
             public boolean isSuccess() { return true; }
             @Override
-            public String getOutput() { return "Simulated execution for Usage-Based Pricing Agent"; }
+            public String getOutput() { return "Simulated execution for Multi-Level Approval Routing Agent"; }
             @Override
             public Map<String, Object> getMetadata() { return Map.of("autonomy", "Automated"); }
         };
@@ -40,6 +40,6 @@ public class UsagebasedPricingAgent implements CpqAgent {
 
     @Override
     public Flux<String> stream(AgentRequest request) {
-        return Flux.just("Starting stream for Usage-Based Pricing Agent...", "Processing...", "Done");
+        return Flux.just("Starting stream for Multi-Level Approval Routing Agent...", "Processing...", "Done");
     }
 }
