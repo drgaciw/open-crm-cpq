@@ -132,10 +132,8 @@ public class DroolsServiceImpl implements DroolsService {
                     .build();
         }
 
-        String packageName = extractPackageName(ruleContent);
-        if (packageName == null) {
-            packageName = "dynamic.pricing.rules";
-        }
+        final String packageName = Optional.ofNullable(extractPackageName(ruleContent))
+                .orElse("dynamic.pricing.rules");
 
         RuleSet ruleSet = ruleSetRepository.findByName(packageName)
                 .orElseGet(() -> {

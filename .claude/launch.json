@@ -1,0 +1,65 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "docker-infra",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && docker compose up postgres redis --wait"],
+      "port": 5432
+    },
+    {
+      "name": "frontend-angular",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/frontend && npx nx serve crm"],
+      "port": 4200
+    },
+    {
+      "name": "frontend-cpq-beta",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/cpq_beta && yarn dev"],
+      "port": 5173
+    },
+    {
+      "name": "gateway-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security -DskipTests -q && cd services/gateway-service && ../../mvnw spring-boot:run"],
+      "port": 8080
+    },
+    {
+      "name": "crm-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security -DskipTests -q && cd services/crm-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8081
+    },
+    {
+      "name": "pricing-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security,libs/rules-engine -DskipTests -q && cd services/pricing-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8082
+    },
+    {
+      "name": "product-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security -DskipTests -q && cd services/product-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8083
+    },
+    {
+      "name": "quote-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security -DskipTests -q && cd services/quote-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8084
+    },
+    {
+      "name": "ai-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security -DskipTests -q && cd services/ai-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8086
+    },
+    {
+      "name": "pricing-ai-rules-service",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/vibrant-wu/backend && ./mvnw install -pl libs/common,libs/security,libs/rules-engine -DskipTests -q && cd services/pricing-ai-rules-service && DB_USERNAME=opencrm DB_PASSWORD=changeme ../../mvnw spring-boot:run"],
+      "port": 8087
+    }
+  ]
+}

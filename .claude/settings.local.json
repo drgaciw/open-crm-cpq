@@ -63,7 +63,18 @@
       "Bash(test:*)",
       "Bash(python3:*)",
       "Bash(./mvnw.cmd:*)",
-      "Bash(mvnw.cmd:*)"
+      "Bash(mvnw.cmd:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(cmd /C \"mvnw.cmd -pl services/pricing-ai-rules-service spring-boot:run 2>&1\")",
+      "Bash(cmd.exe /C \"mvnw.cmd -pl services/pricing-ai-rules-service help:describe -Dcmd=spring-boot:run 2>&1\")",
+      "Bash(./mvnw --version)",
+      "Bash(./mvnw -pl services/pricing-ai-rules-service -am package -DskipTests)",
+      "Bash(bash -c \"cd backend && ./mvnw --version\")",
+      "Bash(timeout 60 bash -c \"cd backend && ./mvnw -pl services/pricing-ai-rules-service -am spring-boot:run 2>&1\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(./mvnw install -pl libs/common,libs/security,libs/rules-engine -DskipTests -q)",
+      "Bash(../../mvnw spring-boot:run)",
+      "Bash(powershell.exe -Command \"Start-Process ''C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe''\")"
     ]
   }
 }
