@@ -1,0 +1,2162 @@
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/ai/rl/model/NumericParameterValue.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/ai/rl/model/NumericParameterValue.java
+deleted file mode 100644
+index 30d881d..0000000
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/ai/rl/model/NumericParameterValue.java
++++ /dev/null
+@@ -1,102 +0,0 @@
+-package com.opencrm.pricingairules.ai.rl.model;
+-
+-import lombok.Data;
+-import lombok.EqualsAndHashCode;
+-import lombok.NoArgsConstructor;
+-
+-/**
+- * Represents a numerical parameter value
+- */
+-@Data
+-@NoArgsConstructor
+-@EqualsAndHashCode(callSuper = true)
+-public class NumericParameterValue extends ParameterValue<Double> {
+-
+-    private double minValue;
+-    private double maxValue;
+-    private double step;
+-    private String unit;
+-    
+-    /**
+-     * Create a new numerical parameter value
+-     * 
+-     * @param name The parameter name
+-     * @param description The parameter description
+-     * @param value The current value
+-     * @param minValue The minimum allowed value
+-     * @param maxValue The maximum allowed value
+-     * @param step The step size for increments
+-     * @param unit The unit of measurement
+-     * @param optimizable Whether this parameter can be optimized
+-     * @param sensitivity How sensitive the system is to changes in this parameter (0-1)
+-     */
+-    public NumericParameterValue(String name, String description, Double value, 
+-                               double minValue, double maxValue, double step, String unit,
+-                               boolean optimizable, double sensitivity) {
+-        super(name, description, value, optimizable, sensitivity, false);
+-        this.minValue = minValue;
+-        this.maxValue = maxValue;
+-        this.step = step;
+-        this.unit = unit;
+-    }
+-    
+-    @Override
+-    public ParameterValue<Double> copy() {
+-        NumericParameterValue copy = new NumericParameterValue();
+-        copy.setName(getName());
+-        copy.setDescription(getDescription());
+-        copy.setValue(getValue());
+-        copy.setOptimizable(isOptimizable());
+-        copy.setSensitivity(getSensitivity());
+-        copy.setModified(isModified());
+-        copy.setMinValue(minValue);
+-        copy.setMaxValue(maxValue);
+-        copy.setStep(step);
+-        copy.setUnit(unit);
+-        return copy;
+-    }
+-    
+-    @Override
+-    public boolean isValid() {
+-        return getValue() != null && getValue() >= minValue && getValue() <= maxValue;
+-    }
+-    
+-    /**
+-     * Increment the value by the step size
+-     * 
+-     * @return the new value
+-     */
+-    public double increment() {
+-        double newValue = Math.min(maxValue, getValue() + step);
+-        setValue(newValue);
+-        setModified(true);
+-        return newValue;
+-    }
+-    
+-    /**
+-     * Decrement the value by the step size
+-     * 
+-     * @return the new value
+-     */
+-    public double decrement() {
+-        double newValue = Math.max(minValue, getValue() - step);
+-        setValue(newValue);
+-        setModified(true);
+-        return newValue;
+-    }
+-    
+-    /**
+-     * Set a random value within the allowed range
+-     * 
+-     * @return the new value
+-     */
+-    public double randomValue() {
+-        double range = maxValue - minValue;
+-        int steps = (int) (range / step);
+-        int randomSteps = (int) (Math.random() * steps);
+-        double random = minValue + (randomSteps * step);
+-        setValue(random);
+-        setModified(true);
+-        return random;
+-    }
+-}
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/OptimizationController.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/OptimizationController.java
+index dc84408..b4f6152 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/OptimizationController.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/OptimizationController.java
+@@ -1,9 +1,9 @@
+ package com.opencrm.pricingairules.api.controller;
+ 
+-import com.opencrm.pricingairules.domain.model.OptimizationMetrics;
+-import com.opencrm.pricingairules.domain.model.Rule;
++import com.opencrm.common.dto.ApiResponse;
+ import com.opencrm.pricingairules.domain.model.RuleOptimization;
+ import com.opencrm.pricingairules.domain.model.RuleSet;
++import com.opencrm.pricingairules.domain.model.Rule;
+ import com.opencrm.pricingairules.domain.repository.OptimizationMetricsRepository;
+ import com.opencrm.pricingairules.domain.repository.RuleOptimizationRepository;
+ import com.opencrm.pricingairules.domain.repository.RuleRepository;
+@@ -12,6 +12,7 @@
+ import io.micrometer.core.annotation.Timed;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
++import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+ import org.springframework.web.bind.annotation.*;
+@@ -33,173 +34,143 @@ public class OptimizationController {
+     private final RuleSetRepository ruleSetRepository;
+     private final RuleOptimizationRepository optimizationRepository;
+     private final OptimizationMetricsRepository optimizationMetricsRepository;
+-    
++
+     @GetMapping("/opportunities")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "optimization.opportunities", description = "Time taken to find optimization opportunities")
+-    public ResponseEntity<Map<String, Object>> findOptimizationOpportunities(@RequestParam Long ruleId) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> findOptimizationOpportunities(@RequestParam Long ruleId) {
+         log.debug("Received request to find optimization opportunities for rule {}", ruleId);
+-        
++
+         try {
+-            return ruleRepository.findById(ruleId)
+-                    .map(rule -> {
+-                        List<RuleOptimization> opportunities = optimizationService.findOptimizationOpportunities(rule);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", true);
+-                        response.put("ruleId", ruleId);
+-                        response.put("opportunitiesCount", opportunities.size());
+-                        response.put("opportunities", opportunities.stream()
+-                                .map(this::mapOptimizationToResponse)
+-                                .collect(Collectors.toList()));
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            Rule rule = ruleRepository.findById(ruleId).orElse(null);
++            if (rule == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule not found"));
++            }
++
++            List<RuleOptimization> opportunities = optimizationService.findOptimizationOpportunities(rule);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("ruleId", ruleId);
++            data.put("opportunitiesCount", opportunities.size());
++            data.put("opportunities", opportunities.stream()
++                    .map(this::mapOptimizationToResponse)
++                    .collect(Collectors.toList()));
++
++            return ResponseEntity.ok(ApiResponse.success(data));
+         } catch (Exception e) {
+             log.error("Error finding optimization opportunities: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error finding optimization opportunities: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PostMapping("/optimize-rule-set")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "optimization.rule-set", description = "Time taken to optimize a rule set")
+-    public ResponseEntity<Map<String, Object>> optimizeRuleSet(@RequestParam Long ruleSetId) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> optimizeRuleSet(@RequestParam Long ruleSetId) {
+         log.debug("Received request to optimize rule set {}", ruleSetId);
+-        
++
+         try {
+-            return ruleSetRepository.findById(ruleSetId)
+-                    .map(ruleSet -> {
+-                        List<RuleOptimization> optimizations = optimizationService.optimizeRuleSet(ruleSet);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", true);
+-                        response.put("ruleSetId", ruleSetId);
+-                        response.put("optimizationsCount", optimizations.size());
+-                        response.put("optimizations", optimizations.stream()
+-                                .map(this::mapOptimizationToResponse)
+-                                .collect(Collectors.toList()));
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleSet ruleSet = ruleSetRepository.findById(ruleSetId).orElse(null);
++            if (ruleSet == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule set not found"));
++            }
++
++            List<RuleOptimization> optimizations = optimizationService.optimizeRuleSet(ruleSet);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("ruleSetId", ruleSetId);
++            data.put("optimizationsCount", optimizations.size());
++            data.put("optimizations", optimizations.stream()
++                    .map(this::mapOptimizationToResponse)
++                    .collect(Collectors.toList()));
++
++            return ResponseEntity.ok(ApiResponse.success(data));
+         } catch (Exception e) {
+             log.error("Error optimizing rule set: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error optimizing rule set: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PostMapping("/apply")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "optimization.apply", description = "Time taken to apply an optimization")
+-    public ResponseEntity<Map<String, Object>> applyOptimization(@RequestParam Long optimizationId) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> applyOptimization(@RequestParam Long optimizationId) {
+         log.debug("Received request to apply optimization {}", optimizationId);
+-        
++
+         try {
+-            return optimizationRepository.findById(optimizationId)
+-                    .map(optimization -> {
+-                        boolean applied = optimizationService.applyOptimization(optimization);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", applied);
+-                        response.put("optimizationId", optimizationId);
+-                        response.put("message", applied 
+-                                ? "Optimization applied successfully" 
+-                                : "Failed to apply optimization");
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleOptimization optimization = optimizationRepository.findById(optimizationId).orElse(null);
++            if (optimization == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Optimization not found"));
++            }
++
++            boolean applied = optimizationService.applyOptimization(optimization);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("optimizationId", optimizationId);
++
++            String message = applied ? "Optimization applied successfully" : "Failed to apply optimization";
++            return ResponseEntity.ok(ApiResponse.success(data, message));
+         } catch (Exception e) {
+             log.error("Error applying optimization: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error applying optimization: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PostMapping("/test")
+     @Timed(value = "optimization.test", description = "Time taken to test an optimization")
+-    public ResponseEntity<Map<String, Object>> testOptimization(@RequestParam Long optimizationId) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> testOptimization(@RequestParam Long optimizationId) {
+         log.debug("Received request to test optimization {}", optimizationId);
+-        
++
+         try {
+-            return optimizationRepository.findById(optimizationId)
+-                    .map(optimization -> {
+-                        double improvementPct = optimizationService.testOptimization(optimization);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", true);
+-                        response.put("optimizationId", optimizationId);
+-                        response.put("improvementPercentage", improvementPct);
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleOptimization optimization = optimizationRepository.findById(optimizationId).orElse(null);
++            if (optimization == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Optimization not found"));
++            }
++
++            double improvementPct = optimizationService.testOptimization(optimization);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("optimizationId", optimizationId);
++            data.put("improvementPercentage", improvementPct);
++
++            return ResponseEntity.ok(ApiResponse.success(data));
+         } catch (Exception e) {
+             log.error("Error testing optimization: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error testing optimization: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @GetMapping("/metrics")
+     @Timed(value = "optimization.metrics", description = "Time taken to get optimization metrics")
+-    public ResponseEntity<Map<String, Object>> getOptimizationMetrics() {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> getOptimizationMetrics() {
+         log.debug("Received request to get optimization metrics");
+-        
++
+         try {
+-            Map<String, Object> response = new HashMap<>();
+-            
+-            // Get average improvement by optimization type
+             Map<String, BigDecimal> averageImprovementByType = new HashMap<>();
+             List<String> optimizationTypes = optimizationRepository.findDistinctOptimizationTypes();
+-            
++
+             for (String type : optimizationTypes) {
+                 BigDecimal avgImprovement = optimizationMetricsRepository.getAverageImprovementForOptimizationType(type);
+                 if (avgImprovement != null) {
+                     averageImprovementByType.put(type, avgImprovement);
+                 }
+             }
+-            
+-            // Get total optimization counts
++
+             long totalOptimizations = optimizationRepository.count();
+             long appliedOptimizations = optimizationRepository.countByApplied(true);
+-            
+-            response.put("totalOptimizations", totalOptimizations);
+-            response.put("appliedOptimizations", appliedOptimizations);
+-            response.put("averageImprovementByType", averageImprovementByType);
+-            
+-            return ResponseEntity.ok(response);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("totalOptimizations", totalOptimizations);
++            data.put("appliedOptimizations", appliedOptimizations);
++            data.put("averageImprovementByType", averageImprovementByType);
++
++            return ResponseEntity.ok(ApiResponse.success(data));
+         } catch (Exception e) {
+             log.error("Error getting optimization metrics: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error getting optimization metrics: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     private Map<String, Object> mapOptimizationToResponse(RuleOptimization optimization) {
+         Map<String, Object> result = new HashMap<>();
+         result.put("id", optimization.getId());
+@@ -208,7 +179,7 @@ private Map<String, Object> mapOptimizationToResponse(RuleOptimization optimizat
+         result.put("optimizationType", optimization.getOptimizationType());
+         result.put("applied", optimization.getApplied());
+         result.put("performanceImprovement", optimization.getPerformanceImprovementPct());
+-        
++
+         return result;
+     }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/PricingController.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/PricingController.java
+index e34f4e1..52b101a 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/PricingController.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/PricingController.java
+@@ -1,8 +1,8 @@
+ package com.opencrm.pricingairules.api.controller;
+ 
++import com.opencrm.common.dto.ApiResponse;
+ import com.opencrm.pricingairules.api.dto.*;
+ import com.opencrm.pricingairules.api.mapper.PricingMapper;
+-import com.opencrm.pricingairules.domain.model.Customer;
+ import com.opencrm.pricingairules.domain.model.Quote;
+ import com.opencrm.pricingairules.service.metrics.FinancialMetricsService;
+ import com.opencrm.pricingairules.service.pricing.PricingService;
+@@ -27,16 +27,14 @@ public class PricingController {
+     private final PricingService pricingService;
+     private final FinancialMetricsService financialMetricsService;
+     private final PricingMapper pricingMapper;
+-    
++
+     @PostMapping("/evaluate")
+     @Timed(value = "pricing.evaluate", description = "Time taken to evaluate pricing")
+-    public ResponseEntity<PricingResponseDTO> evaluatePricing(@RequestBody PricingRequestDTO request) {
++    public ResponseEntity<ApiResponse<PricingResponseDTO>> evaluatePricing(@RequestBody PricingRequestDTO request) {
+         log.debug("Received pricing evaluation request: {}", request.getQuote().getExternalId());
+ 
+-        // Convert DTO to domain model
+         Quote quote = pricingMapper.toQuote(request.getQuote());
+ 
+-        // Evaluate pricing
+         Quote pricedQuote;
+         if (request.getRuleSetName() != null && !request.getRuleSetName().isEmpty()) {
+             pricedQuote = pricingService.calculatePricing(quote, request.getRuleSetName());
+@@ -46,14 +44,11 @@ public ResponseEntity<PricingResponseDTO> evaluatePricing(@RequestBody PricingRe
+             pricedQuote = pricingService.calculatePricing(quote);
+         }
+ 
+-        // Get financial metrics (placeholder maps for now)
+         Map<String, Object> financialMetrics = new HashMap<>();
+         Map<String, Object> pricingDetails = new HashMap<>();
+ 
+-        // Convert domain model back to DTO
+         QuoteDTO quoteDTO = pricingMapper.toQuoteDTO(pricedQuote);
+ 
+-        // Build response
+         PricingResponseDTO response = PricingResponseDTO.builder()
+                 .quote(quoteDTO)
+                 .ruleSetName(request.getRuleSetName())
+@@ -63,28 +58,24 @@ public ResponseEntity<PricingResponseDTO> evaluatePricing(@RequestBody PricingRe
+                 .message("Pricing calculated successfully")
+                 .build();
+ 
+-        return ResponseEntity.ok(response);
++        return ResponseEntity.ok(ApiResponse.success(response));
+     }
+-    
++
+     @PostMapping("/batch")
+     @Timed(value = "pricing.batch", description = "Time taken to batch evaluate pricing")
+-    public ResponseEntity<BatchPricingResponseDTO> batchEvaluatePricing(@RequestBody BatchPricingRequestDTO request) {
++    public ResponseEntity<ApiResponse<BatchPricingResponseDTO>> batchEvaluatePricing(@RequestBody BatchPricingRequestDTO request) {
+         log.debug("Received batch pricing evaluation request for {} quotes", request.getQuotes().size());
+ 
+-        // Convert DTOs to domain models
+         List<Quote> quotes = request.getQuotes().stream()
+                 .map(pricingMapper::toQuote)
+                 .collect(Collectors.toList());
+ 
+-        // Batch evaluate pricing
+         List<Quote> pricedQuotes = pricingService.batchCalculatePricing(quotes);
+ 
+-        // Convert domain models back to DTOs
+         List<QuoteDTO> quoteDTOs = pricedQuotes.stream()
+                 .map(pricingMapper::toQuoteDTO)
+                 .collect(Collectors.toList());
+ 
+-        // Build response
+         BatchPricingResponseDTO response = BatchPricingResponseDTO.builder()
+                 .quotes(quoteDTOs)
+                 .ruleSetName(request.getRuleSetName())
+@@ -95,17 +86,16 @@ public ResponseEntity<BatchPricingResponseDTO> batchEvaluatePricing(@RequestBody
+                 .message("Batch pricing calculated successfully")
+                 .build();
+ 
+-        return ResponseEntity.ok(response);
++        return ResponseEntity.ok(ApiResponse.success(response));
+     }
+-    
++
+     @GetMapping("/metrics")
+     @Timed(value = "pricing.metrics", description = "Time taken to retrieve pricing metrics")
+-    public ResponseEntity<Map<String, Map<String, Object>>> getAggregatedMetrics() {
++    public ResponseEntity<ApiResponse<Map<String, Map<String, Object>>>> getAggregatedMetrics() {
+         log.debug("Received request to get aggregated metrics");
+ 
+         Map<String, Map<String, BigDecimal>> metrics = financialMetricsService.getAggregatedMetrics();
+ 
+-        // Convert BigDecimal to Object for the response
+         Map<String, Map<String, Object>> result = new HashMap<>();
+         metrics.forEach((key, value) -> {
+             Map<String, Object> converted = new HashMap<>();
+@@ -113,21 +103,19 @@ public ResponseEntity<Map<String, Map<String, Object>>> getAggregatedMetrics() {
+             result.put(key, converted);
+         });
+ 
+-        return ResponseEntity.ok(result);
++        return ResponseEntity.ok(ApiResponse.success(result));
+     }
+-    
++
+     @PostMapping("/recalculate")
+     @Timed(value = "pricing.recalculate", description = "Time taken to recalculate pricing")
+-    public ResponseEntity<Map<String, Object>> recalculateAffectedQuotes(@RequestParam String ruleSetName) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> recalculateAffectedQuotes(@RequestParam String ruleSetName) {
+         log.debug("Received request to recalculate quotes affected by rule set {}", ruleSetName);
+ 
+         int count = pricingService.recalculateAffectedQuotes(ruleSetName);
+ 
+-        Map<String, Object> response = new HashMap<>();
+-        response.put("success", true);
+-        response.put("recalculatedCount", count);
+-        response.put("message", "Recalculated pricing for " + count + " quotes");
++        Map<String, Object> data = new HashMap<>();
++        data.put("recalculatedCount", count);
+ 
+-        return ResponseEntity.ok(response);
++        return ResponseEntity.ok(ApiResponse.success(data, "Recalculated pricing for " + count + " quotes"));
+     }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/RuleController.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/RuleController.java
+index 1ef8cfc..1e1a2ee 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/RuleController.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/RuleController.java
+@@ -1,5 +1,6 @@
+ package com.opencrm.pricingairules.api.controller;
+ 
++import com.opencrm.common.dto.ApiResponse;
+ import com.opencrm.pricingairules.api.dto.RuleDTO;
+ import com.opencrm.pricingairules.api.dto.RuleSetDTO;
+ import com.opencrm.pricingairules.api.mapper.PricingMapper;
+@@ -11,11 +12,11 @@
+ import io.micrometer.core.annotation.Timed;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
++import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.access.prepost.PreAuthorize;
+ import org.springframework.web.bind.annotation.*;
+ 
+-import java.time.ZonedDateTime;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+@@ -31,305 +32,264 @@ public class RuleController {
+     private final RuleSetRepository ruleSetRepository;
+     private final DroolsService droolsService;
+     private final PricingMapper pricingMapper;
+-    
++
+     @GetMapping("/sets")
+     @Timed(value = "rules.get.sets", description = "Time taken to get all rule sets")
+-    public ResponseEntity<List<RuleSetDTO>> getAllRuleSets() {
++    public ResponseEntity<ApiResponse<List<RuleSetDTO>>> getAllRuleSets() {
+         log.debug("Received request to get all rule sets");
+-        
++
+         List<RuleSet> ruleSets = ruleSetRepository.findAll();
+         List<RuleSetDTO> ruleSetDTOs = ruleSets.stream()
+                 .map(pricingMapper::toRuleSetDTO)
+                 .collect(Collectors.toList());
+-        
+-        return ResponseEntity.ok(ruleSetDTOs);
++
++        return ResponseEntity.ok(ApiResponse.success(ruleSetDTOs));
+     }
+-    
++
+     @GetMapping("/sets/{id}")
+     @Timed(value = "rules.get.set", description = "Time taken to get a rule set")
+-    public ResponseEntity<RuleSetDTO> getRuleSet(@PathVariable Long id) {
++    public ResponseEntity<ApiResponse<RuleSetDTO>> getRuleSet(@PathVariable Long id) {
+         log.debug("Received request to get rule set {}", id);
+-        
++
+         return ruleSetRepository.findById(id)
+                 .map(pricingMapper::toRuleSetDTO)
+-                .map(ResponseEntity::ok)
+-                .orElse(ResponseEntity.notFound().build());
++                .map(dto -> ResponseEntity.ok(ApiResponse.success(dto)))
++                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
++                        .body(ApiResponse.error("Rule set not found")));
+     }
+-    
++
+     @PostMapping("/sets")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.create.set", description = "Time taken to create a rule set")
+-    public ResponseEntity<RuleSetDTO> createRuleSet(@RequestBody RuleSetDTO ruleSetDTO) {
++    public ResponseEntity<ApiResponse<RuleSetDTO>> createRuleSet(@RequestBody RuleSetDTO ruleSetDTO) {
+         log.debug("Received request to create rule set: {}", ruleSetDTO.getName());
+-        
++
+         try {
+             RuleSet ruleSet = pricingMapper.toRuleSet(ruleSetDTO);
+-            ruleSet.setCreatedAt(ZonedDateTime.now());
+-            ruleSet.setUpdatedAt(ZonedDateTime.now());
+-            
+             RuleSet savedRuleSet = ruleSetRepository.save(ruleSet);
+-            
++
+             // Compile rule set to verify it's valid
+             boolean compiled = droolsService.compileRuleSet(savedRuleSet);
+             if (!compiled) {
+-                return ResponseEntity.badRequest().build();
++                return ResponseEntity.badRequest().body(ApiResponse.error("Rule set compilation failed"));
+             }
+-            
+-            return ResponseEntity.ok(pricingMapper.toRuleSetDTO(savedRuleSet));
++
++            return ResponseEntity.ok(ApiResponse.success(pricingMapper.toRuleSetDTO(savedRuleSet)));
+         } catch (Exception e) {
+             log.error("Error creating rule set: {}", e.getMessage(), e);
+-            return ResponseEntity.badRequest().build();
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PutMapping("/sets/{id}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.update.set", description = "Time taken to update a rule set")
+-    public ResponseEntity<RuleSetDTO> updateRuleSet(@PathVariable Long id, @RequestBody RuleSetDTO ruleSetDTO) {
++    public ResponseEntity<ApiResponse<RuleSetDTO>> updateRuleSet(@PathVariable Long id, @RequestBody RuleSetDTO ruleSetDTO) {
+         log.debug("Received request to update rule set {}", id);
+-        
++
+         try {
+-            return ruleSetRepository.findById(id)
+-                    .map(ruleSet -> {
+-                        pricingMapper.updateRuleSet(ruleSet, ruleSetDTO);
+-                        ruleSet.setUpdatedAt(ZonedDateTime.now());
+-                        
+-                        RuleSet savedRuleSet = ruleSetRepository.save(ruleSet);
+-                        
+-                        // Compile rule set to verify it's valid
+-                        boolean compiled = droolsService.compileRuleSet(savedRuleSet);
+-                        if (!compiled) {
+-                            return ResponseEntity.badRequest().<RuleSetDTO>build();
+-                        }
+-                        
+-                        // Clear rule cache
+-                        droolsService.clearRuleCache(savedRuleSet.getName());
+-                        
+-                        return ResponseEntity.ok(pricingMapper.toRuleSetDTO(savedRuleSet));
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleSet ruleSet = ruleSetRepository.findById(id).orElse(null);
++            if (ruleSet == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule set not found"));
++            }
++
++            pricingMapper.updateRuleSet(ruleSet, ruleSetDTO);
++            RuleSet savedRuleSet = ruleSetRepository.save(ruleSet);
++
++            // Compile rule set to verify it's valid
++            boolean compiled = droolsService.compileRuleSet(savedRuleSet);
++            if (!compiled) {
++                return ResponseEntity.badRequest().body(ApiResponse.error("Rule set compilation failed"));
++            }
++
++            // Clear rule cache
++            droolsService.clearRuleCache(savedRuleSet.getName());
++
++            return ResponseEntity.ok(ApiResponse.success(pricingMapper.toRuleSetDTO(savedRuleSet)));
+         } catch (Exception e) {
+             log.error("Error updating rule set: {}", e.getMessage(), e);
+-            return ResponseEntity.badRequest().build();
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @DeleteMapping("/sets/{id}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.delete.set", description = "Time taken to delete a rule set")
+-    public ResponseEntity<Map<String, Object>> deleteRuleSet(@PathVariable Long id) {
++    public ResponseEntity<ApiResponse<Void>> deleteRuleSet(@PathVariable Long id) {
+         log.debug("Received request to delete rule set {}", id);
+-        
++
+         try {
+-            return ruleSetRepository.findById(id)
+-                    .map(ruleSet -> {
+-                        // Clear rule cache before deletion
+-                        droolsService.clearRuleCache(ruleSet.getName());
+-                        
+-                        ruleSetRepository.delete(ruleSet);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", true);
+-                        response.put("message", "Rule set deleted successfully");
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleSet ruleSet = ruleSetRepository.findById(id).orElse(null);
++            if (ruleSet == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule set not found"));
++            }
++
++            // Clear rule cache before deletion
++            droolsService.clearRuleCache(ruleSet.getName());
++            ruleSetRepository.delete(ruleSet);
++
++            return ResponseEntity.ok(ApiResponse.success(null, "Rule set deleted successfully"));
+         } catch (Exception e) {
+             log.error("Error deleting rule set: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error deleting rule set: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @GetMapping("/sets/{ruleSetId}/rules")
+     @Timed(value = "rules.get.rules", description = "Time taken to get rules for a rule set")
+-    public ResponseEntity<List<RuleDTO>> getRulesForRuleSet(@PathVariable Long ruleSetId) {
++    public ResponseEntity<ApiResponse<List<RuleDTO>>> getRulesForRuleSet(@PathVariable Long ruleSetId) {
+         log.debug("Received request to get rules for rule set {}", ruleSetId);
+-        
+-        return ruleSetRepository.findById(ruleSetId)
+-                .map(ruleSet -> {
+-                    List<Rule> rules = ruleRepository.findByRuleSet(ruleSet);
+-                    List<RuleDTO> ruleDTOs = rules.stream()
+-                            .map(pricingMapper::toRuleDTO)
+-                            .collect(Collectors.toList());
+-                    
+-                    return ResponseEntity.ok(ruleDTOs);
+-                })
+-                .orElse(ResponseEntity.notFound().build());
++
++        RuleSet ruleSet = ruleSetRepository.findById(ruleSetId).orElse(null);
++        if (ruleSet == null) {
++            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule set not found"));
++        }
++
++        List<Rule> rules = ruleRepository.findByRuleSet(ruleSet);
++        List<RuleDTO> ruleDTOs = rules.stream()
++                .map(pricingMapper::toRuleDTO)
++                .collect(Collectors.toList());
++
++        return ResponseEntity.ok(ApiResponse.success(ruleDTOs));
+     }
+-    
++
+     @GetMapping("/rules/{id}")
+     @Timed(value = "rules.get.rule", description = "Time taken to get a rule")
+-    public ResponseEntity<RuleDTO> getRule(@PathVariable Long id) {
++    public ResponseEntity<ApiResponse<RuleDTO>> getRule(@PathVariable Long id) {
+         log.debug("Received request to get rule {}", id);
+-        
++
+         return ruleRepository.findById(id)
+                 .map(pricingMapper::toRuleDTO)
+-                .map(ResponseEntity::ok)
+-                .orElse(ResponseEntity.notFound().build());
++                .map(dto -> ResponseEntity.ok(ApiResponse.success(dto)))
++                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
++                        .body(ApiResponse.error("Rule not found")));
+     }
+-    
++
+     @PostMapping("/sets/{ruleSetId}/rules")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.create.rule", description = "Time taken to create a rule")
+-    public ResponseEntity<RuleDTO> createRule(@PathVariable Long ruleSetId, @RequestBody RuleDTO ruleDTO) {
++    public ResponseEntity<ApiResponse<RuleDTO>> createRule(@PathVariable Long ruleSetId, @RequestBody RuleDTO ruleDTO) {
+         log.debug("Received request to create rule for rule set {}", ruleSetId);
+-        
++
+         try {
+-            return ruleSetRepository.findById(ruleSetId)
+-                    .map(ruleSet -> {
+-                        Rule rule = pricingMapper.toRule(ruleDTO);
+-                        rule.setRuleSet(ruleSet);
+-                        rule.setCreatedAt(ZonedDateTime.now());
+-                        rule.setUpdatedAt(ZonedDateTime.now());
+-                        
+-                        Rule savedRule = ruleRepository.save(rule);
+-                        
+-                        // Compile rule to verify it's valid
+-                        boolean compiled = droolsService.compileRule(savedRule);
+-                        if (!compiled) {
+-                            return ResponseEntity.badRequest().<RuleDTO>build();
+-                        }
+-                        
+-                        // Clear rule cache
+-                        droolsService.clearRuleCache(ruleSet.getName());
+-                        
+-                        return ResponseEntity.ok(pricingMapper.toRuleDTO(savedRule));
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            RuleSet ruleSet = ruleSetRepository.findById(ruleSetId).orElse(null);
++            if (ruleSet == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule set not found"));
++            }
++
++            Rule rule = pricingMapper.toRule(ruleDTO);
++            rule.setRuleSet(ruleSet);
++            Rule savedRule = ruleRepository.save(rule);
++
++            // Compile rule to verify it's valid
++            boolean compiled = droolsService.compileRule(savedRule);
++            if (!compiled) {
++                return ResponseEntity.badRequest().body(ApiResponse.error("Rule compilation failed"));
++            }
++
++            // Clear rule cache
++            droolsService.clearRuleCache(ruleSet.getName());
++
++            return ResponseEntity.ok(ApiResponse.success(pricingMapper.toRuleDTO(savedRule)));
+         } catch (Exception e) {
+             log.error("Error creating rule: {}", e.getMessage(), e);
+-            return ResponseEntity.badRequest().build();
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PutMapping("/rules/{id}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.update.rule", description = "Time taken to update a rule")
+-    public ResponseEntity<RuleDTO> updateRule(@PathVariable Long id, @RequestBody RuleDTO ruleDTO) {
++    public ResponseEntity<ApiResponse<RuleDTO>> updateRule(@PathVariable Long id, @RequestBody RuleDTO ruleDTO) {
+         log.debug("Received request to update rule {}", id);
+-        
++
+         try {
+-            return ruleRepository.findById(id)
+-                    .map(rule -> {
+-                        pricingMapper.updateRule(rule, ruleDTO);
+-                        rule.setUpdatedAt(ZonedDateTime.now());
+-                        
+-                        Rule savedRule = ruleRepository.save(rule);
+-                        
+-                        // Compile rule to verify it's valid
+-                        boolean compiled = droolsService.compileRule(savedRule);
+-                        if (!compiled) {
+-                            return ResponseEntity.badRequest().<RuleDTO>build();
+-                        }
+-                        
+-                        // Clear rule cache
+-                        droolsService.clearRuleCache(savedRule.getRuleSet().getName());
+-                        
+-                        return ResponseEntity.ok(pricingMapper.toRuleDTO(savedRule));
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            Rule rule = ruleRepository.findById(id).orElse(null);
++            if (rule == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule not found"));
++            }
++
++            pricingMapper.updateRule(rule, ruleDTO);
++            Rule savedRule = ruleRepository.save(rule);
++
++            // Compile rule to verify it's valid
++            boolean compiled = droolsService.compileRule(savedRule);
++            if (!compiled) {
++                return ResponseEntity.badRequest().body(ApiResponse.error("Rule compilation failed"));
++            }
++
++            // Clear rule cache
++            droolsService.clearRuleCache(savedRule.getRuleSet().getName());
++
++            return ResponseEntity.ok(ApiResponse.success(pricingMapper.toRuleDTO(savedRule)));
+         } catch (Exception e) {
+             log.error("Error updating rule: {}", e.getMessage(), e);
+-            return ResponseEntity.badRequest().build();
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @DeleteMapping("/rules/{id}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.delete.rule", description = "Time taken to delete a rule")
+-    public ResponseEntity<Map<String, Object>> deleteRule(@PathVariable Long id) {
++    public ResponseEntity<ApiResponse<Void>> deleteRule(@PathVariable Long id) {
+         log.debug("Received request to delete rule {}", id);
+-        
++
+         try {
+-            return ruleRepository.findById(id)
+-                    .map(rule -> {
+-                        String ruleSetName = rule.getRuleSet().getName();
+-                        
+-                        // Delete the rule
+-                        ruleRepository.delete(rule);
+-                        
+-                        // Clear rule cache
+-                        droolsService.clearRuleCache(ruleSetName);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("success", true);
+-                        response.put("message", "Rule deleted successfully");
+-                        
+-                        return ResponseEntity.ok(response);
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            Rule rule = ruleRepository.findById(id).orElse(null);
++            if (rule == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule not found"));
++            }
++
++            String ruleSetName = rule.getRuleSet().getName();
++            ruleRepository.delete(rule);
++            droolsService.clearRuleCache(ruleSetName);
++
++            return ResponseEntity.ok(ApiResponse.success(null, "Rule deleted successfully"));
+         } catch (Exception e) {
+             log.error("Error deleting rule: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error deleting rule: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PostMapping("/rules/{id}/validate")
+     @Timed(value = "rules.validate", description = "Time taken to validate a rule")
+-    public ResponseEntity<Map<String, Object>> validateRule(@PathVariable Long id) {
++    public ResponseEntity<ApiResponse<Map<String, Object>>> validateRule(@PathVariable Long id) {
+         log.debug("Received request to validate rule {}", id);
+-        
++
+         try {
+-            return ruleRepository.findById(id)
+-                    .map(rule -> {
+-                        boolean valid = droolsService.compileRule(rule);
+-                        
+-                        Map<String, Object> response = new HashMap<>();
+-                        response.put("valid", valid);
+-                        
+-                        if (valid) {
+-                            response.put("message", "Rule is valid");
+-                            return ResponseEntity.ok(response);
+-                        } else {
+-                            response.put("message", "Rule is invalid");
+-                            return ResponseEntity.badRequest().body(response);
+-                        }
+-                    })
+-                    .orElse(ResponseEntity.notFound().build());
++            Rule rule = ruleRepository.findById(id).orElse(null);
++            if (rule == null) {
++                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Rule not found"));
++            }
++
++            boolean valid = droolsService.compileRule(rule);
++
++            Map<String, Object> data = new HashMap<>();
++            data.put("valid", valid);
++
++            if (valid) {
++                return ResponseEntity.ok(ApiResponse.success(data, "Rule is valid"));
++            } else {
++                return ResponseEntity.badRequest().body(ApiResponse.error("Rule is invalid"));
++            }
+         } catch (Exception e) {
+             log.error("Error validating rule: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("valid", false);
+-            response.put("message", "Error validating rule: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     @PostMapping("/cache/clear")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "rules.cache.clear", description = "Time taken to clear rule cache")
+-    public ResponseEntity<Map<String, Object>> clearRuleCache(@RequestParam String ruleSetName) {
++    public ResponseEntity<ApiResponse<Void>> clearRuleCache(@RequestParam String ruleSetName) {
+         log.debug("Received request to clear rule cache for rule set {}", ruleSetName);
+-        
++
+         try {
+             droolsService.clearRuleCache(ruleSetName);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", true);
+-            response.put("message", "Rule cache cleared successfully");
+-            
+-            return ResponseEntity.ok(response);
++            return ResponseEntity.ok(ApiResponse.success(null, "Rule cache cleared successfully"));
+         } catch (Exception e) {
+             log.error("Error clearing rule cache: {}", e.getMessage(), e);
+-            
+-            Map<String, Object> response = new HashMap<>();
+-            response.put("success", false);
+-            response.put("message", "Error clearing rule cache: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/ai/AIOrchestrationController.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/ai/AIOrchestrationController.java
+index 9f74d0c..dd6d01f 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/ai/AIOrchestrationController.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/api/controller/ai/AIOrchestrationController.java
+@@ -1,5 +1,6 @@
+ package com.opencrm.pricingairules.api.controller.ai;
+ 
++import com.opencrm.common.dto.ApiResponse;
+ import com.opencrm.pricingairules.ai.orchestration.AIOrchestrationService;
+ import com.opencrm.pricingairules.ai.orchestration.RuleCreationResult;
+ import com.opencrm.pricingairules.ai.orchestration.RuleEvaluationResult;
+@@ -24,119 +25,93 @@
+ public class AIOrchestrationController {
+ 
+     private final AIOrchestrationService orchestrationService;
+-    
++
+     /**
+      * Create a rule from a business requirement using the full AI workflow
+      */
+     @PostMapping("/create-rule")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "ai.workflow.create", description = "Time taken to create a rule using AI workflow")
+-    public ResponseEntity<RuleCreationResult> createRule(@RequestBody CreateRuleRequest request) {
++    public ResponseEntity<ApiResponse<RuleCreationResult>> createRule(@RequestBody CreateRuleRequest request) {
+         log.debug("Received request to create rule from business requirement using AI workflow");
+-        
++
+         try {
+             RuleCreationResult result = orchestrationService.createRuleFromRequirement(request.getBusinessRequirement());
+-            return ResponseEntity.ok(result);
++            return ResponseEntity.ok(ApiResponse.success(result));
+         } catch (Exception e) {
+             log.error("Error creating rule using AI workflow: {}", e.getMessage(), e);
+-            
+-            RuleCreationResult errorResult = new RuleCreationResult();
+-            errorResult.setBusinessRequirement(request.getBusinessRequirement());
+-            errorResult.setSuccess(false);
+-            errorResult.setErrorMessage(e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(errorResult);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     /**
+      * Create a rule asynchronously from a business requirement
+      */
+     @PostMapping("/create-rule/async")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "ai.workflow.create.async", description = "Time taken to request async rule creation")
+-    public ResponseEntity<AsyncOperationResponse> createRuleAsync(@RequestBody CreateRuleRequest request) {
++    public ResponseEntity<ApiResponse<AsyncOperationResponse>> createRuleAsync(@RequestBody CreateRuleRequest request) {
+         log.debug("Received request to create rule asynchronously using AI workflow");
+-        
++
+         try {
+-            CompletableFuture<RuleCreationResult> future = 
++            CompletableFuture<RuleCreationResult> future =
+                 orchestrationService.createRuleAsync(request.getBusinessRequirement());
+-            
++
+             String operationId = "create-" + System.currentTimeMillis();
+-            
++
+             // In a real implementation, you would store the future in a map to retrieve later
+-            
++
+             AsyncOperationResponse response = new AsyncOperationResponse();
+             response.setOperationId(operationId);
+             response.setStatus("PROCESSING");
+             response.setMessage("Rule creation started. Check status using the operation ID.");
+-            
+-            return ResponseEntity.accepted().body(response);
++
++            return ResponseEntity.accepted().body(ApiResponse.success(response));
+         } catch (Exception e) {
+             log.error("Error initiating async rule creation: {}", e.getMessage(), e);
+-            
+-            AsyncOperationResponse response = new AsyncOperationResponse();
+-            response.setOperationId("error");
+-            response.setStatus("FAILED");
+-            response.setMessage("Failed to start rule creation: " + e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(response);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     /**
+      * Modify an existing rule using the AI workflow
+      */
+     @PostMapping("/modify-rule/{ruleId}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "ai.workflow.modify", description = "Time taken to modify a rule using AI workflow")
+-    public ResponseEntity<RuleModificationResult> modifyRule(
+-            @PathVariable Long ruleId, 
++    public ResponseEntity<ApiResponse<RuleModificationResult>> modifyRule(
++            @PathVariable Long ruleId,
+             @RequestBody ModifyRuleRequest request) {
+         log.debug("Received request to modify rule {} using AI workflow", ruleId);
+-        
++
+         try {
+-            RuleModificationResult result = 
++            RuleModificationResult result =
+                 orchestrationService.modifyRule(ruleId, request.getModificationRequirement());
+-            
+-            return ResponseEntity.ok(result);
++            return ResponseEntity.ok(ApiResponse.success(result));
+         } catch (Exception e) {
+             log.error("Error modifying rule using AI workflow: {}", e.getMessage(), e);
+-            
+-            RuleModificationResult errorResult = new RuleModificationResult();
+-            errorResult.setRuleId(ruleId);
+-            errorResult.setModificationRequirement(request.getModificationRequirement());
+-            errorResult.setSuccess(false);
+-            errorResult.setErrorMessage(e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(errorResult);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     /**
+      * Evaluate a rule set using the AI workflow
+      */
+     @GetMapping("/evaluate-ruleset/{ruleSetId}")
+     @PreAuthorize("hasRole('ADMIN')")
+     @Timed(value = "ai.workflow.evaluate", description = "Time taken to evaluate a rule set using AI workflow")
+-    public ResponseEntity<RuleEvaluationResult> evaluateRuleSet(@PathVariable Long ruleSetId) {
++    public ResponseEntity<ApiResponse<RuleEvaluationResult>> evaluateRuleSet(@PathVariable Long ruleSetId) {
+         log.debug("Received request to evaluate rule set {} using AI workflow", ruleSetId);
+-        
++
+         try {
+             RuleEvaluationResult result = orchestrationService.evaluateRuleSet(ruleSetId);
+-            return ResponseEntity.ok(result);
++            return ResponseEntity.ok(ApiResponse.success(result));
+         } catch (Exception e) {
+             log.error("Error evaluating rule set using AI workflow: {}", e.getMessage(), e);
+-            
+-            RuleEvaluationResult errorResult = new RuleEvaluationResult();
+-            errorResult.setRuleSetId(ruleSetId);
+-            errorResult.setSuccess(false);
+-            errorResult.setErrorMessage(e.getMessage());
+-            
+-            return ResponseEntity.badRequest().body(errorResult);
++            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+         }
+     }
+-    
++
+     /**
+      * Request to create a rule
+      */
+@@ -146,7 +121,7 @@ public static class CreateRuleRequest {
+         private String ruleType;
+         private String businessDomain;
+     }
+-    
++
+     /**
+      * Request to modify a rule
+      */
+@@ -154,7 +129,7 @@ public static class CreateRuleRequest {
+     public static class ModifyRuleRequest {
+         private String modificationRequirement;
+     }
+-    
++
+     /**
+      * Response for async operations
+      */
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/config/SecurityConfig.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/config/SecurityConfig.java
+new file mode 100644
+index 0000000..5676305
+--- /dev/null
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/config/SecurityConfig.java
+@@ -0,0 +1,45 @@
++package com.opencrm.pricingairules.config;
++
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.web.SecurityFilterChain;
++
++/**
++ * Security configuration for Pricing AI Rules Service.
++ *
++ * In production, the Gateway handles authentication and forwards the JWT.
++ * Set SECURITY_OPEN=true for local development only.
++ */
++@Configuration
++@EnableWebSecurity
++@EnableMethodSecurity
++public class SecurityConfig {
++
++    @Value("${security.open:false}")
++    private boolean securityOpen;
++
++    @Bean
++    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
++        var builder = http
++                .csrf(csrf -> csrf.disable())
++                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
++
++        if (securityOpen) {
++            builder.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
++        } else {
++            builder.authorizeHttpRequests(auth -> auth
++                    .requestMatchers("/actuator/health", "/actuator/info").permitAll()
++                    .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
++                    .requestMatchers("/api/v1/**").authenticated()
++                    .anyRequest().authenticated()
++            );
++        }
++
++        return builder.build();
++    }
++}
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Customer.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Customer.java
+index cb4bfd1..f17c49a 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Customer.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Customer.java
+@@ -1,25 +1,18 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
+-
+-import java.time.ZonedDateTime;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ @Entity
+ @Table(name = "customer", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class Customer {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "customer_seq")
+-    @SequenceGenerator(name = "customer_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class Customer extends BaseEntity {
+ 
+     @Column(name = "external_id", nullable = false, unique = true)
+     private String externalId;
+@@ -41,21 +34,4 @@ public class Customer {
+ 
+     @Column(name = "churn_score")
+     private Double churnScore;
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/FinancialMetricsLog.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/FinancialMetricsLog.java
+index 415013a..837ff2e 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/FinancialMetricsLog.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/FinancialMetricsLog.java
+@@ -1,26 +1,20 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+-import java.time.ZonedDateTime;
+ 
+ @Entity
+ @Table(name = "financial_metrics_log", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class FinancialMetricsLog {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "financial_metrics_log_seq")
+-    @SequenceGenerator(name = "financial_metrics_log_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class FinancialMetricsLog extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "quote_id", nullable = false)
+@@ -31,12 +25,4 @@ public class FinancialMetricsLog {
+ 
+     @Column(name = "metric_value", precision = 19, scale = 4)
+     private BigDecimal metricValue;
+-
+-    @Column(name = "recorded_at", updatable = false)
+-    private ZonedDateTime recordedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        recordedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/OptimizationMetrics.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/OptimizationMetrics.java
+index 873307f..57ad65f 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/OptimizationMetrics.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/OptimizationMetrics.java
+@@ -1,26 +1,20 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+-import java.time.ZonedDateTime;
+ 
+ @Entity
+ @Table(name = "optimization_metrics", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class OptimizationMetrics {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "optimization_metrics_seq")
+-    @SequenceGenerator(name = "optimization_metrics_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class OptimizationMetrics extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "optimization_id", nullable = false)
+@@ -34,12 +28,4 @@ public class OptimizationMetrics {
+ 
+     @Column(name = "improvement_pct", precision = 5, scale = 2)
+     private BigDecimal improvementPct;
+-
+-    @Column(name = "tested_at", updatable = false)
+-    private ZonedDateTime testedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        testedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Product.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Product.java
+index c7ce438..ecf3600 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Product.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Product.java
+@@ -1,26 +1,20 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+-import java.time.ZonedDateTime;
+ 
+ @Entity
+ @Table(name = "product", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class Product {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_seq")
+-    @SequenceGenerator(name = "product_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class Product extends BaseEntity {
+ 
+     @Column(name = "external_id", nullable = false, unique = true)
+     private String externalId;
+@@ -42,21 +36,4 @@ public class Product {
+ 
+     @Column(name = "currency", length = 10)
+     private String currency;
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundle.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundle.java
+index 584f599..6df2432 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundle.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundle.java
+@@ -1,27 +1,21 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+-import java.time.ZonedDateTime;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+ @Entity
+ @Table(name = "product_bundle", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class ProductBundle {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_bundle_seq")
+-    @SequenceGenerator(name = "product_bundle_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class ProductBundle extends BaseEntity {
+ 
+     @Column(name = "name", nullable = false)
+     private String name;
+@@ -36,22 +30,6 @@ public class ProductBundle {
+     private String status;
+ 
+     @OneToMany(mappedBy = "bundle", cascade = CascadeType.ALL, orphanRemoval = true)
++    @Builder.Default
+     private List<ProductBundleItem> bundleItems = new ArrayList<>();
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundleItem.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundleItem.java
+index 2731255..dcec00c 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundleItem.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/ProductBundleItem.java
+@@ -1,25 +1,18 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
+-
+-import java.time.ZonedDateTime;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ @Entity
+ @Table(name = "product_bundle_item", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class ProductBundleItem {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_bundle_item_seq")
+-    @SequenceGenerator(name = "product_bundle_item_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class ProductBundleItem extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "bundle_id", nullable = false)
+@@ -31,12 +24,4 @@ public class ProductBundleItem {
+ 
+     @Column(name = "quantity")
+     private Integer quantity;
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Quote.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Quote.java
+index c255068..8723558 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Quote.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Quote.java
+@@ -1,32 +1,26 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
+ import com.fasterxml.jackson.databind.JsonNode;
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+ import org.hibernate.annotations.JdbcTypeCode;
+ import org.hibernate.type.SqlTypes;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+ import java.time.LocalDate;
+-import java.time.ZonedDateTime;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+ @Entity
+ @Table(name = "quote", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class Quote {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "quote_seq")
+-    @SequenceGenerator(name = "quote_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class Quote extends BaseEntity {
+ 
+     @Column(name = "external_id", nullable = false, unique = true)
+     private String externalId;
+@@ -110,29 +104,13 @@ public class Quote {
+     @Embedded
+     private CustomerFeedback customerFeedback;
+ 
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL, orphanRemoval = true)
++    @Builder.Default
+     private List<QuoteLineItem> lineItems = new ArrayList<>();
+ 
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+     /**
+      * Get the total price of this quote
+-     * 
++     *
+      * @return the total price
+      */
+     public double getTotalPrice() {
+@@ -146,7 +124,7 @@ public double getTotalPrice() {
+ 
+     /**
+      * Get the discount amount for this quote
+-     * 
++     *
+      * @return the discount amount
+      */
+     public double getDiscountAmount() {
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/QuoteLineItem.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/QuoteLineItem.java
+index 39ca15b..f954bbc 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/QuoteLineItem.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/QuoteLineItem.java
+@@ -1,29 +1,23 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
+ import com.fasterxml.jackson.databind.JsonNode;
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+ import org.hibernate.annotations.JdbcTypeCode;
+ import org.hibernate.type.SqlTypes;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+-import java.time.ZonedDateTime;
+ 
+ @Entity
+ @Table(name = "quote_line_item", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class QuoteLineItem {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "quote_line_item_seq")
+-    @SequenceGenerator(name = "quote_line_item_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class QuoteLineItem extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "quote_id", nullable = false)
+@@ -61,21 +55,4 @@ public class QuoteLineItem {
+     @Column(name = "metadata", columnDefinition = "jsonb")
+     @JdbcTypeCode(SqlTypes.JSON)
+     private JsonNode metadata;
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Rule.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Rule.java
+index 8869bb2..b0faba4 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Rule.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/Rule.java
+@@ -1,27 +1,21 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+-import java.time.ZonedDateTime;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+ @Entity
+ @Table(name = "rule", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class Rule {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_seq")
+-    @SequenceGenerator(name = "rule_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class Rule extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "rule_set_id", nullable = false)
+@@ -52,27 +46,4 @@ public class Rule {
+     @OneToMany(mappedBy = "dependentRule", cascade = CascadeType.ALL, orphanRemoval = true)
+     @Builder.Default
+     private List<RuleDependency> dependents = new ArrayList<>();
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @Column(name = "created_by")
+-    private String createdBy;
+-
+-    @Column(name = "updated_by")
+-    private String updatedBy;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleDependency.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleDependency.java
+index 8bd9949..4473695 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleDependency.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleDependency.java
+@@ -1,25 +1,18 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
+-
+-import java.time.ZonedDateTime;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ @Entity
+ @Table(name = "rule_dependency", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class RuleDependency {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_dependency_seq")
+-    @SequenceGenerator(name = "rule_dependency_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class RuleDependency extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "rule_id", nullable = false)
+@@ -31,12 +24,4 @@ public class RuleDependency {
+ 
+     @Column(name = "dependency_type", nullable = false)
+     private String dependencyType;
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleExecutionMetrics.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleExecutionMetrics.java
+index 0a19a2b..72e98f2 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleExecutionMetrics.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleExecutionMetrics.java
+@@ -1,25 +1,18 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
+-
+-import java.time.ZonedDateTime;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ @Entity
+ @Table(name = "rule_execution_metrics", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class RuleExecutionMetrics {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_execution_metrics_seq")
+-    @SequenceGenerator(name = "rule_execution_metrics_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class RuleExecutionMetrics extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "rule_id")
+@@ -41,12 +34,4 @@ public class RuleExecutionMetrics {
+ 
+     @Column(name = "error_message")
+     private String errorMessage;
+-
+-    @Column(name = "execution_date", updatable = false)
+-    private ZonedDateTime executionDate;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        executionDate = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleOptimization.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleOptimization.java
+index d80df2a..a6b734f 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleOptimization.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleOptimization.java
+@@ -1,10 +1,9 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.math.BigDecimal;
+ import java.time.ZonedDateTime;
+@@ -13,16 +12,12 @@
+ 
+ @Entity
+ @Table(name = "rule_optimization", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class RuleOptimization {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_optimization_seq")
+-    @SequenceGenerator(name = "rule_optimization_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class RuleOptimization extends BaseEntity {
+ 
+     @ManyToOne
+     @JoinColumn(name = "rule_id")
+@@ -47,17 +42,10 @@ public class RuleOptimization {
+     @Column(name = "applied")
+     private Boolean applied;
+ 
+-    @OneToMany(mappedBy = "optimization", cascade = CascadeType.ALL)
+-    private List<OptimizationMetrics> metrics = new ArrayList<>();
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+     @Column(name = "applied_at")
+     private ZonedDateTime appliedAt;
+ 
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-    }
++    @OneToMany(mappedBy = "optimization", cascade = CascadeType.ALL)
++    @Builder.Default
++    private List<OptimizationMetrics> metrics = new ArrayList<>();
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleSet.java b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleSet.java
+index 602c158..7128804 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleSet.java
++++ b/backend/services/pricing-ai-rules-service/src/main/java/com/opencrm/pricingairules/domain/model/RuleSet.java
+@@ -1,10 +1,9 @@
+ package com.opencrm.pricingairules.domain.model;
+ 
++import com.opencrm.common.entity.BaseEntity;
+ import jakarta.persistence.*;
+-import lombok.AllArgsConstructor;
+-import lombok.Builder;
+-import lombok.Data;
+-import lombok.NoArgsConstructor;
++import lombok.*;
++import lombok.experimental.SuperBuilder;
+ 
+ import java.time.ZonedDateTime;
+ import java.util.ArrayList;
+@@ -12,16 +11,12 @@
+ 
+ @Entity
+ @Table(name = "rule_set", schema = "pricing_ai_rules")
+-@Data
+-@Builder
++@Getter
++@Setter
+ @NoArgsConstructor
+ @AllArgsConstructor
+-public class RuleSet {
+-
+-    @Id
+-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "rule_set_seq")
+-    @SequenceGenerator(name = "rule_set_seq", sequenceName = "pricing_ai_rules.hibernate_sequence", allocationSize = 1)
+-    private Long id;
++@SuperBuilder
++public class RuleSet extends BaseEntity {
+ 
+     @Column(name = "name", nullable = false, unique = true)
+     private String name;
+@@ -42,28 +37,6 @@ public class RuleSet {
+     private ZonedDateTime expirationDate;
+ 
+     @OneToMany(mappedBy = "ruleSet", cascade = CascadeType.ALL, orphanRemoval = true)
++    @Builder.Default
+     private List<Rule> rules = new ArrayList<>();
+-
+-    @Column(name = "created_at", updatable = false)
+-    private ZonedDateTime createdAt;
+-
+-    @Column(name = "updated_at")
+-    private ZonedDateTime updatedAt;
+-
+-    @Column(name = "created_by")
+-    private String createdBy;
+-
+-    @Column(name = "updated_by")
+-    private String updatedBy;
+-
+-    @PrePersist
+-    protected void onCreate() {
+-        createdAt = ZonedDateTime.now();
+-        updatedAt = ZonedDateTime.now();
+-    }
+-
+-    @PreUpdate
+-    protected void onUpdate() {
+-        updatedAt = ZonedDateTime.now();
+-    }
+ }
+diff --git a/backend/services/pricing-ai-rules-service/src/main/resources/application.yml b/backend/services/pricing-ai-rules-service/src/main/resources/application.yml
+index 05dce33..996f185 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/resources/application.yml
++++ b/backend/services/pricing-ai-rules-service/src/main/resources/application.yml
+@@ -102,6 +102,9 @@ spring:
+   jpa:
+     show-sql: true
+ 
++security:
++  open: true
++
+ logging:
+   level:
+     com.opencrm.pricingairules: DEBUG
+diff --git a/backend/services/pricing-ai-rules-service/src/main/resources/db/migration/V8__add_base_entity_columns.sql b/backend/services/pricing-ai-rules-service/src/main/resources/db/migration/V8__add_base_entity_columns.sql
+new file mode 100644
+index 0000000..e29eef9
+--- /dev/null
++++ b/backend/services/pricing-ai-rules-service/src/main/resources/db/migration/V8__add_base_entity_columns.sql
+@@ -0,0 +1,104 @@
++-- Add BaseEntity standard columns (uuid, created_by, updated_by, version, is_deleted)
++-- to all pricing_ai_rules tables that now extend BaseEntity.
++
++ALTER TABLE pricing_ai_rules.customer
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.quote
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.product
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.product_bundle
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.product_bundle_item
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.quote_line_item
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.rule_set
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.rule
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.rule_dependency
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.financial_metrics_log
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.optimization_metrics
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.rule_execution_metrics
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++ALTER TABLE pricing_ai_rules.rule_optimization
++    ADD COLUMN IF NOT EXISTS uuid VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
++    ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255),
++    ADD COLUMN IF NOT EXISTS version BIGINT,
++    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
++
++-- Add unique constraints on uuid for tables that didn't have them
++ALTER TABLE pricing_ai_rules.customer ADD CONSTRAINT uk_customer_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.quote ADD CONSTRAINT uk_quote_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.product ADD CONSTRAINT uk_product_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.product_bundle ADD CONSTRAINT uk_product_bundle_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.product_bundle_item ADD CONSTRAINT uk_product_bundle_item_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.quote_line_item ADD CONSTRAINT uk_quote_line_item_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.rule_set ADD CONSTRAINT uk_rule_set_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.rule ADD CONSTRAINT uk_rule_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.rule_dependency ADD CONSTRAINT uk_rule_dependency_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.financial_metrics_log ADD CONSTRAINT uk_financial_metrics_log_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.optimization_metrics ADD CONSTRAINT uk_optimization_metrics_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.rule_execution_metrics ADD CONSTRAINT uk_rule_execution_metrics_uuid UNIQUE (uuid);
++ALTER TABLE pricing_ai_rules.rule_optimization ADD CONSTRAINT uk_rule_optimization_uuid UNIQUE (uuid);
+diff --git a/backend/services/pricing-ai-rules-service/src/main/resources/rules/legacy-additive-tier-and-floor.drl b/backend/services/pricing-ai-rules-service/src/main/resources/rules/legacy-additive-tier-and-floor.drl
+index dbf2f64..32cee74 100644
+--- a/backend/services/pricing-ai-rules-service/src/main/resources/rules/legacy-additive-tier-and-floor.drl
++++ b/backend/services/pricing-ai-rules-service/src/main/resources/rules/legacy-additive-tier-and-floor.drl
+@@ -38,6 +38,10 @@ then
+     if (finalPrice.compareTo(minCommitment) < 0) {
+         $quote.setFinalPrice(minCommitment);
+         $quote.setDecimal("minimumCommitment", minCommitment);
+-        $quote.setString("explanationCode", "ACV_MIN_COMMITMENT");
++        String existingCode = $quote.getString("explanationCode");
++        String newCode = (existingCode != null && !existingCode.isEmpty())
++            ? existingCode + "+ACV_MIN_COMMITMENT"
++            : "ACV_MIN_COMMITMENT";
++        $quote.setString("explanationCode", newCode);
+     }
+ end
