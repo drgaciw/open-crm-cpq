@@ -8,7 +8,7 @@ import reactor.core.publisher.Flux;
 import java.util.Map;
 
 @Service("cpq-agent-010")
-public class DealspecificDiscountAgent implements CpqAgent {
+public class DealSpecificDiscountAgent implements CpqAgent {
 
     @Override
     public String getAgentId() {
