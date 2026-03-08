@@ -8,7 +8,7 @@ This document captures Phase 0 reconciliation evidence for the pricing rule cata
 
 - Target DRL resource catalog: `backend/services/pricing-service/src/main/resources/rules/*.drl`
 - Seeded rules migration: `backend/services/pricing-service/src/main/resources/db/migration/V2__seed_default_rules.sql`
-- Legacy source (read-only input for mapping): `C:/Users/dgorn/my-code/open-crm-cpq/pricing-ai-rules-service/price-drools-service/src/main/resources/rules/PricingRules.drl`
+- Legacy source: external repo (pricing-ai-rules-service, removed from worktree)
 
 ## Findings Summary
 

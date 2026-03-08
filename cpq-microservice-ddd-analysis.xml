@@ -60,21 +60,21 @@
             <context name="Product Catalog">
                 <type>Core / Read-Heavy</type>
                 <responsibility>Single source of truth for taxonomy, static definitions, media assets.</responsibility>
-                <polyseme>CatalogItem</polyseme>
+                <polyseme>Product</polyseme>
             </context>
             <context name="Configuration Engine">
                 <type>Core / Compute-Heavy</type>
                 <responsibility>Constraint satisfaction, active session state, client-side/server-side validation.</responsibility>
-                <polyseme>ConfigurationOption</polyseme>
-                <aggregates>ConfigurationModel (Root), ConfigurationNode (Entity)</aggregates>
-                <value_objects>ConfigurationAttribute</value_objects>
+                <polyseme>Option</polyseme>
+                <aggregates>ProductOptionGroup (Root), ProductOption (Entity)</aggregates>
+                <value_objects>ProductAttribute</value_objects>
             </context>
             <context name="Pricing Engine">
                 <type>Core / Financial</type>
                 <responsibility>Base price, block pricing, volume discounts, AI optimization.</responsibility>
                 <polyseme>PriceBookEntry / RateCard</polyseme>
-                <aggregates>PricingProcedure/PriceRule (Root), RatePlan (Entity)</aggregates>
-                <value_objects>AggregatePrice</value_objects>
+                <aggregates>RuleSet/Rule (Root), PriceBookEntry (Entity)</aggregates>
+                <value_objects>Money</value_objects>
                 <integrations>Avalara/Vertex (Tax), External ERP (FX Rates)</integrations>
             </context>
             <context name="Quote Management">
@@ -145,20 +145,10 @@
         <rule>NEVER block the main thread for Document Generation; it must be fully asynchronous.</rule>
     </strict_constraints>
 
-    <output_format>
+    <response_output_contract>
         <instruction>For each step, provide complete, compilable code for the target microservice, including Dockerfiles and schema definitions. Stop and ask for validation after each Phase is complete.</instruction>
         <required_sections>
             <section order="1">Assumptions and bounded-context mapping</section>
-            <section order="2">Planned/completed file changes</section>
-            <section order="3">API/event/schema impact</section>
-            <section order="4">Validation run (tests/lint/build/manual)</section>
-            <section order="5">Residual risks and approval checkpoint</section>
-        </required_sections>
-    </output_format>
-
-    <response_output_contract>
-        <required_sections>
-            <section order="1">Assumptions and context classification</section>
             <section order="2">Planned or completed file changes</section>
             <section order="3">API/event/schema contract changes</section>
             <section order="4">Validation performed (tests/lints/build/manual)</section>
