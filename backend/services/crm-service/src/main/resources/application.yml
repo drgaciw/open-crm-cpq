@@ -38,6 +38,10 @@ spring:
       time-to-live: 600000
       cache-null-values: false
 
+services:
+  deal-desk:
+    url: ${DEAL_DESK_SERVICE_URL:http://localhost:8085}
+
 springdoc:
   api-docs:
     path: /api-docs

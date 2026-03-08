@@ -27,6 +27,7 @@
         <module>services/pricing-service</module>
         <module>services/product-service</module>
         <module>services/quote-service</module>
+        <module>services/deal-desk-service</module>
         <module>services/ai-service</module>
         <module>services/pricing-ai-rules-service</module>
     </modules>
@@ -101,6 +102,18 @@
                 <groupId>com.opencrm</groupId>
                 <artifactId>rules-engine</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- EasyRules -->
+            <dependency>
+                <groupId>org.jeasy</groupId>
+                <artifactId>easy-rules-core</artifactId>
+                <version>4.1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jeasy</groupId>
+                <artifactId>easy-rules-support</artifactId>
+                <version>4.1.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

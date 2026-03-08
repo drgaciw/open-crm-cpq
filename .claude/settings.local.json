@@ -63,7 +63,11 @@
       "Bash(test:*)",
       "Bash(python3:*)",
       "Bash(./mvnw.cmd:*)",
-      "Bash(mvnw.cmd:*)"
+      "Bash(mvnw.cmd:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(# Check the existing crm-service deal domain for potential overlap find /mnt/c/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/elastic-elgamal/backend/services/crm-service/src -name \"\"*.java\"\" | grep -i deal | sort || find \"\"C:/Users/dgorn/my-code/open-crm-cpq/.claude/worktrees/elastic-elgamal/backend/services/crm-service\"\" -name \"\"*.java\"\")"
     ]
   }
 }

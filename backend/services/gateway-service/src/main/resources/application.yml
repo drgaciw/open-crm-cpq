@@ -65,6 +65,14 @@ spring:
           filters:
             - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
 
+        # Deal Desk Service routes
+        - id: deal-desk-service
+          uri: ${DEAL_DESK_SERVICE_URI:http://localhost:8085}
+          predicates:
+            - Path=/api/deal-desk/**
+          filters:
+            - CircuitBreaker=name=dealDeskCircuitBreaker,fallbackUri=forward:/fallback/deal-desk
+
         # Communication Service routes
         - id: communication-service
           uri: ${COMMUNICATION_SERVICE_URI:lb://communication-service}
@@ -132,6 +140,8 @@ resilience4j:
         baseConfig: default
       quoteCircuitBreaker:
         baseConfig: default
+      dealDeskCircuitBreaker:
+        baseConfig: default
       communicationCircuitBreaker:
         baseConfig: default
       aiCircuitBreaker:
@@ -193,3 +203,8 @@ spring:
           uri: http://localhost:8084
           predicates:
             - Path=/api/v1/quotes/**
+
+        - id: deal-desk-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/deal-desk/**
