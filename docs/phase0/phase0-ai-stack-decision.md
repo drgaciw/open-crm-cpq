@@ -9,7 +9,7 @@ Recommendation:
 Why:
 - The target module is explicitly built/configured for Spring AI `0.8.1` and Azure OpenAI (`backend/services/ai-service/pom.xml:17`, `backend/services/ai-service/pom.xml:52`, `backend/services/ai-service/src/main/resources/application.yml:25`, `backend/services/ai-service/src/main/resources/application.yml:26`).
 - The target codebase still contains stubbed agents with `ChatClient` TODOs, so the fastest Phase 4A evidence path is implementing against the existing contract rather than upgrading the AI API surface first (`backend/services/ai-service/src/main/java/com/opencrm/ai/config/AgentConfiguration.java:7`, `backend/services/ai-service/src/main/java/com/opencrm/ai/agent/pricing/CustomerSegmentDiscountAgent.java:30`).
-- The source repo patterns are useful, but they are on Spring AI `1.0.0` and are `ChatModel`-centric, which is a version/API migration, not just a copy/paste integration (`pricing-ai-rules-service/price-drools-service/pom.xml:23`, `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:22`, `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:45`).
+- The source repo patterns (github.com/drgaciw/pricing-ai-rules-service) are useful, but they are on Spring AI `1.0.0` and are `ChatModel`-centric, which is a version/API migration, not just a copy/paste integration.
 
 ## Path Definitions
 
@@ -36,34 +36,13 @@ Why:
   - `backend/services/ai-service/src/main/java/com/opencrm/ai/agent/pricing/CustomerSegmentDiscountAgent.java:30`
   - `backend/services/ai-service/src/main/java/com/opencrm/ai/agent/pricing/CustomerSegmentDiscountAgent.java:35`
 
-### Source repo (pricing AI reference)
+### Source repo (pricing AI reference - external, removed from worktree)
 
-- Source repo pins Spring AI `1.0.0` and uses `spring-ai-openai` (not Azure starter):
-  - `pricing-ai-rules-service/price-drools-service/pom.xml:23`
-  - `pricing-ai-rules-service/price-drools-service/pom.xml:99`
-  - `pricing-ai-rules-service/price-drools-service/pom.xml:270`
-- Source config explicitly states Spring AI `1.0.0` replaced `ChatClient` with `ChatModel` and builds specialized `ChatModel` beans:
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:22`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:50`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:72`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:94`
-- Source runtime usage is `ChatModel` + `Prompt` + structured output/retry patterns (good design input, but version-specific):
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:45`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:48`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:49`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:155`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:223`
-- Source also includes a useful `ChatModel` fallback pattern via `@ConditionalOnMissingBean`:
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/AppConfig.java:27`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/AppConfig.java:28`
-  - `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/AppConfig.java:29`
-- Source uses generic OpenAI properties (`spring.ai.openai.*`), while target is Azure-specific (`spring.ai.azure.openai.*`):
-  - `pricing-ai-rules-service/price-drools-service/src/main/resources/application.yml:38`
-  - `pricing-ai-rules-service/price-drools-service/src/main/resources/application.yml:39`
-  - `pricing-ai-rules-service/price-drools-service/src/main/resources/application.yml:40`
-  - `backend/services/ai-service/src/main/resources/application.yml:26`
-  - `backend/services/ai-service/src/main/resources/application.yml:27`
-  - `backend/services/ai-service/src/main/resources/application.yml:28`
+- External source: github.com/drgaciw/pricing-ai-rules-service (no longer in this worktree).
+- Source repo pins Spring AI `1.0.0` and uses `spring-ai-openai` (not Azure starter). Config explicitly states Spring AI `1.0.0` replaced `ChatClient` with `ChatModel` and builds specialized `ChatModel` beans.
+- Source runtime usage: `ChatModel` + `Prompt` + structured output/retry patterns (good design input for Path B, but version-specific).
+- Source includes useful `ChatModel` fallback pattern via `@ConditionalOnMissingBean`.
+- Source uses generic OpenAI properties (`spring.ai.openai.*`), while target is Azure-specific (`spring.ai.azure.openai.*`).
 
 ## Path A vs Path B Evaluation
 
@@ -83,7 +62,7 @@ Cons:
 
 Pros:
 - Aligns with the modernization direction that calls out Spring AI `1.0+` (`MODERNIZATION_PLAN.md:158`).
-- Enables reuse of stronger source patterns: multi-bean model profiles, retry, fallback, structured output (`pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/SpringAiConfig.java:50`, `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/config/AppConfig.java:27`, `pricing-ai-rules-service/price-drools-service/src/main/java/com/cascade/price/drools/ai/sequential/SequentialThinkingService.java:49`).
+- Enables reuse of stronger source patterns from pricing-ai-rules-service: multi-bean model profiles, retry, fallback, structured output.
 
 Cons:
 - Higher scope/risk for Phase 4A because it combines: Spring AI upgrade, provider wiring changes, agent implementation work, and potential API refactors (`ChatClient` -> `ChatModel`).

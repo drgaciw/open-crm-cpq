@@ -1,0 +1,768 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Product Configuration Management - Agentic Development Research Prompt
+    Scope: CPQ product configuration service; all product-management business operations.
+    Alignment: OpenCRM CPQ (primary), with unique operations from Oracle CPQ,
+               SAP CPQ, Conga, Configit, Zilliant, and Cincom.
+    Scale: Enterprise (hundreds of thousands of products, complex rule sets, high-throughput).
+-->
+<agent_prompt>
+    <system_context>
+        <role>CPQ Product Configuration Domain Specialist and Agentic Architecture Designer</role>
+        <primary_objective>
+            Guide the agentic development of a CPQ product configuration service that supports all business
+            operations performed by product management in modern CPQ software. Ensure coverage of product rules
+            management, product bundling, guided selling, product governance, and all related functions.
+        </primary_objective>
+        <design_decisions>
+            <decision id="D1" question="Vendor alignment">
+                <answer>OpenCRM CPQ as primary convention (object model, naming, rule types).
+                Include unique capabilities from Oracle CPQ (BOM mapping, Product Workbench), SAP CPQ (variant
+                configuration), Configit (Virtual Tabulation), Conga (constraint rules), and Zilliant/Zoho
+                (AI-suggested rules).</answer>
+            </decision>
+            <decision id="D2" question="Expected scale">
+                <answer>Enterprise: hundreds of thousands of products, tens of thousands of rules and attributes,
+                millions of valid configuration combinations. Design for constraint-solver and cacheable rule
+                evaluation with Redis-backed decision matrices.</answer>
+            </decision>
+            <decision id="D3" question="Recommendation approach">
+                <answer>AI-suggested, human-approved. ML models learn from quoting activity and generate
+                recommendation/bundling/rule suggestions. Suggestions are created in a disabled/draft state;
+                product managers review, tune, and activate.</answer>
+            </decision>
+            <decision id="D4" question="Multi-currency / multi-language">
+                <answer>Not at this time. Single-currency, single-language scope; architecture should not preclude
+                future localization but will not implement it now.</answer>
+            </decision>
+            <decision id="D5" question="External PLM / ERP sync">
+                <answer>Not at this time. Product data is authoritative within this service; future ACL integration
+                points should be reserved but not implemented.</answer>
+            </decision>
+        </design_decisions>
+    </system_context>
+
+    <!-- ================================================================
+         OPENCRM CPQ OBJECT MODEL ALIGNMENT
+         ================================================================ -->
+    <data_model_alignment vendor="OpenCRM CPQ">
+        <description>
+            Core objects follow OpenCRM CPQ naming conventions. Extensions add capabilities
+            sourced from Oracle, SAP, and Configit that the baseline model does not natively provide.
+        </description>
+
+        <core_object name="Product">
+            <description>Goods or services sold individually or as bundle components.</description>
+            <key_fields>Sku, Name, Description, ProductType, Category, Status, ListPrice, Currency, BillingFrequency, UnitOfMeasure, Configurable, Bundle, Metadata</key_fields>
+        </core_object>
+
+        <core_object name="PriceBookEntry">
+            <description>Links a Product to a PriceBook with list and floor prices in a specific currency.</description>
+            <key_fields>PriceBookId, ProductExternalId, ListPrice, FloorPrice, Currency</key_fields>
+        </core_object>
+
+        <core_object name="ProductOption">
+            <description>Connects a component product to a product option group within a bundle.</description>
+            <key_fields>OptionGroupId, ProductId, Name, Description, PriceAdjustment, AdjustmentType, DefaultOption, SortOrder</key_fields>
+        </core_object>
+
+        <core_object name="ProductOptionGroup">
+            <description>Groups ProductOption records into logical sections within a bundle.</description>
+            <key_fields>ProductId, Name, Description, SelectionType, MinSelections, MaxSelections, SortOrder</key_fields>
+        </core_object>
+
+        <core_object name="ConfigurationRule">
+            <description>Business logic governing product selection, validation, alerts, and filtering.</description>
+            <key_fields>Name, RuleType (REQUIRES | EXCLUDES | RECOMMENDS | DEFAULT | VALIDATES), SourceProductId, TargetProductId, ConditionExpression, ErrorMessage, Priority, Status</key_fields>
+        </core_object>
+
+        <core_object name="ProductAttribute">
+            <description>Attribute definition used to drive configuration choices and field mapping behavior.</description>
+            <key_fields>Name, DisplayName, DataType, Required, DefaultValue, ValidationRegex, EnumValues, SortOrder</key_fields>
+        </core_object>
+
+
+        <extension_object name="ProductVersion" source="Oracle EPC / Configit CLM">
+            <description>Tracks draft and released versions of a product definition with effective dates.</description>
+            <key_fields>ProductId, VersionNumber, Status (Draft | Released | Archived), EffectiveStartDate, EffectiveEndDate, ClonedFromVersionId</key_fields>
+        </extension_object>
+
+        <extension_object name="BOMMapping" source="Oracle CPQ Product Workbench">
+            <description>Maps a configured product to a manufacturing BOM structure.</description>
+            <key_fields>ProductId, BOMItemId, ProductOptionGroupId, Effectivity, AutoGenerated</key_fields>
+        </extension_object>
+
+        <extension_object name="GuidedSellingFlow" source="OpenCRM CPQ + Cincom">
+            <description>Dynamic questionnaire that maps customer needs to product recommendations.</description>
+            <key_fields>Name, Questions (ordered JSON), OutputProducts, OutputBundles, Active</key_fields>
+        </extension_object>
+
+        <extension_object name="RecommendationRule" source="Zilliant / Oracle Intelligence Portal">
+            <description>AI-generated or manual product recommendation (cross-sell, upsell, substitute).</description>
+            <key_fields>SourceProductId, TargetProductId, Type (CrossSell | Upsell | Substitute | FrequentlyBoughtTogether), Confidence, Status (Draft | Active | Retired), ApprovedBy, ApprovedDate</key_fields>
+        </extension_object>
+    </data_model_alignment>
+
+    <!-- ================================================================
+         AGENTIC ARCHITECTURAL FOUNDATIONS
+         ================================================================ -->
+    <architectural_foundations>
+        <overview>
+            Agentic CPQ is implemented as a governed multi-agent mesh rather than a monolith.
+            Specialized agents collaborate through an orchestration layer with strict policy controls.
+        </overview>
+
+        <agentic_frameworks>
+            <framework name="GitHub Copilot SDK">
+                <use_case>Primary agent runtime for CPQ workflows: planning, tool invocation, file edits, and structured agent behavior.</use_case>
+            </framework>
+            <framework name="Copilot CLI Server (JSON-RPC)">
+                <use_case>Execution bridge used by SDK clients for deterministic tool orchestration, command execution, and runtime control.</use_case>
+            </framework>
+            <framework name="Copilot Tools and Permissions">
+                <use_case>Governed tool surface for filesystem, git, web, and automation actions with least-privilege enforcement.</use_case>
+            </framework>
+            <framework name="MCP Integration Layer">
+                <use_case>Standardized integration of external enterprise systems and data sources through MCP tool contracts.</use_case>
+            </framework>
+        </agentic_frameworks>
+
+        <agent_types>
+            <agent_type name="Copilot Interactive Session Agents">
+                <purpose>Handle user-facing CPQ interactions with conversational context, guided assistance, and grounded responses.</purpose>
+            </agent_type>
+            <agent_type name="Copilot Autonomous Workflow Agents">
+                <purpose>Run background CPQ operations asynchronously through approved tools and MCP integrations (sync jobs, validations, enrichment).</purpose>
+            </agent_type>
+            <agent_type name="Copilot SDK Orchestration Agents">
+                <purpose>Use the Copilot SDK runtime to plan tasks, invoke tools through the CLI server, evaluate results, and adapt execution in real time.</purpose>
+            </agent_type>
+        </agent_types>
+
+        <agentic_tool_registry>
+            <description>Controlled registry of APIs and systems agents are allowed to invoke.</description>
+            <components>API Gateway, MCP tool contracts, service connectors, policy enforcement hooks</components>
+            <constraint>Agents can only call tools explicitly allowlisted for their role.</constraint>
+        </agentic_tool_registry>
+    </architectural_foundations>
+
+    <!-- ================================================================
+         SEMANTIC LAYER, EKG, AND RAG CONTEXT MANAGEMENT
+         ================================================================ -->
+    <semantic_and_context_layer>
+        <semantic_layer>
+            <description>
+                Enterprise ontology and semantic model defining products, features, constraints,
+                pricing entities, approval policies, and lifecycle states.
+            </description>
+            <artifacts>Business glossary, taxonomy model, relationship graph, canonical schemas</artifacts>
+        </semantic_layer>
+
+        <enterprise_knowledge_graph>
+            <description>
+                Runtime instantiation of enterprise ontology connecting Product, bundles, rules,
+                pricebooks, approvals, quotes, and historical outcomes.
+            </description>
+            <purpose>Provide machine-legible relational context for agentic reasoning.</purpose>
+        </enterprise_knowledge_graph>
+
+        <context_management>
+            <llm_constraint>LLMs are stateless and context-window limited.</llm_constraint>
+            <mitigation>
+                Retrieval-Augmented Generation fetches transaction-relevant context from EKG,
+                CRM, CPQ, and approval history stores at runtime.
+            </mitigation>
+            <components>Vector database, retrieval policies, context pack builder, citation metadata</components>
+            <guarantee>Agent outputs must be grounded in retrieved enterprise truth before action.</guarantee>
+        </context_management>
+
+        <accuracy_and_complexity_controls>
+            <risk>Pure generative reasoning degrades with high combinatorial configuration complexity.</risk>
+            <pattern>
+                Hybrid symbolic AI: LLM interprets intent and drafts logic; deterministic constraint
+                solver validates BOM viability and compatibility before quote commit.
+            </pattern>
+            <validation>Complexity benchmark suite gates releases for high-dimensional rule spaces.</validation>
+        </accuracy_and_complexity_controls>
+    </semantic_and_context_layer>
+
+    <!-- ================================================================
+         PRODUCT MANAGEMENT OPERATIONS (COMPLETE CATALOG)
+         ================================================================ -->
+    <product_management_operations>
+
+        <!-- ========== 1. PRODUCT RULES MANAGEMENT ========== -->
+        <operation_group id="OP01" name="Product Rules Management">
+            <description>
+                Enforce business logic, validate configurations, and constrain product combinations.
+                The implementation model uses five configuration rule types:
+                REQUIRES, EXCLUDES, RECOMMENDS, DEFAULT, and VALIDATES.
+            </description>
+
+            <rule_type name="Validation Rules" canonical_type="VALIDATES">
+                <purpose>Block save/submit when configuration violates business constraints.</purpose>
+                <mechanics>
+                    <step>Error conditions compare tested object fields against filter values.</step>
+                    <step>ConditionsMet logic: All, Any, or Custom (advanced boolean expression).</step>
+                    <step>ErrorMessage displayed to user on rule fire.</step>
+                </mechanics>
+                <examples>
+                    <example>Prevent quoting product X for accounts in industry Y.</example>
+                    <example>Enforce minimum quantity thresholds on high-value SKUs.</example>
+                </examples>
+            </rule_type>
+
+            <rule_type name="Alert Rules" canonical_type="RECOMMENDS">
+                <purpose>Warn users of potential issues without blocking; user may proceed or return to fix.</purpose>
+                <mechanics>
+                    <step>Same condition structure as Validation but non-blocking.</step>
+                    <step>Useful for soft policy (e.g., margin warning, non-standard terms notice).</step>
+                </mechanics>
+            </rule_type>
+
+            <rule_type name="Selection Rules" canonical_type="DEFAULT">
+                <purpose>Automatically add, remove, enable, disable, show, or hide options without user notification.</purpose>
+                <mechanics>
+                    <step>ConfigurationRule records define automated behavior through RuleType and target-product mappings.</step>
+                    <step>Filter-based actions can target multiple products at once via field matching (e.g., all products where isAccessory = true).</step>
+                    <step>Ideal for auto-including mandatory accessories or hiding incompatible options.</step>
+                </mechanics>
+            </rule_type>
+
+            <rule_type name="Filter Rules" canonical_type="EXCLUDES">
+                <purpose>Pre-filter which products are available in a dynamic bundle before the user sees them.</purpose>
+                <mechanics>
+                    <step>Applied at feature level; limits the product picker to matching criteria.</step>
+                    <step>Supports Optional filter (user-initiated) and Default filter (auto-applied on load).</step>
+                    <step>Implemented as REQUIRES and EXCLUDES relationships on ConfigurationRule records.</step>
+                </mechanics>
+            </rule_type>
+
+            <rule_evaluation_control>
+                <scope_options>
+                    <option value="Product">Fires on the Product Configuration page (bundle configurator).</option>
+                    <option value="Quote">Fires on the quote line workspace.</option>
+                </scope_options>
+                <evaluation_events>
+                    <event value="Load">Evaluate when configuration page or quote line editor loads.</event>
+                    <event value="Edit">Evaluate after user makes a change.</event>
+                    <event value="Save">Evaluate on save/submit.</event>
+                    <event value="Always">Evaluate on every event.</event>
+                </evaluation_events>
+                <enterprise_note>
+                    At enterprise scale, batch rule evaluations and use Redis-cached decision matrices
+                    to avoid O(n*m) rule-vs-product evaluations on every interaction.
+                </enterprise_note>
+            </rule_evaluation_control>
+        </operation_group>
+
+        <!-- ========== 2. OPTION CONSTRAINTS ========== -->
+        <operation_group id="OP02" name="Option Constraints">
+            <description>
+                Intra-bundle dependency and exclusion constraints between specific options.
+                Separate from product rules; operates at the option-pair level.
+            </description>
+
+            <constraint_type name="Dependency">
+                <purpose>When option A is selected, option B must also be selected (and vice versa for deselection).</purpose>
+                <field>OptionChecksBefore: controls evaluation order.</field>
+            </constraint_type>
+
+            <constraint_type name="Exclusion">
+                <purpose>When option A is selected, option B is automatically deselected/disabled.</purpose>
+                <field>Prevents incompatible option combinations within a single bundle.</field>
+            </constraint_type>
+        </operation_group>
+
+        <!-- ========== 3. PRODUCT BUNDLING ========== -->
+        <operation_group id="OP03" name="Product Bundling">
+            <description>
+                Combine products into sellable packages. Lead product (always included) plus
+                follower products connected via ProductOption records.
+            </description>
+
+            <bundle_type name="Static Bundles">
+                <characteristic>Manually curated ProductOption records with fixed option set.</characteristic>
+                <characteristic>Best for stable product mixes; changes require manual add/remove.</characteristic>
+            </bundle_type>
+
+            <bundle_type name="Dynamic Bundles">
+                <characteristic>Filter rules auto-populate available options based on product field criteria.</characteristic>
+                <characteristic>New products matching filters appear automatically; discontinued ones drop out.</characteristic>
+                <characteristic>Filter types: Optional (user picks) vs. Default (auto-applied).</characteristic>
+            </bundle_type>
+
+            <bundle_type name="Nested Bundles">
+                <characteristic>A bundle option can itself be a bundle, enabling multi-level configuration.</characteristic>
+                <characteristic>Common for complex solutions (e.g., server → chassis → drive bay → drives).</characteristic>
+            </bundle_type>
+
+            <bundle_elements>
+                <element name="ProductOption">OptionGroup → Product link; includes quantity, pricing adjustment, default selection, and ordering fields.</element>
+                <element name="ProductOptionGroup">Groups options logically; sets min/max selection counts; controls SelectionType.</element>
+                <element name="ProductAttribute">Custom product attributes influencing configuration behavior and downstream field mapping.</element>
+                <element name="ConfigurationRule">Intra-bundle REQUIRES or EXCLUDES constraints between two options.</element>
+            </bundle_elements>
+        </operation_group>
+
+        <!-- ========== 4. PRODUCT CATALOG & TAXONOMY ========== -->
+        <operation_group id="OP04" name="Catalog and Taxonomy">
+            <description>Organize products into hierarchies and classifications for discovery, governance, and rule scoping.</description>
+
+            <capability name="Product Families">
+                <characteristic>Top-level classification on Product; used for rule scoping, reporting, and catalog filtering.</characteristic>
+            </capability>
+
+            <capability name="Categories and Hierarchies">
+                <characteristic>Products associated with categories for logical grouping (e.g., Hardware → Servers → Rack-Mount).</characteristic>
+                <characteristic>Hierarchies allow subdivision into progressively finer groups.</characteristic>
+                <characteristic>Catalog browsing UI displays categories with associated products.</characteristic>
+            </capability>
+
+            <capability name="Product Groups">
+                <characteristic>Cross-cutting groupings independent of family (e.g., "Promotional Items," "New Releases").</characteristic>
+                <characteristic>Used as scope for constraint rules and recommendation targeting.</characteristic>
+            </capability>
+
+            <capability name="Product Definitions">
+                <characteristic>Core fields: Sku, Name, Description, ProductType, Category, Status, Configurable, Bundle.</characteristic>
+                <characteristic>Commercial fields: ListPrice, Currency, BillingFrequency, UnitOfMeasure.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 5. ATTRIBUTES & CONFIGURATION ========== -->
+        <operation_group id="OP05" name="Attributes and Configuration">
+            <description>Enable product customization and configuration without creating multiple SKUs.</description>
+
+            <capability name="Product Attributes">
+                <characteristic>Associate specifications (color, size, model, capacity) enabling customer customization.</characteristic>
+                <characteristic>Input types: picklist, free-form, computed/display, product reference.</characteristic>
+                <characteristic>Attributes can be placed within features when related to specific options.</characteristic>
+            </capability>
+
+            <capability name="Attribute Groups">
+                <characteristic>Organize related attributes together (e.g., "Physical Specs," "Performance Specs").</characteristic>
+                <characteristic>Must be associated with products to appear on configuration UI.</characteristic>
+            </capability>
+
+            <capability name="Configuration Attributes">
+                <characteristic>Bundle-level attributes that drive option behavior.</characteristic>
+                <characteristic>AppliedImmediately: controls whether changes re-evaluate rules instantly.</characteristic>
+                <characteristic>TargetField: maps attribute value to a field on the quote line.</characteristic>
+            </capability>
+
+            <capability name="Attribute-Based Configuration (SAP / Oracle)">
+                <characteristic>Configuration driven by attribute values and constraint expressions rather than explicit option lists.</characteristic>
+                <characteristic>Variant configuration: define characteristics and values; solver resolves valid combinations.</characteristic>
+                <characteristic>Supports complex BOM/engineering rules and manufacturing constraints.</characteristic>
+            </capability>
+
+            <capability name="Cross-Object Field Mapping">
+                <characteristic>Paired fields across objects (Product → QuoteLine, ProductOption → QuoteLine, QuoteLine → Subscription) that auto-synchronize values.</characteristic>
+                <characteristic>Use for propagating SLA level, discount percentage, subscription dates.</characteristic>
+                <characteristic>Limit count to avoid performance impact at enterprise scale.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 6. GUIDED SELLING ========== -->
+        <operation_group id="OP06" name="Guided Selling">
+            <description>
+                Dynamic, needs-based product selection. Customer or sales rep answers questions;
+                system maps answers to recommended products or bundles.
+            </description>
+
+            <capability name="Guided Selling Flows">
+                <characteristic>Ordered question sets (company size, industry, use case, budget).</characteristic>
+                <characteristic>Follow-up questions branch dynamically based on prior answers.</characteristic>
+                <characteristic>Output: filtered product list, recommended bundles, or auto-configured quotes.</characteristic>
+            </capability>
+
+            <capability name="Needs Assessment Integration">
+                <characteristic>Guided selling inputs feed into recommendation engine and filter rules.</characteristic>
+                <characteristic>Reduces time-to-quote for new reps; ensures consistent product selection.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 7. PRODUCT LIFECYCLE MANAGEMENT ========== -->
+        <operation_group id="OP07" name="Product Lifecycle Management">
+            <description>
+                Manage products through introduction, growth, maturity, and discontinuation.
+                Versioning model sourced from Oracle EPC and Configit CLM.
+            </description>
+
+            <capability name="Versioning">
+                <characteristic>Draft and Released versions with unique version numbers.</characteristic>
+                <characteristic>Effective dates (start/end) control when a version is active.</characteristic>
+                <characteristic>Published versions are frozen; cloning creates new draft for modifications.</characteristic>
+                <characteristic>All related entities (options, rules, attributes) are cloned with the version.</characteristic>
+            </capability>
+
+            <capability name="Product Introduction">
+                <characteristic>New product starts as Draft; goes through review/approval gate before activation.</characteristic>
+                <characteristic>Staged rollout: make visible to internal users first, then selected accounts, then general availability.</characteristic>
+            </capability>
+
+            <capability name="End-of-Life / Discontinuation">
+                <option name="Archive">Irreversible; product unavailable for all operations; historical records remain.</option>
+                <option name="Deactivate">Reversible; blocks new quotes but preserves renewals/amendments on existing subscriptions.</option>
+                <option name="Sunset with Replacement">Map retired product to successor SKU; auto-suggest replacement during amendments/renewals.</option>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 8. PRODUCT RECOMMENDATIONS ========== -->
+        <operation_group id="OP08" name="Product Recommendations (AI-Suggested, Human-Approved)">
+            <description>
+                Cross-sell, upsell, substitute, and compatibility suggestions. ML models generate
+                recommendations; product managers review and activate.
+            </description>
+
+            <capability name="AI Recommendation Pipeline">
+                <step>ML models trained on quoting activity (line co-occurrence, win/loss, attach rates).</step>
+                <step>Models: Frequently Bought Together, Customers Also Bought, Upsell Opportunity, Substitute.</step>
+                <step>Recommendations created with confidence score in Draft status.</step>
+                <step>Auto-refresh cycle (configurable, e.g., every 15 days) regenerates suggestions.</step>
+            </capability>
+
+            <capability name="Human Review and Activation">
+                <step>Product managers view pending recommendations in admin UI.</step>
+                <step>Filter by confidence threshold, product family, recommendation type.</step>
+                <step>Approve → Active (visible to sales), Reject → Retired, Edit → adjust target/type.</step>
+                <step>Audit trail records who approved/rejected and when.</step>
+            </capability>
+
+            <capability name="Rule-Based Recommendations (Manual)">
+                <characteristic>Product managers manually define cross-sell/upsell mappings.</characteristic>
+                <characteristic>Coexist with AI-generated recommendations; manual rules take precedence on conflict.</characteristic>
+            </capability>
+
+            <capability name="Account-Specific Recommendations (Zilliant)">
+                <characteristic>Recommendations personalized by customer industry, purchase history, and segment.</characteristic>
+                <characteristic>Displayed in CPQ UI and self-service commerce portals.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 9. PRICING ASSOCIATION ========== -->
+        <operation_group id="OP09" name="Pricing Association">
+            <description>
+                Product managers associate products with price books and price list items.
+                The Pricing Engine bounded context owns calculation logic; this service owns the association.
+            </description>
+
+            <capability name="Price Books (PriceBook)">
+                <characteristic>Standard Price Book: baseline prices for all products.</characteristic>
+                <characteristic>Custom Price Books: segment/channel-specific pricing (e.g., Partner, Enterprise, Government).</characteristic>
+                <characteristic>A product must have a Standard Price Book entry before appearing in custom books.</characteristic>
+            </capability>
+
+            <capability name="Price Book Entries (PriceBookEntry)">
+                <characteristic>Per-product price in a specific price book.</characteristic>
+                <characteristic>Effective dates (start/end) for time-bound pricing.</characteristic>
+                <characteristic>Price types: One-Time, Recurring, Usage-Based.</characteristic>
+            </capability>
+
+            <capability name="Block Pricing and Volume Tiers">
+                <characteristic>Define quantity-based pricing tiers on PriceBookEntry or product.</characteristic>
+                <characteristic>Price breaks: flat rate per tier or sliding scale.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 9B. DYNAMIC PRICING AND DISCOUNT GOVERNANCE ========== -->
+        <operation_group id="OP09B" name="Dynamic Pricing and Discount Governance">
+            <description>
+                Agentic pricing layer continuously optimizes competitiveness and profitability while
+                enforcing strict margin guardrails through autonomous governance.
+            </description>
+
+            <capability name="Demand-Based Dynamic Pricing">
+                <characteristic>Ingest market demand signals and adjust target pricing bands in near real time.</characteristic>
+                <characteristic>Increase during spikes and relax during demand lulls under policy limits.</characteristic>
+            </capability>
+
+            <capability name="Cost-Plus Dynamic Pricing">
+                <characteristic>Track procurement and supply-chain cost shifts and auto-preserve margin floors.</characteristic>
+                <characteristic>Recalculate recommended price ranges when input costs fluctuate materially.</characteristic>
+            </capability>
+
+            <capability name="Segmented and Performance Pricing">
+                <characteristic>Tailor price recommendations by customer segment, region, CLTV, and deal velocity.</characteristic>
+                <characteristic>Use historical win/loss outcomes to tune conversion-vs-margin tradeoffs.</characteristic>
+            </capability>
+
+            <capability name="Automated Discount Governance">
+                <characteristic>Instantly evaluate requested discounts against policy matrices and approval thresholds.</characteristic>
+                <characteristic>Auto-approve in-policy requests; route exceptions to correct approver without manual handoffs.</characteristic>
+                <characteristic>Maintain immutable logs for every override and exception decision.</characteristic>
+            </capability>
+
+            <autonomy_model>
+                <current_state>Human-in-the-loop for strategic overrides.</current_state>
+                <future_state>Progressive autonomy as trust, data quality, and policy confidence increase.</future_state>
+            </autonomy_model>
+        </operation_group>
+
+        <!-- ========== 10. FEATURE COMPARISON ========== -->
+        <operation_group id="OP10" name="Feature Sets and Comparison">
+            <description>Enable side-by-side product comparison for informed customer selection.</description>
+            <capability name="Feature Sets">
+                <characteristic>Configure feature dimensions (e.g., Storage, Bandwidth, Support Level) across product family.</characteristic>
+                <characteristic>Comparison matrix displayed during product selection or guided selling.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 11. BOM MAPPING (Oracle CPQ) ========== -->
+        <operation_group id="OP11" name="BOM Mapping and Manufacturing Integration">
+            <description>
+                Map configured products to bill-of-materials structures for manufacturing/fulfillment.
+                Sourced from Oracle CPQ Product Workbench; not native to the baseline OpenCRM CPQ model.
+            </description>
+
+            <capability name="BOM Mapping Rules">
+                <characteristic>Define how configuration choices translate to BOM line items.</characteristic>
+                <characteristic>Auto-generate or manually create configuration-to-BOM mappings.</characteristic>
+                <characteristic>Effectivity dates control which BOM version applies.</characteristic>
+            </capability>
+
+            <capability name="Product Workbench">
+                <characteristic>Admin UI for managing BOM configurations, regenerating outdated mappings.</characteristic>
+                <characteristic>REST API for programmatic BOM management.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 12. PRODUCT GOVERNANCE & CHANGE MANAGEMENT ========== -->
+        <operation_group id="OP12" name="Product Governance and Change Management">
+            <description>
+                Enterprise controls for product data changes: approval workflows, audit trails,
+                role-based access, and compliance logging.
+            </description>
+
+            <capability name="Change Approval Workflow">
+                <characteristic>Product definition changes (new product, rule change, price update) require approval before activation.</characteristic>
+                <characteristic>Multi-level approval chains based on change type and impact scope.</characteristic>
+                <characteristic>Approval states: Draft → Pending Approval → Approved → Active (or Rejected).</characteristic>
+            </capability>
+
+            <capability name="Audit Trail">
+                <characteristic>All mutations to products, rules, bundles, and attributes are logged with user, timestamp, and before/after values.</characteristic>
+                <characteristic>Compliance-grade: immutable append-only log.</characteristic>
+                <characteristic>Queryable for governance dashboards and regulatory audits.</characteristic>
+            </capability>
+
+            <capability name="Role-Based Access Control">
+                <characteristic>Product Manager: full CRUD on products, rules, bundles, attributes.</characteristic>
+                <characteristic>Pricing Analyst: read products, manage price book entries.</characteristic>
+                <characteristic>Sales Admin: read-only catalog; manage guided selling flows.</characteristic>
+                <characteristic>Viewer: read-only catalog access.</characteristic>
+            </capability>
+
+            <capability name="Critical Field Change Control (Netwrix / Conga)">
+                <characteristic>Designate fields under change control (e.g., BillingFrequency, pricing tier).</characteristic>
+                <characteristic>Auto-generate compliance event when controlled field is modified.</characteristic>
+                <characteristic>Optional: block non-compliant changes until governance review.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 13. BULK MANAGEMENT ========== -->
+        <operation_group id="OP13" name="Bulk Management">
+            <description>Scale product and attribute management for enterprise catalogs.</description>
+
+            <capability name="Import / Export">
+                <characteristic>Bulk create/update products, attributes, options, rules via Excel/CSV.</characteristic>
+                <characteristic>Template-based export for offline editing and re-import.</characteristic>
+                <characteristic>Validation on import: reject rows that violate schema or rule constraints.</characteristic>
+            </capability>
+
+            <capability name="Mass Actions">
+                <characteristic>Mass activate/deactivate products.</characteristic>
+                <characteristic>Mass update fields (e.g., change family for 500 products).</characteristic>
+                <characteristic>Mass clone product with options and rules.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 14. SUBSCRIPTION PRODUCT MANAGEMENT ========== -->
+        <operation_group id="OP14" name="Subscription Product Management">
+            <description>
+                Define and manage subscription-based products for recurring revenue models.
+                Subscription fields and amendment/renewal behavior in the OpenCRM CPQ domain model.
+            </description>
+
+            <capability name="Subscription Product Definition">
+                <characteristic>RenewalModel: Renewable, One-Time, Evergreen.</characteristic>
+                <characteristic>PricingModel: Fixed Price, Percent of Total, Custom.</characteristic>
+                <characteristic>TermMonths: default term length in months.</characteristic>
+            </capability>
+
+            <capability name="Amendment and Renewal Behavior">
+                <characteristic>Products flagged as renewable generate renewal opportunity lines automatically.</characteristic>
+                <characteristic>Amendment quotes allow mid-term add/remove/swap of subscription components.</characteristic>
+                <characteristic>Product manager defines which products are amendable and renewal-eligible.</characteristic>
+            </capability>
+        </operation_group>
+
+        <!-- ========== 15. CONVERSATIONAL QUOTING AND NEXT-BEST-ACTION ========== -->
+        <operation_group id="OP15" name="Conversational Quoting and Next-Best-Action">
+            <description>
+                Quote creation agents assemble full compliant proposals from natural-language commands
+                and continuously recommend next-best actions based on buyer intent signals.
+            </description>
+
+            <capability name="Quote Creation Agent">
+                <characteristic>Accepts text or voice instructions and builds multi-line quotes autonomously.</characteristic>
+                <characteristic>Retrieves opportunity context, selects products, applies governed pricing, and prepares approvals.</characteristic>
+                <characteristic>Reduces manual quote assembly steps and accelerates time-to-quote.</characteristic>
+            </capability>
+
+            <capability name="Signal-Driven Next-Best-Action">
+                <characteristic>Consumes structured and unstructured signals: email, calls, content engagement, pricing page behavior.</characteristic>
+                <characteristic>Recommends configurations, bundles, and justification narratives tailored to buyer intent.</characteristic>
+            </capability>
+        </operation_group>
+    </product_management_operations>
+
+    <!-- ================================================================
+         AGENTIC DEVELOPMENT GUIDANCE
+         ================================================================ -->
+    <agentic_development_guidance>
+        <bounded_context>
+            Product Catalog bounded context (primary owner) with integration to Configuration Engine
+            bounded context for rule evaluation and constraint solving.
+        </bounded_context>
+
+        <agent_capabilities>
+            <agent name="Product Rules Agent">
+                <responsibility>CRUD for configuration rules using REQUIRES, EXCLUDES, RECOMMENDS, DEFAULT, and VALIDATES types; maintain rule expressions and target-product effects.</responsibility>
+                <tools>Rule CRUD API, rule evaluation dry-run, batch rule import, rule dependency analyzer.</tools>
+            </agent>
+            <agent name="Bundle Configuration Agent">
+                <responsibility>Manage static/dynamic/nested bundles; ProductOption, ProductOptionGroup, and related ConfigurationRule records.</responsibility>
+                <tools>Bundle builder API, configuration rule validator, nested bundle depth checker.</tools>
+            </agent>
+            <agent name="Catalog and Taxonomy Agent">
+                <responsibility>Manage product definitions, families, categories, hierarchies, product groups.</responsibility>
+                <tools>Catalog CRUD API, hierarchy builder, bulk import/export, product search index sync.</tools>
+            </agent>
+            <agent name="Attribute Agent">
+                <responsibility>Manage product attributes, attribute groups, and cross-object field mappings.</responsibility>
+                <tools>Attribute CRUD API, attribute group association, field mapping sync validator.</tools>
+            </agent>
+            <agent name="Lifecycle Agent">
+                <responsibility>Product versioning, effective dates, introduction workflows, end-of-life transitions.</responsibility>
+                <tools>Version CRUD API, version clone, effective-date scheduler, sunset-with-replacement mapper.</tools>
+            </agent>
+            <agent name="Guided Selling Agent">
+                <responsibility>Design and maintain guided selling question flows; map outputs to products/bundles.</responsibility>
+                <tools>Flow designer API, question branching engine, output product mapper.</tools>
+            </agent>
+            <agent name="Recommendation Agent">
+                <responsibility>Ingest AI-generated recommendations; manage human review queue; activate/retire rules.</responsibility>
+                <tools>Recommendation ingestion API, review dashboard, confidence threshold configurator, audit logger.</tools>
+            </agent>
+            <agent name="Governance Agent">
+                <responsibility>Enforce change approval workflows, audit trail, RBAC, critical field change control.</responsibility>
+                <tools>Approval workflow engine, audit log query API, RBAC policy manager, compliance event emitter.</tools>
+            </agent>
+        </agent_capabilities>
+
+        <integration_points>
+            <point context="Configuration Engine">Consumes rules, bundles, attributes, option constraints for real-time validation and constraint solving.</point>
+            <point context="Pricing Engine">Consumes product–price book associations and block pricing tiers; does not own price calculation logic.</point>
+            <point context="Quote Management">Receives validated configurations and resolved option sets; references product definitions.</point>
+            <point context="AI/ML Pipeline">Publishes quoting activity events; consumes recommendation suggestions for human review.</point>
+        </integration_points>
+
+        <event_topics>
+            <topic name="cpq.product.created">Product Catalog → Configuration Engine, Pricing Engine (new product available).</topic>
+            <topic name="cpq.product.updated">Product Catalog → Configuration Engine, Pricing Engine (definition changed).</topic>
+            <topic name="cpq.product.status.retired">Product Catalog → Configuration Engine, Quote Management (block new quotes).</topic>
+            <topic name="cpq.product.rules.updated">Product Catalog → Configuration Engine (invalidate rule caches).</topic>
+            <topic name="cpq.bundle.structure.changed">Product Catalog → Configuration Engine (re-resolve bundles).</topic>
+            <topic name="cpq.recommendation.generated">ML Pipeline → Recommendation Agent (new draft suggestions).</topic>
+            <topic name="cpq.recommendation.activated">Recommendation Agent → Configuration Engine, Quote Management.</topic>
+            <topic name="cpq.product.version.released">Lifecycle Agent → Configuration Engine, Pricing Engine (new version effective).</topic>
+            <topic name="cpq.governance.change.approved">Governance Agent → affected bounded contexts (apply approved change).</topic>
+        </event_topics>
+    </agentic_development_guidance>
+
+    <!-- ================================================================
+         METADATA GOVERNANCE, CI/CD, AND OPERATIONS RESILIENCE
+         ================================================================ -->
+    <agentic_governance_and_operations>
+        <metadata_and_schema_governance>
+            <description>
+                Metadata is treated as the governance substrate for agent behavior and policy-compliant output.
+            </description>
+            <controls>
+                <control>Canonical business glossary and semantic schema ownership by product/data governance.</control>
+                <control>Prompt and policy definitions versioned as JSON artifacts with approval workflow.</control>
+                <control>Grounding rules enforce brand voice, compliance language, and bias constraints.</control>
+                <control>All generated actions validated against metadata contracts before execution.</control>
+            </controls>
+        </metadata_and_schema_governance>
+
+        <agentic_cicd_and_qa>
+            <description>
+                CI/CD pipelines include agentic runners for schema validation, regression simulation,
+                and safety checks before production promotion.
+            </description>
+            <pipeline_capabilities>
+                <capability>RAG-driven test generation from historical UAT cases, validation failures, quote history, and audit logs.</capability>
+                <capability>High-volume simulation of configuration permutations and edge cases.</capability>
+                <capability>Containerized and orchestrated test scaling to avoid deployment bottlenecks.</capability>
+                <capability>Digital twin benchmark gates for accuracy, cost, speed, and safety.</capability>
+            </pipeline_capabilities>
+            <release_policy>No product rule, pricing matrix, or prompt change reaches production without automated validation gates.</release_policy>
+        </agentic_cicd_and_qa>
+
+        <self_healing_operations>
+            <description>
+                Operations agents monitor telemetry and traces, isolate anomalies, reproduce failures in sandbox,
+                propose patches, and validate fixes before rollout.
+            </description>
+            <runtime_capabilities>
+                <capability>Anomaly detection across API latency, error rates, and configuration loop failures.</capability>
+                <capability>Autonomous root-cause analysis with localized remediation proposals.</capability>
+                <capability>Policy-based fix application: auto-apply low-risk patches or require human merge approval.</capability>
+                <capability>Multi-agent arbitration for objective conflicts (e.g., margin enforcement vs discount pressure).</capability>
+            </runtime_capabilities>
+        </self_healing_operations>
+
+        <agentic_security_model>
+            <description>Security controls are applied at the agent-tool boundary, not only network perimeter.</description>
+            <controls>
+                <control>Prompt-injection defenses for all untrusted inputs and retrieved content.</control>
+                <control>MCP and API tool invocations restricted by least-privilege role policies.</control>
+                <control>Behavioral monitoring for anomalous tool-use patterns and privilege escalation attempts.</control>
+                <control>Immutable audit trail for every autonomous action and approval decision.</control>
+            </controls>
+        </agentic_security_model>
+    </agentic_governance_and_operations>
+
+    <!-- ================================================================
+         DEFERRED ROADMAP CAPABILITIES
+         ================================================================ -->
+    <deferred_capabilities>
+        <deferred_item id="R1" status="Deferred by decision D5">
+            <name>PLM to CPQ Digital Thread</name>
+            <future_scope>
+                Bidirectional engineering-to-sales synchronization for product structures, constraints,
+                and approved changes with automated impact analysis on open quotes.
+            </future_scope>
+        </deferred_item>
+        <deferred_item id="R2" status="Deferred by decision D4">
+            <name>Multi-currency and Multi-language Catalog</name>
+            <future_scope>
+                Regionalized catalogs, localized metadata, and currency-specific pricing governance.
+            </future_scope>
+        </deferred_item>
+    </deferred_capabilities>
+
+    <response_output_contract>
+        <required_sections>
+            <section order="1">Assumptions and scope classification</section>
+            <section order="2">Product-management operation(s) addressed</section>
+            <section order="3">OpenCRM CPQ object alignment and extensions used</section>
+            <section order="4">Planned or completed file/API/event changes</section>
+            <section order="5">Validation performed</section>
+            <section order="6">Residual risks and trade-offs</section>
+        </required_sections>
+    </response_output_contract>
+</agent_prompt>

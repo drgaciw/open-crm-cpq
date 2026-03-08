@@ -14,7 +14,7 @@
 Price-Drools Service is the centralized pricing decision engine for enterprise software businesses that sell SaaS, on-premise,
 and hybrid offerings. The service uses Drools for deterministic policy execution and integrates with AI components for
 rule creation, analysis, testing, and optimization. This PRD defines current implementation behavior and target-state
-capabilities required to support Salesforce-style CPQ workflows, stronger pricing governance, and faster monetization changes.
+capabilities required to support OpenCRM CPQ workflows, stronger pricing governance, and faster monetization changes.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ capabilities required to support Salesforce-style CPQ workflows, stronger pricin
 4. [Pricing Domain Model](#4-pricing-domain-model)
 5. [Pricing Models (SaaS, On-Prem, Hybrid)](#5-pricing-models-saas-on-prem-hybrid)
 6. [Rule Framework (Conditions, Actions, Scopes, Conflicts)](#6-rule-framework-conditions-actions-scopes-conflicts)
-7. [CPQ Lifecycle Interactions (Salesforce-style)](#7-cpq-lifecycle-interactions-salesforce-style)
+7. [CPQ Lifecycle Interactions (OpenCRM-style)](#7-cpq-lifecycle-interactions-opencrm-style)
 8. [AI Agent Operating Model](#8-ai-agent-operating-model)
 9. [Technical Architecture and Integrations](#9-technical-architecture-and-integrations)
 10. [API and Interface Contracts (Current + Target)](#10-api-and-interface-contracts-current--target)
@@ -45,7 +45,7 @@ layer for quote-time price decisions with auditability and controlled AI assista
 
 - Centralized rule-based pricing for SaaS, on-prem, and hybrid products.
 - Quote-level and line-level pricing decisions, including discounts, surcharges, floors, and commitments.
-- Salesforce-style CPQ lifecycle support: configuration, waterfall pricing, approvals, amendments, renewals.
+- OpenCRM-style CPQ lifecycle support: configuration, waterfall pricing, approvals, amendments, renewals.
 - Rule management APIs and operational metrics.
 - AI-assisted business process agents with human approval for commercial-impacting actions.
 - Current-state and target-state API contracts for staged delivery.
@@ -79,7 +79,7 @@ layer for quote-time price decisions with auditability and controlled AI assista
 
 - Market focus: enterprise hybrid sellers (SaaS + on-prem complexity).
 - Scope boundary: document both current implementation and target capabilities.
-- CPQ style: Salesforce-style interaction framing.
+- CPQ style: OpenCRM interaction framing.
 - AI autonomy default: human approval first for commercial-impacting actions.
 - Example depth: detailed rule catalog with concrete condition-action-output scenarios.
 - API policy: canonical public paths are `/api/v1/*`.
@@ -367,11 +367,11 @@ then
 end
 ```
 
-## 7. CPQ Lifecycle Interactions (Salesforce-style)
+## 7. CPQ Lifecycle Interactions (OpenCRM-style)
 
 ### 7.1 End-to-End CPQ Flow
 
-The CPQ lifecycle follows a Salesforce-style interaction model adapted for API-first operation. Each stage maps to concrete service endpoints and state transitions.
+The CPQ lifecycle follows an OpenCRM interaction model adapted for API-first operation. Each stage maps to concrete service endpoints and state transitions.
 
 ```
 [CRM Deal Created] ──► [Configure Products] ──► [Build Quote] ──► [Price Quote]
