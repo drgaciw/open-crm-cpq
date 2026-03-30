@@ -71,6 +71,8 @@
         <!-- gRPC -->
         <grpc.version>1.60.1</grpc.version>
         <protobuf.version>3.25.1</protobuf.version>
+        <!-- align protobuf-java with protoc -->
+        <protobuf-java.version>3.25.1</protobuf-java.version>
         <grpc-spring-boot-starter.version>3.0.0.RELEASE</grpc-spring-boot-starter.version>
 
         <!-- Testing -->
@@ -79,6 +81,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf-java.version}</version>
+            </dependency>
             <!-- Spring Cloud BOM -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
@@ -117,6 +124,11 @@
     </dependencyManagement>
 
     <dependencies>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf-java.version}</version>
+            </dependency>
         <!-- Lombok for all modules -->
         <dependency>
             <groupId>org.projectlombok</groupId>
