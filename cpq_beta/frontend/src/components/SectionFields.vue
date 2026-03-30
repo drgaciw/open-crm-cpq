@@ -118,6 +118,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { usersStore } from '@/stores/users'
 import { Tooltip } from 'frappe-ui'
 import { computed } from 'vue'
+import Sval from 'sval'
 
 const props = defineProps({
   fields: {
@@ -159,12 +160,11 @@ function evaluate_depends_on(expression, field) {
 }
 
 function evaluate(code, context = {}) {
-  let variable_names = Object.keys(context)
-  let variables = Object.values(context)
-  code = `let out = ${code}; return out`
   try {
-    let expression_function = new Function(...variable_names, code)
-    return expression_function(...variables)
+    const interpreter = new Sval()
+    interpreter.import(context)
+    interpreter.run(`exports.out = ${code}`)
+    return interpreter.exports.out
   } catch (error) {
     console.log('Error evaluating the following expression:')
     console.error(code)
