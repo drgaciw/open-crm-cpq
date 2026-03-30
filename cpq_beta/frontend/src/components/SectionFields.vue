@@ -158,16 +158,128 @@ function evaluate_depends_on(expression, field) {
   }
 }
 
-function evaluate(code, context = {}) {
-  let variable_names = Object.keys(context)
-  let variables = Object.values(context)
-  code = `let out = ${code}; return out`
+function evaluate(expression, context = {}) {
+  const regex =
+    /===|!==|==|!=|>=|<=|>|<|&&|\|\||!|'[^']*'|"[^"]*"|\btrue\b|\bfalse\b|\bnull\b|\bundefined\b|-?\d+(?:\.\d+)?|[a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*|\(|\)/g
+  const tokens = expression.match(regex)
+  if (!tokens) return false
+
+  let pos = 0
+  const peek = () => (pos < tokens.length ? tokens[pos] : null)
+  const consume = () => (pos < tokens.length ? tokens[pos++] : null)
+
+  const parsePrimary = () => {
+    let token = consume()
+    if (!token) return undefined
+
+    if (token === '(') {
+      let expr = parseOr()
+      if (peek() === ')') consume()
+      return expr
+    }
+
+    if (token === 'true') return true
+    if (token === 'false') return false
+    if (token === 'null') return null
+    if (token === 'undefined') return undefined
+
+    if (/^-?\d+(?:\.\d+)?$/.test(token)) return Number(token)
+
+    if (
+      (token.startsWith("'") && token.endsWith("'")) ||
+      (token.startsWith('"') && token.endsWith('"'))
+    ) {
+      return token.slice(1, -1)
+    }
+
+    if (
+      /^[a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*$/.test(token)
+    ) {
+      const parts = token.split('.')
+      let current = context
+      for (const part of parts) {
+        if (current === undefined || current === null) return undefined
+        current = current[part]
+      }
+      return current
+    }
+
+    return undefined
+  }
+
+  const parseUnary = () => {
+    if (peek() === '!') {
+      consume()
+      return !parseUnary()
+    }
+    return parsePrimary()
+  }
+
+  const parseComparison = () => {
+    let left = parseUnary()
+    while (true) {
+      const op = peek()
+      if (['==', '!=', '===', '!==', '>', '<', '>=', '<='].includes(op)) {
+        consume()
+        const right = parseUnary()
+        switch (op) {
+          case '==':
+            left = left == right
+            break
+          case '!=':
+            left = left != right
+            break
+          case '===':
+            left = left === right
+            break
+          case '!==':
+            left = left !== right
+            break
+          case '>':
+            left = left > right
+            break
+          case '<':
+            left = left < right
+            break
+          case '>=':
+            left = left >= right
+            break
+          case '<=':
+            left = left <= right
+            break
+        }
+      } else {
+        break
+      }
+    }
+    return left
+  }
+
+  const parseAnd = () => {
+    let left = parseComparison()
+    while (peek() === '&&') {
+      consume()
+      const right = parseComparison()
+      left = left && right
+    }
+    return left
+  }
+
+  const parseOr = () => {
+    let left = parseAnd()
+    while (peek() === '||') {
+      consume()
+      const right = parseAnd()
+      left = left || right
+    }
+    return left
+  }
+
   try {
-    let expression_function = new Function(...variable_names, code)
-    return expression_function(...variables)
+    return parseOr()
   } catch (error) {
     console.log('Error evaluating the following expression:')
-    console.error(code)
+    console.error(expression)
     throw error
   }
 }
