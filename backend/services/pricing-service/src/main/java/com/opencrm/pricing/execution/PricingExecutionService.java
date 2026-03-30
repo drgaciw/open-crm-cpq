@@ -19,6 +19,11 @@ import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
 import com.opencrm.pricing.waterfall.*;
+import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.rules.engine.RuleExecutionContext;
+import com.opencrm.rules.engine.RuleExecutionResult;
+import com.opencrm.rules.engine.RulesEngine;
+import com.opencrm.rules.engine.RulesEngineType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,6 +54,7 @@ public class PricingExecutionService {
     private final PricingContextValidator contextValidator;
     private final MetricsCalculator metricsCalculator;
     private final ObjectMapper objectMapper;
+    private final RulesEngine rulesEngine;
 
     /**
      * Execute pricing with full audit trail.
@@ -156,15 +162,52 @@ public class PricingExecutionService {
                 lineResults.add(lineResult);
             }
 
-            // 7-10. Execute rules (simplified - would integrate with Drools engine)
-            // TODO: Convert to Drools facts, build RuleExecutionContext, execute rules
-            log.info("Executed {} rules for customer {}", activeRules.size(), customer.getExternalId());
+            // 7. Convert to RuleDefinition
+            List<RuleDefinition> ruleDefinitions = activeRules.stream()
+                    .map(rule -> RuleDefinition.builder()
+                            .id(rule.getId().toString())
+                            .name(rule.getName())
+                            .description(rule.getDescription())
+                            .content(rule.getContent())
+                            .priority(rule.getPriority())
+                            .ruleType(rule.getRuleType().name())
+                            .engineType(ruleSet != null ? ruleSet.getEngineType() : RulesEngineType.DROOLS.name())
+                            .conditionGroup(rule.getConditionGroup())
+                            .actionSet(rule.getActionSet())
+                            .conflictPolicy(rule.getConflictPolicy())
+                            .explanationCode(rule.getExplanationCode())
+                            .build())
+                    .toList();
+
+            // 8. Build RuleExecutionContext
+            RuleExecutionContext executionContext = RuleExecutionContext.builder()
+                    .ruleSetId(ruleSet != null ? ruleSet.getId().toString() : "DEFAULT")
+                    .ruleSetVersion(ruleSet != null ? String.valueOf(ruleSet.getRuleSetVersion()) : "1")
+                    .engineType(ruleSet != null ? RulesEngineType.valueOf(ruleSet.getEngineType()) : RulesEngineType.DROOLS)
+                    .facts(new ArrayList<>())
+                    .build();
+
+            // Add facts
+            executionContext.getFacts().add(customer);
+            executionContext.getFacts().add(context);
+            executionContext.getFacts().addAll(lineResults);
+
+            // 9. Execute rules
+            RuleExecutionResult executionResult = rulesEngine.execute(executionContext, ruleDefinitions);
+            log.info("Executed {} rules for customer {} with success: {}",
+                     executionResult.getRulesFired(), customer.getExternalId(), executionResult.isSuccess());
+
+            // 10. Process results
+            List<String> explanations = new ArrayList<>();
+            if (executionResult.getExplanations() != null) {
+                executionResult.getExplanations().forEach(e -> explanations.add(e.getCode()));
+            }
 
             // 11. Calculate FinancialMetrics
             PricingResult result = PricingResult.builder()
-                    .success(true)
-                    .lineResults(lineResults)
-                    .explanationCodes(new ArrayList<>())
+                    .success(executionResult.isSuccess())
+                    .lineResults(lineResults) // Modified in-place by Drools
+                    .explanationCodes(explanations)
                     .approvalState("APPROVED")
                     .build();
 
