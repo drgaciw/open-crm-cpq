@@ -378,15 +378,6 @@ function handleDisconnectedIncomingCall() {
 }
 
 async function makeOutgoingCall(number) {
-  // check if number has a country code
-  // if (number?.replace(/[^0-9+]/g, '').length == 10) {
-  //   $dialog({
-  //     title: 'Invalid Mobile Number',
-  //     message: `${number} is not a valid mobile number. Either add a country code or check the number again.`,
-  //   })
-  //   return
-  // }
-
   contact.value = getContact(number)
   if (!contact.value) {
     contact.value = getLeadContact(number)
