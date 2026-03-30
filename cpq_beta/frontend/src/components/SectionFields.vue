@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import Interpreter from 'sval'
 import FadedScrollableDiv from '@/components/FadedScrollableDiv.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
 import Link from '@/components/Controls/Link.vue'
@@ -159,12 +160,16 @@ function evaluate_depends_on(expression, field) {
 }
 
 function evaluate(code, context = {}) {
-  let variable_names = Object.keys(context)
-  let variables = Object.values(context)
-  code = `let out = ${code}; return out`
   try {
-    let expression_function = new Function(...variable_names, code)
-    return expression_function(...variables)
+    const interpreter = new Interpreter({ ecmaVersion: 2019, sandBox: true })
+
+    // Add context variables to the global scope of the interpreter
+    for (const [key, value] of Object.entries(context)) {
+      interpreter.import(key, value)
+    }
+
+    interpreter.run(`exports.out = ${code};`)
+    return interpreter.exports.out
   } catch (error) {
     console.log('Error evaluating the following expression:')
     console.error(code)

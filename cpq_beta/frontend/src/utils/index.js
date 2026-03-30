@@ -5,6 +5,7 @@ import { usersStore } from '@/stores/users'
 import { gemoji } from 'gemoji'
 import { toast } from 'frappe-ui'
 import { h } from 'vue'
+import Interpreter from 'sval'
 
 export function createToast(options) {
   toast({
@@ -129,9 +130,19 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupForm')()
-  let formScript = scriptFn(obj)
-  return formScript?.actions || []
+  try {
+    const interpreter = new Interpreter({ ecmaVersion: 2019, sandBox: true })
+    interpreter.run(script + '\nexports.setupForm = typeof setupForm !== "undefined" ? setupForm : null;')
+    let formScript = interpreter.exports.setupForm
+    if (typeof formScript === 'function') {
+      let scriptRes = formScript(obj)
+      return scriptRes?.actions || []
+    }
+    return []
+  } catch (error) {
+    console.error('Error evaluating custom form script:', error)
+    return []
+  }
 }
 
 export function setupCustomActions(data, obj) {
@@ -150,11 +161,21 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupList')()
-  let listScript = scriptFn(obj)
-  return {
-    actions: listScript?.actions || [],
-    bulk_actions: listScript?.bulk_actions || [],
+  try {
+    const interpreter = new Interpreter({ ecmaVersion: 2019, sandBox: true })
+    interpreter.run(script + '\nexports.setupList = typeof setupList !== "undefined" ? setupList : null;')
+    let listScript = interpreter.exports.setupList
+    if (typeof listScript === 'function') {
+      let scriptRes = listScript(obj)
+      return {
+        actions: scriptRes?.actions || [],
+        bulk_actions: scriptRes?.bulk_actions || [],
+      }
+    }
+    return { actions: [], bulk_actions: [] }
+  } catch (error) {
+    console.error('Error evaluating custom list script:', error)
+    return { actions: [], bulk_actions: [] }
   }
 }
 
