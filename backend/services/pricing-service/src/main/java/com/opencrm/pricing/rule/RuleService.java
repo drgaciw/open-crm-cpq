@@ -6,6 +6,7 @@ import com.opencrm.pricing.execution.PricingAuditLogRepository;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
+import com.opencrm.rules.drools.DroolsRuleCompiler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,7 @@ public class RuleService {
     private final RuleSetRepository ruleSetRepository;
     private final PricingAuditLogRepository pricingAuditLogRepository;
     private final RuleMapper ruleMapper;
+    private final DroolsRuleCompiler droolsRuleCompiler;
 
     /**
      * Create a new rule.
@@ -145,10 +147,17 @@ public class RuleService {
         Rule rule = ruleRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rule", id));
 
-        // TODO: Implement DRL syntax validation using Drools compiler
-        // For now, just check that content is not empty
+        // Validate rule content is not empty
         if (rule.getContent() == null || rule.getContent().trim().isEmpty()) {
             throw new BusinessException("Rule content cannot be empty", "INVALID_RULE_CONTENT");
+        }
+
+        // Validate DRL syntax using Drools compiler
+        try {
+            droolsRuleCompiler.compileFromDrlString(rule.getContent());
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid DRL syntax for rule ID {}: {}", id, e.getMessage(), e);
+            throw new BusinessException("Invalid DRL syntax: " + e.getMessage(), "INVALID_RULE_SYNTAX");
         }
 
         log.info("Validated rule ID: {}", id);
