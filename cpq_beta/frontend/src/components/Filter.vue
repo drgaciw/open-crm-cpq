@@ -250,11 +250,34 @@ function convertFilters(data, allFilters) {
     }
 
     if (field) {
+      let operator = oppositeOperatorMap[value[0]]
+      let val = value[1]
+
+      if (key === '_assign') {
+        if (
+          operator === 'like' &&
+          typeof val === 'string' &&
+          val.startsWith('%') &&
+          val.endsWith('%')
+        ) {
+          operator = 'equals'
+          val = val.slice(1, -1)
+        } else if (
+          operator === 'not like' &&
+          typeof val === 'string' &&
+          val.startsWith('%') &&
+          val.endsWith('%')
+        ) {
+          operator = 'not equals'
+          val = val.slice(1, -1)
+        }
+      }
+
       f.push({
         field,
         fieldname: key,
-        operator: oppositeOperatorMap[value[0]],
-        value: value[1],
+        operator: operator,
+        value: val,
       })
     }
   }
@@ -277,8 +300,9 @@ function getOperators(fieldtype, fieldname) {
     )
   }
   if (fieldname === '_assign') {
-    // TODO: make equals and not equals work
     options = [
+      { label: __('Equals'), value: 'equals' },
+      { label: __('Not Equals'), value: 'not equals' },
       { label: __('Like'), value: 'like' },
       { label: __('Not Like'), value: 'not like' },
       { label: __('Is'), value: 'is' },
@@ -553,6 +577,13 @@ function parseFilters(filters) {
 }
 
 function transformIn(f) {
+  if (f.fieldname === '_assign') {
+    if (f.operator === 'equals') {
+      f.operator = 'like'
+    } else if (f.operator === 'not equals') {
+      f.operator = 'not like'
+    }
+  }
   if (f.operator.includes('like') && !f.value.includes('%')) {
     f.value = `%${f.value}%`
   }
