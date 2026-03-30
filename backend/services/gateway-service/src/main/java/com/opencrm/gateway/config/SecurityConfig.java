@@ -36,8 +36,8 @@ public class SecurityConfig {
     @Profile("!dev")
     public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
         return http
-                // Token-based API; CSRF token filter disabled. Cookie requests are protected by CsrfProtectionFilter.
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                // Enable CSRF protection with cookie repository
+                .csrf(csrf -> csrf.csrfTokenRepository(org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository.withHttpOnlyFalse()))
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/**", "/api-docs/**", "/swagger-ui/**").permitAll()
                         .anyExchange().authenticated()
