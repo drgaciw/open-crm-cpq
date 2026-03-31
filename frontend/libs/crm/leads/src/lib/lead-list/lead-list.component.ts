@@ -67,7 +67,7 @@ import { CurrencyPipe } from '@angular/common';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.leads()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.leads()" matSort (matSortChange)="onSort($event)" [trackBy]="trackById">
           <ng-container matColumnDef="title">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
             <td mat-cell *matCellDef="let lead">
@@ -226,5 +226,9 @@ export class LeadListComponent implements OnInit {
 
   getStatusClass(status: LeadStatus): string {
     return `status-${status.toLowerCase()}`;
+  }
+
+  trackById(index: number, item: LeadDto): number {
+    return item.id;
   }
 }

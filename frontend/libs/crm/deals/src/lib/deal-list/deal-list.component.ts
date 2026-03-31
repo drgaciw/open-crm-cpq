@@ -68,7 +68,7 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.deals()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.deals()" matSort (matSortChange)="onSort($event)" [trackBy]="trackById">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Deal Name</th>
             <td mat-cell *matCellDef="let d">
@@ -224,5 +224,9 @@ export class DealListComponent implements OnInit {
 
   private refreshList(): void {
     this.service.list(this.service.pagination().page, this.service.pagination().size, this.currentSort, this.currentStage);
+  }
+
+  trackById(index: number, item: DealDto): number {
+    return item.id;
   }
 }

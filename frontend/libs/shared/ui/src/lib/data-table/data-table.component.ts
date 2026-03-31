@@ -59,7 +59,7 @@ export interface RowActionEvent<T = unknown> {
 
       <!-- Table -->
       <div class="table-wrapper">
-        <table mat-table [dataSource]="data()" matSort (matSortChange)="onSortChange($event)">
+        <table mat-table [dataSource]="data()" matSort (matSortChange)="onSortChange($event)" [trackBy]="trackById">
           <!-- Dynamic Columns -->
           @for (column of columns(); track column.key) {
             <ng-container [matColumnDef]="column.key">
@@ -234,5 +234,9 @@ export class DataTableComponent<T = unknown> {
 
   emitRowAction(action: string, row: T): void {
     this.rowAction.emit({ action, row });
+  }
+
+  trackById(index: number, item: any): unknown {
+    return item.id !== undefined ? item.id : index;
   }
 }

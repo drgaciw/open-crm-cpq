@@ -66,7 +66,7 @@ import { OrganizationDto } from '@frontend/shared-models';
     } @else {
       <div class="table-container">
         <table mat-table [dataSource]="orgService.organizations()" matSort
-               (matSortChange)="onSort($event)">
+               (matSortChange)="onSort($event)" [trackBy]="trackById">
 
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
@@ -218,5 +218,9 @@ export class OrganizationListComponent implements OnInit {
         );
       });
     }
+  }
+
+  trackById(index: number, item: OrganizationDto): number {
+    return item.id;
   }
 }

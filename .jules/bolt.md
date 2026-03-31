@@ -1,0 +1,25 @@
+## Bolt's Journal
+
+## 2024-03-31 - Angular TrackBy Performance
+**Learning:** Found multiple usages of `@for` loops in Angular templates that use the iteration item itself or non-unique identifiers as the `trackBy` expression (e.g., `track stage`, `track ind`). While using primitive values like strings is okay, using object references or iterating over large lists without a unique ID can cause unnecessary DOM re-creations when the collection changes. Angular 17's new `@for` control flow *requires* a `track` expression. When dealing with arrays of objects, tracking by a unique property (like `.id`) is crucial for performance. In components like `deal-kanban.component.ts`, `track col.stage` is used, which is fine since stage is a string, but ensuring efficient tracking across all large lists is vital. Wait, I see `track col.stage` in Kanban where `col.stage` is a string primitive, which is perfectly fine. `track deal.id` is used for deals, which is also correct. `track stage` in `deal-list.component.ts` where `stage` is a string is also correct.
+
+Let me look for `track $index` or missing tracking by id in lists. Let's check `track` usages.
+
+## 2024-03-31 - takeUntilDestroyed Performance Pattern
+**Learning:** We are manually subscribing to Observables in many components without proper unsubscription. Although some use HttpClient which completes after a single response, memory leaks are still a risk if the component is destroyed before the request completes (e.g., fast navigation) or if longer-lived streams are introduced. The `takeUntilDestroyed` operator from `@angular/core/rxjs-interop` should be the standard for component-level subscription management in Angular 16+ codebases using signals. Using `takeUntilDestroyed` ensures subscriptions are automatically cleaned up when the injection context (usually the component) is destroyed, preventing potential memory leaks.
+
+I'll keep looking for another big optimization.
+
+## 2024-03-31 - trackBy in Material Tables
+**Learning:** Found that `<table mat-table>` in Angular Material can take a `trackBy` function just like `ngFor`. Without a `trackBy` function, the `mat-table` tracks rows by reference. If the `dataSource` is completely replaced (which is what happens here when replacing a signal like `this.deals.set(deals)`), the entire table is destroyed and re-rendered, losing DOM focus, internal state, and reducing performance significantly for large data lists. The tables should define a `[trackBy]="trackById"` function for better render performance. I will add `trackBy` to the `mat-table` in the CRM components! Wait, Angular Material tables track by reference by default, so adding `trackBy` reduces DOM thrashing.
+
+Actually, let's add `trackBy` to the shared `data-table.component.ts` and `deal-list.component.ts`, `lead-list.component.ts`, `contact-list.component.ts`, `organization-list.component.ts`.
+
+## 2024-03-31 - Vitest Jasmine Mocking
+**Learning:** Found that some tests in `confirm-dialog.component.spec.ts` use `jasmine.createSpyObj` which fails in Vitest. Vitest uses `vi.fn()` for mocks. Additionally, the `data-table.component.spec.ts` test "should display empty state when data is empty and not loading" failed after my `trackBy` change. This is likely due to the change in how `matRowDef` evaluates or updates. Actually, looking at the diff, I changed `mat-table` `trackBy` but I didn't change empty state. Wait, maybe my `trackBy` change caused a small issue with how empty state is rendered or tested, or it was already failing. Wait, let me check the `data-table.component.spec.ts`.
+
+## 2024-03-31 - ChangeDetection with signals
+**Learning:** Found that modifying signals via `componentRef.setInput` may require multiple change detection runs or `await fixture.whenStable()` if it affects a `mat-table` layout which renders rows asynchronously. The empty state row is within the `table` element in `data-table.component.ts`. Wait, why did the empty state row disappear or fail to render only after adding `trackBy`?
+Actually, `trackBy` causes `mat-table` to preserve rows, but empty state row is NOT a normal `mat-row`. Wait, let's look at `data-table.component.ts`. The empty state is rendered as `<tr class="mat-row">` manually inside the table but outside the `mat-row` structural directives. In Angular Material, putting a raw `<tr>` inside `<table mat-table>` can cause errors or unexpected behavior because `mat-table` strictly manages its row definitions. Actually, wait. It was working BEFORE my change. Let's undo my `trackBy` change temporarily in `data-table.component.ts` and verify if the test passes without it.
+
+Ah, so the `data-table.component.spec.ts` test was *already* failing on `main` before my changes, likely due to Angular 17 signal input testing quirks (e.g. needing `fixture.detectChanges()` properly, or maybe not waiting for `fixture.whenStable()` after updating a `mat-table`'s datasource). Same with `confirm-dialog.component.spec.ts` where `jasmine` is undefined. So these tests are failing completely independent of my `trackBy` changes.
