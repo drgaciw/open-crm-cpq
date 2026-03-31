@@ -1,0 +1,4 @@
+## 2024-05-24 - [Hardcoded Database Credentials in application.yml]
+**Vulnerability:** Several microservices (e.g., approval-routing, contract-asset-management, configuration-engine, document-generation) had hardcoded database credentials (`postgres`/`postgres`) and hardcoded JDBC URLs directly in their `application.yml` files.
+**Learning:** Hardcoding credentials in source control is a critical security risk. Environment-specific configuration and secrets management are crucial. The application should rely on environment variables injected at runtime rather than static configurations in code.
+**Prevention:** Always use property placeholders with environment variable fallbacks (e.g., `${DB_USERNAME:postgres}`) for database credentials, URLs, and any sensitive configuration in Spring Boot properties. Implement secret scanning in CI/CD pipelines to catch these issues early.
