@@ -3,8 +3,8 @@ spring:
     name: configuration-engine
   datasource:
     url: jdbc:postgresql://localhost:5432/cpq_configuration
-    username: postgres
-    password: postgres
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
   jpa:
     hibernate:
       ddl-auto: validate
