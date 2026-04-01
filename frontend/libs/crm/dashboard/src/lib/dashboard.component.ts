@@ -90,7 +90,7 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
             @if (recentDeals().length === 0) {
               <p class="empty-text">No recent deals.</p>
             } @else {
-              <table mat-table [dataSource]="recentDeals()" class="compact-table">
+              <table mat-table [dataSource]="recentDeals()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="name">
                   <th mat-header-cell *matHeaderCellDef>Name</th>
                   <td mat-cell *matCellDef="let d"><a [routerLink]="['/deals', d.id]" class="link">{{ d.name }}</a></td>
@@ -122,7 +122,7 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
             @if (recentLeads().length === 0) {
               <p class="empty-text">No recent leads.</p>
             } @else {
-              <table mat-table [dataSource]="recentLeads()" class="compact-table">
+              <table mat-table [dataSource]="recentLeads()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="title">
                   <th mat-header-cell *matHeaderCellDef>Title</th>
                   <td mat-cell *matCellDef="let l"><a [routerLink]="['/leads', l.id]" class="link">{{ l.title }}</a></td>
@@ -190,6 +190,10 @@ export class DashboardComponent implements OnInit {
   stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
   statusColor(status: string): string { return STATUS_COLORS[status] ?? '#666'; }
+
+  // ⚡ Bolt Optimization: Using trackBy prevents expensive re-rendering of all table rows
+  // when the underlying data signal updates, improving layout performance and reducing DOM mutations.
+  trackById(index: number, item: any): string { return item.id; }
 
   totalDeals(): number {
     return this.pipeline().reduce((sum, item) => sum + item.count, 0);

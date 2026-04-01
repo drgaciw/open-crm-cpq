@@ -59,7 +59,7 @@ export interface RowActionEvent<T = unknown> {
 
       <!-- Table -->
       <div class="table-wrapper">
-        <table mat-table [dataSource]="data()" matSort (matSortChange)="onSortChange($event)">
+        <table mat-table [dataSource]="data()" [trackBy]="trackById" matSort (matSortChange)="onSortChange($event)">
           <!-- Dynamic Columns -->
           @for (column of columns(); track column.key) {
             <ng-container [matColumnDef]="column.key">
@@ -216,6 +216,11 @@ export class DataTableComponent<T = unknown> {
 
   // Computed signals
   displayedColumns = computed(() => this.columns().map(col => col.key));
+
+  // ⚡ Bolt Optimization: Using trackBy identifies items uniquely across reference
+  // changes. This stops Angular Material table from completely resetting and flashing
+  // when component signals emit new arrays containing identical or updated records.
+  trackById(index: number, item: any): string { return item.id || item.key || index; }
 
   onSortChange(sort: Sort): void {
     this.sortChange.emit({

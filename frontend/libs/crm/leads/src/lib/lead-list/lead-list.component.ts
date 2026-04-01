@@ -67,7 +67,7 @@ import { CurrencyPipe } from '@angular/common';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.leads()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.leads()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="title">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
             <td mat-cell *matCellDef="let lead">
@@ -175,6 +175,10 @@ export class LeadListComponent implements OnInit {
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // ⚡ Bolt Optimization: By adding trackBy, Angular can track table items by their unique IDs.
+  // This drastically reduces DOM operations during sorting, filtering, and paging updates.
+  trackById(index: number, item: any): string { return item.id; }
 
   ngOnInit(): void {
     this.service.list(0, 20, this.currentSort);

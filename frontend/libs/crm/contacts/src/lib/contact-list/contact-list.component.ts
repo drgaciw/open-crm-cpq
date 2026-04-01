@@ -55,7 +55,7 @@ import { ContactDto } from '@frontend/shared-models';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.contacts()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.contacts()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header="lastName">Name</th>
             <td mat-cell *matCellDef="let c">
@@ -133,6 +133,10 @@ export class ContactListComponent implements OnInit {
   displayedColumns = ['name', 'email', 'phone', 'organization', 'title', 'actions'];
   private currentSort = 'lastName,asc';
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // ⚡ Bolt Optimization: Using trackBy prevents full re-renders of the data table
+  // by associating list items with unique IDs, resulting in faster UI updates.
+  trackById(index: number, item: any): string { return item.id; }
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
