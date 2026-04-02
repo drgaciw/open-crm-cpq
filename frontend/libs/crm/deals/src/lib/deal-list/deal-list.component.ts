@@ -68,7 +68,7 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.deals()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.deals()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Deal Name</th>
             <td mat-cell *matCellDef="let d">
@@ -163,6 +163,14 @@ export class DealListComponent implements OnInit {
   private currentSort = 'createdAt,desc';
   private currentStage?: DealStage;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // ⚡ Bolt Performance Optimization:
+  // Using trackBy on mat-table prevents unnecessary DOM recreation when signal data updates.
+  // This avoids losing focus state and prevents full-table reflows by matching row IDs.
+  // Impact: Reduces DOM mutations from N to 1 during minor updates.
+  trackById(index: number, item: { id: string | number }): string | number {
+    return item.id;
+  }
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
