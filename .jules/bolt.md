@@ -1,0 +1,3 @@
+## 2025-04-03 - [Prevent Full DOM Re-renders in mat-table with Signals]
+**Learning:** Using `<table mat-table>` in Angular with a signal-based datasource without a `[trackBy]` function causes full DOM re-creation and loss of focus on every data update. Because signals frequently produce new array references upon mutation, the default tracking by object reference is highly inefficient.
+**Action:** Always implement and bind a `[trackBy]="trackById"` function (e.g., returning `item.id`) on `<table mat-table>` elements whenever the datasource is tied to an Angular signal or any frequently updating array reference to ensure optimal rendering performance.

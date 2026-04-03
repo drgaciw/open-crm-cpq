@@ -55,7 +55,7 @@ import { ContactDto } from '@frontend/shared-models';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.contacts()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.contacts()" matSort (matSortChange)="onSort($event)" [trackBy]="trackById">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header="lastName">Name</th>
             <td mat-cell *matCellDef="let c">
@@ -157,5 +157,9 @@ export class ContactListComponent implements OnInit {
         this.service.list(this.service.pagination().page, this.service.pagination().size, this.currentSort);
       });
     }
+  }
+
+  trackById(index: number, item: ContactDto): string {
+    return item.id;
   }
 }
