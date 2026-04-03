@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
 
 /**
  * Security configuration for API Gateway.
@@ -36,8 +38,10 @@ public class SecurityConfig {
     @Profile("!dev")
     public SecurityWebFilterChain securityFilterChain(ServerHttpSecurity http) {
         return http
-                // Token-based API; CSRF token filter disabled. Cookie requests are protected by CsrfProtectionFilter.
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
+                )
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/**", "/api-docs/**", "/swagger-ui/**").permitAll()
                         .anyExchange().authenticated()
