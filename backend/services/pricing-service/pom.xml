@@ -16,6 +16,12 @@
     <description>Pricing engine with Drools and OpenL Tablets rules</description>
 
     <dependencies>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+
         <!-- Internal -->
         <dependency>
             <groupId>com.opencrm</groupId>
@@ -94,6 +100,11 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-stub</artifactId>
             <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf.version}</version>
         </dependency>
 
         <!-- MapStruct -->
