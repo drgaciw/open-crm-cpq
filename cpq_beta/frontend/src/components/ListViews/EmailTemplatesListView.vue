@@ -36,9 +36,6 @@
         :row="row"
       >
         <ListRowItem :item="item">
-          <!-- <template #prefix>
-
-          </template> -->
           <template #default="{ label }">
             <div
               v-if="['modified', 'creation'].includes(column.key)"
