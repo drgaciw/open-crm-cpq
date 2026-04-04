@@ -89,7 +89,6 @@ const show = defineModel()
 const organization = defineModel('organization')
 
 const loading = ref(false)
-const title = ref(null)
 const detailMode = ref(false)
 const editMode = ref(false)
 let _organization = ref({
@@ -246,8 +245,6 @@ watch(
     editMode.value = false
     detailMode.value = props.options.detailMode
     nextTick(() => {
-      // TODO: Issue with FormControl
-      // title.value.el.focus()
       doc.value = organization.value?.doc || organization.value || {}
       _organization.value = { ...doc.value }
       if (_organization.value.name) {
