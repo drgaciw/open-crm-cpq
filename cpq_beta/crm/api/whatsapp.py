@@ -156,29 +156,53 @@ def get_whatsapp_messages(reference_doctype, reference_name):
         message for message in messages if message["message_type"] == "Template"
     ]
 
+    # Pre-fetch all templates used by these messages in a single query
+    template_names = list(set(
+        msg["template"] for msg in template_messages if msg.get("template")
+    ))
+
+    templates_dict = {}
+    if template_names:
+        templates_data = frappe.get_all(
+            "WhatsApp Templates",
+            filters={"name": ["in", template_names]},
+            fields=["name", "template_name", "template", "header", "footer"]
+        )
+        for t in templates_data:
+            # We convert to frappe._dict to access properties with dot notation like the original get_doc behavior
+            t_dict = frappe._dict(t)
+            templates_dict[t_dict.name] = t_dict
+
     # Iterate through template messages
     for template_message in template_messages:
         # Find the template that this message is using
-        template = frappe.get_doc("WhatsApp Templates", template_message["template"])
+        template = templates_dict.get(template_message["template"])
 
         # If the template is found, add the template details to the template message
         if template:
             template_message["template_name"] = template.template_name
-            if template_message["template_parameters"]:
+
+            # Since we're reusing the dict, create a copy of the template properties
+            # to parse parameters specific to this message
+            parsed_template = template.template
+            if template_message["template_parameters"] and parsed_template:
                 parameters = json.loads(template_message["template_parameters"])
-                template.template = parse_template_parameters(
-                    template.template, parameters
+                parsed_template = parse_template_parameters(
+                    parsed_template, parameters
                 )
 
-            template_message["template"] = template.template
-            if template_message["template_header_parameters"]:
+            template_message["template"] = parsed_template
+
+            parsed_header = template.header
+            if template_message["template_header_parameters"] and parsed_header:
                 header_parameters = json.loads(
                     template_message["template_header_parameters"]
                 )
-                template.header = parse_template_parameters(
-                    template.header, header_parameters
+                parsed_header = parse_template_parameters(
+                    parsed_header, header_parameters
                 )
-            template_message["header"] = template.header
+
+            template_message["header"] = parsed_header
             template_message["footer"] = template.footer
 
     # Filter messages to get only reaction messages
