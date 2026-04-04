@@ -1,6 +1,5 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
-import json
 
 import frappe
 from frappe import _
@@ -106,7 +105,8 @@ class CRMDeal(Document):
 		"""
 		Find an SLA to apply to the deal.
 		"""
-		if self.sla: return
+		if self.sla:
+			return
 
 		sla = get_sla(self)
 		if not sla:
