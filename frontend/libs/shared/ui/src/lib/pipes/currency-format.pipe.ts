@@ -33,7 +33,7 @@ export class CurrencyFormatPipe implements PipeTransform {
       }).format(value);
     } catch (error) {
       // Fallback to basic formatting if Intl fails
-      return `$${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+      return `${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
     }
   }
 }

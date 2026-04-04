@@ -89,6 +89,12 @@ describe('CurrencyFormatPipe', () => {
   it('should fallback to basic formatting on error', () => {
     // Test with an invalid currency code that might cause Intl to fail
     const result = pipe.transform(1234.56, 'INVALID' as any);
-    expect(result).toMatch(/\d+,?\d*\.\d{2}/);
+    expect(result).toBe('1,234.56');
+  });
+
+  it('should fallback to basic formatting with large numbers on error', () => {
+    // Test with an invalid currency code that might cause Intl to fail
+    const result = pipe.transform(1234567.89, 'INVALID' as any);
+    expect(result).toBe('1,234,567.89');
   });
 });
