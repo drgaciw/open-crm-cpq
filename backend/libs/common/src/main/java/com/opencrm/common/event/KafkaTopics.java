@@ -37,4 +37,12 @@ public final class KafkaTopics {
     public static final String SUBSCRIPTION_RENEWAL_ELIGIBLE = "cpq.subscription.renewal.eligible";
     public static final String CONTRACT_ACTIVATED = "cpq.contract.activated";
     public static final String ASSET_PROVISIONED = "cpq.asset.provisioned";
+
+    // AMCP Event Mesh (Agentic CPQ Platform v3.0)
+    public static final String MARKET_SIGNAL_COMPETITOR = "cpq.market.signal.competitor";
+    public static final String QUOTE_RISK_BREACH = "cpq.quote.risk.breach";
+    public static final String NEGOTIATION_OFFER_RECEIVED = "cpq.negotiation.offer.received";
+    public static final String CHANNEL_CONFLICT_ALERT = "cpq.channel.conflict.alert";
+    public static final String FULFILLMENT_ATP_RESULT = "cpq.fulfillment.atp.result";
+    public static final String MARGIN_OVERRIDE_REQUEST = "cpq.margin.override.request";
 }
