@@ -94,7 +94,10 @@ describe('DataTableComponent', () => {
       sortEvent = event;
     });
 
-    component.componentInstance.onSortChange({ active: 'name', direction: 'asc' });
+    component.componentInstance.onSortChange({
+      active: 'name',
+      direction: 'asc',
+    });
     expect(sortEvent).toEqual({ active: 'name', direction: 'asc' });
   });
 

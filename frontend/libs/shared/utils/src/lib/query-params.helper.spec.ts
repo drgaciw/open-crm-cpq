@@ -33,7 +33,11 @@ describe('toHttpParams', () => {
   });
 
   it('should set all PageRequest parameters correctly', () => {
-    const pageRequest: PageRequest = { page: 1, size: 20, sort: 'createdAt,desc' };
+    const pageRequest: PageRequest = {
+      page: 1,
+      size: 20,
+      sort: 'createdAt,desc',
+    };
     const params = toHttpParams(pageRequest);
     expect(params.get('page')).toBe('1');
     expect(params.get('size')).toBe('20');
@@ -42,7 +46,11 @@ describe('toHttpParams', () => {
   });
 
   it('should ignore undefined properties in PageRequest', () => {
-    const pageRequest: PageRequest = { page: undefined, size: 20, sort: undefined };
+    const pageRequest: PageRequest = {
+      page: undefined,
+      size: 20,
+      sort: undefined,
+    };
     const params = toHttpParams(pageRequest);
     expect(params.has('page')).toBe(false);
     expect(params.has('sort')).toBe(false);

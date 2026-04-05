@@ -1,4 +1,9 @@
-import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -46,68 +51,70 @@ import { MatButtonModule } from '@angular/material/button';
       }
     </div>
   `,
-  styles: [`
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 64px 24px;
-      text-align: center;
-      min-height: 400px;
-    }
-
-    .empty-state-icon {
-      width: 80px;
-      height: 80px;
-      font-size: 80px;
-      color: #bdbdbd;
-      margin-bottom: 24px;
-    }
-
-    .empty-state-title {
-      margin: 0 0 12px;
-      font-size: 24px;
-      font-weight: 500;
-      color: #424242;
-    }
-
-    .empty-state-message {
-      margin: 0 0 32px;
-      font-size: 14px;
-      color: #757575;
-      max-width: 400px;
-      line-height: 1.6;
-    }
-
-    .empty-state-action {
-      min-width: 140px;
-    }
-
-    @media (max-width: 600px) {
+  styles: [
+    `
       .empty-state {
-        padding: 48px 16px;
-        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 24px;
+        text-align: center;
+        min-height: 400px;
       }
 
       .empty-state-icon {
-        width: 64px;
-        height: 64px;
-        font-size: 64px;
-        margin-bottom: 16px;
+        width: 80px;
+        height: 80px;
+        font-size: 80px;
+        color: #bdbdbd;
+        margin-bottom: 24px;
       }
 
       .empty-state-title {
-        font-size: 20px;
-        margin-bottom: 8px;
+        margin: 0 0 12px;
+        font-size: 24px;
+        font-weight: 500;
+        color: #424242;
       }
 
       .empty-state-message {
-        font-size: 13px;
-        margin-bottom: 24px;
+        margin: 0 0 32px;
+        font-size: 14px;
+        color: #757575;
+        max-width: 400px;
+        line-height: 1.6;
       }
-    }
-  `],
+
+      .empty-state-action {
+        min-width: 140px;
+      }
+
+      @media (max-width: 600px) {
+        .empty-state {
+          padding: 48px 16px;
+          min-height: 300px;
+        }
+
+        .empty-state-icon {
+          width: 64px;
+          height: 64px;
+          font-size: 64px;
+          margin-bottom: 16px;
+        }
+
+        .empty-state-title {
+          font-size: 20px;
+          margin-bottom: 8px;
+        }
+
+        .empty-state-message {
+          font-size: 13px;
+          margin-bottom: 24px;
+        }
+      }
+    `,
+  ],
 })
 export class EmptyStateComponent {
   // Inputs using signal-based API

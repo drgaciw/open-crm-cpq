@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { Injectable } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { BaseCrudService } from './base-crud.service';
@@ -15,7 +18,11 @@ interface CreateTestEntity {
 }
 
 @Injectable()
-class TestCrudService extends BaseCrudService<TestEntity, CreateTestEntity, Partial<TestEntity>> {
+class TestCrudService extends BaseCrudService<
+  TestEntity,
+  CreateTestEntity,
+  Partial<TestEntity>
+> {
   protected override basePath = '/api/v1/test-entities';
 }
 
@@ -28,8 +35,8 @@ describe('BaseCrudService', () => {
       providers: [
         TestCrudService,
         provideHttpClient(),
-        provideHttpClientTesting()
-      ]
+        provideHttpClientTesting(),
+      ],
     });
 
     service = TestBed.inject(TestCrudService);
@@ -49,12 +56,12 @@ describe('BaseCrudService', () => {
       const mockResponse: SpringPageResponse<TestEntity> = {
         content: [
           { id: '1', name: 'Item 1' },
-          { id: '2', name: 'Item 2' }
+          { id: '2', name: 'Item 2' },
         ],
         totalElements: 10,
         totalPages: 5,
         size: 2,
-        number: 0
+        number: 0,
       };
 
       service.list({ page: 0, size: 2 }).subscribe((items) => {
@@ -77,7 +84,7 @@ describe('BaseCrudService', () => {
         totalElements: 0,
         totalPages: 0,
         size: 20,
-        number: 0
+        number: 0,
       };
 
       service.list({ sort: 'name,asc' }).subscribe(() => {
@@ -132,7 +139,7 @@ describe('BaseCrudService', () => {
       // First, populate the items list
       service['itemsSignal'].set([
         { id: '1', name: 'Item 1' },
-        { id: '2', name: 'Item 2' }
+        { id: '2', name: 'Item 2' },
       ]);
 
       const updateRequest: Partial<TestEntity> = { name: 'Updated Item' };
@@ -158,7 +165,7 @@ describe('BaseCrudService', () => {
       // First, populate the items list
       service['itemsSignal'].set([
         { id: '1', name: 'Item 1' },
-        { id: '2', name: 'Item 2' }
+        { id: '2', name: 'Item 2' },
       ]);
 
       service.delete('1').subscribe(() => {
@@ -194,7 +201,7 @@ describe('BaseCrudService', () => {
         totalElements: 1,
         totalPages: 1,
         size: 20,
-        number: 0
+        number: 0,
       };
 
       service.search('query', { page: 0, size: 20 }).subscribe((items) => {
@@ -203,7 +210,9 @@ describe('BaseCrudService', () => {
         done();
       });
 
-      const req = httpMock.expectOne('/api/v1/test-entities/search?q=query&page=0&size=20');
+      const req = httpMock.expectOne(
+        '/api/v1/test-entities/search?q=query&page=0&size=20',
+      );
       expect(req.request.method).toBe('GET');
       req.flush(mockResponse);
     });
@@ -234,7 +243,7 @@ describe('BaseCrudService', () => {
         page: 2,
         size: 10,
         totalElements: 50,
-        totalPages: 5
+        totalPages: 5,
       });
 
       service.reset();
@@ -253,7 +262,7 @@ describe('BaseCrudService', () => {
         page: 0,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasNextPage()).toBe(true);
@@ -262,7 +271,7 @@ describe('BaseCrudService', () => {
         page: 4,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasNextPage()).toBe(false);
@@ -273,7 +282,7 @@ describe('BaseCrudService', () => {
         page: 0,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasPreviousPage()).toBe(false);
@@ -282,7 +291,7 @@ describe('BaseCrudService', () => {
         page: 2,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasPreviousPage()).toBe(true);

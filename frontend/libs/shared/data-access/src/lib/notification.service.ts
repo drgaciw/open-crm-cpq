@@ -25,7 +25,7 @@ import { MatSnackBar, MatSnackBarConfig } from '@angular/material/snack-bar';
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class NotificationService {
   private snackBar = inject(MatSnackBar);
@@ -33,7 +33,7 @@ export class NotificationService {
   private readonly defaultConfig: MatSnackBarConfig = {
     duration: 5000,
     horizontalPosition: 'end',
-    verticalPosition: 'top'
+    verticalPosition: 'top',
   };
 
   /**
@@ -46,7 +46,7 @@ export class NotificationService {
     this.snackBar.open(message, 'Close', {
       ...this.defaultConfig,
       duration: duration ?? this.defaultConfig.duration,
-      panelClass: ['snackbar-success']
+      panelClass: ['snackbar-success'],
     });
   }
 
@@ -60,7 +60,7 @@ export class NotificationService {
     this.snackBar.open(message, 'Close', {
       ...this.defaultConfig,
       duration: duration ?? 7000,
-      panelClass: ['snackbar-error']
+      panelClass: ['snackbar-error'],
     });
   }
 
@@ -74,7 +74,7 @@ export class NotificationService {
     this.snackBar.open(message, 'Close', {
       ...this.defaultConfig,
       duration: duration ?? this.defaultConfig.duration,
-      panelClass: ['snackbar-info']
+      panelClass: ['snackbar-info'],
     });
   }
 
@@ -88,7 +88,7 @@ export class NotificationService {
     this.snackBar.open(message, 'Close', {
       ...this.defaultConfig,
       duration: duration ?? 6000,
-      panelClass: ['snackbar-warning']
+      panelClass: ['snackbar-warning'],
     });
   }
 

@@ -25,7 +25,7 @@ import { Injectable, signal, computed } from '@angular/core';
  * ```
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class LoadingService {
   /**
@@ -45,7 +45,7 @@ export class LoadingService {
    * Call this when an HTTP request begins.
    */
   startRequest(): void {
-    this.requestCount.update(count => count + 1);
+    this.requestCount.update((count) => count + 1);
   }
 
   /**
@@ -55,7 +55,7 @@ export class LoadingService {
    * The counter will never go below 0.
    */
   endRequest(): void {
-    this.requestCount.update(count => Math.max(0, count - 1));
+    this.requestCount.update((count) => Math.max(0, count - 1));
   }
 
   /**

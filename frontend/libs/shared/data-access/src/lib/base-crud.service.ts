@@ -1,7 +1,12 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, signal, computed, Signal } from '@angular/core';
 import { Observable, tap, map } from 'rxjs';
-import { Identifiable, PaginationMeta, PageRequest, SpringPageResponse } from '@frontend/shared-models';
+import {
+  Identifiable,
+  PaginationMeta,
+  PageRequest,
+  SpringPageResponse,
+} from '@frontend/shared-models';
 
 /**
  * Abstract base service that provides CRUD operations with signal-based state management.
@@ -38,7 +43,11 @@ import { Identifiable, PaginationMeta, PageRequest, SpringPageResponse } from '@
  * }
  * ```
  */
-export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpdate = Partial<T>> {
+export abstract class BaseCrudService<
+  T extends Identifiable,
+  TCreate = T,
+  TUpdate = Partial<T>,
+> {
   protected http = inject(HttpClient);
 
   /**
@@ -60,7 +69,8 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
    * Updated automatically by getById() operation.
    */
   private selectedItemSignal = signal<T | null>(null);
-  readonly selectedItem: Signal<T | null> = this.selectedItemSignal.asReadonly();
+  readonly selectedItem: Signal<T | null> =
+    this.selectedItemSignal.asReadonly();
 
   /**
    * Signal indicating whether an operation is in progress.
@@ -76,9 +86,10 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
     page: 0,
     size: 20,
     totalElements: 0,
-    totalPages: 0
+    totalPages: 0,
   });
-  readonly pagination: Signal<PaginationMeta> = this.paginationSignal.asReadonly();
+  readonly pagination: Signal<PaginationMeta> =
+    this.paginationSignal.asReadonly();
 
   /**
    * Computed signal indicating whether there is a next page available.
@@ -116,19 +127,21 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       httpParams = httpParams.set('sort', params.sort);
     }
 
-    return this.http.get<SpringPageResponse<T>>(this.basePath, { params: httpParams }).pipe(
-      tap({
-        next: (response) => {
-          this.itemsSignal.set(response.content);
-          this.updatePaginationFromSpringPage(response);
-          this.loadingSignal.set(false);
-        },
-        error: () => {
-          this.loadingSignal.set(false);
-        }
-      }),
-      map((response) => response.content)
-    );
+    return this.http
+      .get<SpringPageResponse<T>>(this.basePath, { params: httpParams })
+      .pipe(
+        tap({
+          next: (response) => {
+            this.itemsSignal.set(response.content);
+            this.updatePaginationFromSpringPage(response);
+            this.loadingSignal.set(false);
+          },
+          error: () => {
+            this.loadingSignal.set(false);
+          },
+        }),
+        map((response) => response.content),
+      );
   }
 
   /**
@@ -148,8 +161,8 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
         },
         error: () => {
           this.loadingSignal.set(false);
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -166,14 +179,14 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       tap({
         next: (item) => {
           // Add the new item to the beginning of the list
-          this.itemsSignal.update(items => [item, ...items]);
+          this.itemsSignal.update((items) => [item, ...items]);
           this.selectedItemSignal.set(item);
           this.loadingSignal.set(false);
         },
         error: () => {
           this.loadingSignal.set(false);
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -191,18 +204,18 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       tap({
         next: (item) => {
           // Update the item in the list
-          this.itemsSignal.update(items =>
-            items.map(existingItem =>
-              existingItem.id === id ? item : existingItem
-            )
+          this.itemsSignal.update((items) =>
+            items.map((existingItem) =>
+              existingItem.id === id ? item : existingItem,
+            ),
           );
           this.selectedItemSignal.set(item);
           this.loadingSignal.set(false);
         },
         error: () => {
           this.loadingSignal.set(false);
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -219,8 +232,8 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       tap({
         next: () => {
           // Remove the item from the list
-          this.itemsSignal.update(items =>
-            items.filter(item => item.id !== id)
+          this.itemsSignal.update((items) =>
+            items.filter((item) => item.id !== id),
           );
           // Clear selection if the deleted item was selected
           if (this.selectedItemSignal()?.id === id) {
@@ -230,8 +243,8 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
         },
         error: () => {
           this.loadingSignal.set(false);
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -256,19 +269,23 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       httpParams = httpParams.set('sort', params.sort);
     }
 
-    return this.http.get<SpringPageResponse<T>>(`${this.basePath}/search`, { params: httpParams }).pipe(
-      tap({
-        next: (response) => {
-          this.itemsSignal.set(response.content);
-          this.updatePaginationFromSpringPage(response);
-          this.loadingSignal.set(false);
-        },
-        error: () => {
-          this.loadingSignal.set(false);
-        }
-      }),
-      map((response) => response.content)
-    );
+    return this.http
+      .get<
+        SpringPageResponse<T>
+      >(`${this.basePath}/search`, { params: httpParams })
+      .pipe(
+        tap({
+          next: (response) => {
+            this.itemsSignal.set(response.content);
+            this.updatePaginationFromSpringPage(response);
+            this.loadingSignal.set(false);
+          },
+          error: () => {
+            this.loadingSignal.set(false);
+          },
+        }),
+        map((response) => response.content),
+      );
   }
 
   /**
@@ -296,7 +313,7 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
       page: 0,
       size: 20,
       totalElements: 0,
-      totalPages: 0
+      totalPages: 0,
     });
   }
 
@@ -305,12 +322,14 @@ export abstract class BaseCrudService<T extends Identifiable, TCreate = T, TUpda
    *
    * @param response - The Spring Boot Page response
    */
-  private updatePaginationFromSpringPage(response: SpringPageResponse<T>): void {
+  private updatePaginationFromSpringPage(
+    response: SpringPageResponse<T>,
+  ): void {
     this.paginationSignal.set({
       page: response.number,
       size: response.size,
       totalElements: response.totalElements,
-      totalPages: response.totalPages
+      totalPages: response.totalPages,
     });
   }
 }

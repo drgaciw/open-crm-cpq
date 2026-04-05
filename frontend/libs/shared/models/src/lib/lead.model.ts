@@ -12,11 +12,7 @@ export type LeadStatus =
 /**
  * Mirrors: com.opencrm.crm.lead.LeadPriority
  */
-export type LeadPriority =
-  | 'LOW'
-  | 'MEDIUM'
-  | 'HIGH'
-  | 'URGENT';
+export type LeadPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 /**
  * Mirrors: com.opencrm.crm.lead.LeadDto
@@ -64,17 +60,17 @@ export interface LeadDto {
  * Sent to POST /api/v1/leads
  */
 export interface LeadCreateRequest {
-  title: string;                 // @NotBlank
+  title: string; // @NotBlank
   contactId?: number;
   organizationId?: number;
   source?: string;
   sourceDetail?: string;
-  estimatedValue?: number;       // @PositiveOrZero
-  currency?: string;             // defaults to "USD"
+  estimatedValue?: number; // @PositiveOrZero
+  currency?: string; // defaults to "USD"
   description?: string;
   ownerId?: string;
   campaign?: string;
-  priority?: LeadPriority;       // defaults to MEDIUM
+  priority?: LeadPriority; // defaults to MEDIUM
 }
 
 /**
@@ -100,5 +96,5 @@ export interface LeadUpdateRequest {
  * Sent to POST /api/v1/leads/:id/lose
  */
 export interface LeadLoseRequest {
-  reason: string;                // @NotBlank
+  reason: string; // @NotBlank
 }

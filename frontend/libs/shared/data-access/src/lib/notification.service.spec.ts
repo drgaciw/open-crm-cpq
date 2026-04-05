@@ -10,10 +10,7 @@ describe('NotificationService', () => {
     const spy = jasmine.createSpyObj('MatSnackBar', ['open', 'dismiss']);
 
     TestBed.configureTestingModule({
-      providers: [
-        NotificationService,
-        { provide: MatSnackBar, useValue: spy }
-      ]
+      providers: [NotificationService, { provide: MatSnackBar, useValue: spy }],
     });
 
     service = TestBed.inject(NotificationService);
@@ -34,8 +31,8 @@ describe('NotificationService', () => {
         'Close',
         jasmine.objectContaining({
           duration: 5000,
-          panelClass: ['snackbar-success']
-        })
+          panelClass: ['snackbar-success'],
+        }),
       );
     });
 
@@ -48,8 +45,8 @@ describe('NotificationService', () => {
         message,
         'Close',
         jasmine.objectContaining({
-          duration: customDuration
-        })
+          duration: customDuration,
+        }),
       );
     });
   });
@@ -64,8 +61,8 @@ describe('NotificationService', () => {
         'Close',
         jasmine.objectContaining({
           duration: 7000,
-          panelClass: ['snackbar-error']
-        })
+          panelClass: ['snackbar-error'],
+        }),
       );
     });
 
@@ -78,8 +75,8 @@ describe('NotificationService', () => {
         message,
         'Close',
         jasmine.objectContaining({
-          duration: customDuration
-        })
+          duration: customDuration,
+        }),
       );
     });
   });
@@ -94,8 +91,8 @@ describe('NotificationService', () => {
         'Close',
         jasmine.objectContaining({
           duration: 5000,
-          panelClass: ['snackbar-info']
-        })
+          panelClass: ['snackbar-info'],
+        }),
       );
     });
   });
@@ -110,8 +107,8 @@ describe('NotificationService', () => {
         'Close',
         jasmine.objectContaining({
           duration: 6000,
-          panelClass: ['snackbar-warning']
-        })
+          panelClass: ['snackbar-warning'],
+        }),
       );
     });
   });

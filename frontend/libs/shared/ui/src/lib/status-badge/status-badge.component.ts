@@ -1,4 +1,9 @@
-import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  computed,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatChipsModule } from '@angular/material/chips';
 import { LeadStatus, DealStage } from '@frontend/shared-models';
@@ -33,21 +38,23 @@ interface StatusConfig {
       {{ statusConfig().label }}
     </mat-chip>
   `,
-  styles: [`
-    .status-badge {
-      font-weight: 500;
-      font-size: 12px;
-      padding: 4px 12px;
-      height: auto;
-      min-height: 24px;
-      border-radius: 12px;
-      letter-spacing: 0.5px;
-    }
+  styles: [
+    `
+      .status-badge {
+        font-weight: 500;
+        font-size: 12px;
+        padding: 4px 12px;
+        height: auto;
+        min-height: 24px;
+        border-radius: 12px;
+        letter-spacing: 0.5px;
+      }
 
-    :host ::ng-deep .status-badge .mat-mdc-chip-action-label {
-      padding: 0;
-    }
-  `],
+      :host ::ng-deep .status-badge .mat-mdc-chip-action-label {
+        padding: 0;
+      }
+    `,
+  ],
 })
 export class StatusBadgeComponent {
   // Inputs using signal-based API
@@ -100,11 +107,13 @@ export class StatusBadgeComponent {
       },
     };
 
-    return configs[status] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: status,
-    };
+    return (
+      configs[status] || {
+        color: '#757575',
+        backgroundColor: '#f5f5f5',
+        label: status,
+      }
+    );
   }
 
   private getDealStageConfig(stage: DealStage): StatusConfig {
@@ -146,10 +155,12 @@ export class StatusBadgeComponent {
       },
     };
 
-    return configs[stage] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: stage,
-    };
+    return (
+      configs[stage] || {
+        color: '#757575',
+        backgroundColor: '#f5f5f5',
+        label: stage,
+      }
+    );
   }
 }

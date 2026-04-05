@@ -1,4 +1,10 @@
-import { Component, inject, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  input,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,7 +31,11 @@ import { OrganizationService } from '../organization.service';
       <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (orgService.selectedOrganization(); as org) {
       <div class="detail-header">
-        <button mat-icon-button (click)="goBack()" aria-label="Go back to organizations">
+        <button
+          mat-icon-button
+          (click)="goBack()"
+          aria-label="Go back to organizations"
+        >
           <mat-icon>arrow_back</mat-icon>
         </button>
         <div class="header-info">
@@ -118,34 +128,61 @@ import { OrganizationService } from '../organization.service';
       </div>
     }
   `,
-  styles: [`
-    .loading { display: flex; justify-content: center; padding: 48px; }
-    .detail-header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .header-info { flex: 1; }
-    .header-info h1 { margin: 0; font-size: 1.5rem; }
-    .header-actions { display: flex; gap: 8px; }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 16px;
-    }
-    .full-width { grid-column: 1 / -1; }
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      padding: 16px 0;
-    }
-    .info-item { display: flex; flex-direction: column; gap: 4px; }
-    .label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    .value { font-size: 0.95rem; }
-  `],
+  styles: [
+    `
+      .loading {
+        display: flex;
+        justify-content: center;
+        padding: 48px;
+      }
+      .detail-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .header-info {
+        flex: 1;
+      }
+      .header-info h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      .header-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 16px;
+      }
+      .full-width {
+        grid-column: 1 / -1;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        padding: 16px 0;
+      }
+      .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .label {
+        font-size: 0.75rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .value {
+        font-size: 0.95rem;
+      }
+    `,
+  ],
 })
 export class OrganizationDetailComponent implements OnInit {
   readonly orgService = inject(OrganizationService);

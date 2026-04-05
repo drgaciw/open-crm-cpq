@@ -17,7 +17,7 @@ export class CurrencyFormatPipe implements PipeTransform {
     value: number | null | undefined,
     currencyCode: string = 'USD',
     display: 'code' | 'symbol' | 'symbol-narrow' = 'symbol',
-    locale: string = 'en-US'
+    locale: string = 'en-US',
   ): string {
     if (value === null || value === undefined || isNaN(value)) {
       return '-';

@@ -47,7 +47,7 @@ export interface OrganizationDto {
  * Sent to POST /api/v1/organizations
  */
 export interface OrganizationCreateRequest {
-  name: string;                  // @NotBlank
+  name: string; // @NotBlank
   website?: string;
   websiteDomain?: string;
   industry?: string;

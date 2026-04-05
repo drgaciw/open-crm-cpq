@@ -1,6 +1,10 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import {
+  MatDialogModule,
+  MAT_DIALOG_DATA,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 
 export interface ConfirmDialogData {
@@ -50,11 +54,7 @@ export interface ConfirmDialogData {
       </mat-dialog-content>
 
       <mat-dialog-actions class="dialog-actions">
-        <button
-          mat-button
-          (click)="onCancel()"
-          class="cancel-button"
-        >
+        <button mat-button (click)="onCancel()" class="cancel-button">
           {{ data.cancelText || 'Cancel' }}
         </button>
         <button
@@ -68,48 +68,50 @@ export interface ConfirmDialogData {
       </mat-dialog-actions>
     </div>
   `,
-  styles: [`
-    .confirm-dialog {
-      min-width: 300px;
-    }
+  styles: [
+    `
+      .confirm-dialog {
+        min-width: 300px;
+      }
 
-    .dialog-title {
-      margin: 0;
-      padding: 24px 24px 16px;
-      font-size: 20px;
-      font-weight: 600;
-      color: #212121;
-    }
+      .dialog-title {
+        margin: 0;
+        padding: 24px 24px 16px;
+        font-size: 20px;
+        font-weight: 600;
+        color: #212121;
+      }
 
-    .dialog-content {
-      padding: 0 24px;
-      overflow: visible;
-    }
+      .dialog-content {
+        padding: 0 24px;
+        overflow: visible;
+      }
 
-    .dialog-message {
-      margin: 0;
-      color: #616161;
-      font-size: 14px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-    }
+      .dialog-message {
+        margin: 0;
+        color: #616161;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
 
-    .dialog-actions {
-      padding: 16px 24px 24px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin: 0;
-    }
+      .dialog-actions {
+        padding: 16px 24px 24px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin: 0;
+      }
 
-    .cancel-button {
-      color: #757575;
-    }
+      .cancel-button {
+        color: #757575;
+      }
 
-    .confirm-button {
-      min-width: 80px;
-    }
-  `],
+      .confirm-button {
+        min-width: 80px;
+      }
+    `,
+  ],
 })
 export class ConfirmDialogComponent {
   protected readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);

@@ -22,6 +22,7 @@ Generic reusable data table with sorting, pagination, and loading states.
 **Path:** `libs/shared/ui/src/lib/data-table/data-table.component.ts`
 
 **Features:**
+
 - Mat-table integration
 - Sortable columns
 - Pagination with page size options
@@ -31,6 +32,7 @@ Generic reusable data table with sorting, pagination, and loading states.
 - Responsive design
 
 **Usage:**
+
 ```typescript
 import { DataTableComponent, TableColumn } from '@frontend/shared-ui';
 
@@ -80,12 +82,14 @@ MatDialog-based confirmation dialog for user confirmations.
 **Path:** `libs/shared/ui/src/lib/confirm-dialog/confirm-dialog.component.ts`
 
 **Features:**
+
 - Customizable title and message
 - Configurable button text and colors
 - Returns true/false on close
 - Supports warn color for dangerous actions
 
 **Usage:**
+
 ```typescript
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmDialogComponent } from '@frontend/shared-ui';
@@ -123,12 +127,14 @@ Color-coded badge for displaying lead statuses and deal stages.
 **Path:** `libs/shared/ui/src/lib/status-badge/status-badge.component.ts`
 
 **Features:**
+
 - Predefined color schemes for lead statuses
 - Predefined color schemes for deal stages
 - Automatic label formatting
 - Accessible and readable
 
 **Lead Statuses:**
+
 - NEW (Blue)
 - CONTACTED (Light Blue)
 - QUALIFIED (Purple)
@@ -136,6 +142,7 @@ Color-coded badge for displaying lead statuses and deal stages.
 - LOST (Red)
 
 **Deal Stages:**
+
 - PROSPECTING (Blue)
 - QUALIFICATION (Light Blue)
 - PROPOSAL (Orange)
@@ -144,6 +151,7 @@ Color-coded badge for displaying lead statuses and deal stages.
 - CLOSED_LOST (Red)
 
 **Usage:**
+
 ```typescript
 import { StatusBadgeComponent } from '@frontend/shared-ui';
 
@@ -151,7 +159,7 @@ import { StatusBadgeComponent } from '@frontend/shared-ui';
   template: `
     <app-status-badge [status]="'NEW'" [type]="'lead'" />
     <app-status-badge [status]="'CLOSED_WON'" [type]="'deal'" />
-  `
+  `,
 })
 export class MyComponent {}
 ```
@@ -163,25 +171,19 @@ Placeholder component for empty lists or tables.
 **Path:** `libs/shared/ui/src/lib/empty-state/empty-state.component.ts`
 
 **Features:**
+
 - Customizable icon, title, and message
 - Optional call-to-action button
 - Responsive layout
 - Centered design
 
 **Usage:**
+
 ```typescript
 import { EmptyStateComponent } from '@frontend/shared-ui';
 
 @Component({
-  template: `
-    <app-empty-state
-      [icon]="'inbox'"
-      [title]="'No leads found'"
-      [message]="'Get started by creating your first lead.'"
-      [actionLabel]="'Create Lead'"
-      (action)="onCreateLead()"
-    />
-  `
+  template: ` <app-empty-state [icon]="'inbox'" [title]="'No leads found'" [message]="'Get started by creating your first lead.'" [actionLabel]="'Create Lead'" (action)="onCreateLead()" /> `,
 })
 export class MyComponent {
   onCreateLead() {
@@ -197,21 +199,20 @@ Page title bar with content projection for actions and search.
 **Path:** `libs/shared/ui/src/lib/page-header/page-header.component.ts`
 
 **Features:**
+
 - Title and subtitle display
 - Content projection slots for actions
 - Content projection slot for search
 - Responsive design with mobile optimization
 
 **Usage:**
+
 ```typescript
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
   template: `
-    <app-page-header
-      [title]="'Leads'"
-      [subtitle]="'Manage your sales leads'"
-    >
+    <app-page-header [title]="'Leads'" [subtitle]="'Manage your sales leads'">
       <div actions>
         <button mat-raised-button color="primary" (click)="onCreate()">
           <mat-icon>add</mat-icon>
@@ -222,7 +223,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
         <app-search-input (searchChange)="onSearch($event)" />
       </div>
     </app-page-header>
-  `
+  `,
 })
 export class MyComponent {
   onCreate() {
@@ -242,6 +243,7 @@ Debounced search input with Material Design styling.
 **Path:** `libs/shared/ui/src/lib/search-input/search-input.component.ts`
 
 **Features:**
+
 - Automatic debouncing (default 300ms)
 - Clear button when text is entered
 - Search icon prefix
@@ -249,17 +251,12 @@ Debounced search input with Material Design styling.
 - OnPush change detection
 
 **Usage:**
+
 ```typescript
 import { SearchInputComponent } from '@frontend/shared-ui';
 
 @Component({
-  template: `
-    <app-search-input
-      [placeholder]="'Search leads...'"
-      [debounceMs]="300"
-      (searchChange)="onSearch($event)"
-    />
-  `
+  template: ` <app-search-input [placeholder]="'Search leads...'" [debounceMs]="300" (searchChange)="onSearch($event)" /> `,
 })
 export class MyComponent {
   onSearch(searchTerm: string) {
@@ -278,6 +275,7 @@ Formats deal amounts as currency with proper locale formatting.
 **Path:** `libs/shared/ui/src/lib/pipes/currency-format.pipe.ts`
 
 **Features:**
+
 - Supports multiple currencies (USD, EUR, GBP, etc.)
 - Configurable display format (symbol, code, symbol-narrow)
 - Locale-aware formatting
@@ -285,15 +283,16 @@ Formats deal amounts as currency with proper locale formatting.
 - Falls back to basic formatting on error
 
 **Usage:**
+
 ```typescript
 import { CurrencyFormatPipe } from '@frontend/shared-ui';
 
 @Component({
   template: `
     <p>Amount: {{ amount | currencyFormat }}</p>
-    <p>EUR: {{ amount | currencyFormat:'EUR' }}</p>
-    <p>GBP: {{ amount | currencyFormat:'GBP':'symbol-narrow' }}</p>
-  `
+    <p>EUR: {{ amount | currencyFormat: 'EUR' }}</p>
+    <p>GBP: {{ amount | currencyFormat: 'GBP' : 'symbol-narrow' }}</p>
+  `,
 })
 export class MyComponent {
   amount = 1234.56; // Displays as $1,234.56
@@ -307,6 +306,7 @@ Transforms dates into relative time strings.
 **Path:** `libs/shared/ui/src/lib/pipes/date-ago.pipe.ts`
 
 **Features:**
+
 - Human-readable relative dates
 - Handles multiple time units (seconds to years)
 - Supports Date objects and ISO strings
@@ -314,6 +314,7 @@ Transforms dates into relative time strings.
 - Smart singular/plural handling
 
 **Time Units:**
+
 - just now (< 10 seconds)
 - less than a minute ago (< 60 seconds)
 - X minute(s) ago
@@ -324,6 +325,7 @@ Transforms dates into relative time strings.
 - X year(s) ago
 
 **Usage:**
+
 ```typescript
 import { DateAgoPipe } from '@frontend/shared-ui';
 
@@ -331,7 +333,7 @@ import { DateAgoPipe } from '@frontend/shared-ui';
   template: `
     <p>Created: {{ createdAt | dateAgo }}</p>
     <p>Updated: {{ updatedAt | dateAgo }}</p>
-  `
+  `,
 })
 export class MyComponent {
   createdAt = '2024-01-15T10:30:00Z'; // Displays as "3 days ago"
@@ -344,16 +346,7 @@ export class MyComponent {
 The library is already set up in the Nx monorepo. Simply import the components and pipes you need:
 
 ```typescript
-import {
-  DataTableComponent,
-  ConfirmDialogComponent,
-  StatusBadgeComponent,
-  EmptyStateComponent,
-  PageHeaderComponent,
-  SearchInputComponent,
-  CurrencyFormatPipe,
-  DateAgoPipe
-} from '@frontend/shared-ui';
+import { DataTableComponent, ConfirmDialogComponent, StatusBadgeComponent, EmptyStateComponent, PageHeaderComponent, SearchInputComponent, CurrencyFormatPipe, DateAgoPipe } from '@frontend/shared-ui';
 ```
 
 ## Testing

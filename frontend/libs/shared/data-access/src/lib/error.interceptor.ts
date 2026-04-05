@@ -30,7 +30,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         // Handle HTTP errors
         if (error.status === 0) {
           // Network error or CORS issue
-          errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+          errorMessage =
+            'Unable to connect to the server. Please check your internet connection.';
         } else if (error.status >= 400 && error.status < 500) {
           // Client errors (4xx)
           if (error.status === 401) {
@@ -42,11 +43,16 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           } else if (error.status === 422) {
             errorMessage = 'Validation failed. Please check your input.';
           } else {
-            errorMessage = error.error?.message || error.message || `Client error: ${error.status}`;
+            errorMessage =
+              error.error?.message ||
+              error.message ||
+              `Client error: ${error.status}`;
           }
         } else if (error.status >= 500) {
           // Server errors (5xx)
-          errorMessage = error.error?.message || 'A server error occurred. Please try again later.';
+          errorMessage =
+            error.error?.message ||
+            'A server error occurred. Please try again later.';
         }
 
         // If the error has a traceId, append it for support purposes
@@ -74,6 +80,6 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
       // Re-throw the error so it can be handled by the calling code if needed
       return throwError(() => error);
-    })
+    }),
   );
 };

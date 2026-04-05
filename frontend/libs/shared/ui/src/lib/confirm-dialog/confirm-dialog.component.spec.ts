@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ConfirmDialogComponent, ConfirmDialogData } from './confirm-dialog.component';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from './confirm-dialog.component';
 
 describe('ConfirmDialogComponent', () => {
   let component: ComponentFixture<ConfirmDialogComponent>;
@@ -45,12 +48,14 @@ describe('ConfirmDialogComponent', () => {
   });
 
   it('should display custom confirm button text', () => {
-    const confirmButton = component.nativeElement.querySelector('.confirm-button');
+    const confirmButton =
+      component.nativeElement.querySelector('.confirm-button');
     expect(confirmButton.textContent?.trim()).toBe('Yes');
   });
 
   it('should display custom cancel button text', () => {
-    const cancelButton = component.nativeElement.querySelector('.cancel-button');
+    const cancelButton =
+      component.nativeElement.querySelector('.cancel-button');
     expect(cancelButton.textContent?.trim()).toBe('No');
   });
 
@@ -72,7 +77,8 @@ describe('ConfirmDialogComponent', () => {
     component = TestBed.createComponent(ConfirmDialogComponent);
     component.detectChanges();
 
-    const confirmButton = component.nativeElement.querySelector('.confirm-button');
+    const confirmButton =
+      component.nativeElement.querySelector('.confirm-button');
     expect(confirmButton.textContent?.trim()).toBe('Confirm');
   });
 
@@ -87,7 +93,8 @@ describe('ConfirmDialogComponent', () => {
   });
 
   it('should apply confirm button color from data', () => {
-    const confirmButton = component.nativeElement.querySelector('.confirm-button');
+    const confirmButton =
+      component.nativeElement.querySelector('.confirm-button');
     expect(confirmButton.getAttribute('ng-reflect-color')).toBe('primary');
   });
 
@@ -111,7 +118,8 @@ describe('ConfirmDialogComponent', () => {
     component = TestBed.createComponent(ConfirmDialogComponent);
     component.detectChanges();
 
-    const confirmButton = component.nativeElement.querySelector('.confirm-button');
+    const confirmButton =
+      component.nativeElement.querySelector('.confirm-button');
     expect(confirmButton.getAttribute('ng-reflect-color')).toBe('warn');
   });
 });

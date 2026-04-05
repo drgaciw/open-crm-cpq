@@ -11,11 +11,7 @@ import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import {
-  loadingInterceptor,
-  apiResponseInterceptor,
-  errorInterceptor
-} from '@frontend/shared-data-access';
+import { loadingInterceptor, apiResponseInterceptor, errorInterceptor } from '@frontend/shared-data-access';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -24,12 +20,12 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     provideHttpClient(
       withInterceptors([
-        loadingInterceptor,      // Track request count
-        apiResponseInterceptor,  // Unwrap ApiResponse envelope
-        errorInterceptor         // Handle errors with notifications
-      ])
-    )
-  ]
+        loadingInterceptor, // Track request count
+        apiResponseInterceptor, // Unwrap ApiResponse envelope
+        errorInterceptor, // Handle errors with notifications
+      ]),
+    ),
+  ],
 };
 ```
 
@@ -67,18 +63,10 @@ export const appConfig: ApplicationConfig = {
 ```typescript
 import { Injectable } from '@angular/core';
 import { BaseCrudService } from '@frontend/shared-data-access';
-import {
-  Contact,
-  CreateContactRequest,
-  UpdateContactRequest
-} from '@frontend/shared-models';
+import { Contact, CreateContactRequest, UpdateContactRequest } from '@frontend/shared-models';
 
 @Injectable({ providedIn: 'root' })
-export class ContactService extends BaseCrudService<
-  Contact,
-  CreateContactRequest,
-  UpdateContactRequest
-> {
+export class ContactService extends BaseCrudService<Contact, CreateContactRequest, UpdateContactRequest> {
   protected override basePath = '/api/v1/contacts';
 
   // You can add custom methods here
@@ -103,20 +91,12 @@ import { NotificationService } from '@frontend/shared-data-access';
 @Component({
   selector: 'app-contacts',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatProgressSpinnerModule,
-    MatButtonModule,
-    MatCardModule,
-    MatPaginatorModule
-  ],
+  imports: [CommonModule, MatProgressSpinnerModule, MatButtonModule, MatCardModule, MatPaginatorModule],
   template: `
     <div class="contacts-container">
       <div class="header">
         <h1>Contacts</h1>
-        <button mat-raised-button color="primary" (click)="onCreate()">
-          Add Contact
-        </button>
+        <button mat-raised-button color="primary" (click)="onCreate()">Add Contact</button>
       </div>
 
       @if (contactService.loading()) {
@@ -135,9 +115,7 @@ import { NotificationService } from '@frontend/shared-data-access';
         @for (contact of contactService.items(); track contact.id) {
           <mat-card class="contact-card">
             <mat-card-header>
-              <mat-card-title>
-                {{ contact.firstName }} {{ contact.lastName }}
-              </mat-card-title>
+              <mat-card-title> {{ contact.firstName }} {{ contact.lastName }} </mat-card-title>
             </mat-card-header>
             <mat-card-content>
               <p><strong>Email:</strong> {{ contact.email }}</p>
@@ -147,60 +125,54 @@ import { NotificationService } from '@frontend/shared-data-access';
             </mat-card-content>
             <mat-card-actions>
               <button mat-button (click)="onEdit(contact.id)">Edit</button>
-              <button mat-button color="warn" (click)="onDelete(contact.id)">
-                Delete
-              </button>
+              <button mat-button color="warn" (click)="onDelete(contact.id)">Delete</button>
             </mat-card-actions>
           </mat-card>
         }
       </div>
 
       @if (contactService.items().length > 0) {
-        <mat-paginator
-          [length]="contactService.pagination().totalElements"
-          [pageSize]="contactService.pagination().size"
-          [pageIndex]="contactService.pagination().page"
-          [pageSizeOptions]="[10, 20, 50, 100]"
-          (page)="onPageChange($event)">
-        </mat-paginator>
+        <mat-paginator [length]="contactService.pagination().totalElements" [pageSize]="contactService.pagination().size" [pageIndex]="contactService.pagination().page" [pageSizeOptions]="[10, 20, 50, 100]" (page)="onPageChange($event)"> </mat-paginator>
       }
     </div>
   `,
-  styles: [`
-    .contacts-container {
-      padding: 24px;
-    }
+  styles: [
+    `
+      .contacts-container {
+        padding: 24px;
+      }
 
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
 
-    .loading-container {
-      display: flex;
-      justify-content: center;
-      padding: 48px;
-    }
+      .loading-container {
+        display: flex;
+        justify-content: center;
+        padding: 48px;
+      }
 
-    .empty-state {
-      text-align: center;
-      padding: 48px;
-      color: #666;
-    }
+      .empty-state {
+        text-align: center;
+        padding: 48px;
+        color: #666;
+      }
 
-    .contacts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
+      .contacts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+      }
 
-    .contact-card {
-      height: 100%;
-    }
-  `]
+      .contact-card {
+        height: 100%;
+      }
+    `,
+  ],
 })
 export class ContactsComponent implements OnInit {
   contactService = inject(ContactService);
@@ -211,15 +183,13 @@ export class ContactsComponent implements OnInit {
   }
 
   loadContacts(page: number = 0, size: number = 20) {
-    this.contactService
-      .list({ page, size, sort: 'lastName,asc' })
-      .subscribe({
-        next: () => {
-          // Items are automatically updated in the signal
-          console.log('Contacts loaded successfully');
-        }
-        // Errors are handled by the error interceptor
-      });
+    this.contactService.list({ page, size, sort: 'lastName,asc' }).subscribe({
+      next: () => {
+        // Items are automatically updated in the signal
+        console.log('Contacts loaded successfully');
+      },
+      // Errors are handled by the error interceptor
+    });
   }
 
   onPageChange(event: PageEvent) {
@@ -232,13 +202,13 @@ export class ContactsComponent implements OnInit {
       firstName: 'Jane',
       lastName: 'Smith',
       email: 'jane.smith@example.com',
-      phone: '555-0123'
+      phone: '555-0123',
     };
 
     this.contactService.create(newContact).subscribe({
       next: () => {
         this.notificationService.success('Contact created successfully!');
-      }
+      },
     });
   }
 
@@ -249,7 +219,7 @@ export class ContactsComponent implements OnInit {
         const selected = this.contactService.selectedItem();
         console.log('Editing contact:', selected);
         // In a real app, you would open a dialog here with the selected contact
-      }
+      },
     });
   }
 
@@ -258,7 +228,7 @@ export class ContactsComponent implements OnInit {
     this.contactService.delete(id).subscribe({
       next: () => {
         this.notificationService.success('Contact deleted successfully!');
-      }
+      },
     });
   }
 
@@ -287,12 +257,7 @@ import { LoadingService } from '@frontend/shared-data-access';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterOutlet,
-    MatProgressBarModule,
-    MatToolbarModule
-  ],
+  imports: [CommonModule, RouterOutlet, MatProgressBarModule, MatToolbarModule],
   template: `
     <mat-toolbar color="primary">
       <span>CRM Application</span>
@@ -306,19 +271,21 @@ import { LoadingService } from '@frontend/shared-data-access';
       <router-outlet />
     </main>
   `,
-  styles: [`
-    mat-progress-bar {
-      position: fixed;
-      top: 64px;
-      left: 0;
-      right: 0;
-      z-index: 1000;
-    }
+  styles: [
+    `
+      mat-progress-bar {
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+      }
 
-    main {
-      padding-top: 8px;
-    }
-  `]
+      main {
+        padding-top: 8px;
+      }
+    `,
+  ],
 })
 export class AppComponent {
   loadingService = inject(LoadingService);
@@ -334,11 +301,7 @@ import { BaseCrudService } from '@frontend/shared-data-access';
 import { Contact, CreateContactRequest, UpdateContactRequest } from '@frontend/shared-models';
 
 @Injectable({ providedIn: 'root' })
-export class ContactService extends BaseCrudService<
-  Contact,
-  CreateContactRequest,
-  UpdateContactRequest
-> {
+export class ContactService extends BaseCrudService<Contact, CreateContactRequest, UpdateContactRequest> {
   protected override basePath = '/api/v1/contacts';
 
   /**
@@ -347,19 +310,17 @@ export class ContactService extends BaseCrudService<
   findByOrganization(organizationId: string): Observable<Contact[]> {
     this.loadingSignal.set(true);
 
-    return this.http
-      .get<Contact[]>(`${this.basePath}/organization/${organizationId}`)
-      .pipe(
-        tap({
-          next: (contacts) => {
-            this.itemsSignal.set(contacts);
-            this.loadingSignal.set(false);
-          },
-          error: () => {
-            this.loadingSignal.set(false);
-          }
-        })
-      );
+    return this.http.get<Contact[]>(`${this.basePath}/organization/${organizationId}`).pipe(
+      tap({
+        next: (contacts) => {
+          this.itemsSignal.set(contacts);
+          this.loadingSignal.set(false);
+        },
+        error: () => {
+          this.loadingSignal.set(false);
+        },
+      }),
+    );
   }
 
   /**
@@ -371,23 +332,18 @@ export class ContactService extends BaseCrudService<
     const formData = new FormData();
     formData.append('file', file);
 
-    return this.http
-      .post<{ imported: number; failed: number }>(
-        `${this.basePath}/import`,
-        formData
-      )
-      .pipe(
-        tap({
-          next: () => {
-            this.loadingSignal.set(false);
-            // Refresh the list after import
-            this.list().subscribe();
-          },
-          error: () => {
-            this.loadingSignal.set(false);
-          }
-        })
-      );
+    return this.http.post<{ imported: number; failed: number }>(`${this.basePath}/import`, formData).pipe(
+      tap({
+        next: () => {
+          this.loadingSignal.set(false);
+          // Refresh the list after import
+          this.list().subscribe();
+        },
+        error: () => {
+          this.loadingSignal.set(false);
+        },
+      }),
+    );
   }
 
   /**
@@ -395,7 +351,7 @@ export class ContactService extends BaseCrudService<
    */
   exportToCsv(): Observable<Blob> {
     return this.http.get(`${this.basePath}/export`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
   }
 }
@@ -417,11 +373,7 @@ describe('ContactService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        ContactService,
-        provideHttpClient(),
-        provideHttpClientTesting()
-      ]
+      providers: [ContactService, provideHttpClient(), provideHttpClientTesting()],
     });
 
     service = TestBed.inject(ContactService);
@@ -439,13 +391,13 @@ describe('ContactService', () => {
           id: '1',
           firstName: 'John',
           lastName: 'Doe',
-          email: 'john@example.com'
-        }
+          email: 'john@example.com',
+        },
       ],
       totalElements: 1,
       totalPages: 1,
       size: 20,
-      number: 0
+      number: 0,
     };
 
     service.list({ page: 0, size: 20 }).subscribe((contacts) => {
@@ -476,6 +428,7 @@ This setup provides:
 8. **Testable** - Easy to test with Angular's testing utilities
 
 All you need to do is:
+
 1. Configure interceptors in app.config.ts
 2. Extend BaseCrudService for each entity
 3. Inject the service and use the signals in your components

@@ -27,12 +27,19 @@ export const apiResponseInterceptor: HttpInterceptorFn = (req, next) => {
         const body = event.body;
 
         // Check if the response body is an ApiResponse
-        if (body && typeof body === 'object' && 'success' in body && 'timestamp' in body) {
+        if (
+          body &&
+          typeof body === 'object' &&
+          'success' in body &&
+          'timestamp' in body
+        ) {
           const apiResponse = body as ApiResponse<unknown>;
 
           // If the response indicates failure, throw an error
           if (!apiResponse.success) {
-            const error = new ApiError(apiResponse.message || 'An error occurred');
+            const error = new ApiError(
+              apiResponse.message || 'An error occurred',
+            );
             error.errorCode = apiResponse.errorCode;
             error.traceId = apiResponse.traceId;
             error.errors = apiResponse.errors;
@@ -61,6 +68,6 @@ export const apiResponseInterceptor: HttpInterceptorFn = (req, next) => {
 
       // Return the event as-is if it's not an HttpResponse or doesn't have ApiResponse structure
       return event;
-    })
+    }),
   );
 };

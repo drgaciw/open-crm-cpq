@@ -1,0 +1,3 @@
+## 2025-04-05 - Add trackBy to mat-table for Angular signals
+**Learning:** Angular Material's `mat-table` tracks rows by object reference by default. When updating a signal with new arrays (e.g. from polling or API refetch), it triggers a full DOM teardown and recreation for all rows, leading to heavy layout thrashing and loss of DOM focus.
+**Action:** Always provide a `[trackBy]="trackById"` function to `<table mat-table>` when using it with dynamic data (especially reactive Signals or RxJS arrays) to ensure DOM nodes are reused correctly and only changed rows are updated.

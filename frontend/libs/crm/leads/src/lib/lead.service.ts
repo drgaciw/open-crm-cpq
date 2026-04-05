@@ -21,46 +21,62 @@ export class LeadService {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly pagination = signal<PaginationMeta>({
-    page: 0, size: 20, totalElements: 0, totalPages: 0,
+    page: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
   });
 
-  readonly isEmpty = computed(() => this.leads().length === 0 && !this.loading());
+  readonly isEmpty = computed(
+    () => this.leads().length === 0 && !this.loading(),
+  );
 
-  list(page = 0, size = 20, sort = 'createdAt,desc', status?: LeadStatus): void {
+  list(
+    page = 0,
+    size = 20,
+    sort = 'createdAt,desc',
+    status?: LeadStatus,
+  ): void {
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
-      .set('page', page).set('size', size).set('sort', sort);
+      .set('page', page)
+      .set('size', size)
+      .set('sort', sort);
     if (status) params = params.set('status', status);
 
-    this.http.get<SpringPageResponse<LeadDto>>(this.basePath, { params })
+    this.http
+      .get<SpringPageResponse<LeadDto>>(this.basePath, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.leads.set(p.content ?? p);
           if (p.totalElements !== undefined) {
             this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? size,
-              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
+              page: p.number ?? 0,
+              size: p.size ?? size,
+              totalElements: p.totalElements ?? 0,
+              totalPages: p.totalPages ?? 0,
             });
           }
         },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 
   getById(id: number): void {
     this.error.set(null);
     this.loading.set(true);
-    this.http.get<LeadDto>(`${this.basePath}/${id}`)
+    this.http
+      .get<LeadDto>(`${this.basePath}/${id}`)
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (lead) => this.selectedLead.set(lead),
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 
@@ -80,13 +96,14 @@ export class LeadService {
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('q', query);
-    this.http.get<LeadDto[]>(`${this.basePath}/search`, { params })
+    this.http
+      .get<LeadDto[]>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (leads) => this.leads.set(leads),
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 

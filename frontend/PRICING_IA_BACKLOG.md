@@ -48,7 +48,7 @@ interface PricingCustomerDto {
   uuid: string;
   externalId: string;
   name: string;
-  type: string;            // default: DIRECT
+  type: string; // default: DIRECT
   segment: CustomerSegment;
   region: CustomerRegion;
   industry?: string;
@@ -91,7 +91,7 @@ interface PriceBookDto {
   uuid: string;
   name: string;
   region?: string;
-  currency: string;        // default: USD
+  currency: string; // default: USD
   isDefault: boolean;
   effectiveDate: string;
   expirationDate?: string;
@@ -157,7 +157,7 @@ interface RuleSetDto {
   ruleSetVersion?: string;
   effectiveDate: string;
   expirationDate?: string;
-  engineType: RulesEngineType;   // default: DROOLS
+  engineType: RulesEngineType; // default: DROOLS
   createdAt: string;
   updatedAt: string;
 }
@@ -187,7 +187,7 @@ interface RuleDto {
   ruleType: RuleType;
   priority: number;
   status: RuleStatus;
-  content?: string;          // DRL content
+  content?: string; // DRL content
   conditionGroup?: object;
   actionSet?: object;
   conflictPolicy?: string;
@@ -303,10 +303,10 @@ interface PricingWaterfallStep {
 
 /** Mirrors: com.opencrm.pricing.execution.FinancialMetrics */
 interface FinancialMetrics {
-  arr: number;           // Annual Recurring Revenue
-  tcv: number;           // Total Contract Value
-  acv: number;           // Annual Contract Value
-  clv: number;           // Customer Lifetime Value
+  arr: number; // Annual Recurring Revenue
+  tcv: number; // Total Contract Value
+  acv: number; // Annual Contract Value
+  clv: number; // Customer Lifetime Value
   totalDiscount: number;
   totalSurcharge: number;
   estimatedMarginPct: number;
@@ -332,8 +332,8 @@ interface PricingAuditLogDto {
   quoteExternalId: string;
   customerExternalId: string;
   ruleSetId: number;
-  inputSnapshot: string;     // JSON string
-  outputSnapshot: string;    // JSON string
+  inputSnapshot: string; // JSON string
+  outputSnapshot: string; // JSON string
   waterfallTrace?: string;
   rulesFired?: string;
   executionTimeMs: number;
@@ -659,7 +659,7 @@ Manage SaaS subscription tier definitions. Tiers are composed from `PricingProdu
 
 - **`TierDetailComponent`** — Tier header + feature gating matrix + pricing breakdown by billing frequency (monthly/annual/multi-year with discount %).
 
-- **`TierFormComponent`** — Create/edit: name, seatModel (dropdown of SAAS_* ProductTypes), basePrice per frequency, included features, usage limits.
+- **`TierFormComponent`** — Create/edit: name, seatModel (dropdown of SAAS\_\* ProductTypes), basePrice per frequency, included features, usage limits.
 
 - **`FeatureGatingMatrixComponent`** — Matrix view: features (rows) x tiers (columns) with checkmarks/limits showing entitlements per tier.
 
@@ -830,24 +830,24 @@ PR 1  (models)
 
 ## Backend API Coverage Matrix
 
-| Backend Endpoint | Frontend PR |
-|---|---|
-| `POST /api/v1/pricing/execute` | PR 7 (simulator), PR 14 (quote-builder) |
-| `POST /api/v1/pricing/simulate` | PR 7 (simulator) |
-| `POST /api/v1/pricing/simulate/bulk` | PR 7 (simulator) |
-| `GET /api/v1/pricing/audit/:quoteExternalId` | PR 8 (audit) |
-| `CRUD /api/v1/pricing-customers` | PR 4 (customers) |
-| `CRUD /api/v1/price-books` | PR 5 (price-books) |
-| `CRUD /api/v1/price-books/:id/entries` | PR 5 (price-books) |
-| `CRUD /api/v1/rule-sets` | PR 6 (rule-sets) |
-| `POST /api/v1/rule-sets/:id/activate` | PR 6 (rule-sets) |
-| `POST /api/v1/rule-sets/:id/deprecate` | PR 6 (rule-sets) |
-| `CRUD /api/v1/rules` | PR 6 (rule-sets) |
-| `GET /api/v1/rules/by-rule-set/:ruleSetId` | PR 6 (rule-sets) |
-| `POST /api/v1/rules/:id/validate` | PR 6 (rule-sets) |
-| `GET /api/v1/rules/:id/impact` | PR 6 (rule-sets) |
-| gRPC `calculatePrice` | N/A (server-to-server) |
-| gRPC `calculateQuoteTotal` | N/A (server-to-server) |
+| Backend Endpoint                             | Frontend PR                             |
+| -------------------------------------------- | --------------------------------------- |
+| `POST /api/v1/pricing/execute`               | PR 7 (simulator), PR 14 (quote-builder) |
+| `POST /api/v1/pricing/simulate`              | PR 7 (simulator)                        |
+| `POST /api/v1/pricing/simulate/bulk`         | PR 7 (simulator)                        |
+| `GET /api/v1/pricing/audit/:quoteExternalId` | PR 8 (audit)                            |
+| `CRUD /api/v1/pricing-customers`             | PR 4 (customers)                        |
+| `CRUD /api/v1/price-books`                   | PR 5 (price-books)                      |
+| `CRUD /api/v1/price-books/:id/entries`       | PR 5 (price-books)                      |
+| `CRUD /api/v1/rule-sets`                     | PR 6 (rule-sets)                        |
+| `POST /api/v1/rule-sets/:id/activate`        | PR 6 (rule-sets)                        |
+| `POST /api/v1/rule-sets/:id/deprecate`       | PR 6 (rule-sets)                        |
+| `CRUD /api/v1/rules`                         | PR 6 (rule-sets)                        |
+| `GET /api/v1/rules/by-rule-set/:ruleSetId`   | PR 6 (rule-sets)                        |
+| `POST /api/v1/rules/:id/validate`            | PR 6 (rule-sets)                        |
+| `GET /api/v1/rules/:id/impact`               | PR 6 (rule-sets)                        |
+| gRPC `calculatePrice`                        | N/A (server-to-server)                  |
+| gRPC `calculateQuoteTotal`                   | N/A (server-to-server)                  |
 
 ---
 
@@ -855,15 +855,15 @@ PR 1  (models)
 
 All PRs follow the patterns established by the existing CRM modules:
 
-| Concern | Convention |
-|---------|-----------|
-| State management | Angular signals (`signal()`, `computed()`, `effect()`) |
-| HTTP layer | `HttpClient` + `BaseCrudService` from `@frontend/shared-data-access` |
-| Components | Standalone, `ChangeDetectionStrategy.OnPush` |
-| Styling | Angular Material 21 + Tailwind CSS utility classes |
-| Testing | Vitest with Angular testing utilities |
-| Routing | Lazy-loaded `Route[]` arrays exported from each library |
-| Naming | `@frontend/cpq-*` for CPQ libraries vs `@frontend/crm-*` for CRM |
-| Nx structure | `libs/cpq/<feature>/` mirroring `libs/crm/<feature>/` |
-| Models | JSDoc `/** Mirrors: com.opencrm.pricing.<class> */` on every DTO interface |
-| Shared UI | Reuse `DataTableComponent`, `PageHeaderComponent`, `StatusBadgeComponent`, `EmptyStateComponent` from `@frontend/shared-ui` |
+| Concern          | Convention                                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| State management | Angular signals (`signal()`, `computed()`, `effect()`)                                                                      |
+| HTTP layer       | `HttpClient` + `BaseCrudService` from `@frontend/shared-data-access`                                                        |
+| Components       | Standalone, `ChangeDetectionStrategy.OnPush`                                                                                |
+| Styling          | Angular Material 21 + Tailwind CSS utility classes                                                                          |
+| Testing          | Vitest with Angular testing utilities                                                                                       |
+| Routing          | Lazy-loaded `Route[]` arrays exported from each library                                                                     |
+| Naming           | `@frontend/cpq-*` for CPQ libraries vs `@frontend/crm-*` for CRM                                                            |
+| Nx structure     | `libs/cpq/<feature>/` mirroring `libs/crm/<feature>/`                                                                       |
+| Models           | JSDoc `/** Mirrors: com.opencrm.pricing.<class> */` on every DTO interface                                                  |
+| Shared UI        | Reuse `DataTableComponent`, `PageHeaderComponent`, `StatusBadgeComponent`, `EmptyStateComponent` from `@frontend/shared-ui` |

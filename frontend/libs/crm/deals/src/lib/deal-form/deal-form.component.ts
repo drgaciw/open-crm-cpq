@@ -1,6 +1,20 @@
-import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  input,
+  signal,
+  effect,
+  ChangeDetectionStrategy,
+  Injector,
+} from '@angular/core';
 import { Router } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -14,20 +28,34 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DealService } from '../deal.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { ContactService } from '@frontend/crm-contacts';
-import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models';
+import {
+  OrganizationDto,
+  ContactDto,
+  DealStage,
+} from '@frontend/shared-models';
 
 @Component({
   selector: 'app-deal-form',
   standalone: true,
   imports: [
-    ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatSelectModule, MatDatepickerModule,
-    MatNativeDateModule, MatAutocompleteModule, MatProgressSpinnerModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatSelectModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatAutocompleteModule,
+    MatProgressSpinnerModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="form-header">
-      <button mat-icon-button (click)="goBack()" aria-label="Go back"><mat-icon>arrow_back</mat-icon></button>
+      <button mat-icon-button (click)="goBack()" aria-label="Go back">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
       <h1>{{ isEditMode ? 'Edit Deal' : 'New Deal' }}</h1>
     </div>
 
@@ -38,15 +66,17 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Deal Name</mat-label>
-              <input matInput formControlName="name">
-              @if (form.get('name')?.hasError('required')) { <mat-error>Required</mat-error> }
+              <input matInput formControlName="name" />
+              @if (form.get('name')?.hasError('required')) {
+                <mat-error>Required</mat-error>
+              }
             </mat-form-field>
           </div>
 
           <div class="form-row three-col">
             <mat-form-field appearance="outline">
               <mat-label>Amount ($)</mat-label>
-              <input matInput type="number" formControlName="amount">
+              <input matInput type="number" formControlName="amount" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Stage</mat-label>
@@ -58,15 +88,28 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Probability (%)</mat-label>
-              <input matInput type="number" formControlName="probability" min="0" max="100">
+              <input
+                matInput
+                type="number"
+                formControlName="probability"
+                min="0"
+                max="100"
+              />
             </mat-form-field>
           </div>
 
           <div class="form-row">
             <mat-form-field appearance="outline" style="max-width: 300px;">
               <mat-label>Expected Close Date</mat-label>
-              <input matInput [matDatepicker]="picker" formControlName="expectedCloseDate">
-              <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+              <input
+                matInput
+                [matDatepicker]="picker"
+                formControlName="expectedCloseDate"
+              />
+              <mat-datepicker-toggle
+                matIconSuffix
+                [for]="picker"
+              ></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
             </mat-form-field>
           </div>
@@ -75,21 +118,37 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
           <div class="form-row two-col">
             <mat-form-field appearance="outline">
               <mat-label>Contact</mat-label>
-              <input matInput formControlName="contactSearch" [matAutocomplete]="contactAuto"
-                     (input)="searchContacts($event)">
-              <mat-autocomplete #contactAuto="matAutocomplete" [displayWith]="displayContact"
-                                (optionSelected)="onContactSelected($event.option.value)">
+              <input
+                matInput
+                formControlName="contactSearch"
+                [matAutocomplete]="contactAuto"
+                (input)="searchContacts($event)"
+              />
+              <mat-autocomplete
+                #contactAuto="matAutocomplete"
+                [displayWith]="displayContact"
+                (optionSelected)="onContactSelected($event.option.value)"
+              >
                 @for (c of filteredContacts(); track c.id) {
-                  <mat-option [value]="c">{{ c.firstName }} {{ c.lastName }}</mat-option>
+                  <mat-option [value]="c"
+                    >{{ c.firstName }} {{ c.lastName }}</mat-option
+                  >
                 }
               </mat-autocomplete>
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Organization</mat-label>
-              <input matInput formControlName="orgSearch" [matAutocomplete]="orgAuto"
-                     (input)="searchOrgs($event)">
-              <mat-autocomplete #orgAuto="matAutocomplete" [displayWith]="displayOrg"
-                                (optionSelected)="onOrgSelected($event.option.value)">
+              <input
+                matInput
+                formControlName="orgSearch"
+                [matAutocomplete]="orgAuto"
+                (input)="searchOrgs($event)"
+              />
+              <mat-autocomplete
+                #orgAuto="matAutocomplete"
+                [displayWith]="displayOrg"
+                (optionSelected)="onOrgSelected($event.option.value)"
+              >
                 @for (o of filteredOrgs(); track o.id) {
                   <mat-option [value]="o">{{ o.name }}</mat-option>
                 }
@@ -101,33 +160,81 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="4"></textarea>
+              <textarea
+                matInput
+                formControlName="description"
+                rows="4"
+              ></textarea>
             </mat-form-field>
           </div>
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving">
-              @if (saving) { <mat-spinner diameter="20"></mat-spinner> }
-              @else { {{ isEditMode ? 'Update' : 'Create' }} }
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              [disabled]="form.invalid || saving"
+            >
+              @if (saving) {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                {{ isEditMode ? 'Update' : 'Create' }}
+              }
             </button>
           </div>
         </form>
       </mat-card-content>
     </mat-card>
   `,
-  styles: [`
-    .form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
-    .form-header h1 { margin: 0; font-size: 1.5rem; }
-    .form-card { max-width: 900px; }
-    .section-title { margin: 24px 0 12px; font-size: 1rem; font-weight: 500; color: #333; }
-    .section-title:first-of-type { margin-top: 0; }
-    .form-row { display: flex; gap: 16px; margin-bottom: 8px; }
-    .two-col > * { flex: 1; }
-    .three-col > * { flex: 1; }
-    .full-width { width: 100%; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
-  `],
+  styles: [
+    `
+      .form-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      .form-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      .form-card {
+        max-width: 900px;
+      }
+      .section-title {
+        margin: 24px 0 12px;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #333;
+      }
+      .section-title:first-of-type {
+        margin-top: 0;
+      }
+      .form-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 8px;
+      }
+      .two-col > * {
+        flex: 1;
+      }
+      .three-col > * {
+        flex: 1;
+      }
+      .full-width {
+        width: 100%;
+      }
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #eee;
+      }
+    `,
+  ],
 })
 export class DealFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
@@ -190,19 +297,28 @@ export class DealFormComponent implements OnInit {
     if (idVal) {
       this.isEditMode = true;
       this.dealService.getById(Number(idVal));
-      effect(() => {
-        const d = this.dealService.selectedDeal();
-        if (d) {
-          this.form.patchValue({
-            name: d.name, amount: d.amount, stage: d.stage, probability: d.probability,
-            expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
-            contactSearch: d.primaryContactName ?? '', orgSearch: d.organizationName ?? '',
-            description: d.description,
-          });
-          if (d.primaryContactId) this.selectedContactId = d.primaryContactId;
-          if (d.organizationId) this.selectedOrgId = d.organizationId;
-        }
-      }, { injector: this.injector });
+      effect(
+        () => {
+          const d = this.dealService.selectedDeal();
+          if (d) {
+            this.form.patchValue({
+              name: d.name,
+              amount: d.amount,
+              stage: d.stage,
+              probability: d.probability,
+              expectedCloseDate: d.expectedCloseDate
+                ? new Date(d.expectedCloseDate)
+                : null,
+              contactSearch: d.primaryContactName ?? '',
+              orgSearch: d.organizationName ?? '',
+              description: d.description,
+            });
+            if (d.primaryContactId) this.selectedContactId = d.primaryContactId;
+            if (d.organizationId) this.selectedOrgId = d.organizationId;
+          }
+        },
+        { injector: this.injector },
+      );
     }
   }
 
@@ -220,15 +336,24 @@ export class DealFormComponent implements OnInit {
     }
   }
 
-  displayContact(c: ContactDto): string { return c ? `${c.firstName} ${c.lastName}` : ''; }
-  displayOrg(o: OrganizationDto): string { return o?.name ?? ''; }
-  onContactSelected(c: ContactDto): void { this.selectedContactId = c.id; }
-  onOrgSelected(o: OrganizationDto): void { this.selectedOrgId = o.id; }
+  displayContact(c: ContactDto): string {
+    return c ? `${c.firstName} ${c.lastName}` : '';
+  }
+  displayOrg(o: OrganizationDto): string {
+    return o?.name ?? '';
+  }
+  onContactSelected(c: ContactDto): void {
+    this.selectedContactId = c.id;
+  }
+  onOrgSelected(o: OrganizationDto): void {
+    this.selectedOrgId = o.id;
+  }
 
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving = true;
-    const { contactSearch, orgSearch, expectedCloseDate, stage, ...formValue } = this.form.value;
+    const { contactSearch, orgSearch, expectedCloseDate, stage, ...formValue } =
+      this.form.value;
 
     const idVal = this.id();
     if (this.isEditMode && idVal) {
@@ -236,7 +361,9 @@ export class DealFormComponent implements OnInit {
       const data = {
         ...formValue,
         stage,
-        expectedCloseDate: expectedCloseDate ? expectedCloseDate.toISOString().split('T')[0] : null,
+        expectedCloseDate: expectedCloseDate
+          ? expectedCloseDate.toISOString().split('T')[0]
+          : null,
         primaryContactId: this.selectedContactId,
         organizationId: this.selectedOrgId,
       };
@@ -248,7 +375,9 @@ export class DealFormComponent implements OnInit {
       // Create request: exclude stage (backend doesn't accept it on create)
       const data = {
         ...formValue,
-        expectedCloseDate: expectedCloseDate ? expectedCloseDate.toISOString().split('T')[0] : null,
+        expectedCloseDate: expectedCloseDate
+          ? expectedCloseDate.toISOString().split('T')[0]
+          : null,
         primaryContactId: this.selectedContactId,
         organizationId: this.selectedOrgId,
       };
@@ -261,6 +390,8 @@ export class DealFormComponent implements OnInit {
 
   goBack(): void {
     const idVal = this.id();
-    this.router.navigate(this.isEditMode && idVal ? ['/deals', idVal] : ['/deals']);
+    this.router.navigate(
+      this.isEditMode && idVal ? ['/deals', idVal] : ['/deals'],
+    );
   }
 }

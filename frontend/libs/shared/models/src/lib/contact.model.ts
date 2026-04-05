@@ -50,9 +50,9 @@ export interface ContactDto {
  * Sent to POST /api/v1/contacts
  */
 export interface ContactCreateRequest {
-  firstName: string;             // @NotBlank
-  lastName: string;              // @NotBlank
-  email?: string;                // @Email (optional on create)
+  firstName: string; // @NotBlank
+  lastName: string; // @NotBlank
+  email?: string; // @Email (optional on create)
   phone?: string;
   mobile?: string;
   jobTitle?: string;

@@ -37,7 +37,9 @@ export class OrganizationService {
     totalPages: 0,
   });
 
-  readonly isEmpty = computed(() => this.organizations().length === 0 && !this.loading());
+  readonly isEmpty = computed(
+    () => this.organizations().length === 0 && !this.loading(),
+  );
 
   list(page = 0, size = 20, sort = 'name,asc'): void {
     this.error.set(null);
@@ -48,12 +50,15 @@ export class OrganizationService {
       .set('sort', sort);
 
     this.http
-      .get<OrganizationDto[] | SpringPage<OrganizationDto>>(this.basePath, { params })
+      .get<OrganizationDto[] | SpringPage<OrganizationDto>>(this.basePath, {
+        params,
+      })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (response) => {
           // Handle both plain array (from interceptor unwrapping) and Spring Page response
-          const isPage = response && typeof response === 'object' && 'content' in response;
+          const isPage =
+            response && typeof response === 'object' && 'content' in response;
           this.organizations.set(isPage ? response.content : response);
 
           if (isPage) {
@@ -67,7 +72,7 @@ export class OrganizationService {
         },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 
@@ -81,7 +86,7 @@ export class OrganizationService {
         next: (org) => this.selectedOrganization.set(org),
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 
@@ -89,7 +94,10 @@ export class OrganizationService {
     return this.http.post<OrganizationDto>(this.basePath, request);
   }
 
-  update(id: number, request: OrganizationUpdateRequest): Observable<OrganizationDto> {
+  update(
+    id: number,
+    request: OrganizationUpdateRequest,
+  ): Observable<OrganizationDto> {
     return this.http.put<OrganizationDto>(`${this.basePath}/${id}`, request);
   }
 
@@ -108,7 +116,7 @@ export class OrganizationService {
         next: (orgs) => this.organizations.set(orgs),
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
-        }
+        },
       });
   }
 }

@@ -1,4 +1,10 @@
-import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  computed,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule, Sort } from '@angular/material/sort';
@@ -59,7 +65,13 @@ export interface RowActionEvent<T = unknown> {
 
       <!-- Table -->
       <div class="table-wrapper">
-        <table mat-table [dataSource]="data()" matSort (matSortChange)="onSortChange($event)">
+        <table
+          mat-table
+          [dataSource]="data()"
+          [trackBy]="trackByRow"
+          matSort
+          (matSortChange)="onSortChange($event)"
+        >
           <!-- Dynamic Columns -->
           @for (column of columns(); track column.key) {
             <ng-container [matColumnDef]="column.key">
@@ -93,7 +105,7 @@ export interface RowActionEvent<T = unknown> {
           <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
           <tr
             mat-row
-            *matRowDef="let row; columns: displayedColumns();"
+            *matRowDef="let row; columns: displayedColumns()"
             class="table-row"
             [class.clickable]="rowClick.observed"
           ></tr>
@@ -101,7 +113,10 @@ export interface RowActionEvent<T = unknown> {
           <!-- Empty State Row -->
           @if (data().length === 0 && !loading()) {
             <tr class="mat-row">
-              <td [attr.colspan]="displayedColumns().length" class="empty-state-cell">
+              <td
+                [attr.colspan]="displayedColumns().length"
+                class="empty-state-cell"
+              >
                 <div class="empty-state">
                   <p class="empty-state-text">No data available</p>
                 </div>
@@ -125,81 +140,83 @@ export interface RowActionEvent<T = unknown> {
       }
     </div>
   `,
-  styles: [`
-    .data-table-container {
-      position: relative;
-      width: 100%;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
+  styles: [
+    `
+      .data-table-container {
+        position: relative;
+        width: 100%;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
 
-    .loading-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-    }
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
 
-    .table-wrapper {
-      overflow-x: auto;
-      max-width: 100%;
-    }
+      .table-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+      }
 
-    table {
-      width: 100%;
-    }
+      table {
+        width: 100%;
+      }
 
-    .table-row {
-      transition: background-color 0.2s ease;
-    }
+      .table-row {
+        transition: background-color 0.2s ease;
+      }
 
-    .table-row:hover {
-      background-color: #f5f5f5;
-    }
+      .table-row:hover {
+        background-color: #f5f5f5;
+      }
 
-    .table-row.clickable {
-      cursor: pointer;
-    }
+      .table-row.clickable {
+        cursor: pointer;
+      }
 
-    .empty-state-cell {
-      text-align: center;
-      padding: 48px 24px;
-    }
+      .empty-state-cell {
+        text-align: center;
+        padding: 48px 24px;
+      }
 
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
 
-    .empty-state-text {
-      color: #757575;
-      font-size: 14px;
-      margin: 0;
-    }
+      .empty-state-text {
+        color: #757575;
+        font-size: 14px;
+        margin: 0;
+      }
 
-    mat-header-cell {
-      font-weight: 600;
-      color: #424242;
-    }
+      mat-header-cell {
+        font-weight: 600;
+        color: #424242;
+      }
 
-    mat-cell {
-      color: #616161;
-    }
+      mat-cell {
+        color: #616161;
+      }
 
-    mat-paginator {
-      border-top: 1px solid #e0e0e0;
-    }
-  `],
+      mat-paginator {
+        border-top: 1px solid #e0e0e0;
+      }
+    `,
+  ],
 })
 export class DataTableComponent<T = unknown> {
   // Inputs using signal-based API
@@ -215,7 +232,7 @@ export class DataTableComponent<T = unknown> {
   rowAction = output<RowActionEvent<T>>();
 
   // Computed signals
-  displayedColumns = computed(() => this.columns().map(col => col.key));
+  displayedColumns = computed(() => this.columns().map((col) => col.key));
 
   onSortChange(sort: Sort): void {
     this.sortChange.emit({
@@ -234,5 +251,9 @@ export class DataTableComponent<T = unknown> {
 
   emitRowAction(action: string, row: T): void {
     this.rowAction.emit({ action, row });
+  }
+
+  trackByRow(index: number, row: any): any {
+    return row.id ?? index;
   }
 }

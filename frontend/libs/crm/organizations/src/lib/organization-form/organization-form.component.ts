@@ -1,6 +1,19 @@
-import { Component, inject, OnInit, input, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  input,
+  effect,
+  ChangeDetectionStrategy,
+  Injector,
+} from '@angular/core';
 import { Router } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -39,7 +52,11 @@ import { OrganizationService } from '../organization.service';
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Organization Name</mat-label>
-              <input matInput formControlName="name" placeholder="Enter organization name">
+              <input
+                matInput
+                formControlName="name"
+                placeholder="Enter organization name"
+              />
               @if (form.get('name')?.hasError('required')) {
                 <mat-error>Name is required</mat-error>
               }
@@ -58,14 +75,22 @@ import { OrganizationService } from '../organization.service';
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Website</mat-label>
-              <input matInput formControlName="website" placeholder="https://example.com">
+              <input
+                matInput
+                formControlName="website"
+                placeholder="https://example.com"
+              />
             </mat-form-field>
           </div>
 
           <div class="form-row">
             <mat-form-field appearance="outline" style="max-width: 300px;">
               <mat-label>Phone</mat-label>
-              <input matInput formControlName="phone" placeholder="+1 (555) 000-0000">
+              <input
+                matInput
+                formControlName="phone"
+                placeholder="+1 (555) 000-0000"
+              />
             </mat-form-field>
           </div>
 
@@ -73,36 +98,36 @@ import { OrganizationService } from '../organization.service';
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Address Line 1</mat-label>
-              <input matInput formControlName="addressLine1">
+              <input matInput formControlName="addressLine1" />
             </mat-form-field>
           </div>
 
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Address Line 2</mat-label>
-              <input matInput formControlName="addressLine2">
+              <input matInput formControlName="addressLine2" />
             </mat-form-field>
           </div>
 
           <div class="form-row three-col">
             <mat-form-field appearance="outline">
               <mat-label>City</mat-label>
-              <input matInput formControlName="city">
+              <input matInput formControlName="city" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>State</mat-label>
-              <input matInput formControlName="state">
+              <input matInput formControlName="state" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Postal Code</mat-label>
-              <input matInput formControlName="postalCode">
+              <input matInput formControlName="postalCode" />
             </mat-form-field>
           </div>
 
           <div class="form-row">
             <mat-form-field appearance="outline" style="max-width: 300px;">
               <mat-label>Country</mat-label>
-              <input matInput formControlName="country">
+              <input matInput formControlName="country" />
             </mat-form-field>
           </div>
 
@@ -110,14 +135,22 @@ import { OrganizationService } from '../organization.service';
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="4"></textarea>
+              <textarea
+                matInput
+                formControlName="description"
+                rows="4"
+              ></textarea>
             </mat-form-field>
           </div>
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving">
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              [disabled]="form.invalid || saving"
+            >
               @if (saving) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
@@ -129,18 +162,54 @@ import { OrganizationService } from '../organization.service';
       </mat-card-content>
     </mat-card>
   `,
-  styles: [`
-    .form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
-    .form-header h1 { margin: 0; font-size: 1.5rem; }
-    .form-card { max-width: 800px; }
-    .section-title { margin: 24px 0 12px; font-size: 1rem; font-weight: 500; color: #333; }
-    .section-title:first-of-type { margin-top: 0; }
-    .form-row { display: flex; gap: 16px; margin-bottom: 8px; }
-    .two-col > * { flex: 1; }
-    .three-col > * { flex: 1; }
-    .full-width { width: 100%; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
-  `],
+  styles: [
+    `
+      .form-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      .form-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      .form-card {
+        max-width: 800px;
+      }
+      .section-title {
+        margin: 24px 0 12px;
+        font-size: 1rem;
+        font-weight: 500;
+        color: #333;
+      }
+      .section-title:first-of-type {
+        margin-top: 0;
+      }
+      .form-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 8px;
+      }
+      .two-col > * {
+        flex: 1;
+      }
+      .three-col > * {
+        flex: 1;
+      }
+      .full-width {
+        width: 100%;
+      }
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #eee;
+      }
+    `,
+  ],
 })
 export class OrganizationFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
@@ -155,9 +224,21 @@ export class OrganizationFormComponent implements OnInit {
   saving = false;
 
   industries = [
-    'Technology', 'Healthcare', 'Finance', 'Education', 'Manufacturing',
-    'Retail', 'Real Estate', 'Consulting', 'Media', 'Telecommunications',
-    'Energy', 'Transportation', 'Government', 'Non-Profit', 'Other',
+    'Technology',
+    'Healthcare',
+    'Finance',
+    'Education',
+    'Manufacturing',
+    'Retail',
+    'Real Estate',
+    'Consulting',
+    'Media',
+    'Telecommunications',
+    'Energy',
+    'Transportation',
+    'Government',
+    'Non-Profit',
+    'Other',
   ];
 
   ngOnInit(): void {
@@ -180,12 +261,15 @@ export class OrganizationFormComponent implements OnInit {
       this.isEditMode = true;
       this.orgService.getById(Number(idVal));
       // Patch form when data loads
-      effect(() => {
-        const org = this.orgService.selectedOrganization();
-        if (org) {
-          this.form.patchValue(org);
-        }
-      }, { injector: this.injector });
+      effect(
+        () => {
+          const org = this.orgService.selectedOrganization();
+          if (org) {
+            this.form.patchValue(org);
+          }
+        },
+        { injector: this.injector },
+      );
     }
   }
 

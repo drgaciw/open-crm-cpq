@@ -24,27 +24,29 @@ import { SidebarComponent } from './sidebar.component';
       </mat-sidenav-container>
     </div>
   `,
-  styles: [`
-    .shell-container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    .sidenav-container {
-      flex: 1;
-    }
-    .sidenav {
-      width: 240px;
-    }
-    .content {
-      background-color: #fafafa;
-    }
-    .page-container {
-      padding: 24px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-  `],
+  styles: [
+    `
+      .shell-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      .sidenav-container {
+        flex: 1;
+      }
+      .sidenav {
+        width: 240px;
+      }
+      .content {
+        background-color: #fafafa;
+      }
+      .page-container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+    `,
+  ],
 })
 export class ShellComponent {
   @ViewChild('sidenavRef') sidenav!: MatSidenav;

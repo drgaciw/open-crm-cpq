@@ -17,7 +17,11 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-icon matListItemIcon>dashboard</mat-icon>
         <span matListItemTitle>Dashboard</span>
       </a>
-      <a mat-list-item routerLink="/organizations" routerLinkActive="active-link">
+      <a
+        mat-list-item
+        routerLink="/organizations"
+        routerLinkActive="active-link"
+      >
         <mat-icon matListItemIcon>business</mat-icon>
         <span matListItemTitle>Organizations</span>
       </a>
@@ -35,26 +39,28 @@ import { MatIconModule } from '@angular/material/icon';
       </a>
     </mat-nav-list>
   `,
-  styles: [`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    .sidebar-header {
-      padding: 16px 24px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-    }
-    .sidebar-title {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #1976d2;
-    }
-    .active-link {
-      background-color: rgba(25, 118, 210, 0.08) !important;
-      color: #1976d2 !important;
-    }
-  `],
+  styles: [
+    `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .sidebar-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      }
+      .sidebar-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1976d2;
+      }
+      .active-link {
+        background-color: rgba(25, 118, 210, 0.08) !important;
+        color: #1976d2 !important;
+      }
+    `,
+  ],
 })
 export class SidebarComponent {}

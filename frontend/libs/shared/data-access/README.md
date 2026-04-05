@@ -24,14 +24,9 @@ import { apiResponseInterceptor, errorInterceptor } from '@frontend/shared-data-
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideHttpClient(
-      withInterceptors([
-        apiResponseInterceptor,
-        errorInterceptor
-      ])
-    ),
-    provideAnimations() // Required for Material Snackbar
-  ]
+    provideHttpClient(withInterceptors([apiResponseInterceptor, errorInterceptor])),
+    provideAnimations(), // Required for Material Snackbar
+  ],
 };
 ```
 
@@ -69,6 +64,7 @@ In your global styles file (`styles.css` or `styles.scss`), add custom snackbar 
 The `apiResponseInterceptor` automatically handles the backend's `ApiResponse<T>` envelope:
 
 **Backend Response:**
+
 ```json
 {
   "success": true,
@@ -83,6 +79,7 @@ The `apiResponseInterceptor` automatically handles the backend's `ApiResponse<T>
 ```
 
 **What Your Service Receives:**
+
 ```typescript
 {
   "id": "123",
@@ -102,7 +99,7 @@ The `errorInterceptor` catches all HTTP errors and displays Material Snackbar no
 this.contactService.create(contactData).subscribe({
   next: (contact) => {
     // Handle success
-  }
+  },
   // No error handler needed - interceptor handles it
 });
 ```
@@ -122,7 +119,7 @@ import { LoadingService } from '@frontend/shared-data-access';
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <router-outlet />
-  `
+  `,
 })
 export class AppComponent {
   private loadingService = inject(LoadingService);
@@ -140,7 +137,7 @@ import { NotificationService } from '@frontend/shared-data-access';
 
 @Component({
   selector: 'app-my-component',
-  template: `...`
+  template: `...`,
 })
 export class MyComponent {
   private notificationService = inject(NotificationService);
@@ -203,11 +200,7 @@ import { BaseCrudService } from '@frontend/shared-data-access';
 import { Contact, CreateContactRequest, UpdateContactRequest } from './contact.model';
 
 @Injectable({ providedIn: 'root' })
-export class ContactService extends BaseCrudService<
-  Contact,
-  CreateContactRequest,
-  UpdateContactRequest
-> {
+export class ContactService extends BaseCrudService<Contact, CreateContactRequest, UpdateContactRequest> {
   protected override basePath = '/api/v1/contacts';
 }
 ```
@@ -234,13 +227,8 @@ import { ContactService } from './contact.service';
       </div>
     }
 
-    <mat-paginator
-      [length]="contactService.pagination().totalElements"
-      [pageSize]="contactService.pagination().size"
-      [pageIndex]="contactService.pagination().page"
-      (page)="onPageChange($event)">
-    </mat-paginator>
-  `
+    <mat-paginator [length]="contactService.pagination().totalElements" [pageSize]="contactService.pagination().size" [pageIndex]="contactService.pagination().page" (page)="onPageChange($event)"> </mat-paginator>
+  `,
 })
 export class ContactsComponent implements OnInit {
   contactService = inject(ContactService);
@@ -261,7 +249,7 @@ export class ContactsComponent implements OnInit {
     const newContact: CreateContactRequest = {
       firstName: 'Jane',
       lastName: 'Smith',
-      email: 'jane@example.com'
+      email: 'jane@example.com',
     };
 
     this.contactService.create(newContact).subscribe();
@@ -277,7 +265,7 @@ export class ContactsComponent implements OnInit {
 
   onUpdate(id: string) {
     const updates: UpdateContactRequest = {
-      email: 'newemail@example.com'
+      email: 'newemail@example.com',
     };
 
     this.contactService.update(id, updates).subscribe();

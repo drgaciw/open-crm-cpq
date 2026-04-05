@@ -33,6 +33,6 @@ export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
     finalize(() => {
       // This will be called whether the request succeeds or fails
       loadingService.endRequest();
-    })
+    }),
   );
 };

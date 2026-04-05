@@ -62,7 +62,7 @@ export interface SpringPageResponse<T> {
   totalElements: number;
   totalPages: number;
   size: number;
-  number: number;       // current page (0-indexed)
+  number: number; // current page (0-indexed)
   first?: boolean;
   last?: boolean;
   empty?: boolean;

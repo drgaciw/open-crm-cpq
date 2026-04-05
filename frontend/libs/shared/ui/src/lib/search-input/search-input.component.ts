@@ -64,45 +64,47 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
       }
     </mat-form-field>
   `,
-  styles: [`
-    .search-field {
-      width: 100%;
-      max-width: 400px;
-    }
-
-    .search-icon {
-      color: #757575;
-      margin-right: 8px;
-    }
-
-    .search-input {
-      font-size: 14px;
-    }
-
-    .clear-button {
-      margin-right: -8px;
-    }
-
-    :host ::ng-deep .mat-mdc-form-field-infix {
-      min-height: 48px;
-      display: flex;
-      align-items: center;
-    }
-
-    :host ::ng-deep .mat-mdc-text-field-wrapper {
-      padding-bottom: 0;
-    }
-
-    :host ::ng-deep .mat-mdc-form-field-subscript-wrapper {
-      display: none;
-    }
-
-    @media (max-width: 768px) {
+  styles: [
+    `
       .search-field {
-        max-width: 100%;
+        width: 100%;
+        max-width: 400px;
       }
-    }
-  `],
+
+      .search-icon {
+        color: #757575;
+        margin-right: 8px;
+      }
+
+      .search-input {
+        font-size: 14px;
+      }
+
+      .clear-button {
+        margin-right: -8px;
+      }
+
+      :host ::ng-deep .mat-mdc-form-field-infix {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+      }
+
+      :host ::ng-deep .mat-mdc-text-field-wrapper {
+        padding-bottom: 0;
+      }
+
+      :host ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        .search-field {
+          max-width: 100%;
+        }
+      }
+    `,
+  ],
 })
 export class SearchInputComponent {
   private readonly destroyRef = inject(DestroyRef);
@@ -124,7 +126,7 @@ export class SearchInputComponent {
       .pipe(
         debounceTime(this.debounceMs()),
         distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef)
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((searchTerm) => {
         this.searchChange.emit(searchTerm);

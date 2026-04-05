@@ -21,18 +21,31 @@ export type DealType =
   | 'CROSS_SELL';
 
 export const STAGE_COLORS: Record<string, string> = {
-  PROSPECTING: '#2196f3', QUALIFICATION: '#ff9800', NEEDS_ANALYSIS: '#00bcd4',
-  PROPOSAL: '#9c27b0', NEGOTIATION: '#f44336', WON: '#4caf50', LOST: '#757575',
+  PROSPECTING: '#2196f3',
+  QUALIFICATION: '#ff9800',
+  NEEDS_ANALYSIS: '#00bcd4',
+  PROPOSAL: '#9c27b0',
+  NEGOTIATION: '#f44336',
+  WON: '#4caf50',
+  LOST: '#757575',
 };
 
 export const STAGE_LABELS: Record<string, string> = {
-  PROSPECTING: 'Prospecting', QUALIFICATION: 'Qualification', NEEDS_ANALYSIS: 'Needs Analysis',
-  PROPOSAL: 'Proposal', NEGOTIATION: 'Negotiation', WON: 'Won', LOST: 'Lost',
+  PROSPECTING: 'Prospecting',
+  QUALIFICATION: 'Qualification',
+  NEEDS_ANALYSIS: 'Needs Analysis',
+  PROPOSAL: 'Proposal',
+  NEGOTIATION: 'Negotiation',
+  WON: 'Won',
+  LOST: 'Lost',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  NEW: '#2196f3', CONTACTED: '#ff9800', QUALIFIED: '#4caf50',
-  CONVERTED: '#9c27b0', LOST: '#757575',
+  NEW: '#2196f3',
+  CONTACTED: '#ff9800',
+  QUALIFIED: '#4caf50',
+  CONVERTED: '#9c27b0',
+  LOST: '#757575',
 };
 
 /**
@@ -79,15 +92,15 @@ export interface DealDto {
  * Sent to POST /api/v1/deals
  */
 export interface DealCreateRequest {
-  name: string;                  // @NotBlank
+  name: string; // @NotBlank
   organizationId?: number;
   primaryContactId?: number;
-  amount?: number;               // @PositiveOrZero
-  currency?: string;             // defaults to "USD"
+  amount?: number; // @PositiveOrZero
+  currency?: string; // defaults to "USD"
   expectedCloseDate?: string;
   description?: string;
   ownerId?: string;
-  type?: DealType;               // defaults to NEW_BUSINESS
+  type?: DealType; // defaults to NEW_BUSINESS
 }
 
 /**
@@ -112,7 +125,7 @@ export interface DealUpdateRequest {
  * Sent to POST /api/v1/deals/:id/lose
  */
 export interface DealLoseRequest {
-  reason: string;                // @NotBlank
+  reason: string; // @NotBlank
 }
 
 /**

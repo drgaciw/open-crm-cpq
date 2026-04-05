@@ -15,7 +15,9 @@ export const appRoutes: Route[] = [
       {
         path: 'organizations',
         loadChildren: () =>
-          import('@frontend/crm-organizations').then((m) => m.ORGANIZATION_ROUTES),
+          import('@frontend/crm-organizations').then(
+            (m) => m.ORGANIZATION_ROUTES,
+          ),
       },
       {
         path: 'contacts',
