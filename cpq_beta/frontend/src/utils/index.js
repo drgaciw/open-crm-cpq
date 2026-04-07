@@ -5,6 +5,7 @@ import { usersStore } from '@/stores/users'
 import { gemoji } from 'gemoji'
 import { toast } from 'frappe-ui'
 import { h } from 'vue'
+import Sval from 'sval'
 
 export function createToast(options) {
   toast({
@@ -129,8 +130,9 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupForm')()
-  let formScript = scriptFn(obj)
+  let interpreter = new Sval()
+  interpreter.run(script + '\nexports.setupForm = setupForm')
+  let formScript = interpreter.exports.setupForm(obj)
   return formScript?.actions || []
 }
 
@@ -150,8 +152,9 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupList')()
-  let listScript = scriptFn(obj)
+  let interpreter = new Sval()
+  interpreter.run(script + '\nexports.setupList = setupList')
+  let listScript = interpreter.exports.setupList(obj)
   return {
     actions: listScript?.actions || [],
     bulk_actions: listScript?.bulk_actions || [],
