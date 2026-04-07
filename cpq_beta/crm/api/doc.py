@@ -290,10 +290,14 @@ def get_data(
 			"user": frappe.session.user,
 		}
 
-		if not custom_view and frappe.db.exists("CRM View Settings", default_view_filters):
-			list_view_settings = frappe.get_doc("CRM View Settings", default_view_filters)
-			columns = frappe.parse_json(list_view_settings.columns)
-			rows = frappe.parse_json(list_view_settings.rows)
+		view_settings = None
+		if not custom_view:
+			# ⚡ Bolt Optimization: Use fast db.get_value instead of expensive get_doc. Prevents loading full document and child tables.
+			view_settings = frappe.db.get_value("CRM View Settings", default_view_filters, ["columns", "rows"], as_dict=True)
+
+		if view_settings:
+			columns = frappe.parse_json(view_settings.columns)
+			rows = frappe.parse_json(view_settings.rows)
 			is_default = False
 		elif not custom_view or is_default and hasattr(_list, "default_list_data"):
 			columns = _list.default_list_data().get("columns")
@@ -577,9 +581,8 @@ def get_fields_meta(doctype, restricted_fieldtypes=None, as_array=False):
 @frappe.whitelist()
 def get_sidebar_fields(doctype, name):
 	_validate_doctype(doctype)
-	if not frappe.db.exists("CRM Fields Layout", {"dt": doctype, "type": "Side Panel"}):
-		return []
-	layout = frappe.get_doc("CRM Fields Layout", {"dt": doctype, "type": "Side Panel"}).layout
+	# ⚡ Bolt Optimization: Use db.get_value instead of get_doc to skip full document instantiation overhead
+	layout = frappe.db.get_value("CRM Fields Layout", {"dt": doctype, "type": "Side Panel"}, "layout")
 
 	if not layout:
 		return []
