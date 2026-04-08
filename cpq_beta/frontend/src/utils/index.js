@@ -5,6 +5,7 @@ import { usersStore } from '@/stores/users'
 import { gemoji } from 'gemoji'
 import { toast } from 'frappe-ui'
 import { h } from 'vue'
+import Sval from 'sval'
 
 export function createToast(options) {
   toast({
@@ -129,9 +130,33 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupForm')()
-  let formScript = scriptFn(obj)
-  return formScript?.actions || []
+  try {
+    const interpreter = new Sval()
+    // By default, sval runs in sandBox mode and does not have access to global objects.
+    // However, some custom scripts might expect standard globals.
+    // To prevent total breakage while still preventing RCE/XSS (as the sandbox is maintained),
+    // we explicitly whitelist some safe globals.
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date,
+      String: String,
+      Number: Number,
+      Array: Array,
+      Object: Object,
+      Boolean: Boolean,
+    })
+    interpreter.run(script)
+    interpreter.run('if (typeof setupForm !== "undefined") { exports.setupForm = setupForm; }')
+    if (typeof interpreter.exports.setupForm === 'function') {
+      let formScript = interpreter.exports.setupForm(obj)
+      return formScript?.actions || []
+    }
+  } catch (e) {
+    console.error('Error executing custom script', e)
+  }
+  return []
 }
 
 export function setupCustomActions(data, obj) {
@@ -150,12 +175,32 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupList')()
-  let listScript = scriptFn(obj)
-  return {
-    actions: listScript?.actions || [],
-    bulk_actions: listScript?.bulk_actions || [],
+  try {
+    const interpreter = new Sval()
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date,
+      String: String,
+      Number: Number,
+      Array: Array,
+      Object: Object,
+      Boolean: Boolean,
+    })
+    interpreter.run(script)
+    interpreter.run('if (typeof setupList !== "undefined") { exports.setupList = setupList; }')
+    if (typeof interpreter.exports.setupList === 'function') {
+      let listScript = interpreter.exports.setupList(obj)
+      return {
+        actions: listScript?.actions || [],
+        bulk_actions: listScript?.bulk_actions || [],
+      }
+    }
+  } catch (e) {
+    console.error('Error executing list script', e)
   }
+  return { actions: [], bulk_actions: [] }
 }
 
 export function setupListActions(data, obj = {}) {
