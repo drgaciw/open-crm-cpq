@@ -58,11 +58,12 @@ describe('DataTableComponent', () => {
     expect(spinner).toBeTruthy();
   });
 
-  it('should display empty state when data is empty and not loading', () => {
+  it('should display empty state when data is empty and not loading', async () => {
     component.componentRef.setInput('columns', mockColumns);
     component.componentRef.setInput('data', []);
     component.componentRef.setInput('loading', false);
     component.detectChanges();
+    await component.whenStable();
 
     const emptyState = component.nativeElement.querySelector('.empty-state');
     expect(emptyState).toBeTruthy();

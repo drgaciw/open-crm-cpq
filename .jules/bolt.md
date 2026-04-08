@@ -1,0 +1,3 @@
+## 2025-04-08 - Use `[trackBy]` for Angular Material Table rendering performance
+**Learning:** In the Angular frontend, when `<table mat-table>` elements are bound to underlying data arrays that might be replaced entirely (like when updated via signals), Angular Material table tracks rows by object reference by default. This causes a full table re-render and loss of DOM focus on updates.
+**Action:** Always provide a `[trackBy]` function (e.g. `[trackBy]="trackById"`) in `mat-table` templates, mapping rows to a unique identifier (like `.id`) to prevent unnecessary DOM mutations and maintain better performance, especially when using signals.
