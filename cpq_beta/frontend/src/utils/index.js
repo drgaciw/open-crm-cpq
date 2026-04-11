@@ -5,6 +5,7 @@ import { usersStore } from '@/stores/users'
 import { gemoji } from 'gemoji'
 import { toast } from 'frappe-ui'
 import { h } from 'vue'
+import Sval from 'sval'
 
 export function createToast(options) {
   toast({
@@ -129,9 +130,24 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupForm')()
-  let formScript = scriptFn(obj)
-  return formScript?.actions || []
+  const interpreter = new Sval()
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+  })
+
+  try {
+    interpreter.run(script + '\nexports.setupForm = setupForm;')
+    const setupForm = interpreter.exports.setupForm
+    if (typeof setupForm !== 'function') return []
+    let formScript = setupForm(obj)
+    return formScript?.actions || []
+  } catch (error) {
+    console.error('Error executing script:', error)
+    return []
+  }
 }
 
 export function setupCustomActions(data, obj) {
@@ -150,11 +166,28 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  let scriptFn = new Function(script + '\nreturn setupList')()
-  let listScript = scriptFn(obj)
-  return {
-    actions: listScript?.actions || [],
-    bulk_actions: listScript?.bulk_actions || [],
+  const interpreter = new Sval()
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+  })
+
+  try {
+    interpreter.run(script + '\nexports.setupList = setupList;')
+    const setupList = interpreter.exports.setupList
+    if (typeof setupList !== 'function') {
+      return { actions: [], bulk_actions: [] }
+    }
+    let listScript = setupList(obj)
+    return {
+      actions: listScript?.actions || [],
+      bulk_actions: listScript?.bulk_actions || [],
+    }
+  } catch (error) {
+    console.error('Error executing script:', error)
+    return { actions: [], bulk_actions: [] }
   }
 }
 
