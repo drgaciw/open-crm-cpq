@@ -90,7 +90,7 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
             @if (recentDeals().length === 0) {
               <p class="empty-text">No recent deals.</p>
             } @else {
-              <table mat-table [dataSource]="recentDeals()" class="compact-table">
+              <table mat-table [dataSource]="recentDeals()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="name">
                   <th mat-header-cell *matHeaderCellDef>Name</th>
                   <td mat-cell *matCellDef="let d"><a [routerLink]="['/deals', d.id]" class="link">{{ d.name }}</a></td>
@@ -122,7 +122,7 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
             @if (recentLeads().length === 0) {
               <p class="empty-text">No recent leads.</p>
             } @else {
-              <table mat-table [dataSource]="recentLeads()" class="compact-table">
+              <table mat-table [dataSource]="recentLeads()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="title">
                   <th mat-header-cell *matHeaderCellDef>Title</th>
                   <td mat-cell *matCellDef="let l"><a [routerLink]="['/leads', l.id]" class="link">{{ l.title }}</a></td>
@@ -210,6 +210,10 @@ export class DashboardComponent implements OnInit {
     const stageItem = this.pipeline().find((item) => item.stage === stage);
     return stageItem?.totalAmount ?? 0;
   }
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   barWidth(stage: DealStage): number {
     const maxValue = Math.max(
       ...this.pipeline().map((item) => item.totalAmount),

@@ -65,7 +65,7 @@ import { OrganizationDto } from '@frontend/shared-models';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="orgService.organizations()" matSort
+        <table mat-table [dataSource]="orgService.organizations()" [trackBy]="trackById" matSort
                (matSortChange)="onSort($event)">
 
           <ng-container matColumnDef="name">
@@ -172,6 +172,10 @@ export class OrganizationListComponent implements OnInit {
 
   ngOnInit(): void {
     this.orgService.list(0, 20, this.currentSort);
+  }
+
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
   }
 
   onSearch(query: string): void {
