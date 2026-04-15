@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import Sval from 'sval'
 import FadedScrollableDiv from '@/components/FadedScrollableDiv.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
 import Link from '@/components/Controls/Link.vue'
@@ -159,12 +160,23 @@ function evaluate_depends_on(expression, field) {
 }
 
 function evaluate(code, context = {}) {
-  let variable_names = Object.keys(context)
-  let variables = Object.values(context)
-  code = `let out = ${code}; return out`
+  // Use sval (sandboxed JS interpreter) instead of unsafe new Function()
+  // to prevent XSS/RCE from user-controlled expressions
+  const interpreter = new Sval()
+
+  // Whitelist safe global objects
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+    ...context
+  })
+
+  code = `let out = ${code}; exports.out = out;`
   try {
-    let expression_function = new Function(...variable_names, code)
-    return expression_function(...variables)
+    interpreter.run(code)
+    return interpreter.exports.out
   } catch (error) {
     console.log('Error evaluating the following expression:')
     console.error(code)
