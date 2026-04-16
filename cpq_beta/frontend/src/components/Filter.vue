@@ -277,8 +277,9 @@ function getOperators(fieldtype, fieldname) {
     )
   }
   if (fieldname === '_assign') {
-    // TODO: make equals and not equals work
     options = [
+                        { label: __('Equals'), value: 'equals' },
+      { label: __('Not Equals'), value: 'not equals' },
       { label: __('Like'), value: 'like' },
       { label: __('Not Like'), value: 'not like' },
       { label: __('Is'), value: 'is' },
