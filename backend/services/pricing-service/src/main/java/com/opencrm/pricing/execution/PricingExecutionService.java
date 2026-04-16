@@ -2,6 +2,11 @@ package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.rules.drools.DroolsRulesEngine;
+import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.rules.engine.RuleExecutionContext;
+import com.opencrm.rules.engine.RuleExecutionResult;
+import com.opencrm.rules.engine.RulesEngineType;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.pricing.customer.Customer;
@@ -49,6 +54,7 @@ public class PricingExecutionService {
     private final PricingContextValidator contextValidator;
     private final MetricsCalculator metricsCalculator;
     private final ObjectMapper objectMapper;
+    private final DroolsRulesEngine droolsRulesEngine;
 
     /**
      * Execute pricing with full audit trail.
@@ -156,11 +162,42 @@ public class PricingExecutionService {
                 lineResults.add(lineResult);
             }
 
-            // 7-10. Execute rules (simplified - would integrate with Drools engine)
-            // TODO: Convert to Drools facts, build RuleExecutionContext, execute rules
-            log.info("Executed {} rules for customer {}", activeRules.size(), customer.getExternalId());
-
-            // 11. Calculate FinancialMetrics
+                        // 7-10. Convert to Drools facts, build RuleExecutionContext, execute rules
+            if (!activeRules.isEmpty()) {
+                List<RuleDefinition> ruleDefinitions = activeRules.stream()
+                    .map(rule -> RuleDefinition.builder()
+                        .id(String.valueOf(rule.getId()))
+                        .name(rule.getName())
+                        .description(rule.getDescription())
+                        .content(rule.getContent())
+                        .priority(rule.getPriority())
+                        .ruleType(rule.getRuleType() != null ? rule.getRuleType().name() : null)
+                        .conditionGroup(rule.getConditionGroup())
+                        .actionSet(rule.getActionSet())
+                        .conflictPolicy(rule.getConflictPolicy())
+                        .explanationCode(rule.getExplanationCode())
+                        .build())
+                    .toList();
+                RuleExecutionContext ruleContext = RuleExecutionContext.builder()
+                    .ruleSetId(ruleSet != null ? String.valueOf(ruleSet.getId()) : null)
+                    .engineType(RulesEngineType.DROOLS)
+                    .build();
+                ruleContext.getFacts().add(customer);
+                ruleContext.getFacts().add(context);
+                ruleContext.getFacts().addAll(lineResults);
+                try {
+                    RuleExecutionResult ruleResult = droolsRulesEngine.execute(ruleContext, ruleDefinitions);
+                    log.info("Executed {} rules (fired {}) for customer {}",
+                        activeRules.size(), ruleResult.getRulesFired(), customer.getExternalId());
+                } catch (Exception ex) {
+                    log.error("Rule execution failed for customer {}: {}",
+                        customer.getExternalId(), ex.getMessage(), ex);
+                    throw new BusinessException("Pricing rule execution failed", "RULE_EXECUTION_ERROR");
+                }
+            } else {
+                log.info("No active rules to execute for customer {}", customer.getExternalId());
+            }
+// 11. Calculate FinancialMetrics
             PricingResult result = PricingResult.builder()
                     .success(true)
                     .lineResults(lineResults)
