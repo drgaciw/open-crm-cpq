@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+import Sval from 'sval'
 import FadedScrollableDiv from '@/components/FadedScrollableDiv.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
 import Link from '@/components/Controls/Link.vue'
@@ -160,7 +161,11 @@ function evaluate_depends_on(expression, field) {
 }
 
 function evaluate(code, context = {}) {
+  // Use sval (sandboxed JS interpreter) instead of unsafe new Function()
+  // to prevent XSS/RCE from user-controlled expressions
   const interpreter = new Sval()
+
+  // Whitelist safe global objects
   interpreter.import({
     console: console,
     Math: Math,
