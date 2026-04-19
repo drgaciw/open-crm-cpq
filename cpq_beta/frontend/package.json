@@ -20,7 +20,7 @@
     "pinia": "^2.0.33",
     "socket.io-client": "^4.7.2",
     "sortablejs": "^1.15.0",
-    "sval": "^0.6.11",
+    "sval": "^0.6.12",
     "tailwindcss": "^3.3.3",
     "vite": "^4.4.9",
     "vue": "^3.4.12",
