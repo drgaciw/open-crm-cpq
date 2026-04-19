@@ -140,6 +140,7 @@ export class ContactListComponent implements OnInit {
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
+
   onSearch(q: string): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {

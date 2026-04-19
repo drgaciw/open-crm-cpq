@@ -191,6 +191,10 @@ export class DashboardComponent implements OnInit {
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
   statusColor(status: string): string { return STATUS_COLORS[status] ?? '#666'; }
 
+  trackById(index: number, item: any): any {
+    return item.id;
+  }
+
   totalDeals(): number {
     return this.pipeline().reduce((sum, item) => sum + item.count, 0);
   }
@@ -210,6 +214,10 @@ export class DashboardComponent implements OnInit {
     const stageItem = this.pipeline().find((item) => item.stage === stage);
     return stageItem?.totalAmount ?? 0;
   }
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   barWidth(stage: DealStage): number {
     const maxValue = Math.max(
       ...this.pipeline().map((item) => item.totalAmount),
