@@ -130,16 +130,16 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  try {
-    const interpreter = new Sval()
-    interpreter.import({
-      console: console,
-      Math: Math,
-      JSON: JSON,
-      Date: Date
-    })
+  const interpreter = new Sval()
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+  })
 
-    interpreter.run(script + '\nexports.setupForm = setupForm')
+  try {
+    interpreter.run(script + '\nexports.setupForm = setupForm;')
     const setupForm = interpreter.exports.setupForm
     if (typeof setupForm !== 'function') return []
     let formScript = setupForm(obj)
@@ -166,16 +166,16 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  try {
-    const interpreter = new Sval()
-    interpreter.import({
-      console: console,
-      Math: Math,
-      JSON: JSON,
-      Date: Date
-    })
+  const interpreter = new Sval()
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+  })
 
-    interpreter.run(script + '\nexports.setupList = setupList')
+  try {
+    interpreter.run(script + '\nexports.setupList = setupList;')
     const setupList = interpreter.exports.setupList
     if (typeof setupList !== 'function') {
       return { actions: [], bulk_actions: [] }

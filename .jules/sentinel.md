@@ -1,3 +1,7 @@
+## 2025-05-24 - Dynamic Code Evaluation via new Function in Frontend Scripts
+**Vulnerability:** The Vue frontend (`cpq_beta/frontend/src/utils/index.js` and `cpq_beta/frontend/src/components/SectionFields.vue`) used `new Function()` to dynamically evaluate user-provided script strings for form/list actions and field dependency evaluation. This created a significant Remote Code Execution (RCE) / Cross-Site Scripting (XSS) risk if those string payloads were manipulated by an attacker, allowing arbitrary code to run with full access to the browser's global scope.
+**Learning:** Utilizing native Javascript evaluation methods (`new Function`, `eval()`) for dynamically executing metadata configurations or expressions exposes the application to critical injection attacks. Replacing them with a sandboxed Javascript interpreter isolates execution from the `window` context.
+**Prevention:** Always use safe interpretation libraries like `sval` to execute dynamic code on the client side. Ensure only safe objects (`console`, `Math`, `JSON`, `Date`) are explicitly whitelisted into the sandbox context via `interpreter.import()`, preventing access to the DOM or global environment.
 
 ## 2024-05-18 - Replace `new Function` with `sval` in dynamic evaluations
 **Vulnerability:** Evaluated dynamic JavaScript expressions using `new Function(...)` which leads to RCE/XSS.
