@@ -1,3 +1,7 @@
+## 2024-04-13 - [CRITICAL] Prevent Remote Code Execution via new Function()
+**Vulnerability:** Found `new Function(...)` used for dynamically evaluating JavaScript expressions in `cpq_beta/frontend/src/components/SectionFields.vue`. This allowed arbitrary JavaScript execution which could lead to XSS or RCE.
+**Learning:** `new Function()` operates in the global scope and allows any Javascript execution. Relying on it to execute expressions is dangerous. It's safer to sandbox scripts.
+**Prevention:** Used `sval`, a sandboxed JavaScript interpreter. Imported safe globals to maintain existing functionality without compromising security. Never use `eval()` or `new Function()` on user-influenced expressions.
 ## 2024-04-14 - Replace unsafe dynamic code execution in SectionFields.vue
 **Vulnerability:** Usage of `new Function` to evaluate arbitrary javascript strings for `depends_on` functionality in `cpq_beta/frontend/src/components/SectionFields.vue`. This behaves like `eval()` and could allow Cross-Site Scripting (XSS) if expressions contain untrusted input.
 **Learning:** Evaluating dynamic scripts in a frontend application can expose the host environment to malicious code execution.
