@@ -169,6 +169,10 @@ export class DealListComponent implements OnInit {
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
 
