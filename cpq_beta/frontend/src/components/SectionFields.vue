@@ -160,16 +160,25 @@ function evaluate_depends_on(expression, field) {
 }
 
 function evaluate(code, context = {}) {
+  const interpreter = new Sval()
+  interpreter.import({
+    console: console,
+    Math: Math,
+    JSON: JSON,
+    Date: Date,
+    ...context
+  })
+
+  const script = `
+    function _evalExpr() {
+      let out = ${code};
+      return out;
+    }
+    exports.out = _evalExpr();
+  `
+
   try {
-    const interpreter = new Sval()
-    interpreter.import({
-      console,
-      Math,
-      JSON,
-      Date,
-      ...context
-    })
-    interpreter.run(`exports.out = ${code};`)
+    interpreter.run(script)
     return interpreter.exports.out
   } catch (error) {
     console.log('Error evaluating the following expression:')
