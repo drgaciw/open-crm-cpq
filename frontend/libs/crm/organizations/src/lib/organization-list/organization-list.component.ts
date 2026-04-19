@@ -170,6 +170,9 @@ export class OrganizationListComponent implements OnInit {
   private currentSort = 'name,asc';
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Track table rows by ID to prevent unnecessary re-renders when data updates
+  trackById(index: number, item: any): any { return item.id; }
+
   ngOnInit(): void {
     this.orgService.list(0, 20, this.currentSort);
   }
