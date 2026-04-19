@@ -1,3 +1,7 @@
+## 2024-06-03 - [Fix RCE/XSS in custom script evaluation]
+**Vulnerability:** Evaluated dynamic JavaScript (like Custom Actions) in the frontend using `new Function()`, leading to potential XSS and RCE if the scripts are injected or manipulated.
+**Learning:** `new Function()` in browser environments is equivalent to `eval()` and should never be used on untrusted user inputs.
+**Prevention:** Always use a sandboxed JavaScript interpreter like `sval` to evaluate untrusted scripts on the frontend.
 ## 2025-05-24 - Dynamic Code Evaluation via new Function in Frontend Scripts
 **Vulnerability:** The Vue frontend (`cpq_beta/frontend/src/utils/index.js` and `cpq_beta/frontend/src/components/SectionFields.vue`) used `new Function()` to dynamically evaluate user-provided script strings for form/list actions and field dependency evaluation. This created a significant Remote Code Execution (RCE) / Cross-Site Scripting (XSS) risk if those string payloads were manipulated by an attacker, allowing arbitrary code to run with full access to the browser's global scope.
 **Learning:** Utilizing native Javascript evaluation methods (`new Function`, `eval()`) for dynamically executing metadata configurations or expressions exposes the application to critical injection attacks. Replacing them with a sandboxed Javascript interpreter isolates execution from the `window` context.

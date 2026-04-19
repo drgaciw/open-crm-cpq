@@ -130,24 +130,33 @@ export function setupAssignees(data) {
 }
 
 function getActionsFromScript(script, obj) {
-  const interpreter = new Sval()
-  interpreter.import({
-    console: console,
-    Math: Math,
-    JSON: JSON,
-    Date: Date,
-  })
-
   try {
-    interpreter.run(script + '\nexports.setupForm = setupForm;')
-    const setupForm = interpreter.exports.setupForm
-    if (typeof setupForm !== 'function') return []
-    let formScript = setupForm(obj)
-    return formScript?.actions || []
-  } catch (err) {
-    console.error('Error executing form script:', err)
-    return []
+    const interpreter = new Sval()
+    // By default, sval runs in sandBox mode and does not have access to global objects.
+    // However, some custom scripts might expect standard globals.
+    // To prevent total breakage while still preventing RCE/XSS (as the sandbox is maintained),
+    // we explicitly whitelist some safe globals.
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date,
+      String: String,
+      Number: Number,
+      Array: Array,
+      Object: Object,
+      Boolean: Boolean,
+    })
+    interpreter.run(script)
+    interpreter.run('if (typeof setupForm !== "undefined") { exports.setupForm = setupForm; }')
+    if (typeof interpreter.exports.setupForm === 'function') {
+      let formScript = interpreter.exports.setupForm(obj)
+      return formScript?.actions || []
+    }
+  } catch (e) {
+    console.error('Error executing custom script', e)
   }
+  return []
 }
 
 export function setupCustomActions(data, obj) {
@@ -166,29 +175,32 @@ export function setupCustomActions(data, obj) {
 }
 
 function getActionsFromListScript(script, obj) {
-  const interpreter = new Sval()
-  interpreter.import({
-    console: console,
-    Math: Math,
-    JSON: JSON,
-    Date: Date,
-  })
-
   try {
-    interpreter.run(script + '\nexports.setupList = setupList;')
-    const setupList = interpreter.exports.setupList
-    if (typeof setupList !== 'function') {
-      return { actions: [], bulk_actions: [] }
+    const interpreter = new Sval()
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date,
+      String: String,
+      Number: Number,
+      Array: Array,
+      Object: Object,
+      Boolean: Boolean,
+    })
+    interpreter.run(script)
+    interpreter.run('if (typeof setupList !== "undefined") { exports.setupList = setupList; }')
+    if (typeof interpreter.exports.setupList === 'function') {
+      let listScript = interpreter.exports.setupList(obj)
+      return {
+        actions: listScript?.actions || [],
+        bulk_actions: listScript?.bulk_actions || [],
+      }
     }
-    let listScript = setupList(obj)
-    return {
-      actions: listScript?.actions || [],
-      bulk_actions: listScript?.bulk_actions || [],
-    }
-  } catch (err) {
-    console.error('Error executing list script:', err)
-    return { actions: [], bulk_actions: [] }
+  } catch (e) {
+    console.error('Error executing list script', e)
   }
+  return { actions: [], bulk_actions: [] }
 }
 
 export function setupListActions(data, obj = {}) {
