@@ -132,12 +132,20 @@ export function setupAssignees(data) {
 function getActionsFromScript(script, obj) {
   try {
     const interpreter = new Sval()
-    interpreter.import({ console, Math, JSON, Date })
-    interpreter.run(`${script}\nexports.setupForm = setupForm;`)
-    let formScript = interpreter.exports.setupForm(obj)
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date
+    })
+
+    interpreter.run(script + '\nexports.setupForm = setupForm')
+    const setupForm = interpreter.exports.setupForm
+    if (typeof setupForm !== 'function') return []
+    let formScript = setupForm(obj)
     return formScript?.actions || []
-  } catch (error) {
-    console.error('Error executing form script', error)
+  } catch (err) {
+    console.error('Error executing form script:', err)
     return []
   }
 }
@@ -160,19 +168,26 @@ export function setupCustomActions(data, obj) {
 function getActionsFromListScript(script, obj) {
   try {
     const interpreter = new Sval()
-    interpreter.import({ console, Math, JSON, Date })
-    interpreter.run(`${script}\nexports.setupList = setupList;`)
-    let listScript = interpreter.exports.setupList(obj)
+    interpreter.import({
+      console: console,
+      Math: Math,
+      JSON: JSON,
+      Date: Date
+    })
+
+    interpreter.run(script + '\nexports.setupList = setupList')
+    const setupList = interpreter.exports.setupList
+    if (typeof setupList !== 'function') {
+      return { actions: [], bulk_actions: [] }
+    }
+    let listScript = setupList(obj)
     return {
       actions: listScript?.actions || [],
       bulk_actions: listScript?.bulk_actions || [],
     }
-  } catch (error) {
-    console.error('Error executing list script', error)
-    return {
-      actions: [],
-      bulk_actions: [],
-    }
+  } catch (err) {
+    console.error('Error executing list script:', err)
+    return { actions: [], bulk_actions: [] }
   }
 }
 
