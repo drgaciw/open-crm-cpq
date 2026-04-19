@@ -1,3 +1,7 @@
+## 2024-04-15 - [Critical] Unsafe dynamic script evaluation in Vue components
+**Vulnerability:** Found arbitrary JavaScript execution (RCE/XSS) in `SectionFields.vue` due to evaluating dynamic `depends_on` expressions directly via `new Function(...)`. This is extremely dangerous as user-controlled data can result in remote code execution or cross-site scripting inside the browser context.
+**Learning:** The project relies on evaluating conditions for UI rendering (like hiding/showing fields based on `depends_on`), but using native tools like `eval()` or `new Function()` strips away the natural Vue bounds and opens the app to massive vulnerability vectors.
+**Prevention:** Instead of using `new Function()`, use the `sval` sandboxed JS interpreter (which is now correctly utilized). It must be initialized per-evaluation or securely cached, and should specifically whitelist safe globals (`console`, `Math`, `JSON`, `Date`) while keeping the sandbox intact to strictly limit what the evaluated script can do.
 ## 2024-05-18 - [Remove new Function eval with Sandboxed Sval]
 **Vulnerability:** Dynamic arbitrary code execution risk due to `new Function` used to evaluate form dependencies based on `eval:` script expressions.
 **Learning:** The Vue component `SectionFields.vue` was using `new Function(...variable_names, code)` directly, exposing a critical dynamic execution sink, similar to `eval()`. This vulnerability pattern violates our AST grep checks.
