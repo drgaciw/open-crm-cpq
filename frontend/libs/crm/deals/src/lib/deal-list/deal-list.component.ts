@@ -68,7 +68,7 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.deals()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.deals()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Deal Name</th>
             <td mat-cell *matCellDef="let d">
@@ -164,7 +164,14 @@ export class DealListComponent implements OnInit {
   private currentStage?: DealStage;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Track table rows by ID to prevent unnecessary re-renders when data updates
+  trackById(index: number, item: any): any { return item.id; }
+
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
+
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
 
   stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }

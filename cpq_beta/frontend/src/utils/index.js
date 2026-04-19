@@ -236,15 +236,13 @@ export function errorMessage(title, message) {
 
 export function copyToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(show_success_alert)
+    navigator.clipboard.writeText(text)
+      .then(show_success_alert)
+      .catch((err) => {
+        errorMessage('Failed to copy', err?.message || 'Clipboard write failed')
+      })
   } else {
-    let input = document.createElement('textarea')
-    document.body.appendChild(input)
-    input.value = text
-    input.select()
-    document.execCommand('copy')
-    show_success_alert()
-    document.body.removeChild(input)
+    errorMessage('Failed to copy', 'Clipboard API is not supported or not in a secure context')
   }
   function show_success_alert() {
     createToast({
