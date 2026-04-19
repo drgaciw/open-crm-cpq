@@ -1,3 +1,7 @@
+## 2024-05-18 - [Remove new Function eval with Sandboxed Sval]
+**Vulnerability:** Dynamic arbitrary code execution risk due to `new Function` used to evaluate form dependencies based on `eval:` script expressions.
+**Learning:** The Vue component `SectionFields.vue` was using `new Function(...variable_names, code)` directly, exposing a critical dynamic execution sink, similar to `eval()`. This vulnerability pattern violates our AST grep checks.
+**Prevention:** Adopt sandboxed JavaScript interpreters like `sval` for evaluating dynamic scripts securely within a limited context (e.g., exposing only safe Math, Date, etc.) without allowing breakout code execution.
 ## 2025-02-14 - Deprecated ExecCommand API Fixed
 **Vulnerability:** The codebase was utilizing `document.execCommand('copy')` as a fallback method to write data to the user's clipboard when the Clipboard API was unavailable. This method is deprecated across modern browsers and is actively flagged by the repository's structural security scanners (`ast-grep`).
 **Learning:** Legacy browser APIs are sometimes maintained as fallbacks but are actively deprecated because they often lack proper permissions control compared to modern alternatives like the Async Clipboard API (`navigator.clipboard`). Modern clipboard access requires secure contexts (`HTTPS` or `localhost`), which prevents malicious sites from silently intercepting or modifying clipboard contents.
