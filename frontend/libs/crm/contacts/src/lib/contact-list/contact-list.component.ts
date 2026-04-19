@@ -134,14 +134,12 @@ export class ContactListComponent implements OnInit {
   private currentSort = 'lastName,asc';
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Track table rows by ID to prevent unnecessary re-renders when data updates
-  trackById(index: number, item: any): any { return item.id; }
+  trackById(index: number, item: ContactDto): string | number {
+    return item.id;
+  }
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
-  trackById(index: number, item: any): any {
-    return item.id ?? index;
-  }
 
   onSearch(q: string): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);

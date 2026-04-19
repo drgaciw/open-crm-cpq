@@ -226,6 +226,10 @@ export class DashboardComponent implements OnInit {
     return (this.stageValue(stage) / maxValue) * 100;
   }
 
+  trackById(index: number, item: { id: string | number }): string | number {
+    return item.id;
+  }
+
   ngOnInit(): void {
     forkJoin({
       pipeline: this.http.get<PipelineSummaryDto[]>('/api/v1/deals/pipeline'),
