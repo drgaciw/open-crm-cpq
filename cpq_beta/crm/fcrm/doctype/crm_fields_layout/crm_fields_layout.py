@@ -18,13 +18,13 @@ def get_fields_layout(doctype: str, type: str):
 		frappe.throw(_("Invalid doctype"), frappe.ValidationError)
 
 	sections = []
-	if frappe.db.exists("CRM Fields Layout", {"dt": doctype, "type": type}):
-		layout = frappe.get_doc("CRM Fields Layout", {"dt": doctype, "type": type})
-	else:
+	# Bolt Optimization: Used frappe.db.get_value to prevent full document loading
+	layout_json = frappe.db.get_value("CRM Fields Layout", {"dt": doctype, "type": type}, "layout")
+	if not layout_json:
 		return []
 
-	if layout.layout:
-		sections = json.loads(layout.layout)
+	if layout_json:
+		sections = json.loads(layout_json)
 
 	allowed_fields = []
 	for section in sections:
