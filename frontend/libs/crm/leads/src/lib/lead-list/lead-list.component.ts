@@ -67,7 +67,7 @@ import { CurrencyPipe } from '@angular/common';
       </div>
     } @else {
       <div class="table-container">
-        <table mat-table [dataSource]="service.leads()" matSort (matSortChange)="onSort($event)">
+        <table mat-table [dataSource]="service.leads()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="title">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
             <td mat-cell *matCellDef="let lead">
@@ -175,6 +175,9 @@ export class LeadListComponent implements OnInit {
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Track table rows by ID to prevent unnecessary re-renders when data updates
+  trackById(index: number, item: any): any { return item.id; }
 
   ngOnInit(): void {
     this.service.list(0, 20, this.currentSort);
