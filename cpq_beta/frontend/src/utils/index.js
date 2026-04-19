@@ -144,8 +144,8 @@ function getActionsFromScript(script, obj) {
     if (typeof setupForm !== 'function') return []
     let formScript = setupForm(obj)
     return formScript?.actions || []
-  } catch (error) {
-    console.error('Error executing script:', error)
+  } catch (err) {
+    console.error('Error executing form script:', err)
     return []
   }
 }
@@ -185,8 +185,8 @@ function getActionsFromListScript(script, obj) {
       actions: listScript?.actions || [],
       bulk_actions: listScript?.bulk_actions || [],
     }
-  } catch (error) {
-    console.error('Error executing script:', error)
+  } catch (err) {
+    console.error('Error executing list script:', err)
     return { actions: [], bulk_actions: [] }
   }
 }
@@ -224,15 +224,13 @@ export function errorMessage(title, message) {
 
 export function copyToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(show_success_alert)
+    navigator.clipboard.writeText(text)
+      .then(show_success_alert)
+      .catch((err) => {
+        errorMessage('Failed to copy', err?.message || 'Clipboard write failed')
+      })
   } else {
-    let input = document.createElement('textarea')
-    document.body.appendChild(input)
-    input.value = text
-    input.select()
-    document.execCommand('copy')
-    show_success_alert()
-    document.body.removeChild(input)
+    errorMessage('Failed to copy', 'Clipboard API is not supported or not in a secure context')
   }
   function show_success_alert() {
     createToast({
