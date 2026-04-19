@@ -214,6 +214,10 @@ export class DashboardComponent implements OnInit {
     const stageItem = this.pipeline().find((item) => item.stage === stage);
     return stageItem?.totalAmount ?? 0;
   }
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   barWidth(stage: DealStage): number {
     const maxValue = Math.max(
       ...this.pipeline().map((item) => item.totalAmount),

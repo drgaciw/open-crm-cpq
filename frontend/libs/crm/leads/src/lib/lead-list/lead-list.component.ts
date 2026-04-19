@@ -183,6 +183,10 @@ export class LeadListComponent implements OnInit {
     this.service.list(0, 20, this.currentSort);
   }
 
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   onTabChange(index: number): void {
     const statusMap: (LeadStatus | undefined)[] = [
       undefined, 'NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'

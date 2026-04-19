@@ -177,6 +177,10 @@ export class OrganizationListComponent implements OnInit {
     this.orgService.list(0, 20, this.currentSort);
   }
 
+  trackById(index: number, item: any): any {
+    return item.id ?? index;
+  }
+
   onSearch(query: string): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
