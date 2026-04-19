@@ -164,15 +164,13 @@ export class DealListComponent implements OnInit {
   private currentStage?: DealStage;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Track table rows by ID to prevent unnecessary re-renders when data updates
-  trackById(index: number, item: any): any { return item.id; }
+  trackById(index: number, item: DealDto): string | number {
+    return item.id;
+  }
 
   ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
-  trackById(index: number, item: any): any {
-    return item.id ?? index;
-  }
-
+ 
   stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
 

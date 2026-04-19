@@ -176,17 +176,15 @@ export class LeadListComponent implements OnInit {
   private currentStatus?: LeadStatus;
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Track table rows by ID to prevent unnecessary re-renders when data updates
-  trackById(index: number, item: any): any { return item.id; }
+  trackById(index: number, item: LeadDto): string | number {
+    return item.id;
+  }
 
   ngOnInit(): void {
     this.service.list(0, 20, this.currentSort);
   }
 
-  trackById(index: number, item: any): any {
-    return item.id ?? index;
-  }
-
+  
   onTabChange(index: number): void {
     const statusMap: (LeadStatus | undefined)[] = [
       undefined, 'NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'

@@ -217,9 +217,8 @@ export class DataTableComponent<T = unknown> {
   // Computed signals
   displayedColumns = computed(() => this.columns().map(col => col.key));
 
-  // Track table rows by ID to prevent unnecessary re-renders when data updates
-  trackById(index: number, item: any): any {
-    return item && item.id ? item.id : index;
+  trackById(index: number, item: any): string | number {
+    return item?.id ?? index;
   }
 
   onSortChange(sort: Sort): void {
