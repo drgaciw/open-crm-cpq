@@ -119,6 +119,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { usersStore } from '@/stores/users'
 import { Tooltip } from 'frappe-ui'
 import { computed } from 'vue'
+import Sval from 'sval'
 
 const props = defineProps({
   fields: {
@@ -173,9 +174,16 @@ function evaluate(code, context = {}) {
     ...context
   })
 
-  code = `let out = ${code}; exports.out = out;`
+  const script = `
+    function _evalExpr() {
+      let out = ${code};
+      return out;
+    }
+    exports.out = _evalExpr();
+  `
+
   try {
-    interpreter.run(code)
+    interpreter.run(script)
     return interpreter.exports.out
   } catch (error) {
     console.log('Error evaluating the following expression:')
