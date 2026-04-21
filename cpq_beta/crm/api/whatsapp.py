@@ -36,7 +36,27 @@ def notify_agent(doc):
 			</div>
 		"""
         assigned_users = get_assigned_users(doc.reference_doctype, doc.reference_name)
+        if not assigned_users:
+            return
+
+        existing_notifications = set(
+            frappe.get_all(
+                "CRM Notification",
+                filters={
+                    "notification_type_doctype": "WhatsApp Message",
+                    "notification_type_doc": doc.name,
+                    "reference_doctype": doc.reference_doctype,
+                    "reference_name": doc.reference_name,
+                    "type": "WhatsApp",
+                },
+                pluck="to_user",
+            )
+        )
+
         for user in assigned_users:
+            if user in existing_notifications:
+                continue
+
             values = frappe._dict(
                 doctype="CRM Notification",
                 from_user=doc.owner,
@@ -50,8 +70,6 @@ def notify_agent(doc):
                 reference_name=doc.reference_name,
             )
 
-            if frappe.db.exists("CRM Notification", values):
-                return
             frappe.get_doc(values).insert(ignore_permissions=True)
 
 
@@ -106,6 +124,7 @@ def is_whatsapp_enabled():
         return False
     return frappe.get_cached_value("WhatsApp Settings", "WhatsApp Settings", "enabled")
 
+
 @frappe.whitelist()
 def is_whatsapp_installed():
     if not frappe.db.exists("DocType", "WhatsApp Settings"):
@@ -157,16 +176,16 @@ def get_whatsapp_messages(reference_doctype, reference_name):
     ]
 
     # Pre-fetch all templates used by these messages in a single query
-    template_names = list(set(
-        msg["template"] for msg in template_messages if msg.get("template")
-    ))
+    template_names = list(
+        set(msg["template"] for msg in template_messages if msg.get("template"))
+    )
 
     templates_dict = {}
     if template_names:
         templates_data = frappe.get_all(
             "WhatsApp Templates",
             filters={"name": ["in", template_names]},
-            fields=["name", "template_name", "template", "header", "footer"]
+            fields=["name", "template_name", "template", "header", "footer"],
         )
         for t in templates_data:
             # We convert to frappe._dict to access properties with dot notation like the original get_doc behavior
@@ -187,9 +206,7 @@ def get_whatsapp_messages(reference_doctype, reference_name):
             parsed_template = template.template
             if template_message["template_parameters"] and parsed_template:
                 parameters = json.loads(template_message["template_parameters"])
-                parsed_template = parse_template_parameters(
-                    parsed_template, parameters
-                )
+                parsed_template = parse_template_parameters(parsed_template, parameters)
 
             template_message["template"] = parsed_template
 
@@ -326,7 +343,9 @@ def send_whatsapp_template(reference_doctype, reference_name, template, to):
 def react_on_whatsapp_message(emoji, reply_to_name):
     reply_to_doc = frappe.get_doc("WhatsApp Message", reply_to_name)
 
-    if not frappe.has_permission(reply_to_doc.reference_doctype, "read", reply_to_doc.reference_name):
+    if not frappe.has_permission(
+        reply_to_doc.reference_doctype, "read", reply_to_doc.reference_name
+    ):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
     to = reply_to_doc.type == "Incoming" and reply_to_doc.get("from") or reply_to_doc.to
@@ -365,5 +384,7 @@ def get_from_name(message):
         else:
             from_name = doc.get("lead_name")
     else:
-        from_name = " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
+        from_name = (
+            " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
+        )
     return from_name

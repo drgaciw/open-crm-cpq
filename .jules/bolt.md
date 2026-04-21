@@ -8,3 +8,7 @@
 ## 2026-04-18 - Added `trackBy` to Angular Material Tables
 **Learning:** By default, Angular `mat-table` tracks rows by object reference. When data arrays are replaced (e.g., via Signals or RxJS), it triggers a full re-render, degrading performance and causing focus loss.
 **Action:** Always add a `[trackBy]` function (like `trackById`) to `mat-table` (or any `*ngFor` mapping) that returns a unique primitive identifier (like `id`) instead of relying on default object tracking.
+
+## 2024-04-20 - Prevent N+1 queries and loop-invariant execution in Notification Loops
+**Learning:** In Frappe, looping over multiple recipients (like `assigned_users` or `mentions`) to create individual `CRM Notification` records can trigger N+1 queries if checked synchronously via `frappe.db.exists()` inside the loop. Additionally, constructing the notification message (which includes dynamic HTML and full name lookups via `frappe.get_cached_value`) inside the loop wastes CPU cycles with redundant identical string generations. Furthermore, returning prematurely upon finding an existing notification incorrectly aborts processing for subsequent recipients in the list.
+**Action:** Always batch-fetch existing recipient states using `frappe.get_all(..., pluck="fieldname")` to populate a Python `set` for O(1) lookups before the loop. Furthermore, hoist all loop-invariant operations (like HTML string construction and sender metadata lookups) outside the iteration. Ensure `continue` is used instead of `return` when skipping individual duplicates in a loop.
