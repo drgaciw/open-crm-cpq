@@ -106,6 +106,7 @@ def is_whatsapp_enabled():
         return False
     return frappe.get_cached_value("WhatsApp Settings", "WhatsApp Settings", "enabled")
 
+
 @frappe.whitelist()
 def is_whatsapp_installed():
     if not frappe.db.exists("DocType", "WhatsApp Settings"):
@@ -157,16 +158,16 @@ def get_whatsapp_messages(reference_doctype, reference_name):
     ]
 
     # Pre-fetch all templates used by these messages in a single query
-    template_names = list(set(
-        msg["template"] for msg in template_messages if msg.get("template")
-    ))
+    template_names = list(
+        set(msg["template"] for msg in template_messages if msg.get("template"))
+    )
 
     templates_dict = {}
     if template_names:
         templates_data = frappe.get_all(
             "WhatsApp Templates",
             filters={"name": ["in", template_names]},
-            fields=["name", "template_name", "template", "header", "footer"]
+            fields=["name", "template_name", "template", "header", "footer"],
         )
         for t in templates_data:
             # We convert to frappe._dict to access properties with dot notation like the original get_doc behavior
@@ -187,9 +188,7 @@ def get_whatsapp_messages(reference_doctype, reference_name):
             parsed_template = template.template
             if template_message["template_parameters"] and parsed_template:
                 parameters = json.loads(template_message["template_parameters"])
-                parsed_template = parse_template_parameters(
-                    parsed_template, parameters
-                )
+                parsed_template = parse_template_parameters(parsed_template, parameters)
 
             template_message["template"] = parsed_template
 
@@ -226,8 +225,12 @@ def get_whatsapp_messages(reference_doctype, reference_name):
         if reacted_message:
             reacted_message["reaction"] = reaction_message["message"]
 
+    cached_from_name = get_from_name(
+        {"reference_doctype": reference_doctype, "reference_name": reference_name}
+    )
+
     for message in messages:
-        from_name = get_from_name(message) if message["from"] else _("You")
+        from_name = cached_from_name if message["from"] else _("You")
         message["from_name"] = from_name
     # Filter messages to get only replies
     reply_messages = [message for message in messages if message["is_reply"]]
@@ -246,7 +249,9 @@ def get_whatsapp_messages(reference_doctype, reference_name):
 
         # If the replied message is found, add the reply details to the reply message
         from_name = (
-            get_from_name(reply_message) if replied_message["from"] else _("You")
+            cached_from_name
+            if replied_message and replied_message["from"]
+            else _("You")
         )
         if replied_message:
             message = replied_message["message"]
@@ -326,7 +331,9 @@ def send_whatsapp_template(reference_doctype, reference_name, template, to):
 def react_on_whatsapp_message(emoji, reply_to_name):
     reply_to_doc = frappe.get_doc("WhatsApp Message", reply_to_name)
 
-    if not frappe.has_permission(reply_to_doc.reference_doctype, "read", reply_to_doc.reference_name):
+    if not frappe.has_permission(
+        reply_to_doc.reference_doctype, "read", reply_to_doc.reference_name
+    ):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
     to = reply_to_doc.type == "Incoming" and reply_to_doc.get("from") or reply_to_doc.to
@@ -365,5 +372,7 @@ def get_from_name(message):
         else:
             from_name = doc.get("lead_name")
     else:
-        from_name = " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
+        from_name = (
+            " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
+        )
     return from_name
