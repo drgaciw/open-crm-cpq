@@ -31,3 +31,8 @@
 **Vulnerability:** The codebase was utilizing `document.execCommand('copy')` as a fallback method to write data to the user's clipboard when the Clipboard API was unavailable. This method is deprecated across modern browsers and is actively flagged by the repository's structural security scanners (`ast-grep`).
 **Learning:** Legacy browser APIs are sometimes maintained as fallbacks but are actively deprecated because they often lack proper permissions control compared to modern alternatives like the Async Clipboard API (`navigator.clipboard`). Modern clipboard access requires secure contexts (`HTTPS` or `localhost`), which prevents malicious sites from silently intercepting or modifying clipboard contents.
 **Prevention:** Always default to modern, permission-based web APIs like `navigator.clipboard`. Do not attempt to re-implement fallbacks using deprecated APIs (`document.execCommand`); instead, catch unsupported API errors gracefully and present a meaningful error message to the user informing them that their context is insecure.
+
+## 2024-04-22 - [DOMParser over innerHTML for HTML-to-Text]
+**Vulnerability:** A DOM-based XSS vulnerability existed in `htmlToText` where `div.innerHTML = html` was used on a detached DOM element. While `.textContent` was immediately extracted, assigning unsanitized HTML to `innerHTML` synchronously executes inline handlers (e.g., `<img src=x onerror=alert(1)>`).
+**Learning:** Even detached DOM elements execute inline event handlers (like `onerror`) during synchronous parsing when `innerHTML` is assigned.
+**Prevention:** Always use `new DOMParser().parseFromString(html, 'text/html')` to safely parse HTML into an inert document context without executing scripts.
