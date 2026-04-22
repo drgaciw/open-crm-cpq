@@ -70,7 +70,9 @@ def get_deal_contacts(name):
 	if not contacts:
 		return []
 
-	contact_names = [c.contact for c in contacts if frappe.db.exists("Contact", c.contact)]
+	# Bolt Optimization: Avoid N+1 frappe.db.exists checks.
+	# The subsequent frappe.get_all(..., filters={"name": ["in", contact_names]}) naturally filters missing records.
+	contact_names = [c.contact for c in contacts]
 	if not contact_names:
 		return []
 
