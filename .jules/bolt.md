@@ -12,3 +12,6 @@
 ## 2024-05-18 - Replacing Loop Execution of frappe.get_doc
 **Learning:** Calling `frappe.get_doc()` inside loops for objects that share the same underlying references (like `reference_doctype` and `reference_name` in WhatsApp messages) leads to redundant, expensive N+1 instantiation issues.
 **Action:** When a method inside a loop fetches information derived from values that are identical across all iterations, extract the expensive computation (`frappe.get_doc` or `get_from_name`) outside the loop, cache the result, and reuse it inside the loop to turn N queries into 1 query.
+## 2024-05-19 - Replacing loop execution of frappe.db.exists with IN query
+**Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, it is redundant and highly inefficient to perform an N+1 `frappe.db.exists()` check in a loop beforehand to filter the names. The `IN` query will naturally filter out any non-existent records, rendering the prior existence checks useless while causing severe N+1 overhead.
+**Action:** When preparing a list of values to be used in an `IN` clause for fetching data via `frappe.get_all()`, eliminate any preceding `frappe.db.exists()` checks inside loops and rely on the database to handle the filtering natively.
