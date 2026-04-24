@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from bs4 import BeautifulSoup
 
+
 def on_update(self, method):
     notify_mentions(self)
 
@@ -17,18 +18,42 @@ def notify_mentions(doc):
     if not content:
         return
     mentions = extract_mentions(content)
+    if not mentions:
+        return
+
+    owner = frappe.get_cached_value("User", doc.owner, "full_name")
+    doctype = doc.reference_doctype
+    if doctype.startswith("CRM "):
+        doctype = doctype[4:].lower()
+    notification_text = f"""
+        <div class="mb-2 leading-5 text-gray-600">
+            <span class="font-medium text-gray-900">{ owner }</span>
+            <span>{ _('mentioned you in {0}').format(doctype) }</span>
+            <span class="font-medium text-gray-900">{ doc.reference_name }</span>
+        </div>
+    """
+
+    emails = [mention.email for mention in mentions]
+    existing_notifications = set(
+        frappe.get_all(
+            "CRM Notification",
+            filters={
+                "from_user": doc.owner,
+                "to_user": ["in", emails],
+                "type": "Mention",
+                "notification_type_doctype": "Comment",
+                "notification_type_doc": doc.name,
+                "reference_doctype": doc.reference_doctype,
+                "reference_name": doc.reference_name,
+            },
+            pluck="to_user",
+        )
+    )
+
     for mention in mentions:
-        owner = frappe.get_cached_value("User", doc.owner, "full_name")
-        doctype = doc.reference_doctype
-        if doctype.startswith("CRM "):
-            doctype = doctype[4:].lower()
-        notification_text = f"""
-            <div class="mb-2 leading-5 text-gray-600">
-                <span class="font-medium text-gray-900">{ owner }</span>
-                <span>{ _('mentioned you in {0}').format(doctype) }</span>
-                <span class="font-medium text-gray-900">{ doc.reference_name }</span>
-            </div>
-        """
+        if mention.email in existing_notifications:
+            continue
+
         values = frappe._dict(
             doctype="CRM Notification",
             from_user=doc.owner,
@@ -41,10 +66,8 @@ def notify_mentions(doc):
             reference_doctype=doc.reference_doctype,
             reference_name=doc.reference_name,
         )
-
-        if frappe.db.exists("CRM Notification", values):
-            return
         frappe.get_doc(values).insert()
+        existing_notifications.add(mention.email)
 
 
 def extract_mentions(html):
@@ -58,42 +81,47 @@ def extract_mentions(html):
         )
     return mentions
 
+
 @frappe.whitelist()
 def add_attachments(name: str, attachments: Iterable[str | dict]) -> None:
-	"""Add attachments to the given Comment
+    """Add attachments to the given Comment
 
-	:param name: Comment name
-	:param attachments: File names or dicts with keys "fname" and "fcontent"
-	"""
-	comment = frappe.get_doc("Comment", name)
-	if comment.reference_doctype and comment.reference_name:
-		if not frappe.has_permission(comment.reference_doctype, "write", comment.reference_name):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
+    :param name: Comment name
+    :param attachments: File names or dicts with keys "fname" and "fcontent"
+    """
+    comment = frappe.get_doc("Comment", name)
+    if comment.reference_doctype and comment.reference_name:
+        if not frappe.has_permission(
+            comment.reference_doctype, "write", comment.reference_name
+        ):
+            frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-	for a in attachments:
-		if isinstance(a, str):
-			attach = frappe.db.get_value("File", {"name": a}, ["file_url", "is_private"], as_dict=1)
-			file_args = {
-				"file_url": attach.file_url,
-				"is_private": attach.is_private,
-			}
-		elif isinstance(a, dict) and "fcontent" in a and "fname" in a:
-			file_args = {
-				"file_name": a["fname"],
-				"content": a["fcontent"],
-				"is_private": 1,
-			}
-		else:
-			continue
+    for a in attachments:
+        if isinstance(a, str):
+            attach = frappe.db.get_value(
+                "File", {"name": a}, ["file_url", "is_private"], as_dict=1
+            )
+            file_args = {
+                "file_url": attach.file_url,
+                "is_private": attach.is_private,
+            }
+        elif isinstance(a, dict) and "fcontent" in a and "fname" in a:
+            file_args = {
+                "file_name": a["fname"],
+                "content": a["fcontent"],
+                "is_private": 1,
+            }
+        else:
+            continue
 
-		file_args.update(
-			{
-				"attached_to_doctype": "Comment",
-				"attached_to_name": name,
-				"folder": "Home/Attachments",
-			}
-		)
+        file_args.update(
+            {
+                "attached_to_doctype": "Comment",
+                "attached_to_name": name,
+                "folder": "Home/Attachments",
+            }
+        )
 
-		_file = frappe.new_doc("File")
-		_file.update(file_args)
-		_file.save()
+        _file = frappe.new_doc("File")
+        _file.update(file_args)
+        _file.save()
