@@ -135,7 +135,7 @@ public class Quote extends BaseEntity {
         for (QuoteLineItem item : lineItems) {
             if (!item.isDeleted()) {
                 Money lineTotal = Money.of(item.getUnitPrice(), currency).multiply(item.getQuantity());
-                Money lineDiscount = lineTotal.percentage(item.getDiscountPercentage());
+                Money lineDiscount = lineTotal.percentage(item.getDiscountRate());
                 
                 subtotalMoney = subtotalMoney.add(lineTotal);
                 discountMoney = discountMoney.add(lineDiscount);

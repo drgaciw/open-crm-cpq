@@ -293,35 +293,53 @@ public class QuoteService {
         }
 
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
-        JsonNode pricingApiResponse;
-        try {
-            pricingApiResponse = pricingServiceClient.executePricing(pricingContext);
-        } catch (RestClientException ex) {
-            throw new BusinessException(
-                    "Failed to call pricing service: " + ex.getMessage(),
-                    HttpStatus.BAD_GATEWAY,
-                    "PRICING_SERVICE_UNAVAILABLE"
-            );
-        }
-
-        JsonNode wrapperSuccessNode = pricingApiResponse.path("success");
-        if (!wrapperSuccessNode.asBoolean(false)) {
-            throw new BusinessException(
-                    pricingApiResponse.path("message").asText("Pricing execution failed"),
-                    "PRICING_EXECUTION_FAILED"
-            );
-        }
-
-        JsonNode pricingData = pricingApiResponse.path("data");
-        if (!pricingData.path("success").asBoolean(false)) {
-            throw new BusinessException(
-                    pricingData.path("errorMessage").asText("Pricing execution failed"),
-                    "PRICING_EXECUTION_FAILED"
-            );
-        }
-
+        JsonNode pricingData = fetchPricingData(pricingContext);
         Map<String, ArrayDeque<JsonNode>> pricingResultByLine = indexLineResults(pricingData.path("lineResults"));
 
+        PricingTotals totals = applyPricingToLineItems(lineItems, pricingResultByLine);
+        quoteLineItemRepository.saveAll(lineItems);
+
+        quote.setSubtotal(totals.subtotal());
+        quote.setTotalDiscount(totals.totalDiscount());
+        quote.setTotalAmount(totals.totalAmount());
+
+        updateQuoteFromPricingData(quote, pricingData);
+
+        Quote saved = quoteRepository.save(quote);
+        log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
+        return quoteMapper.toDto(saved);
+    }
+
+    private void updateQuoteFromPricingData(Quote quote, JsonNode pricingData) {
+        JsonNode financialMetrics = pricingData.path("financialMetrics");
+        quote.setArr(decimalValue(financialMetrics.path("arr"), quote.getArr()));
+        quote.setTcv(decimalValue(financialMetrics.path("tcv"), quote.getTcv()));
+        quote.setAcv(decimalValue(financialMetrics.path("acv"), quote.getAcv()));
+
+        String approvalState = pricingData.path("approvalState").asText(null);
+        if (approvalState != null && !approvalState.isBlank()) {
+            try {
+                quote.setApprovalState(ApprovalState.valueOf(approvalState));
+            } catch (IllegalArgumentException ignored) {
+                log.warn("Unknown approval state from pricing service: {}", approvalState);
+            }
+        }
+
+        quote.setApprovalTier(pricingData.path("approvalTier").asText(null));
+
+        JsonNode waterfall = pricingData.path("waterfall");
+        if (!waterfall.isMissingNode() && !waterfall.isNull()) {
+            try {
+                quote.setPricingWaterfallJson(objectMapper.writeValueAsString(waterfall));
+            } catch (JsonProcessingException ex) {
+                log.warn("Unable to serialize pricing waterfall for quote {}: {}", quote.getQuoteNumber(), ex.getMessage());
+            }
+        }
+    }
+
+    private record PricingTotals(BigDecimal subtotal, BigDecimal totalDiscount, BigDecimal totalAmount) {}
+
+    private PricingTotals applyPricingToLineItems(List<QuoteLineItem> lineItems, Map<String, ArrayDeque<JsonNode>> pricingResultByLine) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalDiscount = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -369,40 +387,38 @@ public class QuoteService {
             totalAmount = totalAmount.add(lineFinal);
         }
 
-        quoteLineItemRepository.saveAll(lineItems);
+        return new PricingTotals(subtotal, totalDiscount, totalAmount);
+    }
 
-        quote.setSubtotal(subtotal);
-        quote.setTotalDiscount(totalDiscount);
-        quote.setTotalAmount(totalAmount);
-
-        JsonNode financialMetrics = pricingData.path("financialMetrics");
-        quote.setArr(decimalValue(financialMetrics.path("arr"), quote.getArr()));
-        quote.setTcv(decimalValue(financialMetrics.path("tcv"), quote.getTcv()));
-        quote.setAcv(decimalValue(financialMetrics.path("acv"), quote.getAcv()));
-
-        String approvalState = pricingData.path("approvalState").asText(null);
-        if (approvalState != null && !approvalState.isBlank()) {
-            try {
-                quote.setApprovalState(ApprovalState.valueOf(approvalState));
-            } catch (IllegalArgumentException ignored) {
-                log.warn("Unknown approval state from pricing service: {}", approvalState);
-            }
+    private JsonNode fetchPricingData(Map<String, Object> pricingContext) {
+        JsonNode pricingApiResponse;
+        try {
+            pricingApiResponse = pricingServiceClient.executePricing(pricingContext);
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call pricing service: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "PRICING_SERVICE_UNAVAILABLE"
+            );
         }
 
-        quote.setApprovalTier(pricingData.path("approvalTier").asText(null));
-
-        JsonNode waterfall = pricingData.path("waterfall");
-        if (!waterfall.isMissingNode() && !waterfall.isNull()) {
-            try {
-                quote.setPricingWaterfallJson(objectMapper.writeValueAsString(waterfall));
-            } catch (JsonProcessingException ex) {
-                log.warn("Unable to serialize pricing waterfall for quote {}: {}", quote.getQuoteNumber(), ex.getMessage());
-            }
+        JsonNode wrapperSuccessNode = pricingApiResponse.path("success");
+        if (!wrapperSuccessNode.asBoolean(false)) {
+            throw new BusinessException(
+                    pricingApiResponse.path("message").asText("Pricing execution failed"),
+                    "PRICING_EXECUTION_FAILED"
+            );
         }
 
-        Quote saved = quoteRepository.save(quote);
-        log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
-        return quoteMapper.toDto(saved);
+        JsonNode pricingData = pricingApiResponse.path("data");
+        if (!pricingData.path("success").asBoolean(false)) {
+            throw new BusinessException(
+                    pricingData.path("errorMessage").asText("Pricing execution failed"),
+                    "PRICING_EXECUTION_FAILED"
+            );
+        }
+
+        return pricingData;
     }
 
     private Map<String, Object> buildPricingContext(Quote quote, List<QuoteLineItem> lineItems) {
