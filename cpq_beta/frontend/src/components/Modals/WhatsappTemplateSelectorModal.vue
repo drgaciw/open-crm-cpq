@@ -94,7 +94,7 @@ const filteredTemplates = computed(() => {
 
 function newWhatsappTemplate() {
   show.value = false
-  window.open('/app/whatsapp-templates/new')
+  window.open('/app/whatsapp-templates/new', '_blank', 'noopener,noreferrer')
 }
 
 watch(show, (value) => value && nextTick(() => searchInput.value?.el?.focus()))
