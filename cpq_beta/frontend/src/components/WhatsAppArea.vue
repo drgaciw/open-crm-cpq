@@ -182,7 +182,7 @@ const props = defineProps({
 const list = defineModel()
 
 function openFileInAnotherTab(url) {
-  window.open(url, '_blank')
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function formatWhatsAppMessage(message) {
