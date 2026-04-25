@@ -9,11 +9,17 @@ import com.opencrm.pricing.ruleset.RuleSetStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.kie.api.KieServices;
+import org.kie.api.builder.KieBuilder;
+import org.kie.api.builder.KieFileSystem;
+import org.kie.api.builder.Message;
+import org.kie.api.builder.Results;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing rules.
@@ -145,10 +151,21 @@ public class RuleService {
         Rule rule = ruleRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rule", id));
 
-        // TODO: Implement DRL syntax validation using Drools compiler
-        // For now, just check that content is not empty
         if (rule.getContent() == null || rule.getContent().trim().isEmpty()) {
             throw new BusinessException("Rule content cannot be empty", "INVALID_RULE_CONTENT");
+        }
+
+        KieServices kieServices = KieServices.Factory.get();
+        KieFileSystem kfs = kieServices.newKieFileSystem();
+        kfs.write("src/main/resources/rule.drl", rule.getContent());
+        KieBuilder kieBuilder = kieServices.newKieBuilder(kfs).buildAll();
+
+        Results results = kieBuilder.getResults();
+        if (results.hasMessages(Message.Level.ERROR)) {
+            String errorMsg = results.getMessages(Message.Level.ERROR).stream()
+                    .map(Message::getText)
+                    .collect(Collectors.joining(", "));
+            throw new BusinessException("Invalid DRL syntax: " + errorMsg, "INVALID_DRL_SYNTAX");
         }
 
         log.info("Validated rule ID: {}", id);
