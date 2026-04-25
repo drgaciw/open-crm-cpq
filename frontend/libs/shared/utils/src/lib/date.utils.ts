@@ -3,6 +3,9 @@
  */
 export function timeAgo(dateString: string): string {
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
