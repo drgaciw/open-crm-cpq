@@ -112,5 +112,19 @@ class TestCRMCallLog(FrappeTestCase):
 
     def test_missing_from(self):
         frappe.set_user("Administrator")
+
+        # Test missing 'from' in dictionary
         with self.assertRaises(frappe.ValidationError):
             create_lead_from_call_log({"name": "test"})
+
+        # Test 'from' is empty string in dictionary
+        with self.assertRaises(frappe.ValidationError):
+            create_lead_from_call_log({"name": "test", "from": ""})
+
+        # Test 'from' is None in dictionary
+        with self.assertRaises(frappe.ValidationError):
+            create_lead_from_call_log({"name": "test", "from": None})
+
+        # Test missing 'from' in JSON string
+        with self.assertRaises(frappe.ValidationError):
+            create_lead_from_call_log('{"name": "test"}')
