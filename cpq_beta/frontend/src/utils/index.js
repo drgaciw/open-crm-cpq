@@ -80,9 +80,13 @@ export function openWebsite(url) {
 }
 
 export function htmlToText(html) {
-  const div = document.createElement('div')
-  div.innerHTML = html
-  return div.textContent || div.innerText || ''
+  if (!html) return ''
+  if (typeof DOMParser !== 'undefined') {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    return doc.body ? doc.body.textContent || '' : doc.documentElement.textContent || ''
+  }
+  return String(html).replace(/<[^>]*>?/gm, '')
 }
 
 export function secondsToDuration(seconds) {
