@@ -11,8 +11,8 @@ import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttrib
 
 /**
  * Security configuration for API Gateway.
- * In dev profile, all endpoints are open (no auth required).
- * In production, JWT validation is enforced.
+ * Dev profile: all endpoints open (no auth), but CSRF protection is active.
+ * Production: JWT authentication enforced with CSRF protection.
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -20,13 +20,16 @@ public class SecurityConfig {
 
     /**
      * Dev profile: permit all requests without authentication.
+     * CSRF protection is enabled to match production security posture.
      */
     @Bean
     @Profile("dev")
     public SecurityWebFilterChain devSecurityFilterChain(ServerHttpSecurity http) {
         return http
-                // Token-based API; CSRF token filter disabled. Cookie requests are protected by CsrfProtectionFilter.
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
+                )
                 .authorizeExchange(exchanges -> exchanges.anyExchange().permitAll())
                 .build();
     }
