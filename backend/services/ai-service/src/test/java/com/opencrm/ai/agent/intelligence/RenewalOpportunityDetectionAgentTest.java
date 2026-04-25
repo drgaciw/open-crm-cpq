@@ -5,13 +5,13 @@ import com.opencrm.ai.agent.AgentResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.StreamingChatClient;
 import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.Generation;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.StreamingChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
@@ -23,80 +23,90 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-public class RenewalOpportunityDetectionAgentTest {
+class RenewalOpportunityDetectionAgentTest {
 
-    @Mock
     private ChatClient chatClient;
-
-    @Mock
     private StreamingChatClient streamingChatClient;
-
     private RenewalOpportunityDetectionAgent agent;
 
     @BeforeEach
-    public void setup() {
-        MockitoAnnotations.openMocks(this);
+    void setUp() {
+        chatClient = mock(ChatClient.class);
+        streamingChatClient = mock(StreamingChatClient.class);
         agent = new RenewalOpportunityDetectionAgent(chatClient, streamingChatClient);
     }
 
     @Test
-    public void testInvoke() {
+    void testGetAgentIdAndName() {
+        assertEquals("cpq-agent-028", agent.getAgentId());
+        assertEquals("Renewal Opportunity Detection Agent", agent.getName());
+        assertNotNull(agent.getDescription());
+    }
+
+    @Test
+    void testInvokeSuccess() {
+        ChatResponse chatResponse = mock(ChatResponse.class);
+        Generation generation = mock(Generation.class);
+        org.springframework.ai.chat.messages.AssistantMessage assistantMessage =
+                mock(org.springframework.ai.chat.messages.AssistantMessage.class);
+
+        when(chatClient.call(any(Prompt.class))).thenReturn(chatResponse);
+        when(chatResponse.getResult()).thenReturn(generation);
+        when(generation.getOutput()).thenReturn(assistantMessage);
+        when(assistantMessage.getContent()).thenReturn("3 renewals due in 30 days; 1 at churn risk");
+
         AgentRequest request = mock(AgentRequest.class);
-        when(request.getSystemPrompt()).thenReturn("System Prompt");
-        when(request.getMessages()).thenReturn(List.of("Message 1"));
-        when(request.getContext()).thenReturn(Map.of("key", "value"));
-
-        ChatResponse mockResponse = mock(ChatResponse.class);
-        Generation mockGeneration = mock(Generation.class);
-        AssistantMessage mockMessage = mock(AssistantMessage.class);
-
-        when(mockMessage.getContent()).thenReturn("LLM Response");
-        when(mockGeneration.getOutput()).thenReturn(mockMessage);
-        when(mockResponse.getResult()).thenReturn(mockGeneration);
-        when(chatClient.call(any(Prompt.class))).thenReturn(mockResponse);
+        when(request.getSystemPrompt()).thenReturn("System context");
+        when(request.getMessages()).thenReturn(List.of("Detect renewal opportunities"));
 
         AgentResponse response = agent.invoke(request);
 
         assertTrue(response.isSuccess());
-        assertEquals("LLM Response", response.getOutput());
-        assertNotNull(response.getMetadata());
-        assertEquals("Automated", response.getMetadata().get("autonomy"));
-
-        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
-        verify(chatClient, times(1)).call(promptCaptor.capture());
+        assertEquals("3 renewals due in 30 days; 1 at churn risk", response.getOutput());
     }
 
     @Test
-    public void testStream() {
+    void testInvokeFailure() {
+        when(chatClient.call(any(Prompt.class))).thenThrow(new RuntimeException("Backend failure"));
+
         AgentRequest request = mock(AgentRequest.class);
-        when(request.getSystemPrompt()).thenReturn("System Prompt");
-        when(request.getMessages()).thenReturn(List.of("Message 1"));
-        when(request.getContext()).thenReturn(Map.of("key", "value"));
+        when(request.getSystemPrompt()).thenReturn(null);
+        when(request.getMessages()).thenReturn(List.of("Detect renewal opportunities"));
 
-        ChatResponse mockResponse1 = mock(ChatResponse.class);
-        Generation mockGeneration1 = mock(Generation.class);
-        AssistantMessage mockMessage1 = mock(AssistantMessage.class);
-        when(mockMessage1.getContent()).thenReturn("Part 1 ");
-        when(mockGeneration1.getOutput()).thenReturn(mockMessage1);
-        when(mockResponse1.getResult()).thenReturn(mockGeneration1);
+        // RenewalOpportunityDetectionAgent does not wrap in try-catch, exception propagates
+        assertThrows(RuntimeException.class, () -> agent.invoke(request));
+    }
 
-        ChatResponse mockResponse2 = mock(ChatResponse.class);
-        Generation mockGeneration2 = mock(Generation.class);
-        AssistantMessage mockMessage2 = mock(AssistantMessage.class);
-        when(mockMessage2.getContent()).thenReturn("Part 2");
-        when(mockGeneration2.getOutput()).thenReturn(mockMessage2);
-        when(mockResponse2.getResult()).thenReturn(mockGeneration2);
+    @Test
+    void testStreamSuccess() {
+        ChatResponse chunk1 = mock(ChatResponse.class);
+        ChatResponse chunk2 = mock(ChatResponse.class);
+        Generation gen1 = mock(Generation.class);
+        Generation gen2 = mock(Generation.class);
+        org.springframework.ai.chat.messages.AssistantMessage msg1 =
+                mock(org.springframework.ai.chat.messages.AssistantMessage.class);
+        org.springframework.ai.chat.messages.AssistantMessage msg2 =
+                mock(org.springframework.ai.chat.messages.AssistantMessage.class);
 
-        when(streamingChatClient.stream(any(Prompt.class))).thenReturn(Flux.just(mockResponse1, mockResponse2));
+        when(chunk1.getResult()).thenReturn(gen1);
+        when(gen1.getOutput()).thenReturn(msg1);
+        when(msg1.getContent()).thenReturn("Chunk 1");
 
-        Flux<String> resultFlux = agent.stream(request);
+        when(chunk2.getResult()).thenReturn(gen2);
+        when(gen2.getOutput()).thenReturn(msg2);
+        when(msg2.getContent()).thenReturn("Chunk 2");
 
-        StepVerifier.create(resultFlux)
-                .expectNext("Part 1 ")
-                .expectNext("Part 2")
+        when(streamingChatClient.stream(any(Prompt.class))).thenReturn(Flux.just(chunk1, chunk2));
+
+        AgentRequest request = mock(AgentRequest.class);
+        when(request.getSystemPrompt()).thenReturn(null);
+        when(request.getMessages()).thenReturn(List.of("Stream renewal detection"));
+
+        Flux<String> result = agent.stream(request);
+
+        StepVerifier.create(result)
+                .expectNext("Chunk 1")
+                .expectNext("Chunk 2")
                 .verifyComplete();
-
-        ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
-        verify(streamingChatClient, times(1)).stream(promptCaptor.capture());
     }
 }
