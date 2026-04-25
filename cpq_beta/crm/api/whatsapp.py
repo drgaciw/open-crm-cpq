@@ -36,7 +36,28 @@ def notify_agent(doc):
 			</div>
 		"""
         assigned_users = get_assigned_users(doc.reference_doctype, doc.reference_name)
+        if not assigned_users:
+            return
+
+        # Batch-fetch existing notifications in a single query — O(1) set lookup replaces N frappe.db.exists() calls
+        existing_notifications = set(
+            frappe.get_all(
+                "CRM Notification",
+                filters={
+                    "notification_type_doctype": "WhatsApp Message",
+                    "notification_type_doc": doc.name,
+                    "reference_doctype": doc.reference_doctype,
+                    "reference_name": doc.reference_name,
+                    "type": "WhatsApp",
+                },
+                pluck="to_user",
+            )
+        )
+
         for user in assigned_users:
+            if user in existing_notifications:
+                continue
+
             values = frappe._dict(
                 doctype="CRM Notification",
                 from_user=doc.owner,
@@ -50,8 +71,6 @@ def notify_agent(doc):
                 reference_name=doc.reference_name,
             )
 
-            if frappe.db.exists("CRM Notification", values):
-                return
             frappe.get_doc(values).insert(ignore_permissions=True)
 
 
