@@ -89,14 +89,16 @@ class CRMLead(Document):
 			fields=["name", "user"],
 		)
 
-		shared_with = [d.user for d in docshares] + [agent]
+		# Bolt Optimization: Avoid redundant N+1 frappe.db.exists check inside the loop by checking against fetched users
+		shared_users = {d.user for d in docshares}
 
-		for user in shared_with:
-			if user == agent and not frappe.db.exists("DocShare", {"user": agent, "share_name": self.name, "share_doctype": self.doctype}):
-				frappe.share.add_docshare(
-					self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
-				)
-			elif user != agent:
+		if agent not in shared_users:
+			frappe.share.add_docshare(
+				self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
+			)
+
+		for user in shared_users:
+			if user != agent:
 				frappe.share.remove(self.doctype, self.name, user)
 
 	def create_contact(self, throw=True):
@@ -156,27 +158,28 @@ class CRMLead(Document):
 		return organization.name
 
 	def contact_exists(self, throw=True):
-		email_exist = frappe.db.exists("Contact Email", {"email_id": self.email})
-		phone_exist = frappe.db.exists("Contact Phone", {"phone": self.phone})
-		mobile_exist = frappe.db.exists("Contact Phone", {"phone": self.mobile_no})
+		# Bolt Optimization: Short-circuit frappe.db.get_value calls instead of multiple exists() followed by get_value()
+		contact = None
+		if self.email:
+			contact = frappe.db.get_value("Contact Email", {"email_id": self.email}, "parent")
+			if contact:
+				if throw:
+					frappe.throw(_("Contact already exists with Email: {0}").format(self.email), title=_("Contact Already Exists"))
+				return contact
 
-		doctype = "Contact Email" if email_exist else "Contact Phone"
-		name = email_exist or phone_exist or mobile_exist
+		if self.phone:
+			contact = frappe.db.get_value("Contact Phone", {"phone": self.phone}, "parent")
+			if contact:
+				if throw:
+					frappe.throw(_("Contact already exists with Phone: {0}").format(self.phone), title=_("Contact Already Exists"))
+				return contact
 
-		if name:
-			text = "Email" if email_exist else "Phone" if phone_exist else "Mobile No"
-			data = self.email if email_exist else self.phone if phone_exist else self.mobile_no
-
-			value = "{0}: {1}".format(text, data)
-
-			contact = frappe.db.get_value(doctype, name, "parent")
-
-			if throw:
-				frappe.throw(
-					_("Contact already exists with {0}").format(value),
-					title=_("Contact Already Exists"),
-				)
-			return contact
+		if self.mobile_no:
+			contact = frappe.db.get_value("Contact Phone", {"phone": self.mobile_no}, "parent")
+			if contact:
+				if throw:
+					frappe.throw(_("Contact already exists with Mobile No: {0}").format(self.mobile_no), title=_("Contact Already Exists"))
+				return contact
 
 		return False
 

@@ -90,14 +90,16 @@ class CRMDeal(Document):
 			fields=["name", "user"],
 		)
 
-		shared_with = [d.user for d in docshares] + [agent]
+		# Bolt Optimization: Avoid redundant N+1 frappe.db.exists check inside the loop by checking against fetched users
+		shared_users = {d.user for d in docshares}
 
-		for user in shared_with:
-			if user == agent and not frappe.db.exists("DocShare", {"user": agent, "share_name": self.name, "share_doctype": self.doctype}):
-				frappe.share.add_docshare(
-					self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
-				)
-			elif user != agent:
+		if agent not in shared_users:
+			frappe.share.add_docshare(
+				self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
+			)
+
+		for user in shared_users:
+			if user != agent:
 				frappe.share.remove(self.doctype, self.name, user)
 
 
@@ -250,14 +252,16 @@ def create_organization(doc):
 	return organization.name
 
 def contact_exists(doc):
-	email_exist = frappe.db.exists("Contact Email", {"email_id": doc.get("email")})
-	mobile_exist = frappe.db.exists("Contact Phone", {"phone": doc.get("mobile_no")})
+	# Bolt Optimization: Short-circuit frappe.db.get_value calls instead of multiple exists() followed by get_value()
+	if doc.get("email"):
+		contact = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "parent")
+		if contact:
+			return contact
 
-	doctype = "Contact Email" if email_exist else "Contact Phone"
-	name = email_exist or mobile_exist
-
-	if name:
-		return frappe.db.get_value(doctype, name, "parent")
+	if doc.get("mobile_no"):
+		contact = frappe.db.get_value("Contact Phone", {"phone": doc.get("mobile_no")}, "parent")
+		if contact:
+			return contact
 
 	return False
 

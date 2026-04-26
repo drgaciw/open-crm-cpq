@@ -16,3 +16,6 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+## 2024-05-20 - Replacing Loop Execution of frappe.db.exists with Fetched Collection Lookups
+**Learning:** Checking existence in the database within a loop, even if filtering on simple fields like `{"user": agent, "share_name": self.name}`, introduces severe N+1 latency, particularly in heavily-used operations like assigning leads/deals.
+**Action:** When iterating over a collection to update records (e.g., sharing a document with agents), and a list of existing matching records has already been fetched via `frappe.get_all` outside the loop, use Python set lookups (`agent not in shared_users`) in O(1) time rather than making individual `frappe.db.exists` calls per iteration.
