@@ -380,18 +380,23 @@ def parse_template_parameters(string, parameters):
 
 
 def get_from_name(message):
-    doc = frappe.get_doc(message["reference_doctype"], message["reference_name"])
+    # Bolt Optimization: Replaced frappe.get_doc with get_value to avoid full document instantiation
+    ref_dt = message.get("reference_doctype")
+    ref_name = message.get("reference_name")
     from_name = ""
-    if message["reference_doctype"] == "CRM Deal":
-        if doc.get("contacts"):
-            for c in doc.get("contacts"):
-                if c.is_primary:
-                    from_name = c.full_name or c.mobile_no
-                    break
-        else:
-            from_name = doc.get("lead_name")
-    else:
-        from_name = (
-            " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
+    if ref_dt == "CRM Deal":
+        primary_contact = frappe.db.get_value(
+            "CRM Contacts",
+            {"parent": ref_name, "parenttype": "CRM Deal", "is_primary": 1},
+            ["full_name", "mobile_no"],
+            as_dict=True
         )
+        if primary_contact:
+            from_name = primary_contact.get("full_name") or primary_contact.get("mobile_no") or ""
+        else:
+            from_name = frappe.db.get_value("CRM Deal", ref_name, "lead_name") or ""
+    else:
+        doc_data = frappe.db.get_value(ref_dt, ref_name, ["first_name", "last_name"], as_dict=True)
+        if doc_data:
+            from_name = " ".join(filter(None, [doc_data.get("first_name"), doc_data.get("last_name")])) or ""
     return from_name
