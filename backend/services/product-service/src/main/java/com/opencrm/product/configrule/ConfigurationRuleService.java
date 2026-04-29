@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -72,23 +74,31 @@ public class ConfigurationRuleService {
         log.debug("Validating configuration for {} products", selectedProductIds.size());
         List<String> errors = new ArrayList<>();
 
-        for (Long productId : selectedProductIds) {
-            List<ConfigurationRule> requiresRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.REQUIRES);
-            for (ConfigurationRule rule : requiresRules) {
-                if (rule.getTargetProductId() != null && !selectedProductIds.contains(rule.getTargetProductId())) {
-                    errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " requires product " + rule.getTargetProductId());
-                }
-            }
+        if (selectedProductIds == null || selectedProductIds.isEmpty()) {
+            return errors;
+        }
 
-            List<ConfigurationRule> excludesRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.EXCLUDES);
-            for (ConfigurationRule rule : excludesRules) {
-                if (rule.getTargetProductId() != null && selectedProductIds.contains(rule.getTargetProductId())) {
-                    errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " is incompatible with product " + rule.getTargetProductId());
-                }
+        // Bolt optimization: use HashSet for O(1) containment checks
+        // and batch fetch rules with IN clause to avoid N+1 query problem
+        Set<Long> selectedSet = new HashSet<>(selectedProductIds);
+        List<ConfigurationRule> rules = configRuleRepository
+                .findBySourceProductIdInAndRuleTypeInAndDeletedFalse(
+                        selectedProductIds,
+                        List.of(ConfigRuleType.REQUIRES, ConfigRuleType.EXCLUDES)
+                );
+
+        for (ConfigurationRule rule : rules) {
+            Long productId = rule.getSourceProductId();
+            Long targetId = rule.getTargetProductId();
+
+            if (targetId == null) continue;
+
+            if (rule.getRuleType() == ConfigRuleType.REQUIRES && !selectedSet.contains(targetId)) {
+                errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
+                        "Product " + productId + " requires product " + targetId);
+            } else if (rule.getRuleType() == ConfigRuleType.EXCLUDES && selectedSet.contains(targetId)) {
+                errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
+                        "Product " + productId + " is incompatible with product " + targetId);
             }
         }
 
