@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -72,22 +74,25 @@ public class ConfigurationRuleService {
         log.debug("Validating configuration for {} products", selectedProductIds.size());
         List<String> errors = new ArrayList<>();
 
-        for (Long productId : selectedProductIds) {
-            List<ConfigurationRule> requiresRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.REQUIRES);
-            for (ConfigurationRule rule : requiresRules) {
-                if (rule.getTargetProductId() != null && !selectedProductIds.contains(rule.getTargetProductId())) {
-                    errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " requires product " + rule.getTargetProductId());
-                }
-            }
+        if (selectedProductIds == null || selectedProductIds.isEmpty()) {
+            return errors;
+        }
 
-            List<ConfigurationRule> excludesRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.EXCLUDES);
-            for (ConfigurationRule rule : excludesRules) {
-                if (rule.getTargetProductId() != null && selectedProductIds.contains(rule.getTargetProductId())) {
+        // Convert selected products to a Set for O(1) lookups
+        Set<Long> selectedSet = new HashSet<>(selectedProductIds);
+
+        // Batch fetch all rules for the selected products to avoid N+1 queries
+        List<ConfigurationRule> rules = configRuleRepository
+                .findBySourceProductIdInAndRuleTypeInAndDeletedFalse(selectedSet, List.of(ConfigRuleType.REQUIRES, ConfigRuleType.EXCLUDES));
+
+        for (ConfigurationRule rule : rules) {
+            if (rule.getTargetProductId() != null) {
+                if (rule.getRuleType() == ConfigRuleType.REQUIRES && !selectedSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " is incompatible with product " + rule.getTargetProductId());
+                            "Product " + rule.getSourceProductId() + " requires product " + rule.getTargetProductId());
+                } else if (rule.getRuleType() == ConfigRuleType.EXCLUDES && selectedSet.contains(rule.getTargetProductId())) {
+                    errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
+                            "Product " + rule.getSourceProductId() + " is incompatible with product " + rule.getTargetProductId());
                 }
             }
         }
