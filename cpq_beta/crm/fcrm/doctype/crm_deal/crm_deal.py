@@ -232,7 +232,7 @@ def create_organization(doc):
 	if not doc.get("organization_name"):
 		return
 
-	existing_organization = frappe.db.exists("CRM Organization", {"organization_name": doc.get("organization_name")})
+	existing_organization = frappe.db.get_value("CRM Organization", {"organization_name": doc.get("organization_name")}, "name")
 	if existing_organization:
 		return existing_organization
 
@@ -250,14 +250,16 @@ def create_organization(doc):
 	return organization.name
 
 def contact_exists(doc):
-	email_exist = frappe.db.exists("Contact Email", {"email_id": doc.get("email")})
-	mobile_exist = frappe.db.exists("Contact Phone", {"phone": doc.get("mobile_no")})
+	contact = None
 
-	doctype = "Contact Email" if email_exist else "Contact Phone"
-	name = email_exist or mobile_exist
+	if doc.get("email"):
+		contact = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "parent")
 
-	if name:
-		return frappe.db.get_value(doctype, name, "parent")
+	if not contact and doc.get("mobile_no"):
+		contact = frappe.db.get_value("Contact Phone", {"phone": doc.get("mobile_no")}, "parent")
+
+	if contact:
+		return contact
 
 	return False
 

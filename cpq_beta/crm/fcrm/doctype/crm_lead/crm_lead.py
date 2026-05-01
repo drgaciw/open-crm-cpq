@@ -139,7 +139,7 @@ class CRMLead(Document):
 		if not self.organization:
 			return
 
-		existing_organization = frappe.db.exists("CRM Organization", {"organization_name": self.organization})
+		existing_organization = frappe.db.get_value("CRM Organization", {"organization_name": self.organization}, "name")
 		if existing_organization:
 			return existing_organization
 
@@ -156,21 +156,30 @@ class CRMLead(Document):
 		return organization.name
 
 	def contact_exists(self, throw=True):
-		email_exist = frappe.db.exists("Contact Email", {"email_id": self.email})
-		phone_exist = frappe.db.exists("Contact Phone", {"phone": self.phone})
-		mobile_exist = frappe.db.exists("Contact Phone", {"phone": self.mobile_no})
+		contact = None
+		text = ""
+		data = ""
 
-		doctype = "Contact Email" if email_exist else "Contact Phone"
-		name = email_exist or phone_exist or mobile_exist
+		if self.email:
+			contact = frappe.db.get_value("Contact Email", {"email_id": self.email}, "parent")
+			if contact:
+				text = "Email"
+				data = self.email
 
-		if name:
-			text = "Email" if email_exist else "Phone" if phone_exist else "Mobile No"
-			data = self.email if email_exist else self.phone if phone_exist else self.mobile_no
+		if not contact and self.phone:
+			contact = frappe.db.get_value("Contact Phone", {"phone": self.phone}, "parent")
+			if contact:
+				text = "Phone"
+				data = self.phone
 
+		if not contact and self.mobile_no:
+			contact = frappe.db.get_value("Contact Phone", {"phone": self.mobile_no}, "parent")
+			if contact:
+				text = "Mobile No"
+				data = self.mobile_no
+
+		if contact:
 			value = "{0}: {1}".format(text, data)
-
-			contact = frappe.db.get_value(doctype, name, "parent")
-
 			if throw:
 				frappe.throw(
 					_("Contact already exists with {0}").format(value),
