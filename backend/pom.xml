@@ -25,6 +25,7 @@
         <module>services/crm-service</module>
         <module>services/gateway-service</module>
         <module>services/pricing-service</module>
+        <module>services/pricebook-service</module>
         <module>services/product-service</module>
         <module>services/quote-service</module>
         <module>services/ai-service</module>

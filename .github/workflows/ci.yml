@@ -101,6 +101,9 @@ jobs:
       - name: Lint
         run: npx nx run-many --target=lint --all --parallel=3 2>&1 || echo "Lint step completed"
 
+      - name: Test (CRM + shared models)
+        run: npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models" --parallel=3
+
   # ─────────────────────────────────────────────
   # Security audit (Snyk / npm audit)
   # ─────────────────────────────────────────────

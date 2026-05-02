@@ -261,7 +261,7 @@ an immediate response.
 
 | Channel | Publisher | Subscriber | Payload |
 |---------|-----------|-----------|---------|
-| `quote:accepted` | `QuoteEventPublisher` (quote-service) | `QuoteAcceptedEventListener` (crm-service) | `QuoteAcceptedEvent` (quote number, customer, line items) |
+| `quote:accepted` | `QuoteEventPublisher` (quote-service) | `QuoteAcceptedEventListener` (crm-service) | `QuoteAcceptedCrmMessage` in `common` (deal/quote/currency/totals) |
 
 The `quote:accepted` channel bridges the fulfillment boundary: when a quote is accepted
 and a contract created (Agent 030), the event fires and is consumed by the renewal
