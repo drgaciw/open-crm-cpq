@@ -36,3 +36,6 @@ yarn-error.log*
 *.tmp
 *.temp
 
+# Claude Code: embedded worktree copies (use separate clones / branches instead of gitlinks)
+.claude/worktrees/
+
