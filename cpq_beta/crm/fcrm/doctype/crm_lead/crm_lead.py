@@ -156,9 +156,11 @@ class CRMLead(Document):
 		return organization.name
 
 	def contact_exists(self, throw=True):
-		email_exist = frappe.db.exists("Contact Email", {"email_id": self.email})
-		phone_exist = frappe.db.exists("Contact Phone", {"phone": self.phone})
-		mobile_exist = frappe.db.exists("Contact Phone", {"phone": self.mobile_no})
+		# Bolt Optimization: Replace sequential frappe.db.exists() with short-circuited
+		# frappe.db.get_value() to prevent unnecessary queries once a match is found.
+		email_exist = frappe.db.get_value("Contact Email", {"email_id": self.email}, "name") if self.email else None
+		phone_exist = frappe.db.get_value("Contact Phone", {"phone": self.phone}, "name") if not email_exist and self.phone else None
+		mobile_exist = frappe.db.get_value("Contact Phone", {"phone": self.mobile_no}, "name") if not (email_exist or phone_exist) and self.mobile_no else None
 
 		doctype = "Contact Email" if email_exist else "Contact Phone"
 		name = email_exist or phone_exist or mobile_exist

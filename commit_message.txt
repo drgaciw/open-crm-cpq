@@ -1,0 +1,9 @@
+⚡ Bolt: Replace sequential existence checks with short-circuited get_value queries
+
+💡 What: Replaced unconditional `frappe.db.exists()` database calls in `contact_exists` with short-circuited `frappe.db.get_value(..., "name")` conditional assignments in `crm_deal.py` and `crm_lead.py`. Also added null-safety checks before executing the queries.
+
+🎯 Why: To eliminate unnecessary backend N+1 queries. Previously, the application always checked the database for email and multiple phone numbers regardless of whether an earlier check had already matched a contact. The short-circuiting ensures the code immediately bypasses subsequent queries once a hit is registered.
+
+📊 Impact: Reduces database reads per `contact_exists` call from a guaranteed 3 to as few as 1 (up to ~66% query reduction).
+
+🔬 Measurement: View the Frappe Query analyzer during bulk lead/deal processing (or contact creation). You will observe that for an entity with a matching email, no further SQL `SELECT name FROM ... WHERE phone=...` queries are executed.

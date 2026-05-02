@@ -250,8 +250,10 @@ def create_organization(doc):
 	return organization.name
 
 def contact_exists(doc):
-	email_exist = frappe.db.exists("Contact Email", {"email_id": doc.get("email")})
-	mobile_exist = frappe.db.exists("Contact Phone", {"phone": doc.get("mobile_no")})
+	# Bolt Optimization: Replace sequential frappe.db.exists() with short-circuited
+	# frappe.db.get_value() to prevent unnecessary queries once a match is found.
+	email_exist = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "name") if doc.get("email") else None
+	mobile_exist = frappe.db.get_value("Contact Phone", {"phone": doc.get("mobile_no")}, "name") if not email_exist and doc.get("mobile_no") else None
 
 	doctype = "Contact Email" if email_exist else "Contact Phone"
 	name = email_exist or mobile_exist
