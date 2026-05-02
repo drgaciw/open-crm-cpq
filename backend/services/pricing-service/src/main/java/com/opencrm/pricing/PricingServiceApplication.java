@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * Manages:
  * - Pricing rules with Drools and OpenL Tablets
- * - Price books and pricing products
+ * - Pricing products and price resolution via pricebook-service
  * - Rule execution and waterfall calculations
  * - Pricing audit trail
  * - gRPC server for Configuration Engine sync calls

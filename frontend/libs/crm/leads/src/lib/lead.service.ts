@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, finalize, map } from 'rxjs';
 import {
   LeadDto,
   LeadCreateRequest,
@@ -104,5 +104,14 @@ export class LeadService {
 
   markLost(id: number, reason: string): Observable<LeadDto> {
     return this.http.post<LeadDto>(`${this.basePath}/${id}/lose`, { reason });
+  }
+
+  /**
+   * GET /api/v1/leads/stats — count of leads per status (after ApiResponse unwrap).
+   */
+  getStatusCounts(): Observable<Partial<Record<LeadStatus, number>>> {
+    return this.http
+      .get<Record<string, number>>(`${this.basePath}/stats`)
+      .pipe(map((raw) => raw as Partial<Record<LeadStatus, number>>));
   }
 }

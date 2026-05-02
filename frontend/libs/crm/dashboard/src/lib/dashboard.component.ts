@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, STAGE_COLORS, STAGE_LABELS, STATUS_COLORS } from '@frontend/shared-models';
+import { LeadService } from '@frontend/crm-leads';
 
 @Component({
   selector: 'app-dashboard',
@@ -43,8 +44,8 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
         <mat-card class="kpi-card">
           <mat-icon class="kpi-icon" style="color:#ff9800">leaderboard</mat-icon>
           <div class="kpi-info">
-            <span class="kpi-value">{{ recentLeads().length }}</span>
-            <span class="kpi-label">Recent Leads</span>
+            <span class="kpi-value">{{ totalLeadCount() }}</span>
+            <span class="kpi-label">Total Leads</span>
           </div>
         </mat-card>
         <mat-card class="kpi-card">
@@ -178,12 +179,14 @@ import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, ST
 })
 export class DashboardComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  private readonly leadService = inject(LeadService);
 
   loading = signal(true);
   pipeline = signal<PipelineSummaryDto[]>([]);
   recentDeals = signal<DealDto[]>([]);
   recentLeads = signal<LeadDto[]>([]);
+  /** Sum of per-status counts from GET /api/v1/leads/stats */
+  totalLeadCount = signal(0);
 
   pipelineStages: DealStage[] = ['PROSPECTING', 'QUALIFICATION', 'NEEDS_ANALYSIS', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
 
@@ -191,8 +194,8 @@ export class DashboardComponent implements OnInit {
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
   statusColor(status: string): string { return STATUS_COLORS[status] ?? '#666'; }
 
-  trackById(index: number, item: any): any {
-    return item.id;
+  trackById(index: number, item: { id?: string | number }): string | number {
+    return item?.id ?? index;
   }
 
   totalDeals(): number {
@@ -214,9 +217,6 @@ export class DashboardComponent implements OnInit {
     const stageItem = this.pipeline().find((item) => item.stage === stage);
     return stageItem?.totalAmount ?? 0;
   }
-  trackById(index: number, item: any): any {
-    return item.id ?? index;
-  }
 
   barWidth(stage: DealStage): number {
     const maxValue = Math.max(
@@ -226,20 +226,19 @@ export class DashboardComponent implements OnInit {
     return (this.stageValue(stage) / maxValue) * 100;
   }
 
-  trackById(index: number, item: { id: string | number }): string | number {
-    return item.id;
-  }
-
   ngOnInit(): void {
     forkJoin({
       pipeline: this.http.get<PipelineSummaryDto[]>('/api/v1/deals/pipeline'),
       deals: this.http.get<SpringPageResponse<DealDto>>('/api/v1/deals', { params: { page: '0', size: '5', sort: 'createdAt,desc' } }),
       leads: this.http.get<SpringPageResponse<LeadDto>>('/api/v1/leads', { params: { page: '0', size: '5', sort: 'createdAt,desc' } }),
+      leadStats: this.leadService.getStatusCounts(),
     }).subscribe({
-      next: ({ pipeline, deals, leads }) => {
+      next: ({ pipeline, deals, leads, leadStats }) => {
         this.pipeline.set(pipeline);
         this.recentDeals.set(deals.content ?? deals);
         this.recentLeads.set(leads.content ?? leads);
+        const sum = Object.values(leadStats).reduce((a, n) => a + (typeof n === 'number' ? n : 0), 0);
+        this.totalLeadCount.set(sum);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

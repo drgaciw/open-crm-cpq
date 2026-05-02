@@ -11,10 +11,9 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.customer.CustomerRepository;
-import com.opencrm.pricing.pricebook.PriceBook;
-import com.opencrm.pricing.pricebook.PriceBookEntry;
-import com.opencrm.pricing.pricebook.PriceBookEntryRepository;
-import com.opencrm.pricing.pricebook.PriceBookRepository;
+import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
+import com.opencrm.pricing.integration.pricebook.ProductEntryResolveDto;
+import com.opencrm.pricing.integration.pricebook.ResolveBatchResponse;
 import com.opencrm.pricing.product.PricingProduct;
 import com.opencrm.pricing.product.PricingProductRepository;
 import com.opencrm.pricing.rule.Rule;
@@ -32,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Main orchestrator for pricing execution.
@@ -48,8 +47,7 @@ public class PricingExecutionService {
     private final PricingProductRepository pricingProductRepository;
     private final RuleSetRepository ruleSetRepository;
     private final RuleRepository ruleRepository;
-    private final PriceBookRepository priceBookRepository;
-    private final PriceBookEntryRepository priceBookEntryRepository;
+    private final PriceBookResolutionClient priceBookResolutionClient;
     private final PricingAuditLogRepository auditLogRepository;
     private final PricingContextValidator contextValidator;
     private final MetricsCalculator metricsCalculator;
@@ -137,13 +135,20 @@ public class PricingExecutionService {
                             ruleSet.getId(), RuleStatus.ACTIVE)
                     : new ArrayList<>();
 
-            // 5. Find PriceBook
-            PriceBook priceBook = findPriceBook(context.getRegion());
+            // 5. Resolve price book entries (batch) for list pricing
+            LinkedHashSet<String> productsToResolve = new LinkedHashSet<>();
+            for (PricingLineRequest lineRequest : context.getLineItems()) {
+                if (lineRequest.getListPriceOverride() == null) {
+                    productsToResolve.add(lineRequest.getProductExternalId());
+                }
+            }
+            ResolveBatchResponse priceBookBatch =
+                    priceBookResolutionClient.resolveBatch(context.getRegion(), new ArrayList<>(productsToResolve));
 
             // 6. Initialize line results with list prices
             List<PricingLineResult> lineResults = new ArrayList<>();
             for (PricingLineRequest lineRequest : context.getLineItems()) {
-                BigDecimal listPrice = getListPrice(lineRequest, priceBook);
+                BigDecimal listPrice = getListPrice(lineRequest, priceBookBatch);
 
                 PricingLineResult lineResult = PricingLineResult.builder()
                         .productExternalId(lineRequest.getProductExternalId())
@@ -234,35 +239,19 @@ public class PricingExecutionService {
         }
     }
 
-    private PriceBook findPriceBook(String region) {
-        if (region != null) {
-            Optional<PriceBook> regionalBook = priceBookRepository.findByRegionAndDeletedFalse(region);
-            if (regionalBook.isPresent()) {
-                return regionalBook.get();
-            }
-        }
-
-        // Fall back to default price book
-        return priceBookRepository.findByIsDefaultTrueAndDeletedFalse()
-                .orElseThrow(() -> new BusinessException("No price book found", "NO_PRICE_BOOK"));
-    }
-
-    private BigDecimal getListPrice(PricingLineRequest lineRequest, PriceBook priceBook) {
-        // Check for override
+    private BigDecimal getListPrice(PricingLineRequest lineRequest, ResolveBatchResponse batch) {
         if (lineRequest.getListPriceOverride() != null) {
             return lineRequest.getListPriceOverride();
         }
 
-        // Look up in price book
-        Optional<PriceBookEntry> entry = priceBookEntryRepository
-                .findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                        priceBook.getId(), lineRequest.getProductExternalId());
+        ProductEntryResolveDto resolved = batch.getEntries() != null
+                ? batch.getEntries().get(lineRequest.getProductExternalId())
+                : null;
 
-        if (entry.isPresent()) {
-            return entry.get().getListPrice();
+        if (resolved != null && resolved.isEntryMatched() && resolved.getListPrice() != null) {
+            return resolved.getListPrice();
         }
 
-        // Fall back to product list price
         PricingProduct product = pricingProductRepository
                 .findByExternalIdAndDeletedFalse(lineRequest.getProductExternalId())
                 .orElseThrow(() -> new ResourceNotFoundException(

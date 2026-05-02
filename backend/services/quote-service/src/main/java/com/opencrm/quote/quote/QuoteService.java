@@ -8,7 +8,7 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
-import com.opencrm.quote.event.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
@@ -208,7 +208,7 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
-        eventPublisher.publishQuoteAccepted(QuoteAcceptedEvent.builder()
+        eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessage.builder()
                 .quoteNumber(saved.getQuoteNumber())
                 .quoteUuid(saved.getUuid())
                 .customerExternalId(saved.getCustomerExternalId())

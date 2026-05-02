@@ -67,6 +67,34 @@ services:
       start_period: 40s
       retries: 10
 
+  # Price Book Service
+  pricebook-service:
+    build:
+      context: ./services/pricebook-service
+      dockerfile: Dockerfile
+    container_name: opencrm-pricebook-service
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER:-opencrm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SECURITY_OPEN: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8089/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
   # Pricing Service
   pricing-service:
     build:
@@ -90,10 +118,13 @@ services:
       SECURITY_OPEN: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      PRICEBOOK_SERVICE_URL: http://pricebook-service:8089
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      pricebook-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
@@ -189,6 +220,7 @@ services:
     environment:
       CRM_SERVICE_URI: http://crm-service:8081
       PRICING_SERVICE_URI: http://pricing-service:8082
+      PRICEBOOK_SERVICE_URI: http://pricebook-service:8089
       PRODUCT_SERVICE_URI: http://product-service:8083
       QUOTE_SERVICE_URI: http://quote-service:8084
       SPRING_DATA_REDIS_HOST: redis
@@ -200,6 +232,8 @@ services:
       crm-service:
         condition: service_healthy
       pricing-service:
+        condition: service_healthy
+      pricebook-service:
         condition: service_healthy
       product-service:
         condition: service_healthy

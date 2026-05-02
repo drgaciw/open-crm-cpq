@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,6 +12,7 @@ import { OrganizationService } from '../organization.service';
   selector: 'app-organization-detail',
   standalone: true,
   imports: [
+    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -115,6 +116,32 @@ import { OrganizationService } from '../organization.service';
             </mat-card-content>
           </mat-card>
         }
+
+        <mat-card class="full-width">
+          <mat-card-header>
+            <mat-card-title>Contacts at this organization</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @if (orgService.organizationContactsLoading()) {
+              <div class="loading-inline"><mat-spinner diameter="32"></mat-spinner></div>
+            } @else if (orgService.organizationContacts().length === 0) {
+              <p class="empty-text">No linked contacts yet.</p>
+            } @else {
+              <ul class="contact-list">
+                @for (c of orgService.organizationContacts(); track c.id) {
+                  <li>
+                    <a [routerLink]="['/contacts', c.id]" class="contact-link">
+                      {{ c.firstName }} {{ c.lastName }}
+                    </a>
+                    @if (c.email) {
+                      <span class="contact-meta">{{ c.email }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </mat-card-content>
+        </mat-card>
       </div>
     }
   `,
@@ -136,6 +163,13 @@ import { OrganizationService } from '../organization.service';
       gap: 16px;
     }
     .full-width { grid-column: 1 / -1; }
+    .loading-inline { display: flex; justify-content: center; padding: 16px; }
+    .contact-list { list-style: none; margin: 0; padding: 0; }
+    .contact-list li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+    .contact-link { color: #1976d2; text-decoration: none; font-weight: 500; }
+    .contact-link:hover { text-decoration: underline; }
+    .contact-meta { font-size: 0.85rem; color: #666; }
+    .empty-text { color: #999; margin: 0; }
     .info-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -154,7 +188,9 @@ export class OrganizationDetailComponent implements OnInit {
   id = input.required<string>();
 
   ngOnInit(): void {
-    this.orgService.getById(Number(this.id()));
+    const id = Number(this.id());
+    this.orgService.getById(id);
+    this.orgService.loadOrganizationContacts(id);
   }
 
   goBack(): void {

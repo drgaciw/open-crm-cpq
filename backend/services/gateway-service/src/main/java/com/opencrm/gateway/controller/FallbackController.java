@@ -38,6 +38,11 @@ public class FallbackController {
         return buildFallbackResponse("AI Service");
     }
 
+    @GetMapping("/pricebook")
+    public ResponseEntity<Map<String, Object>> pricebookFallback() {
+        return buildFallbackResponse("Price Book Service");
+    }
+
     private ResponseEntity<Map<String, Object>> buildFallbackResponse(String serviceName) {
         log.error("CIRCUIT_BREAKER: {} is unavailable - returning fallback response", serviceName);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
