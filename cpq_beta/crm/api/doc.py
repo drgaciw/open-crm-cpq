@@ -393,9 +393,9 @@ def get_data(
 						d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
 
 			if order:
+				order_idx = {val: i for i, val in enumerate(order)}
 				column_data = sorted(
-					column_data, key=lambda x: order.index(x.get("name"))
-					if x.get("name") in order else len(order)
+					column_data, key=lambda x: order_idx.get(x.get("name"), len(order))
 				)
 
 			data.append({"column": kc, "fields": kanban_fields, "data": column_data})

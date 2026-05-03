@@ -16,3 +16,7 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+
+## 2024-05-20 - Optimizing List Sorting with order.index()
+**Learning:** Using `order.index(x.get("name"))` inside a `sorted()` lambda key results in an $O(N \times K)$ complexity, where $N$ is the length of the list being sorted and $K$ is the length of the reference order list. This is due to the $O(K)$ lookup performed for each element.
+**Action:** Replace `order.index()` lookups in sorting keys with an $O(1)$ dictionary lookup by pre-calculating an index mapping: `order_idx = {val: i for i, val in enumerate(order)}` and using `order_idx.get(x.get("name"), len(order))` in the lambda key. This reduces the sorting complexity to $O(N \log N + K)$.
