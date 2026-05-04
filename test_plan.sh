@@ -1,3 +1,6 @@
 #!/bin/bash
-# Check if ChatClient is used in any other agents
-grep -rn "org.springframework.ai.chat.ChatClient" backend/services/ai-service/src/main/java/com/opencrm/ai/
+set -e
+
+# Run tests in product-service
+cd backend/services/product-service
+mvn test

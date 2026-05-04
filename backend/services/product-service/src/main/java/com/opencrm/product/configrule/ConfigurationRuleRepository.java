@@ -17,5 +17,7 @@ public interface ConfigurationRuleRepository extends JpaRepository<Configuration
 
     List<ConfigurationRule> findBySourceProductIdAndRuleTypeAndDeletedFalse(Long sourceProductId, ConfigRuleType ruleType);
 
+    List<ConfigurationRule> findBySourceProductIdInAndRuleTypeAndDeletedFalse(List<Long> sourceProductIds, ConfigRuleType ruleType);
+
     Page<ConfigurationRule> findByDeletedFalse(Pageable pageable);
 }
