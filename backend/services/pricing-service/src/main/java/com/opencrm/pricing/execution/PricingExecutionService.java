@@ -33,6 +33,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Main orchestrator for pricing execution.
@@ -145,10 +147,27 @@ public class PricingExecutionService {
             ResolveBatchResponse priceBookBatch =
                     priceBookResolutionClient.resolveBatch(context.getRegion(), new ArrayList<>(productsToResolve));
 
+            // Fetch fallback products for any unresolved items in priceBookBatch
+            LinkedHashSet<String> fallbackProductIds = new LinkedHashSet<>();
+            for (PricingLineRequest lineRequest : context.getLineItems()) {
+                if (lineRequest.getListPriceOverride() == null) {
+                    ProductEntryResolveDto resolved = priceBookBatch.getEntries() != null
+                            ? priceBookBatch.getEntries().get(lineRequest.getProductExternalId())
+                            : null;
+                    if (resolved == null || !resolved.isEntryMatched() || resolved.getListPrice() == null) {
+                        fallbackProductIds.add(lineRequest.getProductExternalId());
+                    }
+                }
+            }
+
+            Map<String, PricingProduct> fallbackProducts = fallbackProductIds.isEmpty() ? Map.of()
+                    : pricingProductRepository.findByExternalIdInAndDeletedFalse(fallbackProductIds).stream()
+                            .collect(Collectors.toMap(PricingProduct::getExternalId, p -> p));
+
             // 6. Initialize line results with list prices
             List<PricingLineResult> lineResults = new ArrayList<>();
             for (PricingLineRequest lineRequest : context.getLineItems()) {
-                BigDecimal listPrice = getListPrice(lineRequest, priceBookBatch);
+                BigDecimal listPrice = getListPrice(lineRequest, priceBookBatch, fallbackProducts);
 
                 PricingLineResult lineResult = PricingLineResult.builder()
                         .productExternalId(lineRequest.getProductExternalId())
@@ -239,7 +258,7 @@ public class PricingExecutionService {
         }
     }
 
-    private BigDecimal getListPrice(PricingLineRequest lineRequest, ResolveBatchResponse batch) {
+    private BigDecimal getListPrice(PricingLineRequest lineRequest, ResolveBatchResponse batch, Map<String, PricingProduct> fallbackProducts) {
         if (lineRequest.getListPriceOverride() != null) {
             return lineRequest.getListPriceOverride();
         }
@@ -252,10 +271,11 @@ public class PricingExecutionService {
             return resolved.getListPrice();
         }
 
-        PricingProduct product = pricingProductRepository
-                .findByExternalIdAndDeletedFalse(lineRequest.getProductExternalId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Product with external ID: " + lineRequest.getProductExternalId()));
+        PricingProduct product = fallbackProducts.get(lineRequest.getProductExternalId());
+        if (product == null) {
+            throw new ResourceNotFoundException(
+                    "Product with external ID: " + lineRequest.getProductExternalId());
+        }
 
         return product.getListPrice() != null ? product.getListPrice() : BigDecimal.ZERO;
     }
