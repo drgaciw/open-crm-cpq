@@ -16,3 +16,6 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+## 2024-05-20 - Prevent N+1 Queries with Batch Fetching in Spring JPA
+**Learning:** Sequential existence or read checks in a loop (e.g., `repository.findByExternalId`) create O(N) database queries which scale poorly.
+**Action:** Always pre-collect the required IDs/keys before the loop and execute a single `IN` query to batch fetch all necessary records, caching them in an in-memory `Map` for O(1) lookups during iteration.
