@@ -221,11 +221,19 @@ def get_lead_or_deal_from_number(call):
 		if not mobile_no:
 			return None
 
-		query = f"""
-			SELECT name
-			FROM `tab{doctype}`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		"""
+		if doctype == "CRM Deal":
+			query = """
+				SELECT name
+				FROM `tabCRM Deal`
+				WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+			"""
+		else: # CRM Lead
+			query = """
+				SELECT name
+				FROM `tabCRM Lead`
+				WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+			"""
+
 		if only_unconverted and doctype == "CRM Lead":
 			query += "\nAND converted is not True"
 
