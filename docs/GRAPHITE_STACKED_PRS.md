@@ -111,3 +111,51 @@ Adjust `-pl` for other services.
 - **Restack conflicts:** run `gt sync` often; keep PRs small.
 - **Wrong base:** if PR B needs types from PR A, B must not target `main` alone—keep the stack in Graphite so the GitHub base is the branch below.
 - **Reviewer context:** mention stack position in the PR description when reviewers do not use Graphite’s UI.
+
+---
+
+## Pilot stack recipe (2–3 PRs)
+
+Use this once prerequisites are done to validate org permissions and CI.
+
+1. **Bottom PR:** Documentation or smallest safe change (this guide was shipped using that pattern: prereqs-only commit first).
+2. **Middle PR:** Add team conventions (stacking order, branch naming).
+3. **Top PR:** Add operational sections (pilot checklist, backlog mapping below).
+
+**Submit:**
+
+```bash
+gt submit --no-interactive
+```
+
+**Merge:** Merge from the **bottom** upward (Graphite supports “merge when ready” on the stack). After each merge: `git checkout main && git pull && gt sync`, then continue.
+
+**Verify:** Each PR should show a green **CI** run on its head ref (backend / frontend / `cpq_beta` jobs as applicable).
+
+---
+
+## Backlog mapping (example: current ai-service + platform batch)
+
+When splitting a large working tree (many agents, `AbstractCpqAgent`, `AgentAuditLogger` relocation, `OutboxRelayPublisher`, CI, frontend touches), use a **dependency-ordered** stack:
+
+| Order | Focus | Typical paths / scope |
+|-------|--------|------------------------|
+| 1 | Shared library / outbox | `backend/libs/common/**`, shared event types |
+| 2 | AI core + audit | `backend/services/ai-service/.../AbstractCpqAgent.java`, `AgentAuditLogger.java`, `AgentConfiguration.java`, `application.yml`, `ai-service/pom.xml` |
+| 3 | Agent packages (split by domain) | e.g. `agent/pricing/**` + matching `src/test/**`, then `agent/governance/**`, etc., one or two packages per PR |
+| 4 | Cross-service / CI / docs | `.github/workflows/ci.yml`, `docs/**`, `frontend/**`, `cpq_beta/**` |
+
+Adjust splits to keep each PR **green** under `mvn verify` and your frontend/NX checks. If a middle PR breaks compilation, merge agent groups with their tests in the same PR.
+
+**Related:** Large findings from an architectural review can be filed as epics and landed as **multiple stacks** (one stack per epic), not one infinite chain.
+
+---
+
+## Adoption checklist
+
+- [ ] Graphite GitHub app installed; `gt auth` succeeds.
+- [ ] Trunk is `main`; `gt sync` works after pulling `main`.
+- [ ] First stack merged bottom-up; CI passed on each PR.
+- [ ] Team agrees on max PR size and when to open a new stack vs extend.
+
+**Dashboard:** [Graphite web app](https://app.graphite.dev/) (bookmark for your workspace).
