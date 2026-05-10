@@ -5,17 +5,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.ai.audit.AgentAuditLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.StreamingChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * Base class for all 37 CPQ AI agents.
  *
- * <p>Handles the Spring AI {@link ChatClient} call pattern, context injection,
+ * <p>Handles the Spring AI 0.8.x {@link ChatClient} / {@link StreamingChatClient} call pattern, context injection,
  * session ID generation, audit logging, and error recovery so subclasses only
  * need to declare:</p>
  * <ul>
@@ -67,6 +74,9 @@ public abstract class AbstractCpqAgent implements CpqAgent {
     private ChatClient chatClient;
 
     @Autowired
+    private StreamingChatClient streamingChatClient;
+
+    @Autowired
     private AgentAuditLogger auditLogger;
 
     @Autowired
@@ -99,11 +109,8 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
 
-            String output = chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(userMessage)
-                    .call()
-                    .content();
+            var response = chatClient.call(toPrompt(systemPrompt, userMessage));
+            String output = response.getResult().getOutput().getContent();
 
             auditLogger.logResponse(getAgentId(), sessionId, output);
 
@@ -128,12 +135,11 @@ public abstract class AbstractCpqAgent implements CpqAgent {
         try {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
+            Prompt prompt = toPrompt(systemPrompt, userMessage);
 
-            return chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(userMessage)
-                    .stream()
-                    .content()
+            return streamingChatClient.stream(prompt)
+                    .filter(r -> r.getResult() != null && r.getResult().getOutput() != null)
+                    .map(r -> r.getResult().getOutput().getContent())
                     .doOnError(ex -> log.error(
                             "Agent {} stream failed: {}", getAgentId(), ex.getMessage(), ex));
 
@@ -183,5 +189,12 @@ public abstract class AbstractCpqAgent implements CpqAgent {
     private String extractOrGenerate(AgentRequest request) {
         Object sessionId = request.getContext().get("sessionId");
         return sessionId != null ? sessionId.toString() : UUID.randomUUID().toString();
+    }
+
+    private static Prompt toPrompt(String systemPrompt, String userMessage) {
+        List<Message> messages = new ArrayList<>(2);
+        messages.add(new SystemMessage(systemPrompt));
+        messages.add(new UserMessage(userMessage));
+        return new Prompt(messages);
     }
 }
