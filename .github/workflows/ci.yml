@@ -32,7 +32,7 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn -B verify --no-transfer-progress
+        run: mvn -B -U verify --no-transfer-progress
         env:
           SPRING_PROFILES_ACTIVE: test
 
@@ -41,7 +41,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-reports
-          path: '**/target/surefire-reports/*.xml'
+          path: backend/**/target/surefire-reports/*.xml
+          if-no-files-found: ignore
           retention-days: 7
 
   # ─────────────────────────────────────────────
@@ -61,16 +62,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: pip
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install frappe pytest pytest-cov beautifulsoup4 || true
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov beautifulsoup4
+          python -m pip install frappe || echo "Frappe install skipped or unavailable in CI"
 
       - name: Run Python tests
         run: |
-          python -m pytest crm/ --ignore=crm/public -v --tb=short 2>&1 || echo "No pytest-compatible tests found or Frappe context required — skipping"
+          if [ -d crm ]; then
+            python -m pytest crm/ --ignore=crm/public -v --tb=short || echo "No pytest-compatible tests found or Frappe context required — skipping"
+          else
+            echo "cpq_beta/crm directory not found — skipping"
+          fi
 
   # ─────────────────────────────────────────────
   # Angular / NX frontend
@@ -85,21 +90,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.12.0'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Show toolchain versions
+        run: |
+          node --version
+          npm --version
+          npx nx --version
+
       - name: Build
-        run: npx nx run-many --target=build --all --parallel=3 2>&1 || echo "Build step completed"
+        run: npx nx run-many --target=build --all --parallel=3
 
       - name: Lint
-        run: npx nx run-many --target=lint --all --parallel=3 2>&1 || echo "Lint step completed"
+        run: npx nx run-many --target=lint --all --parallel=3
+
+      - name: Test (CRM + shared models)
+        run: |
+          TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models"
+          AVAILABLE_PROJECTS=$(npx nx show projects --with-target=test | grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" | paste -sd, -)
+
+          if [ -n "$AVAILABLE_PROJECTS" ]; then
+            echo "Running tests for: $AVAILABLE_PROJECTS"
+            npx nx run-many --target=test --projects="$AVAILABLE_PROJECTS" --parallel=3
+          else
+            echo "No targeted CRM/shared projects expose a test target — skipping frontend tests"
+          fi
 
   # ─────────────────────────────────────────────
   # Security audit (Snyk / npm audit)
@@ -110,16 +133,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.12.0'
 
       - name: npm audit (cpq_beta frontend)
         working-directory: cpq_beta
         run: |
           if [ -f package.json ]; then
-            npm audit --audit-level=critical 2>&1 || echo "Audit found issues — review above"
+            npm audit --audit-level=critical || echo "Audit found critical issues — review output"
+          else
+            echo "No cpq_beta/package.json found — skipping npm audit"
           fi
 
       - name: Set up JDK 21 for OWASP check
@@ -132,5 +157,5 @@ jobs:
       - name: OWASP dependency check (backend)
         working-directory: backend
         run: |
-          mvn -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=9 --no-transfer-progress 2>&1 || echo "OWASP check complete"
+          mvn -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=9 --no-transfer-progress || echo "OWASP check complete with findings or scanner issue"
         continue-on-error: true
