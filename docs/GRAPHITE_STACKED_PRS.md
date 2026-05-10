@@ -128,13 +128,29 @@ Use this once prerequisites are done to validate org permissions and CI.
 gt submit --no-interactive
 ```
 
-**Merge:** Merge from the **bottom** upward (Graphite supports “merge when ready” on the stack). After each merge: `git checkout main && git pull && gt sync`, then continue.
+**Merge:** Merge from the **bottom** upward (Graphite supports “merge when ready” on the stack).
 
-**Verify:** Each PR should show a green **CI** run on its head ref (backend / frontend / `cpq_beta` jobs as applicable).
+**After each merge (important):**
+
+1. `git checkout main && git pull origin main`
+2. `gt sync --no-interactive --force` — restacks open branches onto the new `main` and deletes merged branch metadata.
+3. If GitHub still shows the **next** PR’s base as a **deleted** branch (the old bottom branch), repoint it: `gh pr edit <number> --base main`.
+4. If the **top** branch still lists commits already on `main` (duplicate diff), rebase it onto `main` and drop the duplicate commits, then `git push --force-with-lease`:
+
+   ```bash
+   git fetch origin main
+   git checkout <top-branch>
+   git rebase --onto origin/main <sha-of-last-commit-already-on-main>
+   git push --force-with-lease origin <top-branch>
+   ```
+
+**Verify:** Each PR should show a green **CI** run on its head ref (backend / frontend / `cpq_beta` jobs as applicable). If CI fails with empty job logs, check the repository’s **Actions** tab for runner or workflow issues unrelated to your diff.
 
 ---
 
 ## Backlog mapping (example: current ai-service + platform batch)
+
+**Full backlog (epics, stacks B–D, checklists):** [Architecture review implementation backlog](backlog/ARCHITECTURE_REVIEW_IMPLEMENTATION_BACKLOG.md).
 
 When splitting a large working tree (many agents, `AbstractCpqAgent`, `AgentAuditLogger` relocation, `OutboxRelayPublisher`, CI, frontend touches), use a **dependency-ordered** stack:
 
