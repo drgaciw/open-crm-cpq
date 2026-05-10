@@ -2,6 +2,10 @@
 
 A Spring Boot 3.2 microservices backend for CRM and CPQ operations, built with Java 21.
 
+## Stacked pull requests (Graphite)
+
+Use [Graphite](https://graphite.dev) for dependent PR chains against `main`. Conventions and commands: [docs/GRAPHITE_STACKED_PRS.md](../docs/GRAPHITE_STACKED_PRS.md).
+
 ## Architecture
 
 ```
