@@ -115,7 +115,7 @@ jobs:
       - name: Test (CRM + shared models)
         run: |
           TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models"
-          AVAILABLE_PROJECTS=$(npx nx show projects --with-target=test | grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" | paste -sd, -)
+          AVAILABLE_PROJECTS=$(npx nx show projects --with-target=test | { grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" || true; } | paste -sd, -)
 
           if [ -n "$AVAILABLE_PROJECTS" ]; then
             echo "Running tests for: $AVAILABLE_PROJECTS"
