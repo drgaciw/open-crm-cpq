@@ -179,4 +179,20 @@
         </repository>
     </repositories>
 
+    <profiles>
+        <profile>
+            <id>unit-tests</id>
+            <properties>
+                <excludedGroups>integration</excludedGroups>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <jacoco.skip>false</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
+
 </project>
