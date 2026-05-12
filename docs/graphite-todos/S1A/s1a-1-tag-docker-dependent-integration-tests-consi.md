@@ -1,6 +1,6 @@
 # S1A-1: Tag Docker-dependent integration tests consistently, including *IntegrationTest and LeadToDealLifecycleTest, without removing them from full verification.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1A`
 
