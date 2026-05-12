@@ -1,6 +1,6 @@
 # S0A-3: Verify CRM unit tests remain Docker-free and document the focused command in the PR body.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Verified in this PR.
 
 **Stack lane:** `S0A`
 
@@ -16,4 +16,9 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+
+## Verification
+
+- Focused Docker-free unit command: `backend\mvnw.cmd -pl services/crm-service -Dtest=LeadServiceTest test`
+- Result on this stack: exit 0, 39 tests run, 0 failures, 0 errors, 0 skipped.
+- Scope note: `BaseIntegrationTest` still uses Testcontainers for integration tests, but the focused `LeadServiceTest` unit path does not extend it or start Docker.
