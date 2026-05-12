@@ -8,13 +8,13 @@ Honest split between **CI** (no Docker requirement beyond what the runner provid
 
 - Example: `DealServiceTest`, `LeadServiceTest`, `QuoteAcceptedEventListenerTest`, `QuoteAcceptedDealProcessorTest`, `QuoteAcceptedIdempotencyTest`.
 - Run **without** Testcontainers Postgres when they mock repositories/services.
-- **Must stay in default `mvn test` / `mvn verify`** path so CI stays green.
+- Use the `unit-tests` Maven profile for fast PR checks that must not require Docker.
 
 ### Integration tests (`BaseIntegrationTest` + Testcontainers)
 
 - Classes under `src/test/java/.../*IntegrationTest.java` and `LeadToDealLifecycleTest` extend `BaseIntegrationTest`, which starts a **PostgreSQL Testcontainer**.
-- **Requires Docker.** GitHub-hosted `ubuntu-latest` includes Docker; `mvn verify` from `backend/` should run these today.
-- If a pipeline **disables** Docker or uses a runner without it: split tests with JUnit tags (`@Tag("integration")`) and exclude them from PR builds, or add a dedicated job with Docker + `mvn verify -Pintegration` (after you introduce the profile).
+- **Requires Docker.** GitHub-hosted `ubuntu-latest` includes Docker; `mvn verify` from `backend/` should run these on Docker-backed runners.
+- Docker-backed tests are tagged with `@Tag("integration")` on the concrete test classes and `BaseIntegrationTest`. The `integration-tests` Maven profile is the explicit full Docker-backed verification profile; use `-Dgroups=integration` only when you intentionally want a focused integration-tag run.
 
 ### Jacoco (bundle line coverage ≥ 80%)
 
@@ -27,11 +27,36 @@ Honest split between **CI** (no Docker requirement beyond what the runner provid
 
 ```bash
 cd backend
-mvn -pl services/crm-service test              # unit-focused
-mvn -pl services/crm-service verify            # tests + jacoco check (needs Docker for ITs)
+mvn -pl services/crm-service -am -Punit-tests verify       # no Docker; skips integration-tagged tests and Jacoco gate
+mvn -pl services/crm-service -am -Pintegration-tests verify # full verification with Jacoco; Docker required
+mvn -pl services/crm-service -am -Dgroups=integration test  # focused Testcontainers tag run; Docker required
 ```
 
-Windows PowerShell is the same paths; use `mvn.cmd` if needed.
+Windows PowerShell is the same paths; use `mvnw.cmd` from `backend/` if needed.
+
+### Windows Docker Desktop readiness
+
+Before running `-Pintegration-tests` on Windows:
+
+```powershell
+docker version
+docker info --format '{{.ServerVersion}}'
+docker context ls
+Test-Path '\\.\pipe\dockerDesktopLinuxEngine'
+```
+
+If Docker CLI works but Testcontainers reports `Could not find a valid Docker environment`, start Docker Desktop, confirm it is using Linux containers, clear stale `DOCKER_HOST` values, and only then set an explicit host if auto-detection still fails:
+
+```powershell
+Remove-Item Env:\DOCKER_HOST -ErrorAction SilentlyContinue
+$env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
+```
+
+or `%USERPROFILE%\.testcontainers.properties`:
+
+```properties
+docker.host=npipe:////./pipe/dockerDesktopLinuxEngine
+```
 
 ## Frontend (`frontend/libs/crm`, `frontend/libs/shared/models`)
 
