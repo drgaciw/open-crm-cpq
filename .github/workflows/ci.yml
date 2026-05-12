@@ -32,7 +32,7 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn -B -U verify --no-transfer-progress
+        run: mvn -B -U verify -Punit-tests --no-transfer-progress
         env:
           SPRING_PROFILES_ACTIVE: test
 

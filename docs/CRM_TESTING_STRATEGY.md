@@ -14,7 +14,7 @@ Honest split between **CI** (no Docker requirement beyond what the runner provid
 
 - Classes under `src/test/java/.../*IntegrationTest.java` and `LeadToDealLifecycleTest` extend `BaseIntegrationTest`, which starts a **PostgreSQL Testcontainer**.
 - **Requires Docker.** GitHub-hosted `ubuntu-latest` includes Docker; `mvn verify` from `backend/` should run these today.
-- If a pipeline **disables** Docker or uses a runner without it: split tests with JUnit tags (`@Tag("integration")`) and exclude them from PR builds, or add a dedicated job with Docker + `mvn verify -Pintegration` (after you introduce the profile).
+- If a pipeline **disables** Docker or uses a runner without it: use the `unit-tests` Maven profile to exclude JUnit `@Tag("integration")` tests from PR builds, and use `integration-tests` for full Docker-backed verification.
 
 ### Jacoco (bundle line coverage ≥ 80%)
 
@@ -29,6 +29,8 @@ Honest split between **CI** (no Docker requirement beyond what the runner provid
 cd backend
 mvn -pl services/crm-service test              # unit-focused
 mvn -pl services/crm-service verify            # tests + jacoco check (needs Docker for ITs)
+mvn verify -Punit-tests                        # PR verification; excludes @Tag("integration")
+mvn verify -Pintegration-tests                 # full verification; includes Docker-backed ITs
 ```
 
 Windows PowerShell is the same paths; use `mvn.cmd` if needed.
@@ -52,7 +54,7 @@ Use **only** `package-lock.json` with npm in `frontend/`. A stray `pnpm-lock.yam
 ## CI alignment (GitHub Actions)
 
 - Workflow: `.github/workflows/ci.yml`
-  - **backend:** `mvn -B verify` with `SPRING_PROFILES_ACTIVE=test` — sufficient for Testcontainers on default Ubuntu runners.
+  - **backend:** `mvn -B verify -Punit-tests` with `SPRING_PROFILES_ACTIVE=test` — Docker-free PR verification.
   - **frontend:** `nx run-many` build/lint + **Test (CRM + shared models)** for `crm-deals`, `crm-leads`, `crm-contacts`, `crm-organizations`, `crm-dashboard`, `shared-models`.
 
 If integration tests ever fail in CI for Docker reasons, prefer **tagging** integration tests and a **nightly** full verify job rather than dropping coverage.

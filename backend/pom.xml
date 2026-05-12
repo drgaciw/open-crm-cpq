@@ -76,6 +76,10 @@
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
+
+        <!-- Test selection -->
+        <excludedGroups></excludedGroups>
+        <jacoco.skip>false</jacoco.skip>
     </properties>
 
     <dependencyManagement>
@@ -190,6 +194,7 @@
         <profile>
             <id>integration-tests</id>
             <properties>
+                <excludedGroups></excludedGroups>
                 <jacoco.skip>false</jacoco.skip>
             </properties>
         </profile>
