@@ -1,6 +1,6 @@
 # S0B-3: Add shared-data-access to the documented frontend unit-test run set so CI catches regressions in the library.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S0B`
 
@@ -16,4 +16,4 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- `shared-data-access` is included in the focused frontend unit-test command documented for local cutover/testing and in CI.
