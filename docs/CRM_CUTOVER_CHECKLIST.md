@@ -69,7 +69,7 @@ Repo root: `open-crm-cpq`.
 
 ```powershell
 cd frontend
-npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models" --parallel=3
+npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models,shared-data-access" --parallel=3
 ```
 
 **Backend crm-service:**

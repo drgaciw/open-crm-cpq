@@ -33,14 +33,14 @@ mvn -pl services/crm-service verify            # tests + jacoco check (needs Doc
 
 Windows PowerShell is the same paths; use `mvn.cmd` if needed.
 
-## Frontend (`frontend/libs/crm`, `frontend/libs/shared/models`)
+## Frontend (`frontend/libs/crm`, `frontend/libs/shared`)
 
 ### Unit tests (Vitest via Nx)
 
 ```bash
 cd frontend
 npm ci --legacy-peer-deps
-npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models" --parallel=3
+npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models,shared-data-access" --parallel=3
 ```
 
 Use **only** `package-lock.json` with npm in `frontend/`. A stray `pnpm-lock.yaml` (without pnpm) confuses the Nx lockfile plugin and fails the project graph.
@@ -53,6 +53,6 @@ Use **only** `package-lock.json` with npm in `frontend/`. A stray `pnpm-lock.yam
 
 - Workflow: `.github/workflows/ci.yml`
   - **backend:** `mvn -B verify` with `SPRING_PROFILES_ACTIVE=test` — sufficient for Testcontainers on default Ubuntu runners.
-  - **frontend:** `nx run-many` build/lint + **Test (CRM + shared models)** for `crm-deals`, `crm-leads`, `crm-contacts`, `crm-organizations`, `crm-dashboard`, `shared-models`.
+  - **frontend:** `nx run-many` build/lint + **Test (CRM + shared libs)** for `crm-deals`, `crm-leads`, `crm-contacts`, `crm-organizations`, `crm-dashboard`, `shared-models`, `shared-data-access`.
 
 If integration tests ever fail in CI for Docker reasons, prefer **tagging** integration tests and a **nightly** full verify job rather than dropping coverage.
