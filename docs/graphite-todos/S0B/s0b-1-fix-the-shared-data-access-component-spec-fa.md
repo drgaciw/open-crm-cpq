@@ -1,6 +1,6 @@
 # S0B-1: Fix the shared-data-access component/spec failure by aligning standalone component metadata and Vitest Angular TestBed setup.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S0B`
 
@@ -16,4 +16,4 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- The shared data access component is standalone and its Vitest TestBed setup imports the standalone component.
