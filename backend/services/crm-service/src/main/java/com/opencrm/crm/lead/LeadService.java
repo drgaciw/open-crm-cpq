@@ -17,7 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -330,7 +330,11 @@ public class LeadService {
     public Map<LeadStatus, Long> getStatusCounts() {
         log.debug("Fetching lead status counts");
 
-        Map<LeadStatus, Long> counts = new HashMap<>();
+        Map<LeadStatus, Long> counts = new EnumMap<>(LeadStatus.class);
+        for (LeadStatus status : LeadStatus.values()) {
+            counts.put(status, 0L);
+        }
+
         List<Object[]> results = leadRepository.countGroupByStatus();
 
         for (Object[] row : results) {
