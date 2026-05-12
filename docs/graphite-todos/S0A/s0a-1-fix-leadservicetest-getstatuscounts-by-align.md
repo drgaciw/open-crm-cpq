@@ -1,6 +1,6 @@
 # S0A-1: Fix LeadServiceTest$GetStatusCounts by aligning the mock setup with LeadService.getStatusCounts() and LeadRepository.countGroupByStatus(), or by changing the service to intentionally call countByStatusAndDeletedFalse for all statuses.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implementation complete in this PR.
 
 **Stack lane:** `S0A`
 
