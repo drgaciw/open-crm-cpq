@@ -12,8 +12,10 @@ public final class KafkaTopics {
     
     // Product Catalog Events
     public static final String PRODUCT_STATUS_RETIRED = "cpq.product.status.retired";
+    public static final String PRODUCT_RETIRED = PRODUCT_STATUS_RETIRED;
     public static final String PRODUCT_CREATED = "cpq.product.created";
     public static final String PRODUCT_UPDATED = "cpq.product.updated";
+    public static final String BUNDLE_STRUCTURE_CHANGED = "cpq.bundle.structure.changed";
     
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";
@@ -21,9 +23,16 @@ public final class KafkaTopics {
     
     // Quote Events
     public static final String QUOTE_STATUS_ACCEPTED = "cpq.quote.status.accepted";
+    public static final String QUOTE_ACCEPTED = QUOTE_STATUS_ACCEPTED;
     public static final String QUOTE_CREATED = "cpq.quote.created";
     public static final String QUOTE_UPDATED = "cpq.quote.updated";
     public static final String QUOTE_APPROVAL_REJECTED = "cpq.quote.approval.rejected";
+
+    // Configuration Events
+    public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
+
+    // Rule Set Events
+    public static final String RULE_SET_PUBLISHED = "cpq.rule.set.published";
     
     // Approval Events
     public static final String APPROVAL_APPROVED = "cpq.approval.approved";

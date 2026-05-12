@@ -1,6 +1,6 @@
 # S2A-2: Normalize KafkaTopics naming and add missing target events such as ConfigurationCommitted, BundleStructureChanged, and RuleSetPublished as non-breaking constants.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2A`
 

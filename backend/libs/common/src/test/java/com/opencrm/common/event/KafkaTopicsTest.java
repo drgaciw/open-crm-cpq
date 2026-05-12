@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -28,5 +29,20 @@ class KafkaTopicsTest {
             }
         }
         assertTrue(topicCount > 0, "No topic constants found");
+    }
+
+    @Test
+    @DisplayName("target event constants should expose normalized names")
+    void targetEventConstantsShouldExposeNormalizedNames() {
+        assertEquals("cpq.configuration.committed", KafkaTopics.CONFIGURATION_COMMITTED);
+        assertEquals("cpq.bundle.structure.changed", KafkaTopics.BUNDLE_STRUCTURE_CHANGED);
+        assertEquals("cpq.rule.set.published", KafkaTopics.RULE_SET_PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("normalized aliases should preserve existing topic values")
+    void normalizedAliasesShouldPreserveExistingTopicValues() {
+        assertEquals(KafkaTopics.PRODUCT_STATUS_RETIRED, KafkaTopics.PRODUCT_RETIRED);
+        assertEquals(KafkaTopics.QUOTE_STATUS_ACCEPTED, KafkaTopics.QUOTE_ACCEPTED);
     }
 }
