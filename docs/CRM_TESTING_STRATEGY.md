@@ -2,6 +2,29 @@
 
 Honest split between **CI** (no Docker requirement beyond what the runner provides) and **full integration**.
 
+## Backend module test inventory (Stack S1B-2)
+
+Reactor modules under `backend/` and how tests run today. **Default `mvn verify`** (without `-Pintegration`) runs Surefire only and excludes classes named `*IntegrationTest`, `*IT`, or `*LifecycleTest` when the parent POM split is enabled (see [backend/README.md](../backend/README.md)).
+
+| Module | Tests (approx.) | Default verify | Docker / Testcontainers | Redis in `application-test.yml` | Notes |
+|--------|-----------------|----------------|-------------------------|----------------------------------|-------|
+| `libs/common` | 8 | Unit | No | N/A | Shared DTOs/events; [libs verify command](../backend/libs/README.md) |
+| `libs/security` | 1 | Unit | No | N/A | |
+| `libs/rules-engine` | 4 | Unit | No | N/A | Drools unit tests |
+| `services/crm-service` | 13 (6 IT) | Unit + Jacoco | **Yes** — Postgres TC | Configured (localhost; cache off) | Only module with `*IntegrationTest` / `LeadToDealLifecycleTest` |
+| `services/pricing-service` | 3 | Unit + Jacoco | No (mocks) | localhost | `application-test.yml` in test + main |
+| `services/product-service` | 1 | Unit | No | localhost | |
+| `services/quote-service` | 0 | Compile only | — | localhost | Test resources present; add tests in feature stacks |
+| `services/gateway-service` | 0 | Compile only | — | — | WebFlux gateway; add tests when routes stabilize |
+| `services/pricebook-service` | 0 | Compile only | — | — | |
+| `services/ai-service` | 57 | Unit (pilot agents) | No | — | **Compile risk** on full reactor; fix in Stack 3E, not 1B |
+| `services/configuration-engine` | 1 | Unit | No | — | |
+| `services/approval-routing` | 1 | Unit | No | — | |
+| `services/document-generation` | 1 | Unit | No | — | |
+| `services/contract-asset-management` | 1 | Unit | No | — | |
+
+**Profiles:** `-Pintegration` runs Failsafe ITs (Docker required for `crm-service`). `-Punit-tests` is an alias documented on the top-of-stack S1B-4 PR for fast PR checks with `jacoco.skip=true`.
+
 ## Backend (`crm-service`)
 
 ### Unit / pure tests (CI-friendly)
