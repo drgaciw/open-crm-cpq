@@ -1,23 +1,29 @@
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { type Mock, vi } from 'vitest';
 import { NotificationService } from './notification.service';
 
 describe('NotificationService', () => {
   let service: NotificationService;
-  let snackBarSpy: jasmine.SpyObj<MatSnackBar>;
+  let snackBarSpy: {
+    open: Mock;
+    dismiss: Mock;
+  };
 
   beforeEach(() => {
-    const spy = jasmine.createSpyObj('MatSnackBar', ['open', 'dismiss']);
+    snackBarSpy = {
+      open: vi.fn(),
+      dismiss: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
         NotificationService,
-        { provide: MatSnackBar, useValue: spy }
+        { provide: MatSnackBar, useValue: snackBarSpy }
       ]
     });
 
     service = TestBed.inject(NotificationService);
-    snackBarSpy = TestBed.inject(MatSnackBar) as jasmine.SpyObj<MatSnackBar>;
   });
 
   it('should be created', () => {
@@ -32,7 +38,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: 5000,
           panelClass: ['snackbar-success']
         })
@@ -47,7 +53,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: customDuration
         })
       );
@@ -62,7 +68,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: 7000,
           panelClass: ['snackbar-error']
         })
@@ -77,7 +83,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: customDuration
         })
       );
@@ -92,7 +98,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: 5000,
           panelClass: ['snackbar-info']
         })
@@ -108,7 +114,7 @@ describe('NotificationService', () => {
       expect(snackBarSpy.open).toHaveBeenCalledWith(
         message,
         'Close',
-        jasmine.objectContaining({
+        expect.objectContaining({
           duration: 6000,
           panelClass: ['snackbar-warning']
         })

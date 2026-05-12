@@ -15,19 +15,19 @@ describe('LoadingService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should initialize with loading set to 0 (false)', () => {
-    expect(service.loading()).toBe(0);
+  it('should initialize with no active requests', () => {
+    expect(service.loading()).toBe(false);
     expect(service.getRequestCount()).toBe(0);
   });
 
-  it('should increment request count when startRequest is called', () => {
+  it('should report loading while requests are active', () => {
     service.startRequest();
     expect(service.getRequestCount()).toBe(1);
-    expect(service.loading()).toBe(1);
+    expect(service.loading()).toBe(true);
 
     service.startRequest();
     expect(service.getRequestCount()).toBe(2);
-    expect(service.loading()).toBe(2);
+    expect(service.loading()).toBe(true);
   });
 
   it('should decrement request count when endRequest is called', () => {
@@ -37,9 +37,11 @@ describe('LoadingService', () => {
 
     service.endRequest();
     expect(service.getRequestCount()).toBe(1);
+    expect(service.loading()).toBe(true);
 
     service.endRequest();
     expect(service.getRequestCount()).toBe(0);
+    expect(service.loading()).toBe(false);
   });
 
   it('should not go below 0 when endRequest is called more times than startRequest', () => {
@@ -49,6 +51,7 @@ describe('LoadingService', () => {
     service.endRequest();
 
     expect(service.getRequestCount()).toBe(0);
+    expect(service.loading()).toBe(false);
   });
 
   it('should reset request count to 0', () => {
@@ -59,21 +62,22 @@ describe('LoadingService', () => {
 
     service.reset();
     expect(service.getRequestCount()).toBe(0);
+    expect(service.loading()).toBe(false);
   });
 
-  it('should provide a readonly loading signal', () => {
+  it('should provide a readonly boolean loading signal', () => {
     const loadingSignal = service.loading;
 
     service.startRequest();
-    expect(loadingSignal()).toBe(1);
+    expect(loadingSignal()).toBe(true);
 
     service.startRequest();
-    expect(loadingSignal()).toBe(2);
+    expect(loadingSignal()).toBe(true);
 
     service.endRequest();
-    expect(loadingSignal()).toBe(1);
+    expect(loadingSignal()).toBe(true);
 
     service.endRequest();
-    expect(loadingSignal()).toBe(0);
+    expect(loadingSignal()).toBe(false);
   });
 });
