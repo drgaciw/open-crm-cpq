@@ -644,6 +644,8 @@ class LeadServiceTest {
             assertThat(counts.get(LeadStatus.QUALIFIED)).isEqualTo(2L);
             assertThat(counts.get(LeadStatus.CONVERTED)).isEqualTo(4L);
             assertThat(counts.get(LeadStatus.LOST)).isEqualTo(0L);
+            verify(leadRepository).countGroupByStatus();
+            verify(leadRepository, never()).countByStatusAndDeletedFalse(any());
         }
     }
 }
