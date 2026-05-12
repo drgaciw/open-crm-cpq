@@ -1,6 +1,6 @@
 # S0B-2: Add focused tests for exported shared data-access primitives that are documented as library features: API response interceptor, error interceptor, loading service, notification service, and base CRUD service.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S0B`
 
@@ -16,4 +16,4 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Focused coverage has been added for the exported shared data-access primitives documented in the README and usage example.
