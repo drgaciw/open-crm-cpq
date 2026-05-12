@@ -1,6 +1,6 @@
 # S1B-1: Establish shared-library verification as the bottom PR so service stacks can depend on stable common code.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1B`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Added a dedicated GitHub Actions `shared-libraries` job that verifies `backend/libs/common`, `backend/libs/security`, and `backend/libs/rules-engine` before service-stack changes depend on them.
+- The job runs `mvn -B -U verify --no-transfer-progress -pl libs/common,libs/security,libs/rules-engine -am` from `backend/`, with `SPRING_PROFILES_ACTIVE=test`.
+- Preserved the existing full backend verification job so broader service regressions still run in CI.
