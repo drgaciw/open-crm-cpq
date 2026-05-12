@@ -1,6 +1,6 @@
 # S1B-2: Inventory all backend module test modes and identify which modules require Docker, Redis, or only mocks.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Complete in this PR.
 
 **Stack lane:** `S1B`
 
@@ -16,4 +16,5 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Inventory added in [Backend test mode inventory](../../BACKEND_TEST_MODE_INVENTORY.md).
+- Verification: `mvn -pl libs/common,libs/security,libs/rules-engine,services/ai-service,services/approval-routing,services/configuration-engine,services/contract-asset-management,services/document-generation,services/pricing-service,services/product-service test` for mock-only reactor modules, and `mvn -pl services/crm-service verify` when Docker is available for PostgreSQL Testcontainers.
