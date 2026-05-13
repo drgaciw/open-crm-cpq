@@ -52,8 +52,9 @@ public class QuoteLineItemService {
                 .notes(request.getNotes())
                 .build();
 
+        quote.addLineItem(item);
         QuoteLineItem saved = lineItemRepository.save(item);
-        recalculateQuoteTotals(quote);
+        quoteRepository.save(quote);
         log.info("Added line item {} to quote {}", saved.getId(), quote.getQuoteNumber());
 
         return toDto(saved);
@@ -80,9 +81,9 @@ public class QuoteLineItemService {
             throw new BusinessException("Line item " + lineItemId + " does not belong to quote " + quoteId, "LINE_ITEM_QUOTE_MISMATCH");
         }
 
-        item.softDelete();
+        quote.removeLineItem(item);
         lineItemRepository.save(item);
-        recalculateQuoteTotals(quote);
+        quoteRepository.save(quote);
         log.info("Removed line item {} from quote {}", lineItemId, quote.getQuoteNumber());
     }
 

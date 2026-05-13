@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "quotes", indexes = {
@@ -124,42 +125,76 @@ public class Quote extends BaseEntity {
     @Column(name = "accepted_at")
     private Instant acceptedAt;
     
-    /**
-     * Synchronized total calculation - ensures quote totals match line item sums.
-     * Constitutional requirement: totals must remain mathematically synchronized.
-     */
+    public void addLineItem(QuoteLineItem item) {
+        ensureMutable();
+        Objects.requireNonNull(item, "line item is required");
+
+        Quote owner = item.getQuote();
+        if (owner != null && !sameQuote(owner)) {
+            throw new IllegalArgumentException("Line item already belongs to another quote");
+        }
+
+        item.setQuote(this);
+        if (!lineItems.contains(item)) {
+            lineItems.add(item);
+        }
+        recalculateTotals();
+    }
+
+    public void removeLineItem(QuoteLineItem item) {
+        ensureMutable();
+        Objects.requireNonNull(item, "line item is required");
+
+        if (!sameQuote(item.getQuote())) {
+            throw new IllegalArgumentException("Line item does not belong to quote " + quoteNumber);
+        }
+
+        item.softDelete();
+        lineItems.remove(item);
+        recalculateTotals();
+    }
+
     public void recalculateTotals() {
-        Money subtotalMoney = Money.zero(currency);
-        Money discountMoney = Money.zero(currency);
+        ensureMutable();
+
+        BigDecimal subtotalSum = BigDecimal.ZERO;
+        BigDecimal discountSum = BigDecimal.ZERO;
+        BigDecimal totalSum = BigDecimal.ZERO;
         
         for (QuoteLineItem item : lineItems) {
             if (!item.isDeleted()) {
-                Money lineTotal = Money.of(item.getUnitPrice(), currency).multiply(item.getQuantity());
-                Money lineDiscount = lineTotal.percentage(item.getDiscountRate());
-                
-                subtotalMoney = subtotalMoney.add(lineTotal);
-                discountMoney = discountMoney.add(lineDiscount);
+                BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
+                BigDecimal listPrice = valueOrZero(item.getListPrice());
+                BigDecimal discountAmount = valueOrZero(item.getDiscountAmount());
+                BigDecimal extendedAmount = item.getExtendedAmount() != null
+                        ? item.getExtendedAmount()
+                        : listPrice.multiply(quantity).subtract(discountAmount);
+
+                subtotalSum = subtotalSum.add(listPrice.multiply(quantity));
+                discountSum = discountSum.add(discountAmount);
+                totalSum = totalSum.add(extendedAmount);
             }
         }
         
-        Money taxMoney = subtotalMoney.subtract(discountMoney).percentage(BigDecimal.valueOf(10)); // 10% tax
-        Money totalMoney = subtotalMoney.subtract(discountMoney).add(taxMoney);
-        
-        this.subtotal = subtotalMoney.getAmount();
-        this.totalDiscount = discountMoney.getAmount();
-        this.totalTax = taxMoney.getAmount();
-        this.totalAmount = totalMoney.getAmount();
+        this.subtotal = subtotalSum;
+        this.totalDiscount = discountSum;
+        this.totalAmount = totalSum;
     }
     
     /**
      * State machine transition to ACCEPTED status.
      */
     public void accept() {
-        if (status != QuoteStatus.DRAFT && status != QuoteStatus.PENDING_APPROVAL) {
-            throw new IllegalStateException("Can only accept quotes in DRAFT or PENDING_APPROVAL status");
+        accept(Instant.now());
+    }
+
+    public void accept(Instant acceptedAt) {
+        if (status != QuoteStatus.SENT) {
+            throw new IllegalStateException("Can only accept quotes in SENT status");
         }
+        recalculateTotals();
         this.status = QuoteStatus.ACCEPTED;
-        this.acceptedAt = Instant.now();
+        this.acceptedAt = Objects.requireNonNull(acceptedAt, "acceptedAt is required");
     }
     
     /**
@@ -168,5 +203,25 @@ public class Quote extends BaseEntity {
     @Transient
     public Money getTotalAmountMoney() {
         return Money.of(totalAmount, currency);
+    }
+
+    private void ensureMutable() {
+        if (status == QuoteStatus.ACCEPTED) {
+            throw new IllegalStateException("Cannot mutate an accepted quote");
+        }
+    }
+
+    private BigDecimal valueOrZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private boolean sameQuote(Quote other) {
+        if (other == null) {
+            return false;
+        }
+        if (other == this) {
+            return true;
+        }
+        return getId() != null && getId().equals(other.getId());
     }
 }

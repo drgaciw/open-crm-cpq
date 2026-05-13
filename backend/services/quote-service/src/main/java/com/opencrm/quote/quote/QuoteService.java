@@ -204,7 +204,7 @@ public class QuoteService {
             throw new BusinessException("Only sent quotes can be accepted", "INVALID_STATUS_TRANSITION");
         }
 
-        quote.setStatus(QuoteStatus.ACCEPTED);
+        quote.accept(Instant.now());
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
@@ -220,7 +220,7 @@ public class QuoteService {
                 .acv(saved.getAcv())
                 .currency(saved.getCurrency())
                 .durationInMonths(saved.getDurationInMonths())
-                .acceptedAt(Instant.now())
+                .acceptedAt(saved.getAcceptedAt())
                 .build());
 
         return quoteMapper.toDto(saved);

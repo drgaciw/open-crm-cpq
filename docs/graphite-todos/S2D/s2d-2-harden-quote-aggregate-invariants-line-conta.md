@@ -1,6 +1,6 @@
 # S2D-2: Harden Quote aggregate invariants: line containment, total reconciliation, immutable accepted state, and version monotonicity.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 
