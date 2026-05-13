@@ -1,6 +1,6 @@
 # S1A-4: Split CI into fast unit checks and Docker-backed integration checks while preserving full mvn verify on the integration job.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1A`
 
