@@ -1,6 +1,6 @@
 # S3D-5: Add RulesOptimizationAdapter contract from Open CRM ai-service to price-drools-service without allowing AI to mutate pricing directly.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3D`
 
