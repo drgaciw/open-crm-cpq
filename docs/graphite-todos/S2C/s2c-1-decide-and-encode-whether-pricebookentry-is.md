@@ -1,6 +1,6 @@
 # S2C-1: Decide and encode whether PriceBookEntry is an entity under PriceBook; add effective-period and immutable-publication tests.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2C`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Encoded `PriceBook` as the aggregate root and `PriceBookEntry` as a child entity under the price book aggregate.
+- Entries inherit the parent price book's effective publication window.
+- Published price books and their entries are immutable; create a future-dated replacement price book for changes.
