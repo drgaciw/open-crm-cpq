@@ -1,5 +1,6 @@
 package com.opencrm.pricing.execution;
 
+import com.opencrm.pricing.support.NullSafe;
 import com.opencrm.pricing.waterfall.FinancialMetrics;
 import com.opencrm.pricing.waterfall.PricingLineResult;
 import com.opencrm.pricing.waterfall.PricingResult;
@@ -18,7 +19,7 @@ public class MetricsCalculator {
      * Calculate financial metrics from pricing result.
      */
     public FinancialMetrics calculate(PricingResult result, int durationInMonths) {
-        if (result == null || result.getLineResults() == null || result.getLineResults().isEmpty()) {
+        if (result == null || NullSafe.isEmpty(result.getLineResults())) {
             return FinancialMetrics.builder()
                     .arr(BigDecimal.ZERO)
                     .tcv(BigDecimal.ZERO)
@@ -51,11 +52,11 @@ public class MetricsCalculator {
 
         // Calculate total discount and surcharge
         BigDecimal totalDiscount = result.getLineResults().stream()
-                .map(line -> line.getDiscountAmount() != null ? line.getDiscountAmount() : BigDecimal.ZERO)
+                .map(line -> NullSafe.zeroIfNull(line.getDiscountAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalSurcharge = result.getLineResults().stream()
-                .map(line -> line.getSurchargeAmount() != null ? line.getSurchargeAmount() : BigDecimal.ZERO)
+                .map(line -> NullSafe.zeroIfNull(line.getSurchargeAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Estimated margin (placeholder - would need cost data)

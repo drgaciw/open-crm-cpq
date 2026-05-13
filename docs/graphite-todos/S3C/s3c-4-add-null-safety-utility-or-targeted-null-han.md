@@ -1,6 +1,6 @@
 # S3C-4: Add null-safety utility or targeted null-handling simplification for repetitive service/controller guards.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3C`
 

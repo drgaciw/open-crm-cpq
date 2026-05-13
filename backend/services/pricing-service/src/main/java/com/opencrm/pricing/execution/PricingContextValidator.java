@@ -1,6 +1,7 @@
 package com.opencrm.pricing.execution;
 
 import com.opencrm.common.exception.BusinessException;
+import com.opencrm.pricing.support.NullSafe;
 import com.opencrm.pricing.waterfall.PricingContext;
 import org.springframework.stereotype.Component;
 
@@ -18,11 +19,11 @@ public class PricingContextValidator {
             throw new BusinessException("Pricing context cannot be null", "INVALID_CONTEXT");
         }
 
-        if (context.getCustomerExternalId() == null || context.getCustomerExternalId().isBlank()) {
+        if (NullSafe.isBlank(context.getCustomerExternalId())) {
             throw new BusinessException("Customer external ID is required", "INVALID_CONTEXT");
         }
 
-        if (context.getLineItems() == null || context.getLineItems().isEmpty()) {
+        if (NullSafe.isEmpty(context.getLineItems())) {
             throw new BusinessException("At least one line item is required", "INVALID_CONTEXT");
         }
 
@@ -32,7 +33,7 @@ public class PricingContextValidator {
 
         // Validate each line item
         context.getLineItems().forEach(lineItem -> {
-            if (lineItem.getProductExternalId() == null || lineItem.getProductExternalId().isBlank()) {
+            if (NullSafe.isBlank(lineItem.getProductExternalId())) {
                 throw new BusinessException("Product external ID is required for all line items", "INVALID_CONTEXT");
             }
 

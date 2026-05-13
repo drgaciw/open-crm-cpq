@@ -22,6 +22,7 @@ import com.opencrm.pricing.rule.RuleStatus;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
+import com.opencrm.pricing.support.NullSafe;
 import com.opencrm.pricing.waterfall.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,7 +76,7 @@ public class PricingExecutionService {
      */
     @Transactional(readOnly = true)
     public BulkPricingSimulationResponse simulateBulk(List<PricingContext> contexts) {
-        if (contexts == null || contexts.isEmpty()) {
+        if (NullSafe.isEmpty(contexts)) {
             throw new BusinessException("At least one pricing context is required", "INVALID_CONTEXT");
         }
 
@@ -257,7 +258,7 @@ public class PricingExecutionService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Product with external ID: " + lineRequest.getProductExternalId()));
 
-        return product.getListPrice() != null ? product.getListPrice() : BigDecimal.ZERO;
+        return NullSafe.zeroIfNull(product.getListPrice());
     }
 
     private PricingWaterfall buildWaterfall(List<PricingLineResult> lineResults) {
