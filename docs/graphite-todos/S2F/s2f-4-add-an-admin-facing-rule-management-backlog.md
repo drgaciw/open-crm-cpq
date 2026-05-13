@@ -1,6 +1,6 @@
 # S2F-4: Add an admin-facing rule management backlog stub for OpenL table upload/validation status, gated behind backend contracts.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR as a frontend backlog stub in `frontend/PRICING_IA_BACKLOG.md`.
 
 **Stack lane:** `S2F`
 
