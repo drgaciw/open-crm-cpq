@@ -51,6 +51,7 @@ public class PricingExecutionService {
     private final PricingAuditLogRepository auditLogRepository;
     private final PricingContextValidator contextValidator;
     private final MetricsCalculator metricsCalculator;
+    private final QuoteLevelPricingPolicy quoteLevelPricingPolicy;
     private final ObjectMapper objectMapper;
     private final DroolsRulesEngine droolsRulesEngine;
 
@@ -212,6 +213,7 @@ public class PricingExecutionService {
 
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths());
             result.setFinancialMetrics(metrics);
+            quoteLevelPricingPolicy.apply(result, context.getDurationInMonths());
 
             // 12. Build PricingWaterfall
             PricingWaterfall waterfall = buildWaterfall(lineResults);

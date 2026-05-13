@@ -55,6 +55,8 @@ class PricingExecutionServiceTest {
     @Mock
     private MetricsCalculator metricsCalculator;
     @Mock
+    private QuoteLevelPricingPolicy quoteLevelPricingPolicy;
+    @Mock
     private ObjectMapper objectMapper;
     @Mock
     private DroolsRulesEngine droolsRulesEngine;
