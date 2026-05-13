@@ -54,12 +54,16 @@ public class ConstraintSolver {
      * Check if a specific selection is compatible with current configuration.
      */
     public boolean isCompatible(ConfigurationSession session, String optionKey, String optionValue) {
-        // Create temporary session with new selection
         Map<String, String> tempSelections = new HashMap<>(session.getSelections());
         tempSelections.put(optionKey, optionValue);
-        
-        // Validate temporary configuration
-        // This is a simplified version - production would have more sophisticated logic
-        return true;
+
+        ConfigurationSession candidate = ConfigurationSession.builder()
+                .productId(session.getProductId())
+                .userId(session.getUserId())
+                .status(session.getStatus())
+                .selections(tempSelections)
+                .build();
+
+        return validate(candidate).isEmpty();
     }
 }

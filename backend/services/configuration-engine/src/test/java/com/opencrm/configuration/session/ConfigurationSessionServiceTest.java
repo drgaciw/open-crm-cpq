@@ -92,6 +92,23 @@ class ConfigurationSessionServiceTest {
     }
 
     @Test
+    @DisplayName("should revalidate and mark session invalid when removing required selection")
+    void removeSelectionRevalidatesAndMarksInvalid() {
+        session.addSelection("color", "red");
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(constraintSolver.validate(any())).thenReturn(List.of("Color selection is required"));
+        when(sessionRepository.save(any())).thenReturn(session);
+
+        ConfigurationSession result = sessionService.removeSelection(1L, "color");
+
+        assertFalse(result.isValid());
+        assertFalse(result.getSelections().containsKey("color"));
+        assertEquals("Color selection is required", result.getValidationErrors());
+        verify(constraintSolver).validate(session);
+    }
+
+    @Test
     @DisplayName("should complete a valid session")
     void completeValidSession() {
         session.markAsValid();
