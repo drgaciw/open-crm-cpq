@@ -14,6 +14,9 @@ public final class KafkaTopics {
     public static final String PRODUCT_STATUS_RETIRED = "cpq.product.status.retired";
     public static final String PRODUCT_CREATED = "cpq.product.created";
     public static final String PRODUCT_UPDATED = "cpq.product.updated";
+    public static final String PRODUCT_BUNDLE_CREATED = "cpq.product.bundle.created";
+    public static final String PRODUCT_BUNDLE_UPDATED = "cpq.product.bundle.updated";
+    public static final String PRODUCT_BUNDLE_DELETED = "cpq.product.bundle.deleted";
     
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";

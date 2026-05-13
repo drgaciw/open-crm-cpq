@@ -1,6 +1,6 @@
 # S2B-4: Introduce ConfigurationModel compile/cache invalidation behavior driven by product and bundle events.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2B`
 
