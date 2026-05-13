@@ -26,6 +26,8 @@ public class ProductBundleService {
     public ProductBundleDto create(ProductBundleCreateRequest request) {
         log.debug("Creating bundle for product ID: {}", request.getProductId());
 
+        validateItemConstraints(request.getMinItems(), request.getMaxItems());
+
         productRepository.findByIdAndDeletedFalse(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", request.getProductId()));
 
@@ -34,6 +36,21 @@ public class ProductBundleService {
         log.info("Created bundle with ID: {}", saved.getId());
 
         return bundleMapper.toDto(saved);
+    }
+
+    private void validateItemConstraints(Integer minItems, Integer maxItems) {
+        if (minItems != null && minItems < 0) {
+            throw new BusinessException("Bundle minimum items cannot be negative", "BUNDLE_MIN_ITEMS_INVALID");
+        }
+        if (maxItems != null && maxItems < 0) {
+            throw new BusinessException("Bundle maximum items cannot be negative", "BUNDLE_MAX_ITEMS_INVALID");
+        }
+        if (minItems != null && maxItems != null && minItems > maxItems) {
+            throw new BusinessException(
+                    "Bundle minimum items cannot exceed maximum items",
+                    "BUNDLE_MIN_MAX_INVALID"
+            );
+        }
     }
 
     @Transactional(readOnly = true)

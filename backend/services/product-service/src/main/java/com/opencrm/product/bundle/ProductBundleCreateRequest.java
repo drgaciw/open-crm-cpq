@@ -1,6 +1,7 @@
 package com.opencrm.product.bundle;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -29,7 +30,9 @@ public class ProductBundleCreateRequest {
 
     private BigDecimal discountValue;
 
+    @Min(value = 0, message = "Minimum items cannot be negative")
     private Integer minItems;
 
+    @Min(value = 0, message = "Maximum items cannot be negative")
     private Integer maxItems;
 }

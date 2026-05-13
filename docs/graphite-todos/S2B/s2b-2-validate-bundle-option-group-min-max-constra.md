@@ -1,6 +1,6 @@
 # S2B-2: Validate bundle option-group min/max constraints and attribute value rules at write time.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2B`
 

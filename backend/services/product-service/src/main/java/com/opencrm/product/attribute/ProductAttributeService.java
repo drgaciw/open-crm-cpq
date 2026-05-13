@@ -10,7 +10,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 @Slf4j
 @Service
@@ -32,6 +36,8 @@ public class ProductAttributeService {
                     "DUPLICATE_ATTRIBUTE_NAME"
             );
         }
+
+        validateAttributeDefinition(request);
 
         ProductAttribute attribute = attributeMapper.toEntity(request);
         ProductAttribute saved = attributeRepository.save(attribute);
@@ -69,6 +75,8 @@ public class ProductAttributeService {
         ProductAttribute attribute = attributeRepository.findByIdAndDeletedFalse(request.getAttributeId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProductAttribute", request.getAttributeId()));
 
+        validateAttributeValue(attribute, request.getValue());
+
         ProductAttributeValue attrValue = attributeValueRepository
                 .findByProductIdAndAttributeIdAndDeletedFalse(productId, request.getAttributeId())
                 .orElseGet(() -> ProductAttributeValue.builder()
@@ -104,5 +112,108 @@ public class ProductAttributeService {
                     .value(v.getValue())
                     .build();
         }).toList();
+    }
+
+    private void validateAttributeDefinition(AttributeCreateRequest request) {
+        if (request.getValidationRegex() != null && !request.getValidationRegex().isBlank()) {
+            try {
+                Pattern.compile(request.getValidationRegex());
+            } catch (PatternSyntaxException ex) {
+                throw new BusinessException("Attribute validation regex is invalid", "ATTRIBUTE_REGEX_INVALID");
+            }
+        }
+
+        if (request.getDefaultValue() != null) {
+            validateAttributeValue(
+                    ProductAttribute.builder()
+                            .name(request.getName())
+                            .dataType(request.getDataType())
+                            .required(request.isRequired())
+                            .validationRegex(request.getValidationRegex())
+                            .enumValues(request.getEnumValues())
+                            .build(),
+                    request.getDefaultValue()
+            );
+        }
+    }
+
+    private void validateAttributeValue(ProductAttribute attribute, String value) {
+        if (value == null || value.isBlank()) {
+            if (attribute.isRequired()) {
+                throw new BusinessException(
+                        "Attribute '" + attribute.getName() + "' requires a value",
+                        "ATTRIBUTE_VALUE_REQUIRED"
+                );
+            }
+            return;
+        }
+
+        switch (attribute.getDataType()) {
+            case NUMBER -> validateNumber(attribute, value);
+            case BOOLEAN -> validateBoolean(attribute, value);
+            case DATE -> validateDate(attribute, value);
+            case ENUM -> validateEnum(attribute, value);
+            case STRING -> {
+            }
+        }
+
+        if (attribute.getValidationRegex() != null
+                && !attribute.getValidationRegex().isBlank()
+                && !Pattern.matches(attribute.getValidationRegex(), value)) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' does not match validation rules",
+                    "ATTRIBUTE_VALUE_REGEX_MISMATCH"
+            );
+        }
+    }
+
+    private void validateNumber(ProductAttribute attribute, String value) {
+        try {
+            new BigDecimal(value);
+        } catch (NumberFormatException ex) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' must be a number",
+                    "ATTRIBUTE_VALUE_TYPE_INVALID"
+            );
+        }
+    }
+
+    private void validateBoolean(ProductAttribute attribute, String value) {
+        if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' must be true or false",
+                    "ATTRIBUTE_VALUE_TYPE_INVALID"
+            );
+        }
+    }
+
+    private void validateDate(ProductAttribute attribute, String value) {
+        try {
+            LocalDate.parse(value);
+        } catch (RuntimeException ex) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' must be an ISO-8601 date",
+                    "ATTRIBUTE_VALUE_TYPE_INVALID"
+            );
+        }
+    }
+
+    private void validateEnum(ProductAttribute attribute, String value) {
+        if (attribute.getEnumValues() == null || attribute.getEnumValues().isBlank()) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' does not define enum values",
+                    "ATTRIBUTE_ENUM_VALUES_REQUIRED"
+            );
+        }
+
+        boolean allowed = List.of(attribute.getEnumValues().split(",")).stream()
+                .map(String::trim)
+                .anyMatch(value::equals);
+        if (!allowed) {
+            throw new BusinessException(
+                    "Attribute '" + attribute.getName() + "' value is not allowed",
+                    "ATTRIBUTE_VALUE_NOT_ALLOWED"
+            );
+        }
     }
 }
