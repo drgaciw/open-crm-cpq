@@ -1,6 +1,9 @@
 package com.opencrm.configuration.session;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,9 @@ import java.util.List;
 public class ConfigurationSessionService {
 
     private final ConfigurationSessionRepository sessionRepository;
+    private final CommittedConfigurationRepository committedConfigurationRepository;
     private final ConstraintSolver constraintSolver;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     public ConfigurationSession create(String productId, String userId) {
         log.debug("Creating configuration session for product: {}, user: {}", productId, userId);
@@ -105,7 +110,28 @@ public class ConfigurationSessionService {
     public ConfigurationSession complete(Long sessionId) {
         ConfigurationSession session = getById(sessionId);
         session.complete(); // Throws if not valid
-        return sessionRepository.save(session);
+        ConfigurationSession saved = sessionRepository.save(session);
+
+        CommittedConfiguration committedConfiguration = committedConfigurationRepository
+                .findBySessionId(saved.getId())
+                .orElseGet(() -> committedConfigurationRepository.save(CommittedConfiguration.fromSession(saved)));
+
+        ConfigurationCommittedEvent event = new ConfigurationCommittedEvent(
+                committedConfiguration.getId(),
+                saved.getId(),
+                saved.getProductId(),
+                saved.getUserId(),
+                committedConfiguration.getSelections(),
+                committedConfiguration.getCommittedAt()
+        );
+        outboxEventPublisher.publish(
+                "CommittedConfiguration",
+                String.valueOf(committedConfiguration.getId()),
+                KafkaTopics.CONFIGURATION_COMMITTED,
+                event
+        );
+
+        return saved;
     }
 
     public ConfigurationSession cancel(Long sessionId) {

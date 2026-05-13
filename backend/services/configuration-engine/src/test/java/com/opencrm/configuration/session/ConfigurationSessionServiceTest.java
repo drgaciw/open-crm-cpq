@@ -1,6 +1,9 @@
 package com.opencrm.configuration.session;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +33,13 @@ class ConfigurationSessionServiceTest {
     private ConfigurationSessionRepository sessionRepository;
 
     @Mock
+    private CommittedConfigurationRepository committedConfigurationRepository;
+
+    @Mock
     private ConstraintSolver constraintSolver;
+
+    @Mock
+    private OutboxEventPublisher outboxEventPublisher;
 
     @InjectMocks
     private ConfigurationSessionService sessionService;
@@ -94,14 +103,28 @@ class ConfigurationSessionServiceTest {
     @Test
     @DisplayName("should complete a valid session")
     void completeValidSession() {
+        session.addSelection("color", "red");
         session.markAsValid();
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(sessionRepository.save(any())).thenReturn(session);
+        when(committedConfigurationRepository.findBySessionId(1L)).thenReturn(Optional.empty());
+        when(committedConfigurationRepository.save(any())).thenAnswer(inv -> {
+            CommittedConfiguration committedConfiguration = inv.getArgument(0);
+            committedConfiguration.setId(10L);
+            return committedConfiguration;
+        });
 
         ConfigurationSession result = sessionService.complete(1L);
 
         assertEquals(ConfigurationStatus.COMPLETED, result.getStatus());
         assertNotNull(result.getCompletedAt());
+        verify(committedConfigurationRepository).save(any(CommittedConfiguration.class));
+        verify(outboxEventPublisher).publish(
+                eq("CommittedConfiguration"),
+                eq("10"),
+                eq(KafkaTopics.CONFIGURATION_COMMITTED),
+                any(ConfigurationCommittedEvent.class)
+        );
     }
 
     @Test
