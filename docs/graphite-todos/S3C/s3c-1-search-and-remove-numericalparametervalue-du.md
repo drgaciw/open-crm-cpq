@@ -1,6 +1,6 @@
 # S3C-1: Search and remove NumericalParameterValue duplication by migrating to NumericParameterValue.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Completed in this PR.
 
 **Stack lane:** `S3C`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Repository-wide searches for `NumericalParameterValue`, `NumericParameterValue`, and `NumericParam` only find this tracking card; there is no duplicated implementation type to migrate on the current `main` base.
+- The referenced `price-drools-service` module is not present in this repository. The current pricing/rules ownership lives in `backend/services/pricing-service` and `backend/libs/rules-engine`.
+- No production code changes were needed because the duplicate type is already absent from the branch.
