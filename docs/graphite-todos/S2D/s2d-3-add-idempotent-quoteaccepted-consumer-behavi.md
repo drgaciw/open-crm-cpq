@@ -1,6 +1,6 @@
 # S2D-3: Add idempotent QuoteAccepted consumer behavior for accepted quote/proposal document jobs.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 

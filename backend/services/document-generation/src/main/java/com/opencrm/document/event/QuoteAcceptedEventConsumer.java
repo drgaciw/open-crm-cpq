@@ -10,6 +10,7 @@ import com.opencrm.document.repository.DocumentGenerationJobRepository;
 import com.opencrm.document.service.DocumentGenerationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +53,15 @@ public class QuoteAcceptedEventConsumer {
                     .idempotencyKey(idempotencyKey)
                     .build();
             
-            jobRepository.save(job);
+            try {
+                jobRepository.saveAndFlush(job);
+            } catch (DataIntegrityViolationException e) {
+                if (jobRepository.existsByIdempotencyKey(idempotencyKey)) {
+                    log.info("Document generation job already exists for quote: {}", event.getQuoteId());
+                    return;
+                }
+                throw e;
+            }
             
             // Trigger async document generation
             documentGenerationService.generateDocumentAsync(job.getId());
