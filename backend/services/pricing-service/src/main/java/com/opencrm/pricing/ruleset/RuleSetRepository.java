@@ -36,6 +36,11 @@ public interface RuleSetRepository extends JpaRepository<RuleSet, Long> {
     Page<RuleSet> findByStatusAndDeletedFalse(RuleSetStatus status, Pageable pageable);
 
     /**
+     * Find all rule sets by status (excluding deleted).
+     */
+    List<RuleSet> findByStatusAndDeletedFalse(RuleSetStatus status);
+
+    /**
      * Find active rule sets effective on a given date (excluding deleted).
      */
     List<RuleSet> findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(

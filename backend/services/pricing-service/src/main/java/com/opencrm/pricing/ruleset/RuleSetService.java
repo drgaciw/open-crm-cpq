@@ -2,13 +2,24 @@ package com.opencrm.pricing.ruleset;
 
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.pricing.rule.Rule;
+import com.opencrm.pricing.rule.RuleRepository;
+import com.opencrm.pricing.rule.RuleStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.kie.api.KieServices;
+import org.kie.api.builder.KieBuilder;
+import org.kie.api.builder.KieFileSystem;
+import org.kie.api.builder.Message;
+import org.kie.api.builder.Results;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing rule sets.
@@ -20,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RuleSetService {
 
     private final RuleSetRepository ruleSetRepository;
+    private final RuleRepository ruleRepository;
     private final RuleSetMapper ruleSetMapper;
 
     /**
@@ -113,16 +125,32 @@ public class RuleSetService {
     }
 
     /**
-     * Activate a rule set.
+     * Promote a validated draft rule set to active production use.
      */
     @CacheEvict(value = "rules", allEntries = true)
     public RuleSetDto activate(Long id) {
-        log.debug("Activating rule set ID: {}", id);
+        log.debug("Promoting rule set ID: {}", id);
 
         RuleSet ruleSet = ruleSetRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("RuleSet", id));
 
+        List<Rule> activeRules = ruleRepository.findByRuleSetIdAndStatusAndDeletedFalseOrderByPriorityDesc(
+                id, RuleStatus.ACTIVE);
+        if (activeRules.isEmpty()) {
+            throw new BusinessException(
+                    "Cannot promote a rule set without at least one ACTIVE rule.",
+                    "RULE_SET_NOT_VALIDATED"
+            );
+        }
+
+        activeRules.forEach(this::validatePromotableRule);
+
         try {
+            List<RuleSet> supersededRuleSets = ruleSetRepository.findByStatusAndDeletedFalse(RuleSetStatus.ACTIVE).stream()
+                    .filter(activeRuleSet -> !activeRuleSet.getId().equals(ruleSet.getId()))
+                    .toList();
+            supersededRuleSets.forEach(RuleSet::deprecate);
+            ruleSetRepository.saveAll(supersededRuleSets);
             ruleSet.activate();
         } catch (IllegalStateException e) {
             throw new BusinessException(e.getMessage(), "INVALID_STATE_TRANSITION");
@@ -132,6 +160,31 @@ public class RuleSetService {
         log.info("Activated rule set ID: {}", id);
 
         return ruleSetMapper.toDto(updated);
+    }
+
+    private void validatePromotableRule(Rule rule) {
+        if (rule.getContent() == null || rule.getContent().trim().isEmpty()) {
+            throw new BusinessException(
+                    "Cannot promote rule set because rule " + rule.getId() + " has empty content.",
+                    "INVALID_RULE_CONTENT"
+            );
+        }
+
+        KieServices kieServices = KieServices.Factory.get();
+        KieFileSystem kfs = kieServices.newKieFileSystem();
+        kfs.write("src/main/resources/rule-" + rule.getId() + ".drl", rule.getContent());
+        KieBuilder kieBuilder = kieServices.newKieBuilder(kfs).buildAll();
+
+        Results results = kieBuilder.getResults();
+        if (results.hasMessages(Message.Level.ERROR)) {
+            String errorMsg = results.getMessages(Message.Level.ERROR).stream()
+                    .map(Message::getText)
+                    .collect(Collectors.joining(", "));
+            throw new BusinessException(
+                    "Cannot promote rule set because rule " + rule.getId() + " has invalid DRL syntax: " + errorMsg,
+                    "INVALID_DRL_SYNTAX"
+            );
+        }
     }
 
     /**

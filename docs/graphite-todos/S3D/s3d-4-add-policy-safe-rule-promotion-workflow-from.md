@@ -1,6 +1,6 @@
 # S3D-4: Add policy-safe rule promotion workflow from AI-generated draft to validated ruleset to published production ruleset.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3D`
 
