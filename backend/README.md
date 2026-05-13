@@ -130,11 +130,20 @@ Environment variables for production:
 
 ## Running Tests
 
-Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible:
+The default Maven path runs Docker-free unit tests and excludes integration-style
+classes named `*IntegrationTest`, `*IT`, and `*LifecycleTest`:
 
 ```bash
-mvn test -pl services/crm-service -am
+mvn test
 ```
+
+Run Docker-backed integration tests explicitly with the `integration` profile:
+
+```bash
+mvn verify -Pintegration
+```
+
+Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible.
 
 **Windows (Docker Desktop)**: If TestContainers can't find Docker, create `~/.testcontainers.properties`:
 ```properties

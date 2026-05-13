@@ -1,6 +1,6 @@
 # S1B-4: Add a top-of-stack verification PR that proves backend modules can run under the chosen unit/integration split.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1B`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Backend `mvn test` now uses Surefire excludes for `*IntegrationTest`, `*IT`, and `*LifecycleTest`, keeping the default unit verification path Docker-free.
+- Backend `mvn verify -Pintegration` enables Failsafe for the same integration naming patterns, preserving the Docker-backed top-of-stack verification path.
+- `backend/README.md` documents the default unit path and the explicit integration profile.
