@@ -1,6 +1,6 @@
 # S2D-1: Define QuoteAccepted.v1 payload from quote, line, customer, configuration, pricing, and terms snapshots.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 
