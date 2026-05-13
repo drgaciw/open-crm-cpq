@@ -1,6 +1,6 @@
 # S2D-5: Model renewal eligibility and emit SubscriptionRenewalEligible from installed-base state, not last quote history.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 

@@ -95,4 +95,11 @@ public class Subscription extends BaseEntity {
         this.endDate = newEndDate;
         this.renewalDate = newEndDate.minusDays(30); // 30 days before end
     }
+
+    public boolean isRenewalEligible(LocalDate asOfDate) {
+        return status == SubscriptionStatus.ACTIVE
+                && renewalDate != null
+                && !renewalDate.isAfter(asOfDate)
+                && !endDate.isBefore(asOfDate);
+    }
 }

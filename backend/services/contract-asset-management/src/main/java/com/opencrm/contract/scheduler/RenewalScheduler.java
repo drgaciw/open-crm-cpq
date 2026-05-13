@@ -39,7 +39,12 @@ public class RenewalScheduler {
         
         for (Subscription subscription : eligibleSubscriptions) {
             try {
-                // Publish renewal eligible event
+                if (!subscription.isRenewalEligible(today)) {
+                    log.debug("Skipping non-renewal-eligible installed-base subscription: {}",
+                              subscription.getSubscriptionNumber());
+                    continue;
+                }
+
                 SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent(
                         subscription.getId().toString(),
                         subscription.getRenewalDate(),

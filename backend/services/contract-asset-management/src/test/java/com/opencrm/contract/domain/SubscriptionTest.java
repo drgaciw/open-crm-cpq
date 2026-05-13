@@ -93,4 +93,47 @@ class SubscriptionTest {
         assertNotNull(subscription.getArr());
         assertEquals(BigDecimal.valueOf(12000.00), subscription.getArr());
     }
+
+    @Test
+    @DisplayName("should model renewal eligibility from installed-base subscription state")
+    void renewalEligibilityUsesInstalledBaseState() {
+        LocalDate today = LocalDate.now();
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setRenewalDate(today.minusDays(1));
+        subscription.setEndDate(today.plusDays(30));
+
+        assertTrue(subscription.isRenewalEligible(today));
+    }
+
+    @Test
+    @DisplayName("should reject renewal eligibility when installed-base state is not active")
+    void renewalEligibilityRequiresActiveStatus() {
+        LocalDate today = LocalDate.now();
+        subscription.setRenewalDate(today.minusDays(1));
+        subscription.setEndDate(today.plusDays(30));
+
+        assertFalse(subscription.isRenewalEligible(today));
+    }
+
+    @Test
+    @DisplayName("should reject renewal eligibility before the installed-base renewal date")
+    void renewalEligibilityRequiresOpenRenewalWindow() {
+        LocalDate today = LocalDate.now();
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setRenewalDate(today.plusDays(1));
+        subscription.setEndDate(today.plusDays(30));
+
+        assertFalse(subscription.isRenewalEligible(today));
+    }
+
+    @Test
+    @DisplayName("should reject renewal eligibility for expired installed-base subscriptions")
+    void renewalEligibilityRejectsExpiredSubscriptions() {
+        LocalDate today = LocalDate.now();
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setRenewalDate(today.minusDays(30));
+        subscription.setEndDate(today.minusDays(1));
+
+        assertFalse(subscription.isRenewalEligible(today));
+    }
 }
