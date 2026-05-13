@@ -7,3 +7,4 @@ export * from './lib/loading.interceptor';
 export * from './lib/loading.service';
 export * from './lib/notification.service';
 export * from './lib/base-crud.service';
+export * from './lib/cpq-api.service';
