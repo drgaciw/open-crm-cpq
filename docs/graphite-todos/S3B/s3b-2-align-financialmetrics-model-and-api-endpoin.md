@@ -1,6 +1,6 @@
 # S3B-2: Align FinancialMetrics model and API endpoints with ARR, TCV, ACV, CLV, churn score, discount rate, and price multiplier requirements.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3B`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- `FinancialMetrics` now exposes ARR, TCV, ACV, CLV, churn score, discount rate, total discount, total surcharge, price multiplier, and estimated margin percentage.
+- Pricing execution and simulation endpoints populate those metrics from pricing results and customer context.
+- Focused pricing-service tests cover the metric calculations and execution-service integration.
