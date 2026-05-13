@@ -9,16 +9,24 @@ import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
 import com.opencrm.pricing.integration.pricebook.ProductEntryResolveDto;
 import com.opencrm.pricing.integration.pricebook.ResolveBatchResponse;
 import com.opencrm.pricing.product.PricingProductRepository;
+import com.opencrm.pricing.rule.Rule;
 import com.opencrm.pricing.rule.RuleRepository;
+import com.opencrm.pricing.rule.RuleStatus;
+import com.opencrm.pricing.rule.RuleType;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.customer.CustomerRegion;
+import com.opencrm.pricing.ruleset.RuleSetStatus;
 import com.opencrm.pricing.waterfall.*;
 import com.opencrm.rules.drools.DroolsRulesEngine;
+import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.rules.engine.RuleExecutionContext;
+import com.opencrm.rules.engine.RuleExecutionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -204,6 +212,100 @@ class PricingExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("simulate() should pass OpenL pricing outputs before Drools complex rules by priority")
+    void simulateShouldExecuteOpenLPricingOutputsBeforeDroolsComplexRulesByPriority() {
+        RuleSet activeRuleSet = activeRuleSet();
+        Rule openLPricingRule = activeRule(
+                "OpenL table discount",
+                "OPENL_PRICE_TABLE",
+                720,
+                "OPENL_TABLE_DISCOUNT");
+        Rule droolsComplexRule = activeRule(
+                "Drools margin guardrail",
+                "DROOLS_MARGIN_GUARDRAIL",
+                610,
+                "DROOLS_MARGIN_GUARDRAIL");
+
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(List.of(activeRuleSet));
+        when(ruleRepository.findByRuleSetIdAndStatusAndDeletedFalseOrderByPriorityDesc(1L, RuleStatus.ACTIVE))
+                .thenReturn(List.of(openLPricingRule, droolsComplexRule));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(new BigDecimal("100.00")));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+        when(droolsRulesEngine.execute(any(RuleExecutionContext.class), any()))
+                .thenReturn(RuleExecutionResult.builder().success(true).rulesFired(2).build());
+
+        executionService.simulate(defaultContext);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RuleDefinition>> rulesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(droolsRulesEngine).execute(any(RuleExecutionContext.class), rulesCaptor.capture());
+        List<RuleDefinition> ruleDefinitions = rulesCaptor.getValue();
+
+        assertEquals("OpenL table discount", ruleDefinitions.get(0).getName());
+        assertEquals(720, ruleDefinitions.get(0).getPriority());
+        assertEquals("OPENL_PRICE_TABLE", ruleDefinitions.get(0).getContent());
+        assertEquals("OPENL_TABLE_DISCOUNT", ruleDefinitions.get(0).getExplanationCode());
+        assertEquals("Drools margin guardrail", ruleDefinitions.get(1).getName());
+        assertEquals(610, ruleDefinitions.get(1).getPriority());
+        assertEquals("DROOLS_MARGIN_GUARDRAIL", ruleDefinitions.get(1).getContent());
+    }
+
+    @Test
+    @DisplayName("simulate() should reconcile OpenL discounts and Drools outputs without double-discounting")
+    void simulateShouldReconcileOpenLDiscountAndDroolsOutputWithoutDoubleDiscounting() {
+        RuleSet activeRuleSet = activeRuleSet();
+
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(List.of(activeRuleSet));
+        when(ruleRepository.findByRuleSetIdAndStatusAndDeletedFalseOrderByPriorityDesc(1L, RuleStatus.ACTIVE))
+                .thenReturn(List.of(
+                        activeRule("OpenL table discount", "OPENL_PRICE_TABLE", 720, "OPENL_TABLE_DISCOUNT"),
+                        activeRule("Drools complex surcharge", "DROOLS_COMPLEX_SURCHARGE", 610, "DROOLS_COMPLEX_SURCHARGE")));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(new BigDecimal("100.00")));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+        when(droolsRulesEngine.execute(any(RuleExecutionContext.class), any()))
+                .thenAnswer(invocation -> {
+                    RuleExecutionContext ruleContext = invocation.getArgument(0);
+                    PricingLineResult line = ruleContext.getFacts().stream()
+                            .filter(PricingLineResult.class::isInstance)
+                            .map(PricingLineResult.class::cast)
+                            .findFirst()
+                            .orElseThrow();
+
+                    line.setDiscountRate(new BigDecimal("0.10"));
+                    line.setDiscountAmount(new BigDecimal("50.00"));
+                    line.setSurchargeAmount(new BigDecimal("25.00"));
+                    line.setFinalPrice(new BigDecimal("475.00"));
+                    line.getExplanationCodes().add("OPENL_TABLE_DISCOUNT");
+                    line.getExplanationCodes().add("DROOLS_COMPLEX_SURCHARGE");
+
+                    return RuleExecutionResult.builder().success(true).rulesFired(2).build();
+                });
+
+        PricingResult result = executionService.simulate(defaultContext);
+
+        PricingLineResult lineResult = result.getLineResults().get(0);
+        assertEquals(new BigDecimal("500.00"), lineResult.getListPrice().multiply(BigDecimal.valueOf(5)));
+        assertEquals(new BigDecimal("0.10"), lineResult.getDiscountRate());
+        assertEquals(new BigDecimal("50.00"), lineResult.getDiscountAmount());
+        assertEquals(new BigDecimal("25.00"), lineResult.getSurchargeAmount());
+        assertEquals(new BigDecimal("475.00"), lineResult.getFinalPrice());
+        assertTrue(lineResult.getExplanationCodes().contains("OPENL_TABLE_DISCOUNT"));
+        assertTrue(lineResult.getExplanationCodes().contains("DROOLS_COMPLEX_SURCHARGE"));
+    }
+
+    @Test
     @DisplayName("getAuditTrail() should return audit logs")
     void getAuditTrailShouldReturnLogs() {
         String quoteId = "Q-001";
@@ -245,6 +347,31 @@ class PricingExecutionServiceTest {
                 .tcv(BigDecimal.valueOf(6000))
                 .acv(BigDecimal.valueOf(6000))
                 .clv(BigDecimal.valueOf(12000))
+                .build();
+    }
+
+    private static RuleSet activeRuleSet() {
+        return RuleSet.builder()
+                .id(1L)
+                .name("Hybrid pricing rules")
+                .status(RuleSetStatus.ACTIVE)
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .engineType("DROOLS")
+                .build();
+    }
+
+    private static Rule activeRule(String name, String content, int priority, String explanationCode) {
+        return Rule.builder()
+                .id((long) priority)
+                .ruleSetId(1L)
+                .name(name)
+                .description(name)
+                .ruleType(RuleType.PRICING)
+                .priority(priority)
+                .status(RuleStatus.ACTIVE)
+                .content(content)
+                .explanationCode(explanationCode)
+                .conflictPolicy("HIGHEST_PRIORITY_THEN_IMPACT")
                 .build();
     }
 }
