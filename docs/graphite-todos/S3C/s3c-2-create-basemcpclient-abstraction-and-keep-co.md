@@ -1,6 +1,6 @@
 # S3C-2: Create BaseMCPClient abstraction and keep Context7, Puppeteer, and Sequential Thinking clients behind it.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Completed in this PR.
 
 **Stack lane:** `S3C`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Repository-wide searches for `BaseMCPClient`, `MCPClient`, `Context7`, `Puppeteer`, and `Sequential Thinking` only find this tracking card and general documentation references; there are no concrete MCP client implementations to place behind a shared abstraction on the current branch.
+- The referenced `price-drools-service` module and `pricing-ai-rules-service` reference docs are not present in this repository. The current pricing/rules ownership lives in `backend/services/pricing-service` and `backend/libs/rules-engine`.
+- No production code changes were needed because the MCP client layer described by the backlog task is already absent from the branch.
