@@ -76,6 +76,7 @@
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
+        <skip.integration.tests>true</skip.integration.tests>
     </properties>
 
     <dependencyManagement>
@@ -164,9 +165,69 @@
                         </compilerArgs>
                     </configuration>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>**/*IntegrationTest.java</exclude>
+                            <exclude>**/*IT.java</exclude>
+                            <exclude>**/*LifecycleTest.java</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <skipITs>${skip.integration.tests}</skipITs>
+                        <includes>
+                            <include>**/*IntegrationTest.java</include>
+                            <include>**/*IT.java</include>
+                            <include>**/*LifecycleTest.java</include>
+                        </includes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
+
+    <profiles>
+        <!-- Fast PR path: Surefire only, skip Jacoco (services may still enforce when profile inactive). -->
+        <profile>
+            <id>unit-tests</id>
+            <properties>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+        <!-- Docker-backed ITs via Failsafe (*IntegrationTest, *IT, *LifecycleTest). -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skip.integration.tests>false</skip.integration.tests>
+            </properties>
+        </profile>
+        <profile>
+            <id>integration</id>
+            <properties>
+                <skip.integration.tests>false</skip.integration.tests>
+            </properties>
+        </profile>
+    </profiles>
 
     <repositories>
         <repository>

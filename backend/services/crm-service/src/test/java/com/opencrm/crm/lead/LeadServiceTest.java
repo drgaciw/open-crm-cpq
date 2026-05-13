@@ -627,12 +627,14 @@ class LeadServiceTest {
         @Test
         @DisplayName("should return counts for all statuses")
         void shouldReturnStatusCounts() {
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.NEW)).thenReturn(5L);
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.CONTACTED)).thenReturn(3L);
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.QUALIFIED)).thenReturn(2L);
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.UNQUALIFIED)).thenReturn(1L);
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.CONVERTED)).thenReturn(4L);
-            when(leadRepository.countByStatusAndDeletedFalse(LeadStatus.LOST)).thenReturn(0L);
+            when(leadRepository.countGroupByStatus()).thenReturn(List.of(
+                    new Object[]{LeadStatus.NEW, 5L},
+                    new Object[]{LeadStatus.CONTACTED, 3L},
+                    new Object[]{LeadStatus.QUALIFIED, 2L},
+                    new Object[]{LeadStatus.UNQUALIFIED, 1L},
+                    new Object[]{LeadStatus.CONVERTED, 4L},
+                    new Object[]{LeadStatus.LOST, 0L}
+            ));
 
             Map<LeadStatus, Long> counts = leadService.getStatusCounts();
 

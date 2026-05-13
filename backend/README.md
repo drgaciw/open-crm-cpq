@@ -142,11 +142,28 @@ Environment variables for production:
 
 ## Running Tests
 
-Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible:
+### Shared libraries (S1B-1)
 
 ```bash
-mvn test -pl services/crm-service -am
+.\mvnw.cmd -B verify --no-transfer-progress -pl libs/common,libs/security,libs/rules-engine -am
 ```
+
+### Unit vs integration split (S1B-4)
+
+Default `mvn verify` runs **Surefire** unit tests and skips Failsafe ITs (`skip.integration.tests=true`).
+Integration-style classes are named `*IntegrationTest`, `*IT`, or `*LifecycleTest`.
+
+| Goal | Command |
+|------|---------|
+| Fast unit reactor (no Docker ITs, skip Jacoco) | `.\mvnw.cmd -B verify -Punit-tests -Djacoco.skip=true --no-transfer-progress` |
+| Scoped unit (example: CRM + libs) | `.\mvnw.cmd -B verify -Punit-tests -Djacoco.skip=true -pl libs/common,libs/security,libs/rules-engine,services/crm-service -am` |
+| Docker-backed integration ITs | `.\mvnw.cmd -B verify -Pintegration-tests --no-transfer-progress` (alias: `-Pintegration`) |
+
+Set `SPRING_PROFILES_ACTIVE=test` in CI. See [docs/CRM_TESTING_STRATEGY.md](../docs/CRM_TESTING_STRATEGY.md) for per-module inventory.
+
+**Known limitations:** exclude `services/ai-service` (Spring AI compile, Stack 3E) and `services/configuration-engine` (protobuf/grpc generated sources) from full-reactor `-Punit-tests` until fixed upstream.
+
+Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible.
 
 **Windows (Docker Desktop)**: If TestContainers can't find Docker, create `~/.testcontainers.properties`:
 ```properties

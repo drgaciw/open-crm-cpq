@@ -23,7 +23,19 @@ Reactor modules under `backend/` and how tests run today. **Default `mvn verify`
 | `services/document-generation` | 1 | Unit | No | — | |
 | `services/contract-asset-management` | 1 | Unit | No | — | |
 
-**Profiles:** `-Pintegration` runs Failsafe ITs (Docker required for `crm-service`). `-Punit-tests` is an alias documented on the top-of-stack S1B-4 PR for fast PR checks with `jacoco.skip=true`.
+**Profiles:** `-Pintegration-tests` (alias `-Pintegration`) runs Failsafe ITs (Docker required for `crm-service`). `-Punit-tests` skips Jacoco and keeps ITs off by default.
+
+### Reactor verification commands (S1B-4)
+
+```bash
+cd backend
+# Bottom of stack — shared libs
+.\mvnw.cmd -B verify --no-transfer-progress -pl libs/common,libs/security,libs/rules-engine -am
+# Top of stack — unit path (exclude ai-service if compile fails)
+.\mvnw.cmd -B verify -Punit-tests -Djacoco.skip=true --no-transfer-progress -pl '!services/ai-service'
+# Full integration (Docker)
+.\mvnw.cmd -B verify -Pintegration-tests --no-transfer-progress -pl services/crm-service -am
+```
 
 ## Backend (`crm-service`)
 
