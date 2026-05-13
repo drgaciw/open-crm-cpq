@@ -24,6 +24,7 @@
       "@frontend/crm-organizations": ["libs/crm/organizations/src/index.ts"],
       "@frontend/crm-leads": ["libs/crm/leads/src/index.ts"],
       "@frontend/crm-deals": ["libs/crm/deals/src/index.ts"],
+      "@frontend/crm-cpq": ["libs/crm/cpq/src/index.ts"],
       "@frontend/crm-dashboard": ["libs/crm/dashboard/src/index.ts"]
     }
   },

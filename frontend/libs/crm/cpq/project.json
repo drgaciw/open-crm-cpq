@@ -1,0 +1,20 @@
+{
+  "name": "crm-cpq",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/crm/cpq/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:crm", "type:feature", "domain:cpq"],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/crm/cpq"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

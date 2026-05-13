@@ -32,6 +32,11 @@ export const appRoutes: Route[] = [
         loadChildren: () =>
           import('@frontend/crm-deals').then((m) => m.DEAL_ROUTES),
       },
+      {
+        path: 'cpq',
+        loadChildren: () =>
+          import('@frontend/crm-cpq').then((m) => m.CPQ_ROUTES),
+      },
     ],
   },
 ];
