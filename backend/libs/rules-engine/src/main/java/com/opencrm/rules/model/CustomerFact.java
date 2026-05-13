@@ -10,13 +10,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Customer fact for rules engine evaluation.
+ * Customer context fact for pricing and renewal rules.
+ *
+ * <p>The stable fields mirror customer attributes that affect eligibility,
+ * discounting, and approval routing. Metadata carries customer-specific policy
+ * values that vary by rule set or are still being normalized.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CustomerFact {
+public class CustomerFact implements MetadataBackedFact {
 
     private String externalId;
     private String name;
@@ -28,5 +32,5 @@ public class CustomerFact {
     private BigDecimal annualRevenue;
 
     @Builder.Default
-    private Map<String, String> metadata = new HashMap<>();
+    private Map<String, Object> metadata = new HashMap<>();
 }

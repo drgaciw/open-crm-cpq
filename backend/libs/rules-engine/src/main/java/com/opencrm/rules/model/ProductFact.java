@@ -10,13 +10,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Product fact for rules engine evaluation.
+ * Product context fact for pricing rules.
+ *
+ * <p>The stable fields identify the priced product and its list-price context.
+ * Metadata carries catalog attributes that are still owned by product/pricebook
+ * services but need to be visible to rules during evaluation.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductFact {
+public class ProductFact implements MetadataBackedFact {
 
     private String externalId;
     private String name;
@@ -26,5 +30,5 @@ public class ProductFact {
     private String currency;
 
     @Builder.Default
-    private Map<String, String> metadata = new HashMap<>();
+    private Map<String, Object> metadata = new HashMap<>();
 }

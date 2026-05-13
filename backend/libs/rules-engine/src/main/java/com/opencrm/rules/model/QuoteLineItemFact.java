@@ -10,13 +10,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Quote line item fact for rules engine evaluation.
+ * Quote line-item pricing fact for Drools rule evaluation.
+ *
+ * <p>Canonical fields capture the stable line-level inputs and outputs currently
+ * used by the seeded pricing catalog. Metadata is reserved for product-policy
+ * extensions that should not force a fact-model change for every rule.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QuoteLineItemFact {
+public class QuoteLineItemFact implements MetadataBackedFact {
 
     private String externalId;
     private String lineItemType;
@@ -31,67 +35,4 @@ public class QuoteLineItemFact {
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
 
-    // Helper methods for metadata access
-    public String getString(String key) {
-        Object value = metadata.get(key);
-        return value != null ? value.toString() : null;
-    }
-
-    public Integer getInt(String key) {
-        Object value = metadata.get(key);
-        if (value instanceof Integer) {
-            return (Integer) value;
-        } else if (value instanceof Number) {
-            return ((Number) value).intValue();
-        } else if (value instanceof String) {
-            try {
-                return Integer.parseInt((String) value);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    public BigDecimal getDecimal(String key) {
-        Object value = metadata.get(key);
-        if (value instanceof BigDecimal) {
-            return (BigDecimal) value;
-        } else if (value instanceof Number) {
-            return BigDecimal.valueOf(((Number) value).doubleValue());
-        } else if (value instanceof String) {
-            try {
-                return new BigDecimal((String) value);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    public Boolean getBoolean(String key) {
-        Object value = metadata.get(key);
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        } else if (value instanceof String) {
-            return Boolean.parseBoolean((String) value);
-        }
-        return null;
-    }
-
-    public void setString(String key, String value) {
-        metadata.put(key, value);
-    }
-
-    public void setInt(String key, Integer value) {
-        metadata.put(key, value);
-    }
-
-    public void setDecimal(String key, BigDecimal value) {
-        metadata.put(key, value);
-    }
-
-    public void setBoolean(String key, Boolean value) {
-        metadata.put(key, value);
-    }
 }
