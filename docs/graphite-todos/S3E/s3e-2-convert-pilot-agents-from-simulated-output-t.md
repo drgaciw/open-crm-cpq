@@ -1,6 +1,6 @@
 # S3E-2: Convert pilot agents from simulated output to model-backed output using specific agent specs selected in the PR, starting with pricing agents such as customer-segment-discount, volume-discount, and minimum-margin-enforcement.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR for the selected pilot pricing agents.
 
 **Stack lane:** `S3E`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Converted `cpq-agent-007` (volume-discount), `cpq-agent-008` (customer-segment-discount), and `cpq-agent-011` (minimum-margin-enforcement) to the shared internal LLM adapter path introduced in S3E-1.
+- Agent-specific instructions are derived from the referenced pricing agent PRDs and keep pricing-service ownership boundaries intact.
+- Existing ai-service test compilation is still blocked by unrelated stale constructor expectations in non-pilot agent tests.
