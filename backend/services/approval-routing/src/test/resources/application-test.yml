@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///opencrm?currentSchema=approval
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: approval
+  flyway:
+    enabled: true
+    schemas: approval
+    locations: classpath:db/migration
+  cache:
+    type: none
+
+logging:
+  level:
+    com.opencrm: DEBUG
