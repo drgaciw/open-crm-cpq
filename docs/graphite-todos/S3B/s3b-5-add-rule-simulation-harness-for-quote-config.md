@@ -1,6 +1,6 @@
 # S3B-5: Add rule simulation harness for quote/config/pricing facts and approval outputs.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3B`
 
