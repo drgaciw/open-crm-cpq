@@ -1,6 +1,6 @@
 # S3D-2: Re-enable Sequential Thinking, Context7, and Puppeteer clients behind flags once dependency compatibility is proven.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3D`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Added default-off MCP client feature flags for Sequential Thinking, Context7, and Puppeteer in `ai-service`.
+- Added a small registry that exposes only enabled MCP client descriptors, keeping client activation behind configuration.
+- Narrow Maven verification is still blocked by the known Spring AI `ChatClient` compile mismatch in `AbstractCpqAgent`.

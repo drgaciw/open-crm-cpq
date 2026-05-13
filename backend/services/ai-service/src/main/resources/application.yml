@@ -39,6 +39,17 @@ opencrm:
   ai:
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
+    mcp:
+      clients:
+        sequential-thinking:
+          enabled: ${OPENCRM_AI_MCP_SEQUENTIAL_THINKING_ENABLED:false}
+          endpoint: ${OPENCRM_AI_MCP_SEQUENTIAL_THINKING_ENDPOINT:http://localhost:3101}
+        context7:
+          enabled: ${OPENCRM_AI_MCP_CONTEXT7_ENABLED:false}
+          endpoint: ${OPENCRM_AI_MCP_CONTEXT7_ENDPOINT:http://localhost:3102}
+        puppeteer:
+          enabled: ${OPENCRM_AI_MCP_PUPPETEER_ENABLED:false}
+          endpoint: ${OPENCRM_AI_MCP_PUPPETEER_ENDPOINT:http://localhost:3103}
 
 logging:
   level:
