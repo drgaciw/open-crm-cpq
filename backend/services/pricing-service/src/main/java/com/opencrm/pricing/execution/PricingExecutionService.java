@@ -1,6 +1,7 @@
 package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.rules.drools.DroolsRulesEngine;
 import com.opencrm.rules.engine.RuleDefinition;
@@ -31,8 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Main orchestrator for pricing execution.
@@ -181,6 +184,7 @@ public class PricingExecutionService {
                         .actionSet(rule.getActionSet())
                         .conflictPolicy(rule.getConflictPolicy())
                         .explanationCode(rule.getExplanationCode())
+                        .metadata(ruleMetadata(rule))
                         .build())
                     .toList();
                 RuleExecutionContext ruleContext = RuleExecutionContext.builder()
@@ -279,6 +283,25 @@ public class PricingExecutionService {
                 .approvalState("APPROVED")
                 .explanationCodes(new ArrayList<>())
                 .build();
+    }
+
+    private Map<String, String> ruleMetadata(Rule rule) {
+        Map<String, String> metadata = new HashMap<>();
+        if (rule.getRuleType() != null) {
+            metadata.put("impactClass", rule.getRuleType().name());
+        }
+
+        if (rule.getMetadata() == null || rule.getMetadata().isBlank()) {
+            return metadata;
+        }
+
+        try {
+            metadata.putAll(objectMapper.readValue(rule.getMetadata(), new TypeReference<Map<String, String>>() {
+            }));
+        } catch (JsonProcessingException e) {
+            log.warn("Ignoring invalid metadata JSON for rule {}: {}", rule.getId(), e.getOriginalMessage());
+        }
+        return metadata;
     }
 
     private void persistAuditLog(PricingContext context, PricingResult result,

@@ -1,6 +1,7 @@
 package com.opencrm.rules.drools;
 
 import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.rules.engine.RuleEvaluationOrder;
 import com.opencrm.rules.engine.RuleExecutionContext;
 import com.opencrm.rules.engine.RuleExecutionResult;
 import com.opencrm.rules.engine.RulesEngine;
@@ -32,14 +33,16 @@ public class DroolsRulesEngine implements RulesEngine {
 
     @Override
     public RuleExecutionResult execute(RuleExecutionContext context, List<RuleDefinition> rules) {
-        log.info("Executing {} Drools rules", rules.size());
+        List<RuleDefinition> orderedRules = RuleEvaluationOrder.withDeterministicSalience(
+                RuleEvaluationOrder.orderAndValidate(rules));
+        log.info("Executing {} Drools rules", orderedRules.size());
 
         long startTime = System.currentTimeMillis();
         KieSession kieSession = null;
 
         try {
             // Create session from rule definitions
-            kieSession = sessionFactory.createSession(rules);
+            kieSession = sessionFactory.createSession(orderedRules);
 
             // Insert all facts
             for (Object fact : context.getFacts()) {
