@@ -3,6 +3,10 @@ package com.opencrm.pricing.execution;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
+import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.customer.CustomerRepository;
 import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
@@ -33,6 +37,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Spy;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Pricing Execution Service")
@@ -54,10 +60,12 @@ class PricingExecutionServiceTest {
     private PricingContextValidator contextValidator;
     @Mock
     private MetricsCalculator metricsCalculator;
-    @Mock
-    private ObjectMapper objectMapper;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
     @Mock
     private DroolsRulesEngine droolsRulesEngine;
+    @Mock
+    private OutboxEventPublisher outboxEventPublisher;
 
     @InjectMocks
     private PricingExecutionService executionService;
@@ -94,7 +102,6 @@ class PricingExecutionServiceTest {
 
         when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
                 .thenReturn(defaultMetrics);
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
         PricingResult result = executionService.execute(defaultContext);
 
@@ -112,6 +119,71 @@ class PricingExecutionServiceTest {
         assertNotNull(result.getWaterfall());
 
         verify(auditLogRepository).save(any(PricingAuditLog.class));
+    }
+
+    @Test
+    @DisplayName("execute() should publish PriceCalculated with explanation codes and deterministic snapshots")
+    void executeShouldPublishPriceCalculatedEvent() throws Exception {
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(new ArrayList<>());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+
+        executionService.execute(defaultContext);
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxEventPublisher).publish(
+                eq("PricingExecution"),
+                eq("Q-001"),
+                eq(KafkaTopics.PRICE_CALCULATED),
+                payloadCaptor.capture()
+        );
+
+        PriceCalculatedEvent event = (PriceCalculatedEvent) payloadCaptor.getValue();
+        assertEquals("Q-001", event.getQuoteId());
+        assertEquals("CUST-001", event.getCustomerId());
+        assertEquals(List.of("LIST_PRICE_APPLIED"), event.getExplanationCodes());
+        assertTrue(event.getInputSnapshot().contains("\"customerExternalId\":\"CUST-001\""));
+        assertTrue(event.getOutputSnapshot().contains("\"explanationCodes\":[\"LIST_PRICE_APPLIED\"]"));
+    }
+
+    @Test
+    @DisplayName("execute() should publish DiscountApprovalRequired when discount exceeds threshold")
+    void executeShouldPublishDiscountApprovalRequiredWhenThresholdExceeded() throws Exception {
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(new ArrayList<>());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+        defaultContext.getLineItems().get(0).getMetadata().put("discountRate", BigDecimal.valueOf(25));
+
+        executionService.execute(defaultContext);
+
+        ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(outboxEventPublisher).publish(
+                eq("PricingExecution"),
+                eq("Q-001"),
+                eq(KafkaTopics.DISCOUNT_APPROVAL_REQUIRED),
+                payloadCaptor.capture()
+        );
+
+        DiscountApprovalRequiredEvent event = (DiscountApprovalRequiredEvent) payloadCaptor.getValue();
+        assertEquals("Q-001", event.getQuoteId());
+        assertEquals("PROD-001", event.getLineId());
+        assertEquals(BigDecimal.valueOf(25), event.getMarginDelta());
+        assertEquals(0, BigDecimal.valueOf(125).compareTo(event.getRequestedDiscount()));
+        assertEquals(List.of("LIST_PRICE_APPLIED", "DISCOUNT_APPROVAL_REQUIRED"), event.getExplanationCodes());
+        assertTrue(event.getInputSnapshot().contains("\"discountRate\":25"));
+        assertTrue(event.getOutputSnapshot().contains("\"DISCOUNT_APPROVAL_REQUIRED\""));
     }
 
     @Test
@@ -230,6 +302,7 @@ class PricingExecutionServiceTest {
                                 .productExternalId("PROD-001")
                                 .quantity(5)
                                 .lineItemType("SUBSCRIPTION")
+                                .metadata(new java.util.HashMap<>())
                                 .build()
                 ))
                 .build();

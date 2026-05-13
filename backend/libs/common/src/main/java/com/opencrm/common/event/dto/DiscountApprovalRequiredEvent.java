@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Event published when a discount requires approval.
@@ -21,4 +22,7 @@ public class DiscountApprovalRequiredEvent {
     private BigDecimal marginDelta;
     private BigDecimal requestedDiscount;
     private String currencyCode;
+    private List<String> explanationCodes;
+    private String inputSnapshot;
+    private String outputSnapshot;
 }

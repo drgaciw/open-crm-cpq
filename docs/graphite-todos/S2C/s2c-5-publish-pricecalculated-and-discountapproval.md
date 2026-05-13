@@ -1,6 +1,6 @@
 # S2C-5: Publish PriceCalculated and DiscountApprovalRequired with explanation codes and deterministic snapshots.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2C`
 

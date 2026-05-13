@@ -1,7 +1,13 @@
 package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
+import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.rules.drools.DroolsRulesEngine;
 import com.opencrm.rules.engine.RuleDefinition;
 import com.opencrm.rules.engine.RuleExecutionContext;
@@ -29,10 +35,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Main orchestrator for pricing execution.
@@ -53,6 +61,9 @@ public class PricingExecutionService {
     private final MetricsCalculator metricsCalculator;
     private final ObjectMapper objectMapper;
     private final DroolsRulesEngine droolsRulesEngine;
+    private final OutboxEventPublisher outboxEventPublisher;
+
+    private static final BigDecimal APPROVAL_THRESHOLD_PERCENT = BigDecimal.valueOf(20);
 
     /**
      * Execute pricing with full audit trail.
@@ -164,6 +175,7 @@ public class PricingExecutionService {
                         .metadata(lineRequest.getMetadata())
                         .build();
 
+                applyRequestedDiscount(lineRequest, lineResult);
                 lineResults.add(lineResult);
             }
 
@@ -206,8 +218,8 @@ public class PricingExecutionService {
             PricingResult result = PricingResult.builder()
                     .success(true)
                     .lineResults(lineResults)
-                    .explanationCodes(new ArrayList<>())
-                    .approvalState("APPROVED")
+                    .explanationCodes(explanationCodes(lineResults))
+                    .approvalState(requiresDiscountApproval(lineResults) ? "PENDING_APPROVAL" : "APPROVED")
                     .build();
 
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths());
@@ -222,7 +234,9 @@ public class PricingExecutionService {
 
             // 13. Persist audit log for execute mode only
             if (persistAudit) {
-                persistAuditLog(context, result, ruleSet, executionTime);
+                EventSnapshots snapshots = buildSnapshots(context, result);
+                persistAuditLog(context, result, ruleSet, executionTime, snapshots);
+                publishPricingEvents(context, result, snapshots);
             }
 
             return result;
@@ -260,6 +274,61 @@ public class PricingExecutionService {
         return product.getListPrice() != null ? product.getListPrice() : BigDecimal.ZERO;
     }
 
+    private void applyRequestedDiscount(PricingLineRequest lineRequest, PricingLineResult lineResult) {
+        lineResult.getExplanationCodes().add(
+                lineRequest.getListPriceOverride() != null ? "LIST_PRICE_OVERRIDE" : "LIST_PRICE_APPLIED");
+
+        BigDecimal discountRate = metadataDecimal(lineRequest.getMetadata(), "discountRate");
+        if (discountRate == null || discountRate.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        BigDecimal grossPrice = lineResult.getListPrice()
+                .multiply(BigDecimal.valueOf(lineResult.getQuantity()));
+        BigDecimal discountAmount = grossPrice
+                .multiply(discountRate)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        lineResult.setDiscountRate(discountRate);
+        lineResult.setDiscountAmount(discountAmount);
+        lineResult.setFinalPrice(grossPrice.subtract(discountAmount));
+
+        if (discountRate.compareTo(APPROVAL_THRESHOLD_PERCENT) > 0) {
+            lineResult.getExplanationCodes().add("DISCOUNT_APPROVAL_REQUIRED");
+        }
+    }
+
+    private BigDecimal metadataDecimal(Map<String, Object> metadata, String key) {
+        if (metadata == null || metadata.get(key) == null) {
+            return null;
+        }
+
+        Object value = metadata.get(key);
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        if (value instanceof String string) {
+            return new BigDecimal(string);
+        }
+        return null;
+    }
+
+    private List<String> explanationCodes(List<PricingLineResult> lineResults) {
+        return lineResults.stream()
+                .flatMap(line -> line.getExplanationCodes().stream())
+                .distinct()
+                .toList();
+    }
+
+    private boolean requiresDiscountApproval(List<PricingLineResult> lineResults) {
+        return lineResults.stream()
+                .anyMatch(line -> line.getDiscountRate() != null
+                        && line.getDiscountRate().compareTo(APPROVAL_THRESHOLD_PERCENT) > 0);
+    }
+
     private PricingWaterfall buildWaterfall(List<PricingLineResult> lineResults) {
         List<PricingWaterfallStep> steps = new ArrayList<>();
 
@@ -281,27 +350,35 @@ public class PricingExecutionService {
                 .build();
     }
 
-    private void persistAuditLog(PricingContext context, PricingResult result,
-                                   RuleSet ruleSet, long executionTime) {
+    private EventSnapshots buildSnapshots(PricingContext context, PricingResult result) {
         try {
-            String inputSnapshot = objectMapper.writeValueAsString(context);
-            String outputSnapshot = objectMapper.writeValueAsString(result);
+            return new EventSnapshots(
+                    deterministicSnapshotMapper().writeValueAsString(context),
+                    deterministicSnapshotMapper().writeValueAsString(result));
+        } catch (JsonProcessingException e) {
+            log.error("AUDIT_INTEGRITY_FAILURE: Failed to serialize snapshots for quote {}: {}",
+                    context.getQuoteExternalId(), e.getMessage(), e);
+            throw new BusinessException(
+                    "Pricing was calculated but deterministic snapshots could not be serialized",
+                    "SNAPSHOT_SERIALIZATION_FAILED");
+        }
+    }
 
+    private void persistAuditLog(PricingContext context, PricingResult result,
+                                   RuleSet ruleSet, long executionTime, EventSnapshots snapshots) {
+        try {
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
                     .customerExternalId(context.getCustomerExternalId())
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
-                    .inputSnapshot(inputSnapshot)
-                    .outputSnapshot(outputSnapshot)
+                    .inputSnapshot(snapshots.inputSnapshot())
+                    .outputSnapshot(snapshots.outputSnapshot())
                     .executionTimeMs(executionTime)
                     .build();
 
             auditLogRepository.save(auditLog);
             log.info("Persisted audit log for quote: {}", context.getQuoteExternalId());
 
-        } catch (JsonProcessingException e) {
-            log.error("AUDIT_INTEGRITY_FAILURE: Failed to serialize audit log for quote {}: {}",
-                    context.getQuoteExternalId(), e.getMessage(), e);
         } catch (Exception e) {
             log.error("AUDIT_INTEGRITY_FAILURE: Failed to persist audit log for quote {}: {}",
                     context.getQuoteExternalId(), e.getMessage(), e);
@@ -309,5 +386,48 @@ public class PricingExecutionService {
                     "Pricing was calculated but the audit trail could not be saved",
                     "AUDIT_PERSISTENCE_FAILED");
         }
+    }
+
+    private void publishPricingEvents(PricingContext context, PricingResult result, EventSnapshots snapshots) {
+        outboxEventPublisher.publish(
+                "PricingExecution",
+                context.getQuoteExternalId(),
+                KafkaTopics.PRICE_CALCULATED,
+                new PriceCalculatedEvent(
+                        context.getQuoteExternalId(),
+                        context.getCustomerExternalId(),
+                        result.getExplanationCodes(),
+                        snapshots.inputSnapshot(),
+                        snapshots.outputSnapshot()));
+
+        for (PricingLineResult line : result.getLineResults()) {
+            if (line.getDiscountRate() == null
+                    || line.getDiscountRate().compareTo(APPROVAL_THRESHOLD_PERCENT) <= 0) {
+                continue;
+            }
+
+            outboxEventPublisher.publish(
+                    "PricingExecution",
+                    context.getQuoteExternalId(),
+                    KafkaTopics.DISCOUNT_APPROVAL_REQUIRED,
+                    new DiscountApprovalRequiredEvent(
+                            context.getQuoteExternalId(),
+                            line.getProductExternalId(),
+                            line.getDiscountRate(),
+                            line.getDiscountAmount(),
+                            context.getCurrency(),
+                            line.getExplanationCodes(),
+                            snapshots.inputSnapshot(),
+                            snapshots.outputSnapshot()));
+        }
+    }
+
+    private ObjectMapper deterministicSnapshotMapper() {
+        return objectMapper.copy()
+                .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
+                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+    }
+
+    private record EventSnapshots(String inputSnapshot, String outputSnapshot) {
     }
 }

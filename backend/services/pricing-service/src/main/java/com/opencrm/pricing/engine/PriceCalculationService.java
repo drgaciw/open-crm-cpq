@@ -84,7 +84,10 @@ public class PriceCalculationService {
                 lineId,
                 marginDelta,
                 discount.getAmount(),
-                discount.getCurrencyCode()
+                discount.getCurrencyCode(),
+                java.util.List.of("DISCOUNT_APPROVAL_REQUIRED"),
+                null,
+                null
         );
         
         outboxEventPublisher.publish(
