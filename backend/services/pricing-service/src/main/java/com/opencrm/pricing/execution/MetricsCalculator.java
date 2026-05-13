@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 /**
  * Calculator for financial metrics.
@@ -14,40 +15,40 @@ import java.math.RoundingMode;
 @Component
 public class MetricsCalculator {
 
+    private static final int DEFAULT_DURATION_IN_MONTHS = 12;
+    private static final int MONTHS_IN_YEAR = 12;
+    private static final int MONEY_SCALE = 2;
+
     /**
      * Calculate financial metrics from pricing result.
      */
-    public FinancialMetrics calculate(PricingResult result, int durationInMonths) {
+    public FinancialMetrics calculate(PricingResult result, Integer durationInMonths) {
         if (result == null || result.getLineResults() == null || result.getLineResults().isEmpty()) {
-            return FinancialMetrics.builder()
-                    .arr(BigDecimal.ZERO)
-                    .tcv(BigDecimal.ZERO)
-                    .acv(BigDecimal.ZERO)
-                    .clv(BigDecimal.ZERO)
-                    .totalDiscount(BigDecimal.ZERO)
-                    .totalSurcharge(BigDecimal.ZERO)
-                    .estimatedMarginPct(BigDecimal.ZERO)
-                    .build();
+            return zeroMetrics();
         }
 
-        // Calculate total monthly price
-        BigDecimal monthlyPrice = result.getLineResults().stream()
+        int normalizedDuration = normalizeDuration(durationInMonths);
+        BigDecimal recurringMonthlyValue = result.getLineResults().stream()
                 .map(PricingLineResult::getFinalPrice)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // ARR = monthlyPrice * 12
-        BigDecimal arr = monthlyPrice.multiply(BigDecimal.valueOf(12));
+        BigDecimal arr = recurringMonthlyValue
+                .multiply(BigDecimal.valueOf(MONTHS_IN_YEAR))
+                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
 
-        // TCV = monthlyPrice * durationInMonths
-        BigDecimal tcv = monthlyPrice.multiply(BigDecimal.valueOf(durationInMonths));
+        BigDecimal tcv = recurringMonthlyValue
+                .multiply(BigDecimal.valueOf(normalizedDuration))
+                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
 
-        // ACV = TCV / (durationInMonths / 12.0)
-        BigDecimal acv = durationInMonths >= 12
-                ? tcv.divide(BigDecimal.valueOf(durationInMonths / 12.0), 2, RoundingMode.HALF_UP)
-                : tcv;
+        BigDecimal acv = tcv
+                .multiply(BigDecimal.valueOf(MONTHS_IN_YEAR))
+                .divide(BigDecimal.valueOf(normalizedDuration), MONEY_SCALE, RoundingMode.HALF_UP);
 
         // CLV = monthlyPrice * expectedDuration (use durationInMonths * 2 as proxy)
-        BigDecimal clv = monthlyPrice.multiply(BigDecimal.valueOf(durationInMonths * 2));
+        BigDecimal clv = recurringMonthlyValue
+                .multiply(BigDecimal.valueOf(normalizedDuration * 2L))
+                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
 
         // Calculate total discount and surcharge
         BigDecimal totalDiscount = result.getLineResults().stream()
@@ -69,6 +70,24 @@ public class MetricsCalculator {
                 .totalDiscount(totalDiscount)
                 .totalSurcharge(totalSurcharge)
                 .estimatedMarginPct(estimatedMarginPct)
+                .build();
+    }
+
+    private int normalizeDuration(Integer durationInMonths) {
+        return durationInMonths != null && durationInMonths > 0
+                ? durationInMonths
+                : DEFAULT_DURATION_IN_MONTHS;
+    }
+
+    private FinancialMetrics zeroMetrics() {
+        return FinancialMetrics.builder()
+                .arr(BigDecimal.ZERO)
+                .tcv(BigDecimal.ZERO)
+                .acv(BigDecimal.ZERO)
+                .clv(BigDecimal.ZERO)
+                .totalDiscount(BigDecimal.ZERO)
+                .totalSurcharge(BigDecimal.ZERO)
+                .estimatedMarginPct(BigDecimal.ZERO)
                 .build();
     }
 }

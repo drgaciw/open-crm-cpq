@@ -1,6 +1,6 @@
 # S2C-3: Add derived metrics for ARR, TCV, and ACV before porting quote-level additive pricing policies.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2C`
 
@@ -16,4 +16,5 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Added a deterministic derived-metrics layer in `backend/services/pricing-service` for ARR, TCV, and ACV.
+- Added focused unit coverage for standard multi-year terms, short-term annualization, invalid duration defaults, and empty results.
