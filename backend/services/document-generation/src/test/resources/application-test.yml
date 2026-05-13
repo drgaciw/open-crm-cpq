@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///opencrm?currentSchema=document
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: document
+  flyway:
+    enabled: true
+    schemas: document
+    locations: classpath:db/migration
+  cache:
+    type: none
+
+logging:
+  level:
+    com.opencrm: DEBUG

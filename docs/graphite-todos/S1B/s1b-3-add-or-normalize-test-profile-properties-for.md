@@ -1,6 +1,6 @@
 # S1B-3: Add or normalize test profile properties for PostgreSQL, Redis, Flyway/Liquibase, and service schemas so module tests do not depend on developer-local config.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1B`
 
