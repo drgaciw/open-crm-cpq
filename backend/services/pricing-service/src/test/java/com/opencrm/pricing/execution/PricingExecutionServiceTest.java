@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -69,11 +70,14 @@ class PricingExecutionServiceTest {
     private static ResolveBatchResponse batchWithEntry(BigDecimal listPrice) {
         return ResolveBatchResponse.builder()
                 .priceBookId(1L)
+                .priceBookVersion(7L)
                 .priceBookCurrency("USD")
                 .entries(Map.of(
                         "PROD-001",
                         ProductEntryResolveDto.builder()
                                 .entryMatched(true)
+                                .priceBookEntryId(11L)
+                                .priceBookEntryVersion(3L)
                                 .listPrice(listPrice)
                                 .currency("USD")
                                 .build()))
@@ -111,7 +115,42 @@ class PricingExecutionServiceTest {
         assertNotNull(result.getFinancialMetrics());
         assertNotNull(result.getWaterfall());
 
-        verify(auditLogRepository).save(any(PricingAuditLog.class));
+        ArgumentCaptor<PricingAuditLog> auditLogCaptor = ArgumentCaptor.forClass(PricingAuditLog.class);
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        PricingAuditLog savedAuditLog = auditLogCaptor.getValue();
+        assertEquals(1L, savedAuditLog.getPriceBookId());
+        assertEquals(7L, savedAuditLog.getPriceBookVersion());
+        assertEquals("{}", savedAuditLog.getPriceBookSnapshot());
+    }
+
+    @Test
+    @DisplayName("execute() should persist rule set version in audit log")
+    void executeShouldPersistRuleSetVersionInAudit() throws Exception {
+        RuleSet ruleSet = RuleSet.builder()
+                .ruleSetVersion(4)
+                .build();
+        ruleSet.setId(42L);
+
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(List.of(ruleSet));
+        when(ruleRepository.findByRuleSetIdAndStatusAndDeletedFalseOrderByPriorityDesc(eq(42L), any()))
+                .thenReturn(new ArrayList<>());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        executionService.execute(defaultContext);
+
+        ArgumentCaptor<PricingAuditLog> auditLogCaptor = ArgumentCaptor.forClass(PricingAuditLog.class);
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        PricingAuditLog savedAuditLog = auditLogCaptor.getValue();
+        assertEquals(42L, savedAuditLog.getRuleSetId());
+        assertEquals(4, savedAuditLog.getRuleSetVersion());
     }
 
     @Test

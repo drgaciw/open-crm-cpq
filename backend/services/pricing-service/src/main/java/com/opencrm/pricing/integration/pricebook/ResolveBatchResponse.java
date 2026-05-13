@@ -14,6 +14,7 @@ import java.util.Map;
 public class ResolveBatchResponse {
 
     private Long priceBookId;
+    private Long priceBookVersion;
     private String priceBookCurrency;
     private Map<String, ProductEntryResolveDto> entries;
 }

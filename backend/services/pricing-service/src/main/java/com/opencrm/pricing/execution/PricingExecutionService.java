@@ -222,7 +222,7 @@ public class PricingExecutionService {
 
             // 13. Persist audit log for execute mode only
             if (persistAudit) {
-                persistAuditLog(context, result, ruleSet, executionTime);
+                persistAuditLog(context, result, ruleSet, priceBookBatch, executionTime);
             }
 
             return result;
@@ -282,17 +282,23 @@ public class PricingExecutionService {
     }
 
     private void persistAuditLog(PricingContext context, PricingResult result,
-                                   RuleSet ruleSet, long executionTime) {
+                                   RuleSet ruleSet, ResolveBatchResponse priceBookBatch,
+                                   long executionTime) {
         try {
             String inputSnapshot = objectMapper.writeValueAsString(context);
             String outputSnapshot = objectMapper.writeValueAsString(result);
+            String priceBookSnapshot = objectMapper.writeValueAsString(priceBookBatch);
 
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
                     .customerExternalId(context.getCustomerExternalId())
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
+                    .ruleSetVersion(ruleSet != null ? ruleSet.getRuleSetVersion() : null)
+                    .priceBookId(priceBookBatch != null ? priceBookBatch.getPriceBookId() : null)
+                    .priceBookVersion(priceBookBatch != null ? priceBookBatch.getPriceBookVersion() : null)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
+                    .priceBookSnapshot(priceBookSnapshot)
                     .executionTimeMs(executionTime)
                     .build();
 

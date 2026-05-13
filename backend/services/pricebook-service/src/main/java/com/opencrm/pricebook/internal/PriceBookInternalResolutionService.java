@@ -28,6 +28,7 @@ public class PriceBookInternalResolutionService {
         if (productExternalIds == null || productExternalIds.isEmpty()) {
             return ResolveBatchResponse.builder()
                     .priceBookId(priceBook.getId())
+                    .priceBookVersion(priceBook.getVersion())
                     .priceBookCurrency(priceBook.getCurrency())
                     .entries(entries)
                     .build();
@@ -39,6 +40,8 @@ public class PriceBookInternalResolutionService {
                 PriceBookEntry e = entryOpt.get();
                 entries.put(productExternalId, ProductEntryResolveDto.builder()
                         .entryMatched(true)
+                        .priceBookEntryId(e.getId())
+                        .priceBookEntryVersion(e.getVersion())
                         .listPrice(e.getListPrice())
                         .floorPrice(e.getFloorPrice())
                         .currency(e.getCurrency())
@@ -52,6 +55,7 @@ public class PriceBookInternalResolutionService {
         }
         return ResolveBatchResponse.builder()
                 .priceBookId(priceBook.getId())
+                .priceBookVersion(priceBook.getVersion())
                 .priceBookCurrency(priceBook.getCurrency())
                 .entries(entries)
                 .build();

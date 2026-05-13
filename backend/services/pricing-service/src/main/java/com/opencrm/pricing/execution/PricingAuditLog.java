@@ -38,11 +38,23 @@ public class PricingAuditLog {
     @Column(name = "rule_set_id")
     private Long ruleSetId;
 
+    @Column(name = "rule_set_version")
+    private Integer ruleSetVersion;
+
+    @Column(name = "price_book_id")
+    private Long priceBookId;
+
+    @Column(name = "price_book_version")
+    private Long priceBookVersion;
+
     @Column(name = "input_snapshot", nullable = false, columnDefinition = "TEXT")
     private String inputSnapshot;
 
     @Column(name = "output_snapshot", nullable = false, columnDefinition = "TEXT")
     private String outputSnapshot;
+
+    @Column(name = "price_book_snapshot", columnDefinition = "TEXT")
+    private String priceBookSnapshot;
 
     @Column(name = "waterfall_trace", columnDefinition = "TEXT")
     private String waterfallTrace;

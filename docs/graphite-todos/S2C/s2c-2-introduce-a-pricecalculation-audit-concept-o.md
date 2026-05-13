@@ -1,6 +1,6 @@
 # S2C-2: Introduce a PriceCalculation audit concept or harden PricingAuditLog to persist input snapshots, rule set version, and pricebook version.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR by hardening `PricingAuditLog` to persist calculation snapshots plus rule set and price book version context.
 
 **Stack lane:** `S2C`
 

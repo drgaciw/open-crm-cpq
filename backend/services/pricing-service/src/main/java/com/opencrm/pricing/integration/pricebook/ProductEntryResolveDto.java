@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 public class ProductEntryResolveDto {
 
     private boolean entryMatched;
+    private Long priceBookEntryId;
+    private Long priceBookEntryVersion;
     private BigDecimal listPrice;
     private BigDecimal floorPrice;
     private String currency;
