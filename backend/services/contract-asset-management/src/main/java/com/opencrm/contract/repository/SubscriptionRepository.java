@@ -15,6 +15,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     List<Subscription> findByCustomerId(String customerId);
     
     List<Subscription> findByStatus(SubscriptionStatus status);
+
+    boolean existsBySubscriptionNumber(String subscriptionNumber);
     
     @Query("SELECT s FROM Subscription s WHERE s.renewalDate <= :date AND s.status = 'ACTIVE'")
     List<Subscription> findRenewalEligible(LocalDate date);

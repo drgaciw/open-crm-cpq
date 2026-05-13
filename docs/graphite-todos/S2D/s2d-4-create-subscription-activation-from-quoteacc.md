@@ -1,6 +1,6 @@
 # S2D-4: Create subscription activation from QuoteAccepted with idempotency and correlation IDs.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 
