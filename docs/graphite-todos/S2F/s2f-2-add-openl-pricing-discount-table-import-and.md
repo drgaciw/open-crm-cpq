@@ -1,6 +1,6 @@
 # S2F-2: Add OpenL pricing/discount table import and validation scaffolding for business-user maintained pricing rules.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR as import/validation scaffolding.
 
 **Stack lane:** `S2F`
 
@@ -16,4 +16,5 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Adds a pricing-service OpenL pricing table validation endpoint for business-user maintained CSV table drafts.
+- Validates required pricing/discount columns, numeric ranges, duplicate rule names, and rule set existence before import promotion.
