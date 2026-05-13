@@ -1,6 +1,6 @@
 # S3C-3: Refactor rule/pricing/optimization/AI controllers to rely on GlobalExceptionHandler instead of local broad try/catch blocks.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3C`
 

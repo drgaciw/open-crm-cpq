@@ -3,6 +3,7 @@ package com.opencrm.ai.router;
 import com.opencrm.ai.agent.AgentRequest;
 import com.opencrm.ai.agent.AgentResponse;
 import com.opencrm.ai.agent.CpqAgent;
+import com.opencrm.common.exception.ResourceNotFoundException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,14 +40,14 @@ public class AgentRouter {
     @PostMapping("/{agentId}/invoke")
     public ResponseEntity<AgentResponse> invokeAgent(@PathVariable String agentId, @RequestBody AgentRequest request) {
         CpqAgent agent = Optional.ofNullable(agentRegistry.get(agentId))
-                .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", agentId));
         return ResponseEntity.ok(agent.invoke(request));
     }
 
     @PostMapping(value = "/{agentId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> streamAgent(@PathVariable String agentId, @RequestBody AgentRequest request) {
         CpqAgent agent = Optional.ofNullable(agentRegistry.get(agentId))
-                .orElseThrow(() -> new IllegalArgumentException("Agent not found: " + agentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", agentId));
         return agent.stream(request);
     }
 }
