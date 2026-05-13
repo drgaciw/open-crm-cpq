@@ -1,6 +1,6 @@
 # S1A-3: Add Windows Docker Desktop Testcontainers guidance and default environment checks to backend test documentation.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S1A`
 
@@ -14,6 +14,5 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Added backend test documentation for Docker-free unit verification, full Docker-backed verification, focused integration tag selection, and Windows Docker Desktop readiness checks.
+- Documented default Docker environment checks (`docker version`, `docker info`, Docker context, Linux engine named pipe) and fallback Testcontainers host configuration.
