@@ -1,6 +1,6 @@
 # S3B-4: Add cycle and conflicting-mutation diagnostics for rule publication and runtime evaluation.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S3B`
 

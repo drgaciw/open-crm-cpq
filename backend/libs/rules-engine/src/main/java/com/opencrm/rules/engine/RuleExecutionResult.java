@@ -37,5 +37,7 @@ public class RuleExecutionResult {
     @Builder.Default
     private Map<String, Object> outputs = new HashMap<>();
 
+    private RuleDiagnosticReport diagnostics;
+
     private String errorMessage;
 }

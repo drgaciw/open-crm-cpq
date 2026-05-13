@@ -1,6 +1,8 @@
 package com.opencrm.rules.drools;
 
 import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.rules.engine.RuleDiagnosticReport;
+import com.opencrm.rules.engine.RuleDiagnostics;
 import com.opencrm.rules.engine.RuleExecutionContext;
 import com.opencrm.rules.engine.RuleExecutionResult;
 import com.opencrm.rules.engine.RulesEngine;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class DroolsRulesEngine implements RulesEngine {
 
     private final DroolsSessionFactory sessionFactory;
+    private final RuleDiagnostics diagnostics;
 
     @Override
     public RuleExecutionResult execute(RuleExecutionContext context) {
@@ -72,7 +75,14 @@ public class DroolsRulesEngine implements RulesEngine {
 
         } catch (Exception e) {
             log.error("Failed to execute Drools rules: {}", e.getMessage(), e);
-            throw new RuntimeException("Rule execution failed: " + e.getMessage(), e);
+            return RuleExecutionResult.builder()
+                    .success(false)
+                    .diagnostics(RuleDiagnosticReport.builder()
+                            .diagnostics(List.of(diagnostics.runtimeFailure(e.getMessage(), rules)))
+                            .build())
+                    .errorMessage("Rule execution failed: " + e.getMessage())
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
 
         } finally {
             if (kieSession != null) {
