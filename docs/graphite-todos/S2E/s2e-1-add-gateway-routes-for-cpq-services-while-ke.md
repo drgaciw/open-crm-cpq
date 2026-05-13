@@ -1,6 +1,6 @@
 # S2E-1: Add gateway routes for CPQ services while keeping commands delegated to aggregate-owning services.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in PR #198.
 
 **Stack lane:** `S2E`
 
@@ -16,4 +16,4 @@
 
 - Keep the implementation PR focused on this single backlog task.
 - Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Added CPQ-prefixed gateway aliases that rewrite to the aggregate-owning service paths for pricing, price books, products/configuration, quotes, approvals, documents, and subscriptions.
