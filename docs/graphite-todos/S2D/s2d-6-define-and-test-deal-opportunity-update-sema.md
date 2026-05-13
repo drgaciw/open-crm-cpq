@@ -1,6 +1,6 @@
 # S2D-6: Define and test deal/opportunity update semantics from QuoteAccepted without moving accepted commercial ownership into CRM.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2D`
 
@@ -14,6 +14,6 @@
 
 ## Implementation Notes
 
-- Keep the implementation PR focused on this single backlog task.
-- Preserve the service ownership boundaries documented in the referenced DDD specs.
-- Update this tracking card or close the PR when the real implementation PR supersedes it.
+- Quote acceptance updates CRM opportunity state only: a matching deal is marked `WON` and `wonAt` is set from the acceptance timestamp when provided.
+- CRM does not copy accepted quote `totalAmount`, `arr`, `tcv`, `acv`, or `currency` values onto the deal during quote acceptance; accepted commercial ownership remains in quote/contract services.
+- Tests cover preserving existing CRM amount/currency while applying the won-state transition.
