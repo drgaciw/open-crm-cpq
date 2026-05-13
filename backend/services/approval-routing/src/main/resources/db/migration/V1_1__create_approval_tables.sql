@@ -19,6 +19,7 @@ CREATE TABLE approval_requests (
     approver_id VARCHAR(255),
     approval_tier VARCHAR(50),
     reason TEXT,
+    policy_evaluation_snapshot TEXT,
     rejection_reason TEXT,
     submitted_at TIMESTAMPTZ,
     approved_at TIMESTAMPTZ,

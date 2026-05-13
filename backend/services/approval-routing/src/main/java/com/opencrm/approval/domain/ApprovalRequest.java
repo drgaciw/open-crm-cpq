@@ -60,6 +60,9 @@ public class ApprovalRequest extends BaseEntity {
     
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
+
+    @Column(name = "policy_evaluation_snapshot", columnDefinition = "TEXT")
+    private String policyEvaluationSnapshot;
     
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;

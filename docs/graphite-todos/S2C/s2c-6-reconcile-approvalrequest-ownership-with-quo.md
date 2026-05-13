@@ -1,6 +1,6 @@
 # S2C-6: Reconcile ApprovalRequest ownership with quote-service and add policy-evaluation snapshot persistence.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Implemented in this PR.
 
 **Stack lane:** `S2C`
 

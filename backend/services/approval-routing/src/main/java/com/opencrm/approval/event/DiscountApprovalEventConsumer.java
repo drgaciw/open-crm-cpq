@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Consumes discount approval required events and creates approval requests.
@@ -47,6 +49,7 @@ public class DiscountApprovalEventConsumer {
                     .submittedAt(Instant.now())
                     .approvalTier(determineApprovalTier(event.getMarginDelta()))
                     .reason("Discount exceeds standard threshold")
+                    .policyEvaluationSnapshot(writePolicyEvaluationSnapshot(event))
                     .build();
             
             approvalRequestRepository.save(request);
@@ -67,6 +70,21 @@ public class DiscountApprovalEventConsumer {
             return "DIRECTOR";
         } else {
             return "MANAGER";
+        }
+    }
+
+    private String writePolicyEvaluationSnapshot(DiscountApprovalRequiredEvent event) {
+        try {
+            Map<String, Object> snapshot = new LinkedHashMap<>();
+            snapshot.put("explanationCodes", event.getExplanationCodes());
+            snapshot.put("inputSnapshot", event.getInputSnapshot());
+            snapshot.put("outputSnapshot", event.getOutputSnapshot());
+            snapshot.put("marginDelta", event.getMarginDelta());
+            snapshot.put("requestedDiscount", event.getRequestedDiscount());
+            snapshot.put("currencyCode", event.getCurrencyCode());
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize policy evaluation snapshot", e);
         }
     }
 }

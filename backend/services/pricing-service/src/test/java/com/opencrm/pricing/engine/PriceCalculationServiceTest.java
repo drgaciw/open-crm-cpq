@@ -1,12 +1,14 @@
 package com.opencrm.pricing.engine;
 
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.valueobject.Money;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -90,7 +92,29 @@ class PriceCalculationServiceTest {
                 eq("PriceCalculation"),
                 eq("Q-001"),
                 eq("cpq.discount.approval.required"),
-                any()
+                any(DiscountApprovalRequiredEvent.class)
         );
+    }
+
+    @Test
+    @DisplayName("should include explanation code on approval event")
+    void publishDiscountApprovalEventWithExplanationCode() {
+        Money discount = Money.usd(BigDecimal.valueOf(30.00));
+        Money basePrice = Money.usd(BigDecimal.valueOf(100.00));
+
+        priceCalculationService.publishDiscountApprovalRequired("Q-001", "L-001", discount, basePrice);
+
+        ArgumentCaptor<DiscountApprovalRequiredEvent> captor =
+                ArgumentCaptor.forClass(DiscountApprovalRequiredEvent.class);
+        verify(outboxEventPublisher).publish(
+                eq("PriceCalculation"),
+                eq("Q-001"),
+                eq("cpq.discount.approval.required"),
+                captor.capture()
+        );
+
+        DiscountApprovalRequiredEvent event = captor.getValue();
+        assertEquals("DISCOUNT_APPROVAL_REQUIRED", event.getExplanationCodes().get(0));
+        assertEquals(new BigDecimal("30.0000"), event.getMarginDelta());
     }
 }
