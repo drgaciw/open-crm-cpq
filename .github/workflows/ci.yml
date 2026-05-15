@@ -7,8 +7,10 @@ on:
   pull_request:
     branches: [main]
 
+# setup-java/setup-node caching + upload-artifact need token scope beyond contents:read
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: ci-${{ github.ref }}
