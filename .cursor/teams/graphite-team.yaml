@@ -1,0 +1,136 @@
+# graphite-team — Cursor-oriented agent/skills manifest for Graphite CLI workflows.
+# Location: ~/.cursor/teams/graphite-team.yaml (copy into repo .cursor/teams/ to share with your org).
+# Companion agents/skills live under ~/.cursor/agents/ and ~/.cursor/skills/
+
+schema_version: 1
+
+cursor:
+  team_id: graphite-team
+  orchestrator_agent_id: graphite-team-orchestrator
+  manifest_path_user: ~/.cursor/teams/graphite-team.yaml
+  manifest_path_project: .cursor/teams/graphite-team.yaml
+  validate_script_user: ~/.cursor/teams/validate-graphite-team.ps1
+  rules_user:
+    graphitedotdir: ~/.cursor/rules/graphite-cli.mdc
+    team_manifest_edit: ~/.cursor/rules/graphite-team-manifest.mdc
+
+sharing:
+  instructions: >-
+    Commit this YAML under .cursor/teams/ when the team agrees on playbook order.
+    Each developer keeps agent .md files in ~/.cursor/agents/ (or symlink from a shared dotfiles repo).
+    Run validate-graphite-team.ps1 after installs or IDE updates.
+    Use -RepoRoot <path> after copying graphite-team.yaml into a repo to diff-check against ~/.cursor/teams/graphite-team.yaml.
+    Commit .cursor/teams/graphite-team.yaml; install graphite-team-manifest rule in the repo or rely on team members' user rule copy.
+
+# Who runs playbooks: Cursor specialist agents (below), or a Gemini/Jules session the user owns.
+# Do not designate GitHub-hosted coding agents (e.g. Copilot SWE) or bot reviewers as the executor
+# for graphite-team playbooks—keep gt/submit/sync decisions in Cursor (or equivalent IDE agents).
+execution:
+  primary:
+    - cursor_agents: [graphite-team-orchestrator, graphite-repo-bootstrap, graphite-stack-author, graphite-stack-ship, graphite-stack-surgeon]
+  optional_alternates:
+    - gemini_cli_or_ide
+    - jules
+  avoid_as_executor:
+    - github_copilot_coding_agent
+    - delegating_playbook_steps_to_github_actions_bots
+
+team:
+  id: graphite-team
+  display_name: Graphite team
+  docs: https://graphite.com/docs
+
+  orchestration:
+    lead_agent_id: graphite-team-orchestrator
+    summary: >-
+      Routes stacked-PR work through phased delegation — bootstrap trunk metadata,
+      author slices locally, ship remote PR updates, unblock restack/conflicts.
+
+skills:
+  - id: graphite-repo-bootstrap
+    path: skills/graphite-repo-bootstrap
+    use_when: >-
+      First-time gt init, wrong trunk, or metadata repair —
+      requires human gate for `--reset`.
+
+  - id: graphite-fundamentals
+    path: skills/graphite-fundamentals
+    use_when: >-
+      Daily `gt checkout`, `gt create`, `gt fold`, stack inspection (`gt log`).
+
+  - id: graphite-submit-sync
+    path: skills/graphite-submit-sync
+    use_when: >-
+      Publish or refresh PRs (`gt sync`, `gt submit`, `--stack`, `gt ss`, update-only).
+
+  - id: graphite-restack-recovery
+    path: skills/graphite-restack-recovery
+    use_when: >-
+      Restack or `gt modify` conflicts (`gt add`, `gt continue`, `gt abort`, repair chains).
+
+agents:
+  - id: graphite-team-orchestrator
+    file: graphite-team-orchestrator.agent.md
+    role: orchestration
+    delegates_to:
+      - graphite-repo-bootstrap
+      - graphite-stack-author
+      - graphite-stack-ship
+      - graphite-stack-surgeon
+
+  - id: graphite-repo-bootstrap
+    file: graphite-repo-bootstrap.agent.md
+    role: setup
+
+  - id: graphite-stack-author
+    file: graphite-stack-author.agent.md
+    role: author
+
+  - id: graphite-stack-ship
+    file: graphite-stack-ship.agent.md
+    role: ship
+
+  - id: graphite-stack-surgeon
+    file: graphite-stack-surgeon.agent.md
+    role: surgeon
+
+path_resolution:
+  user_agents_root: ~/.cursor/agents/
+  user_skills_root: ~/.cursor/skills/
+  # Resolve `skills/<name>` → ${user_skills_root}/<name>/SKILL.md
+  # Resolve `file` agents → ${user_agents_root}/<filename>
+
+default_playbooks:
+  - id: slice-and-submit
+    description: Typical feature stack from idea to opened PRs.
+    sequence:
+      - agent: graphite-stack-author
+        skills: [graphite-fundamentals]
+      - agent: graphite-stack-ship
+        skills: [graphite-submit-sync]
+
+  - id: fix-broken-metadata
+    description: Repo never initialized or trunk/stack metadata corrupted.
+    sequence:
+      - agent: graphite-repo-bootstrap
+        skills: [graphite-repo-bootstrap]
+
+  - id: unblock-restack
+    description: Conflict or failed continue during restack/modify/sync.
+    sequence:
+      - agent: graphite-stack-surgeon
+        skills: [graphite-restack-recovery]
+      - agent: graphite-stack-ship
+        skills: [graphite-submit-sync]
+
+  - id: bootstrap-then-stack
+    description: >
+      Runs metadata repair first when setup is dubious, then author + ship slices.
+      Stop after bootstrap if the user only needed trunk fixes.
+    sequence:
+      - agent: graphite-repo-bootstrap
+        skills: [graphite-repo-bootstrap]
+      - agent: graphite-stack-author
+        skills: [graphite-fundamentals]
+      - agent: graphite-stack-ship
+        skills: [graphite-submit-sync]
