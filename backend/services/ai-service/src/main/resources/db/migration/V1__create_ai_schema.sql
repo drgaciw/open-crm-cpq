@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS ai.agent_audit_log (
     session_id      VARCHAR(100)    NOT NULL,               -- caller-supplied or generated UUID
     event_type      VARCHAR(20)     NOT NULL,               -- INVOCATION | RESPONSE | ERROR
     input_context   JSONB,                                  -- serialized AgentRequest.context
+    snapshot_references JSONB,                              -- durable references to quote/catalog/pricing snapshots used by the invocation
     llm_output      TEXT,                                   -- raw LLM response text
     human_decision  VARCHAR(20),                            -- ACCEPTED | REJECTED | MODIFIED | PENDING
     latency_ms      INTEGER,                                -- end-to-end invocation latency
@@ -54,6 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_session_expires   ON ai.agent_session (expires_at
 -- ============================================================
 COMMENT ON TABLE  ai.agent_audit_log IS 'Immutable audit trail for all CPQ AI agent invocations (ADR-002)';
 COMMENT ON COLUMN ai.agent_audit_log.event_type     IS 'INVOCATION=request received; RESPONSE=LLM replied; ERROR=exception';
+COMMENT ON COLUMN ai.agent_audit_log.snapshot_references IS 'Snapshot identifiers supplied with AgentRequest.context.snapshotReferences';
 COMMENT ON COLUMN ai.agent_audit_log.human_decision IS 'Set by UI after human reviews: ACCEPTED|REJECTED|MODIFIED|PENDING';
 COMMENT ON COLUMN ai.agent_audit_log.model          IS 'LLM model used — glm-5 per ADR-002';
 
