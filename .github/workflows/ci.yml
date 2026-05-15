@@ -124,9 +124,6 @@ jobs:
             echo "No targeted CRM/shared projects expose a test target — skipping frontend tests"
           fi
 
-      - name: Test (CRM + shared models)
-        run: npx nx run-many --target=test --projects="crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models" --parallel=3
-
   # ─────────────────────────────────────────────
   # Security audit (Snyk / npm audit)
   # ─────────────────────────────────────────────
