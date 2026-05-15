@@ -97,6 +97,8 @@ agents:
 path_resolution:
   user_agents_root: ~/.cursor/agents/
   user_skills_root: ~/.cursor/skills/
+  project_agents_root: .cursor/agents/
+  project_skills_root: .cursor/skills/
   # Resolve `skills/<name>` → ${user_skills_root}/<name>/SKILL.md
   # Resolve `file` agents → ${user_agents_root}/<filename>
 
