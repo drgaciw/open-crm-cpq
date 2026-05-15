@@ -221,13 +221,28 @@ def get_lead_or_deal_from_number(call):
 		if not mobile_no:
 			return None
 
-		query = f"""
-			SELECT name
-			FROM `tab{doctype}`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		"""
-		if only_unconverted and doctype == "CRM Lead":
-			query += "\nAND converted is not True"
+		if doctype == "CRM Deal":
+			query = """
+				SELECT name
+				FROM `tabCRM Deal`
+				WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+			"""
+		elif doctype == "CRM Lead":
+			if only_unconverted:
+				query = """
+					SELECT name
+					FROM `tabCRM Lead`
+					WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+					AND converted is not True
+				"""
+			else:
+				query = """
+					SELECT name
+					FROM `tabCRM Lead`
+					WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+				"""
+		else:
+			return None
 
 		data = frappe.db.sql(query, {"mobile_no": mobile_no}, as_dict=True)
 		return data[0].name if data else None
