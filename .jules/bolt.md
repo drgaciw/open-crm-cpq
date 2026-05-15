@@ -16,3 +16,7 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+
+## 2026-05-15 - Fixed N+1 query loop in Pricing Execution Service
+**Learning:** When resolving price book entries, iterating over a loop of line items and repeatedly fetching pricing products triggered an N+1 query vulnerability (`pricingProductRepository.findByExternalIdAndDeletedFalse`), affecting bulk processing performance.
+**Action:** Implemented a single batch lookup using `findByExternalIdInAndDeletedFalse` and pre-populated a local cache map (using $O(1)$ memory lookup) to dramatically eliminate recurrent queries in the loop.
