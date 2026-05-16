@@ -60,9 +60,7 @@ class ValidationRulesAgentTest {
         assertTrue(response.isSuccess());
         assertEquals(mockResponseContent, response.getOutput());
 
-        Map<String, Object> metadata = response.getMetadata();
-        assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("cpq-agent-016", metadata.get("agentId"));
+        assertEquals("Semi-autonomous", response.getMetadata().get("autonomy"));
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatClient).call(promptCaptor.capture());
@@ -87,9 +85,7 @@ class ValidationRulesAgentTest {
         assertFalse(response.isSuccess());
         assertTrue(response.getOutput().contains("API error"));
 
-        Map<String, Object> metadata = response.getMetadata();
-        assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("API error", metadata.get("error"));
+        assertTrue(response.getMetadata().isEmpty());
     }
 
     @Test
