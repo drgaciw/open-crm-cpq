@@ -1,5 +1,6 @@
 package com.opencrm.common.event.dto;
 
+import com.opencrm.common.event.dto.v1.ProductRetiredEventV1;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,4 +20,12 @@ public class ProductRetiredEvent {
     private String productId;
     private Instant retiredAt;
     private String reasonCode;
+
+    public ProductRetiredEventV1 toPublishedLanguageV1() {
+        return ProductRetiredEventV1.builder()
+                .productId(productId)
+                .retiredAt(retiredAt)
+                .reasonCode(reasonCode)
+                .build();
+    }
 }
