@@ -54,6 +54,7 @@ public class PriceBookService {
 
     public PriceBookDto update(Long id, PriceBookUpdateRequest request) {
         PriceBook existing = requirePriceBook(id);
+        ensureNotPublished(existing);
         normalizeUpdateRequest(request);
 
         String targetRegion = request.getRegion() != null ? request.getRegion() : existing.getRegion();
@@ -77,6 +78,7 @@ public class PriceBookService {
 
     public void delete(Long id) {
         PriceBook existing = requirePriceBook(id);
+        ensureNotPublished(existing);
         existing.softDelete();
         priceBookRepository.save(existing);
         log.info("Deleted price book with ID: {}", id);
@@ -84,6 +86,7 @@ public class PriceBookService {
 
     public PriceBookEntryDto createEntry(Long priceBookId, PriceBookEntryCreateRequest request) {
         PriceBook priceBook = requirePriceBook(priceBookId);
+        ensureNotPublished(priceBook);
         normalizeEntryCreateRequest(request, priceBook);
         validateEntryPriceRange(request.getListPrice(), request.getFloorPrice());
 
@@ -98,7 +101,7 @@ public class PriceBookService {
         }
 
         PriceBookEntry entry = priceBookMapper.toEntryEntity(request);
-        entry.setPriceBookId(priceBookId);
+        entry.setPriceBook(priceBook);
         PriceBookEntry saved = priceBookEntryRepository.save(entry);
         log.info("Created price book entry with ID: {} for price book ID: {}", saved.getId(), priceBookId);
         return priceBookMapper.toEntryDto(saved);
@@ -119,7 +122,8 @@ public class PriceBookService {
     }
 
     public PriceBookEntryDto updateEntry(Long priceBookId, Long entryId, PriceBookEntryUpdateRequest request) {
-        requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBook(priceBookId);
+        ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         normalizeEntryUpdateRequest(request);
 
@@ -146,7 +150,8 @@ public class PriceBookService {
     }
 
     public void deleteEntry(Long priceBookId, Long entryId) {
-        requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBook(priceBookId);
+        ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         entry.softDelete();
         priceBookEntryRepository.save(entry);
@@ -193,6 +198,16 @@ public class PriceBookService {
             throw new BusinessException(
                     "Expiration date must be on or after effective date",
                     "INVALID_DATE_RANGE"
+            );
+        }
+    }
+
+    private void ensureNotPublished(PriceBook priceBook) {
+        LocalDate effectiveDate = priceBook.getEffectiveDate();
+        if (effectiveDate != null && !effectiveDate.isAfter(LocalDate.now())) {
+            throw new BusinessException(
+                    "Published price books and their entries are immutable",
+                    "PRICE_BOOK_PUBLISHED_IMMUTABLE"
             );
         }
     }

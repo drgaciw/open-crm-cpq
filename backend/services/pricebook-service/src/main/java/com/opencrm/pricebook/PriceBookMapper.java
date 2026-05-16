@@ -32,7 +32,7 @@ public interface PriceBookMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "uuid", ignore = true)
-    @Mapping(target = "priceBookId", ignore = true)
+    @Mapping(target = "priceBook", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
@@ -41,11 +41,12 @@ public interface PriceBookMapper {
     @Mapping(target = "deleted", ignore = true)
     PriceBookEntry toEntryEntity(PriceBookEntryCreateRequest request);
 
+    @Mapping(target = "priceBookId", source = "priceBookId")
     PriceBookEntryDto toEntryDto(PriceBookEntry entry);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "uuid", ignore = true)
-    @Mapping(target = "priceBookId", ignore = true)
+    @Mapping(target = "priceBook", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
