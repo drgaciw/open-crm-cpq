@@ -58,7 +58,38 @@ class AgentAuditLoggerTest {
         assertEquals(agentId, saved.getAgentId());
         assertEquals(sessionId, saved.getSessionId());
         assertEquals("INVOCATION", saved.getEventType());
-        assertEquals(serializedContext, saved.getEventData());
+        assertEquals(serializedContext, saved.getInputContext());
+        assertNull(saved.getLlmOutput());
+    }
+
+    @Test
+    @DisplayName("logInvocation() persists snapshot references when present in context")
+    void logInvocationPersistsSnapshotReferences() throws Exception {
+        // Arrange
+        String agentId = "agent-001";
+        String sessionId = "session-abc";
+        Map<String, Object> snapshotReferences = Map.of(
+                "quoteSnapshotId", "quote-snapshot-123",
+                "priceBookSnapshotId", "price-book-snapshot-456"
+        );
+        Map<String, Object> inputContext = Map.of(
+                "quoteId", "QUOTE-1",
+                "snapshotReferences", snapshotReferences
+        );
+        String serializedContext = "{\"quoteId\":\"QUOTE-1\",\"snapshotReferences\":{}}";
+        String serializedSnapshotReferences = "{\"quoteSnapshotId\":\"quote-snapshot-123\",\"priceBookSnapshotId\":\"price-book-snapshot-456\"}";
+
+        when(objectMapper.writeValueAsString(inputContext)).thenReturn(serializedContext);
+        when(objectMapper.writeValueAsString(snapshotReferences)).thenReturn(serializedSnapshotReferences);
+
+        // Act
+        agentAuditLogger.logInvocation(agentId, sessionId, inputContext);
+
+        // Assert
+        verify(auditLogRepository).save(auditLogCaptor.capture());
+        AiAuditLog saved = auditLogCaptor.getValue();
+
+        assertEquals(serializedSnapshotReferences, saved.getSnapshotReferences());
     }
 
     @Test
@@ -95,7 +126,8 @@ class AgentAuditLoggerTest {
         assertEquals(agentId, saved.getAgentId());
         assertEquals(sessionId, saved.getSessionId());
         assertEquals("RESPONSE", saved.getEventType());
-        assertEquals(llmOutput, saved.getEventData());
+        assertEquals(llmOutput, saved.getLlmOutput());
+        assertNull(saved.getInputContext());
     }
 
     @Test
