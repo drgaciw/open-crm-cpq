@@ -43,6 +43,41 @@ public class FallbackController {
         return buildFallbackResponse("Price Book Service");
     }
 
+    @GetMapping("/pricing")
+    public ResponseEntity<Map<String, Object>> pricingFallback() {
+        return buildFallbackResponse("Pricing Service");
+    }
+
+    @GetMapping("/product")
+    public ResponseEntity<Map<String, Object>> productFallback() {
+        return buildFallbackResponse("Product Service");
+    }
+
+    @GetMapping("/quote")
+    public ResponseEntity<Map<String, Object>> quoteFallback() {
+        return buildFallbackResponse("Quote Service");
+    }
+
+    @GetMapping("/configuration")
+    public ResponseEntity<Map<String, Object>> configurationFallback() {
+        return buildFallbackResponse("Configuration Engine");
+    }
+
+    @GetMapping("/approval")
+    public ResponseEntity<Map<String, Object>> approvalFallback() {
+        return buildFallbackResponse("Approval Routing Service");
+    }
+
+    @GetMapping("/document")
+    public ResponseEntity<Map<String, Object>> documentFallback() {
+        return buildFallbackResponse("Document Generation Service");
+    }
+
+    @GetMapping("/contract")
+    public ResponseEntity<Map<String, Object>> contractFallback() {
+        return buildFallbackResponse("Contract/Asset Management Service");
+    }
+
     private ResponseEntity<Map<String, Object>> buildFallbackResponse(String serviceName) {
         log.error("CIRCUIT_BREAKER: {} is unavailable - returning fallback response", serviceName);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

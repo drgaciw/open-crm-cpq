@@ -16,3 +16,7 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+
+## 2024-05-20 - Batch Fetching Attachments in Frappe API Responses
+**Learning:** Calling `frappe.db.get_all("File", ...)` inside loops to fetch attachments for multiple related documents (like comments or communications) results in severe N+1 query performance degradation.
+**Action:** When returning feeds or activities that include attachments for multiple child items, gather all the child item names first. Perform a single batch fetch using `frappe.db.get_all("File", filters={"attached_to_name": ["in", names]})`, map the results into a Python dictionary keyed by `attached_to_name`, and retrieve them inside the loop in O(1) time.

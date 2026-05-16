@@ -331,10 +331,16 @@ public class LeadService {
         log.debug("Fetching lead status counts");
 
         Map<LeadStatus, Long> counts = new EnumMap<>(LeadStatus.class);
+<<<<<<< HEAD
         for (LeadStatus status : LeadStatus.values()) {
             counts.put(status, 0L);
         }
 
+=======
+        for (LeadStatus s : LeadStatus.values()) {
+            counts.put(s, 0L);
+        }
+>>>>>>> origin/main
         List<Object[]> results = leadRepository.countGroupByStatus();
 
         for (Object[] row : results) {

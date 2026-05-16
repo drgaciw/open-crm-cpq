@@ -31,6 +31,9 @@ public class RuleExecutionResult {
     @Builder.Default
     private List<String> firedRuleNames = new ArrayList<>();
 
+    @Builder.Default
+    private List<RuleExecutionTraceEntry> trace = new ArrayList<>();
+
     private int rulesFired;
     private long executionTimeMs;
 
