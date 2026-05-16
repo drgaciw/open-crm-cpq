@@ -1,14 +1,10 @@
 package com.opencrm.ai.agent.pricing;
 
-import com.opencrm.ai.agent.AgentRequest;
-import com.opencrm.ai.agent.AgentResponse;
-import com.opencrm.ai.agent.CpqAgent;
+import com.opencrm.ai.agent.AbstractCpqAgent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import java.util.Map;
 
 @Service("cpq-agent-018")
-public class DynamicBundlePricingAgent implements CpqAgent {
+public class DynamicBundlePricingAgent extends AbstractCpqAgent {
 
     @Override
     public String getAgentId() {
@@ -26,20 +22,29 @@ public class DynamicBundlePricingAgent implements CpqAgent {
     }
 
     @Override
-    public AgentResponse invoke(AgentRequest request) {
-        // TODO: Implement actual LLM call via ChatClient
-        return new AgentResponse() {
-            @Override
-            public boolean isSuccess() { return true; }
-            @Override
-            public String getOutput() { return "Simulated execution for Dynamic Bundle Pricing Agent"; }
-            @Override
-            public Map<String, Object> getMetadata() { return Map.of("autonomy", "Semi-autonomous"); }
-        };
+    protected String autonomyTier() {
+        return "Semi-autonomous";
     }
 
     @Override
-    public Flux<String> stream(AgentRequest request) {
-        return Flux.just("Starting stream for Dynamic Bundle Pricing Agent...", "Processing...", "Done");
+    protected String agentSystemPrompt() {
+        return """
+                You are cpq-agent-018, the Dynamic Bundle Pricing Agent.
+
+                Responsibilities:
+                - Evaluate bundle composition, bundle-level discount eligibility, component
+                  pricing, and dependency constraints using only supplied configuration context.
+                - Explain how bundle adjustments interact with list price, pricing method,
+                  discount, and margin guardrail agents.
+                - Highlight missing component prices, incompatible bundle options, or bundle
+                  overrides that need product or pricing owner review.
+
+                Enforcement:
+                - Standard bundle pricing inside configured policy may be marked automatic.
+                - Bundle exceptions, missing component data, and margin-impacting overrides must
+                  be flagged REQUIRES_APPROVAL or REQUIRES_REVIEW.
+                - Include component breakdown, bundle adjustment, dependency assumptions,
+                  approval needs, and audit-relevant assumptions in the JSON response.
+                """;
     }
 }
