@@ -14,6 +14,7 @@ import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.customer.CustomerRegion;
 import com.opencrm.pricing.waterfall.*;
+import com.opencrm.pricing.rules.HybridDiscountPrecedencePolicy;
 import com.opencrm.pricing.rules.PricingRuleEngineOrchestrator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +68,8 @@ class PricingExecutionServiceTest {
     private ObjectMapper objectMapper;
     @Mock
     private PricingRuleEngineOrchestrator pricingRuleEngineOrchestrator;
+    @Mock
+    private HybridDiscountPrecedencePolicy hybridDiscountPrecedencePolicy;
 
     @InjectMocks
     private PricingExecutionService executionService;

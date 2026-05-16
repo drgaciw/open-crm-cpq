@@ -2,6 +2,7 @@ package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.pricing.rules.HybridDiscountPrecedencePolicy;
 import com.opencrm.pricing.rules.PricingRuleEngineOrchestrator;
 import com.opencrm.rules.engine.RuleExecutionContext;
 import com.opencrm.rules.engine.RuleExecutionResult;
@@ -58,6 +59,7 @@ public class PricingExecutionService {
     private final PricingExecutionEventPublisher pricingExecutionEventPublisher;
     private final ObjectMapper objectMapper;
     private final PricingRuleEngineOrchestrator pricingRuleEngineOrchestrator;
+    private final HybridDiscountPrecedencePolicy hybridDiscountPrecedencePolicy;
 
     /**
      * Execute pricing with full audit trail.
@@ -206,6 +208,7 @@ public class PricingExecutionService {
                 try {
                     RuleExecutionResult ruleResult = pricingRuleEngineOrchestrator.execute(
                             ruleSet, activeRules, ruleContext);
+                    hybridDiscountPrecedencePolicy.enforce(lineResults, ruleResult);
                     log.info("Executed {} hybrid rules (fired {}, trace entries {}) for customer {}",
                             activeRules.size(),
                             ruleResult.getRulesFired(),
