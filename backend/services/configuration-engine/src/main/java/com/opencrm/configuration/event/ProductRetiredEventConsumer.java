@@ -3,6 +3,7 @@ package com.opencrm.configuration.event;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
+import com.opencrm.configuration.model.ConfigurationModelCache;
 import com.opencrm.configuration.session.ConfigurationSessionRepository;
 import com.opencrm.configuration.session.ConfigurationStatus;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductRetiredEventConsumer {
     
     private final ConfigurationSessionRepository sessionRepository;
+    private final ConfigurationModelCache configurationModelCache;
     private final ObjectMapper objectMapper;
     
     @KafkaListener(topics = KafkaTopics.PRODUCT_STATUS_RETIRED, groupId = "configuration-engine")
@@ -29,7 +31,8 @@ public class ProductRetiredEventConsumer {
             ProductRetiredEvent event = objectMapper.readValue(message, ProductRetiredEvent.class);
             
             log.info("Received product retired event for product: {}", event.getProductId());
-            
+            configurationModelCache.invalidate(event.getProductId());
+
             // Find all active configuration sessions for this product
             var sessions = sessionRepository.findByProductIdAndStatus(
                     event.getProductId(), 
