@@ -641,6 +641,7 @@ class LeadServiceTest {
             assertThat(counts.get(LeadStatus.NEW)).isEqualTo(5L);
             assertThat(counts.get(LeadStatus.CONTACTED)).isEqualTo(3L);
             assertThat(counts.get(LeadStatus.QUALIFIED)).isEqualTo(2L);
+            assertThat(counts.get(LeadStatus.UNQUALIFIED)).isEqualTo(1L);
             assertThat(counts.get(LeadStatus.CONVERTED)).isEqualTo(4L);
             assertThat(counts.get(LeadStatus.LOST)).isEqualTo(0L);
         }
