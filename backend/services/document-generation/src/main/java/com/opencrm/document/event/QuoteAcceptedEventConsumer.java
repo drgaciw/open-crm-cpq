@@ -33,10 +33,10 @@ public class QuoteAcceptedEventConsumer {
         try {
             QuoteAcceptedEvent event = objectMapper.readValue(message, QuoteAcceptedEvent.class);
             
-            log.info("Received quote accepted event for quote: {}", event.getQuoteId());
+            log.info("Received quote accepted event for quote: {} (eventType={}, version={})",
+                    event.getQuoteId(), event.getEventType(), event.getEventVersion());
             
-            // Create idempotent job
-            String idempotencyKey = "quote-" + event.getQuoteId() + "-pdf";
+            String idempotencyKey = QuoteAcceptedDocumentIdempotency.proposalPdfKey(event);
             
             // Check if job already exists
             if (jobRepository.existsByIdempotencyKey(idempotencyKey)) {
