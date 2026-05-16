@@ -76,6 +76,7 @@
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
+        <jacoco.skip>false</jacoco.skip>
     </properties>
 
     <dependencyManagement>
