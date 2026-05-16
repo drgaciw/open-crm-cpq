@@ -5,6 +5,9 @@
 -- LLM: GLM-5 via Zhipu AI (ADR-002)
 -- ============================================================
 
+CREATE SCHEMA IF NOT EXISTS ai;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- agent_audit_log: immutable record of every agent invocation and response.
 -- Implements the audit trail requirement from agent-prd.md Section 2.3.
 CREATE TABLE IF NOT EXISTS ai.agent_audit_log (

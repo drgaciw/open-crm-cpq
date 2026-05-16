@@ -31,7 +31,7 @@ public class AgentAuditLogger {
             auditLog.setAgentId(agentId);
             auditLog.setSessionId(sessionId);
             auditLog.setEventType("INVOCATION");
-            auditLog.setEventData(objectMapper.writeValueAsString(inputContext));
+            auditLog.setInputContext(objectMapper.writeValueAsString(inputContext));
             auditLog.setSnapshotReferences(serializeSnapshotReferences(inputContext));
             auditLogRepository.save(auditLog);
         } catch (JsonProcessingException e) {
@@ -46,7 +46,7 @@ public class AgentAuditLogger {
         auditLog.setAgentId(agentId);
         auditLog.setSessionId(sessionId);
         auditLog.setEventType("RESPONSE");
-        auditLog.setEventData(llmOutput);
+        auditLog.setLlmOutput(llmOutput);
         auditLogRepository.save(auditLog);
     }
 
