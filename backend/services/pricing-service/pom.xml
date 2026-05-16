@@ -225,6 +225,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <skip>${jacoco.skip}</skip>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
