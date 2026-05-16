@@ -59,6 +59,18 @@ public class PricingAuditLog {
     @Column(name = "executed_by")
     private String executedBy;
 
+    @Column(name = "correlation_id")
+    private String correlationId;
+
+    @Column(name = "pricebook_version")
+    private String pricebookVersion;
+
+    @Column(name = "ruleset_version")
+    private String rulesetVersion;
+
+    @Column(name = "metrics_snapshot", columnDefinition = "TEXT")
+    private String metricsSnapshot;
+
     @PrePersist
     protected void onCreate() {
         if (this.uuid == null) {
