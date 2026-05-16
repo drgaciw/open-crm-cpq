@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Injectable } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { BaseCrudService } from './base-crud.service';
 import { SpringPageResponse } from '@frontend/shared-models';
 
@@ -25,11 +26,7 @@ describe('BaseCrudService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        TestCrudService,
-        provideHttpClient(),
-        provideHttpClientTesting()
-      ]
+      providers: [TestCrudService, provideHttpClient(), provideHttpClientTesting()],
     });
 
     service = TestBed.inject(TestCrudService);
@@ -45,167 +42,158 @@ describe('BaseCrudService', () => {
   });
 
   describe('list', () => {
-    it('should fetch paginated list of items', (done) => {
+    it('should fetch paginated list of items', async () => {
       const mockResponse: SpringPageResponse<TestEntity> = {
         content: [
           { id: '1', name: 'Item 1' },
-          { id: '2', name: 'Item 2' }
+          { id: '2', name: 'Item 2' },
         ],
         totalElements: 10,
         totalPages: 5,
         size: 2,
-        number: 0
+        number: 0,
       };
 
-      service.list({ page: 0, size: 2 }).subscribe((items) => {
-        expect(items).toEqual(mockResponse.content);
-        expect(service.items()).toEqual(mockResponse.content);
-        expect(service.pagination().totalElements).toBe(10);
-        expect(service.pagination().page).toBe(0);
-        expect(service.loading()).toBe(false);
-        done();
-      });
-
+      const listPromise = firstValueFrom(service.list({ page: 0, size: 2 }));
       const req = httpMock.expectOne('/api/v1/test-entities?page=0&size=2');
       expect(req.request.method).toBe('GET');
       req.flush(mockResponse);
+
+      const items = await listPromise;
+      expect(items).toEqual(mockResponse.content);
+      expect(service.items()).toEqual(mockResponse.content);
+      expect(service.pagination().totalElements).toBe(10);
+      expect(service.pagination().page).toBe(0);
+      expect(service.loading()).toBe(false);
     });
 
-    it('should handle sort parameter', (done) => {
+    it('should handle sort parameter', async () => {
       const mockResponse: SpringPageResponse<TestEntity> = {
         content: [],
         totalElements: 0,
         totalPages: 0,
         size: 20,
-        number: 0
+        number: 0,
       };
 
-      service.list({ sort: 'name,asc' }).subscribe(() => {
-        done();
-      });
-
-      const req = httpMock.expectOne('/api/v1/test-entities?sort=name%2Casc');
+      const listPromise = firstValueFrom(service.list({ sort: 'name,asc' }));
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v1/test-entities' && r.params.get('sort') === 'name,asc'
+      );
       expect(req.request.method).toBe('GET');
       req.flush(mockResponse);
+      await listPromise;
     });
   });
 
   describe('getById', () => {
-    it('should fetch a single item by ID', (done) => {
+    it('should fetch a single item by ID', async () => {
       const mockItem: TestEntity = { id: '1', name: 'Item 1' };
 
-      service.getById('1').subscribe((item) => {
-        expect(item).toEqual(mockItem);
-        expect(service.selectedItem()).toEqual(mockItem);
-        expect(service.loading()).toBe(false);
-        done();
-      });
-
+      const getPromise = firstValueFrom(service.getById('1'));
       const req = httpMock.expectOne('/api/v1/test-entities/1');
       expect(req.request.method).toBe('GET');
       req.flush(mockItem);
+
+      const item = await getPromise;
+      expect(item).toEqual(mockItem);
+      expect(service.selectedItem()).toEqual(mockItem);
+      expect(service.loading()).toBe(false);
     });
   });
 
   describe('create', () => {
-    it('should create a new item', (done) => {
+    it('should create a new item', async () => {
       const createRequest: CreateTestEntity = { name: 'New Item' };
       const createdItem: TestEntity = { id: '3', name: 'New Item' };
 
-      service.create(createRequest).subscribe((item) => {
-        expect(item).toEqual(createdItem);
-        expect(service.selectedItem()).toEqual(createdItem);
-        expect(service.items()[0]).toEqual(createdItem);
-        expect(service.loading()).toBe(false);
-        done();
-      });
-
+      const createPromise = firstValueFrom(service.create(createRequest));
       const req = httpMock.expectOne('/api/v1/test-entities');
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(createRequest);
       req.flush(createdItem);
+
+      const item = await createPromise;
+      expect(item).toEqual(createdItem);
+      expect(service.selectedItem()).toEqual(createdItem);
+      expect(service.items()[0]).toEqual(createdItem);
+      expect(service.loading()).toBe(false);
     });
   });
 
   describe('update', () => {
-    it('should update an existing item', (done) => {
-      // First, populate the items list
+    it('should update an existing item', async () => {
       service['itemsSignal'].set([
         { id: '1', name: 'Item 1' },
-        { id: '2', name: 'Item 2' }
+        { id: '2', name: 'Item 2' },
       ]);
 
       const updateRequest: Partial<TestEntity> = { name: 'Updated Item' };
       const updatedItem: TestEntity = { id: '1', name: 'Updated Item' };
 
-      service.update('1', updateRequest).subscribe((item) => {
-        expect(item).toEqual(updatedItem);
-        expect(service.selectedItem()).toEqual(updatedItem);
-        expect(service.items()[0]).toEqual(updatedItem);
-        expect(service.loading()).toBe(false);
-        done();
-      });
-
+      const updatePromise = firstValueFrom(service.update('1', updateRequest));
       const req = httpMock.expectOne('/api/v1/test-entities/1');
       expect(req.request.method).toBe('PUT');
       expect(req.request.body).toEqual(updateRequest);
       req.flush(updatedItem);
+
+      const item = await updatePromise;
+      expect(item).toEqual(updatedItem);
+      expect(service.selectedItem()).toEqual(updatedItem);
+      expect(service.items()[0]).toEqual(updatedItem);
+      expect(service.loading()).toBe(false);
     });
   });
 
   describe('delete', () => {
-    it('should delete an item', (done) => {
-      // First, populate the items list
+    it('should delete an item', async () => {
       service['itemsSignal'].set([
         { id: '1', name: 'Item 1' },
-        { id: '2', name: 'Item 2' }
+        { id: '2', name: 'Item 2' },
       ]);
 
-      service.delete('1').subscribe(() => {
-        expect(service.items().length).toBe(1);
-        expect(service.items()[0].id).toBe('2');
-        expect(service.loading()).toBe(false);
-        done();
-      });
-
+      const deletePromise = firstValueFrom(service.delete('1'));
       const req = httpMock.expectOne('/api/v1/test-entities/1');
       expect(req.request.method).toBe('DELETE');
       req.flush(null);
+
+      await deletePromise;
+      expect(service.items().length).toBe(1);
+      expect(service.items()[0].id).toBe('2');
+      expect(service.loading()).toBe(false);
     });
 
-    it('should clear selection if deleted item was selected', (done) => {
+    it('should clear selection if deleted item was selected', async () => {
       service['itemsSignal'].set([{ id: '1', name: 'Item 1' }]);
       service['selectedItemSignal'].set({ id: '1', name: 'Item 1' });
 
-      service.delete('1').subscribe(() => {
-        expect(service.selectedItem()).toBeNull();
-        done();
-      });
-
+      const deletePromise = firstValueFrom(service.delete('1'));
       const req = httpMock.expectOne('/api/v1/test-entities/1');
       req.flush(null);
+
+      await deletePromise;
+      expect(service.selectedItem()).toBeNull();
     });
   });
 
   describe('search', () => {
-    it('should search for items', (done) => {
+    it('should search for items', async () => {
       const mockResponse: SpringPageResponse<TestEntity> = {
         content: [{ id: '1', name: 'Search Result' }],
         totalElements: 1,
         totalPages: 1,
         size: 20,
-        number: 0
+        number: 0,
       };
 
-      service.search('query', { page: 0, size: 20 }).subscribe((items) => {
-        expect(items).toEqual(mockResponse.content);
-        expect(service.items()).toEqual(mockResponse.content);
-        done();
-      });
-
+      const searchPromise = firstValueFrom(service.search('query', { page: 0, size: 20 }));
       const req = httpMock.expectOne('/api/v1/test-entities/search?q=query&page=0&size=20');
       expect(req.request.method).toBe('GET');
       req.flush(mockResponse);
+
+      const items = await searchPromise;
+      expect(items).toEqual(mockResponse.content);
+      expect(service.items()).toEqual(mockResponse.content);
     });
   });
 
@@ -234,7 +222,7 @@ describe('BaseCrudService', () => {
         page: 2,
         size: 10,
         totalElements: 50,
-        totalPages: 5
+        totalPages: 5,
       });
 
       service.reset();
@@ -253,7 +241,7 @@ describe('BaseCrudService', () => {
         page: 0,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasNextPage()).toBe(true);
@@ -262,7 +250,7 @@ describe('BaseCrudService', () => {
         page: 4,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasNextPage()).toBe(false);
@@ -273,7 +261,7 @@ describe('BaseCrudService', () => {
         page: 0,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasPreviousPage()).toBe(false);
@@ -282,7 +270,7 @@ describe('BaseCrudService', () => {
         page: 2,
         size: 20,
         totalElements: 100,
-        totalPages: 5
+        totalPages: 5,
       });
 
       expect(service.hasPreviousPage()).toBe(true);
