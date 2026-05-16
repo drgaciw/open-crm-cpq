@@ -52,4 +52,21 @@ class MetricsCalculatorTest {
         assertEquals(BigDecimal.valueOf(25), metrics.getTotalDiscount());
         assertEquals(new BigDecimal("0.9000"), metrics.getPriceMultiplier());
     }
+
+    @Test
+    @DisplayName("defaults contract duration to twelve months when missing")
+    void defaultsContractDurationWhenMissing() {
+        PricingResult result = PricingResult.builder()
+                .lineResults(List.of(PricingLineResult.builder()
+                        .quantity(1)
+                        .listPrice(BigDecimal.valueOf(100))
+                        .finalPrice(BigDecimal.valueOf(100))
+                        .build()))
+                .build();
+
+        FinancialMetrics metrics = calculator.calculate(result, 0, null);
+
+        assertEquals(BigDecimal.valueOf(1200), metrics.getArr());
+        assertEquals(BigDecimal.valueOf(1200), metrics.getTcv());
+    }
 }
