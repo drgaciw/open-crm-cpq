@@ -47,6 +47,9 @@ public class AiAuditLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "snapshot_references", columnDefinition = "TEXT")
+    private String snapshotReferences;
+
     public AiAuditLog() {
     }
 
@@ -149,5 +152,13 @@ public class AiAuditLog {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getSnapshotReferences() {
+        return snapshotReferences;
+    }
+
+    public void setSnapshotReferences(String snapshotReferences) {
+        this.snapshotReferences = snapshotReferences;
     }
 }
