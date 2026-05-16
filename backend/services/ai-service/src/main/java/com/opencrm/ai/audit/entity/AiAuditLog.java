@@ -21,6 +21,9 @@ public class AiAuditLog extends BaseEntity {
     @Column(name = "event_data", columnDefinition = "TEXT")
     private String eventData;
 
+    @Column(name = "snapshot_references", columnDefinition = "TEXT")
+    private String snapshotReferences;
+
     public AiAuditLog() {
     }
 
@@ -54,5 +57,13 @@ public class AiAuditLog extends BaseEntity {
 
     public void setEventData(String eventData) {
         this.eventData = eventData;
+    }
+
+    public String getSnapshotReferences() {
+        return snapshotReferences;
+    }
+
+    public void setSnapshotReferences(String snapshotReferences) {
+        this.snapshotReferences = snapshotReferences;
     }
 }
