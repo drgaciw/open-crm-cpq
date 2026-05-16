@@ -3,9 +3,9 @@ package com.opencrm.ai.agent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.ai.audit.AgentAuditLogger;
+import com.opencrm.ai.llm.LlmAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import reactor.core.publisher.Flux;
 
@@ -15,7 +15,7 @@ import java.util.UUID;
 /**
  * Base class for all 37 CPQ AI agents.
  *
- * <p>Handles the Spring AI {@link ChatClient} call pattern, context injection,
+ * <p>Handles the internal {@link LlmAdapter} call pattern, context injection,
  * session ID generation, audit logging, and error recovery so subclasses only
  * need to declare:</p>
  * <ul>
@@ -64,7 +64,7 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             """;
 
     @Autowired
-    private ChatClient chatClient;
+    private LlmAdapter llmAdapter;
 
     @Autowired
     private AgentAuditLogger auditLogger;
@@ -99,11 +99,7 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
 
-            String output = chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(userMessage)
-                    .call()
-                    .content();
+            String output = llmAdapter.generate(systemPrompt, userMessage);
 
             auditLogger.logResponse(getAgentId(), sessionId, output);
 
@@ -129,11 +125,7 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
 
-            return chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(userMessage)
-                    .stream()
-                    .content()
+            return llmAdapter.stream(systemPrompt, userMessage)
                     .doOnError(ex -> log.error(
                             "Agent {} stream failed: {}", getAgentId(), ex.getMessage(), ex));
 

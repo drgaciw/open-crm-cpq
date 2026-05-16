@@ -6,8 +6,8 @@ services:
     image: postgres:16-alpine
     container_name: opencrm-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-opencrm}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: opencrm
     ports:
       - "5432:5432"
@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-opencrm}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,16 +44,16 @@ services:
       - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=crm
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: crm
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       SECURITY_OPEN: "true"
     depends_on:
       postgres:
@@ -77,13 +77,13 @@ services:
       - "8089:8089"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       SECURITY_OPEN: "true"
     depends_on:
       postgres:
@@ -105,16 +105,16 @@ services:
       - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: pricing
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       SECURITY_OPEN: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -143,16 +143,16 @@ services:
       - "8083:8083"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=product
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: product
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       SECURITY_OPEN: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -178,16 +178,16 @@ services:
       - "8084:8084"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=quote
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: quote
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       SECURITY_OPEN: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -253,8 +253,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: opencrm-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@opencrm.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     ports:
       - "5050:80"
     depends_on:
