@@ -238,7 +238,7 @@ public class PricingExecutionService {
                     .approvalState("APPROVED")
                     .build();
 
-            FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths());
+            FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
             result.setFinancialMetrics(metrics);
 
             // 12. Build PricingWaterfall
