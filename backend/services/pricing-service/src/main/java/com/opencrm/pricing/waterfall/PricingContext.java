@@ -17,6 +17,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class PricingContext {
 
+    private String correlationId;
     private String customerExternalId;
     private String quoteExternalId;
     private List<PricingLineRequest> lineItems;

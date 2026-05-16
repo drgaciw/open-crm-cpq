@@ -22,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.quality.Strictness;
+import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,10 +33,13 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Pricing Execution Service")
 class PricingExecutionServiceTest {
 
@@ -54,6 +59,10 @@ class PricingExecutionServiceTest {
     private PricingContextValidator contextValidator;
     @Mock
     private MetricsCalculator metricsCalculator;
+    @Mock
+    private QuoteLevelMetricsPolicy quoteLevelMetricsPolicy;
+    @Mock
+    private PricingExecutionEventPublisher pricingExecutionEventPublisher;
     @Mock
     private ObjectMapper objectMapper;
     @Mock
@@ -112,6 +121,12 @@ class PricingExecutionServiceTest {
         assertNotNull(result.getWaterfall());
 
         verify(auditLogRepository).save(any(PricingAuditLog.class));
+        verify(pricingExecutionEventPublisher).publishOutcomes(
+                eq(defaultContext),
+                any(PricingResult.class),
+                eq("pb-1"),
+                isNull()
+        );
     }
 
     @Test
@@ -220,6 +235,9 @@ class PricingExecutionServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(quoteLevelMetricsPolicy.apply(any(PricingResult.class), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
         defaultContext = PricingContext.builder()
                 .customerExternalId("CUST-001")
                 .quoteExternalId("Q-001")

@@ -56,6 +56,8 @@ public class PricingExecutionService {
     private final PricingAuditLogRepository auditLogRepository;
     private final PricingContextValidator contextValidator;
     private final MetricsCalculator metricsCalculator;
+    private final QuoteLevelMetricsPolicy quoteLevelMetricsPolicy;
+    private final PricingExecutionEventPublisher pricingExecutionEventPublisher;
     private final ObjectMapper objectMapper;
     private final DroolsRulesEngine droolsRulesEngine;
 
@@ -241,6 +243,10 @@ public class PricingExecutionService {
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
             result.setFinancialMetrics(metrics);
 
+            result = quoteLevelMetricsPolicy.apply(result, context.getDurationInMonths() != null
+                    ? context.getDurationInMonths()
+                    : 12);
+
             // 12. Build PricingWaterfall
             PricingWaterfall waterfall = buildWaterfall(lineResults);
             result.setWaterfall(waterfall);
@@ -248,9 +254,15 @@ public class PricingExecutionService {
             long executionTime = System.currentTimeMillis() - startTime;
             result.setExecutionTimeMs(executionTime);
 
+            String pricebookVersion = priceBookBatch.getPriceBookId() != null
+                    ? "pb-" + priceBookBatch.getPriceBookId()
+                    : null;
+            String rulesetVersion = ruleSet != null ? "rs-" + ruleSet.getId() : null;
+
             // 13. Persist audit log for execute mode only
             if (persistAudit) {
-                persistAuditLog(context, result, ruleSet, executionTime);
+                persistAuditLog(context, result, ruleSet, executionTime, pricebookVersion, rulesetVersion);
+                pricingExecutionEventPublisher.publishOutcomes(context, result, pricebookVersion, rulesetVersion);
             }
 
             return result;
@@ -309,16 +321,29 @@ public class PricingExecutionService {
                 .build();
     }
 
-    private void persistAuditLog(PricingContext context, PricingResult result,
-                                   RuleSet ruleSet, long executionTime) {
+    private void persistAuditLog(
+            PricingContext context,
+            PricingResult result,
+            RuleSet ruleSet,
+            long executionTime,
+            String pricebookVersion,
+            String rulesetVersion
+    ) {
         try {
             String inputSnapshot = objectMapper.writeValueAsString(context);
             String outputSnapshot = objectMapper.writeValueAsString(result);
+            String metricsSnapshot = result.getFinancialMetrics() != null
+                    ? objectMapper.writeValueAsString(result.getFinancialMetrics())
+                    : null;
 
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
                     .customerExternalId(context.getCustomerExternalId())
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
+                    .correlationId(context.getCorrelationId())
+                    .pricebookVersion(pricebookVersion)
+                    .rulesetVersion(rulesetVersion)
+                    .metricsSnapshot(metricsSnapshot)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
                     .executionTimeMs(executionTime)
