@@ -9,12 +9,19 @@ import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
 import com.opencrm.pricing.integration.pricebook.ProductEntryResolveDto;
 import com.opencrm.pricing.integration.pricebook.ResolveBatchResponse;
 import com.opencrm.pricing.product.PricingProductRepository;
+import com.opencrm.pricing.rule.Rule;
 import com.opencrm.pricing.rule.RuleRepository;
+import com.opencrm.pricing.rule.RuleStatus;
+import com.opencrm.pricing.rule.RuleType;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.customer.CustomerRegion;
 import com.opencrm.pricing.waterfall.*;
 import com.opencrm.rules.drools.DroolsRulesEngine;
+import com.opencrm.rules.engine.RuleExecutionContext;
+import com.opencrm.rules.engine.RuleExecutionResult;
+import com.opencrm.rules.model.QuoteFact;
+import com.opencrm.rules.model.QuoteLineItemFact;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +35,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,6 +142,64 @@ class PricingExecutionServiceTest {
         assertNotNull(result);
         assertTrue(result.isSuccess());
         verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("simulate() should evaluate quote and line item facts and return approval outputs")
+    void simulateShouldEvaluateRuleFactsAndReturnApprovalOutputs() {
+        RuleSet ruleSet = RuleSet.builder()
+                .id(10L)
+                .name("Active pricing rules")
+                .status(com.opencrm.pricing.ruleset.RuleSetStatus.ACTIVE)
+                .build();
+        Rule approvalRule = Rule.builder()
+                .id(20L)
+                .name("Route Approval for Margin Exception")
+                .content("rule body")
+                .priority(930)
+                .ruleType(RuleType.APPROVAL)
+                .status(RuleStatus.ACTIVE)
+                .build();
+
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(Optional.of(defaultCustomer));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(List.of(ruleSet));
+        when(ruleRepository.findByRuleSetIdAndStatusAndDeletedFalseOrderByPriorityDesc(10L, RuleStatus.ACTIVE))
+                .thenReturn(List.of(approvalRule));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+                .thenReturn(defaultMetrics);
+        when(droolsRulesEngine.execute(any(RuleExecutionContext.class), any()))
+                .thenAnswer(invocation -> {
+                    RuleExecutionContext ruleContext = invocation.getArgument(0);
+                    QuoteFact quoteFact = ruleContext.getFacts().stream()
+                            .filter(QuoteFact.class::isInstance)
+                            .map(QuoteFact.class::cast)
+                            .findFirst()
+                            .orElseThrow();
+                    quoteFact.setString("approvalState", "PENDING");
+                    quoteFact.setString("approvalTier", "DEAL_DESK");
+                    quoteFact.setString("explanationCode", "MARGIN_BELOW_FLOOR");
+                    return RuleExecutionResult.builder()
+                            .success(true)
+                            .rulesFired(1)
+                            .modifiedFacts(ruleContext.getFacts())
+                            .firedRuleNames(List.of("Route Approval for Margin Exception"))
+                            .build();
+                });
+
+        PricingResult result = executionService.simulate(defaultContext);
+
+        assertEquals("PENDING", result.getApprovalState());
+        assertEquals("DEAL_DESK", result.getApprovalTier());
+        assertEquals(List.of("MARGIN_BELOW_FLOOR"), result.getExplanationCodes());
+        verify(droolsRulesEngine).execute(argThat(ruleContext ->
+                ruleContext.getFacts().stream().anyMatch(QuoteFact.class::isInstance)
+                        && ruleContext.getFacts().stream().anyMatch(QuoteLineItemFact.class::isInstance)
+        ), any(List.class));
     }
 
     @Test

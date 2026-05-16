@@ -7,6 +7,9 @@ import com.opencrm.rules.engine.RuleDefinition;
 import com.opencrm.rules.engine.RuleExecutionContext;
 import com.opencrm.rules.engine.RuleExecutionResult;
 import com.opencrm.rules.engine.RulesEngineType;
+import com.opencrm.rules.model.CustomerFact;
+import com.opencrm.rules.model.QuoteFact;
+import com.opencrm.rules.model.QuoteLineItemFact;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.pricing.customer.Customer;
@@ -31,8 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Main orchestrator for pricing execution.
@@ -167,7 +172,10 @@ public class PricingExecutionService {
                 lineResults.add(lineResult);
             }
 
-                        // 7-10. Convert to Drools facts, build RuleExecutionContext, execute rules
+            QuoteFact quoteFact = buildQuoteFact(context, customer, lineResults);
+            List<QuoteLineItemFact> lineFacts = buildLineItemFacts(lineResults, quoteFact);
+
+            // 7-10. Convert to Drools facts, build RuleExecutionContext, execute rules
             if (!activeRules.isEmpty()) {
                 List<RuleDefinition> ruleDefinitions = activeRules.stream()
                     .map(rule -> RuleDefinition.builder()
@@ -187,11 +195,11 @@ public class PricingExecutionService {
                     .ruleSetId(ruleSet != null ? String.valueOf(ruleSet.getId()) : null)
                     .engineType(RulesEngineType.DROOLS)
                     .build();
-                ruleContext.getFacts().add(customer);
-                ruleContext.getFacts().add(context);
-                ruleContext.getFacts().addAll(lineResults);
+                ruleContext.getFacts().add(quoteFact);
+                ruleContext.getFacts().addAll(lineFacts);
                 try {
                     RuleExecutionResult ruleResult = droolsRulesEngine.execute(ruleContext, ruleDefinitions);
+                    applyRuleOutputs(quoteFact, lineFacts, lineResults);
                     log.info("Executed {} rules (fired {}) for customer {}",
                         activeRules.size(), ruleResult.getRulesFired(), customer.getExternalId());
                 } catch (Exception ex) {
@@ -206,15 +214,16 @@ public class PricingExecutionService {
             PricingResult result = PricingResult.builder()
                     .success(true)
                     .lineResults(lineResults)
-                    .explanationCodes(new ArrayList<>())
-                    .approvalState("APPROVED")
+                    .explanationCodes(explanationCodesFrom(quoteFact))
+                    .approvalState(approvalStateFrom(quoteFact))
+                    .approvalTier(quoteFact.getString("approvalTier"))
                     .build();
 
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths());
             result.setFinancialMetrics(metrics);
 
             // 12. Build PricingWaterfall
-            PricingWaterfall waterfall = buildWaterfall(lineResults);
+            PricingWaterfall waterfall = buildWaterfall(lineResults, result.getApprovalState(), result.getExplanationCodes());
             result.setWaterfall(waterfall);
 
             long executionTime = System.currentTimeMillis() - startTime;
@@ -260,7 +269,10 @@ public class PricingExecutionService {
         return product.getListPrice() != null ? product.getListPrice() : BigDecimal.ZERO;
     }
 
-    private PricingWaterfall buildWaterfall(List<PricingLineResult> lineResults) {
+    private PricingWaterfall buildWaterfall(
+            List<PricingLineResult> lineResults,
+            String approvalState,
+            List<String> explanationCodes) {
         List<PricingWaterfallStep> steps = new ArrayList<>();
 
         BigDecimal totalListPrice = lineResults.stream()
@@ -276,9 +288,95 @@ public class PricingExecutionService {
                 .basePrice(totalListPrice)
                 .netPrice(totalFinalPrice)
                 .steps(steps)
-                .approvalState("APPROVED")
-                .explanationCodes(new ArrayList<>())
+                .approvalState(approvalState)
+                .explanationCodes(explanationCodes)
                 .build();
+    }
+
+    private QuoteFact buildQuoteFact(PricingContext context, Customer customer, List<PricingLineResult> lineResults) {
+        BigDecimal basePrice = lineResults.stream()
+                .map(line -> line.getListPrice().multiply(BigDecimal.valueOf(line.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal finalPrice = lineResults.stream()
+                .map(PricingLineResult::getFinalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (context.getMetadata() != null) {
+            metadata.putAll(context.getMetadata());
+        }
+
+        return QuoteFact.builder()
+                .externalId(context.getQuoteExternalId())
+                .subscriptionType(context.getSubscriptionType())
+                .durationInMonths(context.getDurationInMonths() != null ? context.getDurationInMonths() : 0)
+                .basePrice(basePrice)
+                .finalPrice(finalPrice)
+                .currency(context.getCurrency())
+                .customer(CustomerFact.builder()
+                        .externalId(customer.getExternalId())
+                        .name(customer.getName())
+                        .region(customer.getRegion() != null ? customer.getRegion().name() : null)
+                        .build())
+                .metadata(metadata)
+                .build();
+    }
+
+    private List<QuoteLineItemFact> buildLineItemFacts(List<PricingLineResult> lineResults, QuoteFact quoteFact) {
+        List<QuoteLineItemFact> lineFacts = new ArrayList<>();
+        for (PricingLineResult lineResult : lineResults) {
+            lineFacts.add(QuoteLineItemFact.builder()
+                    .lineItemType(lineResult.getLineItemType())
+                    .productExternalId(lineResult.getProductExternalId())
+                    .quantity(lineResult.getQuantity() != null ? lineResult.getQuantity() : 0)
+                    .listPrice(lineResult.getListPrice())
+                    .unitPrice(lineResult.getUnitPrice())
+                    .discountRate(lineResult.getDiscountRate())
+                    .finalPrice(lineResult.getFinalPrice())
+                    .quote(quoteFact)
+                    .metadata(lineResult.getMetadata() != null ? new LinkedHashMap<>(lineResult.getMetadata()) : new LinkedHashMap<>())
+                    .build());
+        }
+        return lineFacts;
+    }
+
+    private void applyRuleOutputs(
+            QuoteFact quoteFact,
+            List<QuoteLineItemFact> lineFacts,
+            List<PricingLineResult> lineResults) {
+        for (int i = 0; i < lineFacts.size(); i++) {
+            QuoteLineItemFact lineFact = lineFacts.get(i);
+            PricingLineResult lineResult = lineResults.get(i);
+            lineResult.setUnitPrice(lineFact.getUnitPrice());
+            lineResult.setDiscountRate(lineFact.getDiscountRate());
+            lineResult.setFinalPrice(lineFact.getFinalPrice());
+            lineResult.setMetadata(lineFact.getMetadata());
+
+            if (lineFact.getListPrice() != null && lineFact.getDiscountRate() != null) {
+                BigDecimal quantity = BigDecimal.valueOf(lineResult.getQuantity() != null ? lineResult.getQuantity() : 0);
+                lineResult.setDiscountAmount(
+                        lineFact.getListPrice().multiply(lineFact.getDiscountRate()).multiply(quantity));
+            }
+        }
+
+        BigDecimal finalPrice = lineResults.stream()
+                .map(PricingLineResult::getFinalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        quoteFact.setFinalPrice(finalPrice);
+    }
+
+    private String approvalStateFrom(QuoteFact quoteFact) {
+        String approvalState = quoteFact.getString("approvalState");
+        return approvalState != null ? approvalState : "APPROVED";
+    }
+
+    private List<String> explanationCodesFrom(QuoteFact quoteFact) {
+        List<String> explanationCodes = new ArrayList<>();
+        String explanationCode = quoteFact.getString("explanationCode");
+        if (explanationCode != null) {
+            explanationCodes.add(explanationCode);
+        }
+        return explanationCodes;
     }
 
     private void persistAuditLog(PricingContext context, PricingResult result,
