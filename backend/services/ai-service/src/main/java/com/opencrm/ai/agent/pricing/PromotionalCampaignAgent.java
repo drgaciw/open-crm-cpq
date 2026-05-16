@@ -1,31 +1,10 @@
 package com.opencrm.ai.agent.pricing;
 
-import com.opencrm.ai.agent.AgentRequest;
-import com.opencrm.ai.agent.AgentResponse;
-import com.opencrm.ai.agent.CpqAgent;
-import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.StreamingChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
+import com.opencrm.ai.agent.AbstractCpqAgent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @Service("cpq-agent-009")
-public class PromotionalCampaignAgent implements CpqAgent {
-
-    private final ChatClient chatClient;
-    private final StreamingChatClient streamingChatClient;
-
-    public PromotionalCampaignAgent(ChatClient chatClient, StreamingChatClient streamingChatClient) {
-        this.chatClient = chatClient;
-        this.streamingChatClient = streamingChatClient;
-    }
+public class PromotionalCampaignAgent extends AbstractCpqAgent {
 
     @Override
     public String getAgentId() {
@@ -43,64 +22,29 @@ public class PromotionalCampaignAgent implements CpqAgent {
     }
 
     @Override
-    public AgentResponse invoke(AgentRequest request) {
-        try {
-            List<Message> messages = new ArrayList<>();
-            if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
-                messages.add(new SystemMessage(request.getSystemPrompt()));
-            }
-            if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-                for (String msg : request.getMessages()) {
-                    messages.add(new UserMessage(msg));
-                }
-            } else {
-                messages.add(new UserMessage("Apply time-limited promotions and campaign-based pricing rules."));
-            }
-            Prompt prompt = new Prompt(messages);
-            var response = chatClient.call(prompt);
-            String output = response.getResult().getOutput().getContent();
-            return new AgentResponse() {
-                @Override
-                public boolean isSuccess() { return true; }
-                @Override
-                public String getOutput() { return output; }
-                @Override
-                public Map<String, Object> getMetadata() { return Map.of("autonomy", "Semi-autonomous"); }
-            };
-        } catch (Exception e) {
-            String errorMsg = "Error invoking Promotional Campaign Agent: " + e.getMessage();
-            return new AgentResponse() {
-                @Override
-                public boolean isSuccess() { return false; }
-                @Override
-                public String getOutput() { return errorMsg; }
-                @Override
-                public Map<String, Object> getMetadata() { return Map.of(); }
-            };
-        }
+    protected String autonomyTier() {
+        return "Semi-autonomous";
     }
 
     @Override
-    public Flux<String> stream(AgentRequest request) {
-        try {
-            List<Message> messages = new ArrayList<>();
-            if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
-                messages.add(new SystemMessage(request.getSystemPrompt()));
-            }
-            if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-                for (String msg : request.getMessages()) {
-                    messages.add(new UserMessage(msg));
-                }
-            } else {
-                messages.add(new UserMessage("Apply time-limited promotions and campaign-based pricing rules."));
-            }
-            Prompt prompt = new Prompt(messages);
-            return streamingChatClient.stream(prompt)
-                    .filter(response -> response.getResult() != null && response.getResult().getOutput() != null)
-                    .map(response -> response.getResult().getOutput().getContent())
-                    .onErrorResume(e -> Flux.just("Error streaming Promotional Campaign Agent: " + e.getMessage()));
-        } catch (Exception e) {
-            return Flux.just("Error streaming Promotional Campaign Agent: " + e.getMessage());
-        }
+    protected String agentSystemPrompt() {
+        return """
+                You are cpq-agent-009, the Promotional Campaign Agent.
+
+                Responsibilities:
+                - Evaluate time-limited promotional eligibility from supplied campaign, quote,
+                  product, customer, date, and channel context.
+                - Explain stacking with volume, segment, and deal-specific discounts.
+                - Detect expired campaigns, excluded products, missing campaign codes, and
+                  campaign budget or usage limits.
+
+                Enforcement:
+                - In-policy promotional application may be marked automatic when campaign rules
+                  are complete and active.
+                - Expired, manually overridden, budget-limited, or stacking-conflict cases must be
+                  flagged REQUIRES_REVIEW or REQUIRES_APPROVAL.
+                - Include campaign ID, eligibility result, discount effect, expiration, stacking
+                  result, and audit-relevant assumptions in the JSON response.
+                """;
     }
 }
