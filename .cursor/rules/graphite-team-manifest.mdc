@@ -1,0 +1,20 @@
+---
+description: Active when editing the committed Graphite team manifest — keep playbooks aligned with graphite-team-orchestrator.
+globs: **/.cursor/teams/graphite-team.yaml
+alwaysApply: false
+---
+
+# `graphite-team.yaml` in this repo
+
+You are editing the **version-controlled** team manifest (usually mirrored from `~/.cursor/teams/graphite-team.yaml`).
+
+- Preserve **`schema_version`**, **`team.id`** (`graphite-team`), and **`orchestration.lead_agent_id`** (`graphite-team-orchestrator`) unless the team explicitly renames them.
+- **`default_playbooks`** sequences should remain consistent with the four specialist agents; avoid inventing new agent names here without adding matching files under **`~/.cursor/agents/`** (or project `.cursor/agents/`).
+- After structural edits, run:
+
+  `pwsh -File "$HOME/.cursor/teams/validate-graphite-team.ps1" -RepoRoot <this-repo-path>`
+
+  so local agents/skills on disk still satisfy the manifest.
+
+- For day-to-day Git operations, prefer **`graphite-team-orchestrator`** and the skills listed in the YAML over ad-hoc `gt` sequences.
+- Respect **`execution`** in this YAML: assign playbook work to **Cursor graphite-\*** agents or to **Gemini/Jules** sessions the user runs—not to **GitHub-hosted coding agents** as the primary executor.
