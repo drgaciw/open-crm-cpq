@@ -28,8 +28,9 @@ import java.util.List;
  *   <li>{@code customerExternalId} — Customer reference from CPQ (optional CRM-side).</li>
  *   <li>{@code dealExternalId} — <b>Required for CRM:</b> deal UUID string ({@code Deal.uuid}); listener skips update if blank.</li>
  *   <li>{@code dealType} — Optional classification.</li>
- *   <li>{@code totalAmount}, {@code arr}, {@code tcv}, {@code acv} — Commercial totals as published by quote-service.</li>
- *   <li>{@code currency} — ISO currency code.</li>
+ *   <li>{@code totalAmount}, {@code arr}, {@code tcv}, {@code acv} — Commercial totals as published by quote-service.
+ *       CRM does not copy these values onto the deal during quote acceptance.</li>
+ *   <li>{@code currency} — ISO currency code for quote-owned commercial totals.</li>
  *   <li>{@code durationInMonths} — Contract duration.</li>
  *   <li>{@code acceptedAt} — Acceptance timestamp.</li>
  * </ul>
@@ -37,6 +38,10 @@ import java.util.List;
  * <b>Idempotency (Redis):</b> Keys {@code crm:quote-accepted:processed:*} (see {@code QuoteAcceptedIdempotency}).
  * Reprocessing after a failed persistence path may require deleting the key in ops runbooks; for ultimate
  * idempotency across Redis loss, consider a DB column on deals (e.g. last winning quote UUID) in a future change.
+ * <p>
+ * <b>CRM side effect:</b> When {@code dealExternalId} resolves to a CRM deal, crm-service marks the
+ * opportunity WON and records the acceptance timestamp as {@code wonAt}. Accepted pricing, ARR/TCV/ACV,
+ * contract value, and subscription ownership remain in quote/contract services.
  */
 @Data
 @Builder
