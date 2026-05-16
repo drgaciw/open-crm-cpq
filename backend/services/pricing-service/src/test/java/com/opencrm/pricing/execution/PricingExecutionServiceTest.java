@@ -92,7 +92,7 @@ class PricingExecutionServiceTest {
         when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
                 .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
@@ -126,7 +126,7 @@ class PricingExecutionServiceTest {
         when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
                 .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
 
         PricingResult result = executionService.simulate(defaultContext);
@@ -181,7 +181,7 @@ class PricingExecutionServiceTest {
         when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
                 .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
 
         BulkPricingSimulationResponse response = executionService.simulateBulk(contexts);
@@ -238,6 +238,7 @@ class PricingExecutionServiceTest {
                 .externalId("CUST-001")
                 .name("Acme Corp")
                 .region(CustomerRegion.NA)
+                .churnScore(72)
                 .build();
 
         defaultMetrics = FinancialMetrics.builder()
@@ -245,6 +246,9 @@ class PricingExecutionServiceTest {
                 .tcv(BigDecimal.valueOf(6000))
                 .acv(BigDecimal.valueOf(6000))
                 .clv(BigDecimal.valueOf(12000))
+                .churnScore(72)
+                .discountRate(BigDecimal.ZERO)
+                .priceMultiplier(BigDecimal.ONE)
                 .build();
     }
 }
