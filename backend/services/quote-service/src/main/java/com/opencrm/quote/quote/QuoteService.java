@@ -204,13 +204,15 @@ public class QuoteService {
             throw new BusinessException("Only sent quotes can be accepted", "INVALID_STATUS_TRANSITION");
         }
 
+        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        quote.recalculateTotals(lineItems);
+        QuoteAggregateInvariants.assertAcceptanceReady(quote, lineItems);
+
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
-        quote.recalculateTotals();
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
-        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
         QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);

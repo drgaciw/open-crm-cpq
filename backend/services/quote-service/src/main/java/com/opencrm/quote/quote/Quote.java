@@ -129,10 +129,14 @@ public class Quote extends BaseEntity {
      * Constitutional requirement: totals must remain mathematically synchronized.
      */
     public void recalculateTotals() {
+        recalculateTotals(lineItems);
+    }
+
+    public void recalculateTotals(List<QuoteLineItem> items) {
         Money subtotalMoney = Money.zero(currency);
         Money discountMoney = Money.zero(currency);
         
-        for (QuoteLineItem item : lineItems) {
+        for (QuoteLineItem item : items) {
             if (!item.isDeleted()) {
                 Money lineTotal = Money.of(item.getUnitPrice(), currency).multiply(item.getQuantity());
                 Money lineDiscount = lineTotal.percentage(item.getDiscountRate());
