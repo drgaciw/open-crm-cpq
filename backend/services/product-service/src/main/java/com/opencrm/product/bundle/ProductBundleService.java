@@ -1,5 +1,8 @@
 package com.opencrm.product.bundle;
 
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.product.catalog.ProductRepository;
@@ -10,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -22,6 +26,7 @@ public class ProductBundleService {
     private final BundleItemRepository bundleItemRepository;
     private final ProductRepository productRepository;
     private final ProductBundleMapper bundleMapper;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     public ProductBundleDto create(ProductBundleCreateRequest request) {
         log.debug("Creating bundle for product ID: {}", request.getProductId());
@@ -88,6 +93,7 @@ public class ProductBundleService {
 
         bundle.getItems().add(item);
         ProductBundle saved = bundleRepository.save(bundle);
+        publishBundleStructureChanged(saved, "ITEM_ADDED");
         log.info("Added item to bundle ID: {}", bundleId);
 
         return bundleMapper.toDto(saved);
@@ -109,6 +115,20 @@ public class ProductBundleService {
 
         item.softDelete();
         bundleItemRepository.save(item);
+        publishBundleStructureChanged(bundle, "ITEM_REMOVED");
         log.info("Removed item {} from bundle {}", itemId, bundleId);
+    }
+
+    private void publishBundleStructureChanged(ProductBundle bundle, String changeType) {
+        outboxEventPublisher.publish(
+                "ProductBundle",
+                bundle.getId().toString(),
+                KafkaTopics.BUNDLE_STRUCTURE_CHANGED,
+                new ProductCatalogLifecycleEvent(
+                        bundle.getId().toString(),
+                        changeType,
+                        Instant.now()
+                )
+        );
     }
 }

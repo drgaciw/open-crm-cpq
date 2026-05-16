@@ -8,7 +8,6 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
-import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
@@ -205,23 +204,12 @@ public class QuoteService {
         }
 
         quote.setStatus(QuoteStatus.ACCEPTED);
+        quote.setAcceptedAt(Instant.now());
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
-        eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessage.builder()
-                .quoteNumber(saved.getQuoteNumber())
-                .quoteUuid(saved.getUuid())
-                .customerExternalId(saved.getCustomerExternalId())
-                .dealExternalId(saved.getDealExternalId())
-                .dealType(saved.getDealType().name())
-                .totalAmount(saved.getTotalAmount())
-                .arr(saved.getArr())
-                .tcv(saved.getTcv())
-                .acv(saved.getAcv())
-                .currency(saved.getCurrency())
-                .durationInMonths(saved.getDurationInMonths())
-                .acceptedAt(Instant.now())
-                .build());
+        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
         return quoteMapper.toDto(saved);
     }
