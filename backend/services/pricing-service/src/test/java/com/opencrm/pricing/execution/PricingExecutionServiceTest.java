@@ -14,7 +14,7 @@ import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.customer.CustomerRegion;
 import com.opencrm.pricing.waterfall.*;
-import com.opencrm.rules.drools.DroolsRulesEngine;
+import com.opencrm.pricing.rules.PricingRuleEngineOrchestrator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,7 +66,7 @@ class PricingExecutionServiceTest {
     @Mock
     private ObjectMapper objectMapper;
     @Mock
-    private DroolsRulesEngine droolsRulesEngine;
+    private PricingRuleEngineOrchestrator pricingRuleEngineOrchestrator;
 
     @InjectMocks
     private PricingExecutionService executionService;

@@ -2,11 +2,9 @@ package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.opencrm.rules.drools.DroolsRulesEngine;
-import com.opencrm.rules.engine.RuleDefinition;
+import com.opencrm.pricing.rules.PricingRuleEngineOrchestrator;
 import com.opencrm.rules.engine.RuleExecutionContext;
 import com.opencrm.rules.engine.RuleExecutionResult;
-import com.opencrm.rules.engine.RulesEngineType;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.pricing.customer.Customer;
@@ -59,7 +57,7 @@ public class PricingExecutionService {
     private final QuoteLevelMetricsPolicy quoteLevelMetricsPolicy;
     private final PricingExecutionEventPublisher pricingExecutionEventPublisher;
     private final ObjectMapper objectMapper;
-    private final DroolsRulesEngine droolsRulesEngine;
+    private final PricingRuleEngineOrchestrator pricingRuleEngineOrchestrator;
 
     /**
      * Execute pricing with full audit trail.
@@ -197,36 +195,25 @@ public class PricingExecutionService {
                 lineResults.add(lineResult);
             }
 
-                        // 7-10. Convert to Drools facts, build RuleExecutionContext, execute rules
+            // 7-10. Hybrid OpenL + Drools execution via shared rule engine port
             if (!activeRules.isEmpty()) {
-                List<RuleDefinition> ruleDefinitions = activeRules.stream()
-                    .map(rule -> RuleDefinition.builder()
-                        .id(String.valueOf(rule.getId()))
-                        .name(rule.getName())
-                        .description(rule.getDescription())
-                        .content(rule.getContent())
-                        .priority(rule.getPriority())
-                        .ruleType(rule.getRuleType() != null ? rule.getRuleType().name() : null)
-                        .conditionGroup(rule.getConditionGroup())
-                        .actionSet(rule.getActionSet())
-                        .conflictPolicy(rule.getConflictPolicy())
-                        .explanationCode(rule.getExplanationCode())
-                        .build())
-                    .toList();
                 RuleExecutionContext ruleContext = RuleExecutionContext.builder()
-                    .ruleSetId(ruleSet != null ? String.valueOf(ruleSet.getId()) : null)
-                    .engineType(RulesEngineType.DROOLS)
-                    .build();
+                        .ruleSetId(ruleSet != null ? String.valueOf(ruleSet.getId()) : null)
+                        .build();
                 ruleContext.getFacts().add(customer);
                 ruleContext.getFacts().add(context);
                 ruleContext.getFacts().addAll(lineResults);
                 try {
-                    RuleExecutionResult ruleResult = droolsRulesEngine.execute(ruleContext, ruleDefinitions);
-                    log.info("Executed {} rules (fired {}) for customer {}",
-                        activeRules.size(), ruleResult.getRulesFired(), customer.getExternalId());
+                    RuleExecutionResult ruleResult = pricingRuleEngineOrchestrator.execute(
+                            ruleSet, activeRules, ruleContext);
+                    log.info("Executed {} hybrid rules (fired {}, trace entries {}) for customer {}",
+                            activeRules.size(),
+                            ruleResult.getRulesFired(),
+                            ruleResult.getTrace() != null ? ruleResult.getTrace().size() : 0,
+                            customer.getExternalId());
                 } catch (Exception ex) {
                     log.error("Rule execution failed for customer {}: {}",
-                        customer.getExternalId(), ex.getMessage(), ex);
+                            customer.getExternalId(), ex.getMessage(), ex);
                     throw new BusinessException("Pricing rule execution failed", "RULE_EXECUTION_ERROR");
                 }
             } else {

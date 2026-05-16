@@ -61,4 +61,10 @@ public class Rule extends BaseEntity {
 
     @Column(name = "metadata", columnDefinition = "TEXT")
     private String metadata;
+
+    /**
+     * {@link com.opencrm.rules.engine.RulesEngineType} name; when null the parent rule set engine applies.
+     */
+    @Column(name = "engine_type", length = 30)
+    private String engineType;
 }
