@@ -1,0 +1,20 @@
+{
+  "name": "crm-cpq-catalog",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/crm/cpq/catalog/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:crm", "type:cpq-boundary"],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../../coverage/libs/crm/cpq/catalog"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

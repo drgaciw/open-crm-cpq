@@ -1,0 +1,20 @@
+{
+  "name": "crm-cpq-quote",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/crm/cpq/quote/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:crm", "type:cpq-boundary"],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../../coverage/libs/crm/cpq/quote"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
