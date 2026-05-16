@@ -125,7 +125,7 @@ public class ProductBundleService {
                 bundle.getId().toString(),
                 KafkaTopics.BUNDLE_STRUCTURE_CHANGED,
                 new ProductCatalogLifecycleEvent(
-                        bundle.getId().toString(),
+                        String.valueOf(bundle.getProductId()),
                         changeType,
                         Instant.now()
                 )
