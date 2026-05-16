@@ -20,7 +20,10 @@ public class FinancialMetrics {
     private BigDecimal tcv;  // Total Contract Value
     private BigDecimal acv;  // Annual Contract Value
     private BigDecimal clv;  // Customer Lifetime Value
+    private Integer churnScore;
+    private BigDecimal discountRate;
     private BigDecimal totalDiscount;
     private BigDecimal totalSurcharge;
+    private BigDecimal priceMultiplier;
     private BigDecimal estimatedMarginPct;
 }
