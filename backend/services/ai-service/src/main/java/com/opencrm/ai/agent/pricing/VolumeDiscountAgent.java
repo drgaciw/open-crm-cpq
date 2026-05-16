@@ -1,31 +1,10 @@
 package com.opencrm.ai.agent.pricing;
 
-import com.opencrm.ai.agent.AgentRequest;
-import com.opencrm.ai.agent.AgentResponse;
-import com.opencrm.ai.agent.CpqAgent;
-import org.springframework.ai.chat.ChatClient;
-import org.springframework.ai.chat.StreamingChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
+import com.opencrm.ai.agent.AbstractCpqAgent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @Service("cpq-agent-007")
-public class VolumeDiscountAgent implements CpqAgent {
-
-    private final ChatClient chatClient;
-    private final StreamingChatClient streamingChatClient;
-
-    public VolumeDiscountAgent(ChatClient chatClient, StreamingChatClient streamingChatClient) {
-        this.chatClient = chatClient;
-        this.streamingChatClient = streamingChatClient;
-    }
+public class VolumeDiscountAgent extends AbstractCpqAgent {
 
     @Override
     public String getAgentId() {
@@ -39,68 +18,39 @@ public class VolumeDiscountAgent implements CpqAgent {
 
     @Override
     public String getDescription() {
-        return "Apply volume-based discounts based on quantity tiers";
+        return "Apply tiered and volume-based discounts based on ordered quantities";
     }
 
     @Override
-    public AgentResponse invoke(AgentRequest request) {
-        try {
-            List<Message> messages = new ArrayList<>();
-            if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
-                messages.add(new SystemMessage(request.getSystemPrompt()));
-            }
-            if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-                for (String msg : request.getMessages()) {
-                    messages.add(new UserMessage(msg));
-                }
-            } else {
-                messages.add(new UserMessage("Apply volume-based discounts based on quantity tiers."));
-            }
-            Prompt prompt = new Prompt(messages);
-            var response = chatClient.call(prompt);
-            String output = response.getResult().getOutput().getContent();
-            return new AgentResponse() {
-                @Override
-                public boolean isSuccess() { return true; }
-                @Override
-                public String getOutput() { return output; }
-                @Override
-                public Map<String, Object> getMetadata() { return Map.of("autonomy", "Semi-autonomous"); }
-            };
-        } catch (Exception e) {
-            String errorMsg = "Error invoking Volume Discount Agent: " + e.getMessage();
-            return new AgentResponse() {
-                @Override
-                public boolean isSuccess() { return false; }
-                @Override
-                public String getOutput() { return errorMsg; }
-                @Override
-                public Map<String, Object> getMetadata() { return Map.of(); }
-            };
-        }
+    protected String autonomyTier() {
+        return "Automated with constraints";
     }
 
     @Override
-    public Flux<String> stream(AgentRequest request) {
-        try {
-            List<Message> messages = new ArrayList<>();
-            if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
-                messages.add(new SystemMessage(request.getSystemPrompt()));
-            }
-            if (request.getMessages() != null && !request.getMessages().isEmpty()) {
-                for (String msg : request.getMessages()) {
-                    messages.add(new UserMessage(msg));
-                }
-            } else {
-                messages.add(new UserMessage("Apply volume-based discounts based on quantity tiers."));
-            }
-            Prompt prompt = new Prompt(messages);
-            return streamingChatClient.stream(prompt)
-                    .filter(response -> response.getResult() != null && response.getResult().getOutput() != null)
-                    .map(response -> response.getResult().getOutput().getContent())
-                    .onErrorResume(e -> Flux.just("Error streaming Volume Discount Agent: " + e.getMessage()));
-        } catch (Exception e) {
-            return Flux.just("Error streaming Volume Discount Agent: " + e.getMessage());
-        }
+    protected String agentSystemPrompt() {
+        return """
+                You are cpq-agent-007, the Volume Discount Agent for the pricing waterfall.
+
+                Responsibilities:
+                - Resolve quantity tiers for named-seat and other volume-based pricing schedules.
+                - Apply the deterministic tier policy represented by active Drools pricing rules,
+                  including 100-499 seats at 7%, 500-999 seats at 12%, and 1000+ seats at 18%
+                  when the named-seat 12-month minimum term rule applies.
+                - Distinguish all-units tiers from graduated tiers and explain the effective
+                  blended discount when graduated tiers are used.
+                - Account for quote-level and customer-level aggregate volume only when the
+                  provided context includes the required line items, related quotes, or ERP
+                  purchase history.
+                - Surface next-tier simulations as suggestions, but never fabricate prices,
+                  quantities, purchase history, rule sets, or quote state.
+
+                Enforcement:
+                - Standard in-policy volume discounts may be marked as automatic.
+                - Cross-quote aggregation, retroactive tier reclassification, discount stacking
+                  exceptions, or term changes that invalidate an existing discount must be flagged
+                  REQUIRES_APPROVAL or REQUIRES_VALIDATION.
+                - Include tier, discount percentage, quantity basis, term eligibility, stacking
+                  policy, and audit-relevant assumptions in the JSON response.
+                """;
     }
 }
