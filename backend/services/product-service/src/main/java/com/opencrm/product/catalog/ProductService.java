@@ -2,6 +2,7 @@ package com.opencrm.product.catalog;
 
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -68,6 +69,7 @@ public class ProductService {
 
         productMapper.updateEntity(request, product);
         Product updated = productRepository.save(product);
+        publishProductUpdated(updated, "UPDATED");
         log.info("Updated product ID: {}", updated.getId());
 
         return productMapper.toDto(updated);
@@ -118,6 +120,7 @@ public class ProductService {
 
         product.setStatus(ProductStatus.ACTIVE);
         Product updated = productRepository.save(product);
+        publishProductUpdated(updated, "PUBLISHED");
         log.info("Activated product ID: {}", id);
         return productMapper.toDto(updated);
     }
@@ -161,5 +164,18 @@ public class ProductService {
         
         log.info("Retired product ID: {} with reason: {}", id, reason);
         return productMapper.toDto(updated);
+    }
+
+    private void publishProductUpdated(Product product, String changeType) {
+        outboxEventPublisher.publish(
+                "Product",
+                product.getId().toString(),
+                KafkaTopics.PRODUCT_UPDATED,
+                new ProductCatalogLifecycleEvent(
+                        product.getId().toString(),
+                        changeType,
+                        Instant.now()
+                )
+        );
     }
 }
