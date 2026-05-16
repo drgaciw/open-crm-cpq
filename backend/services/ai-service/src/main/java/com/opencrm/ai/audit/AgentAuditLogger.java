@@ -32,6 +32,7 @@ public class AgentAuditLogger {
             auditLog.setSessionId(sessionId);
             auditLog.setEventType("INVOCATION");
             auditLog.setEventData(objectMapper.writeValueAsString(inputContext));
+            auditLog.setSnapshotReferences(serializeSnapshotReferences(inputContext));
             auditLogRepository.save(auditLog);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize input context for audit log", e);
@@ -47,5 +48,13 @@ public class AgentAuditLogger {
         auditLog.setEventType("RESPONSE");
         auditLog.setEventData(llmOutput);
         auditLogRepository.save(auditLog);
+    }
+
+    private String serializeSnapshotReferences(Map<String, Object> inputContext) throws JsonProcessingException {
+        if (inputContext == null || !inputContext.containsKey("snapshotReferences")) {
+            return null;
+        }
+
+        return objectMapper.writeValueAsString(inputContext.get("snapshotReferences"));
     }
 }
