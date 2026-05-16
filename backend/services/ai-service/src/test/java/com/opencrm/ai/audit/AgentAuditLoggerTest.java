@@ -58,7 +58,8 @@ class AgentAuditLoggerTest {
         assertEquals(agentId, saved.getAgentId());
         assertEquals(sessionId, saved.getSessionId());
         assertEquals("INVOCATION", saved.getEventType());
-        assertEquals(serializedContext, saved.getEventData());
+        assertEquals(serializedContext, saved.getInputContext());
+        assertNull(saved.getLlmOutput());
     }
 
     @Test
@@ -125,7 +126,8 @@ class AgentAuditLoggerTest {
         assertEquals(agentId, saved.getAgentId());
         assertEquals(sessionId, saved.getSessionId());
         assertEquals("RESPONSE", saved.getEventType());
-        assertEquals(llmOutput, saved.getEventData());
+        assertEquals(llmOutput, saved.getLlmOutput());
+        assertNull(saved.getInputContext());
     }
 
     @Test
