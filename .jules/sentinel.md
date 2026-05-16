@@ -35,3 +35,8 @@
 **Vulnerability:** Several Vue components (`UserDropdown.vue`, `WhatsAppArea.vue`, `WhatsappTemplateSelectorModal.vue`) used `window.open(url, '_blank')` without the `noopener,noreferrer` attributes. This left the application vulnerable to reverse tabnabbing, allowing newly opened malicious tabs to manipulate the original tab's `window.opener` object and redirect the user to a phishing site.
 **Learning:** Opening untrusted links or external pages using `_blank` without explicitly cutting the context link (`noopener,noreferrer`) poses a high security risk in modern web applications. The `ast-grep` checks properly flagged these unsafe `window.open` patterns.
 **Prevention:** Whenever using `window.open` with `_blank`, always append `'noopener,noreferrer'` as the third argument to ensure the newly opened tab runs in a separate process and cannot access the `window.opener` object of the originating page.
+
+## 2024-05-13 - [Fix SQL Injection via Dynamic SQL Concatenation]
+**Vulnerability:** The code used f-strings and dynamic string concatenation (`query += ...`) to construct raw SQL queries via `frappe.db.sql(query, ...)`. Even if the interpolated variables were strictly constrained by an allowlist (e.g., `doctype` restricted to `"CRM Lead"` or `"CRM Deal"`), this breaks structural security rules and sets a dangerous precedent for SQL injection.
+**Learning:** Frappe's database query wrapper `frappe.db.sql` should never be passed dynamically concatenated raw strings. `ast-grep` rules specifically catch `frappe.db.sql(query + where, $$$)`.
+**Prevention:** Always use explicit, hardcoded strings for raw SQL queries nested within `if/elif/else` blocks, and let the database wrapper parameterize the arguments (`%(param)s`).
