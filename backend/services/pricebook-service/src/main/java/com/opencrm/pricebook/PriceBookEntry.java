@@ -19,8 +19,9 @@ import java.math.BigDecimal;
 @SuperBuilder
 public class PriceBookEntry extends BaseEntity {
 
-    @Column(name = "price_book_id", nullable = false)
-    private Long priceBookId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "price_book_id", nullable = false, updatable = false)
+    private PriceBook priceBook;
 
     @Column(name = "product_external_id", nullable = false)
     private String productExternalId;
@@ -34,4 +35,8 @@ public class PriceBookEntry extends BaseEntity {
     @Column(name = "currency")
     @Builder.Default
     private String currency = "USD";
+
+    public Long getPriceBookId() {
+        return priceBook == null ? null : priceBook.getId();
+    }
 }

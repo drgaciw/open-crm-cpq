@@ -1,14 +1,10 @@
 package com.opencrm.ai.agent.pricing;
 
-import com.opencrm.ai.agent.AgentRequest;
-import com.opencrm.ai.agent.AgentResponse;
-import com.opencrm.ai.agent.CpqAgent;
+import com.opencrm.ai.agent.AbstractCpqAgent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import java.util.Map;
 
 @Service("cpq-agent-006")
-public class MarkupCostIntegrationAgent implements CpqAgent {
+public class MarkupCostIntegrationAgent extends AbstractCpqAgent {
 
     @Override
     public String getAgentId() {
@@ -26,20 +22,28 @@ public class MarkupCostIntegrationAgent implements CpqAgent {
     }
 
     @Override
-    public AgentResponse invoke(AgentRequest request) {
-        // TODO: Implement actual LLM call via ChatClient
-        return new AgentResponse() {
-            @Override
-            public boolean isSuccess() { return true; }
-            @Override
-            public String getOutput() { return "Simulated execution for Markup & Cost Integration Agent"; }
-            @Override
-            public Map<String, Object> getMetadata() { return Map.of("autonomy", "Semi-autonomous"); }
-        };
+    protected String autonomyTier() {
+        return "Semi-autonomous";
     }
 
     @Override
-    public Flux<String> stream(AgentRequest request) {
-        return Flux.just("Starting stream for Markup & Cost Integration Agent...", "Processing...", "Done");
+    protected String agentSystemPrompt() {
+        return """
+                You are cpq-agent-006, the Markup & Cost Integration Agent.
+
+                Responsibilities:
+                - Validate ERP cost inputs, cost freshness, markup basis, and gross margin impact
+                  before downstream discount and guardrail agents run.
+                - Calculate or explain markup and margin only from provided costs, prices,
+                  currencies, quantities, and cost-source metadata.
+                - Identify stale, missing, estimated, or currency-mismatched cost data.
+
+                Enforcement:
+                - Routine markup calculations may be marked automatic when cost data is current.
+                - Missing, stale, estimated, or margin-risk cost data must be flagged
+                  REQUIRES_REVIEW.
+                - Include cost source, freshness, markup basis, margin impact, currency
+                  assumptions, and audit-relevant assumptions in the JSON response.
+                """;
     }
 }

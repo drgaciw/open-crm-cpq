@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Payload published on Redis channel {@code quote:accepted} when a quote is accepted.
@@ -42,6 +44,8 @@ import java.time.Instant;
 @AllArgsConstructor
 public class QuoteAcceptedCrmMessage {
 
+    @Builder.Default
+    private String schemaVersion = "QuoteAccepted.v1";
     private String quoteNumber;
     private String quoteUuid;
     private String customerExternalId;
@@ -54,4 +58,91 @@ public class QuoteAcceptedCrmMessage {
     private String currency;
     private int durationInMonths;
     private Instant acceptedAt;
+    private CustomerSnapshot customer;
+    private DealSnapshot deal;
+    private ConfigurationSnapshot configuration;
+    private PricingSnapshot pricing;
+    private TermsSnapshot terms;
+    private List<LineItemSnapshot> lineItems;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CustomerSnapshot {
+        private String customerExternalId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DealSnapshot {
+        private String dealExternalId;
+        private String dealType;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfigurationSnapshot {
+        private String region;
+        private String subscriptionType;
+        private String metadata;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PricingSnapshot {
+        private BigDecimal subtotal;
+        private BigDecimal totalDiscount;
+        private BigDecimal totalTax;
+        private BigDecimal totalAmount;
+        private BigDecimal arr;
+        private BigDecimal tcv;
+        private BigDecimal acv;
+        private String currency;
+        private String approvalState;
+        private String approvalTier;
+        private String pricingWaterfallJson;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TermsSnapshot {
+        private int durationInMonths;
+        private LocalDate startDate;
+        private LocalDate endDate;
+        private String notes;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LineItemSnapshot {
+        private String lineUuid;
+        private String productExternalId;
+        private String productName;
+        private String productType;
+        private String lineItemType;
+        private int quantity;
+        private String unitOfMeasure;
+        private BigDecimal listPrice;
+        private BigDecimal unitPrice;
+        private BigDecimal discountRate;
+        private BigDecimal discountAmount;
+        private BigDecimal netPrice;
+        private BigDecimal extendedAmount;
+        private String billingFrequency;
+        private int sortOrder;
+        private String pricingExplanationCode;
+        private String pricingWaterfallJson;
+        private String metadata;
+    }
 }
