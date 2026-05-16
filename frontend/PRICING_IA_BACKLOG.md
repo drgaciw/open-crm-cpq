@@ -529,6 +529,30 @@ Manage versioned pricing rule sets and individual rules within them.
 
 ---
 
+## PR 6A: Admin OpenL rule upload and validation status stub
+
+**Library:** `libs/cpq/rule-admin/`
+**Alias:** `@frontend/cpq-rule-admin`
+**Route:** `/pricing/rules/admin`
+
+Admin-facing backlog stub for OpenL table package upload, validation status, and publish readiness. This module is intentionally gated behind backend contracts from the OpenL import/validation work and must not ship interactive upload controls until those contracts are finalized.
+
+- **`RulePackageListComponent`** — Table of uploaded OpenL packages once a backend list endpoint exists; columns: packageName, engineType, version, validationStatus, uploadedBy, uploadedAt, lastValidatedAt, publishedAt. Empty state explains that package history is unavailable until the backend contract is enabled.
+
+- **`RulePackageUploadStubComponent`** — Non-submitting admin panel that documents the expected upload workflow: select OpenL workbook, upload for validation, review validation results, publish into an inactive rule set, then activate through the Rule Sets lifecycle. The upload action remains disabled until the backend exposes a multipart upload endpoint and accepted file constraints.
+
+- **`RulePackageValidationStatusComponent`** — Status panel for backend validation results; expected states: `PENDING`, `VALIDATING`, `VALID`, `INVALID`, `PUBLISH_BLOCKED`, `PUBLISHED`. Displays rule table diagnostics, duplicate rule warnings, precedence conflicts, and import checksum when the backend returns them.
+
+- **`RulePackageBackendContractBannerComponent`** — Persistent admin notice listing required backend contracts before implementation: upload endpoint, validation-result DTO, validation polling or event status, publish endpoint, authorization scope, and audit log linkage.
+
+- **Routes:** `RULE_ADMIN_ROUTES` (list + upload/status stub), guarded to admin users when application-level auth scopes are available.
+
+**Backend contract gate:** Requires explicit backend contracts for OpenL package upload, validation status retrieval, publish readiness, and audit tracking. Until then, this remains a backlog stub only and should link admins back to `/pricing/rules` for active rule-set lifecycle management.
+
+**Size:** S — Stub and backlog wiring only; full upload/status implementation belongs in a later PR after backend contracts are merged.
+
+---
+
 ## PR 7: Pricing simulator module
 
 **Library:** `libs/cpq/pricing-simulator/`
@@ -846,6 +870,9 @@ PR 1  (models)
 | `GET /api/v1/rules/by-rule-set/:ruleSetId` | PR 6 (rule-sets) |
 | `POST /api/v1/rules/:id/validate` | PR 6 (rule-sets) |
 | `GET /api/v1/rules/:id/impact` | PR 6 (rule-sets) |
+| TBD `POST /api/v1/rule-packages/openl` | PR 6A (rule-admin), gated behind backend contract |
+| TBD `GET /api/v1/rule-packages/:id/validation` | PR 6A (rule-admin), gated behind backend contract |
+| TBD `POST /api/v1/rule-packages/:id/publish` | PR 6A (rule-admin), gated behind backend contract |
 | gRPC `calculatePrice` | N/A (server-to-server) |
 | gRPC `calculateQuoteTotal` | N/A (server-to-server) |
 
