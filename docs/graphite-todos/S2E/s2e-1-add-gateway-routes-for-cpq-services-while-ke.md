@@ -1,6 +1,6 @@
 # S2E-1: Add gateway routes for CPQ services while keeping commands delegated to aggregate-owning services.
 
-**Tracking status:** Implemented in PR #198.
+**Tracking status:** Implemented in impl/s2e-1 (supersedes tracking PR #198).
 
 **Stack lane:** `S2E`
 
