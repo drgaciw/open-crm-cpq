@@ -5,6 +5,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,6 +18,8 @@ public interface PricingProductRepository extends JpaRepository<PricingProduct, 
     Optional<PricingProduct> findByIdAndDeletedFalse(Long id);
 
     Optional<PricingProduct> findByExternalIdAndDeletedFalse(String externalId);
+
+    List<PricingProduct> findByExternalIdInAndDeletedFalse(Collection<String> externalIds);
 
     Page<PricingProduct> findByDeletedFalse(Pageable pageable);
 }
