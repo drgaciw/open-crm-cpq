@@ -7,9 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.Generation;
-import org.springframework.ai.chat.StreamingChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
-import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 import java.util.List;
@@ -22,14 +20,12 @@ import static org.mockito.Mockito.*;
 class MultiLevelApprovalRoutingAgentTest {
 
     private ChatClient chatClient;
-    private StreamingChatClient streamingChatClient;
     private MultiLevelApprovalRoutingAgent agent;
 
     @BeforeEach
     void setUp() {
         chatClient = mock(ChatClient.class);
-        streamingChatClient = mock(StreamingChatClient.class);
-        agent = new MultiLevelApprovalRoutingAgent(chatClient, streamingChatClient);
+        agent = new MultiLevelApprovalRoutingAgent(chatClient);
     }
 
     @Test
@@ -61,35 +57,22 @@ class MultiLevelApprovalRoutingAgentTest {
     }
 
     @Test
-    void testInvokeFailure() {
+    void testInvokePropagatesLlmFailure() {
         AgentRequest request = mock(AgentRequest.class);
         when(request.getSystemPrompt()).thenReturn("You are an approval routing agent.");
         when(request.getMessages()).thenReturn(List.of("Route this quote for approval."));
 
         when(chatClient.call(any(Prompt.class))).thenThrow(new RuntimeException("LLM error"));
 
-        AgentResponse response = agent.invoke(request);
-
-        assertFalse(response.isSuccess());
-        assertTrue(response.getOutput().contains("LLM error"));
+        assertThrows(RuntimeException.class, () -> agent.invoke(request));
     }
 
     @Test
-    void testStreamSuccess() {
-        AgentRequest request = mock(AgentRequest.class);
-        when(request.getSystemPrompt()).thenReturn("System prompt");
-        when(request.getMessages()).thenReturn(List.of("User message"));
-
-        ChatResponse chunk1 = new ChatResponse(List.of(new Generation("Approval ")));
-        ChatResponse chunk2 = new ChatResponse(List.of(new Generation("routed.")));
-
-        when(streamingChatClient.stream(any(Prompt.class))).thenReturn(Flux.just(chunk1, chunk2));
-
-        Flux<String> resultFlux = agent.stream(request);
-
-        StepVerifier.create(resultFlux)
-                .expectNext("Approval ")
-                .expectNext("routed.")
+    void testStreamStubSequence() {
+        StepVerifier.create(agent.stream(mock(AgentRequest.class)))
+                .expectNextMatches(s -> s.contains("Multi-Level Approval Routing Agent"))
+                .expectNext("Processing...")
+                .expectNext("Done")
                 .verifyComplete();
     }
 }

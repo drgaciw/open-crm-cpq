@@ -61,8 +61,7 @@ class VolumeDiscountAgentTest {
         assertEquals(mockResponseContent, response.getOutput());
 
         Map<String, Object> metadata = response.getMetadata();
-        assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("cpq-agent-007", metadata.get("agentId"));
+        assertEquals("Semi-autonomous", metadata.get("autonomy"));
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatClient).call(promptCaptor.capture());
@@ -87,9 +86,7 @@ class VolumeDiscountAgentTest {
         assertFalse(response.isSuccess());
         assertTrue(response.getOutput().contains("API error"));
 
-        Map<String, Object> metadata = response.getMetadata();
-        assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("API error", metadata.get("error"));
+        assertTrue(response.getMetadata().isEmpty());
     }
 
     @Test

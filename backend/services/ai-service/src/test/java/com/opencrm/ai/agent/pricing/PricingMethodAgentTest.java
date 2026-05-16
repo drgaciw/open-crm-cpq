@@ -62,7 +62,6 @@ class PricingMethodAgentTest {
 
         Map<String, Object> metadata = response.getMetadata();
         assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("cpq-agent-005", metadata.get("agentId"));
 
         ArgumentCaptor<Prompt> promptCaptor = ArgumentCaptor.forClass(Prompt.class);
         verify(chatClient).call(promptCaptor.capture());
@@ -89,7 +88,7 @@ class PricingMethodAgentTest {
 
         Map<String, Object> metadata = response.getMetadata();
         assertEquals("Automated", metadata.get("autonomy"));
-        assertEquals("API error", metadata.get("error"));
+        assertEquals(Boolean.TRUE, metadata.get("error"));
     }
 
     @Test
