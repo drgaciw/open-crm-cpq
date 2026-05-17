@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies quote-accepted side effects to CRM deals inside a transaction.
+ * Applies quote-accepted opportunity state side effects to CRM deals inside a transaction.
+ * Quote/contract services remain the source of truth for accepted commercial values.
  */
 @Slf4j
 @Service
@@ -31,18 +32,10 @@ public class QuoteAcceptedDealProcessor {
         if (event.getAcceptedAt() != null) {
             deal.setWonAt(event.getAcceptedAt());
         }
-        if (event.getTotalAmount() != null) {
-            deal.setAmount(event.getTotalAmount());
-        }
-        if (event.getCurrency() != null && !event.getCurrency().isBlank()) {
-            deal.setCurrency(event.getCurrency());
-        }
         dealRepository.save(deal);
-        String amountLog = event.getTotalAmount() != null ? event.getTotalAmount().toPlainString() : "n/a";
-        log.info("Updated deal {} to WON from quote {} (amount={})",
+        log.info("Updated deal {} to WON from quote {}",
                 deal.getUuid(),
-                safeQuoteLabel(event),
-                amountLog);
+                safeQuoteLabel(event));
     }
 
     private static String safeQuoteLabel(QuoteAcceptedCrmMessage event) {
