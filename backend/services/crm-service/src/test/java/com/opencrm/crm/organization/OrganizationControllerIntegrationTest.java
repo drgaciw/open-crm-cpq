@@ -6,6 +6,7 @@ import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -21,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests CRUD operations, contact relationships, and search functionality.
  */
 @DisplayName("Organization Controller Integration Tests")
+@Tag("integration")
 class OrganizationControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

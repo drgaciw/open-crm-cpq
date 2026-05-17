@@ -8,6 +8,7 @@ import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests deal lifecycle: creation, stage progression, win/loss, and pipeline analytics.
  */
 @DisplayName("Deal Controller Integration Tests")
+@Tag("integration")
 class DealControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
