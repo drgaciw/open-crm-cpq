@@ -1,7 +1,12 @@
 package com.opencrm.configuration.session;
 
+import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
+import com.opencrm.configuration.model.ConfigurationModel;
+import com.opencrm.configuration.model.ConfigurationModelCache;
+import com.opencrm.configuration.model.ConfigurationModelCompiler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +37,15 @@ class ConfigurationSessionServiceTest {
 
     @Mock
     private ConstraintSolver constraintSolver;
+
+    @Mock
+    private OutboxEventPublisher outboxEventPublisher;
+
+    @Mock
+    private ConfigurationModelCache configurationModelCache;
+
+    @Mock
+    private ConfigurationModelCompiler configurationModelCompiler;
 
     @InjectMocks
     private ConfigurationSessionService sessionService;
@@ -97,11 +112,19 @@ class ConfigurationSessionServiceTest {
         session.markAsValid();
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(sessionRepository.save(any())).thenReturn(session);
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
 
         ConfigurationSession result = sessionService.complete(1L);
 
         assertEquals(ConfigurationStatus.COMPLETED, result.getStatus());
         assertNotNull(result.getCompletedAt());
+        verify(outboxEventPublisher).publish(
+                eq("ConfigurationSession"),
+                eq("1"),
+                eq(KafkaTopics.CONFIGURATION_COMMITTED),
+                any()
+        );
     }
 
     @Test
