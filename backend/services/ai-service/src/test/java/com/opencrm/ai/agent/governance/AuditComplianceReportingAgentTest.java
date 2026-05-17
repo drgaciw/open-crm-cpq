@@ -57,7 +57,7 @@ class AuditComplianceReportingAgentTest {
         assertEquals(mockResponseContent, response.getOutput());
 
         Map<String, Object> metadata = response.getMetadata();
-        assertEquals("Automated", metadata.get("autonomy"));
+        assertEquals("Semi-autonomous", metadata.get("autonomy"));
     }
 
     @Test
