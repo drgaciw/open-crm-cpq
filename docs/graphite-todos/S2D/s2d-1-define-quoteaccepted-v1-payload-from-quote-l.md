@@ -1,6 +1,6 @@
 # S2D-1: Define QuoteAccepted.v1 payload from quote, line, customer, configuration, pricing, and terms snapshots.
 
-**Tracking status:** Implemented in this PR.
+**Tracking status:** Implemented in impl/s2d-1 (QuoteAccepted.v1 CRM + Kafka published-language payloads).
 
 **Stack lane:** `S2D`
 
