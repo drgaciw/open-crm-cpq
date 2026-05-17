@@ -39,11 +39,13 @@ class QuoteAcceptedDealProcessorTest {
                 .name("Opportunity")
                 .uuid("550e8400-e29b-41d4-a716-446655440000")
                 .stage(DealStage.PROPOSAL)
+                .amount(new BigDecimal("12000.00"))
+                .currency("USD")
                 .build();
     }
 
     @Test
-    void applyWinFromQuote_marksWonAndSetsAmountAndCurrency() {
+    void applyWinFromQuote_marksWonAndPreservesCrmCommercialFields() {
         when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
 
         Instant acceptedAt = Instant.parse("2025-05-02T12:00:00Z");
@@ -61,8 +63,8 @@ class QuoteAcceptedDealProcessorTest {
         verify(dealRepository).save(captor.capture());
         Deal saved = captor.getValue();
         assertThat(saved.getStage()).isEqualTo(DealStage.WON);
-        assertThat(saved.getAmount()).isEqualByComparingTo("15000.00");
-        assertThat(saved.getCurrency()).isEqualTo("EUR");
+        assertThat(saved.getAmount()).isEqualByComparingTo("12000.00");
+        assertThat(saved.getCurrency()).isEqualTo("USD");
         assertThat(saved.getWonAt()).isEqualTo(acceptedAt);
     }
 
