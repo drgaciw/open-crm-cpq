@@ -6,6 +6,17 @@ A Spring Boot 3.2 microservices backend for CRM and CPQ operations, built with J
 
 Use [Graphite](https://graphite.dev) for dependent PR chains against `main`. Conventions and commands: [docs/GRAPHITE_STACKED_PRS.md](../docs/GRAPHITE_STACKED_PRS.md).
 
+## Shared libraries (verify first)
+
+Before merging service changes that depend on shared types or rules, run:
+
+```bash
+cd backend
+.\mvnw.cmd -B verify --no-transfer-progress -pl libs/common,libs/security,libs/rules-engine -am
+```
+
+Module list and rationale: [libs/README.md](libs/README.md).
+
 ## Architecture
 
 ```
@@ -13,6 +24,7 @@ backend/
   libs/
     common/          # Shared entities, DTOs, exceptions, utilities
     security/        # JWT auth, UserContext, SecurityUtils
+    rules-engine/    # Drools/OpenL rule engine helpers
   services/
     crm-service/     # CRM API (Contacts, Organizations, Leads, Deals) - port 8081
     gateway-service/ # API Gateway with routing & circuit breakers   - port 8080
