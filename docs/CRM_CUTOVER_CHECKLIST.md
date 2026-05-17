@@ -23,7 +23,7 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 - [ ] Health: `GET` crm-service `/actuator/health` (and gateway if exposed).
 - [ ] CRUD smoke: organizations, contacts, leads, deals via **gateway** paths used by `frontend/libs/crm` (**4200 → 8080**, not direct **8081**).
 - [ ] Pipeline/dashboard: `/api/v1/deals/pipeline` and dashboard loads succeed.
-- [ ] **Quote acceptance E2E:** Accept a sent quote with `dealExternalId` set to the deal’s **UUID** string; confirm deal moves to **WON** and amounts/currency update; publish duplicate Redis messages and confirm **idempotency** (`crm:quote-accepted:processed:*` skips re-application).
+- [ ] **Quote acceptance E2E:** Accept a sent quote with `dealExternalId` set to the deal’s **UUID** string; confirm deal moves to **WON** while CRM preserves its existing opportunity amount/currency; publish duplicate Redis messages and confirm **idempotency** (`crm:quote-accepted:processed:*` skips re-application). Accepted commercial totals remain owned by quote/contract services.
 - [ ] Automated smoke (optional): `docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'https://…'` for read paths.
 
 ---

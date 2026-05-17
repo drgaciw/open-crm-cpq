@@ -33,18 +33,26 @@ public class QuoteAcceptedEventConsumer {
         try {
             QuoteAcceptedEvent event = objectMapper.readValue(message, QuoteAcceptedEvent.class);
             
-            log.info("Received quote accepted event for quote: {}", event.getQuoteId());
-            
-            // Create subscription
+            log.info("Received quote accepted event for quote: {} (eventType={}, version={})",
+                    event.getQuoteId(), event.getEventType(), event.getEventVersion());
+
+            if (subscriptionRepository.existsByQuoteId(event.getQuoteId())) {
+                log.info("Subscription already exists for quote: {}, skipping activation", event.getQuoteId());
+                return;
+            }
+
+            LocalDate startDate = resolveStartDate(event);
+            LocalDate endDate = resolveEndDate(event, startDate);
+
             Subscription subscription = Subscription.builder()
-                    .subscriptionNumber("SUB-" + event.getQuoteId())
+                    .subscriptionNumber(QuoteAcceptedSubscriptionIdempotency.subscriptionNumber(event))
                     .customerId(event.getCustomerId())
                     .quoteId(event.getQuoteId())
                     .status(SubscriptionStatus.PENDING)
-                    .planName("Standard Plan") // In production, extract from quote
-                    .startDate(LocalDate.now())
-                    .endDate(LocalDate.now().plusYears(1))
-                    .renewalDate(LocalDate.now().plusYears(1).minusDays(30))
+                    .planName("Standard Plan")
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .renewalDate(endDate.minusDays(30))
                     .arr(event.getTotalAmount())
                     .currencyCode(event.getCurrencyCode())
                     .build();
@@ -74,5 +82,22 @@ public class QuoteAcceptedEventConsumer {
             log.error("Error processing quote accepted event", e);
             throw new RuntimeException("Failed to process quote accepted event", e);
         }
+    }
+
+    private static LocalDate resolveStartDate(QuoteAcceptedEvent event) {
+        if (event.getTerms() != null && event.getTerms().getStartDate() != null) {
+            return LocalDate.parse(event.getTerms().getStartDate());
+        }
+        return LocalDate.now();
+    }
+
+    private static LocalDate resolveEndDate(QuoteAcceptedEvent event, LocalDate startDate) {
+        if (event.getTerms() != null && event.getTerms().getEndDate() != null) {
+            return LocalDate.parse(event.getTerms().getEndDate());
+        }
+        int months = event.getTerms() != null && event.getTerms().getTermMonths() != null
+                ? event.getTerms().getTermMonths()
+                : 12;
+        return startDate.plusMonths(months);
     }
 }

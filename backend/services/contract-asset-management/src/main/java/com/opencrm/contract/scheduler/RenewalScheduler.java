@@ -40,7 +40,7 @@ public class RenewalScheduler {
         for (Subscription subscription : eligibleSubscriptions) {
             try {
                 // Publish renewal eligible event
-                SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent(
+                SubscriptionRenewalEligibleEvent event = SubscriptionRenewalEligibleEvent.v1(
                         subscription.getId().toString(),
                         subscription.getRenewalDate(),
                         subscription.getPlanName(),
