@@ -142,20 +142,49 @@ Environment variables for production:
 
 ## Running Tests
 
-Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible:
+Fast unit-only verification excludes Docker-backed tests:
 
 ```bash
-mvn test -pl services/crm-service -am
+mvn verify -Punit-tests -pl services/crm-service -am
 ```
 
-**Windows (Docker Desktop)**: If TestContainers can't find Docker, create `~/.testcontainers.properties`:
+Integration tests use **Testcontainers** with PostgreSQL 16. Docker must be accessible:
+
+```bash
+mvn verify -Pintegration-tests -pl services/crm-service -am
+```
+
+The `integration-tests` profile preserves full Maven verification and coverage gates. To run only the integration-tagged Testcontainers tests while diagnosing Docker readiness:
+
+```bash
+mvn test -Dgroups=integration -pl services/crm-service -am
+```
+
+**Windows (Docker Desktop)**: before running integration tests, verify Docker Desktop is running with the Linux engine:
+
+```powershell
+docker version
+docker info --format '{{.ServerVersion}}'
+docker context ls
+Test-Path '\\.\pipe\dockerDesktopLinuxEngine'
+```
+
+If Docker CLI works but Testcontainers cannot find Docker, start Docker Desktop, confirm Linux containers are enabled, clear stale Docker host overrides, and retry before adding an explicit host:
+
+```powershell
+Remove-Item Env:\DOCKER_HOST -ErrorAction SilentlyContinue
+```
+
+If auto-detection still fails, create `%USERPROFILE%\.testcontainers.properties`:
+
 ```properties
 docker.host=npipe:////./pipe/dockerDesktopLinuxEngine
 ```
 
-Or set the environment variable:
-```bash
-export DOCKER_HOST=npipe:////./pipe/dockerDesktopLinuxEngine
+Or set the environment variable for the current PowerShell session:
+
+```powershell
+$env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 ```
 
 ## Tech Stack

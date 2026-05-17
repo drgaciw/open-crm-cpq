@@ -19,6 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test")
 @Testcontainers
 @Tag("docker")
+@Tag("integration")
 public abstract class BaseIntegrationTest {
 
     @Container
