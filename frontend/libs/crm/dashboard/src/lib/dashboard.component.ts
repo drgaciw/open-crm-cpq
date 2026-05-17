@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
@@ -198,32 +198,37 @@ export class DashboardComponent implements OnInit {
     return item?.id ?? index;
   }
 
-  totalDeals(): number {
-    return this.pipeline().reduce((sum, item) => sum + item.count, 0);
-  }
-  totalValue(): number {
-    return this.pipeline().reduce((sum, item) => sum + item.totalAmount, 0);
-  }
-  wonValue(): number {
+  // ⚡ Bolt: Memoized derived state using computed signals to prevent O(n) recalculations on every change detection cycle
+  totalDeals = computed(() => this.pipeline().reduce((sum, item) => sum + item.count, 0));
+
+  totalValue = computed(() => this.pipeline().reduce((sum, item) => sum + item.totalAmount, 0));
+
+  wonValue = computed(() => {
     const wonStage = this.pipeline().find((item) => item.stage === 'WON');
     return wonStage?.totalAmount ?? 0;
-  }
+  });
+
+  // ⚡ Bolt: Created an O(1) lookup map to prevent repeated .find() calls in the stage template loop
+  pipelineMap = computed(() => {
+    const map = new Map<string, PipelineSummaryDto>();
+    for (const item of this.pipeline()) {
+      map.set(item.stage, item);
+    }
+    return map;
+  });
+
+  // ⚡ Bolt: Memoized max value to prevent repeated mapping and Math.max calculations
+  maxPipelineValue = computed(() => Math.max(...this.pipeline().map((item) => item.totalAmount), 1));
 
   stageCount(stage: DealStage): number {
-    const stageItem = this.pipeline().find((item) => item.stage === stage);
-    return stageItem?.count ?? 0;
+    return this.pipelineMap().get(stage)?.count ?? 0;
   }
   stageValue(stage: DealStage): number {
-    const stageItem = this.pipeline().find((item) => item.stage === stage);
-    return stageItem?.totalAmount ?? 0;
+    return this.pipelineMap().get(stage)?.totalAmount ?? 0;
   }
 
   barWidth(stage: DealStage): number {
-    const maxValue = Math.max(
-      ...this.pipeline().map((item) => item.totalAmount),
-      1
-    );
-    return (this.stageValue(stage) / maxValue) * 100;
+    return (this.stageValue(stage) / this.maxPipelineValue()) * 100;
   }
 
   ngOnInit(): void {

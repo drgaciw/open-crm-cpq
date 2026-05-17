@@ -20,3 +20,7 @@
 ## 2024-05-20 - Batch Fetching Attachments in Frappe API Responses
 **Learning:** Calling `frappe.db.get_all("File", ...)` inside loops to fetch attachments for multiple related documents (like comments or communications) results in severe N+1 query performance degradation.
 **Action:** When returning feeds or activities that include attachments for multiple child items, gather all the child item names first. Perform a single batch fetch using `frappe.db.get_all("File", filters={"attached_to_name": ["in", names]})`, map the results into a Python dictionary keyed by `attached_to_name`, and retrieve them inside the loop in O(1) time.
+
+## 2024-05-17 - Angular Template O(N) Loop Optimization
+**Learning:** In Angular frontend components with OnPush change detection, methods called from templates (like array `.find()` or `.reduce()`) run on every change detection cycle. This can lead to significant $O(N)$ or $O(N^2)$ recalculations when mapping lists, even with Signals.
+**Action:** Replace direct template method calls with `@angular/core` `computed` Signals to memoize derived state and create $O(1)$ lookup maps for use within `@for` loops.
