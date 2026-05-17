@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
@@ -205,11 +206,20 @@ public class QuoteService {
 
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
+        quote.recalculateTotals();
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
+
+        QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
+        outboxEventPublisher.publish(
+                "Quote",
+                saved.getQuoteNumber(),
+                KafkaTopics.QUOTE_STATUS_ACCEPTED,
+                kafkaEvent
+        );
 
         return quoteMapper.toDto(saved);
     }
