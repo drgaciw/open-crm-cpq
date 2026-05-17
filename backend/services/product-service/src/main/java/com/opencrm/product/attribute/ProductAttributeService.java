@@ -22,6 +22,7 @@ public class ProductAttributeService {
     private final ProductAttributeValueRepository attributeValueRepository;
     private final ProductRepository productRepository;
     private final ProductAttributeMapper attributeMapper;
+    private final AttributeValueValidator attributeValueValidator;
 
     public ProductAttributeDto createAttribute(AttributeCreateRequest request) {
         log.debug("Creating attribute: {}", request.getName());
@@ -68,6 +69,8 @@ public class ProductAttributeService {
 
         ProductAttribute attribute = attributeRepository.findByIdAndDeletedFalse(request.getAttributeId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProductAttribute", request.getAttributeId()));
+
+        attributeValueValidator.validate(attribute, request.getValue());
 
         ProductAttributeValue attrValue = attributeValueRepository
                 .findByProductIdAndAttributeIdAndDeletedFalse(productId, request.getAttributeId())

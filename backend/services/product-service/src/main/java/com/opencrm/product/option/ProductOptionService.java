@@ -19,12 +19,18 @@ public class ProductOptionService {
     private final ProductOptionGroupRepository optionGroupRepository;
     private final ProductRepository productRepository;
     private final ProductOptionMapper optionMapper;
+    private final OptionGroupConstraintValidator optionGroupConstraintValidator;
 
     public ProductOptionGroupDto createGroup(OptionGroupCreateRequest request) {
         log.debug("Creating option group for product ID: {}", request.getProductId());
 
         productRepository.findByIdAndDeletedFalse(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", request.getProductId()));
+
+        optionGroupConstraintValidator.validateGroupDefinition(
+                request.getMinSelections(),
+                request.getMaxSelections()
+        );
 
         ProductOptionGroup group = optionMapper.toEntity(request);
         ProductOptionGroup saved = optionGroupRepository.save(group);
@@ -64,6 +70,7 @@ public class ProductOptionService {
                 .build();
 
         group.getOptions().add(option);
+        optionGroupConstraintValidator.validateOptionCount(group);
         ProductOptionGroup saved = optionGroupRepository.save(group);
         log.info("Added option to group ID: {}", groupId);
 
