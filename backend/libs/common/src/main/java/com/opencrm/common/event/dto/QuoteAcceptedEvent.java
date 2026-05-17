@@ -1,11 +1,17 @@
 package com.opencrm.common.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.dto.v1.QuoteAcceptedEventV1;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Event published when a quote is accepted.
@@ -15,11 +21,139 @@ import java.time.Instant;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@EqualsAndHashCode(of = {"quoteId", "acceptedAt", "customerId", "totalAmount", "currencyCode"})
 public class QuoteAcceptedEvent {
+
+    public static final String EVENT_TYPE = EventContractRegistry.QUOTE_ACCEPTED_V1.eventType();
+    public static final int EVENT_VERSION = EventContractRegistry.QUOTE_ACCEPTED_V1.eventVersion();
+
+    private String eventType;
+    private Integer eventVersion;
+
     private String quoteId;
     private Instant acceptedAt;
     private String customerId;
     private BigDecimal totalAmount;
     private String currencyCode;
+
+    private QuoteSnapshot quote;
+    private CustomerSnapshot customer;
+    private PricingSnapshot pricing;
+    private ConfigurationSnapshot configuration;
+    private TermSnapshot terms;
+    private CorrelationSnapshot correlation;
+
+    public QuoteAcceptedEvent(
+            String quoteId,
+            Instant acceptedAt,
+            String customerId,
+            BigDecimal totalAmount,
+            String currencyCode
+    ) {
+        this.quoteId = quoteId;
+        this.acceptedAt = acceptedAt;
+        this.customerId = customerId;
+        this.totalAmount = totalAmount;
+        this.currencyCode = currencyCode;
+    }
+
+    public static QuoteAcceptedEvent v1(
+            QuoteSnapshot quote,
+            CustomerSnapshot customer,
+            PricingSnapshot pricing,
+            ConfigurationSnapshot configuration,
+            TermSnapshot terms,
+            CorrelationSnapshot correlation
+    ) {
+        QuoteAcceptedEvent event = new QuoteAcceptedEvent();
+        event.setEventType(EVENT_TYPE);
+        event.setEventVersion(EVENT_VERSION);
+        event.setQuote(quote);
+        event.setCustomer(customer);
+        event.setPricing(pricing);
+        event.setConfiguration(configuration);
+        event.setTerms(terms);
+        event.setCorrelation(correlation);
+        if (quote != null) {
+            event.setQuoteId(quote.getQuoteId());
+            event.setAcceptedAt(quote.getAcceptedAt());
+        }
+        if (customer != null) {
+            event.setCustomerId(customer.getCustomerId());
+        }
+        if (pricing != null) {
+            event.setTotalAmount(pricing.getTotalAmount());
+            event.setCurrencyCode(pricing.getCurrencyCode());
+        }
+        return event;
+    }
+
+    public QuoteAcceptedEventV1 toPublishedLanguageV1() {
+        return QuoteAcceptedEventV1.builder()
+                .quoteId(getQuoteId())
+                .acceptedAt(getAcceptedAt())
+                .customerId(getCustomerId())
+                .totalAmount(getTotalAmount())
+                .currencyCode(getCurrencyCode())
+                .build();
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class QuoteSnapshot {
+        private String quoteId;
+        private String quoteNumber;
+        private Instant acceptedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CustomerSnapshot {
+        private String customerId;
+        private String accountName;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PricingSnapshot {
+        private BigDecimal totalAmount;
+        private String currencyCode;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfigurationSnapshot {
+        private String configurationId;
+        private String committedVersion;
+        private Map<String, String> attributes;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TermSnapshot {
+        private Integer termMonths;
+        private String startDate;
+        private String endDate;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CorrelationSnapshot {
+        private String correlationId;
+        private String causationId;
+        private String sourceService;
+    }
 }
