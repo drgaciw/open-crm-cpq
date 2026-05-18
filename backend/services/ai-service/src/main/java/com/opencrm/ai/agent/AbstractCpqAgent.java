@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Base class for all 37 CPQ AI agents.
@@ -99,9 +100,11 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
 
+            long startNanos = System.nanoTime();
             String output = llmAdapter.generate(systemPrompt, userMessage);
+            int latencyMs = (int) TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
 
-            auditLogger.logResponse(getAgentId(), sessionId, output);
+            auditLogger.logResponse(getAgentId(), sessionId, output, latencyMs, null);
 
             return DefaultAgentResponse.success(output, Map.of(
                     "agentId",   getAgentId(),
@@ -111,6 +114,7 @@ public abstract class AbstractCpqAgent implements CpqAgent {
 
         } catch (Exception ex) {
             log.error("Agent {} invocation failed: {}", getAgentId(), ex.getMessage(), ex);
+            auditLogger.logFailure(getAgentId(), sessionId, ex.getMessage());
             return DefaultAgentResponse.failure(
                     "Agent %s failed: %s".formatted(getAgentId(), ex.getMessage()));
         }
@@ -125,12 +129,19 @@ public abstract class AbstractCpqAgent implements CpqAgent {
             String systemPrompt = buildSystemPrompt(request);
             String userMessage  = buildUserMessage(request);
 
+            StringBuilder streamed = new StringBuilder();
             return llmAdapter.stream(systemPrompt, userMessage)
-                    .doOnError(ex -> log.error(
-                            "Agent {} stream failed: {}", getAgentId(), ex.getMessage(), ex));
+                    .doOnNext(streamed::append)
+                    .doOnError(ex -> {
+                        log.error("Agent {} stream failed: {}", getAgentId(), ex.getMessage(), ex);
+                        auditLogger.logFailure(getAgentId(), sessionId, ex.getMessage());
+                    })
+                    .doOnComplete(() ->
+                            auditLogger.logResponse(getAgentId(), sessionId, streamed.toString()));
 
         } catch (Exception ex) {
             log.error("Agent {} stream setup failed: {}", getAgentId(), ex.getMessage(), ex);
+            auditLogger.logFailure(getAgentId(), sessionId, ex.getMessage());
             return Flux.just("ERROR: " + ex.getMessage());
         }
     }
