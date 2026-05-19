@@ -112,3 +112,7 @@ Track as issues or a tiny stack:
 ## Related
 
 - [Graphite stacked PRs guide](../GRAPHITE_STACKED_PRS.md)
+- [Graphite CPQ microservice backlog](./GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md) — includes **Post-Review Amendment PR Specifications** (`S2A-7` through `S3E-2b`) for API contracts, configuration reconciliation, approval ownership, validation preflight, and deterministic-vs-AI separation.
+- [CPQ_API_CONTRACT_MATRIX.md](./CPQ_API_CONTRACT_MATRIX.md) — S2A-7 route registry (69 routes).
+- [ADR-configuration-api-reconciliation.md](./ADR-configuration-api-reconciliation.md) — S2A-8 configuration API ADR.
+- [AMENDMENT_PR_TEMPLATES.md](./AMENDMENT_PR_TEMPLATES.md) — Graphite PR description templates for amendment slices.
