@@ -1,0 +1,26 @@
+--- frontend/libs/crm/dashboard/src/lib/dashboard.component.ts
++++ frontend/libs/crm/dashboard/src/lib/dashboard.component.ts
+@@ -200,10 +200,15 @@
+     return item?.id ?? index;
+   }
+
++  // ⚡ Bolt: Use computed signals to cache expensive array reductions.
++  // This prevents recalculating totals on every change detection cycle.
+   totalDeals = computed(() => this.pipeline().reduce((sum, item) => sum + item.count, 0));
+   totalValue = computed(() => this.pipeline().reduce((sum, item) => sum + item.totalAmount, 0));
+   wonValue = computed(() => this.pipeline().find((item) => item.stage === 'WON')?.totalAmount ?? 0);
+
++  // ⚡ Bolt: Create an O(1) lookup map for pipeline stages to avoid O(N) .find()
++  // operations inside the template's @for loop during change detection.
+   private pipelineMap = computed(() => {
+     const map = new Map<DealStage, PipelineSummaryDto>();
+     for (const item of this.pipeline()) {
+@@ -212,6 +217,8 @@
+     return map;
+   });
+
++  // ⚡ Bolt: Cache the max pipeline value instead of recalculating Math.max()
++  // repeatedly in the barWidth() method for every stage in the template.
+   private maxPipelineValue = computed(() => Math.max(...this.pipeline().map((item) => item.totalAmount), 1));
+
+   stageCount(stage: DealStage): number {
