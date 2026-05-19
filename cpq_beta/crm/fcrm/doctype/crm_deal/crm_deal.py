@@ -90,10 +90,12 @@ class CRMDeal(Document):
 			fields=["name", "user"],
 		)
 
+		# Bolt Optimization: O(1) set lookup replaces N+1 frappe.db.exists() calls
+		existing_users = {d.user for d in docshares}
 		shared_with = [d.user for d in docshares] + [agent]
 
 		for user in shared_with:
-			if user == agent and not frappe.db.exists("DocShare", {"user": agent, "share_name": self.name, "share_doctype": self.doctype}):
+			if user == agent and agent not in existing_users:
 				frappe.share.add_docshare(
 					self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
 				)
@@ -250,14 +252,17 @@ def create_organization(doc):
 	return organization.name
 
 def contact_exists(doc):
-	email_exist = frappe.db.exists("Contact Email", {"email_id": doc.get("email")})
-	mobile_exist = frappe.db.exists("Contact Phone", {"phone": doc.get("mobile_no")})
+	contact = None
 
-	doctype = "Contact Email" if email_exist else "Contact Phone"
-	name = email_exist or mobile_exist
+	# Bolt Optimization: Replaced 2 consecutive unconditional exists checks with short-circuited get_value queries
+	if not contact and doc.get("email"):
+		contact = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "parent")
 
-	if name:
-		return frappe.db.get_value(doctype, name, "parent")
+	if not contact and doc.get("mobile_no"):
+		contact = frappe.db.get_value("Contact Phone", {"phone": doc.get("mobile_no")}, "parent")
+
+	if contact:
+		return contact
 
 	return False
 
