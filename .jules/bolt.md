@@ -16,3 +16,10 @@
 ## 2024-05-19 - Removing Redundant N+1 frappe.db.exists Checks Before IN Queries
 **Learning:** In Frappe, when compiling a list of candidate names to fetch via `frappe.get_all(..., filters={'name': ['in', names]})`, performing an N+1 `frappe.db.exists()` check in a loop beforehand is redundant. The `IN` query naturally filters out non-existent records, rendering the prior existence checks a complete waste of queries.
 **Action:** When gathering a list of records to fetch with a single `frappe.get_all` `IN` query, directly pass the raw list of IDs to the query and let the database filter out any invalid or non-existent IDs implicitly, avoiding the N+1 `frappe.db.exists()` overhead.
+## 2024-05-20 - Memoizing Expensive Template Bindings with Computed Signals
+**Learning:** In Angular, binding methods that execute array operations (like `reduce()`, `find()`, or `Math.max()`) directly in the template causes them to be re-evaluated on every change detection cycle. This becomes a severe performance bottleneck when dealing with medium-to-large datasets.
+**Action:** Always wrap derived state calculations in `computed` signals from `@angular/core`. This memoizes the result, ensuring the expensive operation is only executed when the underlying signals actually change.
+
+## 2024-05-20 - Optimizing Template Lookups with Computed Maps
+**Learning:** Using array `.find()` methods inside a template lookup method (e.g., `getStageValue(stage) { return pipeline.find(p => p.stage === stage).value }`) inside a `@for` loop results in $O(N \times M)$ complexity during change detection.
+**Action:** Replace sequential template lookups by creating a `computed` Map signal in the component class. This transforms the lookup from $O(N)$ to $O(1)$ and guarantees the mapping is calculated exactly once when the source data changes.
