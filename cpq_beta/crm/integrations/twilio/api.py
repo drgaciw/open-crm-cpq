@@ -149,7 +149,7 @@ def update_recording_info(**kwargs):
 		call_sid = args.CallSid
 		update_call_log(call_sid)
 		frappe.db.set_value("CRM Call Log", call_sid, "recording_url", recording_url)
-	except Exception:
+	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), title=_("Failed to capture Twilio recording"))
 
 @frappe.whitelist(allow_guest=True)
@@ -179,7 +179,7 @@ def update_call_status_info(**kwargs):
 		client.calls(args.ParentCallSid).user_defined_messages.create(
 			content=json.dumps(call_info)
 		)
-	except Exception:
+	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), title=_("Failed to update Twilio call status"))
 
 def get_datetime_from_timestamp(timestamp):
