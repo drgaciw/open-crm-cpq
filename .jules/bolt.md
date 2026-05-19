@@ -20,3 +20,7 @@
 ## 2024-05-20 - Batch Fetching Attachments in Frappe API Responses
 **Learning:** Calling `frappe.db.get_all("File", ...)` inside loops to fetch attachments for multiple related documents (like comments or communications) results in severe N+1 query performance degradation.
 **Action:** When returning feeds or activities that include attachments for multiple child items, gather all the child item names first. Perform a single batch fetch using `frappe.db.get_all("File", filters={"attached_to_name": ["in", names]})`, map the results into a Python dictionary keyed by `attached_to_name`, and retrieve them inside the loop in O(1) time.
+
+## 2024-05-18 - [Batch Fetching in Product Configuration Validation]
+**Learning:** In Spring Boot services, doing database queries like `repository.findBy...` inside loops iterating over request collections leads to severe N+1 query bottlenecks as the collection grows. Using `contains()` on `List` types within these loops introduces hidden O(N) penalties, making the total complexity O(N*M).
+**Action:** Always batch fetch dependent records outside the loop using `IN` clauses in JPA repositories. Convert `List`s to `Set`s for O(1) lookups during validations before the iteration begins. Grouping the batch results by common keys using Java Streams perfectly replicates original iterative logic without the database overhead.

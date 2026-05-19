@@ -11,7 +11,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -72,20 +76,37 @@ public class ConfigurationRuleService {
         log.debug("Validating configuration for {} products", selectedProductIds.size());
         List<String> errors = new ArrayList<>();
 
+        if (selectedProductIds == null || selectedProductIds.isEmpty()) {
+            return errors;
+        }
+
+        Set<Long> productSet = new HashSet<>(selectedProductIds);
+
+        // Batch fetch all rules for all selected products
+        List<ConfigurationRule> allRules = configRuleRepository
+                .findBySourceProductIdInAndDeletedFalse(selectedProductIds);
+
+        // Group rules by source product ID and type
+        Map<Long, List<ConfigurationRule>> requiresRulesByProduct = allRules.stream()
+                .filter(r -> r.getRuleType() == ConfigRuleType.REQUIRES)
+                .collect(Collectors.groupingBy(ConfigurationRule::getSourceProductId));
+
+        Map<Long, List<ConfigurationRule>> excludesRulesByProduct = allRules.stream()
+                .filter(r -> r.getRuleType() == ConfigRuleType.EXCLUDES)
+                .collect(Collectors.groupingBy(ConfigurationRule::getSourceProductId));
+
         for (Long productId : selectedProductIds) {
-            List<ConfigurationRule> requiresRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.REQUIRES);
+            List<ConfigurationRule> requiresRules = requiresRulesByProduct.getOrDefault(productId, new ArrayList<>());
             for (ConfigurationRule rule : requiresRules) {
-                if (rule.getTargetProductId() != null && !selectedProductIds.contains(rule.getTargetProductId())) {
+                if (rule.getTargetProductId() != null && !productSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
                             "Product " + productId + " requires product " + rule.getTargetProductId());
                 }
             }
 
-            List<ConfigurationRule> excludesRules = configRuleRepository
-                    .findBySourceProductIdAndRuleTypeAndDeletedFalse(productId, ConfigRuleType.EXCLUDES);
+            List<ConfigurationRule> excludesRules = excludesRulesByProduct.getOrDefault(productId, new ArrayList<>());
             for (ConfigurationRule rule : excludesRules) {
-                if (rule.getTargetProductId() != null && selectedProductIds.contains(rule.getTargetProductId())) {
+                if (rule.getTargetProductId() != null && productSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
                             "Product " + productId + " is incompatible with product " + rule.getTargetProductId());
                 }
