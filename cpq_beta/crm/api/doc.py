@@ -393,11 +393,9 @@ def get_data(
 						d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
 
 			if order:
-				# Bolt Optimization: O(1) dictionary lookup replaces O(N) list index search
-				order_map = {name: i for i, name in enumerate(order)}
-				order_len = len(order)
+				order_idx = {val: i for i, val in enumerate(order)}
 				column_data = sorted(
-					column_data, key=lambda x: order_map.get(x.get("name"), order_len)
+					column_data, key=lambda x: order_idx.get(x.get("name"), len(order))
 				)
 
 			data.append({"column": kc, "fields": kanban_fields, "data": column_data})
