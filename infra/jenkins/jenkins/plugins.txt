@@ -1,0 +1,12 @@
+# Jenkins plugins for OpenCRM CPQ CI (minimal set; versions resolved by plugin-cli against LTS)
+configuration-as-code
+job-dsl
+workflow-aggregator
+git
+credentials-binding
+docker-workflow
+ws-cleanup
+junit
+timestamper
+ansicolor
+warnings-ng

@@ -1,0 +1,69 @@
+# Optional overlay: smoke-test ai-service health (NOT used as LLM endpoint for ai-assist).
+#
+# ai-assist scripts call Azure OpenAI / OpenAI-compatible gateways (ADR-003).
+# ai-service exposes /api/v1/ai/agents — not chat completions.
+#
+# Build JAR first:
+#   cd backend && mvn -pl services/ai-service -am package -DskipTests
+#
+# Usage:
+#   docker compose -f docker-compose.jenkins.yml -f docker-compose.ai-sidecar.yml --env-file env/jenkins.env up -d
+
+services:
+  jenkins:
+    depends_on:
+      ai-service:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: ../../backend/services/ai-service
+      dockerfile: Dockerfile
+    image: opencrm-ai-service:local
+    container_name: opencrm-jenkins-ai-sidecar
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AZURE_OPENAI_API_KEY: mock-key
+      AZURE_OPENAI_ENDPOINT: https://mock-endpoint.openai.azure.com
+      OPENCRM_AI_AGENTS_ENABLED: "false"
+      REDIS_HOST: redis
+      DB_HOST: postgres
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:18086:8086"
+    networks:
+      - jenkins_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: opencrm
+    networks:
+      - jenkins_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - jenkins_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
