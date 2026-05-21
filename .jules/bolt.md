@@ -24,3 +24,7 @@
 ## 2024-05-18 - [Batch Fetching in Product Configuration Validation]
 **Learning:** In Spring Boot services, doing database queries like `repository.findBy...` inside loops iterating over request collections leads to severe N+1 query bottlenecks as the collection grows. Using `contains()` on `List` types within these loops introduces hidden O(N) penalties, making the total complexity O(N*M).
 **Action:** Always batch fetch dependent records outside the loop using `IN` clauses in JPA repositories. Convert `List`s to `Set`s for O(1) lookups during validations before the iteration begins. Grouping the batch results by common keys using Java Streams perfectly replicates original iterative logic without the database overhead.
+
+## 2024-05-21 - Avoiding Iterator Exhaustion During Batch Processing
+**Learning:** When refactoring functions to resolve N+1 queries by batch-fetching, it is common to iterate through an `Iterable` argument twice: first to extract keys/IDs for the batch fetch, and second to process the actual logic. If the function argument is typed as a generic `Iterable` rather than a concrete `list`, the first pass can exhaust the generator, causing the core logic loop to be silently skipped.
+**Action:** When implementing a multi-pass batch fetch optimization on a parameter typed as `Iterable`, always explicitly coerce the argument to a list (e.g., `items = list(items)`) at the start of the function to prevent exhausting generators and dropping data.
