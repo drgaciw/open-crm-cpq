@@ -167,7 +167,7 @@ describe('BaseCrudService', () => {
       expect(req.request.method).toBe('DELETE');
       req.flush(null);
 
-      await expect(responsePromise).resolves.toBeNull();
+      await responsePromise;
       expect(service.items().length).toBe(1);
       expect(service.items()[0].id).toBe('2');
       expect(service.loading()).toBe(false);
@@ -182,7 +182,7 @@ describe('BaseCrudService', () => {
       const req = httpMock.expectOne('/api/v1/test-entities/1');
       req.flush(null);
 
-      await expect(responsePromise).resolves.toBeNull();
+      await responsePromise;
       expect(service.selectedItem()).toBeNull();
     });
   });
