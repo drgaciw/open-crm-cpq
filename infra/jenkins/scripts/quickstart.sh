@@ -48,7 +48,7 @@ read_env_var() {
   local key="$1"
   local default="$2"
   local val
-  val="$(grep -E "^${key}=" "${ENV_FILE}" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
+  val="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "${ENV_FILE}" 2>/dev/null | tail -1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -d '\r' || true)"
   if [[ -z "${val}" ]]; then
     echo "${default}"
   else

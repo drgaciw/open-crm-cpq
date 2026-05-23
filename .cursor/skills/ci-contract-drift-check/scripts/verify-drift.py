@@ -20,19 +20,25 @@ def load_text(path: Path) -> str:
 
 
 def parse_contract_needs(contract_text: str) -> list[str]:
-    """Extract backend-integration needs from ci-contract.yaml (simple parse)."""
-    in_block = False
+    """Extract backend-integration needs from github_actions.needs_graph."""
+    in_graph = False
+    in_integration = False
     needs: list[str] = []
     for line in contract_text.splitlines():
-        if re.match(r"^\s+backend-integration:\s*$", line):
-            in_block = True
+        if re.match(r"^\s+needs_graph:\s*$", line):
+            in_graph = True
             continue
-        if in_block:
+        if not in_graph:
+            continue
+        if re.match(r"^\s+backend-integration:\s*$", line):
+            in_integration = True
+            continue
+        if in_integration:
             m = re.match(r"^\s+-\s+(\S+)\s*$", line)
             if m:
                 needs.append(m.group(1))
                 continue
-            if line.strip() and not line.startswith(" " * 4 + "-"):
+            if line.strip() and not re.match(r"^\s+-\s+", line):
                 break
     return needs
 

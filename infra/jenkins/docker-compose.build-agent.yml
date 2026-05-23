@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: jenkins/Dockerfile
     container_name: opencrm-jenkins-build-agent
-    user: root
+    user: jenkins
     command: >
       bash -c "
         java -jar /usr/share/jenkins/jenkins.war -version >/dev/null 2>&1 || true;

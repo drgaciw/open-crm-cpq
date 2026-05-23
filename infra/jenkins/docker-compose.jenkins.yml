@@ -46,6 +46,8 @@ services:
       # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
     volumes:
       - jenkins_home:/var/jenkins_home
+      # Repo JCasC is SSOT — avoids stale casc copied into jenkins_home on first boot.
+      - ./jenkins/casc/jenkins.yaml:/var/jenkins_home/casc_configs/jenkins.yaml:ro
       - maven_cache:/var/jenkins/.m2
       - npm_cache:/var/jenkins/.npm
       - /var/run/docker.sock:/var/run/docker.sock

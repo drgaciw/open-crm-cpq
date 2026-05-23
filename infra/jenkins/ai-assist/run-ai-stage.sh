@@ -2,7 +2,7 @@
 # Wrapper invoked from Jenkinsfile for AI stages.
 set -euo pipefail
 
-STAGE="${1:?Usage: run-ai-stage.sh <code_review|test_suggestions|log_analysis> [args...]}"
+STAGE="${1:?Usage: run-ai-stage.sh <code_review|test_suggestions|log_analysis|drift_check|security_triage> [args...]}"
 shift
 
 AI_ASSIST_DIR="${AI_ASSIST_DIR:-/opt/ai-assist}"

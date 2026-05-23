@@ -20,18 +20,24 @@ def find_repo_root(start: Path) -> Path:
 
 
 def parse_contract_needs(text: str) -> list[str]:
-    in_block = False
+    in_graph = False
+    in_integration = False
     needs: list[str] = []
     for line in text.splitlines():
-        if re.match(r"^\s+backend-integration:\s*$", line):
-            in_block = True
+        if re.match(r"^\s+needs_graph:\s*$", line):
+            in_graph = True
             continue
-        if in_block:
+        if not in_graph:
+            continue
+        if re.match(r"^\s+backend-integration:\s*$", line):
+            in_integration = True
+            continue
+        if in_integration:
             m = re.match(r"^\s+-\s+(\S+)\s*$", line)
             if m:
                 needs.append(m.group(1))
                 continue
-            if line.strip() and not line.startswith(" " * 4 + "-"):
+            if line.strip() and not re.match(r"^\s+-\s+", line):
                 break
     return needs
 

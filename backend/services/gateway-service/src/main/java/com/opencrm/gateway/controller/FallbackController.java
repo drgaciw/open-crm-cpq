@@ -84,7 +84,8 @@ public class FallbackController {
      */
     @RequestMapping(value = "/erp/**", method = {
             RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
-            RequestMethod.PATCH, RequestMethod.DELETE
+            RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.OPTIONS,
+            RequestMethod.HEAD
     })
     public ResponseEntity<Map<String, Object>> erpNotImplemented() {
         log.warn("ERP stub: agent-contract path invoked before erp-adapter-service is available");

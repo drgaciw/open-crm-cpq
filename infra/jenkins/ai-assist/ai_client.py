@@ -13,6 +13,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from json import JSONDecodeError
 from typing import Any
 
 
@@ -62,7 +63,10 @@ def chat_completion(system: str, user: str, max_tokens: int = 4096) -> str:
     api_key = cfg["api_key"]
     endpoint = cfg["endpoint"]
     model = cfg["model"]
-    timeout_s = int(cfg["timeout_ms"]) / 1000.0
+    try:
+        timeout_s = float(cfg["timeout_ms"]) / 1000.0
+    except (ValueError, TypeError):
+        timeout_s = 120.0
     api_version = cfg["api_version"]
 
     if not endpoint or not api_key:
@@ -100,7 +104,13 @@ def chat_completion(system: str, user: str, max_tokens: int = 4096) -> str:
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+            raw = resp.read().decode("utf-8")
+        try:
+            payload = json.loads(raw)
+        except JSONDecodeError as exc:
+            raise RuntimeError(
+                f"LLM API returned non-JSON response: {raw[:500]}"
+            ) from exc
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"LLM API HTTP {exc.code}: {detail[:2000]}") from exc

@@ -164,7 +164,7 @@ pipeline {
             returnStatus: true
           )
           if (driftStatus != 0 && env.AI_CI_BLOCKING == 'true') {
-            unstable('CI drift check failed (AI_CI_BLOCKING=true)')
+            error('CI drift check failed (AI_CI_BLOCKING=true)')
           } else if (driftStatus != 0) {
             echo 'CI drift check reported issues (see ci-reports/ai-drift-check.md)'
           }
@@ -178,6 +178,7 @@ pipeline {
       steps {
         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
           sh '''
+            set -o pipefail
             mkdir -p ci-reports
             bash scripts/ci/run-core.sh security-audit 2>&1 | tee ci-reports/security-audit-console.txt
           '''
@@ -230,18 +231,14 @@ pipeline {
           catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
             def blocking = env.AI_CI_BLOCKING == 'true'
             def runLog = {
+              def logTail = currentBuild.rawBuild.getLog(500).join('\n')
+              writeFile file: 'ci-reports/build-log-tail.txt', text: logTail
               sh '''
                 mkdir -p ci-reports
-                LOG_FILE="${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_NUMBER}/log"
-                if [ -f "$LOG_FILE" ]; then
-                  tail -n 500 "$LOG_FILE" | bash infra/jenkins/ai-assist/run-ai-stage.sh log_analysis \
-                    --stage pipeline-failure \
-                    --output "${WORKSPACE}/ci-reports/ai-log-analysis.md"
-                else
-                  bash infra/jenkins/ai-assist/run-ai-stage.sh log_analysis \
-                    --stage pipeline-failure \
-                    --output "${WORKSPACE}/ci-reports/ai-log-analysis.md" </dev/null
-                fi
+                bash infra/jenkins/ai-assist/run-ai-stage.sh log_analysis \
+                  --log-file "${WORKSPACE}/ci-reports/build-log-tail.txt" \
+                  --stage pipeline-failure \
+                  --output "${WORKSPACE}/ci-reports/ai-log-analysis.md"
               '''
             }
             try {

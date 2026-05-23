@@ -16,10 +16,14 @@ Output markdown: Summary, Root Cause, Evidence (quoted log lines), Recommended F
 Do not guess — cite log evidence."""
 
 
-def tail_log(path: Path, max_lines: int = 400) -> str:
+def tail_log(path: Path, max_lines: int = 400, tail_bytes: int = 100_000) -> str:
     if not path.is_file():
         return f"(log file not found: {path})"
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    with open(path, "rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        handle.seek(max(0, handle.tell() - tail_bytes), os.SEEK_SET)
+        text = handle.read().decode("utf-8", errors="replace")
+    lines = text.splitlines()
     return "\n".join(lines[-max_lines:])
 
 
