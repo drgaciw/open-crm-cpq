@@ -1,14 +1,19 @@
-# Machine-readable CI contract — drift prevention between GitHub Actions and Jenkins.
-# Human docs: infra/jenkins/README.md, docs/adr/ADR-003-ci-llm-integration.md
+# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback only.
+# Human docs: docs/ci-jenkins-cutover.md, infra/jenkins/README.md, docs/adr/ADR-003-ci-llm-integration.md
 # When changing Jenkinsfile, .github/workflows/ci.yml, or scripts/ci/*, update this file in the same PR.
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-05-19"
+last_reviewed: "2026-05-20"
+
+execution:
+  primary: jenkins
+  fallback: github_actions_manual
+  github_status_context: jenkins/opencrm-cpq-ci
 
 ssot:
   entrypoint: scripts/ci/run-core.sh
-  description: All build/test commands; Jenkins and GHA invoke only these stage names.
+  description: All build/test commands; Jenkins runs on PR/push; GHA when manually dispatched.
 
 scripts_ci:
   stages:
@@ -89,13 +94,12 @@ ai_assist:
 
 github_actions:
   workflow: .github/workflows/ci.yml
+  role: manual_fallback_only
   trigger:
-    push_branches: [main]
-    pull_request_branches: [main]
     workflow_dispatch: true
-  concurrency:
-    group: ci-${{ github.ref }}
-    cancel_in_progress: true
+    push_branches: []
+    pull_request_branches: []
+  concurrency: null
   jobs:
     shared-libraries:
       needs: []
@@ -123,7 +127,10 @@ github_actions:
 
 jenkins:
   file: Jenkinsfile
+  job: opencrm-cpq
+  job_type: multibranch
   agent: any
+  github_status_context: jenkins/opencrm-cpq-ci
   toolchain_note: Jenkins-only; no GHA equivalent job
   stages_ordered:
     - name: Checkout
@@ -155,10 +162,12 @@ jenkins:
 drift_prevention:
   rules:
     - Change scripts/ci stage scripts and run-core.sh case arms together.
-    - Update this file when adding/removing GHA jobs or Jenkins stages.
-    - backend-integration must depend only on shared-libraries and backend-unit in GHA needs.
+    - Update this file when adding/removing Jenkins stages or GHA manual jobs.
+    - Do not re-enable GHA push/pull_request triggers without updating docs/ci-jenkins-cutover.md.
+    - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
     - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.
+    - Jenkins must publish GitHub status context jenkins/opencrm-cpq-ci when scm-token is set.
   verify_commands:
     - bash scripts/ci/run-core.sh toolchain
     - rg -l "run-core.sh" Jenkinsfile .github/workflows/ci.yml

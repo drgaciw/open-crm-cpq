@@ -34,7 +34,8 @@ Brief status of the Jenkins + advisory LLM CI initiative. Full implementation li
 | P1 documentation / drift | **Done** | `ci-contract.yaml`, README, ADR/runbook updates |
 | Production build agents | **Partial** | `docker-compose.build-agent.yml` scaffold; inbound agent secret wiring is environment-specific |
 | Blocking AI gates | **Deferred** | Enable `AI_CI_BLOCKING` only after false-positive review |
-| Multibranch PR jobs | **Deferred** | JCasC seeds `opencrm-cpq-ci`; replace with multibranch when ready |
+| Multibranch PR CI | **Done** | JCasC job `opencrm-cpq` + GitHub status `jenkins/opencrm-cpq-ci` |
+| GHA auto-CI | **Retired** | `workflow_dispatch` manual fallback only (Option B) |
 
 ## References
 

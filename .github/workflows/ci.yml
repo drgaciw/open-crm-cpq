@@ -1,19 +1,13 @@
-name: CI
+# Manual fallback only — primary CI runs in Jenkins (see docs/ci-jenkins-cutover.md).
+# Automatic push/PR triggers are intentionally disabled (Option B cutover).
+name: CI (manual fallback)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
   actions: write
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   shared-libraries:

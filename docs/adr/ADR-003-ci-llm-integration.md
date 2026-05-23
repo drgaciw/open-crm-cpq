@@ -8,10 +8,12 @@ Accepted
 
 OpenCRM CPQ uses:
 
-- **GitHub Actions** (`.github/workflows/ci.yml`) for primary CI
-- **Jenkins** (`Jenkinsfile`, `infra/jenkins/`) as an optional/on-prem mirror
+- **Jenkins** (`Jenkinsfile`, `infra/jenkins/`) as **primary CI** for branches and pull requests
+- **GitHub Actions** (`.github/workflows/ci.yml`) as **manual fallback only** (`workflow_dispatch`)
 - **`ai-service`** for product CPQ agents (`AgentRouter`, `/api/v1/ai/agents/*`)
 - **`infra/jenkins/ai-assist/`** for pipeline advisory LLM stages (review, test gaps, log triage)
+
+Cutover runbook: **[docs/ci-jenkins-cutover.md](../ci-jenkins-cutover.md)**.
 
 ADR-002 introduces GLM-5 (Zhipu) for runtime agents while `application.yml` still documents Azure OpenAI. CI must not conflate these paths.
 
@@ -19,7 +21,7 @@ ADR-002 introduces GLM-5 (Zhipu) for runtime agents while `application.yml` stil
 
 ### 1. Single CI command source (SSOT)
 
-All build/test commands live in `scripts/ci/run-core.sh` and stage scripts. Jenkins and GitHub Actions invoke the same shell entrypoints.
+All build/test commands live in `scripts/ci/run-core.sh` and stage scripts. **Jenkins** runs them on every branch/PR. **GitHub Actions** uses the same entrypoints when manually dispatched.
 
 ### 2. CI LLM boundary
 
@@ -49,14 +51,16 @@ Environment variables: `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_ENDPOINT`, `LLM_MODEL
 
 ### 6. AI assist platform scope
 
-**GitHub Actions does not run `infra/jenkins/ai-assist/`.** Advisory LLM stages (`code_review`, `test_suggestions`, `log_analysis`) exist only in `Jenkinsfile` when `AI_CI_ENABLED=true`. GHA and Jenkins share build/test stages via `scripts/ci/run-core.sh` only.
+**GitHub Actions does not run automatically on push/PR** (Option B cutover). Manual workflow retains SSOT stages for emergency use. Advisory LLM stages exist only in `Jenkinsfile` when `AI_CI_ENABLED=true`.
+
+Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when `scm-token` is configured.
 
 Machine-readable stage names, job `needs`, and Jenkins stage mapping: **[docs/ci-contract.yaml](../ci-contract.yaml)**.
 
 ## Consequences
 
-- **Positive:** No drift between Jenkins and GHA; clear trust zones; ai-service remains product-focused
-- **Negative:** Two CI platforms to maintain until one is retired; LLM provider unification with ADR-002 still required for runtime
+- **Positive:** Single primary CI platform; AI assist native; no GHA minutes on every PR; SSOT scripts shared with manual GHA fallback
+- **Negative:** Jenkins ops burden; branch protection must target Jenkins status; hosted Jenkins required for team PR gating
 
 ## References
 

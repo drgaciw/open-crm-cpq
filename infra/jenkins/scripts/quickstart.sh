@@ -149,7 +149,7 @@ load_env_port
 echo ""
 echo "Next steps (first green build):"
 echo "  1. Open ${JENKINS_URL} (user from env: JENKINS_ADMIN_USER)"
-echo "  2. Use JCasC job 'opencrm-cpq-ci' or Pipeline from SCM → Jenkinsfile"
+echo "  2. Scan multibranch job 'opencrm-cpq' (JCasC) or configure GitHub webhook"
 echo "  3. Keep AI_CI_ENABLED=false for the first run"
 echo "  4. Trigger a build; expect Security Audit may be UNSTABLE"
 echo ""

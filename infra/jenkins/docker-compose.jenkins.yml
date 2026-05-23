@@ -28,6 +28,8 @@ services:
       JENKINS_URL: ${JENKINS_URL:-http://localhost:8080/}
       JENKINS_NUM_EXECUTORS: ${JENKINS_NUM_EXECUTORS:-2}
       GIT_REPO_URL: ${GIT_REPO_URL:-}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER:-drgaciw}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME:-open-crm-cpq}
       AI_CI_ENABLED: ${AI_CI_ENABLED:-false}
       AI_CI_BLOCKING: ${AI_CI_BLOCKING:-false}
       LLM_ENDPOINT: ${LLM_ENDPOINT:-}

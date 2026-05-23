@@ -60,6 +60,29 @@ def gha_has_ai_assist(gha_text: str) -> bool:
     return "ai-assist" in gha_text or "run-ai-stage" in gha_text
 
 
+def gha_has_auto_triggers(gha_text: str) -> bool:
+    """True if workflow runs on push or pull_request (disallowed for Option B)."""
+    in_on = False
+    for line in gha_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if stripped == "on:":
+            in_on = True
+            continue
+        if in_on:
+            if stripped and not line.startswith(" ") and not line.startswith("\t"):
+                if stripped.endswith(":") and stripped != "on:":
+                    break
+            if re.match(r"^\s+(push|pull_request):", line):
+                return True
+    return False
+
+
+def jenkins_publishes_github_status(jenkins_text: str) -> bool:
+    return "jenkins/opencrm-cpq-ci" in jenkins_text and "publishGitHubStatus" in jenkins_text
+
+
 def jenkins_stage_names(jenkins_text: str) -> set[str]:
     names: set[str] = set()
     for m in re.finditer(r"stage\('([^']+)'\)", jenkins_text):
@@ -103,6 +126,17 @@ def main() -> int:
             if stage == "toolchain":
                 continue
             errors.append(f"GHA ci.yml missing run-core.sh {stage}")
+
+    if gha_has_auto_triggers(gha):
+        errors.append(
+            "GHA workflow must not auto-run on push/pull_request (Jenkins primary; use workflow_dispatch only)"
+        )
+
+    if "workflow_dispatch" not in gha:
+        warnings.append("GHA manual fallback should include workflow_dispatch trigger")
+
+    if not jenkins_publishes_github_status(jenkins):
+        errors.append("Jenkinsfile must publish GitHub status context jenkins/opencrm-cpq-ci")
 
     if gha_has_ai_assist(gha):
         errors.append("GHA workflow must not reference ai-assist (Jenkins-only per ADR-003)")

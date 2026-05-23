@@ -40,6 +40,10 @@ jenkins:
             value: "${LLM_API_VERSION:-2024-02-15-preview}"
           - key: LLM_TIMEOUT_MS
             value: "${LLM_TIMEOUT_MS:-120000}"
+          - key: GITHUB_REPO_OWNER
+            value: "${GITHUB_REPO_OWNER:-drgaciw}"
+          - key: GITHUB_REPO_NAME
+            value: "${GITHUB_REPO_NAME:-open-crm-cpq}"
 
 credentials:
   system:
@@ -66,17 +70,42 @@ unclassified:
 
 jobs:
   - script: >
-      pipelineJob('opencrm-cpq-ci') {
-        description('CI for OpenCRM CPQ — Pipeline from SCM, Jenkinsfile at repo root.')
-        definition {
-          cpsScm {
-            scm {
-              git {
-                remote { url("${GIT_REPO_URL:-https://github.com/your-org/open-crm-cpq.git}") }
-                branches('*/main')
+      multibranchPipelineJob('opencrm-cpq') {
+        displayName('OpenCRM CPQ CI')
+        description('Primary CI — branches and PRs with Jenkinsfile (see docs/ci-jenkins-cutover.md)')
+        branchSources {
+          github {
+            id('opencrm-cpq-github')
+            scanCredentialsId('scm-token')
+            repoOwner('${GITHUB_REPO_OWNER}')
+            repository('${GITHUB_REPO_NAME}')
+            traits {
+              gitHubBranchDiscovery {
+                strategyId(1)
+              }
+              gitHubPullRequestDiscovery {
+                strategyId(1)
+              }
+              headWildcardFilter {
+                includes('main PR-* *')
+                excludes('')
               }
             }
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
             scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(20)
+          }
+        }
+        triggers {
+          periodicFolderTrigger {
+            interval('1h')
           }
         }
       }

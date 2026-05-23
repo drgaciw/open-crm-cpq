@@ -1,8 +1,8 @@
 # Jenkins AI-Driven CI for OpenCRM CPQ
 
-Dockerized Jenkins that mirrors GitHub Actions via **`scripts/ci/run-core.sh`** (single source of truth). Optional AI assist stages call an **LLM gateway** (Azure OpenAI or compatible APIM), not `ai-service` agent APIs.
+**Primary CI** for branches and pull requests. GitHub Actions is **manual fallback only** (`workflow_dispatch`). All build/test commands use **`scripts/ci/run-core.sh`**. Optional AI assist calls an **LLM gateway** (not `ai-service`).
 
-**Architecture:** [ADR-003](../../docs/adr/ADR-003-ci-llm-integration.md) · **Stage contract:** [docs/ci-contract.yaml](../../docs/ci-contract.yaml)
+**Cutover:** [docs/ci-jenkins-cutover.md](../../docs/ci-jenkins-cutover.md) · **Architecture:** [ADR-003](../../docs/adr/ADR-003-ci-llm-integration.md) · **Contract:** [docs/ci-contract.yaml](../../docs/ci-contract.yaml)
 
 ## Cursor Jenkins CI agent team
 
@@ -30,7 +30,10 @@ Orchestrator agent: **`jenkins-ci-orchestrator`**. For GHA PR check failures, us
 
 | Topic | Choice |
 |-------|--------|
-| CI commands | `scripts/ci/*` — shared by GHA and Jenkins |
+| **Primary CI** | Jenkins multibranch job `opencrm-cpq` (PR + branch builds) |
+| **GHA** | Manual fallback only — no push/PR triggers |
+| **PR gate status** | `jenkins/opencrm-cpq-ci` (GitHub commit status API) |
+| CI commands | `scripts/ci/*` — SSOT for Jenkins and manual GHA |
 | LLM for CI | `LLM_*` env → chat completions gateway |
 | `ai-service` sidecar | **Compose health dependency only** — Jenkins waits for healthy `ai-service`; does **not** supply `LLM_ENDPOINT` for ai-assist |
 | GHA graph | Integration after shared-libs + unit; frontend parallel |
@@ -70,10 +73,10 @@ Open http://localhost:8080/ (bound to localhost only).
 
 | Approach | When to use |
 |----------|-------------|
-| **JCasC seed** (`jenkins/casc/jenkins.yaml` → `opencrm-cpq-ci`) | Fast local bootstrap; points at `GIT_REPO_URL` + `Jenkinsfile` on `main` |
-| **Manual Pipeline from SCM** | Real repos: create **Pipeline script from SCM**, set branch/PR ref, credentials, and `Jenkinsfile` at repo root |
+| **JCasC seed** (`jenkins/casc/jenkins.yaml` → `opencrm-cpq` multibranch) | Fast local bootstrap; discovers branches/PRs with Jenkinsfile |
+| **Manual Pipeline from SCM** | Legacy; prefer multibranch + webhook per [ci-jenkins-cutover.md](../../docs/ci-jenkins-cutover.md) |
 
-For PR builds, prefer a **Multibranch Pipeline** — see [jenkins/casc/multibranch.yaml.example](jenkins/casc/multibranch.yaml.example) and playbook `enable-pr-ci` in `.cursor/teams/jenkins-ci-team.yaml`. Disable the seed `opencrm-cpq-ci` job if it conflicts with multibranch.
+For PR builds, the **`opencrm-cpq`** multibranch job is primary — see [docs/ci-jenkins-cutover.md](../../docs/ci-jenkins-cutover.md). Template reference: [jenkins/casc/multibranch.yaml.example](jenkins/casc/multibranch.yaml.example).
 
 ## Compose overlays
 
@@ -151,7 +154,8 @@ Reports: `ci-reports/ai-code-review.md`, `ai-test-suggestions.md`, `ai-log-analy
 
 - [ ] `env/jenkins.env` copied from `jenkins.env.example`; admin password changed
 - [ ] `docker compose ... up -d --build` healthy (`curl -f http://localhost:8080/login`)
-- [ ] Job configured (JCasC seed or Pipeline from SCM) with correct repo URL and credentials
+- [ ] `SCM_TOKEN` + repo owner/name set; multibranch job `opencrm-cpq` scanned
+- [ ] Branch protection requires `jenkins/opencrm-cpq-ci` (see [ci-jenkins-cutover.md](../../docs/ci-jenkins-cutover.md))
 - [ ] Workspace has Docker available for integration stage (controller dev or build agent prod)
 - [ ] `AI_CI_ENABLED=false` for first run (optional: enable after core stages pass)
 - [ ] Build completes: Toolchain → Shared Libraries → parallel fast checks → Backend Integration → Security Audit (may be UNSTABLE)

@@ -1,5 +1,42 @@
-// OpenCRM CPQ — Jenkins CI (SSOT: scripts/ci/run-core.sh, mirrors .github/workflows/ci.yml)
+// OpenCRM CPQ — Jenkins CI (SSOT: scripts/ci/run-core.sh)
+// Primary CI executor — GHA is manual fallback only (docs/ci-jenkins-cutover.md)
 // Design: docs/adr/ADR-003-ci-llm-integration.md | Infra: infra/jenkins/README.md
+
+def publishGitHubStatus(String state, String description) {
+  if (!env.GIT_COMMIT?.trim()) {
+    echo 'No GIT_COMMIT; skipping GitHub status publish'
+    return
+  }
+  def owner = env.GITHUB_REPO_OWNER ?: 'drgaciw'
+  def repo = env.GITHUB_REPO_NAME ?: 'open-crm-cpq'
+  def context = 'jenkins/opencrm-cpq-ci'
+  try {
+    withCredentials([string(credentialsId: 'scm-token', variable: 'GITHUB_TOKEN')]) {
+      if (!GITHUB_TOKEN?.trim()) {
+        echo 'scm-token empty; skipping GitHub status publish'
+        return
+      }
+      writeFile(
+        file: 'gh-status.json',
+        text: groovy.json.JsonOutput.toJson([
+          state: state,
+          context: context,
+          description: description,
+          target_url: env.BUILD_URL ?: ''
+        ])
+      )
+      sh '''
+        curl -fsS -X POST \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/''' + owner + '''/''' + repo + '''/statuses/''' + env.GIT_COMMIT + '''" \
+          -d @gh-status.json
+      '''
+    }
+  } catch (err) {
+    echo "GitHub status publish skipped: ${err}"
+  }
+}
 
 def runAiStage(String scriptName, String extraArgs = '') {
   if (env.AI_CI_ENABLED != 'true') {
@@ -41,6 +78,8 @@ pipeline {
     AI_CI_ENABLED = "${env.AI_CI_ENABLED ?: 'false'}"
     AI_CI_BLOCKING = "${env.AI_CI_BLOCKING ?: 'false'}"
     GIT_BASE_REF = "${env.CHANGE_TARGET ? "origin/${env.CHANGE_TARGET}" : 'origin/main'}"
+    GITHUB_REPO_OWNER = "${env.GITHUB_REPO_OWNER ?: 'drgaciw'}"
+    GITHUB_REPO_NAME = "${env.GITHUB_REPO_NAME ?: 'open-crm-cpq'}"
     DOCKER_HOST = 'unix:///var/run/docker.sock'
     TESTCONTAINERS_RYUK_DISABLED = 'false'
   }
@@ -50,6 +89,9 @@ pipeline {
       steps {
         checkout scm
         sh 'git fetch origin +refs/heads/*:refs/remotes/origin/* || true'
+        script {
+          publishGitHubStatus('pending', 'Jenkins CI running')
+        }
       }
     }
 
@@ -169,8 +211,21 @@ pipeline {
       archiveArtifacts artifacts: 'ci-reports/**/*.md', allowEmptyArchive: true
       archiveArtifacts artifacts: 'backend/**/target/surefire-reports/*.xml', allowEmptyArchive: true
     }
+    success {
+      script {
+        publishGitHubStatus('success', 'Jenkins CI passed')
+      }
+      echo 'Pipeline succeeded.'
+    }
+    unstable {
+      script {
+        publishGitHubStatus('failure', 'Jenkins CI unstable')
+      }
+      echo 'Pipeline unstable (advisory AI or security audit findings may exist).'
+    }
     failure {
       script {
+        publishGitHubStatus('failure', 'Jenkins CI failed')
         if (env.AI_CI_ENABLED == 'true') {
           catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
             def blocking = env.AI_CI_BLOCKING == 'true'
@@ -198,12 +253,6 @@ pipeline {
           }
         }
       }
-    }
-    success {
-      echo 'Pipeline succeeded.'
-    }
-    unstable {
-      echo 'Pipeline unstable (advisory AI or security audit findings may exist).'
     }
   }
 }

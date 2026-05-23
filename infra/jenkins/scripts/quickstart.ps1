@@ -146,7 +146,7 @@ $jenkinsUrl = if ($envMap['JENKINS_URL']) { $envMap['JENKINS_URL'] } else { 'htt
 Write-Host ''
 Write-Host 'Next steps (first green build):'
 Write-Host "  1. Open $jenkinsUrl (user from env: JENKINS_ADMIN_USER)"
-Write-Host "  2. Use JCasC job 'opencrm-cpq-ci' or Pipeline from SCM → Jenkinsfile"
+Write-Host "  2. Scan multibranch job 'opencrm-cpq' (JCasC) or configure GitHub webhook"
 Write-Host '  3. Keep AI_CI_ENABLED=false for the first run'
 Write-Host '  4. Trigger a build; expect Security Audit may be UNSTABLE'
 Write-Host ''
