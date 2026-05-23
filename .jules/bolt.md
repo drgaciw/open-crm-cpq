@@ -24,3 +24,6 @@
 ## 2024-05-18 - [Batch Fetching in Product Configuration Validation]
 **Learning:** In Spring Boot services, doing database queries like `repository.findBy...` inside loops iterating over request collections leads to severe N+1 query bottlenecks as the collection grows. Using `contains()` on `List` types within these loops introduces hidden O(N) penalties, making the total complexity O(N*M).
 **Action:** Always batch fetch dependent records outside the loop using `IN` clauses in JPA repositories. Convert `List`s to `Set`s for O(1) lookups during validations before the iteration begins. Grouping the batch results by common keys using Java Streams perfectly replicates original iterative logic without the database overhead.
+## 2024-05-23 - Batch Fetching in Frappe loops using get_cached_doc
+**Learning:** Calling `frappe.get_cached_doc()` iteratively inside a loop introduces an N+1 query performance bottleneck, even though it utilizes caching, because it forces full document lifecycle traversals and individual cache lookups or DB hits.
+**Action:** To resolve N+1 performance bottlenecks in Frappe loops using `frappe.get_doc` or `frappe.get_cached_doc`, extract the target names into a list and replace the loop with a single batch `frappe.get_all()` query using the `['in', list_of_names]` filter to fetch all required fields in O(1) database calls.
