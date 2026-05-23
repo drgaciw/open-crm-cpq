@@ -15,19 +15,19 @@ describe('LoadingService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should initialize with loading set to 0 (false)', () => {
-    expect(service.loading()).toBe(0);
+  it('should initialize with loading set to false', () => {
+    expect(service.loading()).toBe(false);
     expect(service.getRequestCount()).toBe(0);
   });
 
   it('should increment request count when startRequest is called', () => {
     service.startRequest();
     expect(service.getRequestCount()).toBe(1);
-    expect(service.loading()).toBe(1);
+    expect(service.loading()).toBe(true);
 
     service.startRequest();
     expect(service.getRequestCount()).toBe(2);
-    expect(service.loading()).toBe(2);
+    expect(service.loading()).toBe(true);
   });
 
   it('should decrement request count when endRequest is called', () => {
@@ -65,15 +65,15 @@ describe('LoadingService', () => {
     const loadingSignal = service.loading;
 
     service.startRequest();
-    expect(loadingSignal()).toBe(1);
+    expect(loadingSignal()).toBe(true);
 
     service.startRequest();
-    expect(loadingSignal()).toBe(2);
+    expect(loadingSignal()).toBe(true);
 
     service.endRequest();
-    expect(loadingSignal()).toBe(1);
+    expect(loadingSignal()).toBe(true);
 
     service.endRequest();
-    expect(loadingSignal()).toBe(0);
+    expect(loadingSignal()).toBe(false);
   });
 });
