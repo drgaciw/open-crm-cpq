@@ -5,6 +5,7 @@ Thumbs.db
 
 # Build artifacts
 **/target/
+**/bin/
 **/dist/
 **/build/
 **/.next/
