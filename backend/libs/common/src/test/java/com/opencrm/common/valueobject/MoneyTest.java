@@ -127,7 +127,8 @@ class MoneyTest {
         void rejectDifferentCurrencyAdd() {
             Money usd = Money.usd(BigDecimal.TEN);
             Money eur = Money.of(BigDecimal.TEN, "EUR");
-            assertThrows(IllegalArgumentException.class, () -> usd.add(eur));
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> usd.add(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", exception.getMessage());
         }
 
         @Test
