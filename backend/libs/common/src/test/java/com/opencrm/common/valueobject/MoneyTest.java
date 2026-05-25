@@ -60,12 +60,33 @@ class MoneyTest {
     class Arithmetic {
 
         @Test
-        @DisplayName("should add two Money values")
+        @DisplayName("should add two Money values and retain currency")
         void add() {
             Money a = Money.usd(BigDecimal.valueOf(10.50));
             Money b = Money.usd(BigDecimal.valueOf(20.30));
             Money result = a.add(b);
             assertEquals(new BigDecimal("30.80"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should handle addition of negative amounts")
+        void addNegative() {
+            Money a = Money.usd(BigDecimal.valueOf(50.00));
+            Money b = Money.usd(BigDecimal.valueOf(-20.00));
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("30.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should handle addition of zero")
+        void addZero() {
+            Money a = Money.usd(BigDecimal.valueOf(10.00));
+            Money b = Money.zero("USD");
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("10.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
         }
 
         @Test
