@@ -116,6 +116,16 @@ class MoneyTest {
             assertTrue(negative.isNegative());
             assertEquals(new BigDecimal("-50.00"), negative.getAmount());
         }
+
+        @Test
+        @DisplayName("should subtract into negative values")
+        void subtractToNegative() {
+            Money a = Money.usd(BigDecimal.valueOf(50.00));
+            Money b = Money.usd(BigDecimal.valueOf(100.00));
+            Money result = a.subtract(b);
+            assertTrue(result.isNegative());
+            assertEquals(new BigDecimal("-50.00"), result.getAmount());
+        }
     }
 
     @Nested
@@ -136,6 +146,14 @@ class MoneyTest {
             Money usd = Money.usd(BigDecimal.TEN);
             Money eur = Money.of(BigDecimal.TEN, "EUR");
             assertThrows(IllegalArgumentException.class, () -> usd.isGreaterThan(eur));
+        }
+
+        @Test
+        @DisplayName("should reject subtraction of different currencies")
+        void rejectDifferentCurrencySubtract() {
+            Money usd = Money.usd(BigDecimal.TEN);
+            Money eur = Money.of(BigDecimal.TEN, "EUR");
+            assertThrows(IllegalArgumentException.class, () -> usd.subtract(eur));
         }
     }
 
