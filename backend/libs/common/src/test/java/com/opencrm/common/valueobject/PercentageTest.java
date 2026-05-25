@@ -51,6 +51,31 @@ class PercentageTest {
         assertEquals(new BigDecimal("15.0000"), result.getValue());
     }
 
+
+    @Test
+    @DisplayName("should add negative percentages")
+    void addNegative() {
+        Percentage a = Percentage.of(10.0);
+        Percentage b = Percentage.of(-5.0);
+        Percentage result = a.add(b);
+        assertEquals(new BigDecimal("5.0000"), result.getValue());
+    }
+
+    @Test
+    @DisplayName("should add zero percentage")
+    void addZero() {
+        Percentage a = Percentage.of(10.0);
+        Percentage result = a.add(Percentage.zero());
+        assertEquals(new BigDecimal("10.0000"), result.getValue());
+    }
+
+    @Test
+    @DisplayName("should throw NullPointerException when adding null")
+    void addNull() {
+        Percentage a = Percentage.of(10.0);
+        assertThrows(NullPointerException.class, () -> a.add(null));
+    }
+
     @Test
     @DisplayName("should subtract percentages")
     void subtract() {
