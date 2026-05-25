@@ -80,6 +80,10 @@ class CRMCallLog(Document):
 
 @frappe.whitelist()
 def create_lead_from_call_log(call_log):
+	"""
+	Creates a new CRM Lead from a Call Log entry.
+	Actively used by the frontend CallLogModal.vue component.
+	"""
 	if not frappe.has_permission("CRM Lead", "create"):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
