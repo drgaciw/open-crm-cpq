@@ -14,7 +14,11 @@ public final class KafkaTopics {
     public static final String PRODUCT_STATUS_RETIRED = "cpq.product.status.retired";
     public static final String PRODUCT_CREATED = "cpq.product.created";
     public static final String PRODUCT_UPDATED = "cpq.product.updated";
-    
+    public static final String BUNDLE_STRUCTURE_CHANGED = "cpq.product.bundle.structure.changed";
+
+    // Configuration Events
+    public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
+
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";
     public static final String PRICE_CALCULATED = "cpq.price.calculated";
@@ -28,6 +32,8 @@ public final class KafkaTopics {
     // Approval Events
     public static final String APPROVAL_APPROVED = "cpq.approval.approved";
     public static final String APPROVAL_REJECTED = "cpq.approval.rejected";
+    public static final String APPROVAL_STEP_DECIDED = "cpq.approval.step.decided";
+    public static final String APPROVAL_OUTCOME_COMPLETED = "cpq.approval.outcome.completed";
     
     // Document Events
     public static final String DOCUMENT_GENERATION_REQUESTED = "cpq.document.generation.requested";
@@ -35,6 +41,7 @@ public final class KafkaTopics {
     
     // Contract/Asset Events
     public static final String SUBSCRIPTION_RENEWAL_ELIGIBLE = "cpq.subscription.renewal.eligible";
+    public static final String CONTRACT_EXECUTED = "cpq.contract.executed";
     public static final String CONTRACT_ACTIVATED = "cpq.contract.activated";
     public static final String ASSET_PROVISIONED = "cpq.asset.provisioned";
 

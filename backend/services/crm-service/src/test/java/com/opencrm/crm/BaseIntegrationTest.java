@@ -1,5 +1,6 @@
 package com.opencrm.crm;
 
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -17,6 +18,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@Tag("docker")
+@Tag("integration")
 public abstract class BaseIntegrationTest {
 
     @Container
@@ -31,6 +34,7 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.url", () -> postgres.getJdbcUrl() + "&currentSchema=crm");
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         // Disable Redis for tests
         registry.add("spring.data.redis.host", () -> "localhost");
         registry.add("spring.data.redis.port", () -> "6379");

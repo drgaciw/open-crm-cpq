@@ -37,7 +37,7 @@ spring:
         - id: crm-service
           uri: ${CRM_SERVICE_URI:http://localhost:8081}
           predicates:
-            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/activities/**
+            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**
           filters:
             - CircuitBreaker=name=crmCircuitBreaker,fallbackUri=forward:/fallback/crm
 
@@ -45,9 +45,35 @@ spring:
         - id: pricing-service
           uri: ${PRICING_SERVICE_URI:http://localhost:8082}
           predicates:
-            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**,/api/v1/price-books/**
+            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**
           filters:
             - CircuitBreaker=name=pricingCircuitBreaker,fallbackUri=forward:/fallback/pricing
+
+        # CPQ gateway aliases delegate pricing commands to the pricing aggregate owner.
+        - id: cpq-pricing-service
+          uri: ${PRICING_SERVICE_URI:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/cpq/pricing/**,/api/v1/cpq/pricing-customers/**,/api/v1/cpq/rule-sets/**,/api/v1/cpq/rules/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>pricing|pricing-customers|rule-sets|rules)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+            - CircuitBreaker=name=pricingCircuitBreaker,fallbackUri=forward:/fallback/pricing
+
+        # Price Book Service routes
+        - id: pricebook-service
+          uri: ${PRICEBOOK_SERVICE_URI:http://localhost:8089}
+          predicates:
+            - Path=/api/v1/price-books/**
+          filters:
+            - CircuitBreaker=name=pricebookCircuitBreaker,fallbackUri=forward:/fallback/pricebook
+
+        # CPQ gateway alias delegates price book commands to the price book aggregate owner.
+        - id: cpq-pricebook-service
+          uri: ${PRICEBOOK_SERVICE_URI:http://localhost:8089}
+          predicates:
+            - Path=/api/v1/cpq/price-books/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>price-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+            - CircuitBreaker=name=pricebookCircuitBreaker,fallbackUri=forward:/fallback/pricebook
 
         # Product Service routes
         - id: product-service
@@ -55,6 +81,16 @@ spring:
           predicates:
             - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
           filters:
+            - CircuitBreaker=name=productCircuitBreaker,fallbackUri=forward:/fallback/product
+
+        # CPQ gateway aliases delegate product, bundle, option, attribute, and configuration
+        # commands to the product aggregate owner.
+        - id: cpq-product-service
+          uri: ${PRODUCT_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
             - CircuitBreaker=name=productCircuitBreaker,fallbackUri=forward:/fallback/product
 
         # Quote Service routes
@@ -65,12 +101,30 @@ spring:
           filters:
             - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
 
+        # CPQ gateway alias delegates quote and approval commands to the quote aggregate owner.
+        - id: cpq-quote-service
+          uri: ${QUOTE_SERVICE_URI:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/cpq/quotes/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>quotes)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+            - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
+
         # Configuration Engine routes
         - id: configuration-engine
           uri: ${CONFIGURATION_ENGINE_URI:http://localhost:8088}
           predicates:
             - Path=/api/v1/configurations/**
           filters:
+            - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+
+        # CPQ gateway alias delegates configuration session commands to the configuration owner.
+        - id: cpq-configuration-engine
+          uri: ${CONFIGURATION_ENGINE_URI:http://localhost:8088}
+          predicates:
+            - Path=/api/v1/cpq/configurations/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>configurations)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
             - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
 
         # Approval Routing routes
@@ -81,12 +135,30 @@ spring:
           filters:
             - CircuitBreaker=name=approvalCircuitBreaker,fallbackUri=forward:/fallback/approval
 
+        # CPQ gateway alias delegates approval workflow commands to the approval owner.
+        - id: cpq-approval-routing
+          uri: ${APPROVAL_ROUTING_URI:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/cpq/approvals/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>approvals)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+            - CircuitBreaker=name=approvalCircuitBreaker,fallbackUri=forward:/fallback/approval
+
         # Document Generation routes
         - id: document-generation
           uri: ${DOCUMENT_GENERATION_URI:http://localhost:8086}
           predicates:
             - Path=/api/v1/documents/**
           filters:
+            - CircuitBreaker=name=documentCircuitBreaker,fallbackUri=forward:/fallback/document
+
+        # CPQ gateway alias delegates document commands to the document generation owner.
+        - id: cpq-document-generation
+          uri: ${DOCUMENT_GENERATION_URI:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/cpq/documents/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>documents)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
             - CircuitBreaker=name=documentCircuitBreaker,fallbackUri=forward:/fallback/document
 
         # Contract/Asset Management routes
@@ -96,6 +168,21 @@ spring:
             - Path=/api/v1/subscriptions/**
           filters:
             - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
+
+        # CPQ gateway alias delegates subscription commands to the contract/asset owner.
+        - id: cpq-contract-asset-management
+          uri: ${CONTRACT_ASSET_MANAGEMENT_URI:http://localhost:8087}
+          predicates:
+            - Path=/api/v1/cpq/subscriptions/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>subscriptions)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+            - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
+
+        # ERP adapter placeholder (S2A-7): agent-contract paths reserved until erp-adapter-service exists
+        - id: erp-stub
+          uri: forward:/fallback/erp/unavailable
+          predicates:
+            - Path=/api/v1/erp/**
 
         # Communication Service routes
         - id: communication-service
@@ -160,6 +247,8 @@ resilience4j:
         baseConfig: default
       pricingCircuitBreaker:
         baseConfig: default
+      pricebookCircuitBreaker:
+        baseConfig: default
       productCircuitBreaker:
         baseConfig: default
       quoteCircuitBreaker:
@@ -217,19 +306,105 @@ spring:
         - id: crm-service
           uri: http://localhost:8081
           predicates:
-            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/activities/**
+            - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**
 
         - id: pricing-service
           uri: http://localhost:8082
           predicates:
-            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**,/api/v1/price-books/**
+            - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**
+
+        - id: cpq-pricing-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/v1/cpq/pricing/**,/api/v1/cpq/pricing-customers/**,/api/v1/cpq/rule-sets/**,/api/v1/cpq/rules/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>pricing|pricing-customers|rule-sets|rules)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: pricebook-service
+          uri: http://localhost:8089
+          predicates:
+            - Path=/api/v1/price-books/**
+
+        - id: cpq-pricebook-service
+          uri: http://localhost:8089
+          predicates:
+            - Path=/api/v1/cpq/price-books/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>price-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
 
         - id: product-service
           uri: http://localhost:8083
           predicates:
             - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
 
+        - id: cpq-product-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
         - id: quote-service
           uri: http://localhost:8084
           predicates:
             - Path=/api/v1/quotes/**
+
+        - id: cpq-quote-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/cpq/quotes/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>quotes)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: configuration-engine
+          uri: http://localhost:8088
+          predicates:
+            - Path=/api/v1/configurations/**
+
+        - id: cpq-configuration-engine
+          uri: http://localhost:8088
+          predicates:
+            - Path=/api/v1/cpq/configurations/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>configurations)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: approval-routing
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/v1/approvals/**
+
+        - id: cpq-approval-routing
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/v1/cpq/approvals/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>approvals)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: document-generation
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/v1/documents/**
+
+        - id: cpq-document-generation
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/v1/cpq/documents/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>documents)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: contract-asset-management
+          uri: http://localhost:8087
+          predicates:
+            - Path=/api/v1/subscriptions/**
+
+        - id: cpq-contract-asset-management
+          uri: http://localhost:8087
+          predicates:
+            - Path=/api/v1/cpq/subscriptions/**
+          filters:
+            - RewritePath=/api/v1/cpq/(?<segment>subscriptions)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: erp-stub
+          uri: forward:/fallback/erp/unavailable
+          predicates:
+            - Path=/api/v1/erp/**

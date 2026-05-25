@@ -5,17 +5,16 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.customer.CustomerRepository;
-import com.opencrm.pricing.pricebook.PriceBook;
-import com.opencrm.pricing.pricebook.PriceBookEntry;
-import com.opencrm.pricing.pricebook.PriceBookEntryRepository;
-import com.opencrm.pricing.pricebook.PriceBookRepository;
-import com.opencrm.pricing.product.PricingProduct;
+import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
+import com.opencrm.pricing.integration.pricebook.ProductEntryResolveDto;
+import com.opencrm.pricing.integration.pricebook.ResolveBatchResponse;
 import com.opencrm.pricing.product.PricingProductRepository;
 import com.opencrm.pricing.rule.RuleRepository;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.customer.CustomerRegion;
 import com.opencrm.pricing.waterfall.*;
+import com.opencrm.rules.drools.DroolsRulesEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,9 +47,7 @@ class PricingExecutionServiceTest {
     @Mock
     private RuleRepository ruleRepository;
     @Mock
-    private PriceBookRepository priceBookRepository;
-    @Mock
-    private PriceBookEntryRepository priceBookEntryRepository;
+    private PriceBookResolutionClient priceBookResolutionClient;
     @Mock
     private PricingAuditLogRepository auditLogRepository;
     @Mock
@@ -59,42 +56,48 @@ class PricingExecutionServiceTest {
     private MetricsCalculator metricsCalculator;
     @Mock
     private ObjectMapper objectMapper;
+    @Mock
+    private DroolsRulesEngine droolsRulesEngine;
 
     @InjectMocks
     private PricingExecutionService executionService;
 
     private PricingContext defaultContext;
     private Customer defaultCustomer;
-    private PriceBook defaultPriceBook;
     private FinancialMetrics defaultMetrics;
+
+    private static ResolveBatchResponse batchWithEntry(BigDecimal listPrice) {
+        return ResolveBatchResponse.builder()
+                .priceBookId(1L)
+                .priceBookCurrency("USD")
+                .entries(Map.of(
+                        "PROD-001",
+                        ProductEntryResolveDto.builder()
+                                .entryMatched(true)
+                                .listPrice(listPrice)
+                                .currency("USD")
+                                .build()))
+                .build();
+    }
 
     @Test
     @DisplayName("execute() should calculate pricing and persist audit log")
     void executeShouldCalculatePricingAndPersistAudit() throws Exception {
-        // Arrange
         doNothing().when(contextValidator).validate(any(PricingContext.class));
         when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
-                .thenReturn(Optional.of(defaultCustomer));
+                .thenReturn(java.util.Optional.of(defaultCustomer));
         when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
                 .thenReturn(new ArrayList<>());
-        when(priceBookRepository.findByRegionAndDeletedFalse("NA"))
-                .thenReturn(Optional.of(defaultPriceBook));
 
-        PriceBookEntry pbEntry = PriceBookEntry.builder()
-                .productExternalId("PROD-001")
-                .listPrice(BigDecimal.valueOf(100.0))
-                .build();
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                1L, "PROD-001")).thenReturn(Optional.of(pbEntry));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
-        // Act
         PricingResult result = executionService.execute(defaultContext);
 
-        // Assert
         assertNotNull(result);
         assertTrue(result.isSuccess());
         assertEquals("APPROVED", result.getApprovalState());
@@ -103,7 +106,7 @@ class PricingExecutionServiceTest {
         PricingLineResult lineResult = result.getLineResults().get(0);
         assertEquals("PROD-001", lineResult.getProductExternalId());
         assertEquals(BigDecimal.valueOf(100.0), lineResult.getListPrice());
-        assertEquals(BigDecimal.valueOf(500.0), lineResult.getFinalPrice()); // 100 * 5 quantity
+        assertEquals(BigDecimal.valueOf(500.0), lineResult.getFinalPrice());
 
         assertNotNull(result.getFinancialMetrics());
         assertNotNull(result.getWaterfall());
@@ -114,29 +117,20 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("simulate() should calculate pricing without persisting audit log")
     void simulateShouldCalculatePricingWithoutAudit() {
-        // Arrange
         doNothing().when(contextValidator).validate(any(PricingContext.class));
         when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
-                .thenReturn(Optional.of(defaultCustomer));
+                .thenReturn(java.util.Optional.of(defaultCustomer));
         when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
                 .thenReturn(new ArrayList<>());
-        when(priceBookRepository.findByRegionAndDeletedFalse("NA"))
-                .thenReturn(Optional.of(defaultPriceBook));
 
-        PriceBookEntry pbEntry = PriceBookEntry.builder()
-                .productExternalId("PROD-001")
-                .listPrice(BigDecimal.valueOf(100.0))
-                .build();
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                1L, "PROD-001")).thenReturn(Optional.of(pbEntry));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
 
-        // Act
         PricingResult result = executionService.simulate(defaultContext);
 
-        // Assert
         assertNotNull(result);
         assertTrue(result.isSuccess());
         verify(auditLogRepository, never()).save(any());
@@ -145,12 +139,10 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("execute() should throw ResourceNotFoundException when customer not found")
     void executeShouldThrowWhenCustomerNotFound() {
-        // Arrange
         doNothing().when(contextValidator).validate(any(PricingContext.class));
         when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
-                .thenReturn(Optional.empty());
+                .thenReturn(java.util.Optional.empty());
 
-        // Act & Assert
         ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> {
             executionService.execute(defaultContext);
         });
@@ -160,19 +152,15 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("execute() should throw BusinessException when no price book found")
     void executeShouldThrowWhenNoPriceBookFound() {
-        // Arrange
         doNothing().when(contextValidator).validate(any(PricingContext.class));
         when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
-                .thenReturn(Optional.of(defaultCustomer));
+                .thenReturn(java.util.Optional.of(defaultCustomer));
         when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
                 .thenReturn(new ArrayList<>());
 
-        when(priceBookRepository.findByRegionAndDeletedFalse("NA"))
-                .thenReturn(Optional.empty());
-        when(priceBookRepository.findByIsDefaultTrueAndDeletedFalse())
-                .thenReturn(Optional.empty());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenThrow(new BusinessException("No price book found", "NO_PRICE_BOOK"));
 
-        // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             executionService.execute(defaultContext);
         });
@@ -182,31 +170,22 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("simulateBulk() should calculate pricing for multiple contexts")
     void simulateBulkShouldCalculateMultipleContexts() {
-        // Arrange
         List<PricingContext> contexts = List.of(defaultContext, defaultContext);
 
         doNothing().when(contextValidator).validate(any(PricingContext.class));
         when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
-                .thenReturn(Optional.of(defaultCustomer));
+                .thenReturn(java.util.Optional.of(defaultCustomer));
         when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
                 .thenReturn(new ArrayList<>());
-        when(priceBookRepository.findByRegionAndDeletedFalse("NA"))
-                .thenReturn(Optional.of(defaultPriceBook));
 
-        PriceBookEntry pbEntry = PriceBookEntry.builder()
-                .productExternalId("PROD-001")
-                .listPrice(BigDecimal.valueOf(100.0))
-                .build();
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                1L, "PROD-001")).thenReturn(Optional.of(pbEntry));
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
 
-        when(metricsCalculator.calculate(any(PricingResult.class), eq(12)))
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
                 .thenReturn(defaultMetrics);
 
-        // Act
         BulkPricingSimulationResponse response = executionService.simulateBulk(contexts);
 
-        // Assert
         assertNotNull(response);
         assertEquals(2, response.getTotalRequests());
         assertEquals(2, response.getSuccessfulRequests());
@@ -218,7 +197,6 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("simulateBulk() should throw when empty list provided")
     void simulateBulkShouldThrowWhenEmpty() {
-        // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             executionService.simulateBulk(new ArrayList<>());
         });
@@ -228,16 +206,13 @@ class PricingExecutionServiceTest {
     @Test
     @DisplayName("getAuditTrail() should return audit logs")
     void getAuditTrailShouldReturnLogs() {
-        // Arrange
         String quoteId = "Q-001";
         PricingAuditLog log = PricingAuditLog.builder().quoteExternalId(quoteId).build();
         when(auditLogRepository.findByQuoteExternalIdOrderByExecutedAtDesc(quoteId))
                 .thenReturn(List.of(log));
 
-        // Act
         List<PricingAuditLog> result = executionService.getAuditTrail(quoteId);
 
-        // Assert
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(quoteId, result.get(0).getQuoteExternalId());
@@ -263,13 +238,7 @@ class PricingExecutionServiceTest {
                 .externalId("CUST-001")
                 .name("Acme Corp")
                 .region(CustomerRegion.NA)
-                .build();
-
-        defaultPriceBook = PriceBook.builder()
-                .id(1L)
-                .name("NA Standard")
-                .region("NA")
-                .isDefault(false)
+                .churnScore(72)
                 .build();
 
         defaultMetrics = FinancialMetrics.builder()
@@ -277,7 +246,9 @@ class PricingExecutionServiceTest {
                 .tcv(BigDecimal.valueOf(6000))
                 .acv(BigDecimal.valueOf(6000))
                 .clv(BigDecimal.valueOf(12000))
+                .churnScore(72)
+                .discountRate(BigDecimal.ZERO)
+                .priceMultiplier(BigDecimal.ONE)
                 .build();
     }
-
 }

@@ -6,6 +6,7 @@ import {
   OrganizationCreateRequest,
   OrganizationUpdateRequest,
   PaginationMeta,
+  ContactDto,
 } from '@frontend/shared-models';
 
 /**
@@ -36,6 +37,10 @@ export class OrganizationService {
     totalElements: 0,
     totalPages: 0,
   });
+
+  /** Contacts for the organization detail view (GET .../organizations/:id/contacts). */
+  readonly organizationContacts = signal<ContactDto[]>([]);
+  readonly organizationContactsLoading = signal(false);
 
   readonly isEmpty = computed(() => this.organizations().length === 0 && !this.loading());
 
@@ -109,6 +114,28 @@ export class OrganizationService {
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
         }
+      });
+  }
+
+  /**
+   * GET /api/v1/organizations/{id}/contacts
+   */
+  loadOrganizationContacts(organizationId: number, page = 0, size = 50): void {
+    this.error.set(null);
+    this.organizationContactsLoading.set(true);
+    const params = new HttpParams()
+      .set('page', String(page))
+      .set('size', String(size))
+      .set('sort', 'createdAt,desc');
+    this.http
+      .get<ContactDto[]>(`${this.basePath}/${organizationId}/contacts`, { params })
+      .pipe(finalize(() => this.organizationContactsLoading.set(false)))
+      .subscribe({
+        next: (rows) => this.organizationContacts.set(rows),
+        error: (err) => {
+          this.organizationContacts.set([]);
+          this.error.set(err?.error?.message || 'An error occurred');
+        },
       });
   }
 }

@@ -5,10 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
-import com.opencrm.quote.event.QuoteAcceptedEvent;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
@@ -205,23 +205,21 @@ public class QuoteService {
         }
 
         quote.setStatus(QuoteStatus.ACCEPTED);
+        quote.setAcceptedAt(Instant.now());
+        quote.recalculateTotals();
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
-        eventPublisher.publishQuoteAccepted(QuoteAcceptedEvent.builder()
-                .quoteNumber(saved.getQuoteNumber())
-                .quoteUuid(saved.getUuid())
-                .customerExternalId(saved.getCustomerExternalId())
-                .dealExternalId(saved.getDealExternalId())
-                .dealType(saved.getDealType().name())
-                .totalAmount(saved.getTotalAmount())
-                .arr(saved.getArr())
-                .tcv(saved.getTcv())
-                .acv(saved.getAcv())
-                .currency(saved.getCurrency())
-                .durationInMonths(saved.getDurationInMonths())
-                .acceptedAt(Instant.now())
-                .build());
+        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
+
+        QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
+        outboxEventPublisher.publish(
+                "Quote",
+                saved.getQuoteNumber(),
+                KafkaTopics.QUOTE_STATUS_ACCEPTED,
+                kafkaEvent
+        );
 
         return quoteMapper.toDto(saved);
     }

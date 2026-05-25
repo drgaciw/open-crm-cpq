@@ -2,6 +2,7 @@ package com.opencrm.quote.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,16 +19,16 @@ public class QuoteEventPublisher {
 
     public static final String QUOTE_ACCEPTED_CHANNEL = "quote:accepted";
 
-    public void publishQuoteAccepted(QuoteAcceptedEvent event) {
+    public void publishQuoteAccepted(QuoteAcceptedCrmMessage event) {
         try {
             String message = objectMapper.writeValueAsString(event);
             redisTemplate.convertAndSend(QUOTE_ACCEPTED_CHANNEL, message);
-            log.info("Published QuoteAcceptedEvent for quote: {}", event.getQuoteNumber());
+            log.info("Published QuoteAcceptedCrmMessage for quote: {}", event.getQuoteNumber());
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize QuoteAcceptedEvent for quote: {}", event.getQuoteNumber(), e);
+            log.error("Failed to serialize QuoteAcceptedCrmMessage for quote: {}", event.getQuoteNumber(), e);
             throw new BusinessException("Failed to publish quote accepted event: serialization error", "EVENT_PUBLISH_FAILED");
         } catch (Exception e) {
-            log.error("Failed to publish QuoteAcceptedEvent for quote: {}", event.getQuoteNumber(), e);
+            log.error("Failed to publish QuoteAcceptedCrmMessage for quote: {}", event.getQuoteNumber(), e);
             throw new BusinessException("Failed to publish quote accepted event", "EVENT_PUBLISH_FAILED");
         }
     }

@@ -34,17 +34,10 @@ class DroolsRuleCompilerTest {
                 end
                 """;
 
-        List<RuleDefinition> rules = new ArrayList<>();
-        rules.add(RuleDefinition.builder()
-                .id("rule-1")
-                .name("Rule 1")
-                .content(ruleContent1)
-                .build());
-        rules.add(RuleDefinition.builder()
-                .id("rule-2")
-                .name("Rule 2")
-                .content(ruleContent2)
-                .build());
+        List<RuleDefinition> rules = List.of(
+                createRule("rule-1", "Rule 1", ruleContent1),
+                createRule("rule-2", "Rule 2", ruleContent2)
+        );
 
         KieBase kieBase = compiler.compileRules(rules);
 
@@ -53,12 +46,9 @@ class DroolsRuleCompilerTest {
 
     @Test
     void compileRules_ThrowsExceptionWhenRuleContentIsNull() {
-        List<RuleDefinition> rules = new ArrayList<>();
-        rules.add(RuleDefinition.builder()
-                .id("rule-null")
-                .name("Null Content Rule")
-                .content(null)
-                .build());
+        List<RuleDefinition> rules = List.of(
+                createRule("rule-null", "Null Content Rule", null)
+        );
 
         assertThatThrownBy(() -> compiler.compileRules(rules))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -67,12 +57,9 @@ class DroolsRuleCompilerTest {
 
     @Test
     void compileRules_ThrowsExceptionWhenRuleContentIsEmpty() {
-        List<RuleDefinition> rules = new ArrayList<>();
-        rules.add(RuleDefinition.builder()
-                .id("rule-empty")
-                .name("Empty Content Rule")
-                .content("")
-                .build());
+        List<RuleDefinition> rules = List.of(
+                createRule("rule-empty", "Empty Content Rule", "")
+        );
 
         assertThatThrownBy(() -> compiler.compileRules(rules))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -90,12 +77,9 @@ class DroolsRuleCompilerTest {
                 end
                 """;
 
-        List<RuleDefinition> rules = new ArrayList<>();
-        rules.add(RuleDefinition.builder()
-                .id("rule-invalid")
-                .name("Invalid Rule")
-                .content(invalidRuleContent)
-                .build());
+        List<RuleDefinition> rules = List.of(
+                createRule("rule-invalid", "Invalid Rule", invalidRuleContent)
+        );
 
         assertThatThrownBy(() -> compiler.compileRules(rules))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -131,5 +115,13 @@ class DroolsRuleCompilerTest {
         assertThatThrownBy(() -> compiler.compileFromDrlString(invalidDrl))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Failed to compile DRL");
+    }
+
+    private RuleDefinition createRule(String id, String name, String content) {
+        return RuleDefinition.builder()
+                .id(id)
+                .name(name)
+                .content(content)
+                .build();
     }
 }

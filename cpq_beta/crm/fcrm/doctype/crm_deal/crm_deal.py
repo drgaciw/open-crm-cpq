@@ -27,6 +27,20 @@ class CRMDeal(Document):
 		if self.deal_owner:
 			self.assign_agent(self.deal_owner)
 
+	def before_insert(self):
+		self.set_organization_and_contact()
+
+	def set_organization_and_contact(self):
+		if not self.organization and self.get("organization_name"):
+			self.organization = create_organization(self.as_dict())
+
+		contact = self.get("contact")
+		if not contact and (self.get("first_name") or self.get("last_name") or self.get("email") or self.get("mobile_no")):
+			contact = create_contact(self.as_dict())
+
+		if contact and not any(d.contact == contact for d in self.get("contacts", [])):
+			self.append("contacts", {"contact": contact, "is_primary": 1})
+
 	def before_save(self):
 		self.apply_sla()
 
@@ -90,16 +104,16 @@ class CRMDeal(Document):
 			fields=["name", "user"],
 		)
 
-		# Bolt Optimization: Avoid redundant N+1 frappe.db.exists check inside the loop by checking against fetched users
-		shared_users = {d.user for d in docshares}
+		# Bolt Optimization: O(1) set lookup replaces N+1 frappe.db.exists() calls
+		existing_users = {d.user for d in docshares}
+		shared_with = [d.user for d in docshares] + [agent]
 
-		if agent not in shared_users:
-			frappe.share.add_docshare(
-				self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
-			)
-
-		for user in shared_users:
-			if user != agent:
+		for user in shared_with:
+			if user == agent and agent not in existing_users:
+				frappe.share.add_docshare(
+					self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
+				)
+			elif user != agent:
 				frappe.share.remove(self.doctype, self.name, user)
 
 
@@ -252,16 +266,17 @@ def create_organization(doc):
 	return organization.name
 
 def contact_exists(doc):
-	# Bolt Optimization: Short-circuit frappe.db.get_value calls instead of multiple exists() followed by get_value()
-	if doc.get("email"):
-		contact = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "parent")
-		if contact:
-			return contact
+	contact = None
 
-	if doc.get("mobile_no"):
+	# Bolt Optimization: Replaced 2 consecutive unconditional exists checks with short-circuited get_value queries
+	if not contact and doc.get("email"):
+		contact = frappe.db.get_value("Contact Email", {"email_id": doc.get("email")}, "parent")
+
+	if not contact and doc.get("mobile_no"):
 		contact = frappe.db.get_value("Contact Phone", {"phone": doc.get("mobile_no")}, "parent")
-		if contact:
-			return contact
+
+	if contact:
+		return contact
 
 	return False
 
@@ -290,23 +305,3 @@ def create_contact(doc):
 	contact.reload()  # load changes by hooks on contact
 
 	return contact.name
-
-@frappe.whitelist()
-def create_deal(args):
-	if not frappe.has_permission("CRM Deal", "create"):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-
-	deal = frappe.new_doc("CRM Deal")
-
-	contact = args.get("contact")
-	if not contact and (args.get("first_name") or args.get("last_name") or args.get("email") or args.get("mobile_no")):
-		contact = create_contact(args)
-
-	deal.update({
-		"organization": args.get("organization") or create_organization(args),
-		"contacts": [{"contact": contact, "is_primary": 1}] if contact else [],
-		"deal_owner": args.get("deal_owner"),
-		"status": args.get("status"),
-	})
-	deal.insert()
-	return deal.name

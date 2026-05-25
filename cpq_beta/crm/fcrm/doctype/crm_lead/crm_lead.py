@@ -1,6 +1,5 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
-import json
 
 import frappe
 from frappe import _
@@ -89,16 +88,16 @@ class CRMLead(Document):
 			fields=["name", "user"],
 		)
 
-		# Bolt Optimization: Avoid redundant N+1 frappe.db.exists check inside the loop by checking against fetched users
-		shared_users = {d.user for d in docshares}
+		# Bolt Optimization: O(1) set lookup replaces N+1 frappe.db.exists() calls
+		existing_users = {d.user for d in docshares}
+		shared_with = [d.user for d in docshares] + [agent]
 
-		if agent not in shared_users:
-			frappe.share.add_docshare(
-				self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
-			)
-
-		for user in shared_users:
-			if user != agent:
+		for user in shared_with:
+			if user == agent and agent not in existing_users:
+				frappe.share.add_docshare(
+					self.doctype, self.name, agent, write=1, flags={"ignore_share_permission": True}
+				)
+			elif user != agent:
 				frappe.share.remove(self.doctype, self.name, user)
 
 	def create_contact(self, throw=True):
@@ -158,28 +157,37 @@ class CRMLead(Document):
 		return organization.name
 
 	def contact_exists(self, throw=True):
-		# Bolt Optimization: Short-circuit frappe.db.get_value calls instead of multiple exists() followed by get_value()
 		contact = None
-		if self.email:
+		text = ""
+		data = ""
+
+		# Bolt Optimization: Replaced 3 consecutive unconditional exists checks with short-circuited get_value queries
+		if not contact and self.email:
 			contact = frappe.db.get_value("Contact Email", {"email_id": self.email}, "parent")
 			if contact:
-				if throw:
-					frappe.throw(_("Contact already exists with Email: {0}").format(self.email), title=_("Contact Already Exists"))
-				return contact
+				text = "Email"
+				data = self.email
 
-		if self.phone:
+		if not contact and self.phone:
 			contact = frappe.db.get_value("Contact Phone", {"phone": self.phone}, "parent")
 			if contact:
-				if throw:
-					frappe.throw(_("Contact already exists with Phone: {0}").format(self.phone), title=_("Contact Already Exists"))
-				return contact
+				text = "Phone"
+				data = self.phone
 
-		if self.mobile_no:
+		if not contact and self.mobile_no:
 			contact = frappe.db.get_value("Contact Phone", {"phone": self.mobile_no}, "parent")
 			if contact:
-				if throw:
-					frappe.throw(_("Contact already exists with Mobile No: {0}").format(self.mobile_no), title=_("Contact Already Exists"))
-				return contact
+				text = "Mobile No"
+				data = self.mobile_no
+
+		if contact:
+			if throw:
+				value = "{0}: {1}".format(text, data)
+				frappe.throw(
+					_("Contact already exists with {0}").format(value),
+					title=_("Contact Already Exists"),
+				)
+			return contact
 
 		return False
 

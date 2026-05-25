@@ -2,6 +2,21 @@
 
 A Spring Boot 3.2 microservices backend for CRM and CPQ operations, built with Java 21.
 
+## Stacked pull requests (Graphite)
+
+Use [Graphite](https://graphite.dev) for dependent PR chains against `main`. Conventions and commands: [docs/GRAPHITE_STACKED_PRS.md](../docs/GRAPHITE_STACKED_PRS.md).
+
+## Shared libraries (verify first)
+
+Before merging service changes that depend on shared types or rules, run:
+
+```bash
+cd backend
+.\mvnw.cmd -B verify --no-transfer-progress -pl libs/common,libs/security,libs/rules-engine -am
+```
+
+Module list and rationale: [libs/README.md](libs/README.md).
+
 ## Architecture
 
 ```
@@ -9,6 +24,7 @@ backend/
   libs/
     common/          # Shared entities, DTOs, exceptions, utilities
     security/        # JWT auth, UserContext, SecurityUtils
+    rules-engine/    # Drools/OpenL rule engine helpers
   services/
     crm-service/     # CRM API (Contacts, Organizations, Leads, Deals) - port 8081
     gateway-service/ # API Gateway with routing & circuit breakers   - port 8080
@@ -126,20 +142,49 @@ Environment variables for production:
 
 ## Running Tests
 
-Integration tests use **TestContainers** with PostgreSQL 16. Docker must be accessible:
+Fast unit-only verification excludes Docker-backed tests:
 
 ```bash
-mvn test -pl services/crm-service -am
+mvn verify -Punit-tests -pl services/crm-service -am
 ```
 
-**Windows (Docker Desktop)**: If TestContainers can't find Docker, create `~/.testcontainers.properties`:
+Integration tests use **Testcontainers** with PostgreSQL 16. Docker must be accessible:
+
+```bash
+mvn verify -Pintegration-tests -pl services/crm-service -am
+```
+
+The `integration-tests` profile preserves full Maven verification and coverage gates. To run only the integration-tagged Testcontainers tests while diagnosing Docker readiness:
+
+```bash
+mvn test -Dgroups=integration -pl services/crm-service -am
+```
+
+**Windows (Docker Desktop)**: before running integration tests, verify Docker Desktop is running with the Linux engine:
+
+```powershell
+docker version
+docker info --format '{{.ServerVersion}}'
+docker context ls
+Test-Path '\\.\pipe\dockerDesktopLinuxEngine'
+```
+
+If Docker CLI works but Testcontainers cannot find Docker, start Docker Desktop, confirm Linux containers are enabled, clear stale Docker host overrides, and retry before adding an explicit host:
+
+```powershell
+Remove-Item Env:\DOCKER_HOST -ErrorAction SilentlyContinue
+```
+
+If auto-detection still fails, create `%USERPROFILE%\.testcontainers.properties`:
+
 ```properties
 docker.host=npipe:////./pipe/dockerDesktopLinuxEngine
 ```
 
-Or set the environment variable:
-```bash
-export DOCKER_HOST=npipe:////./pipe/dockerDesktopLinuxEngine
+Or set the environment variable for the current PowerShell session:
+
+```powershell
+$env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 ```
 
 ## Tech Stack

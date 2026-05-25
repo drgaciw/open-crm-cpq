@@ -10,7 +10,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Quote line item fact for rules engine evaluation.
+ * Quote line item fact for rules engine evaluation in pricing-service Drools rules.
+ * Bindings: {@code lineItemType}, {@code quantity}, {@code listPrice}, {@code quote}.
  */
 @Data
 @Builder

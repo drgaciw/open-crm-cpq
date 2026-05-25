@@ -84,6 +84,8 @@ logging:
 opencrm:
   rules:
     enabled: true
+  pricebook:
+    base-url: ${PRICEBOOK_SERVICE_URL:http://localhost:8089}
 
 ---
 # Development profile

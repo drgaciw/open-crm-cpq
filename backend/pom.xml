@@ -25,6 +25,7 @@
         <module>services/crm-service</module>
         <module>services/gateway-service</module>
         <module>services/pricing-service</module>
+        <module>services/pricebook-service</module>
         <module>services/product-service</module>
         <module>services/quote-service</module>
         <module>services/ai-service</module>
@@ -75,6 +76,7 @@
 
         <!-- Testing -->
         <testcontainers.version>1.19.3</testcontainers.version>
+        <jacoco.skip>false</jacoco.skip>
     </properties>
 
     <dependencyManagement>
@@ -177,5 +179,21 @@
             </snapshots>
         </repository>
     </repositories>
+
+    <profiles>
+        <profile>
+            <id>unit-tests</id>
+            <properties>
+                <excludedGroups>integration</excludedGroups>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <jacoco.skip>false</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
 
 </project>

@@ -149,7 +149,7 @@ def update_recording_info(**kwargs):
 		call_sid = args.CallSid
 		update_call_log(call_sid)
 		frappe.db.set_value("CRM Call Log", call_sid, "recording_url", recording_url)
-	except Exception:
+	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), title=_("Failed to capture Twilio recording"))
 
 @frappe.whitelist(allow_guest=True)
@@ -179,7 +179,7 @@ def update_call_status_info(**kwargs):
 		client.calls(args.ParentCallSid).user_defined_messages.create(
 			content=json.dumps(call_info)
 		)
-	except Exception:
+	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), title=_("Failed to update Twilio call status"))
 
 def get_datetime_from_timestamp(timestamp):
@@ -221,15 +221,27 @@ def get_lead_or_deal_from_number(call):
 		if not mobile_no:
 			return None
 
-		query = f"""
+		data = []
+		if doctype == "CRM Deal":
+			data = frappe.db.sql("""
 			SELECT name
-			FROM `tab{doctype}`
+			FROM `tabCRM Deal`
 			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		"""
-		if only_unconverted and doctype == "CRM Lead":
-			query += "\nAND converted is not True"
-
-		data = frappe.db.sql(query, {"mobile_no": mobile_no}, as_dict=True)
+		""", {"mobile_no": mobile_no}, as_dict=True)
+		elif doctype == "CRM Lead":
+			if only_unconverted:
+				data = frappe.db.sql("""
+			SELECT name
+			FROM `tabCRM Lead`
+			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+			AND converted is not True
+		""", {"mobile_no": mobile_no}, as_dict=True)
+			else:
+				data = frappe.db.sql("""
+			SELECT name
+			FROM `tabCRM Lead`
+			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+		""", {"mobile_no": mobile_no}, as_dict=True)
 		return data[0].name if data else None
 
 	doctype = "CRM Deal"

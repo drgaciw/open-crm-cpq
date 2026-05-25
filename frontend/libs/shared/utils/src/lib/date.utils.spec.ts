@@ -67,6 +67,39 @@ describe('date.utils', () => {
       const date = new Date('2020-03-15T12:00:00.000Z'); // 4 years ago
       expect(timeAgo(date.toISOString())).toBe('4 years ago');
     });
+
+    it('should return "just now" for future dates', () => {
+      const date = new Date('2024-03-16T12:00:00.000Z'); // 1 day in the future
+      expect(timeAgo(date.toISOString())).toBe('just now');
+    });
+
+    it('should return "Invalid Date" for invalid dates', () => {
+      expect(timeAgo('invalid-date')).toBe('Invalid Date');
+    });
+
+    it('should handle leap February month length (29 days)', () => {
+      // 2024 is a leap year. From Mar 15, Feb 15 is exactly 29 days ago.
+      // 29 days = 2505600 seconds, which is less than 2592000 (30 days),
+      // so the logic uses the days block.
+      const date = new Date('2024-02-15T12:00:00.000Z'); // 29 days ago
+      expect(timeAgo(date.toISOString())).toBe('29 days ago');
+    });
+
+    it('should handle long month length (31 days)', () => {
+      // From Mar 15, Jan 14 is 61 days ago (Jan has 31 days).
+      // 61 days = 5270400 seconds, which is >= 2592000 (30 days),
+      // so the logic uses the months block: Math.floor(5270400 / 2592000) = 2.
+      const date = new Date('2024-01-14T12:00:00.000Z'); // 61 days ago
+      expect(timeAgo(date.toISOString())).toBe('2 months ago');
+    });
+
+    it('should return "1 year ago" for a leap year duration (366 days)', () => {
+      // 2024 is a leap year, so from Mar 15 2024 to Mar 15 2023 is 366 days.
+      // 366 days = 31622400 seconds, which is >= 31536000 (365 days),
+      // so it falls to the years block.
+      const date = new Date('2023-03-15T12:00:00.000Z'); // 366 days ago
+      expect(timeAgo(date.toISOString())).toBe('1 year ago');
+    });
   });
 
   describe('formatDate', () => {

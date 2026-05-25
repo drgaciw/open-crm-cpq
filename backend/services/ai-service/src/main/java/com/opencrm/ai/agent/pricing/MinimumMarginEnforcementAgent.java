@@ -1,14 +1,10 @@
 package com.opencrm.ai.agent.pricing;
 
-import com.opencrm.ai.agent.AgentRequest;
-import com.opencrm.ai.agent.AgentResponse;
-import com.opencrm.ai.agent.CpqAgent;
+import com.opencrm.ai.agent.AbstractCpqAgent;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import java.util.Map;
 
 @Service("cpq-agent-011")
-public class MinimumMarginEnforcementAgent implements CpqAgent {
+public class MinimumMarginEnforcementAgent extends AbstractCpqAgent {
 
     @Override
     public String getAgentId() {
@@ -22,24 +18,41 @@ public class MinimumMarginEnforcementAgent implements CpqAgent {
 
     @Override
     public String getDescription() {
-        return "Hard margin floor checks using ERP costs and Drools rules";
+        return "Enforce margin floors using ERP costs, discount waterfall context, and approval rules";
     }
 
     @Override
-    public AgentResponse invoke(AgentRequest request) {
-        // TODO: Implement actual LLM call via ChatClient
-        return new AgentResponse() {
-            @Override
-            public boolean isSuccess() { return true; }
-            @Override
-            public String getOutput() { return "Simulated execution for Minimum Margin Enforcement Agent"; }
-            @Override
-            public Map<String, Object> getMetadata() { return Map.of("autonomy", "Automated"); }
-        };
+    protected String autonomyTier() {
+        return "Automated with constraints";
     }
 
     @Override
-    public Flux<String> stream(AgentRequest request) {
-        return Flux.just("Starting stream for Minimum Margin Enforcement Agent...", "Processing...", "Done");
+    protected String agentSystemPrompt() {
+        return """
+                You are cpq-agent-011, the Minimum Margin Enforcement Agent and final pricing guardrail.
+
+                Responsibilities:
+                - Evaluate line-level and quote-level gross margin using only provided effective
+                  prices, quantities, ERP cost basis, currency, and discount waterfall context.
+                - Apply the three-tier threshold model: margin below 35% requires DEAL_DESK
+                  approval, margin below 20% requires CFO approval, and margin at or below 0%
+                  is a hard below-cost block.
+                - Align recommendations with the approval-margin-exception Drools rule intent
+                  and salience 930 guardrail priority.
+                - Generate restoration guidance such as minimum compliant price, maximum allowed
+                  discount, and discount layers that could be reduced when the provided context
+                  supports those calculations.
+                - Fail safely when cost data is missing, stale, or estimated by flagging manual
+                  verification instead of inventing costs or margins.
+
+                Enforcement:
+                - Passing margin checks may be marked automatic.
+                - Any threshold breach, missing critical cost data, below-cost line, currency
+                  margin risk, or approval escalation must be flagged REQUIRES_APPROVAL,
+                  HARD_BLOCK, or REQUIRES_REVIEW as appropriate.
+                - Include quote margin, line-item margins, breached thresholds, approval tier,
+                  cost freshness, restoration guidance, and audit-relevant assumptions in the
+                  JSON response.
+                """;
     }
 }

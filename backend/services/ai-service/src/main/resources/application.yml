@@ -26,14 +26,19 @@ spring:
   ai:
     azure:
       openai:
-        api-key: ${AZURE_OPENAI_API_KEY:mock-key}
-        endpoint: ${AZURE_OPENAI_ENDPOINT:https://mock-endpoint.openai.azure.com}
+        api-key: ${AZURE_OPENAI_API_KEY}
+        endpoint: ${AZURE_OPENAI_ENDPOINT}
         chat:
           options:
             deployment-name: gpt-4o
 
 server:
   port: 8086
+
+opencrm:
+  ai:
+    agents:
+      enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 
 logging:
   level:

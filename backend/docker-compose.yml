@@ -6,8 +6,8 @@ services:
     image: postgres:16-alpine
     container_name: opencrm-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-opencrm}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: opencrm
     ports:
       - "5432:5432"
@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-opencrm}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,17 +44,17 @@ services:
       - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=crm
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: crm
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      SECURITY_OPEN: "true"
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_OPEN: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,6 +62,34 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # Price Book Service
+  pricebook-service:
+    build:
+      context: ./services/pricebook-service
+      dockerfile: Dockerfile
+    container_name: opencrm-pricebook-service
+    ports:
+      - "8089:8089"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_OPEN: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8089/actuator/health"]
       interval: 10s
       timeout: 5s
       start_period: 40s
@@ -77,23 +105,26 @@ services:
       - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=pricing
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: pricing
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      SECURITY_OPEN: "true"
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      PRICEBOOK_SERVICE_URL: http://pricebook-service:8089
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      pricebook-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
@@ -112,17 +143,17 @@ services:
       - "8083:8083"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=product
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: product
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      SECURITY_OPEN: "true"
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -147,17 +178,17 @@ services:
       - "8084:8084"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opencrm?currentSchema=quote
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opencrm}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: quote
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm
-      DB_USERNAME: ${POSTGRES_USER:-opencrm}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      SECURITY_OPEN: "true"
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PRICING_SERVICE_URL: http://pricing-service:8082
@@ -189,6 +220,7 @@ services:
     environment:
       CRM_SERVICE_URI: http://crm-service:8081
       PRICING_SERVICE_URI: http://pricing-service:8082
+      PRICEBOOK_SERVICE_URI: http://pricebook-service:8089
       PRODUCT_SERVICE_URI: http://product-service:8083
       QUOTE_SERVICE_URI: http://quote-service:8084
       SPRING_DATA_REDIS_HOST: redis
@@ -200,6 +232,8 @@ services:
       crm-service:
         condition: service_healthy
       pricing-service:
+        condition: service_healthy
+      pricebook-service:
         condition: service_healthy
       product-service:
         condition: service_healthy
@@ -219,8 +253,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: opencrm-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@opencrm.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     ports:
       - "5050:80"
     depends_on:
