@@ -46,6 +46,15 @@ class PercentageTest {
     }
 
     @Test
+    @DisplayName("should detect if percentage is negative")
+    void isNegative() {
+        assertTrue(Percentage.of(-5.0).isNegative());
+        assertTrue(Percentage.of(new BigDecimal("-0.01")).isNegative());
+        assertFalse(Percentage.zero().isNegative());
+        assertFalse(Percentage.of(5.0).isNegative());
+    }
+
+    @Test
     @DisplayName("should detect positive, negative, zero")
     void signDetection() {
         assertTrue(Percentage.of(10).isPositive());
