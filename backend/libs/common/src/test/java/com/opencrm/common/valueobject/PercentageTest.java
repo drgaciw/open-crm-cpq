@@ -41,8 +41,26 @@ class PercentageTest {
     void subtract() {
         Percentage a = Percentage.of(20.0);
         Percentage b = Percentage.of(8.0);
+
+        // Positive minus positive
         Percentage result = a.subtract(b);
         assertEquals(new BigDecimal("12.0000"), result.getValue());
+
+        // Resulting in negative
+        Percentage resultNegative = b.subtract(a);
+        assertEquals(new BigDecimal("-12.0000"), resultNegative.getValue());
+
+        // Subtracting negative
+        Percentage negative = Percentage.of(-5.0);
+        Percentage resultAdd = a.subtract(negative);
+        assertEquals(new BigDecimal("25.0000"), resultAdd.getValue());
+
+        // Subtracting zero
+        Percentage resultZero = a.subtract(Percentage.zero());
+        assertEquals(new BigDecimal("20.0000"), resultZero.getValue());
+
+        // Null parameter
+        assertThrows(NullPointerException.class, () -> a.subtract(null));
     }
 
     @Test
