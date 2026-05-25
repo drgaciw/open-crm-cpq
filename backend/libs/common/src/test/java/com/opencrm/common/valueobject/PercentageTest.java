@@ -65,6 +65,10 @@ class PercentageTest {
     @Test
     @DisplayName("should reject null value")
     void rejectNull() {
-        assertThrows(IllegalArgumentException.class, () -> new Percentage((BigDecimal) null));
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new Percentage((BigDecimal) null)
+        );
+        assertEquals("Percentage value cannot be null", exception.getMessage());
     }
 }
