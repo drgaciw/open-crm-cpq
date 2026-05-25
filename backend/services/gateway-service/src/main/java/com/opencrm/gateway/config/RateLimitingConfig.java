@@ -1,10 +1,11 @@
 package com.opencrm.gateway.config;
 
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
+import org.springframework.cloud.gateway.support.ipresolver.XForwardedRemoteAddressResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.InetSocketAddress;
@@ -15,6 +16,8 @@ import java.net.InetSocketAddress;
 @Configuration
 public class RateLimitingConfig {
 
+    private final XForwardedRemoteAddressResolver remoteAddressResolver = XForwardedRemoteAddressResolver.maxTrustedIndex(1);
+
     /**
      * Resolve a stable key per caller (authenticated user when available, else client IP).
      */
@@ -24,23 +27,14 @@ public class RateLimitingConfig {
                 .map(principal -> principal.getName())
                 .filter(StringUtils::hasText)
                 .map(name -> "user:" + name)
-                .switchIfEmpty(Mono.fromSupplier(() -> "ip:" + resolveClientIp(exchange.getRequest().getHeaders(),
-                        exchange.getRequest().getRemoteAddress())));
+                .switchIfEmpty(Mono.fromSupplier(() -> "ip:" + resolveClientIp(exchange)));
     }
 
-    private String resolveClientIp(HttpHeaders headers, InetSocketAddress remoteAddress) {
-        String forwardedFor = headers.getFirst("X-Forwarded-For");
-        if (StringUtils.hasText(forwardedFor)) {
-            String first = forwardedFor.split(",")[0].trim();
-            if (StringUtils.hasText(first)) {
-                return first;
-            }
-        }
-
+    private String resolveClientIp(ServerWebExchange exchange) {
+        InetSocketAddress remoteAddress = remoteAddressResolver.resolve(exchange);
         if (remoteAddress != null && remoteAddress.getAddress() != null) {
             return remoteAddress.getAddress().getHostAddress();
         }
-
         return "anonymous";
     }
 }
