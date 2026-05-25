@@ -54,24 +54,67 @@ def notify_agent(doc):
             )
         )
 
+        import uuid
+        from frappe.utils import now_datetime
+
+        new_notifications = []
+        now = now_datetime()
         for user in assigned_users:
             if user in existing_notifications:
                 continue
 
-            values = frappe._dict(
-                doctype="CRM Notification",
-                from_user=doc.owner,
-                to_user=user,
-                type="WhatsApp",
-                message=doc.message,
-                notification_text=notification_text,
-                notification_type_doctype="WhatsApp Message",
-                notification_type_doc=doc.name,
-                reference_doctype=doc.reference_doctype,
-                reference_name=doc.reference_name,
+            new_notifications.append(
+                (
+                    (
+                        frappe.generate_hash(length=10)
+                        if hasattr(frappe, "generate_hash")
+                        else str(uuid.uuid4())[:10]
+                    ),
+                    now,
+                    now,
+                    doc.owner,
+                    doc.owner,
+                    doc.owner,
+                    user,
+                    "WhatsApp",
+                    doc.message,
+                    notification_text,
+                    "WhatsApp Message",
+                    doc.name,
+                    doc.reference_doctype,
+                    doc.reference_name,
+                )
             )
 
-            frappe.get_doc(values).insert(ignore_permissions=True)
+        if new_notifications:
+            frappe.db.bulk_insert(
+                "CRM Notification",
+                fields=[
+                    "name",
+                    "creation",
+                    "modified",
+                    "modified_by",
+                    "owner",
+                    "from_user",
+                    "to_user",
+                    "type",
+                    "message",
+                    "notification_text",
+                    "notification_type_doctype",
+                    "notification_type_doc",
+                    "reference_doctype",
+                    "reference_name",
+                ],
+                values=new_notifications,
+                ignore_duplicates=True,
+            )
+            # Since bulk_insert bypasses hooks, we manually trigger real-time updates for these notifications.
+            for n in new_notifications:
+                frappe.publish_realtime(
+                    "notification",
+                    {"type": "WhatsApp", "message": notification_text},
+                    user=n[6],  # n[6] is to_user
+                )
 
 
 def get_lead_or_deal_from_number(number):
