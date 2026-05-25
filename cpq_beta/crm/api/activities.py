@@ -10,11 +10,11 @@ from frappe.desk.form.load import get_docinfo
 def get_activities(name):
     if frappe.db.exists("CRM Deal", name):
         if not frappe.has_permission("CRM Deal", "read", name):
-            frappe.throw(_("Not permitted"), frappe.PermissionError)
+            frappe.throw(_("Document not found"), frappe.DoesNotExistError)
         return get_deal_activities(name)
     elif frappe.db.exists("CRM Lead", name):
         if not frappe.has_permission("CRM Lead", "read", name):
-            frappe.throw(_("Not permitted"), frappe.PermissionError)
+            frappe.throw(_("Document not found"), frappe.DoesNotExistError)
         return get_lead_activities(name)
     else:
         frappe.throw(_("Document not found"), frappe.DoesNotExistError)

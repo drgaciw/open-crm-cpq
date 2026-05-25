@@ -21,6 +21,19 @@ public final class CpqGatewayRoutes {
             "cpq-contract-asset-management"
     );
 
+    /**
+     * Legacy {@code /api/v1/...} routes from CPQ_API_CONTRACT_MATRIX §9 (agent-critical prefixes).
+     */
+    public static final List<String> AGENT_CONTRACT_ROUTE_IDS = List.of(
+            "crm-service",
+            "pricing-service",
+            "product-service",
+            "quote-service",
+            "configuration-engine",
+            "approval-routing",
+            "erp-stub"
+    );
+
     private CpqGatewayRoutes() {
     }
 }
