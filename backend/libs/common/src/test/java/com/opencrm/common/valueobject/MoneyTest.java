@@ -77,10 +77,37 @@ class MoneyTest {
         @Test
         @DisplayName("should add two Money values")
         void add() {
-            Money a = Money.usd(BigDecimal.valueOf(10.50));
-            Money b = Money.usd(BigDecimal.valueOf(20.30));
+            Money a = Money.usd(new BigDecimal("10.50"));
+            Money b = Money.usd(new BigDecimal("20.30"));
             Money result = a.add(b);
             assertEquals(new BigDecimal("30.80"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add zero")
+        void addZero() {
+            Money a = Money.usd(new BigDecimal("10.50"));
+            Money b = Money.usd(BigDecimal.ZERO);
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("10.50"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add negative amount")
+        void addNegative() {
+            Money a = Money.usd(new BigDecimal("20.30"));
+            Money b = Money.usd(new BigDecimal("-10.50"));
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("9.80"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add large amounts")
+        void addLargeAmounts() {
+            Money a = Money.usd(new BigDecimal("999999999999.99"));
+            Money b = Money.usd(new BigDecimal("0.01"));
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("1000000000000.00"), result.getAmount());
         }
 
         @Test
