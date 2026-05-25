@@ -8,9 +8,25 @@ from pypika import Criterion
 from frappe.utils import make_filter_tuple
 
 from crm.api.views import get_views
-from crm.fcrm.doctype.crm_form_script.crm_form_script import get_form_script
 
 ALLOWED_DOCTYPES = {"CRM Lead", "CRM Deal", "CRM Organization", "Contact"}
+
+def fetch_form_scripts(dt, view="Form"):
+	"""Returns the form script for the given doctype"""
+	FormScript = frappe.qb.DocType("CRM Form Script")
+	query = (
+		frappe.qb.from_(FormScript)
+		.select("script")
+		.where(FormScript.dt == dt)
+		.where(FormScript.view == view)
+		.where(FormScript.enabled == 1)
+	)
+
+	doc = query.run(as_dict=True)
+	if doc:
+		return [d.script for d in doc] if len(doc) > 1 else doc[0].script
+	else:
+		return None
 
 
 def _validate_doctype(doctype: str):
@@ -352,6 +368,9 @@ def get_data(
 			if field not in rows:
 				rows.append(field)
 
+		kanban_column_results = []
+		all_names = []
+
 		for kc in kanban_columns:
 			column_filters = { column_field: kc.get('name') }
 			order = kc.get("order")
@@ -383,14 +402,28 @@ def get_data(
 				kc["all_count"] = all_count
 				kc["count"] = len(column_data)
 
-				if column_data:
-					names = [d.get("name") for d in column_data]
-					counts_batch = get_counts_batch(names, doctype)
-					for d in column_data:
-						d["_email_count"] = counts_batch["email"].get(d.get("name"), 0)
-						d["_comment_count"] = counts_batch["comment"].get(d.get("name"), 0)
-						d["_task_count"] = counts_batch["task"].get(d.get("name"), 0)
-						d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
+			if column_data:
+				all_names.extend([d.get("name") for d in column_data])
+
+			kanban_column_results.append({
+				"kc": kc,
+				"order": order,
+				"column_data": column_data
+			})
+
+		counts_batch = get_counts_batch(all_names, doctype) if all_names else {"email": {}, "comment": {}, "task": {}, "note": {}}
+
+		for result in kanban_column_results:
+			kc = result["kc"]
+			order = result["order"]
+			column_data = result["column_data"]
+
+			if column_data:
+				for d in column_data:
+					d["_email_count"] = counts_batch["email"].get(d.get("name"), 0)
+					d["_comment_count"] = counts_batch["comment"].get(d.get("name"), 0)
+					d["_task_count"] = counts_batch["task"].get(d.get("name"), 0)
+					d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
 
 			if order:
 				order_idx = {val: i for i, val in enumerate(order)}
@@ -485,8 +518,8 @@ def get_data(
 		"views": get_views(doctype),
 		"total_count": frappe.db.count(doctype, filters=filters),
 		"row_count": len(data),
-		"form_script": get_form_script(doctype),
-		"list_script": get_form_script(doctype, "List"),
+		"form_script": fetch_form_scripts(doctype),
+		"list_script": fetch_form_scripts(doctype, "List"),
 		"view_type": view_type,
 	}
 
