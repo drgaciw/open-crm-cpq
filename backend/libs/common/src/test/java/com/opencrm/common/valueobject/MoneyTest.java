@@ -183,4 +183,30 @@ class MoneyTest {
             assertNotEquals(usd, eur);
         }
     }
+
+    @Nested
+    @DisplayName("Formatting")
+    class Formatting {
+
+        @Test
+        @DisplayName("should format positive amount correctly")
+        void formatPositive() {
+            Money money = Money.usd(new BigDecimal("100.50"));
+            assertEquals("USD 100.50", money.toFormattedString());
+        }
+
+        @Test
+        @DisplayName("should format zero amount correctly")
+        void formatZero() {
+            Money money = Money.zero("EUR");
+            assertEquals("EUR 0.00", money.toFormattedString());
+        }
+
+        @Test
+        @DisplayName("should format negative amount correctly")
+        void formatNegative() {
+            Money money = Money.of(new BigDecimal("-50.75"), "GBP");
+            assertEquals("GBP -50.75", money.toFormattedString());
+        }
+    }
 }
