@@ -54,6 +54,14 @@ class PercentageTest {
     }
 
     @Test
+    @DisplayName("should correctly identify negative percentages")
+    void isNegative() {
+        assertTrue(Percentage.of(-5.0).isNegative());
+        assertFalse(Percentage.of(5.0).isNegative());
+        assertFalse(Percentage.zero().isNegative());
+    }
+
+    @Test
     @DisplayName("should compare percentages")
     void compare() {
         Percentage a = Percentage.of(20);
