@@ -40,3 +40,7 @@
 **Vulnerability:** The code used f-strings and dynamic string concatenation (`query += ...`) to construct raw SQL queries via `frappe.db.sql(query, ...)`. Even if the interpolated variables were strictly constrained by an allowlist (e.g., `doctype` restricted to `"CRM Lead"` or `"CRM Deal"`), this breaks structural security rules and sets a dangerous precedent for SQL injection.
 **Learning:** Frappe's database query wrapper `frappe.db.sql` should never be passed dynamically concatenated raw strings. `ast-grep` rules specifically catch `frappe.db.sql(query + where, $$$)`.
 **Prevention:** Always use explicit, hardcoded strings for raw SQL queries nested within `if/elif/else` blocks, and let the database wrapper parameterize the arguments (`%(param)s`).
+## 2026-05-25 - Fix Global CSRF Protection Disabled
+**Vulnerability:** Global CSRF Protection Disabled (`.csrf(csrf -> csrf.disable())`) allowed cross-site request forgery attacks because it permitted any client to make state-changing requests without providing a valid CSRF token.
+**Learning:** It's important to not globally disable CSRF protection, even in seemingly state-less services (JWT-based), as there might still be situations where users make requests from a browser.
+**Prevention:** Instead of using `.csrf(csrf -> csrf.disable())`, use a CSRF token repository such as `CookieCsrfTokenRepository` (`.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())`) to enforce the presence of a CSRF token.
