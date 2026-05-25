@@ -100,14 +100,6 @@ def public(name, value):
 	doc.user = "" if value else frappe.session.user
 	doc.save()
 
-@frappe.whitelist()
-def pin(name, value):
-	doc = frappe.get_doc("CRM View Settings", name)
-	if doc.user != frappe.session.user and frappe.session.user != "Administrator":
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-	doc.pinned = value
-	doc.save()
-
 def remove_duplicates(l):
 	return list(dict.fromkeys(l))
 

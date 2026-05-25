@@ -178,6 +178,12 @@ spring:
             - RewritePath=/api/v1/cpq/(?<segment>subscriptions)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
             - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
 
+        # ERP adapter placeholder (S2A-7): agent-contract paths reserved until erp-adapter-service exists
+        - id: erp-stub
+          uri: forward:/fallback/erp/unavailable
+          predicates:
+            - Path=/api/v1/erp/**
+
         # Communication Service routes
         - id: communication-service
           uri: ${COMMUNICATION_SERVICE_URI:lb://communication-service}
@@ -397,3 +403,8 @@ spring:
             - Path=/api/v1/cpq/subscriptions/**
           filters:
             - RewritePath=/api/v1/cpq/(?<segment>subscriptions)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+
+        - id: erp-stub
+          uri: forward:/fallback/erp/unavailable
+          predicates:
+            - Path=/api/v1/erp/**

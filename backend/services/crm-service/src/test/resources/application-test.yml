@@ -1,7 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:tc:postgresql:16-alpine:///opencrm?TC_INITSCRIPT=db/init-test.sql
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   jpa:
     hibernate:
       ddl-auto: validate
