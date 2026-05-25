@@ -1,6 +1,7 @@
 package com.opencrm.common.entity;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -15,103 +16,111 @@ class BaseEntityTest {
         // No additional properties needed for these tests
     }
 
-    @Test
-    @DisplayName("should generate UUID on create if null")
-    void shouldGenerateUuidOnCreateIfNull() {
-        TestEntity entity = new TestEntity();
-        assertNull(entity.getUuid(), "UUID should be null initially");
+    @Nested
+    @DisplayName("Lifecycle")
+    class Lifecycle {
+        @Test
+        @DisplayName("should generate UUID on create if null")
+        void shouldGenerateUuidOnCreateIfNull() {
+            TestEntity entity = new TestEntity();
+            assertNull(entity.getUuid(), "UUID should be null initially");
 
-        entity.onCreate();
+            entity.onCreate();
 
-        assertNotNull(entity.getUuid(), "UUID should be generated");
-        assertDoesNotThrow(() -> UUID.fromString(entity.getUuid()), "Generated UUID should be valid");
+            assertNotNull(entity.getUuid(), "UUID should be generated");
+            assertDoesNotThrow(() -> UUID.fromString(entity.getUuid()), "Generated UUID should be valid");
+        }
+
+        @Test
+        @DisplayName("should not overwrite existing UUID on create")
+        void shouldNotOverwriteExistingUuidOnCreate() {
+            TestEntity entity = new TestEntity();
+            String existingUuid = UUID.randomUUID().toString();
+            entity.setUuid(existingUuid);
+
+            entity.onCreate();
+
+            assertEquals(existingUuid, entity.getUuid(), "Existing UUID should not be overwritten");
+        }
+
+        @Test
+        @DisplayName("should set deleted flag on soft delete")
+        void shouldSetDeletedFlagOnSoftDelete() {
+            TestEntity entity = new TestEntity();
+            assertFalse(entity.isDeleted(), "Entity should not be deleted initially");
+
+            entity.softDelete();
+
+            assertTrue(entity.isDeleted(), "Entity should be marked as deleted");
+        }
     }
 
-    @Test
-    @DisplayName("should not overwrite existing UUID on create")
-    void shouldNotOverwriteExistingUuidOnCreate() {
-        TestEntity entity = new TestEntity();
-        String existingUuid = UUID.randomUUID().toString();
-        entity.setUuid(existingUuid);
+    @Nested
+    @DisplayName("Equality")
+    class Equality {
+        @Test
+        @DisplayName("equals should return true for same instance")
+        void equalsShouldReturnTrueForSameInstance() {
+            TestEntity entity = new TestEntity();
+            entity.setUuid(UUID.randomUUID().toString());
 
-        entity.onCreate();
+            assertEquals(entity, entity, "Entity should be equal to itself");
+        }
 
-        assertEquals(existingUuid, entity.getUuid(), "Existing UUID should not be overwritten");
-    }
+        @Test
+        @DisplayName("equals should return false for null")
+        void equalsShouldReturnFalseForNull() {
+            TestEntity entity = new TestEntity();
+            entity.setUuid(UUID.randomUUID().toString());
 
-    @Test
-    @DisplayName("should set deleted flag on soft delete")
-    void shouldSetDeletedFlagOnSoftDelete() {
-        TestEntity entity = new TestEntity();
-        assertFalse(entity.isDeleted(), "Entity should not be deleted initially");
+            assertNotEquals(null, entity, "Entity should not be equal to null");
+        }
 
-        entity.softDelete();
+        @Test
+        @DisplayName("equals should return false for different class")
+        void equalsShouldReturnFalseForDifferentClass() {
+            TestEntity entity = new TestEntity();
+            entity.setUuid(UUID.randomUUID().toString());
 
-        assertTrue(entity.isDeleted(), "Entity should be marked as deleted");
-    }
+            assertNotEquals(entity, new Object(), "Entity should not be equal to object of different class");
+        }
 
-    @Test
-    @DisplayName("equals should return true for same instance")
-    void equalsShouldReturnTrueForSameInstance() {
-        TestEntity entity = new TestEntity();
-        entity.setUuid(UUID.randomUUID().toString());
+        @Test
+        @DisplayName("equals should return true for different instances with same UUID")
+        void equalsShouldReturnTrueForDifferentInstancesWithSameUuid() {
+            String uuid = UUID.randomUUID().toString();
+            TestEntity entity1 = new TestEntity();
+            entity1.setUuid(uuid);
 
-        assertEquals(entity, entity, "Entity should be equal to itself");
-    }
+            TestEntity entity2 = new TestEntity();
+            entity2.setUuid(uuid);
 
-    @Test
-    @DisplayName("equals should return false for null")
-    void equalsShouldReturnFalseForNull() {
-        TestEntity entity = new TestEntity();
-        entity.setUuid(UUID.randomUUID().toString());
+            assertEquals(entity1, entity2, "Entities with same UUID should be equal");
+        }
 
-        assertNotEquals(null, entity, "Entity should not be equal to null");
-    }
+        @Test
+        @DisplayName("equals should return false for different instances with different UUIDs")
+        void equalsShouldReturnFalseForDifferentInstancesWithDifferentUuids() {
+            TestEntity entity1 = new TestEntity();
+            entity1.setUuid(UUID.randomUUID().toString());
 
-    @Test
-    @DisplayName("equals should return false for different class")
-    void equalsShouldReturnFalseForDifferentClass() {
-        TestEntity entity = new TestEntity();
-        entity.setUuid(UUID.randomUUID().toString());
+            TestEntity entity2 = new TestEntity();
+            entity2.setUuid(UUID.randomUUID().toString());
 
-        assertNotEquals(entity, new Object(), "Entity should not be equal to object of different class");
-    }
+            assertNotEquals(entity1, entity2, "Entities with different UUIDs should not be equal");
+        }
 
-    @Test
-    @DisplayName("equals should return true for different instances with same UUID")
-    void equalsShouldReturnTrueForDifferentInstancesWithSameUuid() {
-        String uuid = UUID.randomUUID().toString();
-        TestEntity entity1 = new TestEntity();
-        entity1.setUuid(uuid);
+        @Test
+        @DisplayName("hashCode should be equal for entities with same UUID")
+        void hashCodeShouldBeEqualForEntitiesWithSameUuid() {
+            String uuid = UUID.randomUUID().toString();
+            TestEntity entity1 = new TestEntity();
+            entity1.setUuid(uuid);
 
-        TestEntity entity2 = new TestEntity();
-        entity2.setUuid(uuid);
+            TestEntity entity2 = new TestEntity();
+            entity2.setUuid(uuid);
 
-        assertEquals(entity1, entity2, "Entities with same UUID should be equal");
-    }
-
-    @Test
-    @DisplayName("equals should return false for different instances with different UUIDs")
-    void equalsShouldReturnFalseForDifferentInstancesWithDifferentUuids() {
-        TestEntity entity1 = new TestEntity();
-        entity1.setUuid(UUID.randomUUID().toString());
-
-        TestEntity entity2 = new TestEntity();
-        entity2.setUuid(UUID.randomUUID().toString());
-
-        assertNotEquals(entity1, entity2, "Entities with different UUIDs should not be equal");
-    }
-
-    @Test
-    @DisplayName("hashCode should be equal for entities with same UUID")
-    void hashCodeShouldBeEqualForEntitiesWithSameUuid() {
-        String uuid = UUID.randomUUID().toString();
-        TestEntity entity1 = new TestEntity();
-        entity1.setUuid(uuid);
-
-        TestEntity entity2 = new TestEntity();
-        entity2.setUuid(uuid);
-
-        assertEquals(entity1.hashCode(), entity2.hashCode(), "Hash codes should match for same UUID");
+            assertEquals(entity1.hashCode(), entity2.hashCode(), "Hash codes should match for same UUID");
+        }
     }
 }
