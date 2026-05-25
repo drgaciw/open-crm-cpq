@@ -52,11 +52,13 @@ def notify_mentions(doc):
         )
     )
 
+    notifications_to_insert = []
+
     for mention in mentions:
         if mention.email in existing_notifications:
             continue
 
-        values = frappe._dict(
+        values = dict(
             doctype="CRM Notification",
             from_user=doc.owner,
             to_user=mention.email,
@@ -68,10 +70,13 @@ def notify_mentions(doc):
             reference_doctype=doc.reference_doctype,
             reference_name=doc.reference_name,
         )
+        notifications_to_insert.append(values)
 
-        frappe.get_doc(values).insert()
         # Track newly inserted notifications to prevent in-flight duplicates
         existing_notifications.add(mention.email)
+
+    if notifications_to_insert:
+        frappe.deferred_insert("CRM Notification", notifications_to_insert)
 
 
 def extract_mentions(html):
