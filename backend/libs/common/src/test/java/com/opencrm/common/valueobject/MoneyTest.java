@@ -101,11 +101,54 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should calculate percentage")
-        void percentage() {
+        @DisplayName("should calculate percentage with BigDecimal")
+        void percentageBigDecimal() {
             Money base = Money.usd(BigDecimal.valueOf(200.00));
             Money discount = base.percentage(BigDecimal.valueOf(15));
             assertEquals(new BigDecimal("30.00"), discount.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate percentage with double")
+        void percentageDouble() {
+            Money base = Money.usd(BigDecimal.valueOf(200.00));
+            Money discount = base.percentage(15.0);
+            assertEquals(new BigDecimal("30.00"), discount.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate fractional percentage")
+        void percentageFractional() {
+            Money base = Money.usd(BigDecimal.valueOf(100.00));
+            Money discount = base.percentage(33.33);
+            assertEquals(new BigDecimal("33.00"), discount.getAmount()); // 33.33 / 100 -> 0.33. 100 * 0.33 -> 33.00
+        }
+
+        @Test
+        @DisplayName("should calculate zero percentage")
+        void percentageZero() {
+            Money base = Money.usd(BigDecimal.valueOf(100.00));
+            Money discount = base.percentage(BigDecimal.ZERO);
+            assertEquals(new BigDecimal("0.00"), discount.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate greater than 100 percentage")
+        void percentageGreaterThan100() {
+            Money base = Money.usd(BigDecimal.valueOf(100.00));
+            Money discount = base.percentage(150.0);
+            assertEquals(new BigDecimal("150.00"), discount.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate percentage with proper rounding")
+        void percentageRounding() {
+            // 10.00 * (33.33 / 100)
+            // 33.33 / 100 -> 0.33 (HALF_UP, scale 2)
+            // 10.00 * 0.33 -> 3.30
+            Money smallBase = Money.usd(new BigDecimal("10.00"));
+            Money smallDiscount = smallBase.percentage(new BigDecimal("33.33"));
+            assertEquals(new BigDecimal("3.30"), smallDiscount.getAmount());
         }
 
         @Test
