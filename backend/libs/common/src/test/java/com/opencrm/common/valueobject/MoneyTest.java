@@ -152,13 +152,47 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should compare greater/less than")
-        void greaterLessThan() {
-            Money a = Money.usd(BigDecimal.valueOf(100));
-            Money b = Money.usd(BigDecimal.valueOf(50));
-            assertTrue(a.isGreaterThan(b));
-            assertTrue(b.isLessThan(a));
-            assertTrue(a.isGreaterThanOrEqual(a));
+        @DisplayName("should correctly identify if amount is greater than another")
+        void isGreaterThan() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.isGreaterThan(small));
+            assertFalse(small.isGreaterThan(large));
+            assertFalse(large.isGreaterThan(large));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is less than another")
+        void isLessThan() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(small.isLessThan(large));
+            assertFalse(large.isLessThan(small));
+            assertFalse(small.isLessThan(small));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is greater than or equal to another")
+        void isGreaterThanOrEqual() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.isGreaterThanOrEqual(small));
+            assertTrue(large.isGreaterThanOrEqual(large));
+            assertFalse(small.isGreaterThanOrEqual(large));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is less than or equal to another")
+        void isLessThanOrEqual() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(small.isLessThanOrEqual(large));
+            assertTrue(small.isLessThanOrEqual(small));
+            assertFalse(large.isLessThanOrEqual(small));
         }
     }
 
