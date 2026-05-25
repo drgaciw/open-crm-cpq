@@ -1,4 +1,3 @@
-import time
 import frappe
 from crm.api.whatsapp import get_whatsapp_messages
 
