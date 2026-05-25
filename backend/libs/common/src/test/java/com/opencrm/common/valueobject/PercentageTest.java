@@ -48,9 +48,24 @@ class PercentageTest {
     @Test
     @DisplayName("should detect positive, negative, zero")
     void signDetection() {
-        assertTrue(Percentage.of(10).isPositive());
-        assertTrue(Percentage.of(-5).isNegative());
-        assertTrue(Percentage.zero().isZero());
+        Percentage positive = Percentage.of(10);
+        Percentage negative = Percentage.of(-5);
+        Percentage zero = Percentage.zero();
+
+        // Test isPositive
+        assertTrue(positive.isPositive());
+        assertFalse(negative.isPositive());
+        assertFalse(zero.isPositive());
+
+        // Test isNegative
+        assertFalse(positive.isNegative());
+        assertTrue(negative.isNegative());
+        assertFalse(zero.isNegative());
+
+        // Test isZero
+        assertFalse(positive.isZero());
+        assertFalse(negative.isZero());
+        assertTrue(zero.isZero());
     }
 
     @Test
