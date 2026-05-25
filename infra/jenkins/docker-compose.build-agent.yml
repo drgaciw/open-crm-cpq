@@ -1,0 +1,56 @@
+# Production-oriented overlay: Jenkins controller without Docker socket;
+# build agent with Docker for Testcontainers (SE: DevOps/CI recommendation).
+#
+# Usage:
+#   docker compose -f docker-compose.jenkins.yml -f docker-compose.build-agent.yml up -d
+
+services:
+  jenkins:
+    environment:
+      JENKINS_NUM_EXECUTORS: "0"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - maven_cache:/var/jenkins/.m2
+      - npm_cache:/var/jenkins/.npm
+      # No docker.sock on controller
+
+  build-agent:
+    image: opencrm-jenkins:local
+    build:
+      context: .
+      dockerfile: jenkins/Dockerfile
+    container_name: opencrm-jenkins-build-agent
+    user: jenkins
+    command: >
+      bash -c "
+        java -jar /usr/share/jenkins/jenkins.war -version >/dev/null 2>&1 || true;
+        exec /sbin/tini -- /usr/local/bin/jenkins-agent.sh
+          -url http://jenkins:8080/
+          -workDir /home/jenkins/agent
+          -labels 'linux docker maven node22'
+          -name build-agent-1
+          -secret $$(cat /run/secrets/agent_secret 2>/dev/null || echo '')
+      "
+    environment:
+      JENKINS_URL: http://jenkins:8080/
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - maven_cache:/var/jenkins/.m2
+      - npm_cache:/var/jenkins/.npm
+    networks:
+      - jenkins_net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+    depends_on:
+      jenkins:
+        condition: service_healthy
+
+# Note: inbound agent secret must be created in Jenkins UI and mounted at
+# /run/secrets/agent_secret, or use JCasC ssh/ssh-agent pattern for your environment.

@@ -1,0 +1,4 @@
+# Local secrets — copy from jenkins.env.example
+jenkins.env
+*.env
+!jenkins.env.example

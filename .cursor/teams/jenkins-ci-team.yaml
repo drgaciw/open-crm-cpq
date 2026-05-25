@@ -1,0 +1,173 @@
+# jenkins-ci-team — Cursor agent/skills manifest for Jenkins + GHA CI parity.
+# Companion agents: .cursor/agents/jenkins-*.agent.md, ci-*.agent.md
+# Companion skills: .cursor/skills/jenkins-*/SKILL.md, ci-*/SKILL.md
+# Human docs: infra/jenkins/README.md, docs/ci-contract.yaml, docs/adr/ADR-003-ci-llm-integration.md
+
+schema_version: 1
+
+cursor:
+  team_id: jenkins-ci-team
+  orchestrator_agent_id: jenkins-ci-orchestrator
+  manifest_path_user: ~/.cursor/teams/jenkins-ci-team.yaml
+  manifest_path_project: .cursor/teams/jenkins-ci-team.yaml
+  validate_script_user: ~/.cursor/teams/validate-jenkins-ci-team.ps1
+  validate_script_project: .cursor/teams/validate-jenkins-ci-team.ps1
+
+sharing:
+  instructions: >-
+    Commit this YAML under .cursor/teams/ when the team agrees on playbook order.
+    Agents and skills live in .cursor/agents/ and .cursor/skills/ in this repo.
+    Run validate-jenkins-ci-team.ps1 after adding agents/skills or IDE updates.
+    Use -RepoRoot <path> to compare project manifest against ~/.cursor/teams/jenkins-ci-team.yaml.
+
+execution:
+  primary:
+    - cursor_agents:
+        - jenkins-ci-orchestrator
+        - jenkins-compose-bootstrap
+        - jenkins-multibranch-architect
+        - jenkins-build-agent-provisioner
+        - ci-drift-guardian
+        - ci-ssot-editor
+        - jenkins-failure-triage
+        - jenkins-ai-gate-curator
+  optional_alternates:
+    - gemini_cli_or_ide
+    - jules
+  avoid_as_executor:
+    - github_copilot_coding_agent
+    - delegating_jenkins_controller_changes_to_github_actions_bots
+
+team:
+  id: jenkins-ci-team
+  display_name: Jenkins CI team
+  docs: https://www.jenkins.io/doc/
+
+  orchestration:
+    lead_agent_id: jenkins-ci-orchestrator
+    summary: >-
+      Routes Jenkins/GHA CI work — local stack bootstrap, multibranch PR CI,
+      prod build agents, SSOT stage edits with drift checks, failure triage,
+      and advisory AI gate curation (ADR-003).
+
+skills:
+  - id: jenkins-quickstart
+    path: skills/jenkins-quickstart
+    use_when: >-
+      Local Jenkins bring-up, env file setup, first green build checklist.
+
+  - id: jenkins-jcasc-multibranch
+    path: skills/jenkins-jcasc-multibranch
+    use_when: >-
+      Multibranch or Organization Folder jobs; requires Context7 Jenkins docs lookup first.
+
+  - id: jenkins-prod-build-agent
+    path: skills/jenkins-prod-build-agent
+    use_when: >-
+      Production hardening with docker-compose.build-agent.yml and labeled agents.
+
+  - id: ci-contract-drift-check
+    path: skills/ci-contract-drift-check
+    use_when: >-
+      PRs touching Jenkinsfile, ci.yml, scripts/ci/*, or docs/ci-contract.yaml.
+
+  - id: jenkins-ai-assist-config
+    path: skills/jenkins-ai-assist-config
+    use_when: >-
+      Enabling or tuning AI_CI_ENABLED, LLM_* gateway, ai-api-key credential.
+
+  - id: jenkins-failure-log-triage
+    path: skills/jenkins-failure-log-triage
+    use_when: >-
+      Jenkins pipeline failure, UNSTABLE advisory AI, or Testcontainers issues.
+
+  - id: ci-stage-ssot-edit
+    path: skills/ci-stage-ssot-edit
+    use_when: >-
+      Add, remove, or reorder CI stages across run-core.sh, GHA, Jenkins, contract.
+
+agents:
+  - id: jenkins-ci-orchestrator
+    file: jenkins-ci-orchestrator.agent.md
+    role: orchestration
+    delegates_to:
+      - jenkins-compose-bootstrap
+      - jenkins-multibranch-architect
+      - jenkins-build-agent-provisioner
+      - ci-drift-guardian
+      - ci-ssot-editor
+      - jenkins-failure-triage
+      - jenkins-ai-gate-curator
+
+  - id: jenkins-compose-bootstrap
+    file: jenkins-compose-bootstrap.agent.md
+    role: setup
+
+  - id: jenkins-multibranch-architect
+    file: jenkins-multibranch-architect.agent.md
+    role: multibranch
+
+  - id: jenkins-build-agent-provisioner
+    file: jenkins-build-agent-provisioner.agent.md
+    role: agents
+
+  - id: ci-drift-guardian
+    file: ci-drift-guardian.agent.md
+    role: drift
+
+  - id: ci-ssot-editor
+    file: ci-ssot-editor.agent.md
+    role: ssot
+
+  - id: jenkins-failure-triage
+    file: jenkins-failure-triage.agent.md
+    role: triage
+
+  - id: jenkins-ai-gate-curator
+    file: jenkins-ai-gate-curator.agent.md
+    role: ai_policy
+
+path_resolution:
+  user_agents_root: ~/.cursor/agents/
+  user_skills_root: ~/.cursor/skills/
+  project_agents_root: .cursor/agents/
+  project_skills_root: .cursor/skills/
+
+default_playbooks:
+  - id: first-green-build
+    description: Dev Jenkins stack and toolchain smoke without AI stages.
+    sequence:
+      - agent: jenkins-compose-bootstrap
+        skills: [jenkins-quickstart]
+
+  - id: enable-pr-ci
+    description: Multibranch PR discovery replacing single-branch seed job.
+    sequence:
+      - agent: jenkins-multibranch-architect
+        skills: [jenkins-jcasc-multibranch]
+
+  - id: prod-hardening
+    description: Controller without docker.sock; labeled build agents for integration.
+    sequence:
+      - agent: jenkins-build-agent-provisioner
+        skills: [jenkins-prod-build-agent]
+
+  - id: ci-change-safe
+    description: Coordinated SSOT stage change with automated drift verification.
+    sequence:
+      - agent: ci-ssot-editor
+        skills: [ci-stage-ssot-edit]
+      - agent: ci-drift-guardian
+        skills: [ci-contract-drift-check]
+
+  - id: ai-advisory-on
+    description: Enable advisory AI assist without blocking gates.
+    sequence:
+      - agent: jenkins-ai-gate-curator
+        skills: [jenkins-ai-assist-config]
+
+  - id: failure-loop
+    description: Triage Jenkins failure, minimal fix, rebuild.
+    sequence:
+      - agent: jenkins-failure-triage
+        skills: [jenkins-failure-log-triage]

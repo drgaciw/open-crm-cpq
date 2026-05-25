@@ -1,0 +1,71 @@
+# Example JCasC fragment — multibranch PR CI for OpenCRM CPQ
+# Merge into jenkins/casc/jenkins.yaml or load as secondary CasC file.
+# Requires: workflow-multibranch, github-branch-source (or git) plugins (see plugins.txt).
+#
+# Before applying:
+# 1. Context7 Jenkins docs: multibranch + Organization Folder + credentials
+# 2. Set GIT_REPO_URL, SCM credentials (scan vs checkout)
+# 3. Disable seed pipelineJob 'opencrm-cpq-ci' if this job is primary
+#
+# Webhook: POST ${JENKINS_URL}/github-webhook/ (GitHub plugin)
+
+jobs:
+  - script: >
+      multibranchPipelineJob('opencrm-cpq-multibranch') {
+        displayName('OpenCRM CPQ — Multibranch CI')
+        description('PR and branch builds — Jenkinsfile at repo root (ADR-003 / ci-contract.yaml)')
+        branchSources {
+          github {
+            id('opencrm-cpq-github')
+            scanCredentialsId('scm-token')
+            repoOwner('your-org')
+            repository('open-crm-cpq')
+            traits {
+              gitHubBranchDiscovery {
+                strategyId(1)
+              }
+              gitHubPullRequestDiscovery {
+                strategyId(1)
+              }
+              headWildcardFilter {
+                includes('main PR-* *')
+                excludes('')
+              }
+            }
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(20)
+          }
+        }
+        triggers {
+          periodicFolderTrigger {
+            interval('1h')
+          }
+        }
+      }
+
+# Alternative: raw Git multibranch (no GitHub org plugin)
+#   - script: >
+#       multibranchPipelineJob('opencrm-cpq-multibranch') {
+#         branchSources {
+#           git {
+#             remote('${GIT_REPO_URL}')
+#             credentialsId('scm-token')
+#             includes('main PR-* *')
+#           }
+#         }
+#         factory {
+#           workflowBranchProjectFactory { scriptPath('Jenkinsfile') }
+#         }
+#       }
+
+credentials:
+  # Ensure scm-token exists (see jenkins.yaml credentials block)
+  # scanCredentialsId / credentialsId reference the same or separate IDs per your SCM

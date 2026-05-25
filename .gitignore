@@ -5,6 +5,7 @@ Thumbs.db
 
 # Build artifacts
 **/target/
+**/bin/
 **/dist/
 **/build/
 **/.next/
@@ -31,6 +32,10 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+infra/jenkins/env/jenkins.env
+
+# Jenkins AI CI reports (generated per build)
+ci-reports/*.md
 
 # Temporary files
 *.tmp
@@ -39,3 +44,4 @@ yarn-error.log*
 # Claude Code: embedded worktree copies (use separate clones / branches instead of gitlinks)
 .claude/worktrees/
 
+infra/jenkins/ai-assist/__pycache__/

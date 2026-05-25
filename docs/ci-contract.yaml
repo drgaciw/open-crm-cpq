@@ -1,0 +1,174 @@
+# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback only.
+# Human docs: docs/ci-jenkins-cutover.md, infra/jenkins/README.md, docs/adr/ADR-003-ci-llm-integration.md
+# When changing Jenkinsfile, .github/workflows/ci.yml, or scripts/ci/*, update this file in the same PR.
+
+schema_version: "1"
+repository: open-crm-cpq
+last_reviewed: "2026-05-20"
+
+execution:
+  primary: jenkins
+  fallback: github_actions_manual
+  github_status_context: jenkins/opencrm-cpq-ci
+
+ssot:
+  entrypoint: scripts/ci/run-core.sh
+  description: All build/test commands; Jenkins runs on PR/push; GHA when manually dispatched.
+
+scripts_ci:
+  stages:
+    - id: toolchain
+      script: scripts/ci/toolchain-check.sh
+      run_core_arg: toolchain
+      gha_job: null
+      jenkins_stage: Toolchain
+      blocking: true
+    - id: shared-libraries
+      script: scripts/ci/shared-libraries.sh
+      run_core_arg: shared-libraries
+      gha_job: shared-libraries
+      jenkins_stage: Shared Libraries
+      blocking: true
+    - id: backend-unit
+      script: scripts/ci/backend-unit.sh
+      run_core_arg: backend-unit
+      gha_job: backend-unit
+      jenkins_stage: Backend Unit
+      jenkins_parallel_group: Parallel — Fast checks
+      blocking: true
+    - id: cpq-beta-python
+      script: scripts/ci/cpq-beta-python.sh
+      run_core_arg: cpq-beta-python
+      gha_job: cpq-beta-python
+      jenkins_stage: CPQ Beta Python
+      jenkins_parallel_group: Parallel — Fast checks
+      blocking: true
+    - id: frontend
+      script: scripts/ci/frontend.sh
+      run_core_arg: frontend
+      gha_job: frontend
+      jenkins_stage: Frontend
+      jenkins_parallel_group: Parallel — Fast checks
+      blocking: true
+    - id: backend-integration
+      script: scripts/ci/backend-integration.sh
+      run_core_arg: backend-integration
+      gha_job: backend-integration
+      jenkins_stage: Backend Integration
+      blocking: true
+      requires_docker: true
+    - id: security-audit
+      script: scripts/ci/security-audit.sh
+      run_core_arg: security-audit
+      gha_job: security-audit
+      jenkins_stage: Security Audit
+      blocking: false
+      notes: Jenkins uses catchError(UNSTABLE); GHA job has no needs — runs independently
+
+ai_assist:
+  platform: jenkins_only
+  enabled_when: AI_CI_ENABLED=true
+  blocking_when: AI_CI_BLOCKING=true
+  jenkins_stage: AI Assist
+  scripts_dir: infra/jenkins/ai-assist
+  stages:
+    - code_review
+    - test_suggestions
+    - log_analysis
+    - drift_check
+    - security_triage
+  post_failure_only:
+    - log_analysis
+  post_security_audit:
+    - security_triage
+  llm_env:
+    - LLM_PROVIDER
+    - LLM_API_KEY
+    - LLM_ENDPOINT
+    - LLM_MODEL
+    - LLM_TIMEOUT_MS
+  credential_id: ai-api-key
+  not_used_by:
+    - github_actions
+    - ai-service-sidecar
+
+github_actions:
+  workflow: .github/workflows/ci.yml
+  role: manual_fallback_only
+  trigger:
+    workflow_dispatch: true
+    push_branches: []
+    pull_request_branches: []
+  concurrency: null
+  jobs:
+    shared-libraries:
+      needs: []
+      run: bash scripts/ci/run-core.sh shared-libraries
+    backend-unit:
+      needs: []
+      run: bash scripts/ci/run-core.sh backend-unit
+    backend-integration:
+      needs: [shared-libraries, backend-unit]
+      run: bash scripts/ci/run-core.sh backend-integration
+    cpq-beta-python:
+      needs: []
+      run: bash scripts/ci/run-core.sh cpq-beta-python
+    frontend:
+      needs: []
+      run: bash scripts/ci/run-core.sh frontend
+    security-audit:
+      needs: []
+      run: bash scripts/ci/run-core.sh security-audit
+  needs_graph:
+    # Integration gates only on shared-libraries + backend-unit (not frontend or cpq-beta)
+    backend-integration:
+      - shared-libraries
+      - backend-unit
+
+jenkins:
+  file: Jenkinsfile
+  job: opencrm-cpq
+  job_type: multibranch
+  agent: any
+  github_status_context: jenkins/opencrm-cpq-ci
+  toolchain_note: Jenkins-only; no GHA equivalent job
+  stages_ordered:
+    - name: Checkout
+      type: scm
+    - name: Toolchain
+      run: bash scripts/ci/run-core.sh toolchain
+    - name: Shared Libraries
+      run: bash scripts/ci/run-core.sh shared-libraries
+    - name: Parallel — Fast checks
+      parallel:
+        - Backend Unit
+        - CPQ Beta Python
+        - Frontend
+    - name: Backend Integration
+      run: bash scripts/ci/run-core.sh backend-integration
+      parity_note: Does not wait on frontend or cpq-beta (matches GHA needs)
+    - name: AI Assist
+      when: AI_CI_ENABLED=true
+      jenkins_only: true
+    - name: Security Audit
+      run: bash scripts/ci/run-core.sh security-audit
+      non_blocking: true
+  post:
+    always:
+      - archiveArtifacts ci-reports/**/*.md
+    failure:
+      - ai log_analysis when AI_CI_ENABLED=true
+
+drift_prevention:
+  rules:
+    - Change scripts/ci stage scripts and run-core.sh case arms together.
+    - Update this file when adding/removing Jenkins stages or GHA manual jobs.
+    - Do not re-enable GHA push/pull_request triggers without updating docs/ci-jenkins-cutover.md.
+    - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
+    - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
+    - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.
+    - Jenkins must publish GitHub status context jenkins/opencrm-cpq-ci when scm-token is set.
+  verify_commands:
+    - bash scripts/ci/run-core.sh toolchain
+    - rg -l "run-core.sh" Jenkinsfile .github/workflows/ci.yml
+    - python .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py

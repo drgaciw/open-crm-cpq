@@ -1,0 +1,78 @@
+# Jenkins CI stack for OpenCRM CPQ monorepo
+# Usage:
+#   cp env/jenkins.env.example env/jenkins.env
+#   docker compose -f docker-compose.jenkins.yml --env-file env/jenkins.env up -d --build
+#
+# Production: use docker-compose.build-agent.yml overlay; do NOT mount docker.sock on controller.
+
+name: opencrm-jenkins-ci
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: jenkins/Dockerfile
+    image: opencrm-jenkins:local
+    container_name: opencrm-jenkins
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${JENKINS_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${JENKINS_AGENT_PORT:-50000}:50000"
+    environment:
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Xms512m -Xmx2g
+        -XX:+UseG1GC
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-changeme}
+      JENKINS_URL: ${JENKINS_URL:-http://localhost:8080/}
+      JENKINS_NUM_EXECUTORS: ${JENKINS_NUM_EXECUTORS:-2}
+      GIT_REPO_URL: ${GIT_REPO_URL:-}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER:-drgaciw}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME:-open-crm-cpq}
+      AI_CI_ENABLED: ${AI_CI_ENABLED:-false}
+      AI_CI_BLOCKING: ${AI_CI_BLOCKING:-false}
+      LLM_ENDPOINT: ${LLM_ENDPOINT:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_API_VERSION: ${LLM_API_VERSION:-2024-02-15-preview}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-120000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-azure}
+      # Dev-only: seeds JCasC credential ai-api-key at boot. Prod: inject via vault, omit here.
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      SCM_TOKEN: ${SCM_TOKEN:-}
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: "false"
+      # Docker Desktop (Mac/Win): uncomment if Testcontainers cannot reach daemon
+      # TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      # Repo JCasC is SSOT — avoids stale casc copied into jenkins_home on first boot.
+      - ./jenkins/casc/jenkins.yaml:/var/jenkins_home/casc_configs/jenkins.yaml:ro
+      - maven_cache:/var/jenkins/.m2
+      - npm_cache:/var/jenkins/.npm
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - jenkins_net
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 6G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  jenkins_home:
+  maven_cache:
+  npm_cache:
+
+networks:
+  jenkins_net:
+    driver: bridge
