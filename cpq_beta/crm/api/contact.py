@@ -84,25 +84,27 @@ def get_linked_deals(contact):
 		distinct=True,
 	)
 
+	if not deal_names:
+		return []
+
+	parents = [d.parent for d in deal_names]
+
 	# get deals data
-	deals = []
-	for d in deal_names:
-		deal = frappe.get_cached_doc(
-			"CRM Deal",
-			d.parent,
-			fields=[
-				"name",
-				"organization",
-				"currency",
-				"annual_revenue",
-				"status",
-				"email",
-				"mobile_no",
-				"deal_owner",
-				"modified",
-			],
-		)
-		deals.append(deal.as_dict())
+	deals = frappe.get_all(
+		"CRM Deal",
+		filters={"name": ["in", parents]},
+		fields=[
+			"name",
+			"organization",
+			"currency",
+			"annual_revenue",
+			"status",
+			"email",
+			"mobile_no",
+			"deal_owner",
+			"modified",
+		],
+	)
 
 	return deals
 
