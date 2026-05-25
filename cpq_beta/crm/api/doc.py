@@ -352,6 +352,9 @@ def get_data(
 			if field not in rows:
 				rows.append(field)
 
+		kanban_column_results = []
+		all_names = []
+
 		for kc in kanban_columns:
 			column_filters = { column_field: kc.get('name') }
 			order = kc.get("order")
@@ -383,14 +386,28 @@ def get_data(
 				kc["all_count"] = all_count
 				kc["count"] = len(column_data)
 
-				if column_data:
-					names = [d.get("name") for d in column_data]
-					counts_batch = get_counts_batch(names, doctype)
-					for d in column_data:
-						d["_email_count"] = counts_batch["email"].get(d.get("name"), 0)
-						d["_comment_count"] = counts_batch["comment"].get(d.get("name"), 0)
-						d["_task_count"] = counts_batch["task"].get(d.get("name"), 0)
-						d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
+			if column_data:
+				all_names.extend([d.get("name") for d in column_data])
+
+			kanban_column_results.append({
+				"kc": kc,
+				"order": order,
+				"column_data": column_data
+			})
+
+		counts_batch = get_counts_batch(all_names, doctype) if all_names else {"email": {}, "comment": {}, "task": {}, "note": {}}
+
+		for result in kanban_column_results:
+			kc = result["kc"]
+			order = result["order"]
+			column_data = result["column_data"]
+
+			if column_data:
+				for d in column_data:
+					d["_email_count"] = counts_batch["email"].get(d.get("name"), 0)
+					d["_comment_count"] = counts_batch["comment"].get(d.get("name"), 0)
+					d["_task_count"] = counts_batch["task"].get(d.get("name"), 0)
+					d["_note_count"] = counts_batch["note"].get(d.get("name"), 0)
 
 			if order:
 				column_data = sorted(
