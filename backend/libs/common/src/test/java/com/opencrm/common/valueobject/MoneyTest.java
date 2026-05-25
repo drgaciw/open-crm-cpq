@@ -156,9 +156,23 @@ class MoneyTest {
         void greaterLessThan() {
             Money a = Money.usd(BigDecimal.valueOf(100));
             Money b = Money.usd(BigDecimal.valueOf(50));
+            Money c = Money.usd(BigDecimal.valueOf(100));
+
             assertTrue(a.isGreaterThan(b));
+            assertFalse(b.isGreaterThan(a));
+            assertFalse(a.isGreaterThan(c));
+
             assertTrue(b.isLessThan(a));
-            assertTrue(a.isGreaterThanOrEqual(a));
+            assertFalse(a.isLessThan(b));
+            assertFalse(a.isLessThan(c));
+
+            assertTrue(a.isGreaterThanOrEqual(b));
+            assertTrue(a.isGreaterThanOrEqual(c));
+            assertFalse(b.isGreaterThanOrEqual(a));
+
+            assertTrue(b.isLessThanOrEqual(a));
+            assertTrue(a.isLessThanOrEqual(c));
+            assertFalse(a.isLessThanOrEqual(b));
         }
     }
 
