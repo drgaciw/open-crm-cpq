@@ -101,6 +101,13 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should reject division by zero (double)")
+        void divideByZeroDouble() {
+            Money money = Money.usd(BigDecimal.valueOf(100));
+            assertThrows(ArithmeticException.class, () -> money.divide(0.0));
+        }
+
+        @Test
         @DisplayName("should calculate percentage")
         void percentage() {
             Money base = Money.usd(BigDecimal.valueOf(200.00));
