@@ -183,12 +183,10 @@ def get_twilio_number_owners(phone_number):
 def get_active_loggedin_users(users):
 	"""Filter the current loggedin users from the given users list
 	"""
-	rows = frappe.db.sql("""
-		SELECT `user`
-		FROM `tabSessions`
-		WHERE `user` IN %(users)s
-		""", {'users': users})
-	return [row[0] for row in set(rows)]
+	if not users:
+		return []
+	rows = frappe.get_all("Sessions", filters={"user": ["in", users]}, pluck="user")
+	return list(set(rows))
 
 def get_the_call_attender(owners, caller=None):
 	"""Get attender details from list of owners

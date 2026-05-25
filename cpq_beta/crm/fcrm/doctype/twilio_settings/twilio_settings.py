@@ -29,7 +29,7 @@ class TwilioSettings(Document):
 			twilio = Client(self.account_sid, self.get_password("auth_token"))
 			twilio.api.accounts(self.account_sid).fetch()
 			return twilio
-		except Exception:
+		except Exception as e:
 			frappe.throw(_("Invalid Account SID or Auth Token."))
 
 	def set_api_credentials(self, twilio):
@@ -57,7 +57,7 @@ class TwilioSettings(Document):
 		"""
 		try:
 			return twilio.new_keys.create(friendly_name=self.friendly_resource_name)
-		except Exception:
+		except Exception as e:
 			frappe.log_error(title=_("Twilio API credential creation error."))
 			frappe.throw(_("Twilio API credential creation error."))
 
