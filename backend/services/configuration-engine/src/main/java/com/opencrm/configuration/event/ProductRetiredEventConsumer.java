@@ -43,8 +43,8 @@ public class ProductRetiredEventConsumer {
             sessions.forEach(session -> {
                 session.setStatus(ConfigurationStatus.CANCELLED);
                 session.setValidationErrors("Product has been retired: " + event.getReasonCode());
-                sessionRepository.save(session);
             });
+            sessionRepository.saveAll(sessions);
             
             log.info("Cancelled {} configuration sessions for retired product {}", 
                      sessions.size(), event.getProductId());

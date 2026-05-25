@@ -54,24 +54,67 @@ def notify_agent(doc):
             )
         )
 
+        import uuid
+        from frappe.utils import now_datetime
+
+        new_notifications = []
+        now = now_datetime()
         for user in assigned_users:
             if user in existing_notifications:
                 continue
 
-            values = frappe._dict(
-                doctype="CRM Notification",
-                from_user=doc.owner,
-                to_user=user,
-                type="WhatsApp",
-                message=doc.message,
-                notification_text=notification_text,
-                notification_type_doctype="WhatsApp Message",
-                notification_type_doc=doc.name,
-                reference_doctype=doc.reference_doctype,
-                reference_name=doc.reference_name,
+            new_notifications.append(
+                (
+                    (
+                        frappe.generate_hash(length=10)
+                        if hasattr(frappe, "generate_hash")
+                        else str(uuid.uuid4())[:10]
+                    ),
+                    now,
+                    now,
+                    doc.owner,
+                    doc.owner,
+                    doc.owner,
+                    user,
+                    "WhatsApp",
+                    doc.message,
+                    notification_text,
+                    "WhatsApp Message",
+                    doc.name,
+                    doc.reference_doctype,
+                    doc.reference_name,
+                )
             )
 
-            frappe.get_doc(values).insert(ignore_permissions=True)
+        if new_notifications:
+            frappe.db.bulk_insert(
+                "CRM Notification",
+                fields=[
+                    "name",
+                    "creation",
+                    "modified",
+                    "modified_by",
+                    "owner",
+                    "from_user",
+                    "to_user",
+                    "type",
+                    "message",
+                    "notification_text",
+                    "notification_type_doctype",
+                    "notification_type_doc",
+                    "reference_doctype",
+                    "reference_name",
+                ],
+                values=new_notifications,
+                ignore_duplicates=True,
+            )
+            # Since bulk_insert bypasses hooks, we manually trigger real-time updates for these notifications.
+            for n in new_notifications:
+                frappe.publish_realtime(
+                    "notification",
+                    {"type": "WhatsApp", "message": notification_text},
+                    user=n[6],  # n[6] is to_user
+                )
 
 
 def get_lead_or_deal_from_number(number):
@@ -87,28 +130,27 @@ def get_lead_or_deal_from_number(number):
         if not mobile_no:
             return None
 
+        data = []
         if doctype == "CRM Deal":
-            query = """
+            data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Deal`
 			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		"""
+		""", {"mobile_no": mobile_no}, as_dict=True)
         elif doctype == "CRM Lead":
             if only_unconverted:
-                query = """
+                data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Lead`
 			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
 AND converted is not True
-		"""
+		""", {"mobile_no": mobile_no}, as_dict=True)
             else:
-                query = """
+                data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Lead`
 			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		"""
-
-        data = frappe.db.sql(query, {"mobile_no": mobile_no}, as_dict=True)
+		""", {"mobile_no": mobile_no}, as_dict=True)
         return data[0].name if data else None
 
     doctype = "CRM Deal"
@@ -392,18 +434,44 @@ def parse_template_parameters(string, parameters):
 
 
 def get_from_name(message):
-    doc = frappe.get_doc(message["reference_doctype"], message["reference_name"])
+    reference_doctype = message.get("reference_doctype")
+    reference_name = message.get("reference_name")
     from_name = ""
-    if message["reference_doctype"] == "CRM Deal":
-        if doc.get("contacts"):
-            for c in doc.get("contacts"):
-                if c.is_primary:
-                    from_name = c.full_name or c.mobile_no
-                    break
+
+    if reference_doctype == "CRM Deal":
+        meta = frappe.get_meta("CRM Deal")
+        contact_doctype = meta.get_field("contacts").options
+
+        contact = frappe.db.get_value(
+            contact_doctype,
+            {"parent": reference_name, "parenttype": "CRM Deal", "is_primary": 1},
+            ["full_name", "mobile_no"],
+            as_dict=True,
+        )
+        if contact:
+            from_name = contact.get("full_name") or contact.get("mobile_no")
         else:
-            from_name = doc.get("lead_name")
+            # Originally it fetched doc.get("lead_name") but fallback to query if empty contacts
+            contacts = frappe.db.get_value(
+                contact_doctype, {"parent": reference_name, "parenttype": "CRM Deal"}
+            )
+            if not contacts:
+                from_name = frappe.db.get_value("CRM Deal", reference_name, "lead_name")
+    elif reference_doctype == "CRM Lead":
+        values = frappe.db.get_value(
+            reference_doctype, reference_name, ["first_name", "last_name"]
+        )
+        if values:
+            if isinstance(values, tuple):
+                from_name = " ".join(filter(None, values))
+            else:
+                from_name = " ".join(
+                    filter(None, [values.get("first_name"), values.get("last_name")])
+                )
     else:
+        doc = frappe.get_doc(reference_doctype, reference_name)
         from_name = (
             " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
         )
-    return from_name
+
+    return from_name or ""

@@ -16,6 +16,8 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,6 +33,15 @@ public class OutboxRelayPublisherTest {
     @InjectMocks
     private OutboxRelayPublisher outboxRelayPublisher;
 
+    private OutboxEvent createOutboxEvent(Long id, String eventType, String aggregateId, String payload) {
+        OutboxEvent event = new OutboxEvent();
+        event.setId(id);
+        event.setEventType(eventType);
+        event.setAggregateId(aggregateId);
+        event.setPayload(payload);
+        return event;
+    }
+
     @Test
     void publishPendingEvents_NoEvents() {
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Collections.emptyList());
@@ -38,22 +49,13 @@ public class OutboxRelayPublisherTest {
         outboxRelayPublisher.publishPendingEvents();
 
         verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        verify(outboxEventRepository, never()).save(any(OutboxEvent.class));
+        verify(outboxEventRepository, never()).saveAll(any());
     }
 
     @Test
     void publishPendingEvents_SuccessfulPublish() {
-        OutboxEvent event1 = new OutboxEvent();
-        event1.setId(1L);
-        event1.setEventType("TestType");
-        event1.setAggregateId("123");
-        event1.setPayload("{\"data\":\"test\"}");
-
-        OutboxEvent event2 = new OutboxEvent();
-        event2.setId(2L);
-        event2.setEventType("TestType2");
-        event2.setAggregateId("456");
-        event2.setPayload("{\"data\":\"test2\"}");
+        OutboxEvent event1 = createOutboxEvent(1L, "TestType", "123", "{\"data\":\"test\"}");
+        OutboxEvent event2 = createOutboxEvent(2L, "TestType2", "456", "{\"data\":\"test2\"}");
 
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Arrays.asList(event1, event2));
 
@@ -65,7 +67,7 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
         verify(kafkaTemplate).send("TestType2", "456", "{\"data\":\"test2\"}");
 
-        verify(outboxEventRepository, times(2)).save(any(OutboxEvent.class));
+        verify(outboxEventRepository).saveAll(eq(Arrays.asList(event1, event2)));
 
         assertTrue(event1.getPublished());
         assertNotNull(event1.getPublishedAt());
@@ -75,11 +77,7 @@ public class OutboxRelayPublisherTest {
 
     @Test
     void publishPendingEvents_AsynchronousFailure() {
-        OutboxEvent event = new OutboxEvent();
-        event.setId(1L);
-        event.setEventType("TestType");
-        event.setAggregateId("123");
-        event.setPayload("{\"data\":\"test\"}");
+        OutboxEvent event = createOutboxEvent(1L, "TestType", "123", "{\"data\":\"test\"}");
 
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Collections.singletonList(event));
 
@@ -92,18 +90,14 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
         // As per current implementation, an async failure is just logged. The event is still marked as published and saved.
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(eq(Collections.singletonList(event)));
         assertTrue(event.getPublished());
         assertNotNull(event.getPublishedAt());
     }
 
     @Test
     void publishPendingEvents_SynchronousFailure() {
-        OutboxEvent event = new OutboxEvent();
-        event.setId(1L);
-        event.setEventType("TestType");
-        event.setAggregateId("123");
-        event.setPayload("{\"data\":\"test\"}");
+        OutboxEvent event = createOutboxEvent(1L, "TestType", "123", "{\"data\":\"test\"}");
         event.setRetryCount(0);
 
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Collections.singletonList(event));
@@ -114,7 +108,7 @@ public class OutboxRelayPublisherTest {
 
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(eq(Collections.singletonList(event)));
         assertFalse(event.getPublished());
         assertEquals(1, event.getRetryCount());
         assertEquals("Synchronous Kafka error", event.getErrorMessage());

@@ -174,8 +174,13 @@ function createDeal() {
     deal.website = 'https://' + deal.website
   }
   createResource({
-    url: 'crm.fcrm.doctype.crm_deal.crm_deal.create_deal',
-    params: { args: deal },
+    url: 'frappe.client.insert',
+    params: {
+      doc: {
+        doctype: 'CRM Deal',
+        ...deal,
+      }
+    },
     auto: true,
     validate() {
       error.value = null
@@ -200,10 +205,10 @@ function createDeal() {
       }
       isDealCreating.value = true
     },
-    onSuccess(name) {
+    onSuccess(data) {
       isDealCreating.value = false
       show.value = false
-      router.push({ name: 'Deal', params: { dealId: name } })
+      router.push({ name: 'Deal', params: { dealId: data.name } })
     },
     onError(err) {
       isDealCreating.value = false
