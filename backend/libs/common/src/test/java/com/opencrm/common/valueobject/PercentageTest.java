@@ -46,11 +46,28 @@ class PercentageTest {
     }
 
     @Test
-    @DisplayName("should detect positive, negative, zero")
-    void signDetection() {
+    @DisplayName("should correctly identify positive percentages")
+    void isPositive() {
         assertTrue(Percentage.of(10).isPositive());
+        assertFalse(Percentage.of(-5).isPositive());
+        assertFalse(Percentage.zero().isPositive());
+    }
+
+    @Test
+    @DisplayName("should correctly identify negative percentages")
+    void isNegative() {
         assertTrue(Percentage.of(-5).isNegative());
+        assertFalse(Percentage.of(10).isNegative());
+        assertFalse(Percentage.zero().isNegative());
+    }
+
+    @Test
+    @DisplayName("should correctly identify zero percentages")
+    void isZero() {
         assertTrue(Percentage.zero().isZero());
+        assertTrue(Percentage.of(0).isZero());
+        assertFalse(Percentage.of(10).isZero());
+        assertFalse(Percentage.of(-5).isZero());
     }
 
     @Test
