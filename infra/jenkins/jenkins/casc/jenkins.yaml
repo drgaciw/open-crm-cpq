@@ -1,0 +1,111 @@
+# Jenkins Configuration as Code — OpenCRM CPQ CI
+# ADR-003: CI LLM uses LLM_* env + credential ai-api-key (not ai-service chat API)
+
+jenkins:
+  systemMessage: |
+    OpenCRM CPQ — Jenkins CI (SSOT: scripts/ci/run-core.sh).
+    Dev: JENKINS_NUM_EXECUTORS=2 on controller. Prod: JENKINS_NUM_EXECUTORS=0 + labeled agents.
+  numExecutors: ${JENKINS_NUM_EXECUTORS:-2}
+  mode: NORMAL
+  scmCheckoutRetryCount: 3
+  quietPeriod: 5
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD:-changeme}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: SPRING_PROFILES_ACTIVE
+            value: test
+          - key: AI_CI_ENABLED
+            value: "${AI_CI_ENABLED:-false}"
+          - key: AI_CI_BLOCKING
+            value: "${AI_CI_BLOCKING:-false}"
+          - key: LLM_PROVIDER
+            value: "${LLM_PROVIDER:-azure}"
+          - key: LLM_ENDPOINT
+            value: "${LLM_ENDPOINT:-}"
+          - key: LLM_MODEL
+            value: "${LLM_MODEL:-gpt-4o}"
+          - key: LLM_API_VERSION
+            value: "${LLM_API_VERSION:-2024-02-15-preview}"
+          - key: LLM_TIMEOUT_MS
+            value: "${LLM_TIMEOUT_MS:-120000}"
+          - key: GITHUB_REPO_OWNER
+            value: "${GITHUB_REPO_OWNER:-drgaciw}"
+          - key: GITHUB_REPO_NAME
+            value: "${GITHUB_REPO_NAME:-open-crm-cpq}"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              scope: GLOBAL
+              id: ai-api-key
+              secret: "${LLM_API_KEY:-}"
+              description: LLM API key for CI assist (Azure OpenAI or compatible gateway)
+          - string:
+              scope: GLOBAL
+              id: scm-token
+              secret: "${SCM_TOKEN:-}"
+              description: Optional SCM token for private repo checkout
+
+unclassified:
+  timestamper:
+    allPipelines: true
+  ansiColorBuildWrapper:
+    globalColorMapName: xterm
+  location:
+    url: "${JENKINS_URL:-http://localhost:8080/}"
+
+jobs:
+  - script: >
+      multibranchPipelineJob('opencrm-cpq') {
+        displayName('OpenCRM CPQ CI')
+        description('Primary CI — branches and PRs with Jenkinsfile (see docs/ci-jenkins-cutover.md)')
+        branchSources {
+          github {
+            id('opencrm-cpq-github')
+            scanCredentialsId('scm-token')
+            repoOwner('${GITHUB_REPO_OWNER}')
+            repository('${GITHUB_REPO_NAME}')
+            traits {
+              gitHubBranchDiscovery {
+                strategyId(1)
+              }
+              gitHubPullRequestDiscovery {
+                strategyId(1)
+              }
+              headWildcardFilter {
+                includes('main PR-* *')
+                excludes('')
+              }
+            }
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(20)
+          }
+        }
+        triggers {
+          periodicFolderTrigger {
+            interval('1h')
+          }
+        }
+      }
