@@ -109,12 +109,41 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should negate")
+        @DisplayName("should negate positive, negative, and zero values")
         void negate() {
             Money positive = Money.usd(BigDecimal.valueOf(50.00));
             Money negative = positive.negate();
             assertTrue(negative.isNegative());
             assertEquals(new BigDecimal("-50.00"), negative.getAmount());
+
+            Money negativeOriginal = Money.usd(BigDecimal.valueOf(-20.00));
+            Money negatedNegative = negativeOriginal.negate();
+            assertTrue(negatedNegative.isPositive());
+            assertEquals(new BigDecimal("20.00"), negatedNegative.getAmount());
+
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money negatedZero = zero.negate();
+            assertTrue(negatedZero.isZero());
+            assertEquals(new BigDecimal("0.00"), negatedZero.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate absolute value")
+        void abs() {
+            Money positive = Money.usd(BigDecimal.valueOf(50.00));
+            Money absPositive = positive.abs();
+            assertTrue(absPositive.isPositive());
+            assertEquals(new BigDecimal("50.00"), absPositive.getAmount());
+
+            Money negative = Money.usd(BigDecimal.valueOf(-50.00));
+            Money absNegative = negative.abs();
+            assertTrue(absNegative.isPositive());
+            assertEquals(new BigDecimal("50.00"), absNegative.getAmount());
+
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money absZero = zero.abs();
+            assertTrue(absZero.isZero());
+            assertEquals(new BigDecimal("0.00"), absZero.getAmount());
         }
     }
 
