@@ -14,7 +14,7 @@ import { OrganizationService } from '@frontend/crm-organizations';
 import { ContactDto, OrganizationDto } from '@frontend/shared-models';
 
 @Component({
-  selector: 'app-lead-form',
+  selector: 'lib-lead-form',
   standalone: true,
   imports: [
     ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
@@ -254,7 +254,9 @@ export class LeadFormComponent implements OnInit {
     if (this.form.invalid) return;
     this.saving = true;
 
-    const { contactSearch, organizationSearch, ...formValue } = this.form.value;
+    const formValue = this.form.value;
+    delete formValue.contactSearch;
+    delete formValue.organizationSearch;
     const data = {
       ...formValue,
       contactId: this.selectedContactId,

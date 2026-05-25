@@ -16,7 +16,7 @@ import { LeadDto, LeadStatus } from '@frontend/shared-models';
 import { CurrencyPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-lead-list',
+  selector: 'lib-lead-list',
   standalone: true,
   imports: [
     MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
@@ -71,7 +71,7 @@ import { CurrencyPipe } from '@angular/common';
           <ng-container matColumnDef="title">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
             <td mat-cell *matCellDef="let lead">
-              <a class="link" (click)="onRowClick(lead)">{{ lead.title }}</a>
+              <a class="link" (click)="onRowClick(lead)" (keyup.enter)="onRowClick(lead)" tabindex="0">{{ lead.title }}</a>
             </td>
           </ng-container>
 
@@ -196,7 +196,7 @@ export class LeadListComponent implements OnInit {
   onSearch(q: string): void {
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
-      q.trim() ? this.service.search(q.trim()) : this.service.list(0, 20, this.currentSort, this.currentStatus);
+      if (q.trim()) { this.service.search(q.trim()); } else { this.service.list(0, 20, this.currentSort, this.currentStatus); }
     }, 300);
   }
 
