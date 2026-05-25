@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -159,6 +162,27 @@ class MoneyTest {
             assertTrue(a.isGreaterThan(b));
             assertTrue(b.isLessThan(a));
             assertTrue(a.isGreaterThanOrEqual(a));
+        }
+
+        @Test
+        @DisplayName("should implement Comparable for sorting")
+        void compareTo() {
+            Money small = Money.usd(BigDecimal.valueOf(10));
+            Money medium = Money.usd(BigDecimal.valueOf(50));
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money equalMedium = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.compareTo(small) > 0);
+            assertTrue(small.compareTo(large) < 0);
+            assertEquals(0, medium.compareTo(equalMedium));
+
+            List<Money> unsorted = Arrays.asList(medium, large, small);
+            Collections.sort(unsorted);
+
+            assertEquals(3, unsorted.size());
+            assertEquals(small, unsorted.get(0));
+            assertEquals(medium, unsorted.get(1));
+            assertEquals(large, unsorted.get(2));
         }
     }
 
