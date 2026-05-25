@@ -109,6 +109,39 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should calculate percentage using double")
+        void percentageDouble() {
+            Money base = Money.usd(BigDecimal.valueOf(200.00));
+            Money discount = base.percentage(15.0);
+            assertEquals(new BigDecimal("30.00"), discount.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate 100 percentage")
+        void percentageHundred() {
+            Money base = Money.usd(BigDecimal.valueOf(100.00));
+            Money result = base.percentage(BigDecimal.valueOf(100));
+            assertEquals(new BigDecimal("100.00"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should calculate 0 percentage")
+        void percentageZero() {
+            Money base = Money.usd(BigDecimal.valueOf(100.00));
+            Money result = base.percentage(BigDecimal.ZERO);
+            assertEquals(new BigDecimal("0.00"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should handle decimal percentages")
+        void percentageDecimal() {
+            Money base = Money.usd(BigDecimal.valueOf(200.00));
+            Money result = base.percentage(BigDecimal.valueOf(12.5));
+            // 200 * (12.5 / 100 with scale 2 = 0.13) = 26.00
+            assertEquals(new BigDecimal("26.00"), result.getAmount());
+        }
+
+        @Test
         @DisplayName("should negate")
         void negate() {
             Money positive = Money.usd(BigDecimal.valueOf(50.00));
