@@ -128,6 +128,15 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should multiply by BigDecimal and maintain rounding")
+        void multiplyByBigDecimal() {
+            Money price = Money.usd(new BigDecimal("10.55"));
+            Money total = price.multiply(new BigDecimal("2.5"));
+            assertEquals(new BigDecimal("26.38"), total.getAmount());
+        }
+
+
+        @Test
         @DisplayName("should divide with HALF_UP rounding")
         void divide() {
             Money total = Money.usd(BigDecimal.valueOf(100.00));
