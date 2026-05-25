@@ -1,0 +1,15 @@
+🧹 [code health] Refactor agents to extend AbstractCpqAgent
+
+🎯 **What:**
+Refactored eight AI agents (`BundleAssemblyAgent`, `TaxCalculationIntegrationAgent`, `CompetitivePricingIntelligenceAgent`, `CurrencyFxManagementAgent`, `GuidedProductSelectionAgent`, `OptionFeatureConfigurationAgent`, `CompatibilityRulesAgent`, `ProductSkuManagementAgent`) to extend `AbstractCpqAgent` instead of manually implementing `CpqAgent`.
+
+💡 **Why:**
+These agents previously had mocked/simulated implementations of `invoke` and `stream` methods with a TODO comment (`// TODO: Implement actual LLM call via ChatClient`). The `AbstractCpqAgent` base class was already implemented and fully manages LLM adapter calls, system prompts, auditing, and fallback handling. By extending the base class, we remove duplicate code, eliminate the dead-end TODOs, and correctly wire up these agents to the `ChatClient` infrastructure.
+
+✅ **Verification:**
+- Verified that all changes cleanly removed the mock `invoke()` and `stream()` methods.
+- Refactored all corresponding tests to strictly verify the properties of the agents (`getAgentId()`, `getName()`, `getDescription()`).
+- Successfully compiled and ran the test suite (`./mvnw test -pl services/ai-service`), validating there are no regressions.
+
+✨ **Result:**
+All AI agents now leverage the proper centralized `AbstractCpqAgent` infrastructure for LLM execution, significantly improving codebase consistency and maintainability.
