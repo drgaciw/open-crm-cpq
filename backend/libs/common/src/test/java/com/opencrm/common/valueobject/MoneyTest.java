@@ -94,6 +94,18 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should divide by BigDecimal with HALF_UP rounding")
+        void divideByBigDecimal() {
+            Money total = Money.usd(BigDecimal.valueOf(100.00));
+            Money perUnit = total.divide(new BigDecimal("3"));
+            assertEquals(new BigDecimal("33.33"), perUnit.getAmount());
+
+            Money total2 = Money.usd(BigDecimal.valueOf(20.00));
+            Money perUnit2 = total2.divide(new BigDecimal("3"));
+            assertEquals(new BigDecimal("6.67"), perUnit2.getAmount());
+        }
+
+        @Test
         @DisplayName("should reject division by zero")
         void divideByZero() {
             Money money = Money.usd(BigDecimal.valueOf(100));
