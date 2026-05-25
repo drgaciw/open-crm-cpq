@@ -116,6 +116,30 @@ class MoneyTest {
             assertTrue(negative.isNegative());
             assertEquals(new BigDecimal("-50.00"), negative.getAmount());
         }
+
+        @Test
+        @DisplayName("should return absolute value")
+        void abs() {
+            Money positive = Money.usd(BigDecimal.valueOf(50.00));
+            Money negative = Money.usd(BigDecimal.valueOf(-50.00));
+            Money zero = Money.zero("USD");
+
+            Money absPositive = positive.abs();
+            Money absNegative = negative.abs();
+            Money absZero = zero.abs();
+
+            assertTrue(absPositive.isPositive());
+            assertEquals(new BigDecimal("50.00"), absPositive.getAmount());
+            assertEquals("USD", absPositive.getCurrencyCode());
+
+            assertTrue(absNegative.isPositive());
+            assertEquals(new BigDecimal("50.00"), absNegative.getAmount());
+            assertEquals("USD", absNegative.getCurrencyCode());
+
+            assertTrue(absZero.isZero());
+            assertEquals(new BigDecimal("0.00"), absZero.getAmount());
+            assertEquals("USD", absZero.getCurrencyCode());
+        }
     }
 
     @Nested
