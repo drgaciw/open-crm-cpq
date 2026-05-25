@@ -23,8 +23,23 @@ class PercentageTest {
     @Test
     @DisplayName("should convert to decimal")
     void asDecimal() {
+        // Happy path
         Percentage pct = Percentage.of(25.0);
         assertEquals(new BigDecimal("0.2500"), pct.asDecimal());
+
+        // Edge cases
+        assertEquals(new BigDecimal("1.0000"), Percentage.of(100.0).asDecimal());
+        assertEquals(new BigDecimal("0.0000"), Percentage.of(0.0).asDecimal());
+
+        // Negative values
+        assertEquals(new BigDecimal("-0.1500"), Percentage.of(-15.0).asDecimal());
+        assertEquals(new BigDecimal("-1.5000"), Percentage.of(-150.0).asDecimal());
+
+        // Rounding cases (DEFAULT_SCALE = 4, DEFAULT_ROUNDING = HALF_UP)
+        // 33.33333% -> 0.3333
+        assertEquals(new BigDecimal("0.3333"), Percentage.of(33.3333).asDecimal());
+        // 66.66666% -> 0.6667
+        assertEquals(new BigDecimal("0.6667"), Percentage.of(66.6667).asDecimal());
     }
 
     @Test
