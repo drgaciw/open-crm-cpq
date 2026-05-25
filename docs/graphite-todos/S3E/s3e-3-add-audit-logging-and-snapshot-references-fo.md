@@ -1,6 +1,6 @@
 # S3E-3: Add audit logging and snapshot references for agent invocations before expanding domain agent batches.
 
-**Tracking status:** Graphite tracking PR only; implementation is not complete in this PR.
+**Tracking status:** Core audit behavior implemented on branch `cursor/s3e-3-agent-audit-completion-305e` (invoke/stream failure + latency + snapshot correlation extraction).
 
 **Stack lane:** `S3E`
 

@@ -13,6 +13,7 @@ import com.opencrm.crm.organization.OrganizationRepository;
 import com.opencrm.crm.organization.OrganizationType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -40,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 10. Verify final state
  */
 @DisplayName("Lead to Deal Lifecycle Integration Test")
+@Tag("integration")
 class LeadToDealLifecycleTest extends BaseIntegrationTest {
 
     @Autowired
