@@ -1,10 +1,9 @@
-import time
 import frappe
-from crm.api.whatsapp import get_whatsapp_messages
+
 
 def run_benchmark():
     # Setup test data
-    frappe.init(site='test_site')
+    frappe.init(site="test_site")
     frappe.connect()
 
     frappe.db.begin()
@@ -12,5 +11,6 @@ def run_benchmark():
     # Need to verify if whatsapp is enabled or maybe mock some stuff?
     pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_benchmark()
