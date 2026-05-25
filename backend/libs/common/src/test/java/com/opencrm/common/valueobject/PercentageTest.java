@@ -28,6 +28,17 @@ class PercentageTest {
     }
 
     @Test
+    @DisplayName("should convert to decimal with correct scale and rounding")
+    void asDecimalWithRounding() {
+        assertEquals(new BigDecimal("0.0000"), Percentage.zero().asDecimal(), "Zero should be 0.0000");
+        assertEquals(new BigDecimal("-0.1550"), Percentage.of(-15.5).asDecimal(), "Negative should convert correctly");
+        assertEquals(new BigDecimal("0.3333"), Percentage.of(33.3333).asDecimal(), "Should round HALF_UP correctly");
+        assertEquals(new BigDecimal("0.6667"), Percentage.of(66.6666).asDecimal(), "Should round HALF_UP correctly upwards");
+        assertEquals(new BigDecimal("1.0000"), Percentage.of(100.0).asDecimal(), "100% should be 1.0000");
+        assertEquals(new BigDecimal("1.5000"), Percentage.of(150.0).asDecimal(), "150% should be 1.5000");
+    }
+
+    @Test
     @DisplayName("should add percentages")
     void add() {
         Percentage a = Percentage.of(10.0);
