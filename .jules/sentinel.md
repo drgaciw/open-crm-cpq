@@ -40,3 +40,7 @@
 **Vulnerability:** The code used f-strings and dynamic string concatenation (`query += ...`) to construct raw SQL queries via `frappe.db.sql(query, ...)`. Even if the interpolated variables were strictly constrained by an allowlist (e.g., `doctype` restricted to `"CRM Lead"` or `"CRM Deal"`), this breaks structural security rules and sets a dangerous precedent for SQL injection.
 **Learning:** Frappe's database query wrapper `frappe.db.sql` should never be passed dynamically concatenated raw strings. `ast-grep` rules specifically catch `frappe.db.sql(query + where, $$$)`.
 **Prevention:** Always use explicit, hardcoded strings for raw SQL queries nested within `if/elif/else` blocks, and let the database wrapper parameterize the arguments (`%(param)s`).
+## YYYY-MM-DD - [Testing Improvement] Verify Money Exception Messages
+**Vulnerability:** Weak exception handling / lack of exact exception message verification.
+**Learning:** Checking that an exception is thrown is good, but verifying the exact exception message helps ensure that the specific expected condition caused the failure, rather than some other unforeseen error condition that happened to throw the same exception type.
+**Prevention:** Always assert on the exception message when asserting that a method throws an expected exception.

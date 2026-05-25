@@ -127,7 +127,17 @@ class MoneyTest {
         void rejectDifferentCurrencyAdd() {
             Money usd = Money.usd(BigDecimal.TEN);
             Money eur = Money.of(BigDecimal.TEN, "EUR");
-            assertThrows(IllegalArgumentException.class, () -> usd.add(eur));
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> usd.add(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("should reject subtraction of different currencies")
+        void rejectDifferentCurrencySubtract() {
+            Money usd = Money.usd(BigDecimal.TEN);
+            Money eur = Money.of(BigDecimal.TEN, "EUR");
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> usd.subtract(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", exception.getMessage());
         }
 
         @Test
@@ -135,7 +145,21 @@ class MoneyTest {
         void rejectDifferentCurrencyCompare() {
             Money usd = Money.usd(BigDecimal.TEN);
             Money eur = Money.of(BigDecimal.TEN, "EUR");
-            assertThrows(IllegalArgumentException.class, () -> usd.isGreaterThan(eur));
+
+            IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () -> usd.isGreaterThan(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", ex1.getMessage());
+
+            IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () -> usd.isLessThan(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", ex2.getMessage());
+
+            IllegalArgumentException ex3 = assertThrows(IllegalArgumentException.class, () -> usd.isGreaterThanOrEqual(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", ex3.getMessage());
+
+            IllegalArgumentException ex4 = assertThrows(IllegalArgumentException.class, () -> usd.isLessThanOrEqual(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", ex4.getMessage());
+
+            IllegalArgumentException ex5 = assertThrows(IllegalArgumentException.class, () -> usd.compareTo(eur));
+            assertEquals("Cannot operate on different currencies: USD and EUR", ex5.getMessage());
         }
     }
 

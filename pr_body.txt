@@ -1,0 +1,10 @@
+🎯 **What:**
+The `MoneyTest.java` class lacked rigorous validation of exception messages for currency mismatch scenarios (e.g., adding USD and EUR). We added assertions to verify the exact exception messages and expanded coverage to all relevant methods (`subtract`, `compareTo`, etc.).
+
+📊 **Coverage:**
+- `add()` (message verification)
+- `subtract()` (new test)
+- `compareTo()` and all comparison operators (`isGreaterThan`, `isLessThan`, `isGreaterThanOrEqual`, `isLessThanOrEqual`) (message verification)
+
+✨ **Result:**
+Improved test strictness, ensuring that `IllegalArgumentException` thrown during invalid money operations is indeed due to a currency mismatch and not another unforeseen issue.
