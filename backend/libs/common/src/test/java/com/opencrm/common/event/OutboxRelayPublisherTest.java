@@ -16,6 +16,8 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,7 +49,7 @@ public class OutboxRelayPublisherTest {
         outboxRelayPublisher.publishPendingEvents();
 
         verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        verify(outboxEventRepository, never()).save(any(OutboxEvent.class));
+        verify(outboxEventRepository, never()).saveAll(any());
     }
 
     @Test
@@ -65,7 +67,7 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
         verify(kafkaTemplate).send("TestType2", "456", "{\"data\":\"test2\"}");
 
-        verify(outboxEventRepository, times(2)).save(any(OutboxEvent.class));
+        verify(outboxEventRepository).saveAll(eq(Arrays.asList(event1, event2)));
 
         assertTrue(event1.getPublished());
         assertNotNull(event1.getPublishedAt());
@@ -88,7 +90,7 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
         // As per current implementation, an async failure is just logged. The event is still marked as published and saved.
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(eq(Collections.singletonList(event)));
         assertTrue(event.getPublished());
         assertNotNull(event.getPublishedAt());
     }
@@ -106,7 +108,7 @@ public class OutboxRelayPublisherTest {
 
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(eq(Collections.singletonList(event)));
         assertFalse(event.getPublished());
         assertEquals(1, event.getRetryCount());
         assertEquals("Synchronous Kafka error", event.getErrorMessage());
