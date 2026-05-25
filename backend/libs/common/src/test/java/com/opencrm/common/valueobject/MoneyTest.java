@@ -71,10 +71,21 @@ class MoneyTest {
         @Test
         @DisplayName("should subtract two Money values")
         void subtract() {
+            // Positive result
             Money a = Money.usd(BigDecimal.valueOf(50.00));
             Money b = Money.usd(BigDecimal.valueOf(20.50));
             Money result = a.subtract(b);
             assertEquals(new BigDecimal("29.50"), result.getAmount());
+
+            // Zero result
+            Money zeroResult = a.subtract(a);
+            assertEquals(new BigDecimal("0.00"), zeroResult.getAmount());
+            assertTrue(zeroResult.isZero());
+
+            // Negative result
+            Money negativeResult = b.subtract(a);
+            assertEquals(new BigDecimal("-29.50"), negativeResult.getAmount());
+            assertTrue(negativeResult.isNegative());
         }
 
         @Test
@@ -128,6 +139,14 @@ class MoneyTest {
             Money usd = Money.usd(BigDecimal.TEN);
             Money eur = Money.of(BigDecimal.TEN, "EUR");
             assertThrows(IllegalArgumentException.class, () -> usd.add(eur));
+        }
+
+        @Test
+        @DisplayName("should reject subtraction of different currencies")
+        void rejectDifferentCurrencySubtract() {
+            Money usd = Money.usd(BigDecimal.TEN);
+            Money eur = Money.of(BigDecimal.TEN, "EUR");
+            assertThrows(IllegalArgumentException.class, () -> usd.subtract(eur));
         }
 
         @Test
