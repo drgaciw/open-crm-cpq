@@ -128,12 +128,63 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should negate")
-        void negate() {
+        @DisplayName("should negate positive amount")
+        void negatePositive() {
             Money positive = Money.usd(BigDecimal.valueOf(50.00));
             Money negative = positive.negate();
             assertTrue(negative.isNegative());
             assertEquals(new BigDecimal("-50.00"), negative.getAmount());
+            assertEquals("USD", negative.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should negate negative amount")
+        void negateNegative() {
+            Money negative = Money.usd(BigDecimal.valueOf(-25.50));
+            Money positive = negative.negate();
+            assertTrue(positive.isPositive());
+            assertEquals(new BigDecimal("25.50"), positive.getAmount());
+            assertEquals("USD", positive.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should negate zero amount")
+        void negateZero() {
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money result = zero.negate();
+            assertTrue(result.isZero());
+            assertEquals(new BigDecimal("0.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of positive amount")
+        void absPositive() {
+            Money positive = Money.usd(BigDecimal.valueOf(50.00));
+            Money result = positive.abs();
+            assertTrue(result.isPositive());
+            assertEquals(new BigDecimal("50.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of negative amount")
+        void absNegative() {
+            Money negative = Money.usd(BigDecimal.valueOf(-25.50));
+            Money result = negative.abs();
+            assertTrue(result.isPositive());
+            assertEquals(new BigDecimal("25.50"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of zero amount")
+        void absZero() {
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money result = zero.abs();
+            assertTrue(result.isZero());
+            assertEquals(new BigDecimal("0.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
         }
 
         @Test
