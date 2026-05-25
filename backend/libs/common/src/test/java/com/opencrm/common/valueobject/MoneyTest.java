@@ -41,6 +41,15 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should reject null or blank currency code")
+        void rejectNullOrBlankCurrency() {
+            assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, null));
+            assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, ""));
+            assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, "   "));
+        }
+
+
+        @Test
         @DisplayName("should reject invalid currency code")
         void rejectInvalidCurrency() {
             assertThrows(IllegalArgumentException.class, () -> Money.of(BigDecimal.TEN, "XYZ"));
