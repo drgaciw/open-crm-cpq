@@ -23,8 +23,23 @@ class PercentageTest {
     @Test
     @DisplayName("should convert to decimal")
     void asDecimal() {
+        // Happy path
         Percentage pct = Percentage.of(25.0);
         assertEquals(new BigDecimal("0.2500"), pct.asDecimal());
+
+        // Edge cases
+        assertEquals(new BigDecimal("1.0000"), Percentage.of(100.0).asDecimal());
+        assertEquals(new BigDecimal("0.0000"), Percentage.of(0.0).asDecimal());
+
+        // Negative values
+        assertEquals(new BigDecimal("-0.1500"), Percentage.of(-15.0).asDecimal());
+        assertEquals(new BigDecimal("-1.5000"), Percentage.of(-150.0).asDecimal());
+
+        // Rounding cases (DEFAULT_SCALE = 4, DEFAULT_ROUNDING = HALF_UP)
+        // 33.33333% -> 0.3333
+        assertEquals(new BigDecimal("0.3333"), Percentage.of(33.3333).asDecimal());
+        // 66.66666% -> 0.6667
+        assertEquals(new BigDecimal("0.6667"), Percentage.of(66.6667).asDecimal());
     }
 
     @Test
@@ -36,21 +51,72 @@ class PercentageTest {
         assertEquals(new BigDecimal("15.0000"), result.getValue());
     }
 
+
+    @Test
+    @DisplayName("should add negative percentages")
+    void addNegative() {
+        Percentage a = Percentage.of(10.0);
+        Percentage b = Percentage.of(-5.0);
+        Percentage result = a.add(b);
+        assertEquals(new BigDecimal("5.0000"), result.getValue());
+    }
+
+    @Test
+    @DisplayName("should add zero percentage")
+    void addZero() {
+        Percentage a = Percentage.of(10.0);
+        Percentage result = a.add(Percentage.zero());
+        assertEquals(new BigDecimal("10.0000"), result.getValue());
+    }
+
+    @Test
+    @DisplayName("should throw NullPointerException when adding null")
+    void addNull() {
+        Percentage a = Percentage.of(10.0);
+        assertThrows(NullPointerException.class, () -> a.add(null));
+    }
+
     @Test
     @DisplayName("should subtract percentages")
     void subtract() {
         Percentage a = Percentage.of(20.0);
         Percentage b = Percentage.of(8.0);
+
+        // Positive minus positive
         Percentage result = a.subtract(b);
         assertEquals(new BigDecimal("12.0000"), result.getValue());
+
+        // Resulting in negative
+        Percentage resultNegative = b.subtract(a);
+        assertEquals(new BigDecimal("-12.0000"), resultNegative.getValue());
+
+        // Subtracting negative
+        Percentage negative = Percentage.of(-5.0);
+        Percentage resultAdd = a.subtract(negative);
+        assertEquals(new BigDecimal("25.0000"), resultAdd.getValue());
+
+        // Subtracting zero
+        Percentage resultZero = a.subtract(Percentage.zero());
+        assertEquals(new BigDecimal("20.0000"), resultZero.getValue());
+
+        // Null parameter
+        assertThrows(NullPointerException.class, () -> a.subtract(null));
     }
 
     @Test
     @DisplayName("should detect positive, negative, zero")
     void signDetection() {
         assertTrue(Percentage.of(10).isPositive());
+        assertFalse(Percentage.of(-5).isPositive());
+        assertFalse(Percentage.zero().isPositive());
+
         assertTrue(Percentage.of(-5).isNegative());
+        assertFalse(Percentage.of(10).isNegative());
+        assertFalse(Percentage.zero().isNegative());
+
         assertTrue(Percentage.zero().isZero());
+        assertFalse(Percentage.of(10).isZero());
+        assertFalse(Percentage.of(-5).isZero());
     }
 
     @Test
@@ -60,11 +126,20 @@ class PercentageTest {
         Percentage b = Percentage.of(10);
         assertTrue(a.compareTo(b) > 0);
         assertTrue(b.compareTo(a) < 0);
+        assertEquals(0, a.compareTo(Percentage.of(20)));
     }
 
     @Test
-    @DisplayName("should reject null value")
-    void rejectNull() {
-        assertThrows(IllegalArgumentException.class, () -> new Percentage((BigDecimal) null));
+    @DisplayName("should reject null value in constructor")
+    void constructorRejectNull() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new Percentage((BigDecimal) null));
+        assertEquals("Percentage value cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("should reject null value in factory method")
+    void factoryRejectNull() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> Percentage.of((BigDecimal) null));
+        assertEquals("Percentage value cannot be null", exception.getMessage());
     }
 }
