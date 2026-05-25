@@ -54,24 +54,53 @@ def notify_agent(doc):
             )
         )
 
-        for user in assigned_users:
-            if user in existing_notifications:
-                continue
+        new_users = [u for u in assigned_users if u not in existing_notifications]
+        if not new_users:
+            return
 
-            values = frappe._dict(
-                doctype="CRM Notification",
-                from_user=doc.owner,
-                to_user=user,
-                type="WhatsApp",
-                message=doc.message,
-                notification_text=notification_text,
-                notification_type_doctype="WhatsApp Message",
-                notification_type_doc=doc.name,
-                reference_doctype=doc.reference_doctype,
-                reference_name=doc.reference_name,
+        now = frappe.utils.now()
+        fields = [
+            "name",
+            "creation",
+            "modified",
+            "modified_by",
+            "owner",
+            "docstatus",
+            "from_user",
+            "to_user",
+            "type",
+            "message",
+            "notification_text",
+            "notification_type_doctype",
+            "notification_type_doc",
+            "reference_doctype",
+            "reference_name",
+        ]
+
+        values = []
+        for user in new_users:
+            values.append(
+                (
+                    frappe.generate_hash(length=10),
+                    now,
+                    now,
+                    frappe.session.user if getattr(frappe, "session", None) else "Administrator",
+                    frappe.session.user if getattr(frappe, "session", None) else "Administrator",
+                    0,
+                    doc.owner,
+                    user,
+                    "WhatsApp",
+                    doc.message,
+                    notification_text,
+                    "WhatsApp Message",
+                    doc.name,
+                    doc.reference_doctype,
+                    doc.reference_name,
+                )
             )
 
-            frappe.get_doc(values).insert(ignore_permissions=True)
+        frappe.db.bulk_insert("CRM Notification", fields=fields, values=values)
+        frappe.publish_realtime("crm_notification")
 
 
 def get_lead_or_deal_from_number(number):
