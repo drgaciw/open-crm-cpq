@@ -37,7 +37,22 @@ class MoneyTest {
         @Test
         @DisplayName("should reject null amount")
         void rejectNullAmount() {
-            assertThrows(IllegalArgumentException.class, () -> new Money(null, "USD"));
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new Money(null, "USD"));
+            assertEquals("Amount cannot be null", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("should reject null currency code")
+        void rejectNullCurrencyCode() {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, null));
+            assertEquals("Currency code cannot be null or blank", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("should reject blank currency code")
+        void rejectBlankCurrencyCode() {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, "   "));
+            assertEquals("Currency code cannot be null or blank", exception.getMessage());
         }
 
         @Test
