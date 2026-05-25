@@ -152,6 +152,18 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should correctly identify if amount is zero")
+        void isZero() {
+            assertTrue(Money.zero("USD").isZero());
+            assertTrue(Money.usd(BigDecimal.ZERO).isZero());
+            assertTrue(Money.usd(new BigDecimal("0.00")).isZero());
+            assertTrue(Money.usd(0.0).isZero());
+
+            assertFalse(Money.usd(BigDecimal.valueOf(0.01)).isZero());
+            assertFalse(Money.usd(BigDecimal.valueOf(-0.01)).isZero());
+        }
+
+        @Test
         @DisplayName("should compare greater/less than")
         void greaterLessThan() {
             Money a = Money.usd(BigDecimal.valueOf(100));
