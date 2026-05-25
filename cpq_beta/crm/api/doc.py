@@ -8,9 +8,25 @@ from pypika import Criterion
 from frappe.utils import make_filter_tuple
 
 from crm.api.views import get_views
-from crm.fcrm.doctype.crm_form_script.crm_form_script import get_form_script
 
 ALLOWED_DOCTYPES = {"CRM Lead", "CRM Deal", "CRM Organization", "Contact"}
+
+def fetch_form_scripts(dt, view="Form"):
+	"""Returns the form script for the given doctype"""
+	FormScript = frappe.qb.DocType("CRM Form Script")
+	query = (
+		frappe.qb.from_(FormScript)
+		.select("script")
+		.where(FormScript.dt == dt)
+		.where(FormScript.view == view)
+		.where(FormScript.enabled == 1)
+	)
+
+	doc = query.run(as_dict=True)
+	if doc:
+		return [d.script for d in doc] if len(doc) > 1 else doc[0].script
+	else:
+		return None
 
 
 def _validate_doctype(doctype: str):
@@ -502,8 +518,8 @@ def get_data(
 		"views": get_views(doctype),
 		"total_count": frappe.db.count(doctype, filters=filters),
 		"row_count": len(data),
-		"form_script": get_form_script(doctype),
-		"list_script": get_form_script(doctype, "List"),
+		"form_script": fetch_form_scripts(doctype),
+		"list_script": fetch_form_scripts(doctype, "List"),
 		"view_type": view_type,
 	}
 
