@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface ProductAttributeRepository extends JpaRepository<ProductAttribute, Long> {
@@ -17,4 +19,6 @@ public interface ProductAttributeRepository extends JpaRepository<ProductAttribu
     Page<ProductAttribute> findByDeletedFalse(Pageable pageable);
 
     boolean existsByNameAndDeletedFalse(String name);
+
+    List<ProductAttribute> findByIdInAndDeletedFalse(Set<Long> ids);
 }

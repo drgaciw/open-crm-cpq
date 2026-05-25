@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -95,9 +98,16 @@ public class ProductAttributeService {
     @Transactional(readOnly = true)
     public List<AttributeValueDto> getAttributeValues(Long productId) {
         List<ProductAttributeValue> values = attributeValueRepository.findByProductIdAndDeletedFalse(productId);
+
+        Set<Long> attributeIds = values.stream()
+                .map(ProductAttributeValue::getAttributeId)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> attributeNames = attributeRepository.findByIdInAndDeletedFalse(attributeIds).stream()
+                .collect(Collectors.toMap(ProductAttribute::getId, ProductAttribute::getName));
+
         return values.stream().map(v -> {
-            String attrName = attributeRepository.findByIdAndDeletedFalse(v.getAttributeId())
-                    .map(ProductAttribute::getName).orElse(null);
+            String attrName = attributeNames.get(v.getAttributeId());
             return AttributeValueDto.builder()
                     .id(v.getId())
                     .uuid(v.getUuid())
