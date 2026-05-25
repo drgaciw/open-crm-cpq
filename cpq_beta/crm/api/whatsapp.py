@@ -434,18 +434,44 @@ def parse_template_parameters(string, parameters):
 
 
 def get_from_name(message):
-    doc = frappe.get_doc(message["reference_doctype"], message["reference_name"])
+    reference_doctype = message.get("reference_doctype")
+    reference_name = message.get("reference_name")
     from_name = ""
-    if message["reference_doctype"] == "CRM Deal":
-        if doc.get("contacts"):
-            for c in doc.get("contacts"):
-                if c.is_primary:
-                    from_name = c.full_name or c.mobile_no
-                    break
+
+    if reference_doctype == "CRM Deal":
+        meta = frappe.get_meta("CRM Deal")
+        contact_doctype = meta.get_field("contacts").options
+
+        contact = frappe.db.get_value(
+            contact_doctype,
+            {"parent": reference_name, "parenttype": "CRM Deal", "is_primary": 1},
+            ["full_name", "mobile_no"],
+            as_dict=True,
+        )
+        if contact:
+            from_name = contact.get("full_name") or contact.get("mobile_no")
         else:
-            from_name = doc.get("lead_name")
+            # Originally it fetched doc.get("lead_name") but fallback to query if empty contacts
+            contacts = frappe.db.get_value(
+                contact_doctype, {"parent": reference_name, "parenttype": "CRM Deal"}
+            )
+            if not contacts:
+                from_name = frappe.db.get_value("CRM Deal", reference_name, "lead_name")
+    elif reference_doctype == "CRM Lead":
+        values = frappe.db.get_value(
+            reference_doctype, reference_name, ["first_name", "last_name"]
+        )
+        if values:
+            if isinstance(values, tuple):
+                from_name = " ".join(filter(None, values))
+            else:
+                from_name = " ".join(
+                    filter(None, [values.get("first_name"), values.get("last_name")])
+                )
     else:
+        doc = frappe.get_doc(reference_doctype, reference_name)
         from_name = (
             " ".join(filter(None, [doc.get("first_name"), doc.get("last_name")])) or ""
         )
-    return from_name
+
+    return from_name or ""
