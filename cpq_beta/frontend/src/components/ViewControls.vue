@@ -997,8 +997,10 @@ function publicView() {
 }
 
 function pinView() {
-  call('crm.fcrm.doctype.crm_view_settings.crm_view_settings.pin', {
+  call('frappe.client.set_value', {
+    doctype: 'CRM View Settings',
     name: route.query.view,
+    fieldname: 'pinned',
     value: !view.value.pinned,
   }).then(() => {
     view.value.pinned = !view.value.pinned
