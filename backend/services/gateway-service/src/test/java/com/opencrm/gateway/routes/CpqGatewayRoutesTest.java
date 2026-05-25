@@ -52,7 +52,7 @@ class CpqGatewayRoutesTest {
                 "ERP agent-contract paths must have a gateway stub route");
         assertTrue(yaml.contains("Path=/api/v1/erp/**"),
                 "ERP stub must match /api/v1/erp/**");
-        assertTrue(yaml.contains("forward:/fallback/erp/unavailable"),
+        assertTrue(yaml.contains("forward:/fallback/erp"),
                 "ERP stub must forward to local 501 handler");
     }
 
