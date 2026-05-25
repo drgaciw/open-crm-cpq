@@ -2,6 +2,8 @@ package com.opencrm.common.event;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,6 +34,9 @@ public class OutboxRelayPublisherTest {
     @InjectMocks
     private OutboxRelayPublisher outboxRelayPublisher;
 
+    @Captor
+    private ArgumentCaptor<List<OutboxEvent>> listCaptor;
+
     @Test
     void publishPendingEvents_NoEvents() {
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Collections.emptyList());
@@ -38,7 +44,7 @@ public class OutboxRelayPublisherTest {
         outboxRelayPublisher.publishPendingEvents();
 
         verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        verify(outboxEventRepository, never()).save(any(OutboxEvent.class));
+        verify(outboxEventRepository, never()).saveAll(any());
     }
 
     @Test
@@ -65,7 +71,12 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
         verify(kafkaTemplate).send("TestType2", "456", "{\"data\":\"test2\"}");
 
-        verify(outboxEventRepository, times(2)).save(any(OutboxEvent.class));
+        verify(outboxEventRepository).saveAll(listCaptor.capture());
+
+        List<OutboxEvent> savedEvents = listCaptor.getValue();
+        assertEquals(2, savedEvents.size());
+        assertTrue(savedEvents.contains(event1));
+        assertTrue(savedEvents.contains(event2));
 
         assertTrue(event1.getPublished());
         assertNotNull(event1.getPublishedAt());
@@ -92,7 +103,12 @@ public class OutboxRelayPublisherTest {
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
         // As per current implementation, an async failure is just logged. The event is still marked as published and saved.
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(listCaptor.capture());
+
+        List<OutboxEvent> savedEvents = listCaptor.getValue();
+        assertEquals(1, savedEvents.size());
+        assertTrue(savedEvents.contains(event));
+
         assertTrue(event.getPublished());
         assertNotNull(event.getPublishedAt());
     }
@@ -114,7 +130,12 @@ public class OutboxRelayPublisherTest {
 
         verify(kafkaTemplate).send("TestType", "123", "{\"data\":\"test\"}");
 
-        verify(outboxEventRepository).save(event);
+        verify(outboxEventRepository).saveAll(listCaptor.capture());
+
+        List<OutboxEvent> savedEvents = listCaptor.getValue();
+        assertEquals(1, savedEvents.size());
+        assertTrue(savedEvents.contains(event));
+
         assertFalse(event.getPublished());
         assertEquals(1, event.getRetryCount());
         assertEquals("Synchronous Kafka error", event.getErrorMessage());
