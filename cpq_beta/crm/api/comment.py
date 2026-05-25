@@ -98,6 +98,9 @@ def add_attachments(name: str, attachments: Iterable[str | dict]) -> None:
     :param name: Comment name
     :param attachments: File names or dicts with keys "fname" and "fcontent"
     """
+    # Coerce to list to prevent exhausting the iterator during multiple passes
+    attachments = list(attachments)
+
     comment = frappe.get_doc("Comment", name)
     if comment.reference_doctype and comment.reference_name:
         if not frappe.has_permission(
@@ -105,11 +108,23 @@ def add_attachments(name: str, attachments: Iterable[str | dict]) -> None:
         ):
             frappe.throw(_("Not permitted"), frappe.PermissionError)
 
+    # Pre-fetch all string attachments in a single query to eliminate N+1 overhead
+    attachment_names = [a for a in attachments if isinstance(a, str)]
+    attachment_map = {}
+    if attachment_names:
+        fetched_files = frappe.db.get_all(
+            "File",
+            filters={"name": ["in", attachment_names]},
+            fields=["name", "file_url", "is_private"],
+            as_dict=1
+        )
+        attachment_map = {f.name: f for f in fetched_files}
+
     for a in attachments:
         if isinstance(a, str):
-            attach = frappe.db.get_value(
-                "File", {"name": a}, ["file_url", "is_private"], as_dict=1
-            )
+            attach = attachment_map.get(a)
+            if not attach:
+                continue
             file_args = {
                 "file_url": attach.file_url,
                 "is_private": attach.is_private,
