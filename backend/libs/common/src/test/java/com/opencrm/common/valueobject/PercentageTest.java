@@ -130,8 +130,16 @@ class PercentageTest {
     }
 
     @Test
-    @DisplayName("should reject null value")
-    void rejectNull() {
-        assertThrows(IllegalArgumentException.class, () -> new Percentage((BigDecimal) null));
+    @DisplayName("should reject null value in constructor")
+    void constructorRejectNull() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> new Percentage((BigDecimal) null));
+        assertEquals("Percentage value cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("should reject null value in factory method")
+    void factoryRejectNull() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> Percentage.of((BigDecimal) null));
+        assertEquals("Percentage value cannot be null", exception.getMessage());
     }
 }
