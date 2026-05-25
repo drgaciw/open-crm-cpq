@@ -24,6 +24,12 @@ class CpqGatewayRoutesTest {
                     yaml.contains("id: " + routeId),
                     () -> "Missing gateway route id: " + routeId);
         }
+
+        for (String routeId : CpqGatewayRoutes.AGENT_CONTRACT_ROUTE_IDS) {
+            assertTrue(
+                    yaml.contains("id: " + routeId),
+                    () -> "Missing agent-contract gateway route id: " + routeId);
+        }
     }
 
     @Test
@@ -36,5 +42,33 @@ class CpqGatewayRoutesTest {
                 "Pricing aggregate rewrite must be present");
         assertTrue(yaml.contains("configurations"),
                 "Configuration engine rewrite must be present");
+    }
+
+    @Test
+    void applicationYamlDeclaresErpStubRoute() throws Exception {
+        String yaml = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertTrue(yaml.contains("id: erp-stub"),
+                "ERP agent-contract paths must have a gateway stub route");
+        assertTrue(yaml.contains("Path=/api/v1/erp/**"),
+                "ERP stub must match /api/v1/erp/**");
+        assertTrue(yaml.contains("forward:/fallback/erp"),
+                "ERP stub must forward to local 501 handler");
+    }
+
+    @Test
+    void applicationYamlRoutesAgentCriticalPrefixes() throws Exception {
+        String yaml = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertTrue(yaml.contains("/api/v1/configuration/**"),
+                "Configuration rules and validate must route to product-service");
+        assertTrue(yaml.contains("Path=/api/v1/configurations/**"),
+                "Configuration sessions must route to configuration-engine");
+        assertTrue(yaml.contains("Path=/api/v1/pricing/**"),
+                "Pricing execute/simulate must route to pricing-service");
+        assertTrue(yaml.contains("/api/v1/rules/**"),
+                "DRL rules must route to pricing-service");
+        assertTrue(yaml.contains("Path=/api/v1/quotes/**"),
+                "Quote and BFF approval paths must route to quote-service");
     }
 }
