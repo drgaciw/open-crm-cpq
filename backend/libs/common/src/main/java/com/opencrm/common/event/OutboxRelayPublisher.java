@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -42,6 +43,8 @@ public class OutboxRelayPublisher {
         }
 
         int processed = 0;
+        List<OutboxEvent> eventsToSave = new ArrayList<>();
+
         for (OutboxEvent event : events) {
             if (processed >= BATCH_SIZE) {
                 break;
@@ -57,7 +60,7 @@ public class OutboxRelayPublisher {
                         });
 
                 event.markAsPublished();
-                outboxEventRepository.save(event);
+                eventsToSave.add(event);
                 processed++;
 
                 log.debug("Published outbox event {} to topic {}", event.getId(), event.getEventType());
@@ -65,8 +68,12 @@ public class OutboxRelayPublisher {
             } catch (Exception e) {
                 log.error("Error publishing outbox event {}", event.getId(), e);
                 event.incrementRetryCount(e.getMessage());
-                outboxEventRepository.save(event);
+                eventsToSave.add(event);
             }
+        }
+
+        if (!eventsToSave.isEmpty()) {
+            outboxEventRepository.saveAll(eventsToSave);
         }
 
         if (processed > 0) {

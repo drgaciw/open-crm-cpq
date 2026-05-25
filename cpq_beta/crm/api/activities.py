@@ -8,17 +8,16 @@ from frappe.desk.form.load import get_docinfo
 
 @frappe.whitelist()
 def get_activities(name):
-    # Use frappe.get_list to prevent ID enumeration vulnerability
-    # Verify existence and permissions in one step
-    deal_exists = frappe.get_list("CRM Deal", filters={"name": name}, pluck="name")
-    if deal_exists:
+    if frappe.db.exists("CRM Deal", name):
+        if not frappe.has_permission("CRM Deal", "read", name):
+            frappe.throw(_("Document not found"), frappe.DoesNotExistError)
         return get_deal_activities(name)
-
-    lead_exists = frappe.get_list("CRM Lead", filters={"name": name}, pluck="name")
-    if lead_exists:
+    elif frappe.db.exists("CRM Lead", name):
+        if not frappe.has_permission("CRM Lead", "read", name):
+            frappe.throw(_("Document not found"), frappe.DoesNotExistError)
         return get_lead_activities(name)
-
-    frappe.throw(_("Document not found"), frappe.DoesNotExistError)
+    else:
+        frappe.throw(_("Document not found"), frappe.DoesNotExistError)
 
 
 def get_deal_activities(name):

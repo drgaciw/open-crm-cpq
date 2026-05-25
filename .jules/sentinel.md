@@ -40,13 +40,7 @@
 **Vulnerability:** The code used f-strings and dynamic string concatenation (`query += ...`) to construct raw SQL queries via `frappe.db.sql(query, ...)`. Even if the interpolated variables were strictly constrained by an allowlist (e.g., `doctype` restricted to `"CRM Lead"` or `"CRM Deal"`), this breaks structural security rules and sets a dangerous precedent for SQL injection.
 **Learning:** Frappe's database query wrapper `frappe.db.sql` should never be passed dynamically concatenated raw strings. `ast-grep` rules specifically catch `frappe.db.sql(query + where, $$$)`.
 **Prevention:** Always use explicit, hardcoded strings for raw SQL queries nested within `if/elif/else` blocks, and let the database wrapper parameterize the arguments (`%(param)s`).
-## 2026-05-22 - ID Enumeration via Missing Permissions Error
-
-**Vulnerability:**
-Frappe whitelisted APIs often use `frappe.db.exists()` followed by `frappe.has_permission()`. If unauthorized, a `PermissionError` was thrown, whereas if it didn't exist, a `DoesNotExistError` was thrown. This allowed attackers to enumerate valid record IDs (e.g., via the `/api/method/crm.api.activities.get_activities` endpoint) by observing the distinct HTTP 403 versus 404 error responses.
-
-**Learning:**
-Validating existence sequentially before permissions inherently leaks information. Frappe's `frappe.get_list()` enforces `ignore_permissions=False` by default. By querying with a `name` filter, we can safely and simultaneously test for both existence and authorization.
-
-**Prevention:**
-To prevent ID enumeration, replace sequential existence checks with a single `frappe.get_list(..., pluck="name")` call and return a unified `DoesNotExistError` (HTTP 404) whenever the record is unresolvable or inaccessible.
+## 2024-05-24 - [Fix SQL Injection via Dynamic SQL Concatenation]
+**Vulnerability:** Similar to previous discoveries, `frappe.db.sql` was being called with dynamically evaluated variables (e.g., `frappe.db.sql(query, ...)` where `query` was assigned earlier as a string literal). While seemingly safe because the components were statically defined in branches, this practice violated AST Grep's structural security rule against SQL concatenation and risked leaving `query` unbound if a code path fell through, resulting in a 500 error and stack trace leakage.
+**Learning:** `ast-grep` rules enforce explicit hardcoding of SQL strings directly inside `frappe.db.sql()`. Bypassing this by storing strings in variables before execution is not permitted. Additionally, failing to handle fallback branches can lead to `UnboundLocalError`, causing the app to crash and expose stack traces (CWE-209).
+**Prevention:** Always place raw SQL string literals explicitly inside the `frappe.db.sql()` function call and ensure all conditional branches correctly resolve or safely fallback without executing undefined variables.

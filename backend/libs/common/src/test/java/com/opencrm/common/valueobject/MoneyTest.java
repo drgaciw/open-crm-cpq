@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,6 +44,18 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should reject null currency code")
+        void rejectNullCurrencyCode() {
+            assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, null));
+        }
+
+        @Test
+        @DisplayName("should reject blank currency code")
+        void rejectBlankCurrencyCode() {
+            assertThrows(IllegalArgumentException.class, () -> new Money(BigDecimal.TEN, "   "));
+        }
+
+        @Test
         @DisplayName("should reject invalid currency code")
         void rejectInvalidCurrency() {
             assertThrows(IllegalArgumentException.class, () -> Money.of(BigDecimal.TEN, "XYZ"));
@@ -62,10 +77,37 @@ class MoneyTest {
         @Test
         @DisplayName("should add two Money values")
         void add() {
-            Money a = Money.usd(BigDecimal.valueOf(10.50));
-            Money b = Money.usd(BigDecimal.valueOf(20.30));
+            Money a = Money.usd(new BigDecimal("10.50"));
+            Money b = Money.usd(new BigDecimal("20.30"));
             Money result = a.add(b);
             assertEquals(new BigDecimal("30.80"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add zero")
+        void addZero() {
+            Money a = Money.usd(new BigDecimal("10.50"));
+            Money b = Money.usd(BigDecimal.ZERO);
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("10.50"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add negative amount")
+        void addNegative() {
+            Money a = Money.usd(new BigDecimal("20.30"));
+            Money b = Money.usd(new BigDecimal("-10.50"));
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("9.80"), result.getAmount());
+        }
+
+        @Test
+        @DisplayName("should add large amounts")
+        void addLargeAmounts() {
+            Money a = Money.usd(new BigDecimal("999999999999.99"));
+            Money b = Money.usd(new BigDecimal("0.01"));
+            Money result = a.add(b);
+            assertEquals(new BigDecimal("1000000000000.00"), result.getAmount());
         }
 
         @Test
@@ -86,6 +128,15 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should multiply by BigDecimal and maintain rounding")
+        void multiplyByBigDecimal() {
+            Money price = Money.usd(new BigDecimal("10.55"));
+            Money total = price.multiply(new BigDecimal("2.5"));
+            assertEquals(new BigDecimal("26.38"), total.getAmount());
+        }
+
+
+        @Test
         @DisplayName("should divide with HALF_UP rounding")
         void divide() {
             Money total = Money.usd(BigDecimal.valueOf(100.00));
@@ -94,10 +145,25 @@ class MoneyTest {
         }
 
         @Test
+        @DisplayName("should divide by BigDecimal with HALF_UP rounding")
+        void divideByBigDecimal() {
+            Money total = Money.usd(BigDecimal.valueOf(100.00));
+            Money perUnit = total.divide(new BigDecimal("2.5"));
+            assertEquals(new BigDecimal("40.00"), perUnit.getAmount());
+        }
+
+        @Test
         @DisplayName("should reject division by zero")
         void divideByZero() {
             Money money = Money.usd(BigDecimal.valueOf(100));
             assertThrows(ArithmeticException.class, () -> money.divide(BigDecimal.ZERO));
+        }
+
+        @Test
+        @DisplayName("should reject division by double zero")
+        void divideByDoubleZero() {
+            Money money = Money.usd(BigDecimal.valueOf(100));
+            assertThrows(ArithmeticException.class, () -> money.divide(0.0));
         }
 
         @Test
@@ -109,12 +175,73 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should negate")
-        void negate() {
+        @DisplayName("should negate positive amount")
+        void negatePositive() {
             Money positive = Money.usd(BigDecimal.valueOf(50.00));
             Money negative = positive.negate();
             assertTrue(negative.isNegative());
             assertEquals(new BigDecimal("-50.00"), negative.getAmount());
+            assertEquals("USD", negative.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should negate negative amount")
+        void negateNegative() {
+            Money negative = Money.usd(BigDecimal.valueOf(-25.50));
+            Money positive = negative.negate();
+            assertTrue(positive.isPositive());
+            assertEquals(new BigDecimal("25.50"), positive.getAmount());
+            assertEquals("USD", positive.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should negate zero amount")
+        void negateZero() {
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money result = zero.negate();
+            assertTrue(result.isZero());
+            assertEquals(new BigDecimal("0.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of positive amount")
+        void absPositive() {
+            Money positive = Money.usd(BigDecimal.valueOf(50.00));
+            Money result = positive.abs();
+            assertTrue(result.isPositive());
+            assertEquals(new BigDecimal("50.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of negative amount")
+        void absNegative() {
+            Money negative = Money.usd(BigDecimal.valueOf(-25.50));
+            Money result = negative.abs();
+            assertTrue(result.isPositive());
+            assertEquals(new BigDecimal("25.50"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should return absolute value of zero amount")
+        void absZero() {
+            Money zero = Money.usd(BigDecimal.ZERO);
+            Money result = zero.abs();
+            assertTrue(result.isZero());
+            assertEquals(new BigDecimal("0.00"), result.getAmount());
+            assertEquals("USD", result.getCurrencyCode());
+        }
+
+        @Test
+        @DisplayName("should subtract into negative values")
+        void subtractToNegative() {
+            Money a = Money.usd(BigDecimal.valueOf(50.00));
+            Money b = Money.usd(BigDecimal.valueOf(100.00));
+            Money result = a.subtract(b);
+            assertTrue(result.isNegative());
+            assertEquals(new BigDecimal("-50.00"), result.getAmount());
         }
     }
 
@@ -137,6 +264,14 @@ class MoneyTest {
             Money eur = Money.of(BigDecimal.TEN, "EUR");
             assertThrows(IllegalArgumentException.class, () -> usd.isGreaterThan(eur));
         }
+
+        @Test
+        @DisplayName("should reject subtraction of different currencies")
+        void rejectDifferentCurrencySubtract() {
+            Money usd = Money.usd(BigDecimal.TEN);
+            Money eur = Money.of(BigDecimal.TEN, "EUR");
+            assertThrows(IllegalArgumentException.class, () -> usd.subtract(eur));
+        }
     }
 
     @Nested
@@ -152,13 +287,68 @@ class MoneyTest {
         }
 
         @Test
-        @DisplayName("should compare greater/less than")
-        void greaterLessThan() {
-            Money a = Money.usd(BigDecimal.valueOf(100));
-            Money b = Money.usd(BigDecimal.valueOf(50));
-            assertTrue(a.isGreaterThan(b));
-            assertTrue(b.isLessThan(a));
-            assertTrue(a.isGreaterThanOrEqual(a));
+        @DisplayName("should correctly identify if amount is greater than another")
+        void isGreaterThan() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.isGreaterThan(small));
+            assertFalse(small.isGreaterThan(large));
+            assertFalse(large.isGreaterThan(large));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is less than another")
+        void isLessThan() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(small.isLessThan(large));
+            assertFalse(large.isLessThan(small));
+            assertFalse(small.isLessThan(small));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is greater than or equal to another")
+        void isGreaterThanOrEqual() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.isGreaterThanOrEqual(small));
+            assertTrue(large.isGreaterThanOrEqual(large));
+            assertFalse(small.isGreaterThanOrEqual(large));
+        }
+
+        @Test
+        @DisplayName("should correctly identify if amount is less than or equal to another")
+        void isLessThanOrEqual() {
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money small = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(small.isLessThanOrEqual(large));
+            assertTrue(small.isLessThanOrEqual(small));
+            assertFalse(large.isLessThanOrEqual(small));
+        }
+
+        @Test
+        @DisplayName("should implement Comparable for sorting")
+        void compareTo() {
+            Money small = Money.usd(BigDecimal.valueOf(10));
+            Money medium = Money.usd(BigDecimal.valueOf(50));
+            Money large = Money.usd(BigDecimal.valueOf(100));
+            Money equalMedium = Money.usd(BigDecimal.valueOf(50));
+
+            assertTrue(large.compareTo(small) > 0);
+            assertTrue(small.compareTo(large) < 0);
+            assertEquals(0, medium.compareTo(equalMedium));
+
+            List<Money> unsorted = Arrays.asList(medium, large, small);
+            Collections.sort(unsorted);
+
+            assertEquals(3, unsorted.size());
+            assertEquals(small, unsorted.get(0));
+            assertEquals(medium, unsorted.get(1));
+            assertEquals(large, unsorted.get(2));
         }
     }
 
