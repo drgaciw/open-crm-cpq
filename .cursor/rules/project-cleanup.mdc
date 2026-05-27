@@ -1,0 +1,60 @@
+---
+description: Active when the user asks for project cleanup, repo hygiene, Git/worktree cleanup, tech debt scans, dependency audits, PR review, or changelog/release-note generation. Canonical source is .claude/skills/project-cleanup/SKILL.md.
+globs:
+alwaysApply: false
+---
+
+# project-cleanup (Cursor rule)
+
+This rule mirrors the canonical Claude skill at
+**`.claude/skills/project-cleanup/SKILL.md`** — read that file for the full
+workflow, phase definitions, and command catalog. Keep this rule short; only
+include the operational reminders Cursor needs at call time.
+
+## Activation triggers
+
+Use when the user mentions:
+
+- project cleanup, repo cleanup, repo hygiene, cleanup sprint, code health
+- Git cleanup, stale worktrees, merged branches, prune branches
+- technical debt, tech debt scan, refactor priority, legacy code
+- dependency audit, unused dependencies, outdated deps, CVE scan, license audit
+- PR review, diff review, blast radius, breaking change
+- changelog, release notes, Conventional Commits, semver bump
+
+Do **not** trigger on single-file fixes, focused feature work, or incident response.
+
+## Safety guardrails (non-negotiable)
+
+- Propose, then confirm. Never delete branches, worktrees, files, or dependencies without explicit approval.
+- Verify before destruction: merge status (`git branch --merged`), clean working tree (`git status`), upstream presence, no in-flight CI.
+- Never `git push --force` to shared or protected branches.
+- Never `rm -rf`, `git reset --hard`, `git clean -fd`, or `git worktree remove --force` as a shortcut.
+- One concern per PR. Do not bundle Git cleanup + dep bumps + refactors.
+- Always patch security CVEs first; defer non-critical upgrades.
+
+## Cleanup phases (execute in order, checkpoint between each)
+
+1. **Baseline inventory** — read-only snapshot of branches, worktrees, deps, TODOs, CI state.
+2. **Git & worktree cleanup** — merged-branch deletion, stale-worktree removal, with approval.
+3. **Tech debt scan** — TODO/FIXME inventory, complexity hotspots, test gaps; produce a backlog, not a megadiff.
+4. **Dependency hygiene** — security → license → unused → outdated → bloat; one PR per concern.
+5. **PR / diff review** — blast radius, security, tests, breaking changes, performance, ticket linking.
+6. **Changelog & release** — validate Conventional Commits, derive semver bump, prepend Keep-a-Changelog sections.
+7. **Docs & onboarding** — refresh `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+
+## Prioritization
+
+Score severity, blast radius, business impact, effort (inverted), reversibility (1–3 each). Bands: 12–15 do now, 8–11 next sprint, 4–7 backlog, <4 drop. Security always jumps the queue.
+
+## Output
+
+Deliver a single cleanup report: baseline · findings table · plan · recommended PRs (one concern each) · validation evidence · deferred debt. Do not narrate; produce the artifact.
+
+## Red flags
+
+- Bulk `npm update` / `pip install --upgrade` without reading changelogs
+- Deleting `--no-merged` branches "to tidy up"
+- Skipping CI on a cleanup PR
+- Rewriting shared-branch history without coordination
+- Removing a TODO because it "looks old" without checking `git blame` and surrounding code
