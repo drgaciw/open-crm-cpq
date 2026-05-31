@@ -18,6 +18,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,8 +52,8 @@ class PriceBookInternalResolutionServiceTest {
                 .build();
 
         when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(42L, "SKU-1"))
-                .thenReturn(Optional.of(entry));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(anyLong(), any()))
+                .thenReturn(List.of(entry));
 
         ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
 
