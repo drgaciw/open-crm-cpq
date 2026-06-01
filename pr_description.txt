@@ -1,0 +1,5 @@
+🚨 Severity: HIGH
+💡 Vulnerability: Overly permissive CORS and CSRF allowed origin configuration using `*.azurewebsites.net`.
+🎯 Impact: Attackers can host malicious applications on Azure App Services to bypass CORS and perform Cross-Site Request Forgery or read sensitive data.
+🔧 Fix: Restricted allowed CORS origins to specific trusted frontend url via `FRONTEND_URL` environment variable.
+✅ Verification: Ran unit tests to ensure security configuration loads correctly.
