@@ -1,11 +1,7 @@
-🎯 **What:**
-Added a descriptive docstring to the `create_lead_from_call_log` method in `crm_call_log.py`. The method was flagged as potential dead code but is actually actively used by the Vue frontend (`CallLogModal.vue`) via Frappe UI's `call()` RPC function.
+💡 What: Replaced N+1 queries in `PriceBookInternalResolutionService.resolveBatch` with a single `IN` query. Added `findByPriceBookIdAndProductExternalIdInAndDeletedFalse` to `PriceBookEntryRepository`.
 
-💡 **Why:**
-This improves code readability and maintainability by making the method's purpose and usage explicit to future developers and static analysis tools, preventing it from being incorrectly flagged or deleted as dead code.
+🎯 Why: The previous implementation queried the database individually for each `productExternalId` inside a `for` loop, leading to severe N+1 performance degradation when resolving large batches of product prices.
 
-✅ **Verification:**
-Created a standalone test runner mocking the Frappe environment and confirmed that all unit tests in `test_crm_call_log.py` pass cleanly with the new docstring in place.
+📊 Impact: Reduces database queries from O(N) to O(1) per batch resolution call, dramatically speeding up quote pricing for quotes with many line items.
 
-✨ **Result:**
-The codebase is healthier, with clearer documentation for an important API endpoint, preventing accidental regressions.
+🔬 Measurement: Verifiable via existing unit tests (`PriceBookInternalResolutionServiceTest`). Further backend benchmarking could measure throughput difference on quotes with >100 line items.
