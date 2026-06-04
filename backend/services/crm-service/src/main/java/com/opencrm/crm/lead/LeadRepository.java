@@ -62,6 +62,6 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     /**
      * Count leads grouped by status (excluding deleted).
      */
-    @Query("SELECT l.status, COUNT(l) FROM Lead l WHERE l.deleted = false GROUP BY l.status")
-    List<Object[]> countGroupByStatus();
+    @Query("SELECT l.status as status, COUNT(l) as count FROM Lead l WHERE l.deleted = false GROUP BY l.status")
+    List<LeadStatusCountProjection> countGroupByStatus();
 }

@@ -624,16 +624,25 @@ class LeadServiceTest {
     @DisplayName("getStatusCounts")
     class GetStatusCounts {
 
+        private LeadStatusCountProjection mockProjection(LeadStatus status, Long count) {
+            return new LeadStatusCountProjection() {
+                @Override
+                public LeadStatus getStatus() { return status; }
+                @Override
+                public Long getCount() { return count; }
+            };
+        }
+
         @Test
         @DisplayName("should return counts for all statuses")
         void shouldReturnStatusCounts() {
             when(leadRepository.countGroupByStatus()).thenReturn(
                     List.of(
-                            new Object[] {LeadStatus.NEW, 5L},
-                            new Object[] {LeadStatus.CONTACTED, 3L},
-                            new Object[] {LeadStatus.QUALIFIED, 2L},
-                            new Object[] {LeadStatus.UNQUALIFIED, 1L},
-                            new Object[] {LeadStatus.CONVERTED, 4L}));
+                            mockProjection(LeadStatus.NEW, 5L),
+                            mockProjection(LeadStatus.CONTACTED, 3L),
+                            mockProjection(LeadStatus.QUALIFIED, 2L),
+                            mockProjection(LeadStatus.UNQUALIFIED, 1L),
+                            mockProjection(LeadStatus.CONVERTED, 4L)));
 
             Map<LeadStatus, Long> counts = leadService.getStatusCounts();
 
@@ -651,9 +660,9 @@ class LeadServiceTest {
         @Test
         @DisplayName("should return zero counts for statuses omitted by grouped query")
         void shouldReturnZeroCountsForOmittedStatuses() {
-            when(leadRepository.countGroupByStatus()).thenReturn(List.<Object[]>of(
-                    new Object[] {LeadStatus.NEW, 5L},
-                    new Object[] {LeadStatus.CONTACTED, 3L}
+            when(leadRepository.countGroupByStatus()).thenReturn(List.of(
+                    mockProjection(LeadStatus.NEW, 5L),
+                    mockProjection(LeadStatus.CONTACTED, 3L)
             ));
 
             Map<LeadStatus, Long> counts = leadService.getStatusCounts();

@@ -626,13 +626,26 @@ class DealServiceTest {
     @DisplayName("getPipelineSummary")
     class GetPipelineSummary {
 
+        private PipelineSummaryProjection mockProjection(DealStage stage, Long count, BigDecimal totalAmount, BigDecimal weightedAmount) {
+            return new PipelineSummaryProjection() {
+                @Override
+                public DealStage getStage() { return stage; }
+                @Override
+                public Long getCount() { return count; }
+                @Override
+                public BigDecimal getTotalAmount() { return totalAmount; }
+                @Override
+                public BigDecimal getWeightedAmount() { return weightedAmount; }
+            };
+        }
+
         @Test
         @DisplayName("should return pipeline summary")
         void shouldReturnPipelineSummary() {
-            List<Object[]> mockResults = List.of(
-                    new Object[]{DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000)},
-                    new Object[]{DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000)},
-                    new Object[]{DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000)}
+            List<PipelineSummaryProjection> mockResults = List.of(
+                    mockProjection(DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000)),
+                    mockProjection(DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000)),
+                    mockProjection(DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000))
             );
             when(dealRepository.findPipelineSummary()).thenReturn(mockResults);
 

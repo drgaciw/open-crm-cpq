@@ -286,15 +286,15 @@ public class DealService {
     public List<PipelineSummaryDto> getPipelineSummary() {
         log.debug("Fetching pipeline summary");
 
-        List<Object[]> results = dealRepository.findPipelineSummary();
+        List<PipelineSummaryProjection> results = dealRepository.findPipelineSummary();
         List<PipelineSummaryDto> summary = new ArrayList<>();
 
-        for (Object[] row : results) {
+        for (PipelineSummaryProjection row : results) {
             PipelineSummaryDto dto = PipelineSummaryDto.builder()
-                    .stage((DealStage) row[0])
-                    .count(((Number) row[1]).longValue())
-                    .totalAmount(row[2] instanceof BigDecimal ? (BigDecimal) row[2] : BigDecimal.valueOf(((Number) row[2]).doubleValue()))
-                    .weightedAmount(row[3] instanceof BigDecimal ? (BigDecimal) row[3] : BigDecimal.valueOf(((Number) row[3]).doubleValue()))
+                    .stage(row.getStage())
+                    .count(row.getCount())
+                    .totalAmount(row.getTotalAmount())
+                    .weightedAmount(row.getWeightedAmount())
                     .build();
             summary.add(dto);
         }
