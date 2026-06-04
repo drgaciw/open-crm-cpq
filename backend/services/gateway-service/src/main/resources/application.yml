@@ -20,6 +20,7 @@ spring:
           '[/**]':
             allowedOrigins:
               - "http://localhost:4200"
+              # Set FRONTEND_URL in staging/prod; never use shared-host origin wildcards
               - "${FRONTEND_URL:}"
             allowedMethods:
               - GET
@@ -408,3 +409,24 @@ spring:
           uri: forward:/fallback/erp/unavailable
           predicates:
             - Path=/api/v1/erp/**
+
+---
+# Staging / production: require explicit frontend origin (fail fast if FRONTEND_URL unset)
+spring:
+  config:
+    activate:
+      on-profile: staging | production
+
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "${FRONTEND_URL}"
+
+security:
+  csrf:
+    allowed-origins:
+      - "${FRONTEND_URL}"
+

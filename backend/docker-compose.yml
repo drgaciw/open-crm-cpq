@@ -218,6 +218,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Optional: set to deployed frontend origin in staging/prod (see docs/CRM_GATEWAY_ENV.md)
+      FRONTEND_URL: ${FRONTEND_URL:-}
       CRM_SERVICE_URI: http://crm-service:8081
       PRICING_SERVICE_URI: http://pricing-service:8082
       PRICEBOOK_SERVICE_URI: http://pricebook-service:8089

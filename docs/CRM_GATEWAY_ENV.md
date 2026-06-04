@@ -1,5 +1,20 @@
 # Gateway / env parity (CRM)
 
+## `FRONTEND_URL`
+
+Browser origin allowed for **CORS** and **CSRF** validation on `gateway-service`. Must be the exact frontend URL (scheme + host + port), e.g. `https://opencrm-staging.azurewebsites.net`.
+
+| Location | Value / pattern |
+|----------|-----------------|
+| `backend/services/gateway-service/src/main/resources/application.yml` | `${FRONTEND_URL:}` (optional in default/dev; empty when unset) |
+| `backend/docker-compose.yml` | Optional for local stack — `http://localhost:4200` is always allowed |
+| Staging / production deploy | **Required** — set `FRONTEND_URL` to the deployed Angular app origin |
+| `microsite-prompt.xml` | `${FRONTEND_URL:}` |
+
+**Rule:** Do **not** use shared-host wildcards such as `https://*.azurewebsites.net`. Anyone can register a subdomain on that domain and bypass origin checks.
+
+**Profiles:** With `SPRING_PROFILES_ACTIVE=staging` or `production`, `FRONTEND_URL` is required (no empty default) and localhost is not included in allowed origins.
+
 ## `CRM_SERVICE_URI`
 
 | Location | Value / pattern |

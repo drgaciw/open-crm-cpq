@@ -152,7 +152,7 @@
                         <circuit_breaker>aiCircuitBreaker</circuit_breaker>
                     </route>
                     <cors>
-                        <allowed_origins>http://localhost:4200, https://*.azurewebsites.net</allowed_origins>
+                        <allowed_origins>http://localhost:4200, ${FRONTEND_URL:}</allowed_origins>
                         <allowed_methods>GET, POST, PUT, PATCH, DELETE, OPTIONS</allowed_methods>
                         <credentials>true</credentials>
                     </cors>
