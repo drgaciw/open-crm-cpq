@@ -6,11 +6,18 @@
 .PARAMETER GatewayBase
   Base URL for the API gateway (default http://localhost:8080).
 
+.PARAMETER FrontendOrigin
+  Optional frontend origin for CORS preflight verification (must match gateway FRONTEND_URL in staging/prod).
+
 .EXAMPLE
   ./staging-gateway-smoke.ps1 -GatewayBase 'https://your-staging-gateway.azurewebsites.net'
+
+.EXAMPLE
+  ./staging-gateway-smoke.ps1 -GatewayBase 'https://your-staging-gateway.azurewebsites.net' -FrontendOrigin 'https://your-frontend.azurewebsites.net'
 #>
 param(
-    [string] $GatewayBase = 'http://localhost:8080'
+    [string] $GatewayBase = 'http://localhost:8080',
+    [string] $FrontendOrigin = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +29,23 @@ function Invoke-JsonGet([string]$Path) {
     return Invoke-RestMethod -Uri $uri -Method Get -Headers @{ Accept = 'application/json' }
 }
 
+function Test-CorsPreflight([string]$Origin) {
+    $uri = "$base/api/v1/deals/pipeline"
+    Write-Host "OPTIONS $uri (Origin: $Origin)"
+    $response = Invoke-WebRequest -Uri $uri -Method Options -Headers @{
+        Origin = $Origin
+        'Access-Control-Request-Method' = 'GET'
+    } -SkipHttpErrorCheck
+    if ($response.StatusCode -ge 400) {
+        throw "CORS preflight failed with status $($response.StatusCode) for origin $Origin"
+    }
+    $allowOrigin = $response.Headers['Access-Control-Allow-Origin']
+    if (-not $allowOrigin) {
+        throw "CORS preflight missing Access-Control-Allow-Origin for origin $Origin"
+    }
+    Write-Host "CORS OK — Access-Control-Allow-Origin: $allowOrigin"
+}
+
 # Adjust if your gateway requires Bearer tokens in staging.
 Write-Host "=== CRM gateway smoke ($base) ==="
 Invoke-JsonGet '/api/v1/deals/pipeline' | Out-Null
@@ -29,6 +53,11 @@ Invoke-JsonGet '/api/v1/deals?page=0&size=5' | Out-Null
 Invoke-JsonGet '/api/v1/leads?page=0&size=5' | Out-Null
 Invoke-JsonGet '/api/v1/contacts?page=0&size=5' | Out-Null
 Invoke-JsonGet '/api/v1/organizations?page=0&size=5' | Out-Null
+
+if ($FrontendOrigin) {
+    Write-Host "=== CORS preflight ==="
+    Test-CorsPreflight -Origin $FrontendOrigin.TrimEnd('/')
+}
 
 # API-only routes (optional): uncomment to verify server exposes them
 # Invoke-JsonGet '/api/v1/leads/stats' | ConvertTo-Json -Depth 5

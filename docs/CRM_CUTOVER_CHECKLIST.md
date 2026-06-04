@@ -10,6 +10,7 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 
 - [ ] Gateway routes for CRM are only: `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` (no phantom `/api/v1/activities/**` until implemented).
 - [ ] `CRM_SERVICE_URI` in gateway / compose / deployment targets the intended `crm-service` instance ([CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md)).
+- [ ] `FRONTEND_URL` set to the exact deployed Angular origin; `SPRING_PROFILES_ACTIVE=staging` or `production` on gateway ([CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md)). **No** shared-host origin wildcards.
 - [ ] Database: `crm` schema migrations applied; **backup** taken (owner + time boxed).
 - [ ] Redis: available to `crm-service` and `quote-service` (pub/sub channel `quote:accepted`).
 - [ ] Contract: `quote-service` publishes `com.opencrm.common.event.dto.QuoteAcceptedCrmMessage` on `quote:accepted` (see `QuoteEventPublisher`). **No stale publishers** with old payload type names in any environment.
@@ -24,7 +25,7 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 - [ ] CRUD smoke: organizations, contacts, leads, deals via **gateway** paths used by `frontend/libs/crm` (**4200 → 8080**, not direct **8081**).
 - [ ] Pipeline/dashboard: `/api/v1/deals/pipeline` and dashboard loads succeed.
 - [ ] **Quote acceptance E2E:** Accept a sent quote with `dealExternalId` set to the deal’s **UUID** string; confirm deal moves to **WON** and amounts/currency update; publish duplicate Redis messages and confirm **idempotency** (`crm:quote-accepted:processed:*` skips re-application).
-- [ ] Automated smoke (optional): `docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'https://…'` for read paths.
+- [ ] Automated smoke (optional): `docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'https://…' -FrontendOrigin 'https://your-frontend…'` for read paths and CORS preflight.
 
 ---
 
