@@ -130,27 +130,22 @@ def get_lead_or_deal_from_number(number):
         if not mobile_no:
             return None
 
-        data = []
-        if doctype == "CRM Deal":
-            data = frappe.db.sql("""
-			SELECT name
-			FROM `tabCRM Deal`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		""", {"mobile_no": mobile_no}, as_dict=True)
-        elif doctype == "CRM Lead":
-            if only_unconverted:
-                data = frappe.db.sql("""
-			SELECT name
-			FROM `tabCRM Lead`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-AND converted is not True
-		""", {"mobile_no": mobile_no}, as_dict=True)
-            else:
-                data = frappe.db.sql("""
-			SELECT name
-			FROM `tabCRM Lead`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		""", {"mobile_no": mobile_no}, as_dict=True)
+        from pypika import CustomFunction
+        RegexpReplace = CustomFunction("REGEXP_REPLACE", ["string", "pattern", "replacement"])
+        Concat = CustomFunction("CONCAT", ["str1", "str2"])
+
+        table = frappe.qb.DocType(doctype)
+        query = (
+            frappe.qb.from_(table)
+            .select(table.name)
+            .where(
+                Concat('+', RegexpReplace(table.mobile_no, '[^0-9]', '')) == mobile_no
+            )
+        )
+        if doctype == "CRM Lead" and only_unconverted:
+            query = query.where(table.converted.isnull() | (table.converted == 0))
+
+        data = query.run(as_dict=True)
         return data[0].name if data else None
 
     doctype = "CRM Deal"
