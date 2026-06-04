@@ -86,29 +86,18 @@ public class ConfigurationRuleService {
         List<ConfigurationRule> allRules = configRuleRepository
                 .findBySourceProductIdInAndDeletedFalse(selectedProductIds);
 
-        // Group rules by source product ID and type
-        Map<Long, List<ConfigurationRule>> requiresRulesByProduct = allRules.stream()
-                .filter(r -> r.getRuleType() == ConfigRuleType.REQUIRES)
-                .collect(Collectors.groupingBy(ConfigurationRule::getSourceProductId));
-
-        Map<Long, List<ConfigurationRule>> excludesRulesByProduct = allRules.stream()
-                .filter(r -> r.getRuleType() == ConfigRuleType.EXCLUDES)
-                .collect(Collectors.groupingBy(ConfigurationRule::getSourceProductId));
-
-        for (Long productId : selectedProductIds) {
-            List<ConfigurationRule> requiresRules = requiresRulesByProduct.getOrDefault(productId, new ArrayList<>());
-            for (ConfigurationRule rule : requiresRules) {
+        // Instead of grouping by product ID and then iterating over rules for each product ID,
+        // we can simply iterate over all rules directly.
+        for (ConfigurationRule rule : allRules) {
+            if (rule.getRuleType() == ConfigRuleType.REQUIRES) {
                 if (rule.getTargetProductId() != null && !productSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " requires product " + rule.getTargetProductId());
+                            "Product " + rule.getSourceProductId() + " requires product " + rule.getTargetProductId());
                 }
-            }
-
-            List<ConfigurationRule> excludesRules = excludesRulesByProduct.getOrDefault(productId, new ArrayList<>());
-            for (ConfigurationRule rule : excludesRules) {
+            } else if (rule.getRuleType() == ConfigRuleType.EXCLUDES) {
                 if (rule.getTargetProductId() != null && productSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :
-                            "Product " + productId + " is incompatible with product " + rule.getTargetProductId());
+                            "Product " + rule.getSourceProductId() + " is incompatible with product " + rule.getTargetProductId());
                 }
             }
         }

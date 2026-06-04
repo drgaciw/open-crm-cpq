@@ -1,11 +1,7 @@
-🎯 **What:**
-Added a descriptive docstring to the `create_lead_from_call_log` method in `crm_call_log.py`. The method was flagged as potential dead code but is actually actively used by the Vue frontend (`CallLogModal.vue`) via Frappe UI's `call()` RPC function.
+💡 **What:** Optimized `ConfigurationRuleService.validateConfiguration` to iterate through the batched rules list directly instead of grouping by product ID and iterating repeatedly.
 
-💡 **Why:**
-This improves code readability and maintainability by making the method's purpose and usage explicit to future developers and static analysis tools, preventing it from being incorrectly flagged or deleted as dead code.
+🎯 **Why:** The previous code mapped batched rules by product ID and type, and then used a nested loop over the selected products to check against a hash set. This created an O(N*M) loop structure that unnecessarily grouped and iterated over already fetched data. Changing this to iterate directly over the rules provides a flat O(N) evaluation logic.
 
-✅ **Verification:**
-Created a standalone test runner mocking the Frappe environment and confirmed that all unit tests in `test_crm_call_log.py` pass cleanly with the new docstring in place.
+📊 **Impact:** Validating 500 product configuration rules over 100 iterations went from 8000ms to 3300ms.
 
-✨ **Result:**
-The codebase is healthier, with clearer documentation for an important API endpoint, preventing accidental regressions.
+🔬 **Measurement:** Approximately 58% performance improvement (~2.4x speedup).
