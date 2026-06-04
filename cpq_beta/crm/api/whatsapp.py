@@ -135,22 +135,22 @@ def get_lead_or_deal_from_number(number):
             data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Deal`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		""", {"mobile_no": mobile_no}, as_dict=True)
+				WHERE CONCAT('+', REGEXP_REPLACE(`mobile_no`, '[^0-9]', '')) = %s
+			""", (mobile_no,), as_dict=True)
         elif doctype == "CRM Lead":
             if only_unconverted:
                 data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Lead`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
+				WHERE CONCAT('+', REGEXP_REPLACE(`mobile_no`, '[^0-9]', '')) = %s
 AND converted is not True
-		""", {"mobile_no": mobile_no}, as_dict=True)
+			""", (mobile_no,), as_dict=True)
             else:
                 data = frappe.db.sql("""
 			SELECT name
 			FROM `tabCRM Lead`
-			WHERE CONCAT('+', REGEXP_REPLACE(mobile_no, '[^0-9]', '')) = %(mobile_no)s
-		""", {"mobile_no": mobile_no}, as_dict=True)
+				WHERE CONCAT('+', REGEXP_REPLACE(`mobile_no`, '[^0-9]', '')) = %s
+			""", (mobile_no,), as_dict=True)
         return data[0].name if data else None
 
     doctype = "CRM Deal"
