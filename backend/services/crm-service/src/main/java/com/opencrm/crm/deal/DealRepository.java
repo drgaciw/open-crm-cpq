@@ -63,7 +63,7 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     /**
      * Get pipeline summary - count, sum of amount, and sum of weighted amount by stage.
      */
-    @Query("SELECT d.stage, COUNT(d), COALESCE(SUM(d.amount), 0), COALESCE(SUM(d.weightedAmount), 0) " +
+    @Query("SELECT d.stage AS stage, COUNT(d) AS count, COALESCE(SUM(d.amount), 0) AS totalAmount, COALESCE(SUM(d.weightedAmount), 0) AS weightedAmount " +
            "FROM Deal d WHERE d.deleted = false GROUP BY d.stage ORDER BY d.stage")
-    List<Object[]> findPipelineSummary();
+    List<PipelineSummaryProjection> findPipelineSummary();
 }
