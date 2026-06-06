@@ -1,0 +1,5 @@
+🚨 Severity: CRITICAL
+💡 Vulnerability: Hardcoded backdoor `securityOpen` flag allowed bypassing authentication completely in production.
+🎯 Impact: Critical - High potential for unauthorized access to sensitive endpoints.
+🔧 Fix: Removed the flag and restricted to authenticated in `SecurityConfig`. Maintained CSRF and internal paths.
+✅ Verification: Verify code passes tests and compilation.
