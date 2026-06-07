@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 /**
  * Service for publishing domain events via Transactional Outbox pattern.
  * Events are persisted in the same transaction as domain changes,
@@ -29,14 +31,14 @@ public class OutboxEventPublisher {
         try {
             String payload = objectMapper.writeValueAsString(eventPayload);
 
-            OutboxEvent outboxEvent = OutboxEvent.builder()
+            OutboxEvent outboxEvent = Objects.requireNonNull(OutboxEvent.builder()
                     .aggregateType(aggregateType)
                     .aggregateId(aggregateId)
                     .eventType(eventType)
                     .payload(payload)
                     .published(false)
                     .retryCount(0)
-                    .build();
+                    .build());
 
             outboxEventRepository.save(outboxEvent);
 
