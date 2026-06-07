@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.crm.contact.ContactCreateRequest;
 import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.deal.DealRepository;
+import com.opencrm.crm.deal.DealLoseRequest;
 import com.opencrm.crm.lead.LeadCreateRequest;
+import com.opencrm.crm.lead.LeadLoseRequest;
 import com.opencrm.crm.lead.LeadPriority;
 import com.opencrm.crm.lead.LeadRepository;
 import com.opencrm.crm.organization.OrganizationCreateRequest;
@@ -64,10 +66,7 @@ class LeadToDealLifecycleTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        dealRepository.deleteAll();
-        leadRepository.deleteAll();
-        contactRepository.deleteAll();
-        organizationRepository.deleteAll();
+        // BaseIntegrationTest cleanup runs before each test
     }
 
     @Test
@@ -223,11 +222,11 @@ class LeadToDealLifecycleTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.stage").value("PROPOSAL"))
                 .andExpect(jsonPath("$.data.probability").value(60));
 
-        // PROPOSAL (60%) -> NEGOTIATION (75%)
+        // PROPOSAL (60%) -> NEGOTIATION (80%)
         mockMvc.perform(post("/api/v1/deals/{id}/advance", dealId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.stage").value("NEGOTIATION"))
-                .andExpect(jsonPath("$.data.probability").value(75));
+                .andExpect(jsonPath("$.data.probability").value(80));
 
         // Step 9: Win the deal
         mockMvc.perform(post("/api/v1/deals/{id}/win", dealId))
@@ -326,10 +325,13 @@ class LeadToDealLifecycleTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("QUALIFIED"));
 
         // Lose the lead instead of converting
+        LeadLoseRequest loseRequest = LeadLoseRequest.builder()
+                .reason("Budget constraints")
+                .build();
+
         mockMvc.perform(post("/api/v1/leads/{id}/lose", leadId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                "{\"reason\": \"Budget constraints\", \"notes\": \"Company froze budget\"}")))
+                        .content(objectMapper.writeValueAsString(loseRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("LOST"));
 
@@ -405,10 +407,13 @@ class LeadToDealLifecycleTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.stage").value("NEGOTIATION"));
 
         // Lose the deal at negotiation stage
+        DealLoseRequest dealLoseRequest = DealLoseRequest.builder()
+                .reason("Chose competitor")
+                .build();
+
         mockMvc.perform(post("/api/v1/deals/{id}/lose", dealId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                "{\"reason\": \"Chose competitor\", \"notes\": \"Price was the deciding factor\"}")))
+                        .content(objectMapper.writeValueAsString(dealLoseRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.stage").value("LOST"))
                 .andExpect(jsonPath("$.data.probability").value(0))

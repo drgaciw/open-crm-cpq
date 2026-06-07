@@ -1,5 +1,7 @@
 @import './assets/Inter/inter.css';
-@import 'frappe-ui/src/style.css';
+@import "tailwindcss";
+@config "../tailwind.config.cjs";
+@import 'frappe-ui/style.css';
 
 @layer components {
 	.prose-f {

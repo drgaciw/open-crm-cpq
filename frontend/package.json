@@ -2,7 +2,10 @@
   "name": "@frontend/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "test": "nx run-many -t test --all --parallel=3",
+    "test:crm": "nx run-many -t test --projects=crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models,shared-data-access --parallel=3"
+  },
   "private": true,
   "dependencies": {
     "@angular/animations": "^21.1.3",

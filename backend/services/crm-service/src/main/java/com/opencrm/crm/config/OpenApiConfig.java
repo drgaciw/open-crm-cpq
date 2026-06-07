@@ -1,0 +1,17 @@
+package com.opencrm.crm.config;
+
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public GroupedOpenApi crmApi() {
+        return GroupedOpenApi.builder()
+                .group("crm")
+                .pathsToMatch("/api/v1/**")
+                .build();
+    }
+}

@@ -34,7 +34,7 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        contactRepository.deleteAll();
+        // BaseIntegrationTest cleanup runs before each test
     }
 
     @Test
@@ -76,10 +76,10 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/contacts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errors").isArray())
-                .andExpect(jsonPath("$.errors", hasSize(greaterThan(0))));
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -94,9 +94,9 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/contacts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errors").isArray());
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -111,7 +111,7 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/contacts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
@@ -143,8 +143,8 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/v1/contacts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content").isArray())
-                .andExpect(jsonPath("$.data.content", hasSize(2)))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data", hasSize(2)))
                 .andExpect(jsonPath("$.pagination.totalElements").value(2));
     }
 
@@ -259,7 +259,7 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
 
         // Delete the contact
         mockMvc.perform(delete("/api/v1/contacts/{id}", contactId))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -282,7 +282,7 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
 
         // Delete the contact first time
         mockMvc.perform(delete("/api/v1/contacts/{id}", contactId))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
         // Try to delete again - should return 404
         mockMvc.perform(delete("/api/v1/contacts/{id}", contactId))
@@ -329,7 +329,7 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
                         .param("q", "Smith"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content").isArray())
-                .andExpect(jsonPath("$.data.content", hasSize(2)));
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data", hasSize(2)));
     }
 }

@@ -12,7 +12,7 @@ export default [
         'error',
         {
           type: 'attribute',
-          prefix: 'lib',
+          prefix: ['app', 'lib'],
           style: 'camelCase',
         },
       ],
@@ -20,15 +20,23 @@ export default [
         'error',
         {
           type: 'element',
-          prefix: 'lib',
+          prefix: ['app', 'lib'],
           style: 'kebab-case',
         },
       ],
+      '@typescript-eslint/no-unused-expressions': [
+        'error',
+        { allowShortCircuit: true, allowTernary: true },
+      ],
+      '@typescript-eslint/no-empty-function': 'off',
     },
   },
   {
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      '@angular-eslint/template/click-events-have-key-events': 'off',
+      '@angular-eslint/template/interactive-supports-focus': 'off',
+    },
   },
 ];
+

@@ -75,7 +75,7 @@
         <grpc-spring-boot-starter.version>3.0.0.RELEASE</grpc-spring-boot-starter.version>
 
         <!-- Testing -->
-        <testcontainers.version>1.19.3</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <jacoco.skip>false</jacoco.skip>
     </properties>
 
@@ -114,6 +114,18 @@
                 <groupId>com.opencrm</groupId>
                 <artifactId>rules-engine</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- OpenAPI / Springdoc -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -167,6 +179,18 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- Docker Engine 29+ requires API >= 1.44 (Testcontainers 1.x default is 1.32). -->
+                        <api.version>1.44</api.version>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
 
     <repositories>
