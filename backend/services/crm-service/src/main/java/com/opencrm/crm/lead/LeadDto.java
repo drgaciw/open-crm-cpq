@@ -37,6 +37,7 @@ public class LeadDto {
     private Instant assignedAt;
     private Instant firstContactedAt;
     private Instant lastContactedAt;
+    private Instant qualifiedAt;
     private Instant convertedAt;
     private Long convertedDealId;
     private String lostReason;

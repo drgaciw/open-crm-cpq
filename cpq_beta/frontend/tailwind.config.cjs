@@ -1,5 +1,7 @@
+const frappePreset = require('frappe-ui/src/utils/tailwind.config')
+
 module.exports = {
-  presets: [require('frappe-ui/src/utils/tailwind.config')],
+  presets: [frappePreset],
   content: [
     './index.html',
     './src/**/*.{vue,js,ts,jsx,tsx}',

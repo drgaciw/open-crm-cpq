@@ -20,8 +20,7 @@ else
 fi
 
 (
-  cd "$(ci_backend_dir)"
-  mvn -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=9 --no-transfer-progress \
+  ci_mvn -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=9 --no-transfer-progress \
     || { echo "OWASP check complete with findings or scanner issue"; AUDIT_FAILED=1; }
 )
 
