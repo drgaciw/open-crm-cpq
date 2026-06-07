@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.2</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -42,7 +42,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Spring -->
-        <spring-cloud.version>2023.0.0</spring-cloud.version>
+        <spring-cloud.version>2025.1.1</spring-cloud.version>
 
         <!-- Database -->
         <postgresql.version>42.7.1</postgresql.version>
@@ -160,9 +160,6 @@
                                 <version>${lombok-mapstruct-binding.version}</version>
                             </path>
                         </annotationProcessorPaths>
-                        <compilerArgs>
-                            <arg>-Amapstruct.defaultComponentModel=spring</arg>
-                        </compilerArgs>
                     </configuration>
                 </plugin>
             </plugins>
