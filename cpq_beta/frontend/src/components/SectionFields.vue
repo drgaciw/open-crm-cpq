@@ -119,7 +119,6 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { usersStore } from '@/stores/users'
 import { Tooltip } from 'frappe-ui'
 import { computed } from 'vue'
-import Sval from 'sval'
 
 const props = defineProps({
   fields: {

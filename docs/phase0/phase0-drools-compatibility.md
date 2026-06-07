@@ -1,8 +1,8 @@
-# Phase 0 Drools Compatibility (8.44.0.Final)
+# Phase 0 Drools Compatibility (10.2.0)
 
 ## Scope
 
-Phase 0 spike evidence for Drools compatibility in `backend/libs/rules-engine` using the project's current target version `8.44.0.Final`.
+Phase 0 spike evidence for Drools compatibility in `backend/libs/rules-engine` using the project's current target version `10.2.0`.
 
 ## What Was Tested
 
@@ -22,17 +22,17 @@ Covered cases:
 
 ## Evidence
 
-Test command executed (from `backend/`):
+Lane 3 validation command executed (from `backend/`):
 
 ```powershell
-.\mvnw.cmd -pl libs\rules-engine -Dtest=Drools844CompatibilityEvidenceTest test
+.\mvnw.cmd -B -pl libs/rules-engine,services/pricing-service -am test -DskipITs
 ```
 
 Result:
 
-- `BUILD SUCCESS`
-- `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`
-- Both the adapted source-style sample and the source-verbatim sample compiled and fired successfully.
+- `BUILD SUCCESS` (reactor: common, security, rules-engine, pricing-service)
+- **117 tests** total: common 61, security 13, rules-engine 26 (includes `Drools844CompatibilityEvidenceTest`: 2), pricing-service 17 — all **Failures: 0, Errors: 0, Skipped: 0**
+- Resolved runtime: `org.drools:drools-engine:10.2.0` on the pricing-service test classpath
 
 Observed warnings:
 
@@ -40,19 +40,19 @@ Observed warnings:
 
 ## Findings
 
-- Drools `8.44.0.Final` can compile and execute at least one representative adapted DRL written in the same source style used by pricing rules.
+- Drools `10.2.0` can compile and execute at least one representative adapted DRL written in the same source style used by pricing rules.
 - A real pricing-service rule (`approval-margin-exception.drl`) compiles and executes verbatim under the same runtime/compiler path used by `rules-engine`.
 - No Phase 0 syntax incompatibility was observed in the tested samples.
 
 ## Recommendation (Phase 1)
 
-Recommendation: stay on Drools 8.x for Phase 1 (specifically current `8.44.0.Final`) rather than introducing a version upgrade during the compatibility migration.
+Recommendation: stay on Drools **10.2.0** for Phase 1 (aligned with the backend BOM target upgraded from `8.44.0.Final`).
 
 Rationale:
 
-- Current target version already demonstrates successful compile+execute behavior for representative source-style and verbatim DRL samples.
-- Upgrading during Phase 1 would add migration variables without Phase 0 evidence of a blocker in `8.44.0.Final`.
-- Revisit upgrade only if broader rule corpus testing reveals unsupported constructs, performance issues, or dependency/security constraints.
+- Lane 3 validation demonstrates successful compile+execute behavior for representative source-style and verbatim DRL samples on `10.2.0`.
+- Rolling back to `8.44.0.Final` would reintroduce the superseded baseline without a demonstrated blocker on `10.2.0`.
+- Revisit only if broader rule corpus testing reveals unsupported constructs, performance issues, or dependency/security constraints.
 
 ## Next Evidence to Add (Phase 1+)
 

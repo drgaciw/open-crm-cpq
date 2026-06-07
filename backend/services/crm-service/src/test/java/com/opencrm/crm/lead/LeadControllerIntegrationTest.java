@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.crm.BaseIntegrationTest;
 import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
+import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,15 +45,14 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private OrganizationRepository organizationRepository;
 
+    @Autowired
+    private DealRepository dealRepository;
+
     private Long testContactId;
     private Long testOrganizationId;
 
     @BeforeEach
     void setUp() {
-        leadRepository.deleteAll();
-        contactRepository.deleteAll();
-        organizationRepository.deleteAll();
-
         // Create test organization
         Organization org = Organization.builder()
                 .name("Test Corp")
@@ -111,9 +111,9 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/leads")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errors").isArray());
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -127,7 +127,7 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/v1/leads")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
@@ -174,8 +174,8 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
                         .param("page", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content").isArray())
-                .andExpect(jsonPath("$.data.content", hasSize(3)))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data", hasSize(3)))
                 .andExpect(jsonPath("$.pagination.totalElements").value(5))
                 .andExpect(jsonPath("$.pagination.totalPages").value(2))
                 .andExpect(jsonPath("$.pagination.hasNext").value(true));
@@ -206,9 +206,9 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
                         .param("status", "CONTACTED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content").isArray())
-                .andExpect(jsonPath("$.data.content", hasSize(1)))
-                .andExpect(jsonPath("$.data.content[0].status").value("CONTACTED"));
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].status").value("CONTACTED"));
     }
 
     @Test

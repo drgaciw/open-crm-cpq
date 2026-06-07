@@ -1,7 +1,10 @@
 spring:
   application:
     name: ai-service
-  
+  threads:
+    virtual:
+      enabled: true
+
   # Redis State Store
   data:
     redis:
@@ -36,6 +39,8 @@ server:
   port: 8086
 
 opencrm:
+  gateway:
+    base-url: ${OPENCRM_GATEWAY_BASE_URL:http://localhost:8080}
   ai:
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}

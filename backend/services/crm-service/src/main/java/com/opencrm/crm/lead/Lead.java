@@ -75,6 +75,9 @@ public class Lead extends BaseEntity {
     @Column(name = "last_contacted_at")
     private Instant lastContactedAt;
 
+    @Column(name = "qualified_at")
+    private Instant qualifiedAt;
+
     @Column(name = "converted_at")
     private Instant convertedAt;
 
@@ -120,6 +123,7 @@ public class Lead extends BaseEntity {
      */
     public void qualify() {
         this.status = LeadStatus.QUALIFIED;
+        this.qualifiedAt = Instant.now();
     }
 
     /**
