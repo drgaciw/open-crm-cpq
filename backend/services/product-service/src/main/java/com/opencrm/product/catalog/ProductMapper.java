@@ -15,6 +15,8 @@ public interface ProductMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "retiredAt", ignore = true)
+    @Mapping(target = "retirementReason", ignore = true)
     @Mapping(target = "status", constant = "DRAFT")
     Product toEntity(ProductCreateRequest request);
 
@@ -29,6 +31,8 @@ public interface ProductMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "retiredAt", ignore = true)
+    @Mapping(target = "retirementReason", ignore = true)
     void updateEntity(ProductUpdateRequest request, @MappingTarget Product product);
 
     List<ProductDto> toDtoList(List<Product> products);

@@ -51,7 +51,7 @@ public class CsrfProtectionFilter implements WebFilter {
         }
 
         // CSRF risk applies when credentials are automatically sent by browser cookies.
-        if (!request.getHeaders().containsKey(HttpHeaders.COOKIE)) {
+        if (request.getHeaders().getFirst(HttpHeaders.COOKIE) == null) {
             return chain.filter(exchange);
         }
 
