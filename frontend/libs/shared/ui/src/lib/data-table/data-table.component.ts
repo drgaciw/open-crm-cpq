@@ -99,15 +99,15 @@ export interface RowActionEvent<T = unknown> {
           ></tr>
 
           <!-- Empty State Row -->
-          @if (data().length === 0 && !loading()) {
-            <tr class="mat-row">
-              <td [attr.colspan]="displayedColumns().length" class="empty-state-cell">
+          <tr *matNoDataRow class="mat-row">
+            <td [attr.colspan]="displayedColumns().length" class="empty-state-cell">
+              @if (!loading()) {
                 <div class="empty-state">
                   <p class="empty-state-text">No data available</p>
                 </div>
-              </td>
-            </tr>
-          }
+              }
+            </td>
+          </tr>
         </table>
       </div>
 

@@ -15,9 +15,9 @@ import { Pipe, PipeTransform } from '@angular/core';
 export class CurrencyFormatPipe implements PipeTransform {
   transform(
     value: number | null | undefined,
-    currencyCode: string = 'USD',
+    currencyCode = 'USD',
     display: 'code' | 'symbol' | 'symbol-narrow' = 'symbol',
-    locale: string = 'en-US'
+    locale = 'en-US'
   ): string {
     if (value === null || value === undefined || isNaN(value)) {
       return '-';

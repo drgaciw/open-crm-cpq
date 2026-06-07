@@ -4,10 +4,10 @@
 
 This document outlines a comprehensive greenfield rebuild of the existing Frappe-based CRM into a modern, enterprise-grade CRM/CPQ platform using:
 
-- **Backend**: Spring Boot 3.2+ / Spring AI / Spring Cloud
-- **Frontend**: Angular 17+ / TypeScript / Tailwind CSS
+- **Backend**: Spring Boot 3.5.9 / Spring Cloud 2025.0.0 / Spring AI 1.1.7
+- **Frontend**: Angular ~21.2 / Nx 22.7 / Vite 8 / TypeScript / Tailwind CSS
 - **Architecture**: Microservices + Microsites
-- **Rules Engine**: OpenL Tablets + Drools
+- **Rules Engine**: OpenL Tablets + Drools 10.2.0
 - **AI Agents**: Spring AI + Azure OpenAI + Anthropic Claude Agent SDK
 - **Deployment**: Microsoft Azure (AKS)
 
@@ -136,13 +136,13 @@ This document outlines a comprehensive greenfield rebuild of the existing Frappe
 ```yaml
 Core Framework:
   - Java 21 (LTS)
-  - Spring Boot 3.2+
-  - Spring Cloud 2023.x
+  - Spring Boot 3.5.9
+  - Spring Cloud 2025.0.0
 
 Spring Modules:
   - Spring Data JPA (PostgreSQL)
   - Spring Security (OAuth2 Resource Server)
-  - Spring AI (LLM integration)
+  - Spring AI 1.1.7 (LLM integration)
   - Spring Cloud Gateway (API Gateway)
   - Spring Cloud Config (Centralized configuration)
   - Spring Cloud Circuit Breaker (Resilience4j)
@@ -155,11 +155,11 @@ Data & Messaging:
   - Elasticsearch 8 (Search)
 
 AI & Rules:
-  - Spring AI 1.0+
+  - Spring AI 1.1.7
   - Azure OpenAI Service (GPT-4)
   - Anthropic Claude SDK (Agents)
   - OpenL Tablets 5.x (Business rules)
-  - Drools 8.x (Complex rules)
+  - Drools 10.2.0 (Complex rules)
 
 Observability:
   - Micrometer (Metrics)
@@ -177,17 +177,17 @@ Build & Deploy:
 
 ```yaml
 Core Framework:
-  - Angular 17+ (Standalone components)
+  - Angular ~21.2 (Standalone components)
   - TypeScript 5.3+
   - RxJS 7.x
 
 Build & Tooling:
-  - Nx 18+ (Monorepo)
-  - Vite (Build tool)
+  - Nx 22.7 (Monorepo)
+  - Vite 8 (Build tool)
   - ESLint + Prettier
 
 State Management:
-  - NgRx 17+ (Global state)
+  - NgRx 19+ (Global state)
   - NgRx Component Store (Local state)
   - NgRx Effects (Side effects)
 
@@ -670,7 +670,7 @@ The full 16-month roadmap (Section 9) is the long-term plan. **This MVP ships fi
 - Unit tests (80%+ service layer) + integration tests (TestContainers)
 - Docker Compose: all services running with one command
 - **Angular frontend (Nx monorepo):** CRM app with Dashboard, Contacts, Organizations, Leads, Deals views
-  - Nx monorepo workspace at `frontend/` (Angular 19+, standalone components)
+  - Nx monorepo workspace at `frontend/` (Angular ~21.2, standalone components)
   - Feature libs: `crm/contacts`, `crm/leads`, `crm/deals`, `crm/organizations`, `crm/dashboard`
   - Shared libs: `shared/models` (TypeScript interfaces), `shared/data-access` (HTTP services, interceptors)
   - Material Design UI with responsive layout, search, pagination, sorting
@@ -801,7 +801,7 @@ Dashboard:
 - [ ] Performance baseline (response times, throughput)
 
 **Sprint 4 (Week 7-8): Angular Frontend — Core Views**
-- [x] Nx monorepo workspace (`frontend/`) initialized with Angular 19+ ✅
+- [x] Nx monorepo workspace (`frontend/`) initialized with Angular ~21.2 ✅
 - [x] Shared library scaffolding: `shared/models`, `shared/data-access`, `shared/ui`, `shared/utils` ✅
 - [x] TypeScript model interfaces mirroring backend DTOs ✅
 - [x] HTTP base service with signals, pagination, error handling ✅
@@ -1081,28 +1081,29 @@ Recommended Team Size: 12-15 people
 ```yaml
 # Backend
 java: "21"                    # LTS - stable through 2029
-spring-boot: "3.4.x"         # Updated from 3.2.x (Jan 2025 GA)
-spring-cloud: "2024.0.x"     # Updated from 2023.0.x
-spring-ai: "1.0.x"           # GA release
+spring-boot: "3.5.9"
+spring-cloud: "2025.0.0"
+spring-ai: "1.1.7"
 postgresql: "16"
 redis: "7.x"
 elasticsearch: "8.x"
 openl-tablets: "5.27.x"
-drools: "8.x"
+drools: "10.2.0"
 flyway: "10.x"               # Added - schema migrations
 mapstruct: "1.6.x"           # Added - DTO mapping
 testcontainers: "1.20.x"     # Added - integration testing
 
 # Frontend
-angular: "19.x"              # Updated from 17.x (Nov 2024 GA)
-typescript: "5.6.x"          # Updated from 5.3.x
-nx: "20.x"                   # Updated from 18.x
-tailwindcss: "4.x"           # Updated from 3.4.x (Jan 2025 GA)
-ngrx: "19.x"                 # Updated from 17.x
+angular: "~21.2"
+typescript: "5.6.x"
+nx: "22.7"
+vite: "8"
+tailwindcss: "4.x"
+ngrx: "19.x"
 
 # Infrastructure
-kubernetes: "1.30+"           # Updated from 1.28+
-terraform: "1.9+"             # Updated from 1.6+
+kubernetes: "1.30+"
+terraform: "1.9+"
 helm: "3.x"
 ```
 
@@ -1619,5 +1620,5 @@ See `AGENT.md` for comprehensive guidance on using Claude Code agents for develo
 ---
 
 *Document Version: 2.0*
-*Last Updated: 2026-02-05*
+*Last Updated: 2026-05-24*
 *Authors: AI Architecture Team*

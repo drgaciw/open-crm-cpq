@@ -6,12 +6,12 @@
 
 | Dimension | Current State | Target State |
 |-----------|--------------|--------------|
-| Backend | Frappe Framework (Python) | Spring Boot 3.4+ / Java 21 |
-| Frontend | Vue 3 / Frappe UI | Angular 19+ / Nx / Tailwind |
+| Backend | Frappe Framework (Python) | Spring Boot 3.5.9 / Spring Cloud 2025.0.0 / Java 21 |
+| Frontend | Vue 3 / Frappe UI | Angular ~21.2 / Nx 22.7 / Vite 8 / Tailwind |
 | Database | MariaDB 10.6 | PostgreSQL 16 + pgvector |
 | Infrastructure | Docker / GitHub Actions | Azure AKS / Terraform / Helm |
-| AI | None | Spring AI + Azure OpenAI + Claude Agent SDK |
-| Rules Engine | None | OpenL Tablets + Drools |
+| AI | None | Spring AI 1.1.7 + Azure OpenAI + Claude Agent SDK |
+| Rules Engine | None | OpenL Tablets + Drools 10.2.0 |
 
 **Current Implementation Status**: Early stage. Core JPA entities exist for CRM (Lead, Deal, Contact, Organization) with shared libraries (BaseEntity, ApiResponse, SecurityUtils). No controllers, services, repositories, or tests yet. Docker Compose for local dev (PostgreSQL 16, Redis 7). No frontend scaffolding started.
 
@@ -219,7 +219,7 @@ Before marking any task as complete, verify:
 | Event bus | Kafka / Azure Service Bus | Async decoupling between services; event sourcing for Activity Service |
 | Search | Elasticsearch 8 | Full-text search, fuzzy matching, entity indexing across services |
 | AI orchestration | Spring AI + Claude Agent SDK | Multi-LLM strategy with Azure OpenAI primary, Claude for agent workflows |
-| Frontend state | NgRx 17+ | Predictable state, dev tools, effects for side effects |
+| Frontend state | NgRx 19+ | Predictable state, dev tools, effects for side effects |
 | API style | REST (primary) + GraphQL (optional) | REST for CRUD; GraphQL considered for complex aggregation queries |
 | Authentication | Azure AD B2C + OAuth2/OIDC | Enterprise SSO, customer identity, JWT-based resource server |
 | Caching | Redis 7 (cache-aside pattern) | Session management, API response caching, rate limiting |
@@ -232,7 +232,7 @@ Before marking any task as complete, verify:
 | File | Purpose |
 |------|---------|
 | `MODERNIZATION_PLAN.md` | Comprehensive architecture and roadmap document |
-| `backend/build.gradle.kts` | Root Gradle build with Spring Boot 3.2.2, Java 21 |
+| `backend/pom.xml` | Root Maven build with Spring Boot 3.5.9, Spring Cloud 2025.0.0, Java 21 |
 | `backend/settings.gradle.kts` | Multi-module project: 5 services + 2 shared libs |
 | `backend/docker-compose.yml` | Local dev: PostgreSQL 16, Redis 7, pgAdmin, Redis Commander |
 | `backend/scripts/init-db.sql` | DB init: 4 schemas (crm, cpq, communication, ai) + pgvector |

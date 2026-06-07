@@ -91,7 +91,7 @@ public class Organization extends BaseEntity {
     /**
      * Count of non-deleted contacts (computed by DB, avoids N+1 on lazy contacts collection).
      */
-    @Formula("(SELECT COUNT(*) FROM contacts c WHERE c.organization_id = id AND c.is_deleted = false)")
+    @Formula("(SELECT COUNT(*) FROM crm.contacts c WHERE c.organization_id = id AND c.is_deleted = false)")
     private Integer contactCount;
 
     /**

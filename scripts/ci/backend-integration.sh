@@ -7,7 +7,6 @@ source "${SCRIPT_DIR}/common.sh"
 
 ci_require_cmd docker
 
-cd "$(ci_backend_dir)"
 docker version
 docker info
-mvn -B -U verify --no-transfer-progress
+ci_mvn -B -U verify --no-transfer-progress

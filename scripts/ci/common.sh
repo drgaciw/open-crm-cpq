@@ -29,3 +29,17 @@ ci_cpq_beta_dir() {
 }
 
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-test}"
+
+# Prefer system Maven on CI; fall back to backend wrapper for dev machines.
+ci_mvn() {
+  local backend
+  backend="$(ci_backend_dir)"
+  if command -v mvn >/dev/null 2>&1; then
+    (cd "$backend" && mvn "$@")
+  elif [[ -x "$backend/mvnw" ]]; then
+    (cd "$backend" && ./mvnw "$@")
+  else
+    echo "Maven not found and $backend/mvnw is missing" >&2
+    exit 1
+  fi
+}
