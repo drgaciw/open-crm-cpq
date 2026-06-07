@@ -20,7 +20,7 @@ spring:
           '[/**]':
             allowedOrigins:
               - "http://localhost:4200"
-              - "https://*.azurewebsites.net"
+              - "${FRONTEND_URL:}"
             allowedMethods:
               - GET
               - POST
@@ -218,7 +218,7 @@ security:
   csrf:
     allowed-origins:
       - "http://localhost:4200"
-      - "https://*.azurewebsites.net"
+      - "${FRONTEND_URL:}"
 
 # Azure AD B2C Configuration
 azure:
