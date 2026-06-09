@@ -1,11 +1,7 @@
-🎯 **What:**
-Added a descriptive docstring to the `create_lead_from_call_log` method in `crm_call_log.py`. The method was flagged as potential dead code but is actually actively used by the Vue frontend (`CallLogModal.vue`) via Frappe UI's `call()` RPC function.
+💡 What: Replaced individual database queries inside a loop with a batch query (`IN` clause) in `PriceBookInternalResolutionService.resolveBatch`.
 
-💡 **Why:**
-This improves code readability and maintainability by making the method's purpose and usage explicit to future developers and static analysis tools, preventing it from being incorrectly flagged or deleted as dead code.
+🎯 Why: This resolves an N+1 query performance bottleneck that would cause significant delays when resolving prices for many line items simultaneously.
 
-✅ **Verification:**
-Created a standalone test runner mocking the Frappe environment and confirmed that all unit tests in `test_crm_call_log.py` pass cleanly with the new docstring in place.
+📊 Impact: Significantly reduces database round trips from O(N) to O(1), speeding up batch price resolution.
 
-✨ **Result:**
-The codebase is healthier, with clearer documentation for an important API endpoint, preventing accidental regressions.
+🔬 Measurement: Observe lower database latency and overall faster response times when executing batch pricing for multiple product items.

@@ -33,11 +33,19 @@ public class PriceBookInternalResolutionService {
                     .entries(entries)
                     .build();
         }
+        // ⚡ Bolt Performance Optimization:
+        // Replaced O(N) database queries inside the loop with an O(1) batch query using an IN clause.
+        // Expected impact: Drastically reduces database round-trip latency when resolving large batches of product IDs.
+        List<PriceBookEntry> fetchedEntries = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(priceBook.getId(), productExternalIds);
+
+        // Use a Map for O(1) in-memory lookup
+        Map<String, PriceBookEntry> entryMap = fetchedEntries.stream()
+                .collect(java.util.stream.Collectors.toMap(PriceBookEntry::getProductExternalId, e -> e));
+
         for (String productExternalId : productExternalIds) {
-            Optional<PriceBookEntry> entryOpt = priceBookEntryRepository
-                    .findByPriceBookIdAndProductExternalIdAndDeletedFalse(priceBook.getId(), productExternalId);
-            if (entryOpt.isPresent()) {
-                PriceBookEntry e = entryOpt.get();
+            PriceBookEntry e = entryMap.get(productExternalId);
+            if (e != null) {
                 entries.put(productExternalId, ProductEntryResolveDto.builder()
                         .entryMatched(true)
                         .listPrice(e.getListPrice())

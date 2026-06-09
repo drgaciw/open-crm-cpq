@@ -50,8 +50,8 @@ class PriceBookInternalResolutionServiceTest {
                 .build();
 
         when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(42L, "SKU-1"))
-                .thenReturn(Optional.of(entry));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(42L, List.of("SKU-1")))
+                .thenReturn(List.of(entry));
 
         ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
 
