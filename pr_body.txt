@@ -1,0 +1,11 @@
+💡 What:
+Replaced the `for` loop executing singular `PriceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse` calls with a single batch fetch using a new `findByPriceBookIdAndProductExternalIdInAndDeletedFalse` method.
+
+🎯 Why:
+The previous implementation caused an N+1 query problem, making a separate database call for every product external ID passed to `resolveBatch`.
+
+📊 Impact:
+Reduces database round trips from O(N) to O(1) when fetching price book entries during batch resolution, significantly improving performance for large line item batches.
+
+🔬 Measurement:
+Unit tests for the module (`PriceBookInternalResolutionServiceTest`) have been updated to assert against the batch fetch method, and verify the correct construction of `ProductEntryResolveDto` objects. Run `./mvnw test -pl services/pricebook-service`.
