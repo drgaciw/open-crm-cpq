@@ -1,0 +1,7 @@
+🚨 Severity: HIGH
+💡 Vulnerability: Gateway application.yml uses a wildcard CORS allowed origin `https://*.azurewebsites.net` which is vulnerable to subdomain takeover. This allows attackers who control any Azure subdomain to perform Cross-Origin or CSRF attacks.
+🎯 Impact: Attackers could bypass same-origin policy, leading to data exposure, unauthorized actions, and account compromise if they register a subdomain on `azurewebsites.net`.
+🔧 Fix: Replaced the overly permissive wildcard with an environment-configurable variable (`${FRONTEND_URL:}`) with an empty fallback, restricting allowed origins to specific known domains.
+✅ Verification:
+- Compiled the `gateway-service` successfully (`./mvnw clean install -DskipTests -pl services/gateway-service -am`).
+- Ran all tests for the `gateway-service` successfully (`./mvnw test -pl services/gateway-service -am -Dskip.docker.tests=true`).
