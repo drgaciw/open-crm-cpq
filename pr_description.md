@@ -1,11 +1,11 @@
-🎯 **What:**
-Added a descriptive docstring to the `create_lead_from_call_log` method in `crm_call_log.py`. The method was flagged as potential dead code but is actually actively used by the Vue frontend (`CallLogModal.vue`) via Frappe UI's `call()` RPC function.
+💡 What:
+Replaced `next(...)` inner loop searches for reacted and replied messages with an O(1) dictionary lookup by `message_id`.
 
-💡 **Why:**
-This improves code readability and maintainability by making the method's purpose and usage explicit to future developers and static analysis tools, preventing it from being incorrectly flagged or deleted as dead code.
+🎯 Why:
+The previous implementation iterated through all `messages` inside list comprehensions for every reaction and reply. This resulted in O(N^2) time complexity, creating a performance bottleneck when processing WhatsApp threads with many messages.
 
-✅ **Verification:**
-Created a standalone test runner mocking the Frappe environment and confirmed that all unit tests in `test_crm_call_log.py` pass cleanly with the new docstring in place.
+📊 Impact:
+Reduces time complexity from O(N^2) to O(N). For threads with a high volume of reactions or replies, this significantly decreases CPU cycles and response times for fetching WhatsApp messages.
 
-✨ **Result:**
-The codebase is healthier, with clearer documentation for an important API endpoint, preventing accidental regressions.
+🔬 Measurement:
+The optimization can be measured by profiling the `get_whatsapp_messages` function on a `CRM Lead` or `CRM Deal` with a long thread of messages and observing the reduced CPU execution time compared to the original O(N^2) approach.
