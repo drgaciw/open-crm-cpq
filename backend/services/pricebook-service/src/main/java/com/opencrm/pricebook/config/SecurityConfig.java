@@ -1,6 +1,5 @@
 package com.opencrm.pricebook.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -14,9 +13,6 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Value("${security.open:false}")
-    private boolean securityOpen;
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         var builder = http
@@ -24,16 +20,12 @@ public class SecurityConfig {
                         org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        if (securityOpen) {
-            builder.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
-        } else {
-            builder.authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                    .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                    .requestMatchers("/internal/**").permitAll()
-                    .requestMatchers("/api/v1/**").authenticated()
-                    .anyRequest().authenticated());
-        }
+        builder.authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/internal/**").permitAll()
+                .requestMatchers("/api/v1/**").authenticated()
+                .anyRequest().authenticated());
 
         return builder.build();
     }

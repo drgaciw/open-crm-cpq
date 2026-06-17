@@ -1,0 +1,5 @@
+🚨 Severity: CRITICAL
+💡 Vulnerability: The SecurityConfig files contained a `securityOpen` property that, if set to true, completely bypassed all authentication by applying `auth.anyRequest().permitAll()`.
+🎯 Impact: If this flag were accidentally misconfigured or enabled in a production environment, it would allow complete unauthenticated access to all internal microservice APIs.
+🔧 Fix: Removed the `@Value("${security.open:false}")` property and the associated `if-else` block, hardcoding the secure default configuration to strictly enforce authentication rules.
+✅ Verification: Ran unit tests across all affected microservices (`./mvnw test -pl <services> -Dskip.docker.tests=true`) and verified that the applications compile successfully.
