@@ -3,3 +3,6 @@
 **Why:** The original code executed a database query to find the attribute name for *each* attribute value inside a stream map, causing an N+1 query performance bottleneck. Batch fetching resolves this issue by reducing database calls to O(1).
 **Impact:** Execution time for fetching 500 attributes (100 iterations) decreased from 4170ms to 45ms.
 **Measurement:** ~99% improvement (~92x speedup).
+## $(date +%Y-%m-%d) - Resolve N+1 Query in PriceBookInternalResolutionService
+**Learning:** The resolveBatch method executed a database query for each product ID, creating an N+1 bottleneck.
+**Action:** Replaced iterative queries with an IN clause and a Map lookup.
