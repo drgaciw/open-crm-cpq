@@ -1,0 +1,5 @@
+🚨 Severity: HIGH
+💡 Vulnerability: Overly permissive CORS and CSRF wildcards allowed any azurewebsites.net subdomain.
+🎯 Impact: Subdomain takeover or bypasses could lead to unauthorized actions.
+🔧 Fix: Replaced wildcard with environment variable FRONTEND_URL.
+✅ Verification: Verified application.yml and ran gateway tests.
