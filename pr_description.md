@@ -1,11 +1,11 @@
-🎯 **What:**
-Added a descriptive docstring to the `create_lead_from_call_log` method in `crm_call_log.py`. The method was flagged as potential dead code but is actually actively used by the Vue frontend (`CallLogModal.vue`) via Frappe UI's `call()` RPC function.
+🚨 Severity: HIGH
 
-💡 **Why:**
-This improves code readability and maintainability by making the method's purpose and usage explicit to future developers and static analysis tools, preventing it from being incorrectly flagged or deleted as dead code.
+💡 Vulnerability: The Gateway service's `application.yml` permitted cross-origin requests and CSRF tokens from the highly permissive wildcard `https://*.azurewebsites.net`. Any user can register an Azure app service and claim a subdomain under `.azurewebsites.net`.
 
-✅ **Verification:**
-Created a standalone test runner mocking the Frappe environment and confirmed that all unit tests in `test_crm_call_log.py` pass cleanly with the new docstring in place.
+🎯 Impact: An attacker could host a malicious application on an Azure subdomain and bypass CORS and CSRF protections to interact with the backend API as the authenticated user.
 
-✨ **Result:**
-The codebase is healthier, with clearer documentation for an important API endpoint, preventing accidental regressions.
+🔧 Fix: Replaced the overly permissive wildcard with an environment variable `${FRONTEND_URL:}` for both `spring.cloud.gateway.globalcors.corsConfigurations['[/**]'].allowedOrigins` and `security.csrf.allowed-origins`.
+
+✅ Verification:
+- `cd backend && ./mvnw clean compile -DskipTests -pl services/gateway-service -am`
+- `cd backend && ./mvnw test -pl services/gateway-service -am -Dskip.docker.tests=true`
