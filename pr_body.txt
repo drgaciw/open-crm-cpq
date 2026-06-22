@@ -1,0 +1,4 @@
+💡 What: Replaced raw `Object[]` arrays in `LeadRepository.countGroupByStatus` and `DealRepository.findPipelineSummary` with strongly-typed Spring Data JPA projections (`LeadStatusCountProjection` and `PipelineSummaryProjection`).
+🎯 Why: Eliminate type casting (`(Long) row[1]`) which is error-prone, but more importantly, to follow Spring Data JPA's optimized projection mechanisms for analytical queries, potentially yielding a small performance boost by letting Hibernate map the grouped result sets directly.
+📊 Impact: Reduces array allocation and manual mapping overhead. Improves type safety.
+🔬 Measurement: Verified unit tests.

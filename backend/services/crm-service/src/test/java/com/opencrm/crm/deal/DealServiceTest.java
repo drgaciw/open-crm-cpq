@@ -629,10 +629,10 @@ class DealServiceTest {
         @Test
         @DisplayName("should return pipeline summary")
         void shouldReturnPipelineSummary() {
-            List<Object[]> mockResults = List.of(
-                    new Object[]{DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000)},
-                    new Object[]{DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000)},
-                    new Object[]{DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000)}
+            List<PipelineSummaryProjection> mockResults = List.of(
+                    createMockProjection(DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000)),
+                    createMockProjection(DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000)),
+                    createMockProjection(DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000))
             );
             when(dealRepository.findPipelineSummary()).thenReturn(mockResults);
 
@@ -654,6 +654,30 @@ class DealServiceTest {
             List<PipelineSummaryDto> result = dealService.getPipelineSummary();
 
             assertThat(result).isEmpty();
+        }
+
+        private PipelineSummaryProjection createMockProjection(DealStage stage, Long count, BigDecimal totalAmount, BigDecimal weightedAmount) {
+            return new PipelineSummaryProjection() {
+                @Override
+                public DealStage getStage() {
+                    return stage;
+                }
+
+                @Override
+                public Long getCount() {
+                    return count;
+                }
+
+                @Override
+                public BigDecimal getTotalAmount() {
+                    return totalAmount;
+                }
+
+                @Override
+                public BigDecimal getWeightedAmount() {
+                    return weightedAmount;
+                }
+            };
         }
     }
 }
