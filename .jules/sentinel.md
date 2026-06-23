@@ -44,3 +44,8 @@
 **Vulnerability:** Similar to previous discoveries, `frappe.db.sql` was being called with dynamically evaluated variables (e.g., `frappe.db.sql(query, ...)` where `query` was assigned earlier as a string literal). While seemingly safe because the components were statically defined in branches, this practice violated AST Grep's structural security rule against SQL concatenation and risked leaving `query` unbound if a code path fell through, resulting in a 500 error and stack trace leakage.
 **Learning:** `ast-grep` rules enforce explicit hardcoding of SQL strings directly inside `frappe.db.sql()`. Bypassing this by storing strings in variables before execution is not permitted. Additionally, failing to handle fallback branches can lead to `UnboundLocalError`, causing the app to crash and expose stack traces (CWE-209).
 **Prevention:** Always place raw SQL string literals explicitly inside the `frappe.db.sql()` function call and ensure all conditional branches correctly resolve or safely fallback without executing undefined variables.
+
+## 2026-06-23 - Overly Permissive CORS and CSRF configurations in Gateway
+**Vulnerability:** The API Gateway configuration (`application.yml`) allowed `https://*.azurewebsites.net` in its global CORS and CSRF allowed-origins configuration.
+**Learning:** Hardcoding overly broad wildcard domains, especially for cloud provider subdomains (like azurewebsites.net), allows potential subdomain takeover attacks where a malicious actor registers a subdomain and bypasses cross-origin restrictions.
+**Prevention:** Always restrict CORS and CSRF origins to explicit, known domains or use strict environment variables (e.g., `${FRONTEND_URL:}`) with safe fallbacks instead of broad wildcards.
