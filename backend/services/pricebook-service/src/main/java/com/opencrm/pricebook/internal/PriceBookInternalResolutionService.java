@@ -33,11 +33,17 @@ public class PriceBookInternalResolutionService {
                     .entries(entries)
                     .build();
         }
+        List<PriceBookEntry> fetchedEntries = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(priceBook.getId(), productExternalIds);
+
+        Map<String, PriceBookEntry> entryMap = new LinkedHashMap<>();
+        for (PriceBookEntry entry : fetchedEntries) {
+            entryMap.put(entry.getProductExternalId(), entry);
+        }
+
         for (String productExternalId : productExternalIds) {
-            Optional<PriceBookEntry> entryOpt = priceBookEntryRepository
-                    .findByPriceBookIdAndProductExternalIdAndDeletedFalse(priceBook.getId(), productExternalId);
-            if (entryOpt.isPresent()) {
-                PriceBookEntry e = entryOpt.get();
+            PriceBookEntry e = entryMap.get(productExternalId);
+            if (e != null) {
                 entries.put(productExternalId, ProductEntryResolveDto.builder()
                         .entryMatched(true)
                         .listPrice(e.getListPrice())
