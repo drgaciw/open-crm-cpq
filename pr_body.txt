@@ -1,0 +1,4 @@
+💡 What: Replaced iterative per-item `PriceBookEntry` lookups with a single batched `IN` query in `PriceBookInternalResolutionService`.
+🎯 Why: Fixes an N+1 query problem during price book resolution which caused a database hit for every product ID in a batch.
+📊 Impact: Reduces database queries in `resolveBatch` from N (number of products) to 1, significantly improving resolution time.
+🔬 Measurement: Verify test suite execution time and check the number of SQL queries generated during batch price book resolution (e.g., via Hibernate logging).
