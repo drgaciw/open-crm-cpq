@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +34,15 @@ public class PriceBookInternalResolutionService {
                     .entries(entries)
                     .build();
         }
+
+        Map<String, PriceBookEntry> foundEntries = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(priceBook.getId(), productExternalIds)
+                .stream()
+                .collect(Collectors.toMap(PriceBookEntry::getProductExternalId, e -> e));
+
         for (String productExternalId : productExternalIds) {
-            Optional<PriceBookEntry> entryOpt = priceBookEntryRepository
-                    .findByPriceBookIdAndProductExternalIdAndDeletedFalse(priceBook.getId(), productExternalId);
-            if (entryOpt.isPresent()) {
-                PriceBookEntry e = entryOpt.get();
+            PriceBookEntry e = foundEntries.get(productExternalId);
+            if (e != null) {
                 entries.put(productExternalId, ProductEntryResolveDto.builder()
                         .entryMatched(true)
                         .listPrice(e.getListPrice())
