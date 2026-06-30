@@ -17,7 +17,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * Configures a shared Testcontainers PostgreSQL instance and Spring Boot test environment.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Tag("docker")
 @Tag("integration")
@@ -46,7 +46,6 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        registry.add("security.open", () -> "true");
         // Disable Redis for tests
         registry.add("spring.data.redis.host", () -> "localhost");
         registry.add("spring.data.redis.port", () -> "6379");

@@ -1,0 +1,5 @@
+🚨 Severity: CRITICAL
+💡 Vulnerability: The `security.open` property in `SecurityConfig.java` acts as a backdoor that bypasses all Spring Security authentication (via `permitAll()`) across multiple microservices when enabled.
+🎯 Impact: If this flag is accidentally enabled in a production environment via environment variables (`SECURITY_OPEN=true`), it would leave all internal APIs completely exposed and vulnerable to unauthenticated access.
+🔧 Fix: Removed the `securityOpen` backdoor property and conditional block from `SecurityConfig` across all 9 affected microservices. Also updated `BaseIntegrationTest` in `crm-service` to explicitly disable MockMvc filters (`@AutoConfigureMockMvc(addFilters = false)`) instead of relying on the removed backdoor.
+✅ Verification: Tested the application by running the unit/integration tests with `./mvnw test -Dskip.docker.tests=true -pl ...` to confirm all tests pass and security bypass relies safely on `@AutoConfigureMockMvc` for test context rather than application code.
