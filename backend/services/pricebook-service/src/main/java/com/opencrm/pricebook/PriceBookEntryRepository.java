@@ -19,6 +19,8 @@ public interface PriceBookEntryRepository extends JpaRepository<PriceBookEntry, 
 
     Page<PriceBookEntry> findByPriceBookIdAndDeletedFalse(Long priceBookId, Pageable pageable);
 
+    List<PriceBookEntry> findByPriceBookIdAndProductExternalIdInAndDeletedFalse(Long priceBookId, List<String> productExternalIds);
+
     Optional<PriceBookEntry> findByPriceBookIdAndProductExternalIdAndDeletedFalse(
             Long priceBookId, String productExternalId);
 }
