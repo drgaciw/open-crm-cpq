@@ -1,25 +1,14 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, tap, finalize } from 'rxjs';
+import { Observable, finalize } from 'rxjs';
 import {
   OrganizationDto,
   OrganizationCreateRequest,
   OrganizationUpdateRequest,
   PaginationMeta,
   ContactDto,
+  SpringPageResponse,
 } from '@frontend/shared-models';
-
-/**
- * Spring Page response structure for type safety.
- * Used when the backend returns paginated data.
- */
-interface SpringPage<T> {
-  content: T[];
-  number: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-}
 
 @Injectable({ providedIn: 'root' })
 export class OrganizationService {
@@ -53,20 +42,17 @@ export class OrganizationService {
       .set('sort', sort);
 
     this.http
-      .get<OrganizationDto[] | SpringPage<OrganizationDto>>(this.basePath, { params })
+      .get<SpringPageResponse<OrganizationDto>>(this.basePath, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (response) => {
-          // Handle both plain array (from interceptor unwrapping) and Spring Page response
-          const isPage = response && typeof response === 'object' && 'content' in response;
-          this.organizations.set(isPage ? response.content : response);
-
-          if (isPage) {
+        next: (p) => {
+          this.organizations.set(p.content ?? p);
+          if (p.totalElements !== undefined) {
             this.pagination.set({
-              page: response.number ?? 0,
-              size: response.size ?? size,
-              totalElements: response.totalElements ?? 0,
-              totalPages: response.totalPages ?? 0,
+              page: p.number ?? 0,
+              size: p.size ?? size,
+              totalElements: p.totalElements ?? 0,
+              totalPages: p.totalPages ?? 0,
             });
           }
         },
@@ -106,11 +92,22 @@ export class OrganizationService {
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('q', query);
+    // Interceptor rebuilds List+PageInfo into SpringPageResponse
     this.http
-      .get<OrganizationDto[]>(`${this.basePath}/search`, { params })
+      .get<SpringPageResponse<OrganizationDto>>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (orgs) => this.organizations.set(orgs),
+        next: (p) => {
+          this.organizations.set(p.content ?? p);
+          if (p.totalElements !== undefined) {
+            this.pagination.set({
+              page: p.number ?? 0,
+              size: p.size ?? 20,
+              totalElements: p.totalElements ?? 0,
+              totalPages: p.totalPages ?? 0,
+            });
+          }
+        },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
         }
@@ -128,10 +125,10 @@ export class OrganizationService {
       .set('size', String(size))
       .set('sort', 'createdAt,desc');
     this.http
-      .get<ContactDto[]>(`${this.basePath}/${organizationId}/contacts`, { params })
+      .get<SpringPageResponse<ContactDto>>(`${this.basePath}/${organizationId}/contacts`, { params })
       .pipe(finalize(() => this.organizationContactsLoading.set(false)))
       .subscribe({
-        next: (rows) => this.organizationContacts.set(rows),
+        next: (p) => this.organizationContacts.set(p.content ?? p),
         error: (err) => {
           this.organizationContacts.set([]);
           this.error.set(err?.error?.message || 'An error occurred');

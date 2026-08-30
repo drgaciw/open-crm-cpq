@@ -48,14 +48,11 @@ export interface PageRequest {
 }
 
 /**
- * Mirrors: Spring Boot Page<T> response structure.
- * Lead and Deal endpoints return ApiResponse<Page<T>>, so after interceptor
- * unwrapping, services receive this shape.
+ * Spring-like page shape synthesized by apiResponseInterceptor when the backend
+ * returns ApiResponse with `data: T[]` plus `pagination` (list, search, org contacts).
  *
- * Contact and Organization endpoints return ApiResponse<List<T>> with pagination
- * in ApiResponse.PageInfo, so after unwrapping services get a plain T[].
- *
- * Services should handle both cases.
+ * CRM list/search endpoints all use List + PageInfo; after the interceptor runs,
+ * services receive this shape and should read `.content` for the row array.
  */
 export interface SpringPageResponse<T> {
   content: T[];
