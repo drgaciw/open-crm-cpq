@@ -2,28 +2,23 @@
 
 Product catalog feature library (`@frontend/cpq-catalog`).
 
-PR-FE-CPQ-05 **lite**: presentational list/detail using `@frontend/shared-ui` primitives and mock data. No HTTP service or quote builder.
+## Pattern
 
-## Import
+HTTP services use the **DealService signal-state pattern** (`HttpClient` + `signal()` / `computed()`), not `BaseCrudService`. Mutations return `Observable`; list/getById update signals via `subscribe`.
+
+## HTTP — ProductService
+
+| Method | Path |
+|--------|------|
+| `list` / `search` / CRUD | `/api/v1/products` |
+| `getBySku` | `/api/v1/products/sku/:sku` |
+| `activate` / `deprecate` / `retire` | `/api/v1/products/:id/{activate\|deprecate\|retire}` |
 
 ```ts
-import { CATALOG_ROUTES, CatalogListComponent } from '@frontend/cpq-catalog';
+import { ProductService, CATALOG_ROUTES } from '@frontend/cpq-catalog';
 ```
 
-## Routes
-
-Lazy-load from the CRM shell:
-
-```ts
-{
-  path: 'catalog',
-  loadChildren: () =>
-    import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
-}
-```
-
-- `/catalog` — list (`PageHeader`, `SearchInput`, `DataTable`, `EmptyState`)
-- `/catalog/:id` — detail (`StatusBadge` product type, `CurrencyFormatPipe`)
+Presentational list/detail (PR-FE-CPQ-05 lite) still use mock data until UI wires `ProductService`.
 
 ## Running unit tests
 
