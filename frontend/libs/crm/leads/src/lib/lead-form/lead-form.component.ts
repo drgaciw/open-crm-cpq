@@ -8,10 +8,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { LeadService } from '../lead.service';
 import { ContactService } from '@frontend/crm-contacts';
 import { OrganizationService } from '@frontend/crm-organizations';
-import { ContactDto, OrganizationDto } from '@frontend/shared-models';
+import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-models';
 
 @Component({
   selector: 'lib-lead-form',
@@ -19,6 +20,7 @@ import { ContactDto, OrganizationDto } from '@frontend/shared-models';
   imports: [
     ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatAutocompleteModule, MatProgressSpinnerModule,
+    MatSelectModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -47,6 +49,17 @@ import { ContactDto, OrganizationDto } from '@frontend/shared-models';
               <input matInput formControlName="source" placeholder="e.g. Website, Referral, Conference">
             </mat-form-field>
             <mat-form-field appearance="outline">
+              <mat-label>Priority</mat-label>
+              <mat-select formControlName="priority" aria-label="Lead priority">
+                @for (p of priorities; track p) {
+                  <mat-option [value]="p">{{ p }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
               <mat-label>Estimated Value</mat-label>
               <input matInput formControlName="estimatedValue" type="number" placeholder="0">
               <span matTextPrefix>$&nbsp;</span>
@@ -159,6 +172,7 @@ export class LeadFormComponent implements OnInit {
   selectedOrgId: number | null = null;
   filteredContacts = signal<ContactDto[]>([]);
   filteredOrgs = signal<OrganizationDto[]>([]);
+  readonly priorities: LeadPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
   constructor() {
     // F1: effect() created once in constructor to reactively update filteredContacts
@@ -182,6 +196,7 @@ export class LeadFormComponent implements OnInit {
     this.form = this.fb.group({
       title: ['', Validators.required],
       source: [''],
+      priority: ['MEDIUM' as LeadPriority],
       description: [''],
       estimatedValue: [''],
       contactSearch: [''],
@@ -198,6 +213,7 @@ export class LeadFormComponent implements OnInit {
           this.form.patchValue({
             title: lead.title,
             source: lead.source,
+            priority: lead.priority ?? 'MEDIUM',
             description: lead.description,
             estimatedValue: lead.estimatedValue,
             contactSearch: lead.contactName ?? '',

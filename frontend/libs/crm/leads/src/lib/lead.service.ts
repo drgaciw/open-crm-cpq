@@ -6,6 +6,7 @@ import {
   LeadCreateRequest,
   LeadUpdateRequest,
   LeadStatus,
+  LeadPriority,
   PaginationMeta,
   SpringPageResponse,
 } from '@frontend/shared-models';
@@ -25,12 +26,19 @@ export class LeadService {
 
   readonly isEmpty = computed(() => this.leads().length === 0 && !this.loading());
 
-  list(page = 0, size = 20, sort = 'createdAt,desc', status?: LeadStatus): void {
+  list(
+    page = 0,
+    size = 20,
+    sort = 'createdAt,desc',
+    status?: LeadStatus,
+    priority?: LeadPriority,
+  ): void {
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
       .set('page', page).set('size', size).set('sort', sort);
     if (status) params = params.set('status', status);
+    if (priority) params = params.set('priority', priority);
 
     this.http.get<SpringPageResponse<LeadDto>>(this.basePath, { params })
       .pipe(finalize(() => this.loading.set(false)))
