@@ -1,15 +1,27 @@
 # cpq-quotes
 
-Nx library stub for `@frontend/cpq-quotes`.
+Quotes feature library (`@frontend/cpq-quotes`).
 
-Quotes feature library (list/detail/lifecycle). UI lands in PR-FE-CPQ-06.
+## Pattern
 
-## Import
+HTTP services use the **DealService signal-state pattern** (`HttpClient` + signals), not `BaseCrudService`.
+
+## HTTP — QuoteService
+
+| Method | Path |
+|--------|------|
+| list / CRUD | `/api/v1/quotes` |
+| lifecycle | `/api/v1/quotes/:id/{submit\|approve\|reject\|send\|accept\|expire\|cancel\|clone\|calculate}` |
+| line items | `/api/v1/quotes/:quoteId/line-items` |
 
 ```ts
-import { CPQ_QUOTES_LIB } from '@frontend/cpq-quotes';
+import { QuoteService } from '@frontend/cpq-quotes';
 ```
+
+UI (list/detail/builder) lands in PR-FE-CPQ-06.
 
 ## Running unit tests
 
-Run `nx test cpq-quotes` to execute the unit tests.
+```bash
+npx nx test cpq-quotes
+```
