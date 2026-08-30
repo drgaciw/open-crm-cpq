@@ -17,6 +17,9 @@ public class RestClientConfig {
     @Value("${services.product.url}")
     private String productServiceUrl;
 
+    @Value("${services.gateway.url}")
+    private String gatewayServiceUrl;
+
     @Bean
     public RestClient pricingRestClient() {
         return RestClient.builder()
@@ -29,6 +32,15 @@ public class RestClientConfig {
     public RestClient productRestClient() {
         return RestClient.builder()
                 .baseUrl(productServiceUrl)
+                .requestFactory(createRequestFactory())
+                .build();
+    }
+
+    /** Gateway RestClient for S2D-3a validate (structured ConfigurationValidationResult). */
+    @Bean
+    public RestClient gatewayRestClient() {
+        return RestClient.builder()
+                .baseUrl(gatewayServiceUrl)
                 .requestFactory(createRequestFactory())
                 .build();
     }

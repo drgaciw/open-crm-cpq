@@ -3,12 +3,15 @@ package com.opencrm.quote.quote;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.dto.ConfigurationValidationResult;
+import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricingServiceClient;
+import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
@@ -27,10 +30,12 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -44,6 +49,7 @@ public class QuoteService {
     private final QuoteEventPublisher eventPublisher;
     private final QuoteLineItemRepository quoteLineItemRepository;
     private final PricingServiceClient pricingServiceClient;
+    private final ProductServiceClient productServiceClient;
     private final ObjectMapper objectMapper;
     private final OutboxEventPublisher outboxEventPublisher;
 
@@ -143,10 +149,64 @@ public class QuoteService {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
         }
 
+        assertConfigurationPreflight(quote.getLineItems());
+
         quote.setStatus(QuoteStatus.IN_REVIEW);
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} submitted for review", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
+    }
+
+    /**
+     * S2D-3a CONFIGURATION_ONLY preflight: gateway validate on line product IDs.
+     * Blocks submit when {@code valid=false}; no inline REQUIRES/EXCLUDES in quote-service.
+     */
+    private void assertConfigurationPreflight(List<QuoteLineItem> lineItems) {
+        List<Long> productIds = resolveLineProductIds(lineItems);
+        ConfigurationValidationResult result = productServiceClient.validateConfiguration(productIds);
+        if (result.isValid()) {
+            return;
+        }
+
+        List<ConfigurationViolation> violations =
+                result.getViolations() == null ? List.of() : result.getViolations();
+        String detail = violations.stream()
+                .map(v -> {
+                    String description = v.getDescription() != null ? v.getDescription() : "constraint violated";
+                    String type = v.getRuleType() != null ? v.getRuleType() : "UNKNOWN";
+                    return type + ": " + description;
+                })
+                .collect(Collectors.joining("; "));
+        if (detail.isBlank()) {
+            detail = "Configuration is invalid";
+        }
+        throw new BusinessException(
+                "Quote configuration preflight failed: " + detail,
+                "CONFIGURATION_PREFLIGHT_FAILED"
+        );
+    }
+
+    private List<Long> resolveLineProductIds(List<QuoteLineItem> lineItems) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (QuoteLineItem item : lineItems) {
+            String externalId = item.getProductExternalId();
+            if (externalId == null || externalId.isBlank()) {
+                throw new BusinessException(
+                        "Line item is missing productExternalId required for configuration preflight",
+                        "QUOTE_INVALID_PRODUCT_ID"
+                );
+            }
+            try {
+                ids.add(Long.parseLong(externalId.trim()));
+            } catch (NumberFormatException ex) {
+                throw new BusinessException(
+                        "Line productExternalId must be a numeric product id for configuration preflight: "
+                                + externalId,
+                        "QUOTE_INVALID_PRODUCT_ID"
+                );
+            }
+        }
+        return List.copyOf(ids);
     }
 
     public QuoteDto approve(Long id) {
