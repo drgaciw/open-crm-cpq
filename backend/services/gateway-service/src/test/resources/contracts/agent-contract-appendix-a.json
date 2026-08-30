@@ -1,0 +1,230 @@
+{
+  "source": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md Appendix A",
+  "routes": [
+    {
+      "matrixId": "A-CFG-VALIDATE",
+      "method": "POST",
+      "path": "/api/v1/configuration/validate",
+      "examplePath": "/api/v1/configuration/validate",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015", "016"]
+    },
+    {
+      "matrixId": "A-CFG-RULES-POST",
+      "method": "POST",
+      "path": "/api/v1/configuration/rules",
+      "examplePath": "/api/v1/configuration/rules",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015"]
+    },
+    {
+      "matrixId": "A-CFG-RULES-GET",
+      "method": "GET",
+      "path": "/api/v1/configuration/rules",
+      "examplePath": "/api/v1/configuration/rules",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015"]
+    },
+    {
+      "matrixId": "A-CFG-RULES-PRODUCT",
+      "method": "GET",
+      "path": "/api/v1/configuration/rules/product/{productId}",
+      "examplePath": "/api/v1/configuration/rules/product/42",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015", "016"]
+    },
+    {
+      "matrixId": "A-CFG-RULES-DELETE",
+      "method": "DELETE",
+      "path": "/api/v1/configuration/rules/{id}",
+      "examplePath": "/api/v1/configuration/rules/7",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015"]
+    },
+    {
+      "matrixId": "A-RULES-VALIDATE",
+      "method": "POST",
+      "path": "/api/v1/rules/{id}/validate",
+      "examplePath": "/api/v1/rules/9/validate",
+      "gatewayRouteId": "pricing-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-PRICING-EXECUTE",
+      "method": "POST",
+      "path": "/api/v1/pricing/execute",
+      "examplePath": "/api/v1/pricing/execute",
+      "gatewayRouteId": "pricing-service",
+      "erpStub": false,
+      "agents": ["011"]
+    },
+    {
+      "matrixId": "A-PRICING-CUSTOMER-GET",
+      "method": "GET",
+      "path": "/api/v1/pricing-customers/{id}",
+      "examplePath": "/api/v1/pricing-customers/100",
+      "gatewayRouteId": "pricing-service",
+      "erpStub": false,
+      "agents": ["011", "016"]
+    },
+    {
+      "matrixId": "A-PB-LIST",
+      "method": "GET",
+      "path": "/api/v1/price-books",
+      "examplePath": "/api/v1/price-books",
+      "gatewayRouteId": "pricebook-service",
+      "erpStub": false,
+      "agents": ["004", "032", "035"]
+    },
+    {
+      "matrixId": "A-PB-GET",
+      "method": "GET",
+      "path": "/api/v1/price-books/{id}",
+      "examplePath": "/api/v1/price-books/3",
+      "gatewayRouteId": "pricebook-service",
+      "erpStub": false,
+      "agents": ["004", "035"]
+    },
+    {
+      "matrixId": "A-PB-ENTRIES",
+      "method": "GET",
+      "path": "/api/v1/price-books/{id}/entries",
+      "examplePath": "/api/v1/price-books/3/entries",
+      "gatewayRouteId": "pricebook-service",
+      "erpStub": false,
+      "agents": ["004", "032", "035"]
+    },
+    {
+      "matrixId": "A-QUOTE-LIST",
+      "method": "GET",
+      "path": "/api/v1/quotes",
+      "examplePath": "/api/v1/quotes",
+      "gatewayRouteId": "quote-service",
+      "erpStub": false,
+      "agents": ["011", "015", "016"]
+    },
+    {
+      "matrixId": "A-QUOTE-GET",
+      "method": "GET",
+      "path": "/api/v1/quotes/{id}",
+      "examplePath": "/api/v1/quotes/55",
+      "gatewayRouteId": "quote-service",
+      "erpStub": false,
+      "agents": ["011"]
+    },
+    {
+      "matrixId": "A-QUOTE-LINES",
+      "method": "GET",
+      "path": "/api/v1/quotes/{quoteId}/line-items",
+      "examplePath": "/api/v1/quotes/55/line-items",
+      "gatewayRouteId": "quote-service",
+      "erpStub": false,
+      "agents": ["011", "015", "016"]
+    },
+    {
+      "matrixId": "A-QUOTE-APPROVALS-POST",
+      "method": "POST",
+      "path": "/api/v1/quotes/{quoteId}/approvals",
+      "examplePath": "/api/v1/quotes/55/approvals",
+      "gatewayRouteId": "quote-service",
+      "erpStub": false,
+      "agents": ["011"]
+    },
+    {
+      "matrixId": "A-QUOTE-APPROVALS-PENDING",
+      "method": "GET",
+      "path": "/api/v1/quotes/approvals/pending",
+      "examplePath": "/api/v1/quotes/approvals/pending",
+      "gatewayRouteId": "quote-service",
+      "erpStub": false,
+      "agents": ["011"]
+    },
+    {
+      "matrixId": "A-PRODUCT-GET",
+      "method": "GET",
+      "path": "/api/v1/products/{id}",
+      "examplePath": "/api/v1/products/12",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["015", "016"]
+    },
+    {
+      "matrixId": "A-PRODUCT-BUNDLES",
+      "method": "GET",
+      "path": "/api/v1/product-bundles/product/{productId}",
+      "examplePath": "/api/v1/product-bundles/product/12",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-PRODUCT-ATTRIBUTES",
+      "method": "GET",
+      "path": "/api/v1/product-attributes",
+      "examplePath": "/api/v1/product-attributes",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-PRODUCT-ATTR-VALUES",
+      "method": "GET",
+      "path": "/api/v1/product-attributes/products/{productId}/values",
+      "examplePath": "/api/v1/product-attributes/products/12/values",
+      "gatewayRouteId": "product-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-CRM-CONTACTS",
+      "method": "GET",
+      "path": "/api/v1/contacts",
+      "examplePath": "/api/v1/contacts",
+      "gatewayRouteId": "crm-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-CRM-DEAL-GET",
+      "method": "GET",
+      "path": "/api/v1/deals/{id}",
+      "examplePath": "/api/v1/deals/8",
+      "gatewayRouteId": "crm-service",
+      "erpStub": false,
+      "agents": ["016"]
+    },
+    {
+      "matrixId": "A-ERP-COSTS",
+      "method": "GET",
+      "path": "/api/v1/erp/costs/{productExternalId}",
+      "examplePath": "/api/v1/erp/costs/SKU-1",
+      "gatewayRouteId": "erp-stub",
+      "erpStub": true,
+      "agents": ["011", "016"]
+    },
+    {
+      "matrixId": "A-ERP-COSTS-BULK",
+      "method": "GET",
+      "path": "/api/v1/erp/costs/bulk",
+      "examplePath": "/api/v1/erp/costs/bulk",
+      "gatewayRouteId": "erp-stub",
+      "erpStub": true,
+      "agents": ["011"]
+    },
+    {
+      "matrixId": "A-ERP-INVENTORY",
+      "method": "GET",
+      "path": "/api/v1/erp/inventory/{productExternalId}",
+      "examplePath": "/api/v1/erp/inventory/SKU-1",
+      "gatewayRouteId": "erp-stub",
+      "erpStub": true,
+      "agents": ["011", "016"]
+    }
+  ]
+}

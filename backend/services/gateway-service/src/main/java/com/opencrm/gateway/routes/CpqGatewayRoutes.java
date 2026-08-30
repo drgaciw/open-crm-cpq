@@ -22,11 +22,13 @@ public final class CpqGatewayRoutes {
     );
 
     /**
-     * Legacy {@code /api/v1/...} routes from CPQ_API_CONTRACT_MATRIX §9 (agent-critical prefixes).
+     * Legacy {@code /api/v1/...} routes from CPQ_API_CONTRACT_MATRIX §9 / Appendix A
+     * (agent-critical prefixes including price books).
      */
     public static final List<String> AGENT_CONTRACT_ROUTE_IDS = List.of(
             "crm-service",
             "pricing-service",
+            "pricebook-service",
             "product-service",
             "quote-service",
             "configuration-engine",
