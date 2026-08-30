@@ -61,7 +61,7 @@
 | Backend unit scope | **crm-service only** | `scripts/ci/backend-unit.sh`: `-pl services/crm-service -am verify -Punit-tests` |
 | Backend integration | Full reactor `mvn verify` (includes gateway compile + its unit test) | `scripts/ci/backend-integration.sh` |
 | Toolchain | Java/mvn/node/npm/docker/python presence only | `scripts/ci/toolchain-check.sh` — no contract drift invoke |
-| Staging smoke | PowerShell CRM reads only | `docs/scripts/staging-gateway-smoke.ps1` |
+| Staging smoke | Bash + PowerShell CRM reads; quote-accept idempotency runbook | `docs/scripts/staging-gateway-smoke.sh` / `.ps1`; `staging-quote-accept-idempotency.md` |
 
 ### Docs already encoding intent
 

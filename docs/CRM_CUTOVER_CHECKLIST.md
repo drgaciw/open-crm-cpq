@@ -24,8 +24,8 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 - [ ] Health: `GET` crm-service `/actuator/health` (and gateway if exposed).
 - [ ] CRUD smoke: organizations, contacts, leads, deals via **gateway** paths used by `frontend/libs/crm` (**4200 → 8080**, not direct **8081**).
 - [ ] Pipeline/dashboard: `/api/v1/deals/pipeline` and dashboard loads succeed.
-- [ ] **Quote acceptance E2E:** Accept a sent quote with `dealExternalId` set to the deal’s **UUID** string; confirm deal moves to **WON** and amounts/currency update; publish duplicate Redis messages and confirm **idempotency** (`crm:quote-accepted:processed:*` skips re-application).
-- [ ] Automated smoke (optional): `docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'https://…'` for read paths.
+- [ ] **Quote acceptance E2E:** Accept a sent quote with `dealExternalId` set to the deal’s **UUID** string; confirm deal moves to **WON** and amounts/currency update; publish duplicate Redis messages and confirm **idempotency** (`crm:quote-accepted:processed:*` skips re-application). Runbook: [scripts/staging-quote-accept-idempotency.md](./scripts/staging-quote-accept-idempotency.md) (helper: `staging-quote-accept-idempotency.sh`).
+- [ ] Automated smoke (optional CRM reads): bash `GATEWAY_BASE='https://…' ./docs/scripts/staging-gateway-smoke.sh` or PowerShell `docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'https://…'`.
 
 ---
 
@@ -66,6 +66,23 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 ## Commands reference (Windows + Nx + Maven)
 
 Repo root: `open-crm-cpq`.
+
+**Staging gateway CRM smoke (reads via :8080):**
+
+```bash
+# Linux / macOS / CI agents
+GATEWAY_BASE='http://localhost:8080' ./docs/scripts/staging-gateway-smoke.sh
+# Optional ERP stub (expect 501, not 404):
+CHECK_ERP=1 GATEWAY_BASE='http://localhost:8080' ./docs/scripts/staging-gateway-smoke.sh
+```
+
+```powershell
+# Windows
+./docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'http://localhost:8080'
+./docs/scripts/staging-gateway-smoke.ps1 -GatewayBase 'http://localhost:8080' -CheckErp
+```
+
+**Quote accept → WON + duplicate idempotency:** [scripts/staging-quote-accept-idempotency.md](./scripts/staging-quote-accept-idempotency.md)
 
 **Frontend tests (after `npm ci` in `frontend`):**
 
