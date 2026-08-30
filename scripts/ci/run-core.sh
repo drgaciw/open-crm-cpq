@@ -11,7 +11,7 @@ usage() {
 Usage: bash scripts/ci/run-core.sh <stage>
 
 Stages:
-  toolchain            Verify java, mvn, node, docker, python
+  toolchain            Verify java, mvn, node, docker, python + CI contract drift
   shared-libraries     Maven verify for backend/libs/*
   backend-unit         Fast Maven unit profile (crm-service)
   backend-integration  Full Maven verify (Testcontainers)

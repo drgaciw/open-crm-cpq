@@ -27,3 +27,16 @@ npm --version
 docker version
 python3 --version
 echo "Toolchain OK"
+
+# Blocking, non-AI contract gate (ADR-003: no LLM in GHA; Jenkins AI drift_sentinel remains advisory).
+REPO_ROOT="$(ci_repo_root)"
+DRIFT_VERIFY="${REPO_ROOT}/.cursor/skills/ci-contract-drift-check/scripts/verify-drift.py"
+if [[ ! -f "${DRIFT_VERIFY}" ]]; then
+  echo "Missing CI contract drift verifier: ${DRIFT_VERIFY}" >&2
+  exit 1
+fi
+echo "=== CI contract drift ==="
+(
+  cd "${REPO_ROOT}"
+  python3 "${DRIFT_VERIFY}"
+)
