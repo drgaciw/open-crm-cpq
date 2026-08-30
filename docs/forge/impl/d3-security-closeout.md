@@ -1,5 +1,5 @@
 ---
-status: partial
+status: done
 id: d3-security-closeout
 ---
 
