@@ -27,6 +27,7 @@ describe('LeadListComponent action wiring', () => {
   let convertSpy: ReturnType<typeof vi.fn>;
   let markContactedSpy: ReturnType<typeof vi.fn>;
   let markLostSpy: ReturnType<typeof vi.fn>;
+  let dialogOpenSpy: ReturnType<typeof vi.fn>;
 
   const pagination = signal<PaginationMeta>({
     page: 0,
@@ -45,6 +46,7 @@ describe('LeadListComponent action wiring', () => {
     );
     markContactedSpy = vi.fn(() => of(lead({ id: 1, title: 'N', status: 'CONTACTED' })));
     markLostSpy = vi.fn(() => of(lead({ id: 1, title: 'L', status: 'LOST' })));
+    dialogOpenSpy = vi.fn(() => ({ afterClosed: () => of(undefined) }));
 
     const serviceMock = {
       leads,
@@ -69,7 +71,7 @@ describe('LeadListComponent action wiring', () => {
         {
           provide: MatDialog,
           useValue: {
-            open: vi.fn(() => ({ afterClosed: () => of(undefined) })),
+            open: dialogOpenSpy,
           },
         },
       ],
@@ -103,19 +105,19 @@ describe('LeadListComponent action wiring', () => {
 
   it('onConvert calls convertToDeal and navigates via convertedDealId', () => {
     listSpy.mockClear();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    dialogOpenSpy.mockReturnValueOnce({ afterClosed: () => of(true) });
     const qualified = lead({ id: 9, title: 'Ready', status: 'QUALIFIED' });
 
     component.onConvert(qualified);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(dialogOpenSpy).toHaveBeenCalled();
     expect(convertSpy).toHaveBeenCalledWith(9);
     expect(router.navigate).toHaveBeenCalledWith(['/deals', 77]);
     expect(component.actionLoading()).toBe(false);
   });
 
   it('onConvert does nothing when confirm is cancelled', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    dialogOpenSpy.mockReturnValueOnce({ afterClosed: () => of(false) });
     component.onConvert(lead({ id: 9, title: 'Ready', status: 'QUALIFIED' }));
 
     expect(convertSpy).not.toHaveBeenCalled();
@@ -126,12 +128,24 @@ describe('LeadListComponent action wiring', () => {
     convertSpy.mockReturnValueOnce(
       of(lead({ id: 9, title: 'Ready', status: 'CONVERTED', convertedDealId: undefined })),
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    dialogOpenSpy.mockReturnValueOnce({ afterClosed: () => of(true) });
     listSpy.mockClear();
 
     component.onConvert(lead({ id: 9, title: 'Ready', status: 'QUALIFIED' }));
 
     expect(router.navigate).not.toHaveBeenCalledWith(['/deals', expect.anything()]);
+    expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('onDelete uses ConfirmDialog then deletes', () => {
+    const deleteSpy = vi.mocked(TestBed.inject(LeadService).delete);
+    dialogOpenSpy.mockReturnValueOnce({ afterClosed: () => of(true) });
+    listSpy.mockClear();
+
+    component.onDelete(lead({ id: 4, title: 'Remove me', status: 'NEW' }));
+
+    expect(dialogOpenSpy).toHaveBeenCalled();
+    expect(deleteSpy).toHaveBeenCalledWith(4);
     expect(listSpy).toHaveBeenCalled();
   });
 
