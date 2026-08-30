@@ -23,6 +23,11 @@ services:
     url: http://localhost:8083
   gateway:
     url: http://localhost:8080
+  approval-routing:
+    url: http://localhost:8085
+
+approvals:
+  legacy-local-read-enabled: true
 
 logging:
   level:
