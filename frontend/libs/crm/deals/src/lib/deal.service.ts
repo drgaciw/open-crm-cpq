@@ -112,16 +112,16 @@ export class DealService {
     return this.http.post<DealDto>(`${this.basePath}/${id}/lose`, { reason });
   }
 
+  /**
+   * Loads stage totals for pipeline header/KPI use.
+   * Does not toggle {@link loading} so it can run alongside {@link list} (e.g. kanban).
+   */
   loadPipelineSummary(): void {
-    this.error.set(null);
-    this.loading.set(true);
-    this.http.get<PipelineSummaryDto[]>(`${this.basePath}/pipeline`)
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (summary) => this.pipelineSummary.set(summary),
-        error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
-        }
-      });
+    this.http.get<PipelineSummaryDto[]>(`${this.basePath}/pipeline`).subscribe({
+      next: (summary) => this.pipelineSummary.set(summary),
+      error: (err) => {
+        this.error.set(err?.error?.message || 'An error occurred');
+      },
+    });
   }
 }

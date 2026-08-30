@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, input, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,14 +6,19 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
+import { DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
 import { DealService } from '../deal.service';
+import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 
 @Component({
   selector: 'app-deal-detail',
   standalone: true,
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule, MatProgressSpinnerModule, MatDividerModule, CurrencyPipe, DatePipe],
+  imports: [
+    RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule,
+    MatProgressSpinnerModule, MatDividerModule, CurrencyPipe, DatePipe,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (service.loading()) {
@@ -28,15 +33,24 @@ import { DealService } from '../deal.service';
           </span>
         </div>
         <div class="header-actions">
-          <button mat-stroked-button (click)="onEdit()"><mat-icon>edit</mat-icon> Edit</button>
-          @if (deal.stage !== 'WON' && deal.stage !== 'LOST') {
-            <button mat-raised-button color="primary" (click)="onAdvance()">
-              <mat-icon>arrow_forward</mat-icon> Advance Stage
+          <button mat-stroked-button (click)="onEdit()" [disabled]="actionLoading()">
+            <mat-icon>edit</mat-icon> Edit
+          </button>
+          @if (canAdvance(deal.stage)) {
+            <button mat-raised-button color="primary" (click)="onAdvance()" [disabled]="actionLoading()">
+              @if (actionLoading()) {
+                <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+              } @else {
+                <mat-icon>arrow_forward</mat-icon>
+              }
+              Advance Stage
             </button>
-            <button mat-raised-button style="background:#4caf50;color:white" (click)="onWin()">
+          }
+          @if (canClose(deal.stage)) {
+            <button mat-raised-button class="win-btn" (click)="onWin()" [disabled]="actionLoading()">
               <mat-icon>emoji_events</mat-icon> Won
             </button>
-            <button mat-stroked-button color="warn" (click)="onLose()">
+            <button mat-stroked-button color="warn" (click)="onLose()" [disabled]="actionLoading()">
               <mat-icon>cancel</mat-icon> Lost
             </button>
           }
@@ -99,13 +113,15 @@ import { DealService } from '../deal.service';
       </div>
     }
   `,
-  styles: [`
+  styles: `
     .loading { display: flex; justify-content: center; padding: 48px; }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .header-info { flex: 1; display: flex; align-items: center; gap: 12px; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
     .stage-badge { color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
-    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .win-btn { background: #4caf50; color: white; }
+    .btn-spinner { display: inline-block; margin-right: 8px; }
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
     .full-width { grid-column: 1 / -1; }
     .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px 0; }
@@ -118,47 +134,80 @@ import { DealService } from '../deal.service';
     .link:hover { text-decoration: underline; }
     .no-relations { color: #999; font-style: italic; }
     .lost-card { border-left: 4px solid #d32f2f; }
-  `],
+  `,
 })
 export class DealDetailComponent implements OnInit {
   readonly service = inject(DealService);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+
   id = input.required<string>();
+  readonly actionLoading = signal(false);
 
-  stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
-  stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
+  stageColor(stage: string): string {
+    return STAGE_COLORS[stage] ?? '#666';
+  }
 
-  ngOnInit(): void { this.service.getById(Number(this.id())); }
-  goBack(): void { this.router.navigate(['/deals']); }
-  onEdit(): void { this.router.navigate(['/deals', this.id(), 'edit']); }
+  stageLabel(stage: string): string {
+    return STAGE_LABELS[stage] ?? stage;
+  }
+
+  /** API advances one step; NEGOTIATION must use win/lose. */
+  canAdvance(stage: DealStage): boolean {
+    return stage !== 'WON' && stage !== 'LOST' && stage !== 'NEGOTIATION';
+  }
+
+  canClose(stage: DealStage): boolean {
+    return stage !== 'WON' && stage !== 'LOST';
+  }
+
+  ngOnInit(): void {
+    this.service.getById(Number(this.id()));
+  }
+
+  goBack(): void {
+    this.router.navigate(['/deals']);
+  }
+
+  onEdit(): void {
+    this.router.navigate(['/deals', this.id(), 'edit']);
+  }
 
   onAdvance(): void {
+    this.actionLoading.set(true);
     this.service.advanceStage(Number(this.id())).subscribe({
       next: (d) => {
         this.service.selectedDeal.set(d);
+        this.actionLoading.set(false);
       },
-      error: () => {}
+      error: () => this.actionLoading.set(false),
     });
   }
+
   onWin(): void {
-    if (confirm('Mark this deal as Won?')) {
-      this.service.markWon(Number(this.id())).subscribe({
-        next: (d) => {
-          this.service.selectedDeal.set(d);
-        },
-        error: () => {}
-      });
-    }
+    if (!confirm('Mark this deal as Won?')) return;
+    this.actionLoading.set(true);
+    this.service.markWon(Number(this.id())).subscribe({
+      next: (d) => {
+        this.service.selectedDeal.set(d);
+        this.actionLoading.set(false);
+      },
+      error: () => this.actionLoading.set(false),
+    });
   }
+
   onLose(): void {
-    const reason = prompt('Why was this deal lost?');
-    if (reason) {
+    const dialogRef = this.dialog.open(DealLoseReasonDialogComponent, { width: '500px' });
+    dialogRef.afterClosed().subscribe((reason: string | undefined) => {
+      if (!reason) return;
+      this.actionLoading.set(true);
       this.service.markLost(Number(this.id()), reason).subscribe({
         next: (d) => {
           this.service.selectedDeal.set(d);
+          this.actionLoading.set(false);
         },
-        error: () => {}
+        error: () => this.actionLoading.set(false),
       });
-    }
+    });
   }
 }
