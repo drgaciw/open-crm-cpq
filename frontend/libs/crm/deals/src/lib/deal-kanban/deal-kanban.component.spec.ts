@@ -30,6 +30,8 @@ describe('DealKanbanComponent pipeline wiring', () => {
   const deals = signal<DealDto[]>([
     deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000 }),
     deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000 }),
+    deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250 }),
+    deal({ id: 4, name: 'D', stage: 'NEGOTIATION' }),
   ]);
   const loading = signal(false);
   const pipelineSummary = signal<PipelineSummaryDto[] | null>([
@@ -91,13 +93,23 @@ describe('DealKanbanComponent pipeline wiring', () => {
     });
   });
 
-  it('columns group deals by stage', () => {
+  it('columns group deals by stage with single-pass totals', () => {
     const cols = component.columns();
+    expect(cols).toHaveLength(7);
+
     const prospecting = cols.find((c) => c.stage === 'PROSPECTING');
     const proposal = cols.find((c) => c.stage === 'PROPOSAL');
-    expect(prospecting?.deals).toHaveLength(1);
+    const negotiation = cols.find((c) => c.stage === 'NEGOTIATION');
+    const qualification = cols.find((c) => c.stage === 'QUALIFICATION');
+
+    expect(prospecting?.deals.map((d) => d.id)).toEqual([1, 3]);
+    expect(prospecting?.totalValue).toBe(1250);
     expect(proposal?.deals).toHaveLength(1);
-    expect(prospecting?.totalValue).toBe(1000);
+    expect(proposal?.totalValue).toBe(5000);
+    expect(negotiation?.deals).toHaveLength(1);
+    expect(negotiation?.totalValue).toBe(0);
+    expect(qualification?.deals).toEqual([]);
+    expect(qualification?.totalValue).toBe(0);
   });
 
   it('onAdvance wires advanceStage and refreshes board + summary', () => {
