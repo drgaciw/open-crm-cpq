@@ -10,7 +10,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DisplayName("ProductRuleEvaluationCore VALIDATES conditionExpression (Wave H1)")
+@DisplayName("ProductRuleEvaluationCore VALIDATES conditionExpression (Wave H1 + J2)")
 class ProductRuleEvaluationCoreTest {
 
     @Test
@@ -36,12 +36,44 @@ class ProductRuleEvaluationCoreTest {
     }
 
     @Test
+    @DisplayName("attr:key in:v1,v2 matches when value in set (trim, case-sensitive)")
+    void attrInMatches() {
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in:red,blue", Map.of("color", "red"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in:red,blue", Map.of("color", "blue"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in: red , blue ", Map.of("color", "blue"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in:red,blue", Map.of("color", "green"))).isFalse();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in:red,blue", Map.of("color", "Red"))).isFalse();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color in:red,blue", Map.of("size", "L"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("in: is parsed before = / != so attr:key in:a=b stays list dialect")
+    void attrInParsedBeforeEquals() {
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:mode in:a=b,c", Map.of("mode", "a=b"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:mode in:a!=b,c", Map.of("mode", "a!=b"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:mode in:a=b,c", Map.of("mode", "c"))).isTrue();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:mode in:a=b,c", Map.of("mode", "a"))).isFalse();
+    }
+
+    @Test
     @DisplayName("unsupported dialect returns null (skip)")
     void unsupportedDialectIsNull() {
         assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
                 "spel:color=='red'", Map.of("color", "red"))).isNull();
         assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
                 "color=red", Map.of("color", "red"))).isNull();
+        assertThat(ProductRuleEvaluationCore.matchesAttrExpression(
+                "attr:color", Map.of("color", "red"))).isNull();
     }
 
     @Test
@@ -83,6 +115,68 @@ class ProductRuleEvaluationCoreTest {
 
         assertThat(result.isValid()).isTrue();
         assertThat(result.getViolations()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("attr:in: VALIDATES hard-fails when value not in set")
+    void attrInMismatchIsHard() {
+        ProductConfigurationRuleDto rule = ProductConfigurationRuleDto.builder()
+                .id(506L)
+                .ruleType("VALIDATES")
+                .sourceProductId(10L)
+                .conditionExpression("attr:color in:red,blue")
+                .errorMessage("Color must be red or blue")
+                .build();
+
+        ConfigurationValidationResult result = ProductRuleEvaluationCore.evaluate(
+                List.of(10L),
+                id -> List.of(rule),
+                Map.of("color", "green"));
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getViolations()).hasSize(1);
+        assertThat(result.getViolations().get(0).getRuleType()).isEqualTo("VALIDATES");
+        assertThat(result.getViolations().get(0).getDescription()).isEqualTo("Color must be red or blue");
+    }
+
+    @Test
+    @DisplayName("attr:in: VALIDATES passes when value is in set")
+    void attrInMatchIsValid() {
+        ProductConfigurationRuleDto rule = ProductConfigurationRuleDto.builder()
+                .id(507L)
+                .ruleType("VALIDATES")
+                .sourceProductId(10L)
+                .conditionExpression("attr:color in:red,blue")
+                .build();
+
+        ConfigurationValidationResult result = ProductRuleEvaluationCore.evaluate(
+                List.of(10L),
+                id -> List.of(rule),
+                Map.of("color", "blue"));
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.getViolations()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("attr:in: VALIDATES hard-fails when key missing")
+    void attrInMissingKeyIsHard() {
+        ProductConfigurationRuleDto rule = ProductConfigurationRuleDto.builder()
+                .id(508L)
+                .ruleType("VALIDATES")
+                .sourceProductId(10L)
+                .conditionExpression("attr:color in:red,blue")
+                .errorMessage("Color required")
+                .build();
+
+        ConfigurationValidationResult result = ProductRuleEvaluationCore.evaluate(
+                List.of(10L),
+                id -> List.of(rule),
+                Map.of("size", "L"));
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getViolations()).hasSize(1);
+        assertThat(result.getViolations().get(0).getDescription()).isEqualTo("Color required");
     }
 
     @Test

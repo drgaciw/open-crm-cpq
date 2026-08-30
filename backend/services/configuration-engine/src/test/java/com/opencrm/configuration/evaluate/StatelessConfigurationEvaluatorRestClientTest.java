@@ -13,7 +13,6 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
-import java.time.InstantSource;
 import java.util.Collections;
 import java.util.List;
 
@@ -37,7 +36,7 @@ class StatelessConfigurationEvaluatorRestClientTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://product.test");
         server = MockRestServiceServer.bindTo(builder).build();
         ProductConfigurationRuleClient ruleClient = new ProductConfigurationRuleClient(
-                builder.build(), Duration.ofSeconds(30), InstantSource.system());
+                builder.build(), Duration.ofSeconds(30));
         evaluator = new StatelessConfigurationEvaluator(ruleClient);
     }
 
