@@ -7,15 +7,20 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { LeadService } from '../lead.service';
 import { LeadDto, LeadPriority, LeadStatus } from '@frontend/shared-models';
 import { CurrencyPipe } from '@angular/common';
+import {
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  PageHeaderComponent,
+  SearchInputComponent,
+  StatusBadgeComponent,
+} from '@frontend/shared-ui';
 import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.component';
 
 @Component({
@@ -24,23 +29,25 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
   imports: [
     MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
     MatIconModule, MatProgressSpinnerModule, MatFormFieldModule,
-    MatInputModule, MatMenuModule, MatTabsModule, MatChipsModule, MatSelectModule,
-    CurrencyPipe,
+    MatMenuModule, MatTabsModule, MatSelectModule, CurrencyPipe,
+    PageHeaderComponent, SearchInputComponent, EmptyStateComponent, StatusBadgeComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="page-header">
-      <div class="header-left">
-        <h1>Leads</h1>
-        <p class="subtitle">Manage your lead pipeline</p>
+    <app-page-header
+      title="Leads"
+      subtitle="Manage your lead pipeline"
+    >
+      <div actions>
+        <button mat-raised-button color="primary" (click)="onCreate()">
+          <mat-icon>add</mat-icon> New Lead
+        </button>
       </div>
-      <div class="header-actions">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search leads..." #searchInput
-                 (input)="onSearch(searchInput.value)"
-                 aria-label="Search leads">
-        </mat-form-field>
+      <div search class="list-filters">
+        <app-search-input
+          placeholder="Search leads..."
+          (searchChange)="onSearch($event)"
+        />
         <mat-form-field appearance="outline" class="priority-field">
           <mat-label>Priority</mat-label>
           <mat-select [value]="currentPriority() ?? ''" (selectionChange)="onPriorityChange($event.value)"
@@ -51,11 +58,8 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
             }
           </mat-select>
         </mat-form-field>
-        <button mat-raised-button color="primary" (click)="onCreate()">
-          <mat-icon>add</mat-icon> New Lead
-        </button>
       </div>
-    </div>
+    </app-page-header>
 
     <mat-tab-group [(selectedIndex)]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)" class="status-tabs">
       <mat-tab label="All"></mat-tab>
@@ -72,20 +76,16 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
     }
 
     @if (!service.loading() && service.isEmpty()) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon">trending_up</mat-icon>
-        @if (hasActiveFilters()) {
-          <h3>No matching leads</h3>
-          <p>Try another status or priority filter, or clear filters to see all leads.</p>
-        } @else {
-          <h3>No leads yet</h3>
-          <p>Add your first lead to start tracking opportunities.</p>
-          <button mat-raised-button color="primary" (click)="onCreate()">
-            <mat-icon>add</mat-icon> Create Lead
-          </button>
-        }
-      </div>
-    } @else {
+      <app-empty-state
+        icon="trending_up"
+        [title]="hasActiveFilters() ? 'No matching leads' : 'No leads yet'"
+        [message]="hasActiveFilters()
+          ? 'Try another status or priority filter, or clear filters to see all leads.'
+          : 'Add your first lead to start tracking opportunities.'"
+        [actionLabel]="hasActiveFilters() ? '' : 'Create Lead'"
+        (action)="onCreate()"
+      />
+    } @else if (!service.loading()) {
       <div class="table-container">
         <table mat-table [dataSource]="service.leads()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="title">
@@ -98,7 +98,7 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
             <td mat-cell *matCellDef="let lead">
-              <mat-chip [class]="getStatusClass(lead.status)">{{ lead.status }}</mat-chip>
+              <app-status-badge [status]="lead.status" type="lead" />
             </td>
           </ng-container>
 
@@ -189,13 +189,8 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
     }
   `,
   styles: [`
-    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-    .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
-    .subtitle { margin: 4px 0 0; color: #666; }
-    .header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .search-field { width: 280px; }
+    .list-filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; width: 100%; }
     .priority-field { width: 160px; }
-    .search-field .mat-mdc-form-field-subscript-wrapper,
     .priority-field .mat-mdc-form-field-subscript-wrapper { display: none; }
     .status-tabs { margin-bottom: 24px; }
     .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
@@ -205,18 +200,11 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background: #f5f5f5; }
     .loading { display: flex; justify-content: center; padding: 48px; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; padding: 64px 24px; text-align: center; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-    .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #ccc; margin-bottom: 16px; }
-    .empty-state h3 { margin: 0 0 8px; }
-    .empty-state p { color: #666; margin: 0 0 24px; }
 
-    mat-chip { font-size: 0.75rem; font-weight: 500; min-height: 24px; padding: 4px 8px; }
-    .status-new { background-color: #2196f3 !important; color: white !important; }
-    .status-contacted { background-color: #ff9800 !important; color: white !important; }
-    .status-qualified { background-color: #4caf50 !important; color: white !important; }
-    .status-unqualified { background-color: #78909c !important; color: white !important; }
-    .status-converted { background-color: #9c27b0 !important; color: white !important; }
-    .status-lost { background-color: #f44336 !important; color: white !important; }
+    @media (max-width: 768px) {
+      .list-filters { flex-direction: column; }
+      .priority-field { width: 100%; }
+    }
   `],
 })
 export class LeadListComponent implements OnInit {
@@ -232,7 +220,6 @@ export class LeadListComponent implements OnInit {
   selectedTabIndex = 0;
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /** Tab order: All, New, Contacted, Qualified, Unqualified, Converted, Lost */
   private readonly statusMap: (LeadStatus | undefined)[] = [
@@ -258,14 +245,11 @@ export class LeadListComponent implements OnInit {
   }
 
   onSearch(q: string): void {
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => {
-      if (q.trim()) {
-        this.service.search(q.trim());
-      } else {
-        this.refreshList(0, 20);
-      }
-    }, 300);
+    if (q.trim()) {
+      this.service.search(q.trim());
+    } else {
+      this.refreshList(0, 20);
+    }
   }
 
   onPageChange(e: PageEvent): void {
@@ -312,20 +296,33 @@ export class LeadListComponent implements OnInit {
   }
 
   onConvert(lead: LeadDto): void {
-    if (!confirm(`Convert "${lead.title}" to a deal?`)) return;
-
-    this.actionLoading.set(true);
-    this.service.convertToDeal(lead.id).subscribe({
-      next: (convertedLead) => {
-        this.actionLoading.set(false);
-        const dealId = convertedLead.convertedDealId;
-        if (dealId != null) {
-          this.router.navigate(['/deals', dealId]);
-        } else {
-          this.refreshList(this.service.pagination().page, this.service.pagination().size);
-        }
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Convert lead',
+        message: `Convert "${lead.title}" to a deal?`,
+        confirmText: 'Convert',
+        cancelText: 'Cancel',
+        confirmColor: 'primary' as const,
       },
-      error: () => this.actionLoading.set(false),
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+
+      this.actionLoading.set(true);
+      this.service.convertToDeal(lead.id).subscribe({
+        next: (convertedLead) => {
+          this.actionLoading.set(false);
+          const dealId = convertedLead.convertedDealId;
+          if (dealId != null) {
+            this.router.navigate(['/deals', dealId]);
+          } else {
+            this.refreshList(this.service.pagination().page, this.service.pagination().size);
+          }
+        },
+        error: () => this.actionLoading.set(false),
+      });
     });
   }
 
@@ -348,11 +345,23 @@ export class LeadListComponent implements OnInit {
   }
 
   onDelete(lead: LeadDto): void {
-    if (confirm(`Delete lead "${lead.title}"?`)) {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete lead',
+        message: `Delete lead "${lead.title}"?`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        confirmColor: 'warn' as const,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
       this.service.delete(lead.id).subscribe(() => {
         this.refreshList(this.service.pagination().page, this.service.pagination().size);
       });
-    }
+    });
   }
 
   canEdit(status: LeadStatus): boolean {
@@ -365,10 +374,6 @@ export class LeadListComponent implements OnInit {
 
   canMarkLost(status: LeadStatus): boolean {
     return status === 'NEW' || status === 'CONTACTED' || status === 'QUALIFIED';
-  }
-
-  getStatusClass(status: LeadStatus): string {
-    return `status-${status.toLowerCase()}`;
   }
 
   hasActiveFilters(): boolean {
