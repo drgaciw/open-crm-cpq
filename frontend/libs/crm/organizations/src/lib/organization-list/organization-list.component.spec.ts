@@ -1,0 +1,79 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal, computed } from '@angular/core';
+import { of } from 'rxjs';
+import { OrganizationListComponent } from './organization-list.component';
+import { OrganizationService } from '../organization.service';
+import { OrganizationDto, PaginationMeta } from '@frontend/shared-models';
+
+describe('OrganizationListComponent SearchInput wiring', () => {
+  let fixture: ComponentFixture<OrganizationListComponent>;
+  let component: OrganizationListComponent;
+  let listSpy: ReturnType<typeof vi.fn>;
+  let searchSpy: ReturnType<typeof vi.fn>;
+
+  const pagination = signal<PaginationMeta>({
+    page: 0,
+    size: 20,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  const organizations = signal<OrganizationDto[]>([]);
+  const loading = signal(false);
+
+  beforeEach(async () => {
+    listSpy = vi.fn();
+    searchSpy = vi.fn();
+
+    await TestBed.configureTestingModule({
+      imports: [OrganizationListComponent],
+      providers: [
+        provideRouter([]),
+        provideNoopAnimations(),
+        {
+          provide: OrganizationService,
+          useValue: {
+            organizations,
+            loading,
+            pagination,
+            isEmpty: computed(() => organizations().length === 0 && !loading()),
+            list: listSpy,
+            search: searchSpy,
+            delete: vi.fn(() => of(void 0)),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(OrganizationListComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('ngOnInit loads the organization list', () => {
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
+  });
+
+  it('renders shared SearchInput instead of raw input', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-search-input')).toBeTruthy();
+    expect(el.querySelector('input[aria-label="Search organizations"]')).toBeNull();
+  });
+
+  it('onSearch with term calls OrganizationService.search', () => {
+    component.onSearch('  acme  ');
+    expect(searchSpy).toHaveBeenCalledWith('acme');
+  });
+
+  it('onSearch with blank term reloads list', () => {
+    listSpy.mockClear();
+    component.onSearch('   ');
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
+    expect(searchSpy).not.toHaveBeenCalled();
+  });
+});
