@@ -29,4 +29,9 @@ class QuoteAcceptedIdempotencyTest {
         assertThat(QuoteAcceptedIdempotency.redisKey("abc"))
                 .isEqualTo(QuoteAcceptedIdempotency.KEY_PREFIX + "abc");
     }
+
+    @Test
+    void ttl_isThirtyDays() {
+        assertThat(QuoteAcceptedIdempotency.TTL.toDays()).isEqualTo(30);
+    }
 }

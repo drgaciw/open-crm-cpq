@@ -55,8 +55,9 @@ class QuoteAcceptedDealProcessorTest {
                 .quoteNumber("Q-1")
                 .build();
 
-        processor.applyWinFromQuote(msg, deal.getUuid());
+        boolean applied = processor.applyWinFromQuote(msg, deal.getUuid());
 
+        assertThat(applied).isTrue();
         ArgumentCaptor<Deal> captor = ArgumentCaptor.forClass(Deal.class);
         verify(dealRepository).save(captor.capture());
         Deal saved = captor.getValue();
@@ -67,11 +68,13 @@ class QuoteAcceptedDealProcessorTest {
     }
 
     @Test
-    void applyWinFromQuote_noOpWhenDealMissing() {
+    void applyWinFromQuote_returnsFalseWhenDealMissing() {
         when(dealRepository.findByUuid("missing")).thenReturn(Optional.empty());
 
-        processor.applyWinFromQuote(QuoteAcceptedCrmMessage.builder().quoteNumber("Q-9").build(), "missing");
+        boolean applied = processor.applyWinFromQuote(
+                QuoteAcceptedCrmMessage.builder().quoteNumber("Q-9").build(), "missing");
 
+        assertThat(applied).isFalse();
         verify(dealRepository).findByUuid("missing");
         verify(dealRepository, never()).save(any());
     }
