@@ -74,11 +74,16 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
     @if (!service.loading() && service.isEmpty()) {
       <div class="empty-state">
         <mat-icon class="empty-icon">trending_up</mat-icon>
-        <h3>No leads yet</h3>
-        <p>Add your first lead to start tracking opportunities.</p>
-        <button mat-raised-button color="primary" (click)="onCreate()">
-          <mat-icon>add</mat-icon> Create Lead
-        </button>
+        @if (hasActiveFilters()) {
+          <h3>No matching leads</h3>
+          <p>Try another status or priority filter, or clear filters to see all leads.</p>
+        } @else {
+          <h3>No leads yet</h3>
+          <p>Add your first lead to start tracking opportunities.</p>
+          <button mat-raised-button color="primary" (click)="onCreate()">
+            <mat-icon>add</mat-icon> Create Lead
+          </button>
+        }
       </div>
     } @else {
       <div class="table-container">
@@ -364,6 +369,10 @@ export class LeadListComponent implements OnInit {
 
   getStatusClass(status: LeadStatus): string {
     return `status-${status.toLowerCase()}`;
+  }
+
+  hasActiveFilters(): boolean {
+    return this.currentStatus !== undefined || this.currentPriority() !== undefined;
   }
 
   private refreshList(page: number, size: number): void {
