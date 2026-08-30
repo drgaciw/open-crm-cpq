@@ -1,5 +1,7 @@
 package com.opencrm.configuration.session;
 
+import com.opencrm.common.dto.ConfigurationValidationResult;
+import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -16,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,26 +85,51 @@ class ConfigurationSessionServiceTest {
     @DisplayName("should add selection and validate")
     void addSelectionAndValidate() {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
-        when(constraintSolver.validate(any())).thenReturn(Collections.emptyList());
+        when(constraintSolver.evaluate(any())).thenReturn(ConfigurationValidationResult.ok());
         when(sessionRepository.save(any())).thenReturn(session);
 
         ConfigurationSession result = sessionService.addSelection(1L, "color", "red");
 
         assertTrue(result.getSelections().containsKey("color"));
-        verify(constraintSolver).validate(any());
+        assertTrue(result.isValid());
+        assertNull(result.getValidationErrors());
+        verify(constraintSolver).evaluate(any());
     }
 
     @Test
-    @DisplayName("should mark session invalid when constraints fail")
+    @DisplayName("should mark session invalid when hard constraints fail")
     void markInvalidOnConstraintFailure() {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
-        when(constraintSolver.validate(any())).thenReturn(List.of("Color is required"));
+        when(constraintSolver.evaluate(any())).thenReturn(ConfigurationValidationResult.of(List.of(
+                ConfigurationViolation.builder()
+                        .ruleType("REQUIRES")
+                        .description("Color is required")
+                        .build()
+        )));
         when(sessionRepository.save(any())).thenReturn(session);
 
         ConfigurationSession result = sessionService.addSelection(1L, "premium_feature", "yes");
 
         assertFalse(result.isValid());
-        assertNotNull(result.getValidationErrors());
+        assertEquals("Color is required", result.getValidationErrors());
+    }
+
+    @Test
+    @DisplayName("soft RECOMMENDS surfaces on session without blocking valid")
+    void softRecommendSurfacesWithoutBlocking() {
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(constraintSolver.evaluate(any())).thenReturn(ConfigurationValidationResult.of(List.of(
+                ConfigurationViolation.builder()
+                        .ruleType("RECOMMENDS")
+                        .description("Consider warranty")
+                        .build()
+        )));
+        when(sessionRepository.save(any())).thenReturn(session);
+
+        ConfigurationSession result = sessionService.addSelection(1L, "base", "10");
+
+        assertTrue(result.isValid());
+        assertEquals("Consider warranty", result.getValidationErrors());
     }
 
     @Test
