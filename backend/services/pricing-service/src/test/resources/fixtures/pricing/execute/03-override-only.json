@@ -1,0 +1,67 @@
+{
+  "id": "s2c-1b-03-override-only",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "description": "All lines use listPriceOverride so price-book resolve receives an empty product list.",
+  "request": {
+    "customerExternalId": "CUST-GOLD-003",
+    "quoteExternalId": "Q-GOLD-003",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 12,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-OVERRIDE",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 10,
+        "listPriceOverride": 49.99
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {
+      "externalId": "CUST-GOLD-003",
+      "name": "Override Only Inc",
+      "region": "NA",
+      "churnScore": 10
+    },
+    "priceBookEntries": {},
+    "activeRules": []
+  },
+  "expected": {
+    "success": true,
+    "approvalState": "APPROVED",
+    "lineResults": [
+      {
+        "productExternalId": "PROD-OVERRIDE",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 10,
+        "listPrice": 49.99,
+        "unitPrice": 49.99,
+        "discountRate": 0,
+        "discountAmount": 0,
+        "surchargeAmount": 0,
+        "finalPrice": 499.90
+      }
+    ],
+    "waterfall": {
+      "listPrice": 49.99,
+      "basePrice": 49.99,
+      "netPrice": 499.90,
+      "approvalState": "APPROVED",
+      "steps": []
+    },
+    "financialMetrics": {
+      "arr": 5998.80,
+      "tcv": 5998.80,
+      "acv": 499.90,
+      "clv": 11997.60,
+      "churnScore": 10,
+      "discountRate": 0.0000,
+      "totalDiscount": 0,
+      "totalSurcharge": 0,
+      "priceMultiplier": 1.0000,
+      "estimatedMarginPct": 40.0
+    }
+  }
+}
