@@ -54,7 +54,6 @@ services:
       DB_NAME: opencrm
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SECURITY_OPEN: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,7 +83,6 @@ services:
       DB_NAME: opencrm
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SECURITY_OPEN: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,7 +113,6 @@ services:
       DB_NAME: opencrm
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PRICEBOOK_SERVICE_URL: http://pricebook-service:8089
@@ -153,7 +150,6 @@ services:
       DB_NAME: opencrm
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -188,7 +184,6 @@ services:
       DB_NAME: opencrm
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      SECURITY_OPEN: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PRICING_SERVICE_URL: http://pricing-service:8082
