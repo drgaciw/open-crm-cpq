@@ -1,0 +1,214 @@
+{
+  "source": "docs/forge/15-wave-f-architecture.md F4 — product validate ↔ CE evaluate hard-failure parity",
+  "requestBody": "List<Long> selectedProductIds",
+  "productShape": "ApiResponse<List<String>> errors (empty ⇒ valid)",
+  "ceShape": "ApiResponse<ConfigurationValidationResult> { valid, violations[{ruleId,ruleType,description,remediation}] }",
+  "equivalence": "product errors empty ⇔ CE.valid=true; each product hard-failure string ⇔ a CE violation.description for REQUIRES/EXCLUDES only (RECOMMENDS/DEFAULT/VALIDATES ignored both sides until S2B-8)",
+  "waitingOn": "F2 StatelessConfigurationEvaluator / POST /internal/v1/configurations/evaluate for live dual-run",
+  "cases": [
+    {
+      "id": "empty-selection",
+      "description": "Empty selection is valid on both sides",
+      "selectedProductIds": [],
+      "rules": [],
+      "expectedProductErrors": [],
+      "expectedCe": {
+        "valid": true,
+        "violations": []
+      }
+    },
+    {
+      "id": "requires-satisfied",
+      "description": "Source with REQUIRES target present → valid",
+      "selectedProductIds": [101, 202],
+      "rules": [
+        {
+          "id": 1,
+          "name": "Base requires License",
+          "ruleType": "REQUIRES",
+          "sourceProductId": 101,
+          "targetProductId": 202,
+          "errorMessage": "Product 101 requires product 202",
+          "priority": 100
+        }
+      ],
+      "expectedProductErrors": [],
+      "expectedCe": {
+        "valid": true,
+        "violations": []
+      }
+    },
+    {
+      "id": "requires-miss",
+      "description": "Source selected without required target → hard failure",
+      "selectedProductIds": [101],
+      "rules": [
+        {
+          "id": 1,
+          "name": "Base requires License",
+          "ruleType": "REQUIRES",
+          "sourceProductId": 101,
+          "targetProductId": 202,
+          "errorMessage": "Product 101 requires product 202",
+          "priority": 100
+        }
+      ],
+      "expectedProductErrors": ["Product 101 requires product 202"],
+      "expectedCe": {
+        "valid": false,
+        "violations": [
+          {
+            "ruleId": 1,
+            "ruleType": "REQUIRES",
+            "description": "Product 101 requires product 202",
+            "remediation": "Add required product 202 to the selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "excludes-hit",
+      "description": "Source and excluded target both selected → hard failure",
+      "selectedProductIds": [101, 303],
+      "rules": [
+        {
+          "id": 2,
+          "name": "Base excludes AddonX",
+          "ruleType": "EXCLUDES",
+          "sourceProductId": 101,
+          "targetProductId": 303,
+          "errorMessage": "Product 101 is incompatible with product 303",
+          "priority": 100
+        }
+      ],
+      "expectedProductErrors": ["Product 101 is incompatible with product 303"],
+      "expectedCe": {
+        "valid": false,
+        "violations": [
+          {
+            "ruleId": 2,
+            "ruleType": "EXCLUDES",
+            "description": "Product 101 is incompatible with product 303",
+            "remediation": "Remove incompatible product 303 from the selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "excludes-ok-without-target",
+      "description": "EXCLUDES rule with target absent → valid",
+      "selectedProductIds": [101],
+      "rules": [
+        {
+          "id": 2,
+          "name": "Base excludes AddonX",
+          "ruleType": "EXCLUDES",
+          "sourceProductId": 101,
+          "targetProductId": 303,
+          "errorMessage": "Product 101 is incompatible with product 303",
+          "priority": 100
+        }
+      ],
+      "expectedProductErrors": [],
+      "expectedCe": {
+        "valid": true,
+        "violations": []
+      }
+    },
+    {
+      "id": "recommends-ignored",
+      "description": "RECOMMENDS is not a hard failure on either side (Wave F thin parity)",
+      "selectedProductIds": [101],
+      "rules": [
+        {
+          "id": 3,
+          "name": "Base recommends Upsell",
+          "ruleType": "RECOMMENDS",
+          "sourceProductId": 101,
+          "targetProductId": 404,
+          "errorMessage": "Consider adding product 404",
+          "priority": 50
+        }
+      ],
+      "expectedProductErrors": [],
+      "expectedCe": {
+        "valid": true,
+        "violations": []
+      }
+    },
+    {
+      "id": "requires-and-excludes-combined",
+      "description": "Both hard-failure types can fire for the same selection",
+      "selectedProductIds": [101, 303],
+      "rules": [
+        {
+          "id": 1,
+          "name": "Base requires License",
+          "ruleType": "REQUIRES",
+          "sourceProductId": 101,
+          "targetProductId": 202,
+          "errorMessage": "Product 101 requires product 202",
+          "priority": 100
+        },
+        {
+          "id": 2,
+          "name": "Base excludes AddonX",
+          "ruleType": "EXCLUDES",
+          "sourceProductId": 101,
+          "targetProductId": 303,
+          "errorMessage": "Product 101 is incompatible with product 303",
+          "priority": 90
+        }
+      ],
+      "expectedProductErrors": [
+        "Product 101 requires product 202",
+        "Product 101 is incompatible with product 303"
+      ],
+      "expectedCe": {
+        "valid": false,
+        "violations": [
+          {
+            "ruleId": 1,
+            "ruleType": "REQUIRES",
+            "description": "Product 101 requires product 202",
+            "remediation": "Add required product 202 to the selection"
+          },
+          {
+            "ruleId": 2,
+            "ruleType": "EXCLUDES",
+            "description": "Product 101 is incompatible with product 303",
+            "remediation": "Remove incompatible product 303 from the selection"
+          }
+        ]
+      }
+    },
+    {
+      "id": "default-error-message-requires",
+      "description": "Null errorMessage falls back to product-service default REQUIRES text",
+      "selectedProductIds": [101],
+      "rules": [
+        {
+          "id": 4,
+          "name": "Requires without custom message",
+          "ruleType": "REQUIRES",
+          "sourceProductId": 101,
+          "targetProductId": 202,
+          "errorMessage": null,
+          "priority": 100
+        }
+      ],
+      "expectedProductErrors": ["Product 101 requires product 202"],
+      "expectedCe": {
+        "valid": false,
+        "violations": [
+          {
+            "ruleId": 4,
+            "ruleType": "REQUIRES",
+            "description": "Product 101 requires product 202",
+            "remediation": "Add required product 202 to the selection"
+          }
+        ]
+      }
+    }
+  ]
+}
