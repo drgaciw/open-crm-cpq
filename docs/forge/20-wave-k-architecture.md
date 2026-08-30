@@ -1,6 +1,6 @@
 # Wave K architecture — quote lifecycle+lines FE ∥ approval inbox ∥ catalog update ∥ last JsonNode landmine
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (architect pick after Wave J COMPLETE; orchestrator review)  
+**Status:** COMPLETE on main (K1–K4 merged; K5 closeout) — PM authorized 2026-08-30 (architect pick after Wave J COMPLETE; orchestrator review)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** Wave J COMPLETE on `main` @ `6f66b9c` (J1–J5 merged; J6 closeout)  
@@ -278,7 +278,7 @@ Implement Open CRM/CPQ Wave K per docs/forge/20-wave-k-architecture.md in four p
 - [x] Overall wave risk **LOW–MED** (K4 MED; no HIGH in-scope work)  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
 - [x] Orchestrator → Wave K FORGING (orchestrator owns `00-orchestrator-status.md`)  
-- [ ] Day-1 + closeout merged; K5 COMPLETE  
+- [x] Day-1 + closeout merged; K5 COMPLETE  
 
 **PM WARNING:** Re-analyze before quote BE edits (**UNKNOWN** / stale index ≠ unused/safe). Do **not** flip approval legacy dual-read default (**HIGH**). K1 deletes unused JsonNode getters only — preserve `validateConfiguration`. K4 must use quote BFF paths, not approval-routing direct.
 

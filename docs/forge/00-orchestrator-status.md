@@ -1,29 +1,18 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave K FORGING** (quote JsonNode landmine ∥ FE quote lifecycle+lines ∥ catalog update ∥ approval inbox)  
+**Session state:** **Wave K COMPLETE** (JsonNode landmine ∥ FE quote lifecycle+lines ∥ catalog update ∥ approval inbox)  
 **Architect:** `/opencrm-architect`  
 **Plan:** `docs/forge/20-wave-k-architecture.md`  
-**Baseline:** Wave J COMPLETE on `main` @ `6f66b9c`
+**Baseline:** Wave J COMPLETE; Wave K K1–K4 merged + K5
 
-## Wave J results (prior)
+## Wave K results
 
-- **J1** Quote typed pricing apply (String + Jackson 2)
-- **J2** VALIDATES `attr:in:`
-- **J3** FE quote create + Calculate/Submit
-- **J4** FE catalog create dialog
-- **J5** Dual-read checklist; default stays true
-- **J6** Closeout
-
-## Wave K plan (architect pick)
-
-- **K1** Delete unused `ProductServiceClient` JsonNode getters; keep `validateConfiguration`
-- **K2** FE quote Approve/Reject/Send/Accept + line list/edit/remove
+- **K1** Unused `ProductServiceClient` JsonNode getters removed; validate path kept
+- **K2** FE quote Approve/Reject/Send/Accept + line edit/remove
 - **K3** FE catalog-detail update
-- **K4** FE approval inbox vs quote BFF
+- **K4** FE approval inbox against quote BFF
 - **K5** Docs closeout
-
-**Day-1 panes:** K1 ∥ K2 ∥ K3 ∥ K4
 
 ## Still held
 
