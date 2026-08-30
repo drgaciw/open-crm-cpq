@@ -14,9 +14,6 @@ public class RestClientConfig {
     @Value("${services.pricing.url}")
     private String pricingServiceUrl;
 
-    @Value("${services.product.url}")
-    private String productServiceUrl;
-
     @Value("${services.gateway.url}")
     private String gatewayServiceUrl;
 
@@ -27,14 +24,6 @@ public class RestClientConfig {
     public RestClient pricingRestClient() {
         return RestClient.builder()
                 .baseUrl(pricingServiceUrl)
-                .requestFactory(createRequestFactory())
-                .build();
-    }
-
-    @Bean
-    public RestClient productRestClient() {
-        return RestClient.builder()
-                .baseUrl(productServiceUrl)
                 .requestFactory(createRequestFactory())
                 .build();
     }

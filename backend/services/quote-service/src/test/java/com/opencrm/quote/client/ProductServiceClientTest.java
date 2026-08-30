@@ -32,8 +32,7 @@ class ProductServiceClientTest {
         RestClient.Builder gatewayBuilder = RestClient.builder().baseUrl("http://gateway.test");
         gatewayServer = MockRestServiceServer.bindTo(gatewayBuilder).build();
 
-        RestClient productRestClient = RestClient.builder().baseUrl("http://product.test").build();
-        client = new ProductServiceClient(productRestClient, gatewayBuilder.build());
+        client = new ProductServiceClient(gatewayBuilder.build());
     }
 
     @AfterEach
