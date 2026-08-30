@@ -1,6 +1,7 @@
 package com.opencrm.configuration.session;
 
 import com.opencrm.common.configuration.ConfigurationValidityAuthority;
+import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
@@ -70,15 +71,7 @@ public class ConfigurationSessionService {
         }
 
         session.addSelection(optionKey, optionValue);
-
-        // Validate after each selection change
-        List<String> errors = constraintSolver.validate(session);
-        if (errors.isEmpty()) {
-            session.markAsValid();
-        } else {
-            session.markAsInvalid(String.join("; ", errors));
-        }
-
+        applyConstraintResult(session, constraintSolver.evaluate(session));
         return sessionRepository.save(session);
     }
 
@@ -90,29 +83,29 @@ public class ConfigurationSessionService {
         }
 
         session.removeSelection(optionKey);
-
-        List<String> errors = constraintSolver.validate(session);
-        if (errors.isEmpty()) {
-            session.markAsValid();
-        } else {
-            session.markAsInvalid(String.join("; ", errors));
-        }
-
+        applyConstraintResult(session, constraintSolver.evaluate(session));
         return sessionRepository.save(session);
     }
 
     public ConfigurationSession validate(Long sessionId) {
         ConfigurationSession session = getById(sessionId);
         configurationModelCache.getOrCompile(session.getProductId(), configurationModelCompiler);
-
-        List<String> errors = constraintSolver.validate(session);
-        if (errors.isEmpty()) {
-            session.markAsValid();
-        } else {
-            session.markAsInvalid(String.join("; ", errors));
-        }
-
+        applyConstraintResult(session, constraintSolver.evaluate(session));
         return sessionRepository.save(session);
+    }
+
+    /**
+     * Hard failures block {@code valid}; soft RECOMMENDS still land in {@code validationErrors}
+     * without blocking complete.
+     */
+    private static void applyConstraintResult(ConfigurationSession session, ConfigurationValidationResult result) {
+        List<String> messages = ConstraintSolver.allViolationMessages(result);
+        if (result.isValid()) {
+            session.setValid(true);
+            session.setValidationErrors(messages.isEmpty() ? null : String.join("; ", messages));
+        } else {
+            session.markAsInvalid(messages.isEmpty() ? "Configuration is invalid" : String.join("; ", messages));
+        }
     }
 
     public ConfigurationSession complete(Long sessionId) {
