@@ -1,27 +1,27 @@
-# Wave D architecture — Security hardening (architect-only)
+# Wave D architecture — Security hardening
 
-**Status:** COMPLETE — merged to main  
+**Status:** COMPLETE — merged to `main` @ `871e49e` (D1∥D2→D3→D4)  
 **Architect:** `opencrm-architect` agent + `/opencrm-architect` skill  
-**Evidence date:** 2026-08-30 against `main` @ `6f1844d`  
+**Evidence date:** 2026-08-30 (pre-fix baseline @ `6f1844d`; post-fix tip `871e49e`)  
 **Sources:** GitHub Sentinel issues; `SecurityConfig.java` × N; gateway `application.yml` + `CsrfProtectionFilter`
 
-## 1. Problem / evidence
+## 1. Problem / evidence (pre-fix baseline)
 
 ### D-CRIT — `security.open` authentication bypass (GitHub #451, #419, …)
 
-Still present in code (Jules issue text claims removal; **not applied on main**):
+**Was present** on `main` before D2 (Jules/Sentinel PRs claimed removal; tree contradicted). D2 removed:
 
-- `@Value("${security.open:false}")` + `permitAll()` when true in at least:  
+- `@Value("${security.open:false}")` + `permitAll()` when true from:  
   `crm`, `pricing`, `pricebook`, `product`, `quote`, `approval-routing`, `configuration-engine`, `contract-asset-management`, `document-generation`  
-- Tests: `crm-service` `BaseIntegrationTest` sets `security.open=true`  
-- Compose sets `SECURITY_OPEN: "false"` (safe default) but **env override remains a prod footgun**
+- CRM `BaseIntegrationTest` no longer sets `security.open=true`  
+- Compose no longer exposes `SECURITY_OPEN`
 
 ### D-HIGH — Gateway CORS/CSRF subdomain wildcards (GitHub #458, #457, #455, …)
 
-Still present:
+**Was present** before D1:
 
 ```yaml
-# gateway-service application.yml
+# gateway-service application.yml (pre-D1)
 allowedOrigins:
   - "http://localhost:4200"
   - "https://*.azurewebsites.net"
@@ -30,7 +30,7 @@ security.csrf.allowed-origins:
   - "https://*.azurewebsites.net"
 ```
 
-`CsrfProtectionFilter.matchesPattern` explicitly supports `*.` suffix matching → any Azure App Service subdomain can satisfy Origin checks.
+`CsrfProtectionFilter` previously supported `*.` suffix matching. D1 replaced this with an explicit `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS` allow-list and rejects `*` entries at bind time.
 
 ## 2. Decisions
 
@@ -94,10 +94,13 @@ Implement Open CRM/CPQ Wave D security hardening per docs/forge/13-wave-d-archit
 
 ## 8. Architect sign-off checklist
 
-- [x] Vulnerabilities confirmed present on current `main`  
+- [x] Vulnerabilities confirmed present on pre-fix `main`  
 - [x] Jules “fixed” claims contradicted by tree evidence  
 - [x] PR DAG parallelizable without same-file fights (D1 vs D2)  
-- [ ] PM authorizes forge execution  
+- [x] PM authorized forge execution  
+- [x] D1∥D2 merged; D3 docs done; D4 Sentinel PRs closed  
+- [x] Post-merge `rg` clean on `main` @ `871e49e`  
+
 
 ## Architect review notes
 
