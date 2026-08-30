@@ -33,6 +33,10 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-icon matListItemIcon>handshake</mat-icon>
         <span matListItemTitle>Deals</span>
       </a>
+      <a mat-list-item routerLink="/catalog" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>inventory_2</mat-icon>
+        <span matListItemTitle>Catalog</span>
+      </a>
     </mat-nav-list>
   `,
   styles: [`
