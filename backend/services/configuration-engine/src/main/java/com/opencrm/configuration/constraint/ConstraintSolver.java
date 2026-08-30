@@ -29,18 +29,33 @@ public class ConstraintSolver {
 
     /**
      * Full evaluation including soft RECOMMENDS violations ({@code valid} still true when only soft).
+     * Passes {@link ConfigurationSession#getSelections()} as attribute bag for VALIDATES
+     * {@code conditionExpression} (Wave H1).
      */
     public ConfigurationValidationResult evaluate(ConfigurationSession session) {
         List<Long> selectedIds = selectedProductIds(session);
+        Map<String, String> attributes = sessionAttributes(session);
         ConfigurationValidationResult result = ProductRuleEvaluationCore.evaluate(
                 selectedIds,
-                ruleClient::getRulesForProduct);
-        log.debug("Evaluated configuration session {} selectedIds={} valid={} violations={}",
+                ruleClient::getRulesForProduct,
+                attributes);
+        log.debug("Evaluated configuration session {} selectedIds={} attrs={} valid={} violations={}",
                 session.getId(),
                 selectedIds,
+                attributes.size(),
                 result.isValid(),
                 result.getViolations() == null ? 0 : result.getViolations().size());
         return result;
+    }
+
+    /**
+     * Session selection map used as VALIDATES attribute bag (option key → value).
+     */
+    static Map<String, String> sessionAttributes(ConfigurationSession session) {
+        if (session == null || session.getSelections() == null || session.getSelections().isEmpty()) {
+            return Map.of();
+        }
+        return Map.copyOf(session.getSelections());
     }
 
     /**
