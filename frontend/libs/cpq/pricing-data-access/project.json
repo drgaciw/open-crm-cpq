@@ -1,0 +1,24 @@
+{
+  "name": "cpq-pricing-data-access",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/pricing-data-access/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": [
+    "scope:cpq",
+    "type:data-access",
+    "domain:pricing"
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/cpq/pricing-data-access"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

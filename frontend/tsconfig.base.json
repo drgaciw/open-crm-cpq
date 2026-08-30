@@ -24,7 +24,12 @@
       "@frontend/crm-organizations": ["libs/crm/organizations/src/index.ts"],
       "@frontend/crm-leads": ["libs/crm/leads/src/index.ts"],
       "@frontend/crm-deals": ["libs/crm/deals/src/index.ts"],
-      "@frontend/crm-dashboard": ["libs/crm/dashboard/src/index.ts"]
+      "@frontend/crm-dashboard": ["libs/crm/dashboard/src/index.ts"],
+      "@frontend/cpq-catalog": ["libs/cpq/catalog/src/index.ts"],
+      "@frontend/cpq-quotes": ["libs/cpq/quotes/src/index.ts"],
+      "@frontend/cpq-pricing-data-access": ["libs/cpq/pricing-data-access/src/index.ts"],
+      "@frontend/cpq-pricing-ui": ["libs/cpq/pricing-ui/src/index.ts"],
+      "@frontend/cpq-pricing-simulator": ["libs/cpq/pricing-simulator/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
