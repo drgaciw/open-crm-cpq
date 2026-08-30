@@ -47,7 +47,8 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("security.open", () -> "true");
-        // Disable Redis for tests
+        // Default Redis endpoints for ITs that do not start a Redis container.
+        // QuoteAcceptedRedisIntegrationTest overrides these via its own @DynamicPropertySource.
         registry.add("spring.data.redis.host", () -> "localhost");
         registry.add("spring.data.redis.port", () -> "6379");
         registry.add("spring.cache.type", () -> "none");
