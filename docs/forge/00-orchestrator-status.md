@@ -1,23 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave C RESUMED** — finishing uncommitted work in `forge-wave-c`  
-**Plan:** `docs/forge/12-wave-c-plan.md`  
-**Herdr:** `forge-wave-c` (6× Grok 4.5)  
-**Sources:** GitHub `gh issue list` + forge backlog (GitNexus MCP offline; CLI reindex in progress)
+**Session state:** **Wave C COMPLETE** (merged to main)  
+**Plan:** `docs/forge/12-wave-c-plan.md`
 
-## Wave C agents
-
-| Agent | Task |
-|-------|------|
-| `wc-quotes` | Quotes list/detail stub |
-| `wc-data` | CPQ data-access HTTP clients |
-| `wc-ui` | Shared-ui on CRM leads/contacts |
-| `wc-sim` | Pricing simulator stub |
-| `wc-tests` | FE test hardening |
-| `wc-n1` | PriceBook N+1 (gh #456 family) |
+## Wave C results
+- C1 quotes list/detail stub  
+- C2 CPQ HTTP data-access services  
+- C3 shared-ui on leads/contacts lists  
+- C4 pricing simulator stub  
+- C5 FE test hardening (crm-deals + cpq-catalog verified green)  
+- C6 PriceBook N+1 batch resolution  
 
 ## Still held
 - Activities API, S2B-11, S2C-12  
-- CORS/CSRF wildcard cluster (#458…)  
-- Auth bypass CRITICAL (#451)  
+- CORS/CSRF wildcards, auth bypass CRITICAL  

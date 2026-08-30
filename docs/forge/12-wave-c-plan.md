@@ -1,6 +1,6 @@
 # Wave C plan — Safe CPQ/CRM polish
 
-**Status:** EXECUTING  
+**Status:** COMPLETE — merged to main  
 **Sources:** GitHub issues (`gh`), forge backlog, post–Wave A/B `main` @ `24c468f`  
 **GitNexus MCP:** offline this session — use CLI index + grep for blast radius  
 **Model:** Grok 4.5 / Herdr max parallel  
