@@ -38,7 +38,7 @@ Use this skill when you need to determine the list price for one or more product
 ## Useful Commands
 
 ```bash
-curl -s GET /api/v1/pricing/price-books
-curl -s GET /api/v1/pricing/price-books/{priceBookId}/entries?productId={productId}
+curl -s GET /api/v1/price-books
+curl -s GET /api/v1/price-books/{priceBookId}/entries
 curl -s POST /api/v1/pricing/execute -d '{"quoteId":"...","products":[...]}'
 ```
