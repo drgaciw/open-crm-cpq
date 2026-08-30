@@ -2,7 +2,7 @@
 
 Quotes feature library (`@frontend/cpq-quotes`).
 
-PR-FE-CPQ-06 **lite**: presentational list/detail using `@frontend/shared-ui` primitives and mock data, plus `QuoteService` HTTP client for gateway `/api/v1/quotes`.
+List/detail browse quotes via `QuoteService` HttpClient against gateway `/api/v1/quotes`. `MOCK_QUOTES` remain as Vitest fixtures only (Wave G7).
 
 ## Pattern
 
@@ -19,6 +19,11 @@ HTTP services use the **DealService signal-state pattern** (`HttpClient` + signa
 ```ts
 import { QuoteService, QUOTES_ROUTES, QuotesListComponent } from '@frontend/cpq-quotes';
 ```
+
+## UI wiring (G7)
+
+- **List** — `QuotesListComponent` calls `QuoteService.list` on init / filter / page change. Status and deal type are server filters; text search is client-side on the current page.
+- **Detail** — `QuotesDetailComponent` calls `QuoteService.getById` and renders `selectedQuote` (loading / error / not-found states).
 
 ## Routes
 
