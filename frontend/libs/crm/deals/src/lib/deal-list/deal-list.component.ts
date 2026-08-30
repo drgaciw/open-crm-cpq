@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -11,9 +11,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { DealService } from '../deal.service';
 import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
+import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 
 @Component({
   selector: 'app-deal-list',
@@ -102,17 +104,28 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let d">
-              <button mat-icon-button [matMenuTriggerFor]="menu">
+              <button mat-icon-button [matMenuTriggerFor]="menu" [disabled]="actionLoading()"
+                      (click)="$event.stopPropagation()" aria-label="Deal actions">
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #menu="matMenu">
                 <button mat-menu-item (click)="onEdit(d)"><mat-icon>edit</mat-icon><span>Edit</span></button>
-                @if (d.stage !== 'WON' && d.stage !== 'LOST') {
-                  <button mat-menu-item (click)="onAdvance(d)"><mat-icon>arrow_forward</mat-icon><span>Advance Stage</span></button>
-                  <button mat-menu-item (click)="onWin(d)"><mat-icon>emoji_events</mat-icon><span>Mark Won</span></button>
-                  <button mat-menu-item (click)="onLose(d)"><mat-icon>cancel</mat-icon><span>Mark Lost</span></button>
+                @if (canAdvance(d.stage)) {
+                  <button mat-menu-item (click)="onAdvance(d)" [disabled]="actionLoading()">
+                    <mat-icon>arrow_forward</mat-icon><span>Advance Stage</span>
+                  </button>
                 }
-                <button mat-menu-item (click)="onDelete(d)"><mat-icon>delete</mat-icon><span>Delete</span></button>
+                @if (canClose(d.stage)) {
+                  <button mat-menu-item (click)="onWin(d)" [disabled]="actionLoading()">
+                    <mat-icon>emoji_events</mat-icon><span>Mark Won</span>
+                  </button>
+                  <button mat-menu-item (click)="onLose(d)" [disabled]="actionLoading()">
+                    <mat-icon>cancel</mat-icon><span>Mark Lost</span>
+                  </button>
+                }
+                <button mat-menu-item (click)="onDelete(d)" [disabled]="actionLoading()">
+                  <mat-icon>delete</mat-icon><span>Delete</span>
+                </button>
               </mat-menu>
             </td>
           </ng-container>
@@ -132,7 +145,7 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
       </div>
     }
   `,
-  styles: [`
+  styles: `
     .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
     .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
     .subtitle { margin: 4px 0 0; color: #666; }
@@ -152,11 +165,14 @@ import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared
     .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #ccc; margin-bottom: 16px; }
     .empty-state h3 { margin: 0 0 8px; }
     .empty-state p { color: #666; margin: 0 0 24px; }
-  `],
+  `,
 })
 export class DealListComponent implements OnInit {
   readonly service = inject(DealService);
   readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+
+  readonly actionLoading = signal(false);
 
   displayedColumns = ['name', 'amount', 'stage', 'probability', 'expectedCloseDate', 'contact', 'actions'];
   stages: DealStage[] = ['PROSPECTING', 'QUALIFICATION', 'NEEDS_ANALYSIS', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
@@ -168,11 +184,26 @@ export class DealListComponent implements OnInit {
     return item.id;
   }
 
-  ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
+  ngOnInit(): void {
+    this.service.list(0, 20, this.currentSort);
+  }
 
- 
-  stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
-  stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
+  /** API advances one step; NEGOTIATION must use win/lose. */
+  canAdvance(stage: DealStage): boolean {
+    return stage !== 'WON' && stage !== 'LOST' && stage !== 'NEGOTIATION';
+  }
+
+  canClose(stage: DealStage): boolean {
+    return stage !== 'WON' && stage !== 'LOST';
+  }
+
+  stageColor(stage: string): string {
+    return STAGE_COLORS[stage] ?? '#666';
+  }
+
+  stageLabel(stage: string): string {
+    return STAGE_LABELS[stage] ?? stage;
+  }
 
   onTabChange(index: number): void {
     this.currentStage = index === 0 ? undefined : this.stages[index - 1];
@@ -186,48 +217,83 @@ export class DealListComponent implements OnInit {
     }, 300);
   }
 
-  onPageChange(e: PageEvent): void { this.service.list(e.pageIndex, e.pageSize, this.currentSort, this.currentStage); }
+  onPageChange(e: PageEvent): void {
+    this.service.list(e.pageIndex, e.pageSize, this.currentSort, this.currentStage);
+  }
+
   onSort(s: Sort): void {
     this.currentSort = s.active && s.direction ? `${s.active},${s.direction}` : 'createdAt,desc';
     this.service.list(0, this.service.pagination().size, this.currentSort, this.currentStage);
   }
-  onCreate(): void { this.router.navigate(['/deals', 'new']); }
-  onRowClick(d: DealDto): void { this.router.navigate(['/deals', d.id]); }
-  onEdit(d: DealDto): void { this.router.navigate(['/deals', d.id, 'edit']); }
+
+  onCreate(): void {
+    this.router.navigate(['/deals', 'new']);
+  }
+
+  onRowClick(d: DealDto): void {
+    this.router.navigate(['/deals', d.id]);
+  }
+
+  onEdit(d: DealDto): void {
+    this.router.navigate(['/deals', d.id, 'edit']);
+  }
 
   onAdvance(d: DealDto): void {
+    this.actionLoading.set(true);
     this.service.advanceStage(d.id).subscribe({
-      next: () => this.refreshList(),
-      error: () => {}
+      next: () => {
+        this.actionLoading.set(false);
+        this.refreshList();
+      },
+      error: () => this.actionLoading.set(false),
     });
   }
+
   onWin(d: DealDto): void {
-    if (confirm(`Mark "${d.name}" as Won?`)) {
-      this.service.markWon(d.id).subscribe({
-        next: () => this.refreshList(),
-        error: () => {}
-      });
-    }
+    if (!confirm(`Mark "${d.name}" as Won?`)) return;
+    this.actionLoading.set(true);
+    this.service.markWon(d.id).subscribe({
+      next: () => {
+        this.actionLoading.set(false);
+        this.refreshList();
+      },
+      error: () => this.actionLoading.set(false),
+    });
   }
+
   onLose(d: DealDto): void {
-    const reason = prompt(`Why is "${d.name}" lost?`);
-    if (reason) {
+    const dialogRef = this.dialog.open(DealLoseReasonDialogComponent, { width: '500px' });
+    dialogRef.afterClosed().subscribe((reason: string | undefined) => {
+      if (!reason) return;
+      this.actionLoading.set(true);
       this.service.markLost(d.id, reason).subscribe({
-        next: () => this.refreshList(),
-        error: () => {}
+        next: () => {
+          this.actionLoading.set(false);
+          this.refreshList();
+        },
+        error: () => this.actionLoading.set(false),
       });
-    }
+    });
   }
+
   onDelete(d: DealDto): void {
-    if (confirm(`Delete "${d.name}"?`)) {
-      this.service.delete(d.id).subscribe({
-        next: () => this.refreshList(),
-        error: () => {}
-      });
-    }
+    if (!confirm(`Delete "${d.name}"?`)) return;
+    this.actionLoading.set(true);
+    this.service.delete(d.id).subscribe({
+      next: () => {
+        this.actionLoading.set(false);
+        this.refreshList();
+      },
+      error: () => this.actionLoading.set(false),
+    });
   }
 
   private refreshList(): void {
-    this.service.list(this.service.pagination().page, this.service.pagination().size, this.currentSort, this.currentStage);
+    this.service.list(
+      this.service.pagination().page,
+      this.service.pagination().size,
+      this.currentSort,
+      this.currentStage,
+    );
   }
 }
