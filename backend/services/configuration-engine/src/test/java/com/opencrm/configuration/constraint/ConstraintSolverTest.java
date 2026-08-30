@@ -149,6 +149,53 @@ class ConstraintSolverTest {
         assertThat(solver.isCompatible(session, "addon", "blue")).isTrue();
     }
 
+    @Test
+    @DisplayName("session selections drive attr:key=value VALIDATES (match → valid)")
+    void validatesExpressionMatchViaSelections() {
+        ConfigurationSession session = session("10", Map.of("base", "10", "color", "red"));
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(5L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .conditionExpression("attr:color=red")
+                        .build()
+        ));
+
+        assertThat(solver.evaluate(session).isValid()).isTrue();
+        assertThat(solver.validate(session)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("session selections drive attr:key=value VALIDATES (mismatch → hard fail)")
+    void validatesExpressionMismatchViaSelections() {
+        ConfigurationSession session = session("10", Map.of("base", "10", "color", "blue"));
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(6L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .conditionExpression("attr:color=red")
+                        .errorMessage("Color must be red")
+                        .build()
+        ));
+
+        ConfigurationValidationResult result = solver.evaluate(session);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(solver.validate(session)).containsExactly("Color must be red");
+    }
+
+    @Test
+    @DisplayName("sessionAttributes copies selection map for expression evaluation")
+    void sessionAttributesFromSelections() {
+        ConfigurationSession session = session("10", Map.of("color", "red", "size", "L"));
+        assertThat(ConstraintSolver.sessionAttributes(session))
+                .containsEntry("color", "red")
+                .containsEntry("size", "L");
+        assertThat(ConstraintSolver.sessionAttributes(session("10", Map.of()))).isEmpty();
+    }
+
     private static ConfigurationSession session(String productId, Map<String, String> selections) {
         return ConfigurationSession.builder()
                 .productId(productId)
