@@ -55,7 +55,13 @@ interface CatalogTableRow {
       subtitle="Browse sellable products from the product catalog API"
     >
       <div actions>
-        <button mat-stroked-button type="button" disabled aria-disabled="true">
+        <button
+          mat-stroked-button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title="Product create wizard is deferred (Wave I — catalog is read-only HTTP list/detail)"
+        >
           <mat-icon>add</mat-icon>
           New Product
         </button>
