@@ -25,10 +25,8 @@ import {
   PricingResult,
   SubscriptionType,
 } from '@frontend/shared-models';
-import {
-  MOCK_PRICING_CONTEXT,
-  mockExecuteOk,
-} from '../pricing-simulator.mock';
+import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
+import { MOCK_PRICING_CONTEXT } from '../pricing-simulator.mock';
 
 @Component({
   selector: 'cpq-simulator-page',
@@ -49,7 +47,7 @@ import {
   template: `
     <app-page-header
       title="Pricing Simulator"
-      subtitle="What-if sandbox stub — mock execute (no HTTP)"
+      subtitle="What-if sandbox — POST /api/v1/pricing/execute"
     >
       <div actions>
         <button
@@ -69,7 +67,7 @@ import {
       <mat-card class="panel form-panel" appearance="outlined">
         <mat-card-header>
           <mat-card-title>Pricing context</mat-card-title>
-          <mat-card-subtitle>Build a PricingContext and run mock execute</mat-card-subtitle>
+          <mat-card-subtitle>Build a PricingContext and run pricing execute</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
           <form class="form-grid" [formGroup]="form" (ngSubmit)="onSimulate()">
@@ -91,7 +89,7 @@ import {
             <mat-form-field appearance="outline">
               <mat-label>List price override</mat-label>
               <input matInput type="number" formControlName="listPriceOverride" min="0" step="0.01" />
-              <mat-hint>Optional; default mock list is 100</mat-hint>
+              <mat-hint>Optional; default list is server-side</mat-hint>
             </mat-form-field>
 
             <mat-form-field appearance="outline">
@@ -132,16 +130,24 @@ import {
       <mat-card class="panel result-panel" appearance="outlined">
         <mat-card-header>
           <mat-card-title>Result</mat-card-title>
-          <mat-card-subtitle>Mock PricingResult (execute OK)</mat-card-subtitle>
+          <mat-card-subtitle>PricingResult from execute</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
-          @if (!result()) {
+          @if (error()) {
+            <app-empty-state
+              icon="error_outline"
+              title="Simulation failed"
+              [message]="error()!"
+              actionLabel="Dismiss"
+              (action)="clearError()"
+            />
+          } @else if (!result()) {
             <app-empty-state
               icon="science"
               title="No simulation yet"
-              message="Fill the form and click Simulate to see a mock OK pricing result."
+              message="Fill the form and click Simulate to run pricing execute."
             />
-          } @else if (result()!.success) {
+          } @else {
             <div class="success-banner" role="status">
               <mat-icon>check_circle</mat-icon>
               <span>
@@ -198,11 +204,6 @@ import {
                 </tbody>
               </table>
             </div>
-          } @else {
-            <div class="error-banner" role="alert">
-              <mat-icon>error_outline</mat-icon>
-              <span>{{ result()!.errorMessage ?? 'Simulation failed' }}</span>
-            </div>
           }
         </mat-card-content>
       </mat-card>
@@ -228,24 +229,15 @@ import {
         margin-top: 8px;
       }
 
-      .success-banner,
-      .error-banner {
+      .success-banner {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 12px 16px;
         border-radius: 8px;
         margin-bottom: 16px;
-      }
-
-      .success-banner {
         background: #e8f5e9;
         color: #2e7d32;
-      }
-
-      .error-banner {
-        background: #ffebee;
-        color: #c62828;
       }
 
       .metrics-row {
@@ -320,6 +312,7 @@ import {
 })
 export class SimulatorPageComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly pricingExecution = inject(PricingExecutionService);
 
   readonly regions = ['NA', 'EMEA', 'APAC', 'LATAM'] as const;
   readonly currencies = ['USD', 'EUR', 'GBP'] as const;
@@ -327,6 +320,7 @@ export class SimulatorPageComponent {
 
   readonly loading = signal(false);
   readonly result = signal<PricingResult | null>(null);
+  readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     customerExternalId: [
@@ -364,15 +358,47 @@ export class SimulatorPageComponent {
       return;
     }
     this.loading.set(true);
+    this.error.set(null);
     const context = this.toContext();
-    // Sync mock execute — real HTTP lands in PR-FE-CPQ-03 / PR-FE-CPQ-07.
-    this.result.set(mockExecuteOk(context));
-    this.loading.set(false);
+    this.pricingExecution.execute(context).subscribe({
+      next: (pricingResult) => {
+        if (pricingResult.success) {
+          this.result.set(pricingResult);
+          this.error.set(null);
+        } else {
+          this.result.set(null);
+          this.error.set(
+            pricingResult.errorMessage ?? 'Pricing execute returned success=false',
+          );
+        }
+        this.loading.set(false);
+      },
+      error: (err: { error?: { message?: string }; message?: string }) => {
+        this.result.set(null);
+        this.error.set(
+          err?.error?.message || err?.message || 'Failed to execute pricing',
+        );
+        this.loading.set(false);
+      },
+    });
+  }
+
+  clearError(): void {
+    this.error.set(null);
   }
 
   /** Test helper: clear result panel. */
   clearResultForTest(): void {
     this.result.set(null);
+    this.error.set(null);
+  }
+
+  /** Test helper: surface the error empty-state. */
+  setErrorForTest(message: string | null): void {
+    this.error.set(message);
+    if (message) {
+      this.result.set(null);
+    }
   }
 
   private toContext(): PricingContext {
