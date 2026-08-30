@@ -169,14 +169,26 @@ export class DealKanbanComponent implements OnInit {
     { stage: 'LOST', label: 'Lost', color: '#757575' },
   ];
 
+  /** Single-pass O(stages + deals) bucketing (salvage #436); avoids filter-per-stage. */
   columns = computed<KanbanColumn[]>(() => {
     const deals = this.service.deals();
+    const stageMap = new Map<DealStage, { deals: DealDto[]; totalValue: number }>();
+    for (const cfg of this.stageConfig) {
+      stageMap.set(cfg.stage, { deals: [], totalValue: 0 });
+    }
+    for (const d of deals) {
+      const bucket = stageMap.get(d.stage);
+      if (bucket) {
+        bucket.deals.push(d);
+        bucket.totalValue += d.amount ?? 0;
+      }
+    }
     return this.stageConfig.map((cfg) => {
-      const stageDeals = deals.filter((d) => d.stage === cfg.stage);
+      const bucket = stageMap.get(cfg.stage)!;
       return {
         ...cfg,
-        deals: stageDeals,
-        totalValue: stageDeals.reduce((sum, d) => sum + (d.amount ?? 0), 0),
+        deals: bucket.deals,
+        totalValue: bucket.totalValue,
       };
     });
   });
