@@ -7,8 +7,9 @@ export * from './lib/contact.model';
 export * from './lib/lead.model';
 export * from './lib/deal.model';
 
-// Domain Models — CPQ (catalog / quote / pricing)
+// Domain Models — CPQ (catalog / quote / pricing / approvals)
 // CatalogProductType ≠ PricingProductType — keep enums separate (see forge PR-FE-CPQ-02).
 export * from './lib/product.model';
 export * from './lib/quote.model';
 export * from './lib/pricing.model';
+export * from './lib/approval.model';
