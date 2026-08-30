@@ -38,6 +38,8 @@ server:
 services:
   product:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
+    # Thin in-process TTL for configuration rule GET (S2B-9); no Kafka invalidation.
+    rules-cache-ttl: ${PRODUCT_RULES_CACHE_TTL:30s}
 
 management:
   endpoints:
