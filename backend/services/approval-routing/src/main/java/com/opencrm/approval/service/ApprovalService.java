@@ -2,16 +2,19 @@ package com.opencrm.approval.service;
 
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
+import com.opencrm.approval.dto.ApprovalSubmitRequest;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
+import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -25,6 +28,43 @@ public class ApprovalService {
     
     private final ApprovalRequestRepository approvalRequestRepository;
     private final OutboxEventPublisher outboxEventPublisher;
+
+    /**
+     * Create a PENDING approval for quote BFF orchestration (S2C-12).
+     * Additive to {@link com.opencrm.approval.event.DiscountApprovalEventConsumer}.
+     */
+    public ApprovalRequest submit(ApprovalSubmitRequest request) {
+        if (request == null) {
+            throw new BusinessException("Approval submit request is required", "INVALID_APPROVAL_SUBMIT");
+        }
+        if (request.getQuoteId() == null || request.getQuoteId().isBlank()) {
+            throw new BusinessException("quoteId is required", "INVALID_APPROVAL_SUBMIT");
+        }
+
+        QuoteApprovalTierMapper.MappedApproval mapped = QuoteApprovalTierMapper.map(request.getTier());
+        String requesterId = (request.getRequesterId() == null || request.getRequesterId().isBlank())
+                ? "system"
+                : request.getRequesterId();
+
+        ApprovalRequest entity = ApprovalRequest.builder()
+                .quoteId(request.getQuoteId().trim())
+                .lineId(request.getLineId())
+                .approvalType(mapped.approvalType())
+                .status(ApprovalStatus.PENDING)
+                .requestedDiscount(request.getRequestedDiscount())
+                .marginDelta(request.getMarginDelta())
+                .currencyCode(request.getCurrencyCode())
+                .requesterId(requesterId)
+                .submittedAt(Instant.now())
+                .approvalTier(mapped.approvalTier())
+                .reason(request.getReason() != null ? request.getReason() : "Quote approval submitted via BFF")
+                .build();
+
+        ApprovalRequest saved = approvalRequestRepository.save(entity);
+        log.info("Created PENDING approval id={} quoteId={} tier={} type={}",
+                saved.getId(), saved.getQuoteId(), saved.getApprovalTier(), saved.getApprovalType());
+        return saved;
+    }
     
     public ApprovalRequest getById(Long id) {
         return approvalRequestRepository.findById(id)
