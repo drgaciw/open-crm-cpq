@@ -13,6 +13,14 @@ import {
   QUOTE_STATUSES,
   isQuoteStatus,
 } from './quote.model';
+import {
+  APPROVAL_REQUEST_STATUSES,
+  APPROVAL_REQUEST_STATUS_LABELS,
+  APPROVAL_TIERS,
+  APPROVAL_TIER_LABELS,
+  isApprovalRequestStatus,
+  isApprovalTier,
+} from './approval.model';
 
 describe('CPQ shared models', () => {
   describe('CatalogProductType vs PricingProductType', () => {
@@ -70,6 +78,24 @@ describe('CPQ shared models', () => {
     it('provides a label for every quote status', () => {
       for (const status of QUOTE_STATUSES) {
         expect(QUOTE_STATUS_LABELS[status]).toBeTruthy();
+      }
+    });
+  });
+
+  describe('ApprovalRequestDto unions', () => {
+    it('isApprovalTier / isApprovalRequestStatus guard known values', () => {
+      expect(isApprovalTier('DEAL_DESK')).toBe(true);
+      expect(isApprovalTier('MANAGER')).toBe(false);
+      expect(isApprovalRequestStatus('PENDING')).toBe(true);
+      expect(isApprovalRequestStatus('NONE')).toBe(false);
+    });
+
+    it('provides a label for every tier and approval status', () => {
+      for (const tier of APPROVAL_TIERS) {
+        expect(APPROVAL_TIER_LABELS[tier]).toBeTruthy();
+      }
+      for (const status of APPROVAL_REQUEST_STATUSES) {
+        expect(APPROVAL_REQUEST_STATUS_LABELS[status]).toBeTruthy();
       }
     });
   });

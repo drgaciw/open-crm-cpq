@@ -1,0 +1,24 @@
+{
+  "name": "cpq-approvals",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/approvals/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": [
+    "scope:cpq",
+    "type:feature",
+    "domain:approval"
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/cpq/approvals"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
