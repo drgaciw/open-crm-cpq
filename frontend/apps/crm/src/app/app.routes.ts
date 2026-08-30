@@ -37,6 +37,13 @@ export const appRoutes: Route[] = [
         loadChildren: () =>
           import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
       },
+      {
+        path: 'pricing/simulator',
+        loadChildren: () =>
+          import('@frontend/cpq-pricing-simulator').then(
+            (m) => m.SIMULATOR_ROUTES,
+          ),
+      },
     ],
   },
 ];
