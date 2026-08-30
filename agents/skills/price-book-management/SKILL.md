@@ -41,12 +41,12 @@ Use this skill when you need to manage price book hierarchies, create or update 
 ## Useful Commands
 
 ```bash
-# Retrieve price books
-curl -X GET "${CPQ_BASE_URL}/api/v1/pricing/price-books" \
+# Retrieve price books (pricebook-service; not under /api/v1/pricing/)
+curl -X GET "${CPQ_BASE_URL}/api/v1/price-books" \
   -H "Authorization: Bearer ${TOKEN}"
 
-# Add or update a price book entry
-curl -X POST "${CPQ_BASE_URL}/api/v1/pricing/price-books/{id}/entries" \
+# Add a price book entry
+curl -X POST "${CPQ_BASE_URL}/api/v1/price-books/{id}/entries" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"productId": "PROD-001", "listPrice": 1000.00, "floorPrice": 750.00, "effectiveDate": "2026-04-01"}'

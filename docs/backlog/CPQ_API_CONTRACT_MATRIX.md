@@ -2,7 +2,7 @@
 
 **Backlog PR:** S2A-7  
 **Status:** Published contract registry (documentation only; gateway route stubs tracked in same PR stack)  
-**Last verified against controllers:** 2026-05-18 (`ConfigurationRuleController`, `ConfigurationSessionController`, `RuleController`, `PricingExecutionController`, `CustomerController`, quote/approval controllers)
+**Last verified against controllers:** 2026-08-30 (`ConfigurationRuleController`, `ConfigurationSessionController`, `RuleController`, `PricingExecutionController`, `CustomerController`, `PriceBookController`, quote/approval controllers)
 
 ---
 
@@ -10,7 +10,7 @@
 
 This matrix is the **canonical registry of agent-critical REST routes** for Open CRM CPQ. It satisfies S2A-7 acceptance criteria:
 
-1. Every route referenced by `agents/validation-rules.md` (cpq-agent-016), `agents/compatibility-rules.md` (cpq-agent-015), and `agents/minimum-margin-enforcement.md` (cpq-agent-011) appears below with **owning service** and **stability tier**.
+1. Every route referenced by `agents/validation-rules.md` (cpq-agent-016), `agents/compatibility-rules.md` (cpq-agent-015), `agents/minimum-margin-enforcement.md` (cpq-agent-011), and price-book consumers (cpq-agent-004 / 032 / 035) appears below with **owning service** and **stability tier**.
 2. **Gateway** must expose these paths without embedding domain logic (`gateway-service` routes in `application.yml`; stubs in S2A-7).
 3. PR descriptions for configuration, pricing, and approval work should link here instead of duplicating path lists.
 
@@ -38,7 +38,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 | **beta** | Implemented but boundary still moving (session model, approval split, response shape). | Use only when PRD allows; expect ADR follow-up. |
 | **internal** | Service-to-service or superseded BFF; agents should not call directly when an `agent-contract` alias exists. | Orchestration layers only (quote-service → pricing-service, etc.). |
 
-**Port map (local MVP):** crm-service `8081`, pricing-service `8082`, product-service `8083`, quote-service `8084`, approval-routing `8085`, configuration-engine `8088`.
+**Port map (local MVP):** crm-service `8081`, pricing-service `8082`, product-service `8083`, quote-service `8084`, approval-routing `8085`, configuration-engine `8088`, pricebook-service `8089`.
 
 ---
 
@@ -84,6 +84,28 @@ Deterministic pricing execution and customer context for margin and validation a
 | DELETE | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | stable | — | Soft delete. |
 
 **Section row count:** 9
+
+---
+
+## 4b. Price book APIs
+
+Owned by **pricebook-service** (`PriceBookController` → `/api/v1/price-books`). Canonical **external** path is `/api/v1/price-books/**` (gateway → pricebook-service on 8089). Do **not** call `/api/v1/pricing/price-books` — that prefix routes to pricing-service and is not implemented.
+
+| Method | Path | Owning service | Stability | Consumer agents | Notes |
+|--------|------|----------------|-----------|-----------------|-------|
+| GET | `/api/v1/price-books` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-032, cpq-agent-035 | List/filter by `region` (and currency via client filter); regional / default book resolution. |
+| GET | `/api/v1/price-books/{id}` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-035 | Single book fetch after resolution. |
+| POST | `/api/v1/price-books` | pricebook-service (8089) | stable | cpq-agent-035 | Create book; advisory agent — human confirmation required. |
+| PUT | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Update book metadata. |
+| DELETE | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Soft delete. |
+| GET | `/api/v1/price-books/{id}/entries` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-032, cpq-agent-035 | List prices / floor prices for products on a quote. |
+| GET | `/api/v1/price-books/{id}/entries/{entryId}` | pricebook-service (8089) | stable | cpq-agent-035 | Single entry fetch. |
+| POST | `/api/v1/price-books/{id}/entries` | pricebook-service (8089) | stable | cpq-agent-035 | Create entry; human-gated for agent 035. |
+| PUT | `/api/v1/price-books/{id}/entries/{entryId}` | pricebook-service (8089) | stable | cpq-agent-035 | Update entry. |
+| DELETE | `/api/v1/price-books/{id}/entries/{entryId}` | pricebook-service (8089) | stable | cpq-agent-035 | Soft delete entry. |
+| POST | `/internal/v1/price-books/resolve-batch` | pricebook-service (8089) | internal | — | `InternalPriceBookController`; pricing-service list-price resolution only. |
+
+**Section row count:** 11
 
 ---
 
@@ -196,6 +218,7 @@ Agent PRDs reference ERP paths; **no `erp` backend controllers** exist under `ba
 | **Validate response shape** | product-service returns `List<String>` messages; agent PRDs expect structured `{ valid, violations[] }`. | agent-contract path unchanged; body may evolve additively. | S2B-11 contract tests; no breaking removal of product-service handler without gateway shim. |
 | **Quote vs approval-routing approvals** | Duplicate pending/approve paths under `/api/v1/quotes/...` and `/api/v1/approvals/...`. | Agents use **quote-service BFF** paths only. | S2C-12: pricing emits events; approval-routing owns state machine; quote-service orchestrates. |
 | **ERP cost paths** | Gateway **501 stub** at `/api/v1/erp/**` (S2A-7); no erp-adapter yet. | agent-contract paths reserved. | Introduce erp-adapter-service; until then agents treat **501** as adapter unavailable per PRD fail-safes. |
+| **Price-book path drift** | Skills historically documented `/api/v1/pricing/price-books`. Impl + gateway use `/api/v1/price-books` on **pricebook-service**. | Agents **must** use `/api/v1/price-books/**` only. | Corrected in agent skills (B0-6 / forge PR-B). Do not add a pricing-service mount without ADR. |
 
 **ADR pointer:** [ADR-configuration-api-reconciliation.md](./ADR-configuration-api-reconciliation.md) (S2A-8).
 
@@ -210,6 +233,8 @@ External clients and agents should call **only through the gateway** (default po
 | `/api/v1/configuration/**` | product-service | Rules CRUD + **`POST .../validate`** (agent-contract) |
 | `/api/v1/configurations/**` | configuration-engine | Session APIs (beta); not agent-contract |
 | `/api/v1/pricing/**`, `/api/v1/pricing-customers/**`, `/api/v1/rule-sets/**`, `/api/v1/rules/**` | pricing-service | execute, simulate, rules validate, pricing-customers |
+| `/api/v1/price-books/**` | pricebook-service | list/get books + entries (**agent-contract** GETs); CRUD stable |
+| `/api/v1/cpq/price-books/**` | pricebook-service (rewrite → `/api/v1/price-books/**`) | Gateway alias only; agents prefer non-`/cpq` path |
 | `/api/v1/quotes/**` | quote-service | quotes, line-items, quote-scoped approvals |
 | `/api/v1/approvals/**` | approval-routing | internal (orchestration only) |
 | `/api/v1/products/**`, `/api/v1/product-bundles/**`, `/api/v1/product-options/**`, `/api/v1/product-attributes/**` | product-service | catalog integrity |
@@ -222,6 +247,7 @@ External clients and agents should call **only through the gateway** (default po
 
 - `ProductServiceClient` → `GET /api/v1/products/{id}`, `POST /api/v1/configuration/validate`
 - `PricingServiceClient` → `POST /api/v1/pricing/execute`, `POST /api/v1/pricing/simulate`
+- `PriceBookResolutionClient` → `POST /internal/v1/price-books/resolve-batch` (pricing → pricebook; not agent-facing)
 
 ---
 
@@ -234,6 +260,7 @@ External clients and agents should call **only through the gateway** (default po
 | `POST /api/v1/rules/{id}/validate` | 016 |
 | `POST /api/v1/pricing/execute` | 011 |
 | `GET /api/v1/pricing-customers/{id}` | 011, 016 |
+| `GET /api/v1/price-books`, `GET .../{id}`, `GET .../{id}/entries` | 004, 032, 035 |
 | `GET /api/v1/quotes`, `GET .../line-items` | 011, 015, 016 |
 | `GET /api/v1/quotes/{id}` | 011 |
 | `POST /api/v1/quotes/{quoteId}/approvals`, `GET /api/v1/quotes/approvals/pending` | 011 |
@@ -249,9 +276,10 @@ External clients and agents should call **only through the gateway** (default po
 |---------|------|
 | §3 Configuration APIs | 12 |
 | §4 Pricing APIs | 9 |
+| §4b Price book APIs | 11 |
 | §5 Rules / DRL APIs | 14 |
 | §6 Quote & approval APIs | 18 |
 | §7 Cross-service integrity | 16 |
-| **Total matrix rows** | **69** |
+| **Total matrix rows** | **80** |
 
 **Routes not assignable to an implemented backend service:** 0 (§7c ERP rows route through gateway stub; erp-adapter-service is future work).
