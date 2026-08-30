@@ -8,4 +8,4 @@ export type {
   CatalogProductCategory,
   CatalogProductStatus,
 } from './lib/catalog.model';
-export { MOCK_CATALOG_PRODUCTS, findMockCatalogProduct } from './lib/catalog.mock';
+// MOCK_CATALOG_PRODUCTS / findMockCatalogProduct stay in catalog.mock.ts (Vitest only).
