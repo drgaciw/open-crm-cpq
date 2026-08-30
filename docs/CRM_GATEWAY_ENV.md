@@ -1,5 +1,41 @@
 # Gateway / env parity (CRM)
 
+## CORS / CSRF allowed origins
+
+Gateway browser CORS (`spring.cloud.gateway.globalcors`) and CSRF Origin/Referer checks (`security.csrf.allowed-origins` / `CsrfProtectionFilter`) share the same **explicit** allow-list. Subdomain wildcards such as `https://*.azurewebsites.net` are **not** supported; `CsrfProtectionFilter` rejects any allow-list entry containing `*`.
+
+| Variable | Role | Default |
+|----------|------|---------|
+| `FRONTEND_URL` | Primary SPA origin (scheme + host + port) | `http://localhost:4200` |
+| `CORS_ALLOWED_ORIGINS` | Optional comma-separated **full** override of the allow-list | unset → uses `FRONTEND_URL` |
+
+Resolution in `gateway-service` `application.yml`:
+
+```text
+CORS_ALLOWED_ORIGINS → else FRONTEND_URL → else http://localhost:4200
+```
+
+Examples:
+
+```bash
+# Local Angular CRM (default — no env required)
+# FRONTEND_URL=http://localhost:4200
+
+# Single deployed SPA
+export FRONTEND_URL=https://crm-portal.azurewebsites.net
+
+# Multiple explicit origins (include FRONTEND_URL in the list if both are needed)
+export CORS_ALLOWED_ORIGINS=https://crm-portal.azurewebsites.net,https://admin.example.com
+```
+
+| Location | Notes |
+|----------|--------|
+| `backend/services/gateway-service/src/main/resources/application.yml` | `allowedOrigins` + `security.csrf.allowed-origins` use the placeholder above |
+| `backend/docker-compose.yml` | Sets `FRONTEND_URL: http://localhost:4200` on `gateway-service` |
+| Staging / Azure | Set `FRONTEND_URL` (or `CORS_ALLOWED_ORIGINS`) to the exact browser origin(s); never `*.` patterns |
+
+**Rule:** Prefer one explicit origin via `FRONTEND_URL`. Use `CORS_ALLOWED_ORIGINS` only when several origins are required; when set, it **replaces** the `FRONTEND_URL` default (list every allowed origin explicitly).
+
 ## `CRM_SERVICE_URI`
 
 | Location | Value / pattern |
