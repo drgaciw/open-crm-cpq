@@ -136,18 +136,19 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12.
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
 | GET | `/api/v1/quotes` | quote-service (8084) | **agent-contract** | cpq-agent-015, cpq-agent-016 | Filters: `status`, `dealType`, `customerExternalId`; impact assessment & completeness. |
 | GET | `/api/v1/quotes/{id}` | quote-service (8084) | **agent-contract** | cpq-agent-011 | Quote status for margin gate (DRAFT → PENDING_APPROVAL block). |
 | GET | `/api/v1/quotes/{quoteId}/line-items` | quote-service (8084) | **agent-contract** | cpq-agent-011, cpq-agent-015, cpq-agent-016 | Line-level margin, impact analysis, completeness. |
-| POST | `/api/v1/quotes/{quoteId}/approvals` | quote-service (8084) | **agent-contract** | cpq-agent-011 | BFF submit; tiers DEAL_DESK / CFO / below-cost exception; delegates to approval-routing (S2C-12). |
-| GET | `/api/v1/quotes/{quoteId}/approvals` | quote-service (8084) | stable | cpq-agent-011 | Approval history for a quote. |
-| GET | `/api/v1/quotes/approvals/pending` | quote-service (8084) | **agent-contract** | cpq-agent-011 | Pending queue; monitor unblock after approval. |
-| POST | `/api/v1/quotes/approvals/{approvalId}/approve` | quote-service (8084) | stable | — | BFF approve action. |
-| POST | `/api/v1/quotes/approvals/{approvalId}/reject` | quote-service (8084) | stable | — | BFF reject action. |
+| POST | `/api/v1/quotes/{quoteId}/approvals` | quote-service (8084) | **agent-contract** | cpq-agent-011 | BFF submit → routing create (G3/G4); Quote status only locally; no dual-write ApprovalRequest. |
+| GET | `/api/v1/quotes/{quoteId}/approvals` | quote-service (8084) | stable | cpq-agent-011 | Dual-read: routing pending for quote + legacy local history. |
+| GET | `/api/v1/quotes/approvals/pending` | quote-service (8084) | **agent-contract** | cpq-agent-011 | Dual-read pending (routing preferred; legacy fallback). |
+| POST | `/api/v1/quotes/approvals/{approvalId}/approve` | quote-service (8084) | stable | — | BFF → routing approve; legacy local on 404. |
+| POST | `/api/v1/quotes/approvals/{approvalId}/reject` | quote-service (8084) | stable | — | BFF → routing reject; legacy local on 404. |
+| POST | `/api/v1/approvals` | approval-routing (8085) | internal | quote BFF | G3 create/submit for quote orchestration. |
 | POST | `/api/v1/quotes` | quote-service (8084) | stable | — | Create quote (supporting workflow). |
 | PUT | `/api/v1/quotes/{id}` | quote-service (8084) | stable | — | Update DRAFT/REJECTED. |
 | POST | `/api/v1/quotes/{quoteId}/line-items` | quote-service (8084) | stable | — | Add line item. |
@@ -159,7 +160,7 @@ Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Can
 | POST | `/api/v1/approvals/{id}/approve` | approval-routing (8085) | internal | — | Canonical approve. |
 | POST | `/api/v1/approvals/{id}/reject` | approval-routing (8085) | internal | — | Canonical reject. |
 
-**Section row count:** 18
+**Section row count:** 19
 
 ---
 
