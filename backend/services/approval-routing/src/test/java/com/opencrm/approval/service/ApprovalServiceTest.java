@@ -3,12 +3,16 @@ package com.opencrm.approval.service;
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
+import com.opencrm.approval.domain.QuoteApprovalTier;
+import com.opencrm.approval.dto.ApprovalSubmitRequest;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -122,5 +126,95 @@ class ApprovalServiceTest {
 
         assertEquals(1, result.size());
         assertEquals("MANAGER", result.get(0).getApprovalTier());
+    }
+
+    @Test
+    @DisplayName("submit DEAL_DESK → PENDING QUOTE approval")
+    void submitDealDeskCreatesPendingQuoteApproval() {
+        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> {
+            ApprovalRequest saved = invocation.getArgument(0);
+            saved.setId(42L);
+            return saved;
+        });
+
+        ApprovalSubmitRequest request = ApprovalSubmitRequest.builder()
+                .quoteId("1001")
+                .tier(QuoteApprovalTier.DEAL_DESK)
+                .requesterId("rep-1")
+                .reason("Margin below 35%")
+                .build();
+
+        ApprovalRequest result = approvalService.submit(request);
+
+        assertEquals(42L, result.getId());
+        assertEquals(ApprovalStatus.PENDING, result.getStatus());
+        assertEquals("1001", result.getQuoteId());
+        assertEquals("DEAL_DESK", result.getApprovalTier());
+        assertEquals(ApprovalType.QUOTE, result.getApprovalType());
+        assertEquals("rep-1", result.getRequesterId());
+        assertEquals("Margin below 35%", result.getReason());
+        assertNotNull(result.getSubmittedAt());
+        verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("submit SALES_VP → PENDING QUOTE with SALES_VP tier")
+    void submitSalesVpCreatesPendingQuoteApproval() {
+        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ApprovalRequest result = approvalService.submit(ApprovalSubmitRequest.builder()
+                .quoteId("Q-77")
+                .tier(QuoteApprovalTier.SALES_VP)
+                .build());
+
+        assertEquals(ApprovalStatus.PENDING, result.getStatus());
+        assertEquals("SALES_VP", result.getApprovalTier());
+        assertEquals(ApprovalType.QUOTE, result.getApprovalType());
+        assertEquals("system", result.getRequesterId());
+    }
+
+    @Test
+    @DisplayName("submit CFO → PENDING GOVERNANCE approval")
+    void submitCfoCreatesPendingGovernanceApproval() {
+        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> {
+            ApprovalRequest saved = invocation.getArgument(0);
+            saved.setId(7L);
+            return saved;
+        });
+
+        ApprovalRequest result = approvalService.submit(ApprovalSubmitRequest.builder()
+                .quoteId("2002")
+                .tier(QuoteApprovalTier.CFO)
+                .requesterId("desk-9")
+                .requestedDiscount(BigDecimal.valueOf(40))
+                .marginDelta(BigDecimal.valueOf(12.5))
+                .currencyCode("USD")
+                .build());
+
+        ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(approvalRequestRepository).save(captor.capture());
+        ApprovalRequest persisted = captor.getValue();
+
+        assertEquals(ApprovalStatus.PENDING, result.getStatus());
+        assertEquals("CFO", persisted.getApprovalTier());
+        assertEquals(ApprovalType.GOVERNANCE, persisted.getApprovalType());
+        assertEquals(BigDecimal.valueOf(40), persisted.getRequestedDiscount());
+        assertEquals(BigDecimal.valueOf(12.5), persisted.getMarginDelta());
+        assertEquals("USD", persisted.getCurrencyCode());
+    }
+
+    @Test
+    @DisplayName("submit rejects blank quoteId")
+    void submitRejectsBlankQuoteId() {
+        assertThrows(BusinessException.class, () -> approvalService.submit(
+                ApprovalSubmitRequest.builder().quoteId("  ").tier(QuoteApprovalTier.DEAL_DESK).build()));
+        verify(approvalRequestRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("submit rejects null request")
+    void submitRejectsNullRequest() {
+        assertThrows(BusinessException.class, () -> approvalService.submit(null));
+        verify(approvalRequestRepository, never()).save(any());
     }
 }
