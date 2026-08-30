@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,4 +22,10 @@ public interface PriceBookEntryRepository extends JpaRepository<PriceBookEntry, 
 
     Optional<PriceBookEntry> findByPriceBookIdAndProductExternalIdAndDeletedFalse(
             Long priceBookId, String productExternalId);
+
+    /**
+     * Batch lookup for resolve-batch: one IN query instead of N per-product finds.
+     */
+    List<PriceBookEntry> findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+            Long priceBookId, Collection<String> productExternalIds);
 }

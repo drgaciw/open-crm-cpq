@@ -18,6 +18,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,14 +57,66 @@ class PriceBookInternalResolutionServiceTest {
                 .build();
 
         when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(42L, "SKU-1"))
-                .thenReturn(Optional.of(entry));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(42L), eq(List.of("SKU-1"))))
+                .thenReturn(List.of(entry));
 
         ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
 
         assertThat(response.getPriceBookId()).isEqualTo(42L);
         assertThat(response.getEntries().get("SKU-1").isEntryMatched()).isTrue();
         assertThat(response.getEntries().get("SKU-1").getListPrice()).isEqualByComparingTo("100.00");
+        verify(priceBookEntryRepository, times(1))
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(eq(42L), anyCollection());
+        verify(priceBookEntryRepository, never())
+                .findByPriceBookIdAndProductExternalIdAndDeletedFalse(anyLong(), anyString());
+    }
+
+    @Test
+    void resolveBatchFetchesEntriesInSingleQueryForMultipleProducts() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(7L)
+                .region("NA")
+                .currency("USD")
+                .isDefault(true)
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry matched = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("PROD-A")
+                .listPrice(new BigDecimal("50.00"))
+                .floorPrice(new BigDecimal("40.00"))
+                .currency("USD")
+                .build();
+        List<String> productIds = List.of("PROD-A", "PROD-MISSING", "PROD-B");
+        PriceBookEntry matchedB = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("PROD-B")
+                .listPrice(new BigDecimal("75.00"))
+                .floorPrice(new BigDecimal("60.00"))
+                .currency("USD")
+                .build();
+
+        when(priceBookRepository.findByRegionAndDeletedFalse("NA")).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(7L), eq(productIds)))
+                .thenReturn(List.of(matched, matchedB));
+
+        ResolveBatchResponse response = service.resolveBatch("NA", productIds);
+
+        assertThat(response.getEntries()).hasSize(3);
+        assertThat(response.getEntries().get("PROD-A").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("PROD-A").getListPrice()).isEqualByComparingTo("50.00");
+        assertThat(response.getEntries().get("PROD-MISSING").isEntryMatched()).isFalse();
+        assertThat(response.getEntries().get("PROD-MISSING").getCurrency()).isEqualTo("USD");
+        assertThat(response.getEntries().get("PROD-B").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("PROD-B").getListPrice()).isEqualByComparingTo("75.00");
+
+        // Proves batching: one IN query for N products, never the per-id finder.
+        verify(priceBookEntryRepository, times(1))
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(eq(7L), anyCollection());
+        verify(priceBookEntryRepository, never())
+                .findByPriceBookIdAndProductExternalIdAndDeletedFalse(anyLong(), anyString());
     }
 
     @Test

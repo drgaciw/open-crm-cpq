@@ -14,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +35,18 @@ public class PriceBookInternalResolutionService {
                     .entries(entries)
                     .build();
         }
+        // Single IN query — avoids N+1 per productExternalId (GitHub #456 family).
+        Map<String, PriceBookEntry> entryByProductId = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                        priceBook.getId(), productExternalIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        PriceBookEntry::getProductExternalId,
+                        Function.identity(),
+                        (first, ignored) -> first));
         for (String productExternalId : productExternalIds) {
-            Optional<PriceBookEntry> entryOpt = priceBookEntryRepository
-                    .findByPriceBookIdAndProductExternalIdAndDeletedFalse(priceBook.getId(), productExternalId);
-            if (entryOpt.isPresent()) {
-                PriceBookEntry e = entryOpt.get();
+            PriceBookEntry e = entryByProductId.get(productExternalId);
+            if (e != null) {
                 entries.put(productExternalId, ProductEntryResolveDto.builder()
                         .entryMatched(true)
                         .listPrice(e.getListPrice())
