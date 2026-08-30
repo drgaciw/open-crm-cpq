@@ -36,6 +36,10 @@ export CORS_ALLOWED_ORIGINS=https://crm-portal.azurewebsites.net,https://admin.e
 
 **Rule:** Prefer one explicit origin via `FRONTEND_URL`. Use `CORS_ALLOWED_ORIGINS` only when several origins are required; when set, it **replaces** the `FRONTEND_URL` default (list every allowed origin explicitly).
 
+## CSRF enforcement boundary
+
+Browser Cookie CSRF is **gateway-only**. Domain services use `csrf.disable()` + `SessionCreationPolicy.STATELESS` (Bearer / mesh); do **not** enable Cookie CSRF on downstream services. See [ADR-004: CSRF edge-only boundary](./ADR-004-csrf-edge-boundary.md).
+
 ## `CRM_SERVICE_URI`
 
 | Location | Value / pattern |
