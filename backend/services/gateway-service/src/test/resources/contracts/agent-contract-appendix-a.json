@@ -6,7 +6,7 @@
       "method": "POST",
       "path": "/api/v1/configuration/validate",
       "examplePath": "/api/v1/configuration/validate",
-      "gatewayRouteId": "product-service",
+      "gatewayRouteId": "configuration-validate",
       "erpStub": false,
       "agents": ["015", "016"]
     },
