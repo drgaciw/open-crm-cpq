@@ -1,0 +1,153 @@
+import { TestBed } from '@angular/core/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { QuoteService } from './quote.service';
+import { QuoteDto, QuoteLineItemDto, SpringPageResponse } from '@frontend/shared-models';
+
+function quote(
+  partial: Partial<QuoteDto> & Pick<QuoteDto, 'id' | 'name' | 'customerExternalId'>,
+): QuoteDto {
+  return {
+    uuid: `u-${partial.id}`,
+    status: 'DRAFT',
+    durationInMonths: 12,
+    createdAt: '',
+    updatedAt: '',
+    ...partial,
+  };
+}
+
+function lineItem(
+  partial: Partial<QuoteLineItemDto> & Pick<QuoteLineItemDto, 'id' | 'productExternalId'>,
+): QuoteLineItemDto {
+  return {
+    uuid: `li-${partial.id}`,
+    quantity: 1,
+    sortOrder: 0,
+    createdAt: '',
+    updatedAt: '',
+    ...partial,
+  };
+}
+
+describe('QuoteService', () => {
+  let service: QuoteService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [QuoteService, provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(QuoteService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('list GETs /api/v1/quotes with filters', () => {
+    const page: SpringPageResponse<QuoteDto> = {
+      content: [quote({ id: 1, name: 'Q1', customerExternalId: 'cust-1' })],
+      number: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    };
+
+    service.list(0, 20, 'createdAt,desc', {
+      status: 'DRAFT',
+      customerExternalId: 'cust-1',
+    });
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/quotes' &&
+        r.params.get('status') === 'DRAFT' &&
+        r.params.get('customerExternalId') === 'cust-1',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(page);
+    expect(service.quotes()).toEqual(page.content);
+  });
+
+  it('lifecycle POSTs hit quote action paths', async () => {
+    const submit = firstValueFrom(service.submit(5));
+    httpMock.expectOne('/api/v1/quotes/5/submit').flush(
+      quote({ id: 5, name: 'Q', customerExternalId: 'c', status: 'IN_REVIEW' }),
+    );
+    await expect(submit).resolves.toMatchObject({ status: 'IN_REVIEW' });
+
+    const approve = firstValueFrom(service.approve(5));
+    httpMock.expectOne('/api/v1/quotes/5/approve').flush(
+      quote({ id: 5, name: 'Q', customerExternalId: 'c', status: 'APPROVED' }),
+    );
+    await expect(approve).resolves.toMatchObject({ status: 'APPROVED' });
+
+    const reject = firstValueFrom(service.reject(5, 'No budget'));
+    const rejectReq = httpMock.expectOne(
+      (r) => r.url === '/api/v1/quotes/5/reject' && r.params.get('reason') === 'No budget',
+    );
+    expect(rejectReq.request.method).toBe('POST');
+    rejectReq.flush(
+      quote({ id: 5, name: 'Q', customerExternalId: 'c', status: 'REJECTED' }),
+    );
+    await expect(reject).resolves.toMatchObject({ status: 'REJECTED' });
+  });
+
+  it('send / accept / calculate / clone hit expected paths', async () => {
+    const send = firstValueFrom(service.send(2));
+    httpMock.expectOne('/api/v1/quotes/2/send').flush(
+      quote({ id: 2, name: 'Q', customerExternalId: 'c', status: 'SENT' }),
+    );
+    await expect(send).resolves.toMatchObject({ status: 'SENT' });
+
+    const accept = firstValueFrom(service.accept(2));
+    httpMock.expectOne('/api/v1/quotes/2/accept').flush(
+      quote({ id: 2, name: 'Q', customerExternalId: 'c', status: 'ACCEPTED' }),
+    );
+    await expect(accept).resolves.toMatchObject({ status: 'ACCEPTED' });
+
+    const calculate = firstValueFrom(service.calculate(2));
+    httpMock.expectOne('/api/v1/quotes/2/calculate').flush(
+      quote({ id: 2, name: 'Q', customerExternalId: 'c', totalAmount: 100 }),
+    );
+    await expect(calculate).resolves.toMatchObject({ totalAmount: 100 });
+
+    const clone = firstValueFrom(service.cloneQuote(2));
+    const cloneReq = httpMock.expectOne('/api/v1/quotes/2/clone');
+    expect(cloneReq.request.method).toBe('POST');
+    cloneReq.flush(quote({ id: 99, name: 'Q copy', customerExternalId: 'c' }));
+    await expect(clone).resolves.toMatchObject({ id: 99 });
+  });
+
+  it('line-item CRUD hits /api/v1/quotes/:id/line-items', async () => {
+    service.listLineItems(7);
+    const listReq = httpMock.expectOne('/api/v1/quotes/7/line-items');
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush([lineItem({ id: 1, productExternalId: 'prod-1' })]);
+    expect(service.lineItems()).toHaveLength(1);
+
+    const add = firstValueFrom(
+      service.addLineItem(7, { productExternalId: 'prod-2', listPrice: 50 }),
+    );
+    const addReq = httpMock.expectOne('/api/v1/quotes/7/line-items');
+    expect(addReq.request.method).toBe('POST');
+    addReq.flush(lineItem({ id: 2, productExternalId: 'prod-2', listPrice: 50 }));
+    await expect(add).resolves.toMatchObject({ id: 2 });
+
+    const update = firstValueFrom(
+      service.updateLineItem(7, 2, { productExternalId: 'prod-2', listPrice: 60 }),
+    );
+    const updateReq = httpMock.expectOne('/api/v1/quotes/7/line-items/2');
+    expect(updateReq.request.method).toBe('PUT');
+    updateReq.flush(lineItem({ id: 2, productExternalId: 'prod-2', listPrice: 60 }));
+    await expect(update).resolves.toMatchObject({ listPrice: 60 });
+
+    const remove = firstValueFrom(service.removeLineItem(7, 2));
+    const removeReq = httpMock.expectOne('/api/v1/quotes/7/line-items/2');
+    expect(removeReq.request.method).toBe('DELETE');
+    removeReq.flush(null);
+    await expect(remove).resolves.toBeNull();
+  });
+});
