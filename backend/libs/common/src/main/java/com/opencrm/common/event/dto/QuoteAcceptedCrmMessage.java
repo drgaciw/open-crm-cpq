@@ -35,8 +35,9 @@ import java.util.List;
  * </ul>
  * <p>
  * <b>Idempotency (Redis):</b> Keys {@code crm:quote-accepted:processed:*} (see {@code QuoteAcceptedIdempotency}).
- * Reprocessing after a failed persistence path may require deleting the key in ops runbooks; for ultimate
- * idempotency across Redis loss, consider a DB column on deals (e.g. last winning quote UUID) in a future change.
+ * CRM claims with SET NX, retains the key only after a successful deal update, and deletes it when the deal
+ * is missing or apply fails (so retries are not poisoned). For ultimate idempotency across Redis loss,
+ * consider a DB column on deals (e.g. last winning quote UUID) in a future change.
  */
 @Data
 @Builder
