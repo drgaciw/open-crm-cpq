@@ -1,12 +1,14 @@
 package com.opencrm.approval.controller;
 
 import com.opencrm.approval.domain.ApprovalRequest;
-import com.opencrm.approval.domain.ApprovalStatus;
+import com.opencrm.approval.dto.ApprovalSubmitRequest;
 import com.opencrm.approval.service.ApprovalService;
 import com.opencrm.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +24,14 @@ import java.util.List;
 public class ApprovalController {
 
     private final ApprovalService approvalService;
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create/submit approval request (quote BFF / internal orchestration)")
+    public ApiResponse<ApprovalRequest> submit(@Valid @RequestBody ApprovalSubmitRequest request) {
+        ApprovalRequest created = approvalService.submit(request);
+        return ApiResponse.success(created, "Approval request created");
+    }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get approval request by ID")
