@@ -1,6 +1,6 @@
 # Wave G architecture — S2B-8 ∥ S2C-12 ∥ S2D-3a+FE CPQ HTTP (three-track parallel)
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (tracks 1+2+3; **G4 HIGH** dual-store acknowledged)  
+**Status:** COMPLETE — merged to main (G1∥G3∥G5∥G6∥G7∥G8 → G2∥G4 → G9)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** worktree / `origin/main` @ `3952b20` (Waves A–F COMPLETE; hybrid S2B-11 on main)  
@@ -245,6 +245,7 @@ Implement Open CRM/CPQ Wave G per docs/forge/16-wave-g-architecture.md in THREE 
 - [x] Holds: Activities, #238, #241, product validate deletion, gateway domain rules  
 - [x] PM authorized tracks 1+2+3 in parallel  
 - [x] Forge execution authorized (`forge-wave-g` / goal §7) — **G4 HIGH acknowledged**  
+- [x] Day-1 + Day-2 merged; single-writer tests + ConstraintSolver product-rules on main  
 
 - [ ] Post-merge: G9 matrix + orchestrator COMPLETE  
 
