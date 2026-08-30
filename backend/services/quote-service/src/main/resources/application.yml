@@ -65,3 +65,5 @@ services:
     url: ${PRICING_SERVICE_URL:http://localhost:8082}
   product:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
+  gateway:
+    url: ${GATEWAY_SERVICE_URL:http://localhost:8080}
