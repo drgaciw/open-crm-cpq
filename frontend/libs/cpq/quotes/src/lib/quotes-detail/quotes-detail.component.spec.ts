@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
+import { of, throwError } from 'rxjs';
 import { QuotesDetailComponent } from './quotes-detail.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
@@ -44,6 +45,9 @@ describe('QuotesDetailComponent', () => {
   let component: QuotesDetailComponent;
   let router: Router;
   let getByIdSpy: ReturnType<typeof vi.fn>;
+  let calculateSpy: ReturnType<typeof vi.fn>;
+  let submitSpy: ReturnType<typeof vi.fn>;
+  let addLineItemSpy: ReturnType<typeof vi.fn>;
 
   const selectedQuote = signal<QuoteDto | null>(null);
   const loading = signal(false);
@@ -57,6 +61,29 @@ describe('QuotesDetailComponent', () => {
         error.set('Quote not found');
       }
     });
+    calculateSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[0]),
+        totalAmount: 99999,
+      }),
+    );
+    submitSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[0]),
+        status: 'IN_REVIEW',
+      }),
+    );
+    addLineItemSpy = vi.fn(() =>
+      of({
+        id: 50,
+        uuid: 'li-new',
+        productExternalId: 'prod-x',
+        quantity: 1,
+        sortOrder: 0,
+        createdAt: '2026-08-30T12:00:00Z',
+        updatedAt: '2026-08-30T12:00:00Z',
+      }),
+    );
     selectedQuote.set(null);
     loading.set(false);
     error.set(null);
@@ -66,6 +93,9 @@ describe('QuotesDetailComponent', () => {
       loading,
       error,
       getById: getByIdSpy,
+      calculate: calculateSpy,
+      submit: submitSpy,
+      addLineItem: addLineItemSpy,
     };
 
     await TestBed.configureTestingModule({
@@ -131,5 +161,62 @@ describe('QuotesDetailComponent', () => {
   it('navigates back to quotes list', () => {
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/quotes']);
+  });
+
+  it('enables Calculate and Submit for DRAFT and calls QuoteService', () => {
+    expect(component.canCalculate()).toBe(true);
+    expect(component.canSubmit()).toBe(true);
+
+    component.onCalculate();
+    expect(calculateSpy).toHaveBeenCalledWith(1);
+    expect(selectedQuote()?.totalAmount).toBe(99999);
+
+    component.onSubmit();
+    expect(submitSpy).toHaveBeenCalledWith(1);
+    expect(selectedQuote()?.status).toBe('IN_REVIEW');
+  });
+
+  it('disables Calculate/Submit for non-editable status', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW
+    fixture.detectChanges();
+
+    expect(component.canCalculate()).toBe(false);
+    expect(component.canSubmit()).toBe(false);
+    expect(component.canEditLines()).toBe(false);
+
+    component.onCalculate();
+    component.onSubmit();
+    expect(calculateSpy).not.toHaveBeenCalled();
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
+  it('adds a line item when editable and reloads quote', () => {
+    getByIdSpy.mockClear();
+    component.lineForm.setValue({
+      productExternalId: 'prod-x',
+      listPrice: 100,
+      quantity: 2,
+    });
+    component.onAddLineItem();
+
+    expect(addLineItemSpy).toHaveBeenCalledWith(1, {
+      productExternalId: 'prod-x',
+      listPrice: 100,
+      quantity: 2,
+    });
+    expect(getByIdSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('shows action error banner when calculate fails', () => {
+    calculateSpy.mockReturnValue(
+      throwError(() => ({ error: { message: 'Quote must have at least one line item' } })),
+    );
+    component.onCalculate();
+    fixture.detectChanges();
+
+    expect(component.actionError()).toBe('Quote must have at least one line item');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Quote must have at least one line item',
+    );
   });
 });
