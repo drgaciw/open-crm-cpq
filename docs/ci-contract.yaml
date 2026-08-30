@@ -4,7 +4,7 @@
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-05-20"
+last_reviewed: "2026-08-30"
 
 execution:
   primary: jenkins
@@ -23,6 +23,9 @@ scripts_ci:
       gha_job: null
       jenkins_stage: Toolchain
       blocking: true
+      notes: >-
+        After tool versions, runs python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+        as a blocking non-AI gate. Jenkins AI Assist drift_sentinel remains advisory when AI_CI_ENABLED=true.
     - id: shared-libraries
       script: scripts/ci/shared-libraries.sh
       run_core_arg: shared-libraries
@@ -104,6 +107,9 @@ github_actions:
     shared-libraries:
       needs: []
       run: bash scripts/ci/run-core.sh shared-libraries
+      notes: >-
+        Also runs python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+        (manual fallback mirror of Jenkins toolchain gate; no AI assist).
     backend-unit:
       needs: []
       run: bash scripts/ci/run-core.sh backend-unit
@@ -168,6 +174,7 @@ drift_prevention:
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
     - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.
     - Jenkins must publish GitHub status context jenkins/opencrm-cpq-ci when scm-token is set.
+    - Toolchain (Jenkins) and GHA shared-libraries must run verify-drift.py as a blocking non-AI gate.
   verify_commands:
     - bash scripts/ci/run-core.sh toolchain
     - rg -l "run-core.sh" Jenkinsfile .github/workflows/ci.yml
