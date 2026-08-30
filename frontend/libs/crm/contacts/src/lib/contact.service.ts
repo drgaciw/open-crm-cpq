@@ -76,10 +76,19 @@ export class ContactService {
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('q', query);
-    this.http.get<ContactDto[]>(`${this.basePath}/search`, { params })
+    // Interceptor rebuilds List+PageInfo into SpringPageResponse
+    this.http.get<SpringPageResponse<ContactDto>>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (contacts) => this.contacts.set(contacts),
+        next: (p) => {
+          this.contacts.set(p.content ?? p);
+          if (p.totalElements !== undefined) {
+            this.pagination.set({
+              page: p.number ?? 0, size: p.size ?? 20,
+              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
+            });
+          }
+        },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
         }
