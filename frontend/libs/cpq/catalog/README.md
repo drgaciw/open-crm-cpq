@@ -18,7 +18,7 @@ HTTP services use the **DealService signal-state pattern** (`HttpClient` + `sign
 import { ProductService, CATALOG_ROUTES } from '@frontend/cpq-catalog';
 ```
 
-List/detail happy path uses `ProductService` (`GET /api/v1/products`, `GET /api/v1/products/:id`). `MOCK_CATALOG_PRODUCTS` remains for Vitest fixtures only.
+List/detail happy path uses `ProductService` (`GET /api/v1/products`, `GET /api/v1/products/:id`). **New Product** opens a create dialog (`ProductCreateRequest` → `POST /api/v1/products`) and navigates to detail on success. `MOCK_CATALOG_PRODUCTS` remains for Vitest fixtures only.
 
 ## Running unit tests
 
