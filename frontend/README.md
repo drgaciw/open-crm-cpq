@@ -14,6 +14,12 @@ To run the dev server for your app, use:
 npx nx serve crm
 ```
 
+### API proxy (local)
+
+`proxy.conf.json` forwards `/api` to the **API gateway** at `http://localhost:8080` so CRM and CPQ routes (for example `/api/v1/deals` and `/api/v1/products`) share one origin when the gateway is up.
+
+For CRM-only debugging against **crm-service** directly, temporarily set the proxy target to `http://localhost:8081` in `proxy.conf.json`, then restore `:8080` when finished.
+
 To create a production bundle:
 
 ```sh
