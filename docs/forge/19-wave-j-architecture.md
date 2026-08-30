@@ -4,8 +4,8 @@
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** Wave I COMPLETE on forging tip (I1–I4 merged; I5 closeout in same docs PR as this authorize)  
-**Survey tip:** `main` after I1–I4 merges (`9ffc0b7` + I5)  
-**Sources:** GitNexus CLI on `/home/username01/Projects/open-crm-cpq` (index **stale ~42 commits** — re-analyze before symbol edits); GitHub open issues/PRs; I2 Jackson 3 bind proof; `docs/forge/18-wave-i-architecture.md`; `docs/forge/impl/h7-dual-read-prep.md`; held list from PM
+**Survey tip:** `main` @ `9292e9e` (Wave I closeout + Wave J authorize)  
+**Sources:** GitNexus CLI on `/home/username01/Projects/open-crm-cpq` (index **stale ~51 commits** @ `c5075a8` → tip — re-analyze before symbol edits); GitHub open issues/PRs; I2 Jackson 3 bind proof; `docs/forge/18-wave-i-architecture.md`; `docs/forge/impl/h7-dual-read-prep.md`; held list from PM
 
 ## 0. Wave selection (decision record)
 
@@ -41,33 +41,35 @@
 
 ### J-T1 — Quote pricing apply-path still opaque JsonNode (MED contract / apply correctness)
 
-| Layer | Today (`25ef48a` + post-I assumption) | Target |
-|-------|--------------------------------------|--------|
-| AI `CpqAgentToolClients.executePricing` | Structured after **I2** | Unchanged by J1 |
-| quote `PricingServiceClient` | `executePricing` / `simulatePricing` → `body(JsonNode.class)` | Quote-local views; **read body as `String` then Jackson 2 `ObjectMapper.readTree` / bind views** (I2 proof: RestClient Jackson 3 cannot construct `com.fasterxml.jackson.databind.JsonNode`); **no** `pricing-service` Maven dep |
+| Layer | Today (`9292e9e` post-I) | Target |
+|-------|--------------------------|--------|
+| AI `CpqAgentToolClients.executePricing` | **I2:** `.body(String.class)` + Jackson 2 `ObjectMapper.readTree` | Unchanged by J1 |
+| quote `PricingServiceClient` | **Still** `executePricing` / `simulatePricing` → `.body(JsonNode.class)` | Quote-local views; **NEVER** `RestClient.body(JsonNode.class)` — **read body as `String` then Jackson 2 `ObjectMapper.readTree` / bind views** (I2 proof: RestClient Jackson 3 cannot construct `com.fasterxml.jackson.databind.JsonNode`); **no** `pricing-service` Maven dep |
 | `QuoteService.calculate` | `fetchPricingData` / `applyPricingToLineItems` / `updateQuoteFromPricingData` walk JsonNode paths (`success`, `data`, `lineResults`, `financialMetrics`, `approvalState`, …) | Consume typed views; preserve decimal/fallback semantics |
-| `ProductServiceClient.getProductById/Sku` | JsonNode; **no production callers** (only `validateConfiguration` used) | Optional: type or `@Deprecated` unused getters — do **not** block J1 |
+| `ProductServiceClient.getProductById/Sku` | Still `.body(JsonNode.class)`; **no production callers** (only typed `validateConfiguration` used) | Optional: type or `@Deprecated` unused getters — do **not** block J1 (same Jackson 3 landmine if revived) |
 
 **Evidence:**
 
 ```text
-PricingServiceClient.java — body(JsonNode.class) on /pricing/execute and /simulate
-  **I2 proof (must apply here):** CpqAgentToolClientsTest failed HttpMessageConversionException
-  `Cannot construct instance of com.fasterxml.jackson.databind.JsonNode` under tools.jackson.
-  Quote calculate is likely broken at runtime for the same reason until J1.
-QuoteService.java:354+ — JsonNode pricingData = fetchPricingData(...); path("lineResults") / financialMetrics / approvalState
+quote PricingServiceClient.java:21-36 — STILL body(JsonNode.class) on /pricing/execute and /simulate
+  **I2 proof (must apply here):** CpqAgentToolClients javadoc + tests:
+  Spring RestClient Jackson 3 converters cannot bind com.fasterxml.jackson.databind.JsonNode;
+  I2 fixed AI path via String + ObjectMapper.readTree. Quote calculate is broken the same way until J1.
+QuoteService.java (package com.opencrm.quote.quote):354+ — JsonNode pricingData = fetchPricingData(...);
+  path("lineResults") / financialMetrics / approvalState
 ProductServiceClient.validateConfiguration — already ConfigurationValidationResult (G5)
+ProductServiceClient.getProductById/Sku — still body(JsonNode.class); text: no production callers
 rg simulatePricing — definition only (unused)
 ```
 
-**GitNexus** (`-r /home/username01/Projects/open-crm-cpq`, index **42 behind**):
+**GitNexus** (`-r /home/username01/Projects/open-crm-cpq`, index **~51 behind** — **UNKNOWN ≠ unused**):
 
 | Symbol | Risk | Note |
 |--------|------|------|
-| `PricingServiceClient` (quote) | **LOW** (1 direct → `QuoteService.java` IMPORTS; depth-2 ApprovalService file edge) | Re-impact after analyze |
-| `QuoteService` (BE uid) | **LOW** (1 direct → controller) | Treat **MED product** for calculate apply semantics |
-| `ProductServiceClient` (quote) | **UNKNOWN** (0 edges) | Text: `QuoteService` validate + tests; UNKNOWN ≠ unused |
-| Ambiguous `QuoteService` name | FE vs BE | Disambiguate with `--uid` / `--file` |
+| `PricingServiceClient` (quote) | **LOW** (`--file …/quote/client/PricingServiceClient.java`: 1 direct → `QuoteService.java` IMPORTS; depth-2 ApprovalService file edge) | Re-impact after analyze |
+| `QuoteService` (BE) | **LOW** graph (stale edges); **text:** `QuoteController` calls `calculate` / lifecycle | `--file …/quote/quote/QuoteService.java` (not `…/service/…`); treat **MED product** for apply semantics |
+| `ProductServiceClient` (quote) | **UNKNOWN** (0 edges + riskNote) | Text: `QuoteService` validate + tests; UNKNOWN ≠ unused |
+| Ambiguous `QuoteService` name | FE vs BE | Always `--file` / `--uid` (wrong path → Target not found / UNKNOWN) |
 
 ### J-T2 — VALIDATES dialect still missing `in:` lists (LOW–MED product)
 
@@ -107,7 +109,7 @@ H7: `ApprovalServiceSingleWriterTest.getPendingWithLegacyFlagOffDoesNotReadLocal
 approvals.legacy-local-read-enabled: ${APPROVALS_LEGACY_LOCAL_READ:true}
 ```
 
-Single-writer submit already skips local `ApprovalRequest` persist. Flip remains **HIGH** without empty-legacy evidence. Wave J readiness only: checklist in matrix/forge + optional read-only count/probe for local PENDING rows — **no default change**.
+Single-writer submit already skips local `ApprovalRequest` persist. Flip remains **HIGH** without empty-legacy evidence. Wave J readiness only: **docs/ops checklist** (empty local PENDING; flag-off soak; rollback) — **no Java probe**, **no** `application.yml` default change (**default stays `true`**).
 
 ### GitHub inventory (held)
 
@@ -125,7 +127,7 @@ Single-writer submit already skips local `ApprovalRequest` persist. Flip remains
 | Topic | Decision | Rejected |
 |-------|----------|----------|
 | DTO home | Quote-local view types under `com.opencrm.quote.client` / `dto` mirroring fields already read (`success`, `errorMessage`, `lineResults[]`, `financialMetrics`, `approvalState`, `approvalTier`, `waterfall`) | Add Maven dep on `pricing-service`; move `PricingResult` into `libs/common` Day-1 |
-| HTTP bind | **String body → Jackson 2 parse** (same as I2). Never `body(JsonNode.class)` | Keep JsonNode RestClient bind (known Jackson 3 failure) |
+| HTTP bind | **String body → Jackson 2 parse** (same as I2). **NEVER** `RestClient.body(JsonNode.class)` — I2 proved Jackson 3 cannot bind `com.fasterxml.jackson.databind.JsonNode`; quote client still does this today | Keep JsonNode RestClient bind (known Jackson 3 failure) |
 | Client API | `executePricing` returns typed `ApiResponse<PricingExecuteView>` (or parse once into view); `simulatePricing` same shape or leave unused | Big-bang rewrite all RestClients |
 | Apply path | Refactor `fetchPricingData` / `applyPricingToLineItems` / `updateQuoteFromPricingData` to views; keep decimal fallbacks + `PRICING_*` error codes | Behavioral change to totals formulas |
 | Product getters | Out of critical path; optional tiny follow-up or javadoc “unused” | Force product DTO module |
@@ -182,7 +184,7 @@ J1 typed PricingServiceClient   J2 attr:in: dialect   J3 quote create +      J4 
 
 | ID | Title | Scope (files) | Risk | Acceptance |
 |----|-------|---------------|------|------------|
-| **J1** | `refactor(quote): typed pricing execute apply-path` | `PricingServiceClient` + quote-local views; String/Jackson-2 bind (not `body(JsonNode.class)`); `QuoteService.calculate` helpers; unit tests preserving `PRICING_*` codes / decimals; `docs/forge/impl/j1-quote-pricing-typed.md` | **MED** | RestClient no longer binds Jackson 2 JsonNode; fixtures assert line apply + financial metrics; no pricing-service Maven dep; AI clients untouched |
+| **J1** | `refactor(quote): typed pricing execute apply-path` | `PricingServiceClient` + quote-local views; **NEVER** `body(JsonNode.class)` — String + Jackson-2 bind (I2); `QuoteService.calculate` helpers; unit tests preserving `PRICING_*` codes / decimals; `docs/forge/impl/j1-quote-pricing-typed.md` | **MED** | Zero `body(JsonNode.class)` in quote `PricingServiceClient`; fixtures assert line apply + financial metrics; no pricing-service Maven dep; AI `CpqAgentToolClients` untouched |
 | **J2** | `feat(configuration-engine): VALIDATES attr:in: list dialect` | `ProductRuleEvaluationCore` (+ tests / ConstraintSolver fixture); `docs/forge/impl/j2-validates-attr-in.md` | **LOW–MED** | `attr:color in:red,blue` match/mismatch covered; `=` / `!=` unchanged; unsupported still skip |
 | **J3** | `feat(fe-cpq): quote create + detail calculate/submit` | `quotes-list`, `quotes-detail`, optional create component; Vitest; `docs/forge/impl/j3-fe-quote-create-lifecycle.md` | **LOW** | New Quote enabled and creates via API; detail Calculate/Submit call existing service; list/detail still green |
 | **J4** | `feat(fe-cpq): catalog product create dialog` | `catalog-list` (+ create form); Vitest; `docs/forge/impl/j4-fe-catalog-create.md` | **LOW** | New Product enabled; create navigates to detail; no quotes lib edits |
@@ -219,12 +221,12 @@ J1 typed PricingServiceClient   J2 attr:in: dialect   J3 quote create +      J4 
 
 **Explicit HIGH callouts:**
 
-1. **Do not flip** `approvals.legacy-local-read-enabled` default in Wave J.  
-2. **Index 42 commits behind** — re-analyze (`node .gitnexus/run.cjs analyze`) on tip before symbol edits; treat **UNKNOWN** as unresolved + confirm with `rg`.  
-3. Disambiguate `QuoteService` (FE vs BE) and `ApprovalService` (quote vs routing) by `file_path` / uid.  
-4. Wave I must be COMPLETE before forging J; this draft may exist while I panes land.
+1. **Do not flip** `approvals.legacy-local-read-enabled` default in Wave J (**HIGH** cutover if flipped).  
+2. **Index ~51 commits behind** — re-analyze (`node .gitnexus/run.cjs analyze`) on tip before symbol edits; treat **UNKNOWN** as unresolved + confirm with `rg` (UNKNOWN ≠ unused).  
+3. Disambiguate `QuoteService` (FE vs BE — BE path `…/quote/quote/QuoteService.java`) and `ApprovalService` (quote vs routing) by `file_path` / uid.  
+4. Wave I is **COMPLETE** on tip — forge gate satisfied; do not reopen I tracks in J panes.
 
-**UNKNOWN callout:** quote `ProductServiceClient` (0 edges) and `ProductRuleEvaluationCore` (not in index) — text-confirmed; empty/missing ≠ safe to delete.
+**UNKNOWN callout:** quote `ProductServiceClient` (0 edges + riskNote) and `ProductRuleEvaluationCore` (not in index / Target not found) — text-confirmed callers/tests; empty/missing ≠ safe to delete.
 
 ---
 
@@ -274,9 +276,9 @@ Implement Open CRM/CPQ Wave J per docs/forge/19-wave-j-architecture.md in five p
 - [x] Waves A–I complete on forging tip (I1–I4 merged; I5 closeout)  
 - [x] GitHub: open issues **only #238, #241** (held); Bolt **#412** close as superseded by I3; **#430** out  
 - [x] Evidence: quote `PricingServiceClient` JsonNode; `QuoteService.calculate` JsonNode apply; VALIDATES no `in:`; FE New Quote/Product disabled; detail lifecycle absent; dual-read default true (H7 prep only)  
-- [x] GitNexus: `PricingServiceClient` **LOW**; BE `QuoteService` **LOW** (treat MED product); `ProductServiceClient` **UNKNOWN**; `ProductRuleEvaluationCore` missing → **UNKNOWN** — **warned**; index **42 behind**  
+- [x] GitNexus: `PricingServiceClient` **LOW**; BE `QuoteService` **LOW** (treat MED product; text → `QuoteController`); `ProductServiceClient` **UNKNOWN**; `ProductRuleEvaluationCore` missing → **UNKNOWN** — **warned**; index **~51 behind**  
 - [x] Dual-read default flip **held**; product validate delete **held**; gateway domain rules **rejected**  
-- [x] PR DAG max parallelism with disjoint files documented (**5** Day-1 panes)  
+- [x] PR DAG max parallelism with disjoint files documented (**5** Day-1 panes: J1∥J2∥J3∥J4∥J5 → J6)  
 - [x] Holds: Activities, #238, #241, product validate deletion, gateway domain rules, WhatsApp #430, full SpEL, Kafka S2B-9, dual-read flip  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
 - [x] Wave I COMPLETE on forging tip (gate before `/goal`)  
@@ -284,6 +286,6 @@ Implement Open CRM/CPQ Wave J per docs/forge/19-wave-j-architecture.md in five p
 - [x] Forge execution authorized (PM standing orchestrator + architect pick)  
 - [ ] Day-1 + closeout merged; J6 matrix + orchestrator COMPLETE  
 
-**PM WARNING:** Re-analyze before quote/CE edits (**UNKNOWN** / stale index ≠ safe). Do **not** flip approval legacy dual-read default in this wave. J1 **must** use String+Jackson 2 parse (I2 Jackson 3 bind bug). J5 docs-only.
+**PM WARNING:** Re-analyze before quote/CE edits (**UNKNOWN** / stale index ≠ unused/safe). Do **not** flip approval legacy dual-read default in this wave (**HIGH**). J1 **must NEVER** `RestClient.body(JsonNode.class)` — String+Jackson 2 parse (I2 Jackson 3 bind bug; quote client still broken). J5 docs-only; default stays `true`.
 
 **WAVE J — APPROVED FOR FORGE.**
