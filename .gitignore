@@ -45,3 +45,4 @@ ci-reports/*.md
 .claude/worktrees/
 
 infra/jenkins/ai-assist/__pycache__/
+.forge-worktrees/
