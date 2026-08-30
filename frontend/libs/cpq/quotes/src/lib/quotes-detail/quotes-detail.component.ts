@@ -25,7 +25,10 @@ import {
   PageHeaderComponent,
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
-import { LineItemCreateRequest } from '@frontend/shared-models';
+import {
+  LineItemCreateRequest,
+  QuoteLineItemDto,
+} from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 
 function httpErrorMessage(err: unknown): string {
@@ -101,6 +104,66 @@ function httpErrorMessage(err: unknown): string {
             <mat-icon>send</mat-icon>
             Submit
           </button>
+          <button
+            mat-stroked-button
+            color="primary"
+            type="button"
+            (click)="onApprove()"
+            [disabled]="!canApproveReject() || actionBusy()"
+            [title]="
+              canApproveReject()
+                ? 'Approve this quote'
+                : 'Approve is available for IN_REVIEW or PENDING_APPROVAL'
+            "
+          >
+            <mat-icon>check_circle</mat-icon>
+            Approve
+          </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            (click)="onReject()"
+            [disabled]="!canApproveReject() || actionBusy()"
+            [title]="
+              canApproveReject()
+                ? 'Reject this quote (optional reason)'
+                : 'Reject is available for IN_REVIEW or PENDING_APPROVAL'
+            "
+          >
+            <mat-icon>cancel</mat-icon>
+            Reject
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            type="button"
+            (click)="onSend()"
+            [disabled]="!canSend() || actionBusy()"
+            [title]="
+              canSend()
+                ? 'Send approved quote to customer'
+                : 'Send is available only for APPROVED quotes'
+            "
+          >
+            <mat-icon>outgoing_mail</mat-icon>
+            Send
+          </button>
+          <button
+            mat-raised-button
+            color="accent"
+            type="button"
+            (click)="onAccept()"
+            [disabled]="!canAccept() || actionBusy()"
+            [title]="
+              canAccept()
+                ? 'Mark sent quote as accepted'
+                : 'Accept is available only for SENT quotes'
+            "
+          >
+            <mat-icon>done_all</mat-icon>
+            Accept
+          </button>
         </div>
       </app-page-header>
 
@@ -171,6 +234,125 @@ function httpErrorMessage(err: unknown): string {
           </mat-card-content>
         </mat-card>
 
+        <mat-card class="line-item-card">
+          <mat-card-header>
+            <mat-card-title>Line items</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @if (lineItems().length === 0) {
+              <p class="empty-lines">No line items yet.</p>
+            } @else {
+              <div class="line-table" role="table">
+                <div class="line-row line-head" role="row">
+                  <span role="columnheader">Product</span>
+                  <span role="columnheader">Name</span>
+                  <span role="columnheader">Qty</span>
+                  <span role="columnheader">List price</span>
+                  <span role="columnheader">Net</span>
+                  <span role="columnheader">Actions</span>
+                </div>
+                @for (line of lineItems(); track line.id) {
+                  <div class="line-row" role="row">
+                    @if (editingLineId() === line.id) {
+                      <span role="cell">{{ line.productExternalId }}</span>
+                      <span role="cell">
+                        <mat-form-field appearance="outline" class="edit-field">
+                          <mat-label>Name</mat-label>
+                          <input matInput [formControl]="editForm.controls.productName" />
+                        </mat-form-field>
+                      </span>
+                      <span role="cell">
+                        <mat-form-field appearance="outline" class="edit-field narrow">
+                          <mat-label>Qty</mat-label>
+                          <input
+                            matInput
+                            type="number"
+                            min="1"
+                            [formControl]="editForm.controls.quantity"
+                          />
+                        </mat-form-field>
+                      </span>
+                      <span role="cell">
+                        <mat-form-field appearance="outline" class="edit-field">
+                          <mat-label>List price</mat-label>
+                          <input
+                            matInput
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            [formControl]="editForm.controls.listPrice"
+                          />
+                        </mat-form-field>
+                      </span>
+                      <span role="cell">{{
+                        line.netPrice != null
+                          ? (line.netPrice | currencyFormat: quote.currency || 'USD')
+                          : '—'
+                      }}</span>
+                      <span role="cell" class="line-actions">
+                        <button
+                          mat-button
+                          color="primary"
+                          type="button"
+                          (click)="onSaveLineEdit(line)"
+                          [disabled]="editForm.invalid || actionBusy()"
+                        >
+                          Save
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          (click)="cancelLineEdit()"
+                          [disabled]="actionBusy()"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    } @else {
+                      <span role="cell">{{ line.productExternalId }}</span>
+                      <span role="cell">{{ line.productName || '—' }}</span>
+                      <span role="cell">{{ line.quantity }}</span>
+                      <span role="cell">{{
+                        line.listPrice != null
+                          ? (line.listPrice | currencyFormat: quote.currency || 'USD')
+                          : '—'
+                      }}</span>
+                      <span role="cell">{{
+                        line.netPrice != null
+                          ? (line.netPrice | currencyFormat: quote.currency || 'USD')
+                          : '—'
+                      }}</span>
+                      <span role="cell" class="line-actions">
+                        @if (canEditLines()) {
+                          <button
+                            mat-button
+                            type="button"
+                            (click)="startLineEdit(line)"
+                            [disabled]="actionBusy()"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            mat-button
+                            color="warn"
+                            type="button"
+                            (click)="onRemoveLineItem(line)"
+                            [disabled]="actionBusy()"
+                          >
+                            Remove
+                          </button>
+                        } @else {
+                          <span class="muted">—</span>
+                        }
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+
         @if (canEditLines()) {
           <mat-card class="line-item-card">
             <mat-card-header>
@@ -189,6 +371,10 @@ function httpErrorMessage(err: unknown): string {
                   }
                 </mat-form-field>
                 <mat-form-field appearance="outline">
+                  <mat-label>Product name</mat-label>
+                  <input matInput formControlName="productName" autocomplete="off" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
                   <mat-label>List price</mat-label>
                   <input matInput type="number" formControlName="listPrice" min="0" step="0.01" />
                   @if (
@@ -201,6 +387,10 @@ function httpErrorMessage(err: unknown): string {
                 <mat-form-field appearance="outline">
                   <mat-label>Quantity</mat-label>
                   <input matInput type="number" formControlName="quantity" min="1" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="notes-field">
+                  <mat-label>Notes</mat-label>
+                  <input matInput formControlName="notes" autocomplete="off" />
                 </mat-form-field>
                 <button
                   mat-stroked-button
@@ -290,6 +480,55 @@ function httpErrorMessage(err: unknown): string {
         color: #212121;
       }
 
+      .empty-lines {
+        margin: 16px 0 0;
+        color: #757575;
+      }
+
+      .line-table {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .line-row {
+        display: grid;
+        grid-template-columns: 1.2fr 1.2fr 0.6fr 1fr 1fr 1.2fr;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 4px;
+        border-bottom: 1px solid #eeeeee;
+      }
+
+      .line-head {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #757575;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .line-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .muted {
+        color: #9e9e9e;
+      }
+
+      .edit-field {
+        width: 100%;
+      }
+
+      .edit-field.narrow {
+        max-width: 88px;
+      }
+
       .line-form {
         display: flex;
         flex-wrap: wrap;
@@ -301,6 +540,10 @@ function httpErrorMessage(err: unknown): string {
       .line-form mat-form-field {
         flex: 1 1 160px;
         min-width: 140px;
+      }
+
+      .line-form .notes-field {
+        flex: 2 1 220px;
       }
 
       .line-item-card {
@@ -319,6 +562,10 @@ function httpErrorMessage(err: unknown): string {
         .info-grid {
           grid-template-columns: 1fr;
         }
+
+        .line-row {
+          grid-template-columns: 1fr 1fr;
+        }
       }
     `,
   ],
@@ -334,17 +581,17 @@ export class QuotesDetailComponent implements OnInit {
   readonly loading = computed(() => this.quoteService.loading());
   readonly error = computed(() => this.quoteService.error());
   readonly quote = computed(() => this.quoteService.selectedQuote());
-  readonly lineItemCount = computed(
-    () => this.quote()?.lineItems?.length ?? 0,
-  );
+  readonly lineItems = computed(() => this.quote()?.lineItems ?? []);
+  readonly lineItemCount = computed(() => this.lineItems().length);
 
   readonly actionBusy = signal(false);
   readonly actionError = signal<string | null>(null);
+  readonly editingLineId = signal<number | null>(null);
 
   /** Submit only from DRAFT (matches quote-service). */
   readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT');
 
-  /** Calculate / add line when quote is editable. */
+  /** Calculate / add / edit / remove line when quote is editable. */
   readonly canEditLines = computed(() => {
     const status = this.quote()?.status;
     return status === 'DRAFT' || status === 'REJECTED';
@@ -352,10 +599,28 @@ export class QuotesDetailComponent implements OnInit {
 
   readonly canCalculate = computed(() => this.canEditLines());
 
+  /** Approve / Reject from review states. */
+  readonly canApproveReject = computed(() => {
+    const status = this.quote()?.status;
+    return status === 'IN_REVIEW' || status === 'PENDING_APPROVAL';
+  });
+
+  readonly canSend = computed(() => this.quote()?.status === 'APPROVED');
+
+  readonly canAccept = computed(() => this.quote()?.status === 'SENT');
+
   readonly lineForm = this.fb.nonNullable.group({
     productExternalId: ['', Validators.required],
+    productName: [''],
     listPrice: [null as number | null, Validators.required],
     quantity: [1 as number | null],
+    notes: [''],
+  });
+
+  readonly editForm = this.fb.nonNullable.group({
+    productName: [''],
+    listPrice: [null as number | null, Validators.required],
+    quantity: [1 as number | null, Validators.required],
   });
 
   ngOnInit(): void {
@@ -375,18 +640,45 @@ export class QuotesDetailComponent implements OnInit {
   }
 
   onCalculate(): void {
-    if (!this.canCalculate() || this.actionBusy()) {
+    this.runQuoteAction(
+      () => this.canCalculate(),
+      (id) => this.quoteService.calculate(id),
+    );
+  }
+
+  onSubmit(): void {
+    this.runQuoteAction(
+      () => this.canSubmit(),
+      (id) => this.quoteService.submit(id),
+    );
+  }
+
+  onApprove(): void {
+    this.runQuoteAction(
+      () => this.canApproveReject(),
+      (id) => this.quoteService.approve(id),
+    );
+  }
+
+  onReject(): void {
+    if (!this.canApproveReject() || this.actionBusy()) {
       return;
     }
     const numericId = this.numericId();
     if (numericId == null) {
       return;
     }
+    const reasonRaw = window.prompt('Rejection reason (optional):');
+    if (reasonRaw === null) {
+      return;
+    }
+    const reason = reasonRaw.trim();
     this.actionBusy.set(true);
     this.actionError.set(null);
-    this.quoteService.calculate(numericId).subscribe({
+    this.quoteService.reject(numericId, reason || undefined).subscribe({
       next: (updated) => {
         this.quoteService.selectedQuote.set(updated);
+        this.editingLineId.set(null);
         this.actionBusy.set(false);
       },
       error: (err) => {
@@ -396,26 +688,18 @@ export class QuotesDetailComponent implements OnInit {
     });
   }
 
-  onSubmit(): void {
-    if (!this.canSubmit() || this.actionBusy()) {
-      return;
-    }
-    const numericId = this.numericId();
-    if (numericId == null) {
-      return;
-    }
-    this.actionBusy.set(true);
-    this.actionError.set(null);
-    this.quoteService.submit(numericId).subscribe({
-      next: (updated) => {
-        this.quoteService.selectedQuote.set(updated);
-        this.actionBusy.set(false);
-      },
-      error: (err) => {
-        this.actionBusy.set(false);
-        this.actionError.set(httpErrorMessage(err));
-      },
-    });
+  onSend(): void {
+    this.runQuoteAction(
+      () => this.canSend(),
+      (id) => this.quoteService.send(id),
+    );
+  }
+
+  onAccept(): void {
+    this.runQuoteAction(
+      () => this.canAccept(),
+      (id) => this.quoteService.accept(id),
+    );
   }
 
   onAddLineItem(): void {
@@ -436,13 +720,131 @@ export class QuotesDetailComponent implements OnInit {
           ? Number(raw.quantity)
           : 1,
     };
+    const productName = raw.productName.trim();
+    if (productName) {
+      request.productName = productName;
+    }
+    const notes = raw.notes.trim();
+    if (notes) {
+      request.notes = notes;
+    }
     this.actionBusy.set(true);
     this.actionError.set(null);
     this.quoteService.addLineItem(numericId, request).subscribe({
       next: () => {
-        this.lineForm.reset({ productExternalId: '', listPrice: null, quantity: 1 });
+        this.lineForm.reset({
+          productExternalId: '',
+          productName: '',
+          listPrice: null,
+          quantity: 1,
+          notes: '',
+        });
         this.actionBusy.set(false);
         this.quoteService.getById(numericId);
+      },
+      error: (err) => {
+        this.actionBusy.set(false);
+        this.actionError.set(httpErrorMessage(err));
+      },
+    });
+  }
+
+  startLineEdit(line: QuoteLineItemDto): void {
+    if (!this.canEditLines() || this.actionBusy()) {
+      return;
+    }
+    this.editingLineId.set(line.id);
+    this.editForm.setValue({
+      productName: line.productName ?? '',
+      listPrice: line.listPrice ?? null,
+      quantity: line.quantity,
+    });
+  }
+
+  cancelLineEdit(): void {
+    this.editingLineId.set(null);
+  }
+
+  onSaveLineEdit(line: QuoteLineItemDto): void {
+    if (!this.canEditLines() || this.editForm.invalid || this.actionBusy()) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    const raw = this.editForm.getRawValue();
+    const request: LineItemCreateRequest = {
+      productExternalId: line.productExternalId,
+      listPrice: Number(raw.listPrice),
+      quantity:
+        raw.quantity != null && Number.isFinite(raw.quantity)
+          ? Number(raw.quantity)
+          : 1,
+    };
+    const productName = raw.productName.trim();
+    if (productName) {
+      request.productName = productName;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.quoteService.updateLineItem(numericId, line.id, request).subscribe({
+      next: () => {
+        this.editingLineId.set(null);
+        this.actionBusy.set(false);
+        this.quoteService.getById(numericId);
+      },
+      error: (err) => {
+        this.actionBusy.set(false);
+        this.actionError.set(httpErrorMessage(err));
+      },
+    });
+  }
+
+  onRemoveLineItem(line: QuoteLineItemDto): void {
+    if (!this.canEditLines() || this.actionBusy()) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.quoteService.removeLineItem(numericId, line.id).subscribe({
+      next: () => {
+        if (this.editingLineId() === line.id) {
+          this.editingLineId.set(null);
+        }
+        this.actionBusy.set(false);
+        this.quoteService.getById(numericId);
+      },
+      error: (err) => {
+        this.actionBusy.set(false);
+        this.actionError.set(httpErrorMessage(err));
+      },
+    });
+  }
+
+  private runQuoteAction(
+    canRun: () => boolean,
+    call: (id: number) => ReturnType<QuoteService['approve']>,
+  ): void {
+    if (!canRun() || this.actionBusy()) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    call(numericId).subscribe({
+      next: (updated) => {
+        this.quoteService.selectedQuote.set(updated);
+        this.editingLineId.set(null);
+        this.actionBusy.set(false);
       },
       error: (err) => {
         this.actionBusy.set(false);
@@ -458,6 +860,7 @@ export class QuotesDetailComponent implements OnInit {
 
   private load(): void {
     this.actionError.set(null);
+    this.editingLineId.set(null);
     const numericId = this.numericId();
     if (numericId == null) {
       this.quoteService.selectedQuote.set(null);
