@@ -1,17 +1,15 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave C COMPLETE** (merged to main)  
-**Plan:** `docs/forge/12-wave-c-plan.md`
+**Session state:** **Architect-only** — Wave D design ready; forge not started  
+**Architect:** `.cursor/agents/opencrm-architect.agent.md` + skill `/opencrm-architect`  
+**Wave D plan:** `docs/forge/13-wave-d-architecture.md`
 
-## Wave C results
-- C1 quotes list/detail stub  
-- C2 CPQ HTTP data-access services  
-- C3 shared-ui on leads/contacts lists  
-- C4 pricing simulator stub  
-- C5 FE test hardening (crm-deals + cpq-catalog verified green)  
-- C6 PriceBook N+1 batch resolution  
+## Completed waves (on main)
+A (pricing fixtures, proxy), B (CRM/CPQ polish), C (quotes/data-access/shared-ui/sim/tests/N+1)
 
-## Still held
-- Activities API, S2B-11, S2C-12  
-- CORS/CSRF wildcards, auth bypass CRITICAL  
+## Next (awaiting PM forge authorization)
+Wave D security: remove `security.open` bypass + gateway CORS/CSRF wildcards (GitHub #451 / #458)
+
+## Still held beyond D
+Activities API, S2B-11, S2C-12, CI runners (#238), agent Kafka (#241)
