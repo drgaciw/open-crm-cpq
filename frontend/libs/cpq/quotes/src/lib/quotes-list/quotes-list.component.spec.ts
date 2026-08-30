@@ -167,6 +167,18 @@ describe('QuotesListComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/quotes', 2]);
   });
 
+  it('enables New Quote and navigates to create route', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const newBtn = Array.from(compiled.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('New Quote'),
+    ) as HTMLButtonElement | undefined;
+    expect(newBtn).toBeTruthy();
+    expect(newBtn?.disabled).toBe(false);
+
+    component.onNewQuote();
+    expect(router.navigate).toHaveBeenCalledWith(['/quotes', 'new']);
+  });
+
   it('uses shared-ui data table (not inline MatTable happy path)', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-data-table')).toBeTruthy();
