@@ -73,7 +73,7 @@ Deterministic pricing execution and customer context for margin and validation a
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
-| POST | `/api/v1/pricing/execute` | pricing-service (8082) | **agent-contract** | cpq-agent-011 | `PricingExecutionController`; waterfall + audit + `PriceCalculated`; runs `approval-margin-exception.drl` (salience 930). S2C-1b golden fixtures. |
+| POST | `/api/v1/pricing/execute` | pricing-service (8082) | **agent-contract** | cpq-agent-011 | `PricingExecutionController`; waterfall + audit + `PriceCalculated`; runs `approval-margin-exception.drl` (salience 930). S2C-1b goldens: `fixtures/pricing/execute/*` + `fixtures/pricing/drl/*` (`PricingExecuteGoldenFixtureTest`, `PricingDrulesGoldenFixtureTest`, `@Tag("unit")`). |
 | POST | `/api/v1/pricing/simulate` | pricing-service (8082) | stable | — | No persistence; referenced by other agents, not the three PRDs. |
 | POST | `/api/v1/pricing/simulate/bulk` | pricing-service (8082) | beta | — | Implemented in `PricingExecutionController`; PRD §10.2 previously "not started". |
 | GET | `/api/v1/pricing/audit/{quoteExternalId}` | pricing-service (8082) | beta | — | Audit trail query; margin audit / compliance cross-ref. |
