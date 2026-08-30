@@ -19,16 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * F4 stub: gateway must match {@code POST /api/v1/configuration/validate} (and CPQ alias)
+ * F3/F4: gateway must match {@code POST /api/v1/configuration/validate} (and CPQ alias)
  * with a route that is declared <em>before</em> the broad {@code Path=.../configuration/**}
  * product pass-through (Wave F3 predicate-order constraint).
  * <p>
- * Until F3 lands, documents current wildcard ownership and the required insertion order.
- * After F3, asserts the specific validate route precedes {@code configuration/**}.
+ * Asserts the specific validate route precedes {@code configuration/**} so agents hit
+ * configuration-engine evaluate rather than product {@code List&lt;String&gt;}.
  */
 @Tag("unit")
 @Tag("contract")
-@DisplayName("F4 gateway validate-before-configuration/** route predicate stub")
+@DisplayName("F3/F4 gateway validate-before-configuration/** route predicate")
 class ConfigurationValidateRoutePredicateTest {
 
     private static final Path APPLICATION_YAML = Path.of("src/main/resources/application.yml");
@@ -54,58 +54,49 @@ class ConfigurationValidateRoutePredicateTest {
     }
 
     @Test
-    @DisplayName("validate and rules currently match product configuration/** wildcard")
-    void preF3ValidateAndRulesMatchProductWildcard() {
+    @DisplayName("rules CRUD stays on product configuration/**; validate has dedicated path")
+    void rulesStayOnProductWildcardAndValidateIsCovered() {
         assertTrue(yaml.contains(CONFIGURATION_WILDCARD),
                 "product-service must keep Path including /api/v1/configuration/**");
+        assertTrue(yaml.contains("id: configuration-validate"),
+                "F3 must declare configuration-validate route id");
         assertTrue(matchesAnyDeclaredPattern(VALIDATE_PATH),
-                "validate path must be covered by a Path predicate (today: configuration/**)");
+                "validate path must be covered by a Path predicate");
         assertTrue(matchesAnyDeclaredPattern(RULES_PATH),
                 "rules CRUD path must remain covered by configuration/**");
+        assertFalse(PATH_MATCHER.match(VALIDATE_PATH, RULES_PATH),
+                "validate-only pattern must not match rules CRUD");
     }
 
     @Test
-    @DisplayName("F3/F4: when validate-specific route exists it must precede configuration/**")
+    @DisplayName("F3: validate-specific route must precede configuration/**")
     void validateSpecificRouteMustPrecedeConfigurationWildcardWhenPresent() {
         int validateRouteIndex = indexOfFirstRouteMatching(VALIDATE_PATH, true);
         int wildcardRouteIndex = indexOfFirstRouteWithExactPattern(CONFIGURATION_WILDCARD);
 
         assertTrue(wildcardRouteIndex >= 0,
                 "Expected a route declaring Path=.../configuration/**");
-
-        if (validateRouteIndex < 0 || validateRouteIndex == wildcardRouteIndex) {
-            // Pre-F3: only the broad product wildcard matches validate — document required F3 order.
-            assertTrue(
-                    firstMatchingPattern(VALIDATE_PATH).contains("/configuration/**"),
-                    "Pre-F3 validate is owned by configuration/**; F3 must insert a more specific "
-                            + "validate route (→ configuration-engine evaluate) before that wildcard");
-            return;
-        }
-
+        assertTrue(validateRouteIndex >= 0,
+                "F3 must declare a validate-specific Path (not only configuration/**)");
         assertTrue(validateRouteIndex < wildcardRouteIndex,
                 () -> "Validate-specific route (index " + validateRouteIndex
                         + ") must be declared before configuration/** (index "
                         + wildcardRouteIndex + ") or Spring Cloud Gateway will keep routing "
                         + "agents to product-service List<String>");
+        assertFalse(firstMatchingPattern(VALIDATE_PATH).endsWith("/**"),
+                "First matching pattern for validate must be the specific Path, not /**");
     }
 
     @Test
-    @DisplayName("F3/F4: CPQ alias validate must precede cpq/configuration/** when specific route exists")
+    @DisplayName("F3: CPQ alias validate must precede cpq/configuration/**")
     void cpqValidateSpecificRouteMustPrecedeCpqWildcardWhenPresent() {
         int validateRouteIndex = indexOfFirstRouteMatching(CPQ_VALIDATE_PATH, true);
         int wildcardRouteIndex = indexOfFirstRouteWithExactPattern(CPQ_CONFIGURATION_WILDCARD);
 
         assertTrue(wildcardRouteIndex >= 0,
                 "Expected a route declaring Path=.../cpq/configuration/**");
-
-        if (validateRouteIndex < 0 || validateRouteIndex == wildcardRouteIndex) {
-            assertTrue(
-                    firstMatchingPattern(CPQ_VALIDATE_PATH).contains("/cpq/configuration/**"),
-                    "Pre-F3 CPQ validate is owned by cpq/configuration/**; F3 must insert a more "
-                            + "specific validate alias before that wildcard");
-            return;
-        }
-
+        assertTrue(validateRouteIndex >= 0,
+                "F3 must declare a CPQ validate-specific Path");
         assertTrue(validateRouteIndex < wildcardRouteIndex,
                 () -> "CPQ validate-specific route must precede cpq/configuration/**");
     }

@@ -183,7 +183,7 @@ class CpqGatewayRoutesTest {
     @Test
     void applicationYamlRoutesAgentCriticalPrefixes() {
         assertTrue(yaml.contains("/api/v1/configuration/**"),
-                "Configuration rules and validate must route to product-service");
+                "Configuration rules CRUD must remain on product-service via configuration/**");
         assertTrue(yaml.contains("Path=/api/v1/configurations/**"),
                 "Configuration sessions must route to configuration-engine");
         assertTrue(yaml.contains("Path=/api/v1/pricing/**"),
@@ -208,6 +208,41 @@ class CpqGatewayRoutesTest {
                 "CRM deals must route to crm-service");
         assertTrue(yaml.contains("Path=/api/v1/erp/**"),
                 "ERP agent-contract paths must hit erp-stub");
+    }
+
+    @Test
+    @DisplayName("F3 S2B-11: POST configuration/validate rewrites to CE evaluate before product wildcard")
+    void applicationYamlDeclaresConfigurationValidateShim() {
+        assertTrue(yaml.contains("id: configuration-validate"),
+                "Missing configuration-validate route (agent POST validate → CE)");
+        assertTrue(yaml.contains("id: cpq-configuration-validate"),
+                "Missing cpq-configuration-validate alias route");
+        assertTrue(yaml.contains("Path=/api/v1/configuration/validate"),
+                "Validate shim must match POST /api/v1/configuration/validate");
+        assertTrue(yaml.contains("Path=/api/v1/cpq/configuration/validate"),
+                "CPQ validate alias must match POST /api/v1/cpq/configuration/validate");
+        assertTrue(yaml.contains("RewritePath=/api/v1/configuration/validate, /internal/v1/configurations/evaluate"),
+                "Validate must rewrite to CE POST /internal/v1/configurations/evaluate");
+        assertTrue(yaml.contains(
+                        "RewritePath=/api/v1/cpq/configuration/validate, /internal/v1/configurations/evaluate"),
+                "CPQ validate alias must rewrite to CE evaluate");
+        assertTrue(yaml.contains("CONFIGURATION_ENGINE_URI") || yaml.contains("http://localhost:8088"),
+                "Validate shim must target configuration-engine URI");
+
+        // Predicate order: first occurrence of validate Path must precede configuration/**
+        int validateIdx = yaml.indexOf("Path=/api/v1/configuration/validate");
+        int wildcardIdx = yaml.indexOf("/api/v1/configuration/**");
+        assertTrue(validateIdx >= 0 && wildcardIdx >= 0,
+                "Both validate Path and configuration/** must be present");
+        assertTrue(validateIdx < wildcardIdx,
+                "configuration-validate Path must be declared before product configuration/**");
+
+        int cpqValidateIdx = yaml.indexOf("Path=/api/v1/cpq/configuration/validate");
+        int cpqWildcardIdx = yaml.indexOf("/api/v1/cpq/configuration/**");
+        assertTrue(cpqValidateIdx >= 0 && cpqWildcardIdx >= 0,
+                "Both CPQ validate Path and cpq/configuration/** must be present");
+        assertTrue(cpqValidateIdx < cpqWildcardIdx,
+                "cpq-configuration-validate Path must precede cpq/configuration/**");
     }
 
     @Test
