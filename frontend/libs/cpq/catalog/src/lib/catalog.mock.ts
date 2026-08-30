@@ -1,6 +1,6 @@
 import { CatalogProduct } from './catalog.model';
 
-/** Mock catalog rows for the presentational stub (no HTTP). */
+/** Mock catalog rows for unit tests and fixtures (happy path uses ProductService HTTP). */
 export const MOCK_CATALOG_PRODUCTS: CatalogProduct[] = [
   {
     id: 1,

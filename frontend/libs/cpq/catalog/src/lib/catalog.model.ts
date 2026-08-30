@@ -1,7 +1,7 @@
 /**
- * Lightweight catalog product shape for the presentational stub.
+ * Lightweight catalog product shape for test fixtures / local mapping.
  * Mirrors product-service ProductDto fields used by list/detail UI.
- * Full shared-models export is PR-FE-CPQ-02.
+ * Runtime happy path uses {@link ProductDto} via ProductService.
  */
 export type CatalogProductStatus = 'DRAFT' | 'ACTIVE' | 'DEPRECATED' | 'RETIRED';
 
