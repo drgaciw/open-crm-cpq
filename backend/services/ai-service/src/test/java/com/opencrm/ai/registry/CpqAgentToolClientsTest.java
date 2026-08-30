@@ -33,35 +33,54 @@ class CpqAgentToolClientsTest {
     }
 
     @Test
-    void executePricingReturnsGatewayPayload() {
+    void executePricingUnwrapsApiResponseAndExposesSuccessAndLineResults() {
         server.expect(requestTo("http://gateway.test/api/v1/pricing/execute"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("{\"quoteExternalId\":\"Q-1\"}"))
                 .andRespond(withSuccess("""
-                        {"success":true,"data":{"finalPrice":100.0}}
+                        {
+                          "success": true,
+                          "message": "Pricing executed",
+                          "data": {
+                            "success": true,
+                            "lineResults": [{"productExternalId":"SKU-1","netPrice":100.0}],
+                            "errorMessage": null
+                          }
+                        }
                         """, MediaType.APPLICATION_JSON));
 
         CpqToolResponse response = clients.executePricing(Map.of("quoteExternalId", "Q-1"));
 
         assertTrue(response.success());
-        assertEquals("Gateway call succeeded", response.message());
+        assertEquals("Pricing executed", response.message());
         assertNotNull(response.data());
         assertTrue(response.data().get("success").asBoolean());
+        assertTrue(response.data().get("lineResults").isArray());
+        assertEquals(1, response.data().get("lineResults").size());
+        assertEquals("SKU-1", response.data().get("lineResults").get(0).get("productExternalId").asText());
     }
 
     @Test
-    void getQuoteLineItemsReturnsGatewayPayload() {
+    void getQuoteLineItemsUnwrapsApiResponseArray() {
         server.expect(requestTo("http://gateway.test/api/v1/quotes/42/line-items"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
-                        {"success":true,"data":[{"id":1,"quantity":2}]}
+                        {
+                          "success": true,
+                          "message": "Line items",
+                          "data": [{"id":1,"quantity":2,"productExternalId":"SKU-1"}]
+                        }
                         """, MediaType.APPLICATION_JSON));
 
         CpqToolResponse response = clients.getQuoteLineItems(42);
 
         assertTrue(response.success());
+        assertEquals("Line items", response.message());
         assertNotNull(response.data());
-        assertTrue(response.data().get("data").isArray());
+        assertTrue(response.data().isArray());
+        assertEquals(1, response.data().size());
+        assertEquals(2, response.data().get(0).get("quantity").asInt());
+        assertEquals("SKU-1", response.data().get(0).get("productExternalId").asText());
     }
 
     @Test
@@ -151,6 +170,22 @@ class CpqAgentToolClientsTest {
         assertFalse(response.success());
         assertEquals("CPQ_CLIENT_ERROR", response.errorCode());
         assertNotNull(response.message());
+    }
+
+    @Test
+    void executePricingMapsGatewayEnvelopeFailure() {
+        server.expect(requestTo("http://gateway.test/api/v1/pricing/execute"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"success":false,"message":"Pricing unavailable","data":null}
+                        """, MediaType.APPLICATION_JSON));
+
+        CpqToolResponse response = clients.executePricing(Map.of("quoteExternalId", "Q-1"));
+
+        assertFalse(response.success());
+        assertEquals("CPQ_CLIENT_ERROR", response.errorCode());
+        assertEquals("Pricing unavailable", response.message());
+        assertNull(response.data());
     }
 
     @Test
