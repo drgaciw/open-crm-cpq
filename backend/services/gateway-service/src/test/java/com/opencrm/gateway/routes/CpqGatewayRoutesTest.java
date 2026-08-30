@@ -7,23 +7,24 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.util.AntPathMatcher;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import org.junit.jupiter.params.provider.Arguments;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,7 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Docker-free agent-contract smoke for CPQ_API_CONTRACT_MATRIX Appendix A.
  * <p>
  * Non-ERP rows: assert gateway {@code application.yml} Path predicates cover the route
- * (no full mesh). ERP rows: assert stub route config + {@link FallbackController} 501 body.
+ * (no full mesh). ERP rows: assert stub route config + HTTP 501 JSON from
+ * {@link FallbackController} via {@link WebTestClient} (no Redis / Spring context).
  * <p>
  * Run:
  * <pre>
@@ -46,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Tag("unit")
 @Tag("contract")
+@Execution(ExecutionMode.SAME_THREAD)
 class CpqGatewayRoutesTest {
 
     private static final Path APPLICATION_YAML = Path.of("src/main/resources/application.yml");
@@ -55,9 +58,17 @@ class CpqGatewayRoutesTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
+    /** Documented ERP 501 body fields (CPQ_API_CONTRACT_MATRIX §7c / S2A-7). */
+    private static final Set<String> ERP_501_JSON_FIELDS =
+            Set.of("success", "message", "service", "timestamp");
+    private static final String ERP_501_MESSAGE_FRAGMENT =
+            "Agent-contract ERP paths are reserved";
+    private static final String ERP_FORWARD_FALLBACK_PATH = "/fallback/erp/unavailable";
+
     private static String yaml;
     private static JsonNode appendixRoutes;
     private static List<String> gatewayPathPatterns;
+    private static WebTestClient erpFallbackClient;
 
     @BeforeAll
     static void loadFixtures() throws Exception {
@@ -80,6 +91,15 @@ class CpqGatewayRoutesTest {
             }
         }
         assertFalse(gatewayPathPatterns.isEmpty(), "application.yml must declare Path predicates");
+
+        // Docker-free HTTP: bind FallbackController only (no Redis / Security / Gateway context).
+        erpFallbackClient = WebTestClient
+                .bindToController(new FallbackController())
+                .configureClient()
+                .responseTimeout(Duration.ofSeconds(30))
+                .build();
+        // Warm the client so first assertion is not racing validator init under parallel suites.
+        assertErpHttp501(ERP_FORWARD_FALLBACK_PATH);
     }
 
     static Stream<JsonNode> appendixARoutes() {
@@ -117,6 +137,28 @@ class CpqGatewayRoutesTest {
     }
 
     @Test
+    @DisplayName("default profile declares every published route id (owners + CPQ aliases)")
+    void applicationYamlDeclaresDefaultProfileRouteIds() {
+        for (String routeId : CpqGatewayRoutes.DEFAULT_PROFILE_ROUTE_IDS) {
+            assertTrue(
+                    yaml.contains("id: " + routeId),
+                    () -> "Missing default-profile gateway route id: " + routeId);
+        }
+        for (String routeId : CpqGatewayRoutes.DEFAULT_PROFILE_OWNER_ROUTE_IDS) {
+            assertTrue(
+                    yaml.contains("id: " + routeId),
+                    () -> "Missing default-profile owner route id: " + routeId);
+        }
+        assertTrue(
+                CpqGatewayRoutes.DEFAULT_PROFILE_ROUTE_IDS.containsAll(CpqGatewayRoutes.ROUTE_IDS),
+                "DEFAULT_PROFILE_ROUTE_IDS must include all CPQ alias ROUTE_IDS");
+        assertTrue(
+                CpqGatewayRoutes.DEFAULT_PROFILE_ROUTE_IDS.containsAll(
+                        CpqGatewayRoutes.AGENT_CONTRACT_ROUTE_IDS),
+                "DEFAULT_PROFILE_ROUTE_IDS must include all AGENT_CONTRACT_ROUTE_IDS");
+    }
+
+    @Test
     void applicationYamlRewritesCpqPathsToAggregateOwners() {
         assertTrue(yaml.contains("RewritePath=/api/v1/cpq/"),
                 "CPQ routes must rewrite to owning service paths");
@@ -134,6 +176,8 @@ class CpqGatewayRoutesTest {
                 "ERP stub must match /api/v1/erp/**");
         assertTrue(yaml.contains("forward:/fallback/erp"),
                 "ERP stub must forward to local 501 handler");
+        assertTrue(yaml.contains("uri: forward:/fallback/erp/unavailable"),
+                "ERP stub must forward to " + ERP_FORWARD_FALLBACK_PATH);
     }
 
     @Test
@@ -218,36 +262,56 @@ class CpqGatewayRoutesTest {
     }
 
     @Test
-    @DisplayName("matrix_A-ERP-COSTS_returns501ReservedMessage")
-    void matrix_A_ERP_COSTS_returns501ReservedMessage() {
-        assertErpStub501();
+    @DisplayName("matrix_A-ERP-forwardTarget_returns501DocumentedJson")
+    void matrix_A_ERP_configuredForwardTarget_returns501DocumentedJson() {
+        assertErpHttp501(ERP_FORWARD_FALLBACK_PATH);
     }
 
-    @Test
-    @DisplayName("matrix_A-ERP-COSTS-BULK_returns501ReservedMessage")
-    void matrix_A_ERP_COSTS_BULK_returns501ReservedMessage() {
-        assertErpStub501();
+    @ParameterizedTest(name = "matrix_{0}_returns501DocumentedJson")
+    @MethodSource("appendixAErpRoutes")
+    @DisplayName("Appendix A ERP reserved paths return HTTP 501 with documented JSON")
+    void appendixA_erp_http501DocumentedJson(String matrixId, JsonNode route) {
+        String examplePath = route.get("examplePath").asText();
+        assertTrue(examplePath.startsWith("/api/v1/erp/"),
+                () -> matrixId + ": ERP examplePath must be under /api/v1/erp/");
+        // Gateway forwards /api/v1/erp/** → FallbackController at /fallback/erp/**
+        String fallbackPath = "/fallback/erp/" + examplePath.substring("/api/v1/erp/".length());
+        assertErpHttp501(fallbackPath);
     }
 
-    @Test
-    @DisplayName("matrix_A-ERP-INVENTORY_returns501ReservedMessage")
-    void matrix_A_ERP_INVENTORY_returns501ReservedMessage() {
-        assertErpStub501();
+    private static void assertErpHttp501(String fallbackPath) {
+        erpFallbackClient.get()
+                .uri(fallbackPath)
+                .exchange()
+                .expectStatus().isEqualTo(501)
+                .expectHeader().contentTypeCompatibleWith("application/json")
+                .expectBody()
+                .jsonPath("$.success").isEqualTo(false)
+                .jsonPath("$.service").isEqualTo("erp-adapter-service")
+                .jsonPath("$.message").value(message ->
+                        assertTrue(
+                                message.toString().contains(ERP_501_MESSAGE_FRAGMENT),
+                                "ERP stub must advertise reserved agent-contract message"))
+                .jsonPath("$.timestamp").isNotEmpty()
+                .consumeWith(result -> {
+                    byte[] body = result.getResponseBody();
+                    assertNotNull(body, "ERP 501 body must be present");
+                    try {
+                        JsonNode json = MAPPER.readTree(body);
+                        assertEquals(
+                                ERP_501_JSON_FIELDS,
+                                Set.copyOf(iterableToList(json.fieldNames())),
+                                "ERP 501 JSON must match documented fields exactly");
+                    } catch (Exception e) {
+                        throw new AssertionError("ERP 501 body must be valid JSON", e);
+                    }
+                });
     }
 
-    private static void assertErpStub501() {
-        FallbackController controller = new FallbackController();
-        ResponseEntity<Map<String, Object>> response = controller.erpNotImplemented();
-
-        assertEquals(HttpStatus.NOT_IMPLEMENTED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(Boolean.FALSE, response.getBody().get("success"));
-        assertEquals("erp-adapter-service", response.getBody().get("service"));
-        Object message = response.getBody().get("message");
-        assertNotNull(message);
-        assertTrue(
-                message.toString().contains("Agent-contract ERP paths are reserved"),
-                "ERP stub must advertise reserved agent-contract message");
+    private static List<String> iterableToList(java.util.Iterator<String> iterator) {
+        List<String> names = new ArrayList<>();
+        iterator.forEachRemaining(names::add);
+        return names;
     }
 
     private static boolean matchesAnyGatewayPattern(String examplePath) {
