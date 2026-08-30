@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -23,6 +24,9 @@ import java.util.Set;
 /**
  * Lightweight CSRF protection for cookie-authenticated browser requests.
  * For state-changing requests that include cookies, enforce allowed Origin/Referer.
+ * <p>
+ * Allowed origins are an explicit allow-list (no {@code *} / {@code *.} patterns).
+ * Misconfiguration with wildcard origins fails fast at construction.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -39,7 +43,37 @@ public class CsrfProtectionFilter implements WebFilter {
 
     public CsrfProtectionFilter(
             @Value("${security.csrf.allowed-origins:http://localhost:4200}") List<String> allowedOrigins) {
-        this.allowedOrigins = allowedOrigins;
+        this.allowedOrigins = sanitizeAllowedOrigins(allowedOrigins);
+    }
+
+    /**
+     * Rejects wildcard origin patterns ({@code *}, {@code *.example.com}) at bind time.
+     * Package-visible for unit tests.
+     */
+    static List<String> sanitizeAllowedOrigins(List<String> allowedOrigins) {
+        if (allowedOrigins == null || allowedOrigins.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "security.csrf.allowed-origins must contain at least one explicit origin");
+        }
+
+        List<String> sanitized = new ArrayList<>(allowedOrigins.size());
+        for (String origin : allowedOrigins) {
+            if (!StringUtils.hasText(origin)) {
+                continue;
+            }
+            String trimmed = origin.trim();
+            if (trimmed.indexOf('*') >= 0) {
+                throw new IllegalArgumentException(
+                        "Wildcard CORS/CSRF origin patterns are not allowed: " + trimmed);
+            }
+            sanitized.add(trimmed);
+        }
+
+        if (sanitized.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "security.csrf.allowed-origins must contain at least one explicit origin");
+        }
+        return List.copyOf(sanitized);
     }
 
     @Override
@@ -103,8 +137,7 @@ public class CsrfProtectionFilter implements WebFilter {
         int normalizedPort = resolvePort(originUri);
 
         for (String allowedOrigin : allowedOrigins) {
-            if (!StringUtils.hasText(allowedOrigin)) continue;
-            if (matchesPattern(normalizedScheme, normalizedHost, normalizedPort, allowedOrigin.trim())) {
+            if (matchesExactOrigin(normalizedScheme, normalizedHost, normalizedPort, allowedOrigin)) {
                 return true;
             }
         }
@@ -112,8 +145,11 @@ public class CsrfProtectionFilter implements WebFilter {
         return false;
     }
 
-    private boolean matchesPattern(String requestScheme, String requestHost, int requestPort, String allowedPattern) {
-        URI allowedUri = parseUri(allowedPattern.replace("*.", "wildcard."));
+    /**
+     * Exact scheme/host/port match only — subdomain wildcards are not supported.
+     */
+    private boolean matchesExactOrigin(String requestScheme, String requestHost, int requestPort, String allowedOrigin) {
+        URI allowedUri = parseUri(allowedOrigin);
         if (allowedUri == null || !StringUtils.hasText(allowedUri.getScheme()) || !StringUtils.hasText(allowedUri.getHost())) {
             return false;
         }
@@ -125,19 +161,9 @@ public class CsrfProtectionFilter implements WebFilter {
         if (!requestScheme.equals(allowedScheme)) {
             return false;
         }
-
-        boolean hostMatches;
-        if (allowedPattern.contains("*.")) {
-            String suffix = allowedHost.replaceFirst("^wildcard\\.", ".");
-            hostMatches = requestHost.endsWith(suffix) && requestHost.length() > suffix.length();
-        } else {
-            hostMatches = requestHost.equals(allowedHost);
-        }
-
-        if (!hostMatches) {
+        if (!requestHost.equals(allowedHost)) {
             return false;
         }
-
         return allowedPort == requestPort;
     }
 
