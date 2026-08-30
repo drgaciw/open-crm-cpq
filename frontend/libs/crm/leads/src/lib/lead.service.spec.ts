@@ -64,4 +64,41 @@ describe('LeadService', () => {
     expect(result.convertedDealId).toBe(99);
     expect(result.id).toBe(10);
   });
+
+  it('list forwards status and priority query params', () => {
+    service.list(1, 10, 'title,asc', 'UNQUALIFIED', 'HIGH');
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/leads' &&
+        r.params.get('page') === '1' &&
+        r.params.get('size') === '10' &&
+        r.params.get('sort') === 'title,asc' &&
+        r.params.get('status') === 'UNQUALIFIED' &&
+        r.params.get('priority') === 'HIGH',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      content: [],
+      number: 1,
+      size: 10,
+      totalElements: 0,
+      totalPages: 0,
+    });
+  });
+
+  it('qualify posts to /qualify', async () => {
+    const promise = firstValueFrom(service.qualify(4));
+    const req = httpMock.expectOne('/api/v1/leads/4/qualify');
+    expect(req.request.method).toBe('POST');
+    req.flush({
+      id: 4,
+      uuid: 'u4',
+      title: 'Qualified',
+      status: 'QUALIFIED',
+      priority: 'MEDIUM',
+      createdAt: '',
+      updatedAt: '',
+    } satisfies LeadDto);
+    await expect(promise).resolves.toMatchObject({ id: 4, status: 'QUALIFIED' });
+  });
 });
