@@ -1,6 +1,6 @@
 # Wave E architecture — Residual security boundary + ADR unblock + Sentinel hygiene
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30  
+**Status:** COMPLETE — merged to main (E1∥E2∥E3 → E4)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** `origin/main` @ `8cd0ca4` (Waves A–D complete; D1 CORS/CSRF allow-list + D2 `security.open` removal)  
@@ -172,8 +172,8 @@ Implement Open CRM/CPQ Wave E per docs/forge/14-wave-e-architecture.md: (E1) pub
 - [x] PR DAG parallelizable (E1∥E2∥E3 → E4) without same-file fights  
 - [x] Holds respected: Activities, S2B-11 impl, S2C-12, #238, #241  
 - [x] PM authorizes forge execution (`forge-wave-e` / goal text in §7)  
-- [ ] Post-merge: E2 `rg` clean; E3 Status Accepted; E4 PRs closed  
+- [x] Post-merge: E2 `rg` clean; E3 Status Accepted; E4 PRs closed  
 
-**PM WARNING (GitNexus):** `SecurityConfig` impact is **UNKNOWN** (Spring config beans — no resolvable callers). E2 proceeds only with text confirmation: FE uses gateway `:8080`; no `XSRF`/`withCredentials` clients hit pricing/pricebook directly. Re-run `impact` after index refresh before merge.
+**PM WARNING (GitNexus):** `SecurityConfig` impact was **UNKNOWN**; E2 proceeded after text confirmation (FE gateway-only; no XSRF clients to pricing/pricebook).
 
-**FORGE AUTHORIZED** — E1∥E2∥E3 → E4.
+**WAVE E COMPLETE.**
