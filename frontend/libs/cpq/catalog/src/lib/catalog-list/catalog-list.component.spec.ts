@@ -1,9 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MatDialog } from '@angular/material/dialog';
 import { computed, signal } from '@angular/core';
+import { of } from 'rxjs';
 import { CatalogListComponent } from './catalog-list.component';
 import { ProductService } from '../product.service';
+import { ProductCreateDialogComponent } from '../product-create-dialog/product-create-dialog.component';
 import { MOCK_CATALOG_PRODUCTS } from '../catalog.mock';
 import {
   PaginationMeta,
@@ -39,6 +42,7 @@ describe('CatalogListComponent', () => {
   let router: Router;
   let listSpy: ReturnType<typeof vi.fn>;
   let searchSpy: ReturnType<typeof vi.fn>;
+  let dialogOpen: ReturnType<typeof vi.fn>;
 
   const products = signal<ProductDto[]>(
     MOCK_CATALOG_PRODUCTS.map(toProductDto),
@@ -107,12 +111,17 @@ describe('CatalogListComponent', () => {
       selectedProduct: signal<ProductDto | null>(null),
     };
 
+    dialogOpen = vi.fn().mockReturnValue({
+      afterClosed: () => of(undefined),
+    });
+
     await TestBed.configureTestingModule({
       imports: [CatalogListComponent],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),
         { provide: ProductService, useValue: serviceMock },
+        { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
 
@@ -225,6 +234,51 @@ describe('CatalogListComponent', () => {
     });
 
     expect(router.navigate).toHaveBeenCalledWith(['/catalog', 2]);
+  });
+
+  it('enables New Product and opens create dialog', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const button = Array.from(compiled.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('New Product'),
+    ) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+    expect(button?.disabled).toBe(false);
+    expect(button?.getAttribute('title')).toBeNull();
+
+    button?.click();
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ProductCreateDialogComponent,
+      expect.objectContaining({ width: '520px', disableClose: true }),
+    );
+  });
+
+  it('navigates to detail after successful create dialog close', () => {
+    dialogOpen.mockReturnValue({
+      afterClosed: () =>
+        of({
+          id: 99,
+          uuid: 'u-99',
+          sku: 'CREATED',
+          name: 'Created',
+          productType: 'CUSTOM',
+          category: 'ADD_ON',
+          status: 'DRAFT',
+          configurable: false,
+          bundle: false,
+          createdAt: '',
+          updatedAt: '',
+        } satisfies ProductDto),
+    });
+
+    component.openCreateDialog();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/catalog', 99]);
+  });
+
+  it('does not navigate when create dialog is cancelled', () => {
+    dialogOpen.mockReturnValue({ afterClosed: () => of(undefined) });
+    component.openCreateDialog();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('uses shared-ui data table (not inline MatTable happy path)', () => {

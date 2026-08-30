@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,6 +26,7 @@ import {
   ProductStatus,
 } from '@frontend/shared-models';
 import { ProductService } from '../product.service';
+import { ProductCreateDialogComponent } from '../product-create-dialog/product-create-dialog.component';
 
 interface CatalogTableRow {
   id: number;
@@ -58,9 +60,7 @@ interface CatalogTableRow {
         <button
           mat-stroked-button
           type="button"
-          disabled
-          aria-disabled="true"
-          title="Product create wizard is deferred (Wave I — catalog is read-only HTTP list/detail)"
+          (click)="openCreateDialog()"
         >
           <mat-icon>add</mat-icon>
           New Product
@@ -115,8 +115,10 @@ interface CatalogTableRow {
         [message]="
           hasActiveFilters()
             ? 'Try another search, category, or status filter.'
-            : 'Catalog is empty. Products will appear here once loaded.'
+            : 'Catalog is empty. Create a product to get started.'
         "
+        [actionLabel]="hasActiveFilters() ? '' : 'New Product'"
+        (action)="openCreateDialog()"
       />
     } @else {
       <app-data-table
@@ -173,6 +175,7 @@ interface CatalogTableRow {
 export class CatalogListComponent implements OnInit {
   readonly service = inject(ProductService);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
 
   readonly categories: ProductCategory[] = [
     'SUBSCRIPTION',
@@ -272,6 +275,19 @@ export class CatalogListComponent implements OnInit {
 
   onRowClick(row: CatalogTableRow): void {
     void this.router.navigate(['/catalog', row.id]);
+  }
+
+  openCreateDialog(): void {
+    const ref = this.dialog.open(ProductCreateDialogComponent, {
+      width: '520px',
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((created: ProductDto | undefined) => {
+      if (!created?.id) {
+        return;
+      }
+      void this.router.navigate(['/catalog', created.id]);
+    });
   }
 
   clearError(): void {
