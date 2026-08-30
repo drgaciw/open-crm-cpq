@@ -67,3 +67,9 @@ services:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
   gateway:
     url: ${GATEWAY_SERVICE_URL:http://localhost:8080}
+  approval-routing:
+    url: ${APPROVAL_ROUTING_SERVICE_URL:http://localhost:8085}
+
+# Dual-read legacy local approval_requests when routing has no row (pre-cutover IDs).
+approvals:
+  legacy-local-read-enabled: ${APPROVALS_LEGACY_LOCAL_READ:true}
