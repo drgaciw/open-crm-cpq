@@ -59,9 +59,8 @@ interface QuoteTableRow {
         <button
           mat-stroked-button
           type="button"
-          disabled
-          aria-disabled="true"
-          title="Quote create wizard is deferred (Wave I — quotes are read-only HTTP list/detail)"
+          (click)="onNewQuote()"
+          title="Create a new quote"
         >
           <mat-icon>add</mat-icon>
           New Quote
@@ -268,6 +267,10 @@ export class QuotesListComponent implements OnInit {
 
   onRowClick(row: QuoteTableRow): void {
     void this.router.navigate(['/quotes', row.id]);
+  }
+
+  onNewQuote(): void {
+    void this.router.navigate(['/quotes', 'new']);
   }
 
   clearError(): void {
