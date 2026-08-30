@@ -2,7 +2,8 @@
 
 **Authority:** PM delegated autonomous decisions.  
 **Herdr:** `forge-impl` (w8) + worktrees under `.forge-worktrees/`  
-**Push/PR:** not done (local branches only)
+**Push/PR:** not done
+**Merged into local `main`:** yes (ahead of origin)
 
 | ID | Branch | Commit | Status |
 |----|--------|--------|--------|
