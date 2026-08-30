@@ -2,7 +2,7 @@
 
 **Scout:** forge `quote-e2e` (Grok 4.5)  
 **Mode:** discovery / plan only (no application source edits)  
-**Related docs:** [CRM_CUTOVER_CHECKLIST.md](../CRM_CUTOVER_CHECKLIST.md), [CRM_TESTING_STRATEGY.md](../CRM_TESTING_STRATEGY.md), [CRM_GATEWAY_ENV.md](../CRM_GATEWAY_ENV.md), [scripts/staging-gateway-smoke.ps1](../scripts/staging-gateway-smoke.ps1)  
+**Related docs:** [CRM_CUTOVER_CHECKLIST.md](../CRM_CUTOVER_CHECKLIST.md), [CRM_TESTING_STRATEGY.md](../CRM_TESTING_STRATEGY.md), [CRM_GATEWAY_ENV.md](../CRM_GATEWAY_ENV.md), [scripts/staging-gateway-smoke.sh](../scripts/staging-gateway-smoke.sh) / [.ps1](../scripts/staging-gateway-smoke.ps1), [scripts/staging-quote-accept-idempotency.md](../scripts/staging-quote-accept-idempotency.md)  
 **Orchestrator:** [00-orchestrator-status.md](./00-orchestrator-status.md)
 
 ---
@@ -80,8 +80,9 @@ JavaDoc documents idempotency prefix `crm:quote-accepted:processed:*` and warns 
 
 ### Cutover / smoke docs
 
-- Checklist item **open**: Quote acceptance E2E + duplicate publish idempotency (`docs/CRM_CUTOVER_CHECKLIST.md` § Verification).
-- `docs/scripts/staging-gateway-smoke.ps1` — CRM **GET** reads only; prints “Next: manual quote accept → deal WON…”.
+- Checklist item **open** until staging evidence: Quote acceptance E2E + duplicate publish idempotency (`docs/CRM_CUTOVER_CHECKLIST.md` § Verification).
+- `docs/scripts/staging-gateway-smoke.sh` (+ `.ps1`) — CRM **GET** reads via gateway; optional `CHECK_ERP=1` / `-CheckErp`.
+- `docs/scripts/staging-quote-accept-idempotency.md` (+ `.sh`) — accept → WON + Redis `PUBLISH` duplicate idempotency runbook/helper (Wave B3 / `b2-staging-smoke`).
 - Priority next 1–2 days explicitly lists staging E2E + share field contract.
 
 ---
@@ -90,25 +91,20 @@ JavaDoc documents idempotency prefix `crm:quote-accepted:processed:*` and warns 
 
 ### G1 — Staging smoke does not exercise quote → WON or idempotency
 
-**Evidence:** `docs/scripts/staging-gateway-smoke.ps1` only GETs deals/leads/contacts/organizations; checklist item still unchecked.
+**Evidence (historical):** `staging-gateway-smoke.ps1` was CRM GET-only. **Mitigated (docs/scripts):** Wave B3 added bash CRM smoke + quote-accept idempotency runbook/helper. Checklist item stays unchecked until a staging run produces evidence.
 
-**Gap:** No automated (or scripted) staging path for:
+**Remaining gap:** Full create-deal → create/send quote fixture automation still operator-driven (helper needs existing `DEAL_ID` / `QUOTE_ID`).
 
-1. Create/find deal UUID  
-2. Create/send/accept quote with `dealExternalId`  
-3. Assert deal `stage=WON`, amount/currency  
-4. Republish same payload / second accept attempt and assert Redis key skip / no double mutation  
-
-**Verify today (manual):**
+**Verify today:**
 
 ```bash
-# After stack up (gateway :8080, quote :8084, crm :8081, redis)
-# 1) Create deal via gateway; note data.uuid
-# 2) Create quote with dealExternalId=<deal.uuid>; approve → send → accept
-curl -s -X POST "http://localhost:8080/api/v1/quotes/{id}/accept" -H "Accept: application/json"
-# 3) GET deal; expect stage WON
-# 4) redis-cli KEYS 'crm:quote-accepted:processed:*'
-# 5) PUBLISH quote:accepted '<same json>' and confirm listener skip + deal unchanged
+# CRM reads
+GATEWAY_BASE=http://localhost:8080 ./docs/scripts/staging-gateway-smoke.sh
+
+# Accept → WON + duplicate PUBLISH (see staging-quote-accept-idempotency.md)
+GATEWAY_BASE=http://localhost:8080 DEAL_ID=… QUOTE_ID=… \
+  REDIS_CLI='docker compose -f backend/docker-compose.yml exec -T redis redis-cli' \
+  ./docs/scripts/staging-quote-accept-idempotency.sh
 ```
 
 ### G2 — No Redis / cross-service integration test

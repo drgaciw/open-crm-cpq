@@ -27,6 +27,17 @@ Wire dashboards or log queries for:
 
 1. **Gateway 5xx** (and latency) for routes under `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organizations`.
 2. **crm-service** application errors (deal/lead pipelines, validation).
-3. **Redis listener:** logs from `QuoteAcceptedEventListener` — failures deserializing or applying `QuoteAcceptedCrmMessage`, and **idempotency skips** (duplicate delivery after successful key set).
+3. **Redis listener:** logs from `QuoteAcceptedEventListener` — failures deserializing or applying `QuoteAcceptedCrmMessage`, and **idempotency skips** (duplicate delivery after successful key set). INFO: `Duplicate quote acceptance for key …, skipping`.
 
 **Kafka:** `acceptQuote` still publishes `QuoteAcceptedEvent` for document-generation / contract-asset — **separate** from Redis `QuoteAcceptedCrmMessage`; do not conflate in dashboards without labeling the channel.
+
+## Staging smoke scripts
+
+| Script | Purpose |
+|--------|---------|
+| [scripts/staging-gateway-smoke.sh](./scripts/staging-gateway-smoke.sh) | Bash CRM GET smoke via gateway (`GATEWAY_BASE`, optional `TOKEN`, `CHECK_ERP=1`) |
+| [scripts/staging-gateway-smoke.ps1](./scripts/staging-gateway-smoke.ps1) | PowerShell twin (`-GatewayBase`, `-Token`, `-CheckErp`) |
+| [scripts/staging-quote-accept-idempotency.md](./scripts/staging-quote-accept-idempotency.md) | Quote accept → deal WON + duplicate Redis publish runbook |
+| [scripts/staging-quote-accept-idempotency.sh](./scripts/staging-quote-accept-idempotency.sh) | Helper for accept + `PUBLISH quote:accepted` idempotency check |
+
+CRM FE and cutover smokes must hit the **gateway** (`:8080`), not crm-service direct (`:8081`).
