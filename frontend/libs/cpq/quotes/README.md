@@ -2,11 +2,9 @@
 
 Quotes feature library (`@frontend/cpq-quotes`).
 
-<<<<<<< HEAD
+PR-FE-CPQ-06 **lite**: presentational list/detail using `@frontend/shared-ui` primitives and mock data, plus `QuoteService` HTTP client for gateway `/api/v1/quotes`.
+
 ## Pattern
-=======
-PR-FE-CPQ-06 **lite**: presentational list/detail using `@frontend/shared-ui` primitives and mock data. No HTTP service, draft create, or quote builder.
->>>>>>> feat/forge-c1-quotes-stub
 
 HTTP services use the **DealService signal-state pattern** (`HttpClient` + signals), not `BaseCrudService`.
 
@@ -19,13 +17,7 @@ HTTP services use the **DealService signal-state pattern** (`HttpClient` + signa
 | line items | `/api/v1/quotes/:quoteId/line-items` |
 
 ```ts
-<<<<<<< HEAD
-import { QuoteService } from '@frontend/cpq-quotes';
-```
-
-UI (list/detail/builder) lands in PR-FE-CPQ-06.
-=======
-import { QUOTES_ROUTES, QuotesListComponent } from '@frontend/cpq-quotes';
+import { QuoteService, QUOTES_ROUTES, QuotesListComponent } from '@frontend/cpq-quotes';
 ```
 
 ## Routes
@@ -42,7 +34,6 @@ Lazy-load from the CRM shell:
 
 - `/quotes` — list (`PageHeader`, `SearchInput`, `DataTable`, `EmptyState`)
 - `/quotes/:id` — detail (`StatusBadge` quote type, `CurrencyFormatPipe`)
->>>>>>> feat/forge-c1-quotes-stub
 
 ## Running unit tests
 
