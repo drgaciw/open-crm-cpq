@@ -1,19 +1,25 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave F COMPLETE** (hybrid S2B-11 on main)  
+**Session state:** **Wave G FORGING** (tracks 1∥2∥3; G4 HIGH acknowledged)  
 **Architect:** `/opencrm-architect`  
-**Plan:** `docs/forge/15-wave-f-architecture.md`
+**Plan:** `docs/forge/16-wave-g-architecture.md`  
+**Baseline:** `3952b20` (Waves A–F COMPLETE)
 
-## Wave F results
-- F1 `ConfigurationValidationResult` / `ConfigurationViolation` in `libs/common`  
-- F2 CE `POST /internal/v1/configurations/evaluate` (thin REQUIRES/EXCLUDES; ConstraintSolver untouched)  
-- F3 Gateway validate → CE evaluate (HIGH risk; route-order tests green)  
-- F4 Contract parity fixtures + gateway predicate tests  
-- F5 Matrix + forge closeout  
+## Wave G (authorized)
 
-## Still held (next wave candidates)
-- Full S2B-8 ConstraintSolver (RECOMMENDS/DEFAULT/VALIDATES/graph)  
-- S2C-12 quote → approval-routing BFF  
-- S2D-3a quote preflight wiring  
-- Activities API, CI runners (#238), agent Kafka (#241)  
+| ID | Track | Risk | Day |
+|----|-------|------|-----|
+| **G1** | Shared rule evaluation core (S2B-8) | MED | 1 ∥ |
+| **G3** | approval-routing POST create/submit | MED | 1 ∥ |
+| **G5** | Quote preflight → gateway validate | MED | 1 ∥ |
+| **G6** | FE catalog → ProductService | LOW | 1 ∥ |
+| **G7** | FE quotes → QuoteService | LOW | 1 ∥ |
+| **G8** | FE simulator → PricingExecutionService | LOW–MED | 1 ∥ |
+| **G2** | ConstraintSolver session wire | MED | after G1 |
+| **G4** | quote ApprovalService → routing BFF | **HIGH** | after G3 |
+| **G9** | Matrix + forge closeout | LOW | after G2+G4+G5 |
+
+## Still held
+- Activities API, CI #238, agent Kafka #241  
+- Delete product-service validate; gateway domain validation  
