@@ -247,7 +247,7 @@ Implement Open CRM/CPQ Wave G per docs/forge/16-wave-g-architecture.md in THREE 
 - [x] Forge execution authorized (`forge-wave-g` / goal §7) — **G4 HIGH acknowledged**  
 - [x] Day-1 + Day-2 merged; single-writer tests + ConstraintSolver product-rules on main  
 
-- [ ] Post-merge: G9 matrix + orchestrator COMPLETE  
+- [x] Post-merge: G9 matrix + orchestrator COMPLETE 
 
 **PM WARNING:** S2C-12 is **HIGH** dual-store risk. Index stale (8 commits) + several **UNKNOWN** impacts — re-analyze before edits.
 
