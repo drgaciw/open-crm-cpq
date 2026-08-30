@@ -44,7 +44,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 
 ## 3. Configuration APIs
 
-Configuration **rule CRUD** is owned by **product-service** (`ConfigurationRuleController` → `/api/v1/configuration`). **Session-scoped** validation lives on **configuration-engine** (`ConfigurationSessionController` → `/api/v1/configurations`). Agent PRDs standardize on **`POST /api/v1/configuration/validate`** (product-service today; gateway delegation per S2A-8).
+Configuration **rule CRUD** is owned by **product-service** (`ConfigurationRuleController` → `/api/v1/configuration`). **Session-scoped** validation lives on **configuration-engine** (`ConfigurationSessionController` → `/api/v1/configurations`). Agent PRDs standardize on **`POST /api/v1/configuration/validate`**. **Wave F / S2B-11 (hybrid):** gateway routes that POST to configuration-engine `POST /internal/v1/configurations/evaluate` (thin REQUIRES/EXCLUDES) and returns structured `{ valid, violations[] }` (`ConfigurationValidationResult` in `libs/common`). product-service `POST /validate` **retained** for direct/parity until post-parity retirement.
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -53,7 +53,7 @@ Configuration **rule CRUD** is owned by **product-service** (`ConfigurationRuleC
 | GET | `/api/v1/configuration/rules/{id}` | product-service (8083) | stable | cpq-agent-015 | Single rule fetch (implied by create/verify flow; not in PRD text but required for admin UI). |
 | GET | `/api/v1/configuration/rules/product/{productId}` | product-service (8083) | stable | cpq-agent-015, cpq-agent-016 | Product-scoped rule set for validation and status checks. |
 | DELETE | `/api/v1/configuration/rules/{id}` | product-service (8083) | stable | cpq-agent-015 | Rule retirement; requires impact assessment per agent PRD. |
-| POST | `/api/v1/configuration/validate` | product-service (8083) *→ gateway shim (S2A-8)* | **agent-contract** | cpq-agent-015, cpq-agent-016 | Stateless validate today: body `List<Long>` product IDs; returns `List<String>` errors. **Canonical agent path.** S2B-11: structured pass/fail + optional delegate to configuration-engine. |
+| POST | `/api/v1/configuration/validate` | **gateway** → configuration-engine (8088) evaluate; product-service (8083) path **retained** | **agent-contract** | cpq-agent-015, cpq-agent-016 | **Canonical agent path.** Body `List<Long>` product IDs; gateway response `ApiResponse<ConfigurationValidationResult>` (`valid` + `violations[{ruleId,ruleType,description,remediation}]`). Internal: `POST /internal/v1/configurations/evaluate`. Thin REQUIRES/EXCLUDES only (full S2B-8 follow-on). |
 | POST | `/api/v1/configurations` | configuration-engine (8088) | beta | — | Session create (`productId`, `userId` query params); not in three agent PRDs; related to S2B-7. |
 | GET | `/api/v1/configurations/{id}` | configuration-engine (8088) | beta | — | Session read. |
 | GET | `/api/v1/configurations` | configuration-engine (8088) | beta | — | List by `userId` + `status`. |
