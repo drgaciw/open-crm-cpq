@@ -14,6 +14,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -47,14 +48,75 @@ public class CpqAgentToolClients {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Wave I2: unwrap {@code ApiResponse} and expose pricing {@code success}/{@code lineResults}
+     * on the tool data node (no pricing-service Maven dependency).
+     *
+     * <p>Body is read as {@code String} then parsed with Jackson 2 {@link ObjectMapper}.
+     * Spring RestClient Jackson 3 converters cannot bind {@code com.fasterxml.jackson.databind.JsonNode}.
+     */
     public CpqToolResponse executePricing(Map<String, Object> pricingContext) {
         log.debug("Calling gateway POST /api/v1/pricing/execute");
-        return postJson("/api/v1/pricing/execute", pricingContext);
+        try {
+            String raw = restClient.post()
+                    .uri("/api/v1/pricing/execute")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(pricingContext)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode envelope = parseGatewayJson(raw);
+            JsonNode data = envelope != null ? envelope.path("data") : null;
+            if (envelope == null || !envelope.path("success").asBoolean(true)
+                    || data == null || data.isMissingNode() || data.isNull()) {
+                String message = envelope != null && envelope.hasNonNull("message")
+                        ? envelope.get("message").asText()
+                        : "Pricing execute returned an empty response";
+                return CpqToolResponse.clientError(message);
+            }
+            boolean pricingOk = !data.has("success") || data.path("success").asBoolean(true);
+            String message = envelope.hasNonNull("message")
+                    ? envelope.get("message").asText()
+                    : (pricingOk ? "Pricing execute succeeded" : data.path("errorMessage").asText("Pricing execute failed"));
+            return CpqToolResponse.ok(data, message);
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for POST /api/v1/pricing/execute: {}", ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for POST /api/v1/pricing/execute: {}", ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
     }
 
+    /**
+     * Wave I2: unwrap {@code ApiResponse} so tool data is the line-item array.
+     */
     public CpqToolResponse getQuoteLineItems(long quoteId) {
         log.debug("Calling gateway GET /api/v1/quotes/{}/line-items", quoteId);
-        return getJson("/api/v1/quotes/{quoteId}/line-items", quoteId);
+        try {
+            String raw = restClient.get()
+                    .uri("/api/v1/quotes/{quoteId}/line-items", quoteId)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode envelope = parseGatewayJson(raw);
+            JsonNode data = envelope != null ? envelope.path("data") : null;
+            if (envelope == null || !envelope.path("success").asBoolean(true)
+                    || data == null || data.isMissingNode() || data.isNull()) {
+                String message = envelope != null && envelope.hasNonNull("message")
+                        ? envelope.get("message").asText()
+                        : "Quote line items returned an empty response";
+                return CpqToolResponse.clientError(message);
+            }
+            String message = envelope.hasNonNull("message")
+                    ? envelope.get("message").asText()
+                    : "Quote line items loaded";
+            return CpqToolResponse.ok(data, message);
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for GET /api/v1/quotes/{}/line-items: {}", quoteId, ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for GET /api/v1/quotes/{}/line-items: {}", quoteId, ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
     }
 
     /**
@@ -93,37 +155,17 @@ public class CpqAgentToolClients {
         }
     }
 
-    private CpqToolResponse postJson(String path, Object body) {
-        try {
-            JsonNode response = restClient.post()
-                    .uri(path)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
-            return CpqToolResponse.ok(response, "Gateway call succeeded");
-        } catch (ResourceAccessException ex) {
-            log.warn("Gateway unreachable for POST {}: {}", path, ex.getMessage());
-            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
-        } catch (RestClientException ex) {
-            log.warn("Gateway client error for POST {}: {}", path, ex.getMessage());
-            return CpqToolResponse.clientError(ex.getMessage());
+    /**
+     * Parse gateway JSON with Jackson 2 so {@link CpqToolResponse} can keep {@code JsonNode} data.
+     */
+    private JsonNode parseGatewayJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
         }
-    }
-
-    private CpqToolResponse getJson(String pathTemplate, long quoteId) {
         try {
-            JsonNode response = restClient.get()
-                    .uri(pathTemplate, quoteId)
-                    .retrieve()
-                    .body(JsonNode.class);
-            return CpqToolResponse.ok(response, "Gateway call succeeded");
-        } catch (ResourceAccessException ex) {
-            log.warn("Gateway unreachable for GET {}: {}", pathTemplate, ex.getMessage());
-            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
-        } catch (RestClientException ex) {
-            log.warn("Gateway client error for GET {}: {}", pathTemplate, ex.getMessage());
-            return CpqToolResponse.clientError(ex.getMessage());
+            return objectMapper.readTree(raw);
+        } catch (IOException ex) {
+            throw new RestClientException("Failed to parse gateway JSON: " + ex.getMessage(), ex);
         }
     }
 
