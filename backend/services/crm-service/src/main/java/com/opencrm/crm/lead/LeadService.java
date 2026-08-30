@@ -334,12 +334,10 @@ public class LeadService {
         for (LeadStatus s : LeadStatus.values()) {
             counts.put(s, 0L);
         }
-        List<Object[]> results = leadRepository.countGroupByStatus();
+        List<LeadStatusCountProjection> results = leadRepository.countGroupByStatus();
 
-        for (Object[] row : results) {
-            LeadStatus status = (LeadStatus) row[0];
-            Long count = (Long) row[1];
-            counts.put(status, count);
+        for (LeadStatusCountProjection projection : results) {
+            counts.put(projection.getStatus(), projection.getCount());
         }
 
         return counts;
