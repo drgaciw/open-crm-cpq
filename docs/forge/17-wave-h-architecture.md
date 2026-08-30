@@ -1,6 +1,6 @@
 # Wave H architecture — VALIDATES expression ∥ F6 AI validate ∥ CRM Bolt hygiene ∥ S2B-9 thin cache
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30  
+**Status:** COMPLETE — merged to main (H1∥H2∥H3∥H4∥H5∥H6 → H7∥H8)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** worktree / `origin/main` @ `e427847` (Waves A–G COMPLETE)  
@@ -274,9 +274,8 @@ Implement Open CRM/CPQ Wave H per docs/forge/17-wave-h-architecture.md in four p
 - [x] PR DAG max parallelism with disjoint files documented (**6** Day-1 panes)  
 - [x] Holds: Activities, #238, #241, product validate deletion, gateway domain rules, WhatsApp #430, full SpEL, Kafka S2B-9  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
-- [ ] Forge execution authorized (`forge-wave-h` / goal §7)  
-- [x] Forge authorized (`forge-wave-h`); Day-1+2 pending
-- [ ] Day-1 + Day-2 merged; H8 matrix + orchestrator COMPLETE  
+- [x] Forge execution authorized (`forge-wave-h` / goal §7)  
+- [x] Day-1 + Day-2 merged; H8 matrix + orchestrator COMPLETE  
 
 **PM WARNING:** Re-analyze before CE edits (**UNKNOWN** ≠ safe). Do **not** flip approval legacy dual-read default in this wave.
 

@@ -179,4 +179,30 @@ class ApprovalServiceSingleWriterTest {
         assertThat(dto.getStatus()).isEqualTo(ApprovalStatus.APPROVED);
         assertThat(dto.getApprover()).isEqualTo("mgr-1");
     }
+
+    @Test
+    @DisplayName("H7: flag-off pending read is routing-only — never queries local ApprovalRequest")
+    void getPendingWithLegacyFlagOffDoesNotReadLocal() {
+        ApprovalService routingOnly = new ApprovalService(
+                approvalRepository,
+                quoteRepository,
+                approvalRoutingClient,
+                false
+        );
+        when(approvalRoutingClient.getPending()).thenReturn(List.of(
+                RoutingApprovalDto.builder()
+                        .id(10L)
+                        .quoteId("7")
+                        .status("PENDING")
+                        .approvalTier("DEAL_DESK")
+                        .requesterId("r1")
+                        .build()
+        ));
+
+        List<ApprovalRequestDto> pending = routingOnly.getPendingApprovals();
+
+        assertThat(pending).extracting(ApprovalRequestDto::getId).containsExactly(10L);
+        verify(approvalRepository, never()).findByStatusAndDeletedFalse(any());
+        verify(approvalRepository, never()).findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(any());
+    }
 }

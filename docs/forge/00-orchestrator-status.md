@@ -1,7 +1,7 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave H FORGING** (VALIDATES expression ∥ F6 AI validate ∥ CRM Bolt hygiene ∥ S2B-9 thin cache)  
+**Session state:** **Wave H COMPLETE** (VALIDATES expression ∥ F6 AI validate ∥ CRM Bolt hygiene ∥ S2B-9 thin cache)  
 **Architect:** `/opencrm-architect`  
 **Plan:** `docs/forge/17-wave-h-architecture.md`  
 **Baseline:** `e427847` (Waves A–G COMPLETE)
