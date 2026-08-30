@@ -86,6 +86,7 @@ export class QuoteService {
 
   getById(id: number): void {
     this.error.set(null);
+    this.selectedQuote.set(null);
     this.loading.set(true);
     this.http
       .get<QuoteDto>(`${this.basePath}/${id}`)
