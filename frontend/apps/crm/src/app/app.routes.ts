@@ -38,9 +38,17 @@ export const appRoutes: Route[] = [
           import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
       },
       {
+<<<<<<< HEAD
         path: 'quotes',
         loadChildren: () =>
           import('@frontend/cpq-quotes').then((m) => m.QUOTES_ROUTES),
+=======
+        path: 'pricing/simulator',
+        loadChildren: () =>
+          import('@frontend/cpq-pricing-simulator').then(
+            (m) => m.SIMULATOR_ROUTES,
+          ),
+>>>>>>> feat/forge-c4-pricing-simulator-stub
       },
     ],
   },
