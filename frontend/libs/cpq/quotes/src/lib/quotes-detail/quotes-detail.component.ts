@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
   inject,
   input,
@@ -9,14 +10,14 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
-import { QuoteListItem } from '../quotes.model';
-import { findMockQuote } from '../quotes.mock';
+import { QuoteService } from '../quote.service';
 
 @Component({
   selector: 'cpq-quotes-detail',
@@ -25,6 +26,7 @@ import { findMockQuote } from '../quotes.mock';
     MatButtonModule,
     MatCardModule,
     MatIconModule,
+    MatProgressSpinnerModule,
     PageHeaderComponent,
     StatusBadgeComponent,
     EmptyStateComponent,
@@ -32,8 +34,22 @@ import { findMockQuote } from '../quotes.mock';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (quote(); as quote) {
-      <app-page-header [title]="quote.name" [subtitle]="quote.quoteNumber">
+    @if (loading()) {
+      <div class="loading" role="status" aria-live="polite">
+        <mat-spinner diameter="40" />
+      </div>
+    } @else if (error(); as err) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ err }}</span>
+        <button mat-button type="button" (click)="retry()">Retry</button>
+        <button mat-button type="button" (click)="goBack()">Back to quotes</button>
+      </div>
+    } @else if (quote(); as quote) {
+      <app-page-header
+        [title]="quote.name"
+        [subtitle]="quote.quoteNumber ?? 'Quote ' + quote.id"
+      >
         <div actions>
           <button mat-stroked-button type="button" (click)="goBack()">
             <mat-icon>arrow_back</mat-icon>
@@ -55,7 +71,7 @@ import { findMockQuote } from '../quotes.mock';
               </div>
               <div class="info-item">
                 <span class="label">Deal type</span>
-                <span class="value">{{ quote.dealType }}</span>
+                <span class="value">{{ quote.dealType || '—' }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Customer</span>
@@ -68,14 +84,16 @@ import { findMockQuote } from '../quotes.mock';
               <div class="info-item">
                 <span class="label">Total amount</span>
                 <span class="value">{{
-                  quote.totalAmount | currencyFormat: quote.currency
+                  quote.totalAmount != null
+                    ? (quote.totalAmount | currencyFormat: quote.currency || 'USD')
+                    : '—'
                 }}</span>
               </div>
               <div class="info-item">
                 <span class="label">ARR</span>
                 <span class="value">{{
                   quote.arr != null
-                    ? (quote.arr | currencyFormat: quote.currency)
+                    ? (quote.arr | currencyFormat: quote.currency || 'USD')
                     : '—'
                 }}</span>
               </div>
@@ -89,7 +107,7 @@ import { findMockQuote } from '../quotes.mock';
               </div>
               <div class="info-item">
                 <span class="label">Line items</span>
-                <span class="value">{{ quote.lineItemCount }}</span>
+                <span class="value">{{ lineItemCount() }}</span>
               </div>
               <div class="info-item full-width">
                 <span class="label">Description</span>
@@ -103,7 +121,7 @@ import { findMockQuote } from '../quotes.mock';
       <app-empty-state
         icon="search_off"
         title="Quote not found"
-        message="This quote is not in the mock data set."
+        message="This quote could not be loaded from the API."
         actionLabel="Back to quotes"
         (action)="goBack()"
       />
@@ -111,6 +129,24 @@ import { findMockQuote } from '../quotes.mock';
   `,
   styles: [
     `
+      .loading {
+        display: flex;
+        justify-content: center;
+        padding: 48px;
+      }
+
+      .error-banner {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 24px 32px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        background: #ffebee;
+        color: #c62828;
+      }
+
       .detail-body {
         padding: 0 32px 32px;
       }
@@ -146,6 +182,10 @@ import { findMockQuote } from '../quotes.mock';
       }
 
       @media (max-width: 768px) {
+        .error-banner {
+          margin: 16px;
+        }
+
         .detail-body {
           padding: 0 16px 24px;
         }
@@ -157,22 +197,41 @@ import { findMockQuote } from '../quotes.mock';
     `,
   ],
 })
-export class QuotesDetailComponent {
+export class QuotesDetailComponent implements OnInit {
+  readonly quoteService = inject(QuoteService);
   private readonly router = inject(Router);
 
   /** Route param `:id` (string from Angular router). */
   readonly id = input.required<string>();
 
-  readonly quote = computed<QuoteListItem | undefined>(() => {
-    const raw = this.id();
-    const numericId = Number(raw);
-    if (!Number.isFinite(numericId)) {
-      return undefined;
-    }
-    return findMockQuote(numericId);
-  });
+  readonly loading = computed(() => this.quoteService.loading());
+  readonly error = computed(() => this.quoteService.error());
+  readonly quote = computed(() => this.quoteService.selectedQuote());
+  readonly lineItemCount = computed(
+    () => this.quote()?.lineItems?.length ?? 0,
+  );
+
+  ngOnInit(): void {
+    this.load();
+  }
 
   goBack(): void {
     void this.router.navigate(['/quotes']);
+  }
+
+  retry(): void {
+    this.load();
+  }
+
+  private load(): void {
+    const numericId = Number(this.id());
+    if (!Number.isFinite(numericId)) {
+      this.quoteService.selectedQuote.set(null);
+      this.quoteService.error.set('Invalid quote id');
+      this.quoteService.loading.set(false);
+      return;
+    }
+    this.quoteService.selectedQuote.set(null);
+    this.quoteService.getById(numericId);
   }
 }

@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
+  inject,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -17,13 +19,12 @@ import {
   SearchInputComponent,
   TableColumn,
 } from '@frontend/shared-ui';
-import { PaginationMeta } from '@frontend/shared-models';
 import {
-  QuoteListDealType,
-  QuoteListItem,
-  QuoteListStatus,
-} from '../quotes.model';
-import { MOCK_QUOTES } from '../quotes.mock';
+  QuoteDealType,
+  QuoteDto,
+  QuoteStatus,
+} from '@frontend/shared-models';
+import { QuoteService } from '../quote.service';
 
 interface QuoteTableRow {
   id: number;
@@ -52,7 +53,7 @@ interface QuoteTableRow {
   template: `
     <app-page-header
       title="Quotes"
-      subtitle="Browse quotes (presentational stub — mock data)"
+      subtitle="Browse quotes from quote-service via gateway"
     >
       <div actions>
         <button mat-stroked-button type="button" disabled aria-disabled="true">
@@ -115,7 +116,7 @@ interface QuoteTableRow {
     } @else {
       <app-data-table
         [columns]="columns"
-        [data]="pagedRows()"
+        [data]="tableRows()"
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
@@ -164,8 +165,11 @@ interface QuoteTableRow {
     `,
   ],
 })
-export class QuotesListComponent {
-  readonly statuses: QuoteListStatus[] = [
+export class QuotesListComponent implements OnInit {
+  readonly quoteService = inject(QuoteService);
+  private readonly router = inject(Router);
+
+  readonly statuses: QuoteStatus[] = [
     'DRAFT',
     'IN_REVIEW',
     'PENDING_APPROVAL',
@@ -176,7 +180,7 @@ export class QuotesListComponent {
     'CANCELLED',
     'REJECTED',
   ];
-  readonly dealTypes: QuoteListDealType[] = [
+  readonly dealTypes: QuoteDealType[] = [
     'NEW',
     'AMENDMENT',
     'RENEWAL',
@@ -192,72 +196,43 @@ export class QuotesListComponent {
     { key: 'totalAmount', header: 'Total', type: 'currency', sortable: true },
   ];
 
-  private readonly allQuotes = signal<QuoteListItem[]>([...MOCK_QUOTES]);
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly statusFilter = signal('');
   readonly dealTypeFilter = signal('');
-  readonly pageIndex = signal(0);
-  readonly pageSize = signal(10);
 
+  readonly loading = computed(() => this.quoteService.loading());
+  readonly error = computed(() => this.quoteService.error());
+  readonly pagination = computed(() => this.quoteService.pagination());
+
+  /** Client-side text filter on the current API page (status/dealType are server-side). */
   readonly filteredQuotes = computed(() => {
     const q = this.searchTerm().trim().toLowerCase();
-    const status = this.statusFilter();
-    const dealType = this.dealTypeFilter();
-
-    return this.allQuotes().filter((quote) => {
-      if (status && quote.status !== status) {
-        return false;
-      }
-      if (dealType && quote.dealType !== dealType) {
-        return false;
-      }
-      if (!q) {
-        return true;
-      }
-      return (
-        quote.name.toLowerCase().includes(q) ||
-        quote.quoteNumber.toLowerCase().includes(q) ||
-        quote.customerExternalId.toLowerCase().includes(q) ||
-        (quote.description?.toLowerCase().includes(q) ?? false)
-      );
-    });
+    const quotes = this.quoteService.quotes();
+    if (!q) {
+      return quotes;
+    }
+    return quotes.filter((quote) => this.matchesSearch(quote, q));
   });
 
   readonly tableRows = computed<QuoteTableRow[]>(() =>
     this.filteredQuotes().map((quote) => ({
       id: quote.id,
-      quoteNumber: quote.quoteNumber,
+      quoteNumber: quote.quoteNumber ?? `Q-${quote.id}`,
       name: quote.name,
       customerExternalId: quote.customerExternalId,
       status: quote.status,
-      dealType: quote.dealType,
-      totalAmount: quote.totalAmount,
+      dealType: quote.dealType ?? '—',
+      totalAmount: quote.totalAmount ?? 0,
     })),
   );
-
-  readonly pagination = computed<PaginationMeta>(() => {
-    const total = this.tableRows().length;
-    const size = this.pageSize();
-    return {
-      page: this.pageIndex(),
-      size,
-      totalElements: total,
-      totalPages: Math.max(1, Math.ceil(total / size) || 1),
-    };
-  });
-
-  readonly pagedRows = computed(() => {
-    const start = this.pageIndex() * this.pageSize();
-    return this.tableRows().slice(start, start + this.pageSize());
-  });
 
   readonly isEmpty = computed(
     () => this.tableRows().length === 0 && !this.loading(),
   );
 
-  constructor(private readonly router: Router) {}
+  ngOnInit(): void {
+    this.reload(0, this.pagination().size || 10);
+  }
 
   hasActiveFilters(): boolean {
     return (
@@ -269,22 +244,20 @@ export class QuotesListComponent {
 
   onSearch(term: string): void {
     this.searchTerm.set(term);
-    this.pageIndex.set(0);
   }
 
   onStatusChange(value: string): void {
     this.statusFilter.set(value ?? '');
-    this.pageIndex.set(0);
+    this.reload(0, this.pagination().size || 10);
   }
 
   onDealTypeChange(value: string): void {
     this.dealTypeFilter.set(value ?? '');
-    this.pageIndex.set(0);
+    this.reload(0, this.pagination().size || 10);
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageIndex.set(event.pageIndex);
-    this.pageSize.set(event.pageSize);
+    this.reload(event.pageIndex, event.pageSize);
   }
 
   onRowClick(row: QuoteTableRow): void {
@@ -292,22 +265,24 @@ export class QuotesListComponent {
   }
 
   clearError(): void {
-    this.error.set(null);
+    this.quoteService.error.set(null);
   }
 
-  /** Test helper: replace quote rows (e.g. empty list). */
-  setQuotesForTest(quotes: QuoteListItem[]): void {
-    this.allQuotes.set(quotes);
-    this.pageIndex.set(0);
+  private reload(page: number, size: number): void {
+    const status = this.statusFilter();
+    const dealType = this.dealTypeFilter();
+    this.quoteService.list(page, size, 'createdAt,desc', {
+      status: status ? (status as QuoteStatus) : undefined,
+      dealType: dealType ? (dealType as QuoteDealType) : undefined,
+    });
   }
 
-  /** Test helper: surface the error banner. */
-  setErrorForTest(message: string | null): void {
-    this.error.set(message);
-  }
-
-  /** Test helper: toggle loading overlay. */
-  setLoadingForTest(value: boolean): void {
-    this.loading.set(value);
+  private matchesSearch(quote: QuoteDto, q: string): boolean {
+    return (
+      quote.name.toLowerCase().includes(q) ||
+      (quote.quoteNumber?.toLowerCase().includes(q) ?? false) ||
+      quote.customerExternalId.toLowerCase().includes(q) ||
+      (quote.description?.toLowerCase().includes(q) ?? false)
+    );
   }
 }

@@ -1,6 +1,6 @@
 import { QuoteListItem } from './quotes.model';
 
-/** Mock quote rows for the presentational stub (no HTTP). */
+/** Test / offline fixtures — happy-path UI loads via QuoteService HTTP. */
 export const MOCK_QUOTES: QuoteListItem[] = [
   {
     id: 1,
