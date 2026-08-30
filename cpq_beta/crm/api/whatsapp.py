@@ -277,6 +277,8 @@ def get_whatsapp_messages(reference_doctype, reference_name):
             template_message["header"] = parsed_header
             template_message["footer"] = template.footer
 
+    messages_by_id = {m["message_id"]: m for m in messages if m.get("message_id")}
+
     # Filter messages to get only reaction messages
     reaction_messages = [
         message for message in messages if message["content_type"] == "reaction"
@@ -285,14 +287,7 @@ def get_whatsapp_messages(reference_doctype, reference_name):
     # Iterate through reaction messages
     for reaction_message in reaction_messages:
         # Find the message that this reaction is reacting to
-        reacted_message = next(
-            (
-                m
-                for m in messages
-                if m["message_id"] == reaction_message["reply_to_message_id"]
-            ),
-            None,
-        )
+        reacted_message = messages_by_id.get(reaction_message.get("reply_to_message_id"))
 
         # If the reacted message is found, add the reaction to it
         if reacted_message:
@@ -311,14 +306,7 @@ def get_whatsapp_messages(reference_doctype, reference_name):
     # Iterate through reply messages
     for reply_message in reply_messages:
         # Find the message that this message is replying to
-        replied_message = next(
-            (
-                m
-                for m in messages
-                if m["message_id"] == reply_message["reply_to_message_id"]
-            ),
-            None,
-        )
+        replied_message = messages_by_id.get(reply_message.get("reply_to_message_id"))
 
         # If the replied message is found, add the reply details to the reply message
         from_name = (
