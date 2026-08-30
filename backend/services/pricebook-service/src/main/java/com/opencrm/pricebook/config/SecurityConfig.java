@@ -8,6 +8,15 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Security configuration for Pricebook Service.
+ *
+ * In production, the Gateway handles authentication and forwards the JWT.
+ * Browser CSRF is enforced at the gateway edge only; this STATELESS resource
+ * server disables servlet Cookie CSRF so Bearer / service-mesh callers are not
+ * rejected for missing XSRF tokens. Internal mesh paths under {@code /internal/**}
+ * remain permitAll for service-to-service lookups.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -16,8 +25,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.csrfTokenRepository(
-                        org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse()))
+                .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
