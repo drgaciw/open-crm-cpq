@@ -35,6 +35,10 @@ grpc:
 server:
   port: 8088
 
+services:
+  product:
+    url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
+
 management:
   endpoints:
     web:
