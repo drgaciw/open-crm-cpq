@@ -3,6 +3,7 @@ package com.opencrm.quote.quote;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.KafkaTopics;
@@ -10,6 +11,9 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.quote.client.PricingExecuteView;
+import com.opencrm.quote.client.PricingFinancialMetricsView;
+import com.opencrm.quote.client.PricingLineResultView;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
@@ -351,8 +355,9 @@ public class QuoteService {
         }
 
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
-        JsonNode pricingData = fetchPricingData(pricingContext);
-        Map<String, ArrayDeque<JsonNode>> pricingResultByLine = indexLineResults(pricingData.path("lineResults"));
+        PricingExecuteView pricingData = fetchPricingData(pricingContext);
+        Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine =
+                indexLineResults(pricingData.getLineResults());
 
         PricingTotals totals = applyPricingToLineItems(lineItems, pricingResultByLine);
         quoteLineItemRepository.saveAll(lineItems);
@@ -368,13 +373,15 @@ public class QuoteService {
         return quoteMapper.toDto(saved);
     }
 
-    private void updateQuoteFromPricingData(Quote quote, JsonNode pricingData) {
-        JsonNode financialMetrics = pricingData.path("financialMetrics");
-        quote.setArr(decimalValue(financialMetrics.path("arr"), quote.getArr()));
-        quote.setTcv(decimalValue(financialMetrics.path("tcv"), quote.getTcv()));
-        quote.setAcv(decimalValue(financialMetrics.path("acv"), quote.getAcv()));
+    private void updateQuoteFromPricingData(Quote quote, PricingExecuteView pricingData) {
+        PricingFinancialMetricsView financialMetrics = pricingData.getFinancialMetrics();
+        if (financialMetrics != null) {
+            quote.setArr(decimalOrFallback(financialMetrics.getArr(), quote.getArr()));
+            quote.setTcv(decimalOrFallback(financialMetrics.getTcv(), quote.getTcv()));
+            quote.setAcv(decimalOrFallback(financialMetrics.getAcv(), quote.getAcv()));
+        }
 
-        String approvalState = pricingData.path("approvalState").asText(null);
+        String approvalState = pricingData.getApprovalState();
         if (approvalState != null && !approvalState.isBlank()) {
             try {
                 quote.setApprovalState(ApprovalState.valueOf(approvalState));
@@ -383,10 +390,10 @@ public class QuoteService {
             }
         }
 
-        quote.setApprovalTier(pricingData.path("approvalTier").asText(null));
+        quote.setApprovalTier(pricingData.getApprovalTier());
 
-        JsonNode waterfall = pricingData.path("waterfall");
-        if (!waterfall.isMissingNode() && !waterfall.isNull()) {
+        JsonNode waterfall = pricingData.getWaterfall();
+        if (waterfall != null && !waterfall.isMissingNode() && !waterfall.isNull()) {
             try {
                 quote.setPricingWaterfallJson(objectMapper.writeValueAsString(waterfall));
             } catch (JsonProcessingException ex) {
@@ -397,15 +404,17 @@ public class QuoteService {
 
     private record PricingTotals(BigDecimal subtotal, BigDecimal totalDiscount, BigDecimal totalAmount) {}
 
-    private PricingTotals applyPricingToLineItems(List<QuoteLineItem> lineItems, Map<String, ArrayDeque<JsonNode>> pricingResultByLine) {
+    private PricingTotals applyPricingToLineItems(
+            List<QuoteLineItem> lineItems,
+            Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalDiscount = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (QuoteLineItem lineItem : lineItems) {
             String key = lineKey(lineItem.getProductExternalId(), lineItem.getLineItemType());
-            ArrayDeque<JsonNode> queue = pricingResultByLine.get(key);
-            JsonNode lineResult = queue != null ? queue.pollFirst() : null;
+            ArrayDeque<PricingLineResultView> queue = pricingResultByLine.get(key);
+            PricingLineResultView lineResult = queue != null ? queue.pollFirst() : null;
 
             if (lineResult == null) {
                 throw new BusinessException(
@@ -415,11 +424,11 @@ public class QuoteService {
             }
 
             BigDecimal quantity = BigDecimal.valueOf(lineItem.getQuantity());
-            BigDecimal listPrice = decimalValue(lineResult.path("listPrice"), lineItem.getListPrice());
-            BigDecimal unitPrice = decimalValue(lineResult.path("unitPrice"), listPrice);
-            BigDecimal lineDiscount = decimalValue(lineResult.path("discountAmount"), BigDecimal.ZERO);
-            BigDecimal lineFinal = decimalValue(
-                    lineResult.path("finalPrice"),
+            BigDecimal listPrice = decimalOrFallback(lineResult.getListPrice(), lineItem.getListPrice());
+            BigDecimal unitPrice = decimalOrFallback(lineResult.getUnitPrice(), listPrice);
+            BigDecimal lineDiscount = decimalOrFallback(lineResult.getDiscountAmount(), BigDecimal.ZERO);
+            BigDecimal lineFinal = decimalOrFallback(
+                    lineResult.getFinalPrice(),
                     unitPrice.multiply(quantity)
             );
             BigDecimal netUnit = quantity.signum() > 0
@@ -428,14 +437,14 @@ public class QuoteService {
 
             lineItem.setListPrice(listPrice);
             lineItem.setUnitPrice(unitPrice);
-            lineItem.setDiscountRate(decimalValue(lineResult.path("discountRate"), BigDecimal.ZERO));
+            lineItem.setDiscountRate(decimalOrFallback(lineResult.getDiscountRate(), BigDecimal.ZERO));
             lineItem.setDiscountAmount(lineDiscount);
             lineItem.setNetPrice(netUnit);
             lineItem.setExtendedAmount(lineFinal);
 
-            JsonNode explanationCodes = lineResult.path("explanationCodes");
-            if (explanationCodes.isArray() && !explanationCodes.isEmpty()) {
-                lineItem.setPricingExplanationCode(explanationCodes.get(0).asText());
+            List<String> explanationCodes = lineResult.getExplanationCodes();
+            if (explanationCodes != null && !explanationCodes.isEmpty()) {
+                lineItem.setPricingExplanationCode(explanationCodes.getFirst());
             } else {
                 lineItem.setPricingExplanationCode(null);
             }
@@ -448,8 +457,8 @@ public class QuoteService {
         return new PricingTotals(subtotal, totalDiscount, totalAmount);
     }
 
-    private JsonNode fetchPricingData(Map<String, Object> pricingContext) {
-        JsonNode pricingApiResponse;
+    private PricingExecuteView fetchPricingData(Map<String, Object> pricingContext) {
+        ApiResponse<PricingExecuteView> pricingApiResponse;
         try {
             pricingApiResponse = pricingServiceClient.executePricing(pricingContext);
         } catch (RestClientException ex) {
@@ -460,20 +469,19 @@ public class QuoteService {
             );
         }
 
-        JsonNode wrapperSuccessNode = pricingApiResponse.path("success");
-        if (!wrapperSuccessNode.asBoolean(false)) {
-            throw new BusinessException(
-                    pricingApiResponse.path("message").asText("Pricing execution failed"),
-                    "PRICING_EXECUTION_FAILED"
-            );
+        if (pricingApiResponse == null || !pricingApiResponse.isSuccess()) {
+            String message = pricingApiResponse != null && pricingApiResponse.getMessage() != null
+                    ? pricingApiResponse.getMessage()
+                    : "Pricing execution failed";
+            throw new BusinessException(message, "PRICING_EXECUTION_FAILED");
         }
 
-        JsonNode pricingData = pricingApiResponse.path("data");
-        if (!pricingData.path("success").asBoolean(false)) {
-            throw new BusinessException(
-                    pricingData.path("errorMessage").asText("Pricing execution failed"),
-                    "PRICING_EXECUTION_FAILED"
-            );
+        PricingExecuteView pricingData = pricingApiResponse.getData();
+        if (pricingData == null || !pricingData.isSuccess()) {
+            String message = pricingData != null && pricingData.getErrorMessage() != null
+                    ? pricingData.getErrorMessage()
+                    : "Pricing execution failed";
+            throw new BusinessException(message, "PRICING_EXECUTION_FAILED");
         }
 
         return pricingData;
@@ -501,17 +509,15 @@ public class QuoteService {
         return context;
     }
 
-    private Map<String, ArrayDeque<JsonNode>> indexLineResults(JsonNode lineResults) {
-        Map<String, ArrayDeque<JsonNode>> indexed = new HashMap<>();
-        if (!lineResults.isArray()) {
+    private Map<String, ArrayDeque<PricingLineResultView>> indexLineResults(
+            List<PricingLineResultView> lineResults) {
+        Map<String, ArrayDeque<PricingLineResultView>> indexed = new HashMap<>();
+        if (lineResults == null) {
             return indexed;
         }
 
-        for (JsonNode lineResult : lineResults) {
-            String key = lineKey(
-                    lineResult.path("productExternalId").asText(null),
-                    lineResult.path("lineItemType").asText(null)
-            );
+        for (PricingLineResultView lineResult : lineResults) {
+            String key = lineKey(lineResult.getProductExternalId(), lineResult.getLineItemType());
             indexed.computeIfAbsent(key, ignored -> new ArrayDeque<>()).addLast(lineResult);
         }
         return indexed;
@@ -521,21 +527,8 @@ public class QuoteService {
         return (Objects.toString(productExternalId, "") + "::" + Objects.toString(lineItemType, "")).toLowerCase();
     }
 
-    private BigDecimal decimalValue(JsonNode node, BigDecimal fallback) {
-        if (node == null || node.isMissingNode() || node.isNull()) {
-            return fallback;
-        }
-
-        String raw = node.asText(null);
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
-
-        try {
-            return new BigDecimal(raw);
-        } catch (NumberFormatException ex) {
-            return fallback;
-        }
+    private BigDecimal decimalOrFallback(BigDecimal value, BigDecimal fallback) {
+        return value != null ? value : fallback;
     }
     
     /**
