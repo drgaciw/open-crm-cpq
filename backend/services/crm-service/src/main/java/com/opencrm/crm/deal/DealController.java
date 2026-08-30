@@ -94,7 +94,7 @@ public class DealController {
      */
     @GetMapping("/search")
     @Operation(summary = "Search deals", description = "Search deals by name")
-    public ApiResponse<Page<DealDto>> search(
+    public ApiResponse<List<DealDto>> search(
             @RequestParam("q") String query,
             @PageableDefault(size = 20) Pageable pageable) {
         Page<DealDto> deals = dealService.search(query, pageable);
@@ -108,7 +108,7 @@ public class DealController {
                 .hasPrevious(deals.hasPrevious())
                 .build();
 
-        return ApiResponse.success(deals, pageInfo);
+        return ApiResponse.success(deals.getContent(), pageInfo);
     }
 
     /**

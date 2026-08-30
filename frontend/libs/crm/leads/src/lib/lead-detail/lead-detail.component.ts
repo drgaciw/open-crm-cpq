@@ -266,9 +266,13 @@ export class LeadDetailComponent implements OnInit {
 
     this.actionLoading.set(true);
     this.service.convertToDeal(lead.id).subscribe({
-      next: (deal) => {
+      next: (convertedLead) => {
         this.actionLoading.set(false);
-        this.router.navigate(['/deals', deal.id]);
+        this.service.selectedLead.set(convertedLead);
+        const dealId = convertedLead.convertedDealId;
+        if (dealId != null) {
+          this.router.navigate(['/deals', dealId]);
+        }
       },
       error: () => this.actionLoading.set(false),
     });

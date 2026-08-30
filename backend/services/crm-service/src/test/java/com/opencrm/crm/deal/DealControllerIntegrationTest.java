@@ -515,13 +515,15 @@ class DealControllerIntegrationTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request3)));
 
-        // Search for "Enterprise"
+        // Search for "Enterprise" — data is T[] + pagination (same contract as list)
         mockMvc.perform(get("/api/v1/deals/search")
                         .param("q", "Enterprise"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content").isArray())
-                .andExpect(jsonPath("$.data.content", hasSize(2)));
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.pagination").exists())
+                .andExpect(jsonPath("$.pagination.totalElements").value(2));
     }
 
     @Test

@@ -65,10 +65,10 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | GET | `/api/v1/leads/{id}` | `LeadService.getById` | `LeadDto` |
 | PUT | `/api/v1/leads/{id}` | `LeadService.update` | `LeadUpdateRequest` → `LeadDto` |
 | DELETE | `/api/v1/leads/{id}` | `LeadService.delete` | — |
-| GET | `/api/v1/leads/search` | `LeadService.search` | `LeadDto[]` |
+| GET | `/api/v1/leads/search` | `LeadService.search` | `LeadDto[]` + `PageInfo` (FE reads interceptor `SpringPageResponse.content`) |
 | POST | `/api/v1/leads/{id}/contact` | `LeadService.markContacted` | `LeadDto` |
 | POST | `/api/v1/leads/{id}/qualify` | `LeadService.qualify` | `LeadDto` |
-| POST | `/api/v1/leads/{id}/convert` | `LeadService.convertToDeal` | `DealDto` |
+| POST | `/api/v1/leads/{id}/convert` | `LeadService.convertToDeal` | `LeadDto` (navigate via `convertedDealId`) |
 | POST | `/api/v1/leads/{id}/lose` | `LeadService.markLost` | `LeadDto` |
 | GET | `/api/v1/leads/stats` | `LeadService.getStatusCounts`, dashboard KPI **`totalLeadCount`** | `Partial<Record<LeadStatus, number>>` |
 | POST | `/api/v1/deals` | `DealService.create` | `DealCreateRequest` → `DealDto` |
@@ -76,7 +76,7 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | GET | `/api/v1/deals/{id}` | `DealService.getById` | `DealDto` |
 | PUT | `/api/v1/deals/{id}` | `DealService.update` | `DealUpdateRequest` → `DealDto` |
 | DELETE | `/api/v1/deals/{id}` | `DealService.delete` | — |
-| GET | `/api/v1/deals/search` | `DealService.search` | `DealDto[]` |
+| GET | `/api/v1/deals/search` | `DealService.search` | `DealDto[]` + `PageInfo` (FE reads interceptor `SpringPageResponse.content`) |
 | POST | `/api/v1/deals/{id}/advance` | `DealService.advanceStage` | `DealDto` |
 | POST | `/api/v1/deals/{id}/win` | `DealService.markWon` | `DealDto` |
 | POST | `/api/v1/deals/{id}/lose` | `DealService.markLost` | `DealDto` |
@@ -86,14 +86,14 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | GET | `/api/v1/contacts/{id}` | `ContactService.getById` | `ContactDto` |
 | PUT | `/api/v1/contacts/{id}` | `ContactService.update` | `ContactUpdateRequest` → `ContactDto` |
 | DELETE | `/api/v1/contacts/{id}` | `ContactService.delete` | — |
-| GET | `/api/v1/contacts/search` | `ContactService.search` | `ContactDto[]` |
+| GET | `/api/v1/contacts/search` | `ContactService.search` | `ContactDto[]` + `PageInfo` (FE reads interceptor `SpringPageResponse.content`) |
 | POST | `/api/v1/organizations` | `OrganizationService.create` | `OrganizationCreateRequest` → `OrganizationDto` |
 | GET | `/api/v1/organizations` | `OrganizationService.list` | `OrganizationDto` / page unwrap |
 | GET | `/api/v1/organizations/{id}` | `OrganizationService.getById` | `OrganizationDto` |
 | PUT | `/api/v1/organizations/{id}` | `OrganizationService.update` | `OrganizationUpdateRequest` → `OrganizationDto` |
 | DELETE | `/api/v1/organizations/{id}` | `OrganizationService.delete` | — |
-| GET | `/api/v1/organizations/search` | `OrganizationService.search` | `OrganizationDto[]` |
-| GET | `/api/v1/organizations/{id}/contacts` | `OrganizationService.loadOrganizationContacts`, **organization detail** UI | `ContactDto[]` |
+| GET | `/api/v1/organizations/search` | `OrganizationService.search` | `OrganizationDto[]` + `PageInfo` (FE reads interceptor `SpringPageResponse.content`) |
+| GET | `/api/v1/organizations/{id}/contacts` | `OrganizationService.loadOrganizationContacts`, **organization detail** UI | `ContactDto[]` + `PageInfo` (FE reads `.content`) |
 
 ### FE-only / indirect usage
 
@@ -104,6 +104,12 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 - **Leads:** `priority` on list — not exposed in `LeadService.list` (FE could extend).
 - **Contacts:** `status` on list — not passed by `ContactService.list`.
 - **Organizations:** `type` on list — not passed by `OrganizationService.list`.
+
+### Response shape notes (B0-1)
+
+- **List / search / org contacts:** all return `ApiResponse` with `data: T[]` and `pagination` (`PageInfo`). Lead/Deal search previously put a Spring `Page` in `data`; they now match Contact/Org (`getContent()` + `PageInfo`).
+- **FE unwrap:** `apiResponseInterceptor` rebuilds `{ content, number, size, totalElements, totalPages }` when `data` is an array and `pagination` is present. CRM services must set table signals from `.content`, not the page object.
+- **Lead convert:** `POST /leads/{id}/convert` returns `LeadDto` with `convertedDealId`; UI navigates to `/deals/{convertedDealId}` (not `lead.id`).
 
 ---
 

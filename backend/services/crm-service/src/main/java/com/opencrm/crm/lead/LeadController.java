@@ -96,7 +96,7 @@ public class LeadController {
      */
     @GetMapping("/search")
     @Operation(summary = "Search leads", description = "Search leads by title")
-    public ApiResponse<Page<LeadDto>> search(
+    public ApiResponse<List<LeadDto>> search(
             @RequestParam("q") String query,
             @PageableDefault(size = 20) Pageable pageable) {
         Page<LeadDto> leads = leadService.search(query, pageable);
@@ -110,7 +110,7 @@ public class LeadController {
                 .hasPrevious(leads.hasPrevious())
                 .build();
 
-        return ApiResponse.success(leads, pageInfo);
+        return ApiResponse.success(leads.getContent(), pageInfo);
     }
 
     /**

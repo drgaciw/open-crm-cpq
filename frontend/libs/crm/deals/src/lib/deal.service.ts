@@ -81,10 +81,19 @@ export class DealService {
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('q', query);
-    this.http.get<DealDto[]>(`${this.basePath}/search`, { params })
+    // Interceptor rebuilds List+PageInfo into SpringPageResponse
+    this.http.get<SpringPageResponse<DealDto>>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (deals) => this.deals.set(deals),
+        next: (p) => {
+          this.deals.set(p.content ?? p);
+          if (p.totalElements !== undefined) {
+            this.pagination.set({
+              page: p.number ?? 0, size: p.size ?? 20,
+              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
+            });
+          }
+        },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
         }
