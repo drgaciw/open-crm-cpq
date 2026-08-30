@@ -56,7 +56,13 @@ interface QuoteTableRow {
       subtitle="Browse quotes from quote-service via gateway"
     >
       <div actions>
-        <button mat-stroked-button type="button" disabled aria-disabled="true">
+        <button
+          mat-stroked-button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title="Quote create wizard is deferred (Wave I — quotes are read-only HTTP list/detail)"
+        >
           <mat-icon>add</mat-icon>
           New Quote
         </button>

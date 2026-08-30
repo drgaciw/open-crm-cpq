@@ -4,8 +4,8 @@ import {
 } from '@frontend/shared-models';
 
 /**
- * Stub OK response shaped like POST /api/v1/pricing/execute (and /simulate).
- * Mirrors golden fixture 01-list-price-baseline; no HTTP.
+ * Vitest fixture shaped like POST /api/v1/pricing/execute (and /simulate).
+ * Mirrors golden fixture 01-list-price-baseline; happy path uses HTTP.
  */
 export const MOCK_PRICING_EXECUTE_OK: PricingResult = {
   success: true,
@@ -80,8 +80,8 @@ export const MOCK_PRICING_CONTEXT: PricingContext = {
 };
 
 /**
- * Builds a presentational OK result from the submitted context.
- * Adjusts line product/qty/totals; keeps success=true (stub execute).
+ * Builds a Vitest OK result from the submitted context.
+ * Adjusts line product/qty/totals; keeps success=true for fixture assertions.
  */
 export function mockExecuteOk(context: PricingContext): PricingResult {
   const line = context.lineItems[0];
