@@ -8,12 +8,13 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 
 ## Pre-cutover
 
-- [ ] Gateway routes for CRM are only: `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` (no phantom `/api/v1/activities/**` until implemented).
+- [ ] Gateway routes for CRM are only: `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` (no phantom `/api/v1/activities/**` — **deferred**; see [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities-deferred)).
 - [ ] `CRM_SERVICE_URI` in gateway / compose / deployment targets the intended `crm-service` instance ([CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md)).
 - [ ] Database: `crm` schema migrations applied; **backup** taken (owner + time boxed).
 - [ ] Redis: available to `crm-service` and `quote-service` (pub/sub channel `quote:accepted`).
 - [ ] Contract: `quote-service` publishes `com.opencrm.common.event.dto.QuoteAcceptedCrmMessage` on `quote:accepted` (see `QuoteEventPublisher`). **No stale publishers** with old payload type names in any environment.
 - [ ] **Freeze window:** agree CRM DB migrations + **image tags** (gateway, crm-service, quote-service) for cutover; avoid drifting midship.
+- [ ] Confirm search/list envelopes are `ApiResponse` + `data: T[]` + `pagination` (`PageInfo`) for leads/deals/contacts/organizations (Batch 0 / B0-1); FE reads interceptor `.content`.
 
 ---
 
@@ -57,7 +58,8 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 
 - [ ] Inventory `cpq_beta` CRM APIs and DocTypes vs Spring `crm-service` — expect a **large capability gap** list.
 - [ ] **Do not** big-bang Frappe: pick **one vertical** (e.g. read-only activities feed or notes), design migration + `crm-service` API, own plan.
-- [ ] Revisit gateway: add `/api/v1/activities/**` only when a **real** controller + schema exist.
+- [ ] **Activities API (deferred for cutover):** legacy reference `cpq_beta/crm/api/activities.py`. No Spring controller/schema yet — decision recorded in [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities-deferred).
+- [ ] Revisit gateway: add `/api/v1/activities/**` **only** when a **real** controller + schema exist (never stub a phantom route).
 
 ---
 
