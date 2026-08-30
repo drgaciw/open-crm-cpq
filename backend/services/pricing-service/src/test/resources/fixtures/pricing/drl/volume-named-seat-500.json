@@ -1,0 +1,17 @@
+{
+  "id": "s2c-1b-drl-volume-named-seat-500",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "description": "Named seat volume discount at qty 500 / 12 months → 12% off (salience 620).",
+  "ruleClasspath": "rules/volume-discount-named-seat.drl",
+  "facts": {
+    "durationInMonths": 12,
+    "lineItemType": "SAAS_SEAT_NAMED",
+    "quantity": 500,
+    "listPrice": 100.00
+  },
+  "expected": {
+    "rulesFired": 1,
+    "discountRate": 0.12,
+    "finalPrice": 88.00
+  }
+}
