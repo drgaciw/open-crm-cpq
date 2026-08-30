@@ -182,4 +182,23 @@ class StatelessConfigurationEvaluatorTest {
         assertThat(result.isValid()).isFalse();
         assertThat(result.getViolations().get(0).getRuleType()).isEqualTo("VALIDATES");
     }
+
+    @Test
+    @DisplayName("List<Long> agent path skips expression-only VALIDATES (no false-fail)")
+    void agentPathSkipsExpressionOnlyValidates() {
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(402L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .conditionExpression("attr:color=red")
+                        .errorMessage("Color must be red")
+                        .build()
+        ));
+
+        ConfigurationValidationResult result = evaluator.evaluate(List.of(10L));
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.getViolations()).isEmpty();
+    }
 }
