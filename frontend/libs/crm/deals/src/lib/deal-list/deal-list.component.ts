@@ -6,8 +6,6 @@ import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
@@ -15,6 +13,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { DealService } from '../deal.service';
 import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
+import { SearchInputComponent } from '@frontend/shared-ui';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 
 @Component({
@@ -22,8 +21,9 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
   standalone: true,
   imports: [
     MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
-    MatIconModule, MatProgressSpinnerModule, MatFormFieldModule, MatInputModule,
+    MatIconModule, MatProgressSpinnerModule,
     MatMenuModule, MatTabsModule, MatChipsModule, CurrencyPipe, DatePipe,
+    SearchInputComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -33,12 +33,10 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
         <p class="subtitle">Track your sales pipeline</p>
       </div>
       <div class="header-actions">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search deals..." #searchInput
-                 (input)="onSearch(searchInput.value)"
-                 aria-label="Search deals">
-        </mat-form-field>
+        <app-search-input
+          placeholder="Search deals..."
+          (searchChange)="onSearch($event)"
+        />
         <button mat-stroked-button (click)="router.navigate(['/deals/kanban'])">
           <mat-icon>view_kanban</mat-icon> Kanban
         </button>
@@ -150,8 +148,7 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
     .subtitle { margin: 4px 0 0; color: #666; }
     .header-actions { display: flex; gap: 12px; align-items: center; }
-    .search-field { width: 280px; }
-    .search-field .mat-mdc-form-field-subscript-wrapper { display: none; }
+    .header-actions app-search-input { width: 280px; }
     .stage-tabs { margin-bottom: 16px; }
     .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
     table { width: 100%; }
@@ -178,7 +175,6 @@ export class DealListComponent implements OnInit {
   stages: DealStage[] = ['PROSPECTING', 'QUALIFICATION', 'NEEDS_ANALYSIS', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
   private currentSort = 'createdAt,desc';
   private currentStage?: DealStage;
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   trackById(index: number, item: DealDto): string | number {
     return item.id;
@@ -211,10 +207,11 @@ export class DealListComponent implements OnInit {
   }
 
   onSearch(q: string): void {
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => {
-      q.trim() ? this.service.search(q.trim()) : this.service.list(0, 20, this.currentSort, this.currentStage);
-    }, 300);
+    if (q.trim()) {
+      this.service.search(q.trim());
+    } else {
+      this.service.list(0, 20, this.currentSort, this.currentStage);
+    }
   }
 
   onPageChange(e: PageEvent): void {
