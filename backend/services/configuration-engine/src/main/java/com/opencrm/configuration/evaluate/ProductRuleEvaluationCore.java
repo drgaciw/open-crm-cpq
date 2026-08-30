@@ -23,9 +23,10 @@ import java.util.function.Function;
  * Soft warnings (recorded but do not alone fail): RECOMMENDS.
  * DEFAULT: adds missing {@code targetProductId} to the working selection, then re-evaluates.
  *
- * <p>VALIDATES {@code conditionExpression} dialect (Wave H1): {@code attr:key=value}
- * and {@code attr:key!=value}. When attributes are null/empty the expression branch
- * is skipped (agent {@code List<Long>} path must not false-fail).
+ * <p>VALIDATES {@code conditionExpression} dialect (Wave H1 + J2): {@code attr:key=value},
+ * {@code attr:key!=value}, and {@code attr:key in:v1,v2,...} ({@code in:} parsed before
+ * {@code =}/{@code !=}). When attributes are null/empty the expression branch is skipped
+ * (agent {@code List<Long>} path must not false-fail).
  */
 public final class ProductRuleEvaluationCore {
 
@@ -38,6 +39,7 @@ public final class ProductRuleEvaluationCore {
     public static final String VALIDATES = "VALIDATES";
 
     private static final String ATTR_PREFIX = "attr:";
+    private static final String IN_MARKER = " in:";
 
     private ProductRuleEvaluationCore() {
     }
@@ -208,7 +210,8 @@ public final class ProductRuleEvaluationCore {
     }
 
     /**
-     * Evaluate constrained {@code attr:key=value} / {@code attr:key!=value} dialect.
+     * Evaluate constrained {@code attr:key=value} / {@code attr:key!=value} /
+     * {@code attr:key in:v1,v2,...} dialect. {@code in:} is parsed before {@code =}/{@code !=}.
      *
      * @return {@code true}/{@code false} when parsed; {@code null} when unsupported
      */
@@ -221,6 +224,26 @@ public final class ProductRuleEvaluationCore {
             return null;
         }
         String body = trimmed.substring(ATTR_PREFIX.length());
+
+        int in = body.indexOf(IN_MARKER);
+        if (in >= 0) {
+            String key = body.substring(0, in).trim();
+            if (key.isEmpty()) {
+                return null;
+            }
+            String actual = attributes.get(key);
+            if (actual == null) {
+                return false;
+            }
+            String listPart = body.substring(in + IN_MARKER.length());
+            for (String raw : listPart.split(",", -1)) {
+                if (actual.equals(raw.trim())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         int ne = body.indexOf("!=");
         int eq = body.indexOf('=');
         final String key;

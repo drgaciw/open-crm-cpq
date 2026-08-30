@@ -187,6 +187,43 @@ class ConstraintSolverTest {
     }
 
     @Test
+    @DisplayName("session selections drive attr:key in:v1,v2 VALIDATES (match → valid)")
+    void validatesAttrInMatchViaSelections() {
+        ConfigurationSession session = session("10", Map.of("base", "10", "color", "blue"));
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(7L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .conditionExpression("attr:color in:red,blue")
+                        .build()
+        ));
+
+        assertThat(solver.evaluate(session).isValid()).isTrue();
+        assertThat(solver.validate(session)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("session selections drive attr:key in:v1,v2 VALIDATES (mismatch → hard fail)")
+    void validatesAttrInMismatchViaSelections() {
+        ConfigurationSession session = session("10", Map.of("base", "10", "color", "green"));
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(8L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .conditionExpression("attr:color in:red,blue")
+                        .errorMessage("Color must be red or blue")
+                        .build()
+        ));
+
+        ConfigurationValidationResult result = solver.evaluate(session);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(solver.validate(session)).containsExactly("Color must be red or blue");
+    }
+
+    @Test
     @DisplayName("sessionAttributes copies selection map for expression evaluation")
     void sessionAttributesFromSelections() {
         ConfigurationSession session = session("10", Map.of("color", "red", "size", "L"));
