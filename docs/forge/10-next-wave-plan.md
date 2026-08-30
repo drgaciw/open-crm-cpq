@@ -1,6 +1,6 @@
 # Next forge wave plan (ready on MCP reconnect)
 
-**Status:** Wave A MERGED to main — next: Wave B  
+**Status:** Wave A + Wave B MERGED to main  
 **Chosen wave (PM):** Finish WIP, then Batch 2 leftovers  
 **Model:** Grok 4.5 via Herdr  
 **Autonomy:** Full after reconnect (prior PM delegation + this choice)

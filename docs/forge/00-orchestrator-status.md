@@ -1,18 +1,24 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave A complete (merged to main)** — Wave B next  
+**Session state:** **Wave A + Wave B complete** (merged to main)  
 **Plan:** `docs/forge/10-next-wave-plan.md`  
-**Herdr:** `forge-wave-a` (A1/A2 done; may close after push)  
-**MCP:** Linear/Notion/GitNexus still offline last check  
+**Herdr:** Wave workspaces closable after sync  
 
-## Wave A results
+## Completed
 
-| ID | Branch | Merged |
-|----|--------|--------|
-| A1 | `test/forge-b1-pricing-execute-fixtures` | yes — pricing golden fixtures |
-| A2 | `chore/forge-b2-proxy-gateway-8080` | yes — proxy → `:8080` |
+### Wave A
+- Pricing execute golden fixtures  
+- FE proxy → gateway `:8080`
 
-## Next
+### Wave B
+- Deal pipeline UX  
+- CPQ shared TS models  
+- Staging smoke scripts + quote-accept runbook  
+- Gateway ERP 501 contract tests  
+- CRM parity docs + activities deferral  
+- CPQ catalog list/detail stub  
 
-Wave B: deal pipeline UX, CPQ models, staging smokes, ERP 501 tests, parity docs (6 panes).
+## Still held
+- Activities API implementation  
+- S2B-11 / S2C-12 HIGH CPQ boundary work  
