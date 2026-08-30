@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
   inject,
   input,
@@ -9,14 +10,15 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
-import { CatalogProduct } from '../catalog.model';
-import { findMockCatalogProduct } from '../catalog.mock';
+import { ProductDto } from '@frontend/shared-models';
+import { ProductService } from '../product.service';
 
 @Component({
   selector: 'cpq-catalog-detail',
@@ -25,6 +27,7 @@ import { findMockCatalogProduct } from '../catalog.mock';
     MatButtonModule,
     MatCardModule,
     MatIconModule,
+    MatProgressSpinnerModule,
     PageHeaderComponent,
     StatusBadgeComponent,
     EmptyStateComponent,
@@ -32,7 +35,11 @@ import { findMockCatalogProduct } from '../catalog.mock';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (product(); as product) {
+    @if (loading()) {
+      <div class="loading" role="status" aria-live="polite">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+    } @else if (product(); as product) {
       <app-page-header [title]="product.name" [subtitle]="product.sku">
         <div actions>
           <button mat-stroked-button type="button" (click)="goBack()">
@@ -64,7 +71,8 @@ import { findMockCatalogProduct } from '../catalog.mock';
               <div class="info-item">
                 <span class="label">List price</span>
                 <span class="value">{{
-                  product.listPrice | currencyFormat: product.currency
+                  (product.listPrice ?? 0)
+                    | currencyFormat: product.currency || 'USD'
                 }}</span>
               </div>
               <div class="info-item full-width">
@@ -79,7 +87,10 @@ import { findMockCatalogProduct } from '../catalog.mock';
       <app-empty-state
         icon="search_off"
         title="Product not found"
-        message="This catalog item is not in the mock data set."
+        [message]="
+          error() ||
+          'This catalog item could not be loaded from the product catalog API.'
+        "
         actionLabel="Back to catalog"
         (action)="goBack()"
       />
@@ -87,6 +98,12 @@ import { findMockCatalogProduct } from '../catalog.mock';
   `,
   styles: [
     `
+      .loading {
+        display: flex;
+        justify-content: center;
+        padding: 48px;
+      }
+
       .detail-body {
         padding: 0 32px 32px;
       }
@@ -133,20 +150,39 @@ import { findMockCatalogProduct } from '../catalog.mock';
     `,
   ],
 })
-export class CatalogDetailComponent {
+export class CatalogDetailComponent implements OnInit {
   private readonly router = inject(Router);
+  readonly service = inject(ProductService);
 
   /** Route param `:id` (string from Angular router). */
   readonly id = input.required<string>();
 
-  readonly product = computed<CatalogProduct | undefined>(() => {
+  readonly loading = computed(() => this.service.loading());
+  readonly error = computed(() => this.service.error());
+
+  readonly product = computed<ProductDto | null>(() => {
+    const selected = this.service.selectedProduct();
+    if (!selected) {
+      return null;
+    }
     const raw = this.id();
     const numericId = Number(raw);
-    if (!Number.isFinite(numericId)) {
-      return undefined;
+    if (!Number.isFinite(numericId) || selected.id !== numericId) {
+      return null;
     }
-    return findMockCatalogProduct(numericId);
+    return selected;
   });
+
+  ngOnInit(): void {
+    const numericId = Number(this.id());
+    if (!Number.isFinite(numericId)) {
+      this.service.selectedProduct.set(null);
+      this.service.error.set('Invalid product id');
+      this.service.loading.set(false);
+      return;
+    }
+    this.service.getById(numericId);
+  }
 
   goBack(): void {
     void this.router.navigate(['/catalog']);
