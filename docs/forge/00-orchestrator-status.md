@@ -1,7 +1,7 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave C EXECUTING** — Safe CPQ/CRM polish  
+**Session state:** **Wave C RESUMED** — finishing uncommitted work in `forge-wave-c`  
 **Plan:** `docs/forge/12-wave-c-plan.md`  
 **Herdr:** `forge-wave-c` (6× Grok 4.5)  
 **Sources:** GitHub `gh issue list` + forge backlog (GitNexus MCP offline; CLI reindex in progress)

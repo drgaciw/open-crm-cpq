@@ -1,9 +1,14 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatChipsModule } from '@angular/material/chips';
-import { LeadStatus, DealStage } from '@frontend/shared-models';
+import {
+  LeadStatus,
+  DealStage,
+  QuoteStatus,
+  QUOTE_STATUS_LABELS,
+} from '@frontend/shared-models';
 
-export type StatusType = 'lead' | 'deal' | 'product';
+export type StatusType = 'lead' | 'deal' | 'product' | 'quote';
 
 export type ProductStatusBadge =
   | 'DRAFT'
@@ -18,12 +23,13 @@ interface StatusConfig {
 }
 
 /**
- * Color-coded badge for lead statuses, deal stages, and catalog product statuses
+ * Color-coded badge for lead, deal, product, and quote statuses
  *
  * @example
  * <app-status-badge [status]="'NEW'" [type]="'lead'" />
  * <app-status-badge [status]="'WON'" [type]="'deal'" />
  * <app-status-badge [status]="'ACTIVE'" [type]="'product'" />
+ * <app-status-badge [status]="'DRAFT'" [type]="'quote'" />
  */
 @Component({
   selector: 'app-status-badge',
@@ -69,6 +75,9 @@ export class StatusBadgeComponent {
     }
     if (typeValue === 'product') {
       return this.getProductStatusConfig(statusValue as ProductStatusBadge);
+    }
+    if (typeValue === 'quote') {
+      return this.getQuoteStatusConfig(statusValue as QuoteStatus);
     }
     return this.getDealStageConfig(statusValue as DealStage);
   });
@@ -181,6 +190,62 @@ export class StatusBadgeComponent {
         color: '#d32f2f',
         backgroundColor: '#ffebee',
         label: 'Retired',
+      },
+    };
+
+    return configs[status] || {
+      color: '#757575',
+      backgroundColor: '#f5f5f5',
+      label: status,
+    };
+  }
+
+  private getQuoteStatusConfig(status: QuoteStatus): StatusConfig {
+    const configs: Record<QuoteStatus, StatusConfig> = {
+      DRAFT: {
+        color: '#757575',
+        backgroundColor: '#f5f5f5',
+        label: QUOTE_STATUS_LABELS.DRAFT,
+      },
+      IN_REVIEW: {
+        color: '#1976d2',
+        backgroundColor: '#e3f2fd',
+        label: QUOTE_STATUS_LABELS.IN_REVIEW,
+      },
+      PENDING_APPROVAL: {
+        color: '#f57c00',
+        backgroundColor: '#fff3e0',
+        label: QUOTE_STATUS_LABELS.PENDING_APPROVAL,
+      },
+      APPROVED: {
+        color: '#388e3c',
+        backgroundColor: '#e8f5e9',
+        label: QUOTE_STATUS_LABELS.APPROVED,
+      },
+      SENT: {
+        color: '#00838f',
+        backgroundColor: '#e0f7fa',
+        label: QUOTE_STATUS_LABELS.SENT,
+      },
+      ACCEPTED: {
+        color: '#2e7d32',
+        backgroundColor: '#c8e6c9',
+        label: QUOTE_STATUS_LABELS.ACCEPTED,
+      },
+      EXPIRED: {
+        color: '#5d4037',
+        backgroundColor: '#efebe9',
+        label: QUOTE_STATUS_LABELS.EXPIRED,
+      },
+      CANCELLED: {
+        color: '#616161',
+        backgroundColor: '#eeeeee',
+        label: QUOTE_STATUS_LABELS.CANCELLED,
+      },
+      REJECTED: {
+        color: '#d32f2f',
+        backgroundColor: '#ffebee',
+        label: QUOTE_STATUS_LABELS.REJECTED,
       },
     };
 
