@@ -13,7 +13,8 @@ import java.util.function.Function;
 
 /**
  * Shared product-rule evaluation core for Wave G / S2B-8.
- * Used by {@link StatelessConfigurationEvaluator} (agent path) and later {@code ConstraintSolver}.
+ * Used by {@link StatelessConfigurationEvaluator} (agent path) and
+ * {@link com.opencrm.configuration.constraint.ConstraintSolver} (session path).
  *
  * <p>Hard failures ({@code valid=false}): REQUIRES, EXCLUDES, VALIDATES.
  * Soft warnings (recorded but do not alone fail): RECOMMENDS.
