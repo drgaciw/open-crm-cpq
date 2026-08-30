@@ -4,7 +4,8 @@
   "license": "MIT",
   "scripts": {
     "test": "nx run-many -t test --all --parallel=3",
-    "test:crm": "nx run-many -t test --projects=crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models,shared-data-access --parallel=3"
+    "test:crm": "nx run-many -t test --projects=crm-deals,crm-leads,crm-contacts,crm-organizations,crm-dashboard,shared-models,shared-data-access --parallel=3",
+    "test:cpq": "nx run-many -t test --projects=cpq-catalog,cpq-quotes,cpq-pricing-data-access,cpq-pricing-ui,cpq-pricing-simulator --parallel=3"
   },
   "private": true,
   "dependencies": {

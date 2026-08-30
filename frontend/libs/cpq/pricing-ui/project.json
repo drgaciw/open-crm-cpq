@@ -1,0 +1,24 @@
+{
+  "name": "cpq-pricing-ui",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/pricing-ui/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": [
+    "scope:cpq",
+    "type:ui",
+    "domain:pricing"
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/cpq/pricing-ui"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
