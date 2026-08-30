@@ -1,6 +1,6 @@
 # Wave F architecture — S2B-11 configuration validate compatibility (hybrid)
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (hybrid S2B-11; F3 HIGH acknowledged)  
+**Status:** COMPLETE — hybrid S2B-11 merged to main (F1→F2∥F4→F3→F5)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** worktree / `origin/main` @ `c5075a8` (Waves A–E complete; configuration ADR **Accepted**)  
@@ -192,6 +192,6 @@ Implement Open CRM/CPQ Wave F hybrid S2B-11 per docs/forge/15-wave-f-architectur
 - [x] Holds respected: Activities, S2C-12, #238, #241, full S2B-8  
 - [x] Gateway must not embed domain validation — captured in F3 acceptance  
 - [x] PM authorizes forge execution (`forge-wave-f` / goal text in §7) — **F3 HIGH risk acknowledged**  
-- [ ] Post-merge: dual-run green; matrix updated; product validate retained  
+- [x] Post-merge: dual-run fixtures + gateway tests green; matrix updated; product validate retained  
 
-**FORGE AUTHORIZED — HYBRID S2B-11.** F3 requires contract/dual-run evidence before merge.
+**WAVE F COMPLETE.**

@@ -31,7 +31,7 @@ You design **implementation-ready** plans for this monorepo. Prefer evidence fro
 2. **Entities never at API boundary** — DTOs + MapStruct; `ApiResponse<T>`; Flyway for schema.
 3. **Gateway owns external paths** — no domain logic in gateway; agent-contract paths from `docs/backlog/CPQ_API_CONTRACT_MATRIX.md`.
 4. **Do not invent** `/api/v1/activities/**` until schema+controller exist.
-5. **S2B-11 / S2C-12** require **Accepted** ADR before forge implementation (Accept-only docs PRs are allowed while Status is Proposed).
+5. **S2B-11 / S2C-12** require **Accepted** ADR before forge implementation (Accept-only docs PRs are allowed while Status is Proposed). Hybrid S2B-11 (Wave F) landed: gateway validate → CE `/internal/.../evaluate` + structured DTO; full S2B-8 ConstraintSolver still separate.
 6. **Security defaults** — never leave `SECURITY_OPEN` as a production-reachable bypass; never ship `*.azurewebsites.net` origin wildcards.
 7. **CSRF edge-only** — browser Cookie CSRF lives on **gateway** only. Domain services stay `csrf.disable()` + `STATELESS` (Bearer/mesh). Do **not** merge Jules enable-all Cookie CSRF on microservices (#402/#404).
 

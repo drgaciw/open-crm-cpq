@@ -5,7 +5,7 @@
 **Accepted:** 2026-08-30 (Wave E / E3 — freeze open-question defaults only)  
 **Backlog PR:** S2A-8 (Stack 2A — Shared Contracts and Published Language)  
 **Depends on:** S2A-7 (`CPQ_API_CONTRACT_MATRIX.md`)  
-**Implementation PR:** S2B-11 (configuration API compatibility layer) — **deferred**; Accept does **not** schedule or land the gateway validate shim, response-shape rewrite, or product-service validate removal  
+**Implementation PR:** S2B-11 (configuration API compatibility layer) — **Wave F hybrid landed** (gateway validate → CE `/internal/v1/configurations/evaluate` + `ConfigurationValidationResult`); product-service validate **retained**; full S2B-8 ConstraintSolver still follow-on  
 **Deciders:** Platform architecture / CPQ microservice backlog owners  
 **Accept authority:** Wave E architecture (`docs/forge/14-wave-e-architecture.md`)
 
