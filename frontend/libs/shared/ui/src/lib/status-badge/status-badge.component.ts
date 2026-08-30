@@ -3,7 +3,13 @@ import { CommonModule } from '@angular/common';
 import { MatChipsModule } from '@angular/material/chips';
 import { LeadStatus, DealStage } from '@frontend/shared-models';
 
-export type StatusType = 'lead' | 'deal';
+export type StatusType = 'lead' | 'deal' | 'product';
+
+export type ProductStatusBadge =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'DEPRECATED'
+  | 'RETIRED';
 
 interface StatusConfig {
   color: string;
@@ -12,11 +18,12 @@ interface StatusConfig {
 }
 
 /**
- * Color-coded badge component for displaying lead statuses and deal stages
+ * Color-coded badge for lead statuses, deal stages, and catalog product statuses
  *
  * @example
  * <app-status-badge [status]="'NEW'" [type]="'lead'" />
- * <app-status-badge [status]="'CLOSED_WON'" [type]="'deal'" />
+ * <app-status-badge [status]="'WON'" [type]="'deal'" />
+ * <app-status-badge [status]="'ACTIVE'" [type]="'product'" />
  */
 @Component({
   selector: 'app-status-badge',
@@ -50,20 +57,20 @@ interface StatusConfig {
   `],
 })
 export class StatusBadgeComponent {
-  // Inputs using signal-based API
   status = input.required<string>();
   type = input.required<StatusType>();
 
-  // Computed signal for status configuration
   statusConfig = computed(() => {
     const statusValue = this.status();
     const typeValue = this.type();
 
     if (typeValue === 'lead') {
       return this.getLeadStatusConfig(statusValue as LeadStatus);
-    } else {
-      return this.getDealStageConfig(statusValue as DealStage);
     }
+    if (typeValue === 'product') {
+      return this.getProductStatusConfig(statusValue as ProductStatusBadge);
+    }
+    return this.getDealStageConfig(statusValue as DealStage);
   });
 
   private getLeadStatusConfig(status: LeadStatus): StatusConfig {
@@ -150,6 +157,37 @@ export class StatusBadgeComponent {
       color: '#757575',
       backgroundColor: '#f5f5f5',
       label: stage,
+    };
+  }
+
+  private getProductStatusConfig(status: ProductStatusBadge): StatusConfig {
+    const configs: Record<ProductStatusBadge, StatusConfig> = {
+      DRAFT: {
+        color: '#757575',
+        backgroundColor: '#f5f5f5',
+        label: 'Draft',
+      },
+      ACTIVE: {
+        color: '#388e3c',
+        backgroundColor: '#e8f5e9',
+        label: 'Active',
+      },
+      DEPRECATED: {
+        color: '#f57c00',
+        backgroundColor: '#fff3e0',
+        label: 'Deprecated',
+      },
+      RETIRED: {
+        color: '#d32f2f',
+        backgroundColor: '#ffebee',
+        label: 'Retired',
+      },
+    };
+
+    return configs[status] || {
+      color: '#757575',
+      backgroundColor: '#f5f5f5',
+      label: status,
     };
   }
 }

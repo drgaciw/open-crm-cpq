@@ -95,7 +95,7 @@ export interface RowActionEvent<T = unknown> {
             mat-row
             *matRowDef="let row; columns: displayedColumns();"
             class="table-row"
-            [class.clickable]="rowClick.observed"
+            [class.clickable]="clickable()"
           ></tr>
 
           <!-- Empty State Row -->
@@ -207,6 +207,8 @@ export class DataTableComponent<T = unknown> {
   data = input.required<T[]>();
   loading = input<boolean>(false);
   pagination = input<PaginationMeta | null>(null);
+  /** When true, rows show pointer cursor (OutputEmitterRef has no EventEmitter.observed). */
+  clickable = input<boolean>(true);
 
   // Outputs using signal-based API
   pageChange = output<PageEvent>();
