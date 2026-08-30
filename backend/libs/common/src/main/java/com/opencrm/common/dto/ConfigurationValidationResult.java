@@ -39,4 +39,25 @@ public class ConfigurationValidationResult {
                 .violations(list)
                 .build();
     }
+
+    /**
+     * Build a result where only hard rule types fail {@code valid}.
+     * Soft types (e.g. RECOMMENDS) may appear in {@code violations} while {@code valid} stays true.
+     */
+    public static ConfigurationValidationResult of(List<ConfigurationViolation> violations) {
+        List<ConfigurationViolation> list = violations == null ? List.of() : List.copyOf(violations);
+        boolean hardFailure = list.stream().anyMatch(ConfigurationValidationResult::isHardViolation);
+        return ConfigurationValidationResult.builder()
+                .valid(!hardFailure)
+                .violations(list)
+                .build();
+    }
+
+    private static boolean isHardViolation(ConfigurationViolation violation) {
+        if (violation == null || violation.getRuleType() == null) {
+            return false;
+        }
+        String type = violation.getRuleType().trim().toUpperCase();
+        return "REQUIRES".equals(type) || "EXCLUDES".equals(type) || "VALIDATES".equals(type);
+    }
 }

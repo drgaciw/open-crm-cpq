@@ -119,21 +119,67 @@ class StatelessConfigurationEvaluatorTest {
     }
 
     @Test
-    @DisplayName("RECOMMENDS and other rule types are ignored (parity with product validate)")
-    void recommendsIgnored() {
+    @DisplayName("RECOMMENDS miss is soft: valid=true with RECOMMENDS violation")
+    void recommendsMissIsSoft() {
         when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
                 ProductConfigurationRuleDto.builder()
-                        .id(303L)
+                        .id(201L)
                         .ruleType("RECOMMENDS")
                         .sourceProductId(10L)
-                        .targetProductId(99L)
-                        .errorMessage("should not fail")
+                        .targetProductId(30L)
+                        .errorMessage("Consider addon")
                         .build()
         ));
 
         ConfigurationValidationResult result = evaluator.evaluate(List.of(10L));
 
         assertThat(result.isValid()).isTrue();
+        assertThat(result.getViolations()).hasSize(1);
+        assertThat(result.getViolations().get(0).getRuleType()).isEqualTo("RECOMMENDS");
+    }
+
+    @Test
+    @DisplayName("DEFAULT expands selection so REQUIRES against default target can pass")
+    void defaultExpandsSelection() {
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(301L)
+                        .ruleType("DEFAULT")
+                        .sourceProductId(10L)
+                        .targetProductId(20L)
+                        .build(),
+                ProductConfigurationRuleDto.builder()
+                        .id(302L)
+                        .ruleType("REQUIRES")
+                        .sourceProductId(10L)
+                        .targetProductId(20L)
+                        .build()
+        ));
+        when(ruleClient.getRulesForProduct(20L)).thenReturn(List.of());
+
+        ConfigurationValidationResult result = evaluator.evaluate(List.of(10L));
+
+        assertThat(result.isValid()).isTrue();
         assertThat(result.getViolations()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("VALIDATES miss on targetProductId is hard failure")
+    void validatesMissIsHard() {
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder()
+                        .id(401L)
+                        .ruleType("VALIDATES")
+                        .sourceProductId(10L)
+                        .targetProductId(40L)
+                        .conditionExpression("attr:color=red")
+                        .errorMessage("Needs validated option")
+                        .build()
+        ));
+
+        ConfigurationValidationResult result = evaluator.evaluate(List.of(10L));
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getViolations().get(0).getRuleType()).isEqualTo("VALIDATES");
     }
 }
