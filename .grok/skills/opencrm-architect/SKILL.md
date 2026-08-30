@@ -3,9 +3,10 @@ name: opencrm-architect
 description: >
   Open CRM/CPQ system architect for Spring Boot microservices, Angular/Nx frontend,
   gateway security, CPQ contracts, and GitNexus blast-radius planning. Use when
-  designing Wave D+ work, writing ADRs, sequencing forge PR DAGs, assessing CORS/
-  securityOpen/security boundaries, or when the user runs /opencrm-architect.
-  Triggers: architecture, ADR, wave plan, blast radius, security design, forge plan.
+  designing Wave D/E+ work, writing ADRs, sequencing forge PR DAGs, assessing CORS/
+  securityOpen/CSRF edge boundaries, or when the user runs /opencrm-architect.
+  Triggers: architecture, ADR, wave plan, blast radius, security design, forge plan,
+  CSRF boundary, configuration ADR accept.
 ---
 
 # Open CRM/CPQ Architect
@@ -30,8 +31,9 @@ You design **implementation-ready** plans for this monorepo. Prefer evidence fro
 2. **Entities never at API boundary** — DTOs + MapStruct; `ApiResponse<T>`; Flyway for schema.
 3. **Gateway owns external paths** — no domain logic in gateway; agent-contract paths from `docs/backlog/CPQ_API_CONTRACT_MATRIX.md`.
 4. **Do not invent** `/api/v1/activities/**` until schema+controller exist.
-5. **S2B-11 / S2C-12** require Accepted ADR before forge implementation.
+5. **S2B-11 / S2C-12** require **Accepted** ADR before forge implementation (Accept-only docs PRs are allowed while Status is Proposed).
 6. **Security defaults** — never leave `SECURITY_OPEN` as a production-reachable bypass; never ship `*.azurewebsites.net` origin wildcards.
+7. **CSRF edge-only** — browser Cookie CSRF lives on **gateway** only. Domain services stay `csrf.disable()` + `STATELESS` (Bearer/mesh). Do **not** merge Jules enable-all Cookie CSRF on microservices (#402/#404).
 
 ## Architecture deliverable shape
 
@@ -53,7 +55,7 @@ Every architecture output MUST include:
 | P2 CPQ product surface | FE stubs → real HTTP, catalog/quotes/pricing UX |
 | P3 Agent/Kafka | Simulated agent migration (#241), S2A topics |
 
-## Security design checklist (Wave D)
+## Security design checklist (Wave D — done on main)
 
 - Inventory every `SecurityConfig` with `security.open` (expect ~9 services).  
 - Prefer **remove bypass** + `@AutoConfigureMockMvc(addFilters = false)` / `@WithMockUser` in tests over keeping the flag.  
@@ -61,6 +63,15 @@ Every architecture output MUST include:
 - Tighten `CsrfProtectionFilter` so `*.` patterns are rejected or require explicit allow-list entries without subdomain wildcards.  
 - Add gateway unit tests asserting wildcard origins are rejected.  
 - Deduplicate GitHub Sentinel issue cluster after fix (comment/close duplicates).  
+
+## Security design checklist (Wave E — CSRF boundary + ADR)
+
+- Inventory CSRF: gateway ON; domain services should be `csrf.disable()` + STATELESS.  
+- Align any Cookie CSRF anomalies on pricing/pricebook to `csrf.disable()` (do not enable CSRF on crm/quote/etc.).  
+- Publish `docs/ADR-004-csrf-edge-boundary.md`; reject Jules #402/#404 as wrong for gateway JWT model.  
+- Accept configuration ADR with frozen open-question defaults — **no** S2B-11 shim code in the same wave.  
+- GitNexus `SecurityConfig` impact is often **UNKNOWN** — warn user; confirm with `rg` + FE gateway-only clients before editing.  
+- Hygiene: close superseded Bolt N+1 (C6), WhatsApp FP/legacy, obsolete CI password PRs.
 
 ## Collaboration
 
