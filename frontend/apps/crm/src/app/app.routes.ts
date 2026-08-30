@@ -37,6 +37,11 @@ export const appRoutes: Route[] = [
         loadChildren: () =>
           import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
       },
+      {
+        path: 'quotes',
+        loadChildren: () =>
+          import('@frontend/cpq-quotes').then((m) => m.QUOTES_ROUTES),
+      },
     ],
   },
 ];

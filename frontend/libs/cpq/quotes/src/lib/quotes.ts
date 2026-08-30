@@ -1,5 +1,4 @@
 /**
- * Scaffold marker for @frontend/cpq-quotes.
- * Quotes feature library (list/detail/lifecycle). UI lands in PR-FE-CPQ-06.
+ * Library marker for @frontend/cpq-quotes (PR-FE-CPQ-06 lite stub).
  */
 export const CPQ_QUOTES_LIB = 'cpq-quotes' as const;
