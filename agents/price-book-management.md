@@ -7,7 +7,7 @@
 | **Agent ID**      | cpq-agent-035                                  |
 | **Name**          | Price Book Management Agent                    |
 | **Group**         | Integration & Operations                       |
-| **Primary Service** | pricing-service (8082), product-service (8083) |
+| **Primary Service** | pricebook-service (8089), product-service (8083) |
 | **Autonomy Level** | Advisory                                      |
 | **Dependencies**  | cpq-agent-004 (List Price Application Agent)   |
 
@@ -23,7 +23,7 @@ The agent operates at an Advisory level: it analyzes price book health, identifi
 
 ## Key Skills / Capabilities
 
-- **Price Book Health Analysis**: Scans all active price books via `GET /api/v1/pricing/price-books` and cross-references entries against the active product catalog from `GET /api/v1/products?status=ACTIVE`. Identifies products missing from specific price books, entries with stale effective dates, and price books with no active entries.
+- **Price Book Health Analysis**: Scans all active price books via `GET /api/v1/price-books` and cross-references entries against the active product catalog from `GET /api/v1/products?status=ACTIVE`. Identifies products missing from specific price books, entries with stale effective dates, and price books with no active entries.
 
 - **Gap Analysis**: Generates a coverage matrix showing which products have entries in which price books. Highlights gaps where a product is available in a region but has no regional price book entry, forcing fallback to the global default. Recommends specific entries to create based on product-region-segment combinations.
 
