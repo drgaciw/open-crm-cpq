@@ -2,9 +2,10 @@
 
 Nx library for `@frontend/cpq-pricing-simulator`.
 
-Presentational pricing simulator stub (Wave C4): minimal form + result panel with
-mock `PricingResult` success (no HTTP). Full UX (waterfall components, real
-`POST /api/v1/pricing/simulate`) lands in PR-FE-CPQ-07.
+Pricing simulator UI (Wave G8): form builds a `PricingContext` and calls
+`PricingExecutionService.execute` → `POST /api/v1/pricing/execute`. HTTP and
+`success=false` failures surface via an error empty-state. Mock fixtures
+(`mockExecuteOk` / `MOCK_PRICING_*`) remain for Vitest only.
 
 ## Route
 
