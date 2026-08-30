@@ -1,0 +1,17 @@
+{
+  "id": "s2c-1b-drl-approval-margin-below-floor",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "description": "approval-margin-exception.drl (salience 930) routes DEAL_DESK when estimatedMarginPct < 0.35.",
+  "ruleClasspath": "rules/approval-margin-exception.drl",
+  "facts": {
+    "basePrice": 1000.00,
+    "finalPrice": 900.00,
+    "estimatedMarginPct": 0.30
+  },
+  "expected": {
+    "rulesFired": 1,
+    "approvalState": "PENDING",
+    "approvalTier": "DEAL_DESK",
+    "explanationCode": "MARGIN_BELOW_FLOOR"
+  }
+}
