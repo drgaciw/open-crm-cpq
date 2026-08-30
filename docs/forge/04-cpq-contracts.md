@@ -150,7 +150,7 @@ rg -l 'MockMvc|WebTestClient' backend/services/{product,pricing,quote,pricebook,
 # (empty)
 ```
 
-No S2C-1b **golden fixtures** for `POST /api/v1/pricing/execute` (only unit `PricingExecutionServiceTest` with mocked pricebook client). No S2B-11 contract tests for validate response shape.
+S2C-1b **golden fixtures** for `POST /api/v1/pricing/execute` are in place (`PricingExecuteGoldenFixtureTest` + `PricingDrulesGoldenFixtureTest`, `@Tag("unit")`, Docker-free). No S2B-11 contract tests for validate response shape.
 
 ### G6 — Gateway test depth / ERP forward path fragility — **MEDIUM**
 

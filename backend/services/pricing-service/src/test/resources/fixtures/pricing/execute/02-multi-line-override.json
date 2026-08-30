@@ -1,0 +1,89 @@
+{
+  "id": "s2c-1b-02-multi-line-override",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "description": "Mixed price-book resolve and listPriceOverride; 24-month metrics; no active Drools rules.",
+  "request": {
+    "customerExternalId": "CUST-GOLD-002",
+    "quoteExternalId": "Q-GOLD-002",
+    "region": "EMEA",
+    "currency": "USD",
+    "durationInMonths": 24,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-A",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 2
+      },
+      {
+        "productExternalId": "PROD-B",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 3,
+        "listPriceOverride": 80.00
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {
+      "externalId": "CUST-GOLD-002",
+      "name": "Override Fixture GmbH",
+      "region": "EMEA",
+      "churnScore": 45
+    },
+    "priceBookEntries": {
+      "PROD-A": {
+        "entryMatched": true,
+        "listPrice": 250.00,
+        "currency": "USD"
+      }
+    },
+    "activeRules": []
+  },
+  "expected": {
+    "success": true,
+    "approvalState": "APPROVED",
+    "lineResults": [
+      {
+        "productExternalId": "PROD-A",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 2,
+        "listPrice": 250.00,
+        "unitPrice": 250.00,
+        "discountRate": 0,
+        "discountAmount": 0,
+        "surchargeAmount": 0,
+        "finalPrice": 500.00
+      },
+      {
+        "productExternalId": "PROD-B",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 3,
+        "listPrice": 80.00,
+        "unitPrice": 80.00,
+        "discountRate": 0,
+        "discountAmount": 0,
+        "surchargeAmount": 0,
+        "finalPrice": 240.00
+      }
+    ],
+    "waterfall": {
+      "listPrice": 330.00,
+      "basePrice": 330.00,
+      "netPrice": 740.00,
+      "approvalState": "APPROVED",
+      "steps": []
+    },
+    "financialMetrics": {
+      "arr": 8880,
+      "tcv": 17760,
+      "acv": 1480.00,
+      "clv": 35520,
+      "churnScore": 45,
+      "discountRate": 0.0000,
+      "totalDiscount": 0,
+      "totalSurcharge": 0,
+      "priceMultiplier": 1.0000,
+      "estimatedMarginPct": 40.0
+    }
+  }
+}
