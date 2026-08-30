@@ -8,8 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Subset of product-service {@code ConfigurationRuleDto} used for thin
- * REQUIRES/EXCLUDES parity evaluation (Wave F / S2B-11).
+ * Subset of product-service {@code ConfigurationRuleDto} for CE evaluation
+ * (Wave F REQUIRES/EXCLUDES + Wave G S2B-8 extended types).
  */
 @Data
 @Builder
@@ -25,6 +25,8 @@ public class ProductConfigurationRuleDto {
     private String ruleType;
     private Long sourceProductId;
     private Long targetProductId;
+    /** Product-service VALIDATES/DEFAULT expression payload (Wave G). */
+    private String conditionExpression;
     private String errorMessage;
     private int priority;
 }
