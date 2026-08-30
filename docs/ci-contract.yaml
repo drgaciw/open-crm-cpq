@@ -4,7 +4,7 @@
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-05-20"
+last_reviewed: "2026-08-30"
 
 execution:
   primary: jenkins
@@ -36,6 +36,7 @@ scripts_ci:
       jenkins_stage: Backend Unit
       jenkins_parallel_group: Parallel — Fast checks
       blocking: true
+      notes: "Maven -pl services/crm-service,services/gateway-service -am verify -Punit-tests (Docker-free; excludes integration-tagged tests)"
     - id: cpq-beta-python
       script: scripts/ci/cpq-beta-python.sh
       run_core_arg: cpq-beta-python
