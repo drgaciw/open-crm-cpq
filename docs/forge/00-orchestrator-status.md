@@ -1,24 +1,23 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave A + Wave B complete** (merged to main)  
-**Plan:** `docs/forge/10-next-wave-plan.md`  
-**Herdr:** Wave workspaces closable after sync  
+**Session state:** **Wave C EXECUTING** — Safe CPQ/CRM polish  
+**Plan:** `docs/forge/12-wave-c-plan.md`  
+**Herdr:** `forge-wave-c` (6× Grok 4.5)  
+**Sources:** GitHub `gh issue list` + forge backlog (GitNexus MCP offline; CLI reindex in progress)
 
-## Completed
+## Wave C agents
 
-### Wave A
-- Pricing execute golden fixtures  
-- FE proxy → gateway `:8080`
-
-### Wave B
-- Deal pipeline UX  
-- CPQ shared TS models  
-- Staging smoke scripts + quote-accept runbook  
-- Gateway ERP 501 contract tests  
-- CRM parity docs + activities deferral  
-- CPQ catalog list/detail stub  
+| Agent | Task |
+|-------|------|
+| `wc-quotes` | Quotes list/detail stub |
+| `wc-data` | CPQ data-access HTTP clients |
+| `wc-ui` | Shared-ui on CRM leads/contacts |
+| `wc-sim` | Pricing simulator stub |
+| `wc-tests` | FE test hardening |
+| `wc-n1` | PriceBook N+1 (gh #456 family) |
 
 ## Still held
-- Activities API implementation  
-- S2B-11 / S2C-12 HIGH CPQ boundary work  
+- Activities API, S2B-11, S2C-12  
+- CORS/CSRF wildcard cluster (#458…)  
+- Auth bypass CRITICAL (#451)  
