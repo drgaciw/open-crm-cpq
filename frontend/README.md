@@ -16,9 +16,26 @@ npx nx serve crm
 
 ### API proxy (local)
 
-`proxy.conf.json` forwards `/api` to the **API gateway** at `http://localhost:8080` so CRM and CPQ routes (for example `/api/v1/deals` and `/api/v1/products`) share one origin when the gateway is up.
+**Default:** `proxy.conf.json` forwards `/api` to the **API gateway** at `http://localhost:8080`. With `npx nx serve crm`, CRM and CPQ routes (for example `/api/v1/deals` and `/api/v1/products`) share one origin when the gateway is running.
 
-For CRM-only debugging against **crm-service** directly, temporarily set the proxy target to `http://localhost:8081` in `proxy.conf.json`, then restore `:8080` when finished.
+| Target | Port | When to use |
+|--------|------|-------------|
+| API gateway (default) | `:8080` | Normal local FE + CRM/CPQ via gateway |
+| crm-service (override) | `:8081` | CRM-only debugging without the gateway |
+
+**CRM-direct override:** temporarily point the proxy at crm-service, then restore the default before committing:
+
+```json
+{
+  "/api": {
+    "target": "http://localhost:8081",
+    "secure": false,
+    "changeOrigin": true
+  }
+}
+```
+
+Committed `proxy.conf.json` must keep `"target": "http://localhost:8080"`. See also [docs/CRM_API_PARITY.md](../docs/CRM_API_PARITY.md) (gateway vs direct) and [docs/CRM_GATEWAY_ENV.md](../docs/CRM_GATEWAY_ENV.md).
 
 To create a production bundle:
 
