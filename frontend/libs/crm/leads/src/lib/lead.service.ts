@@ -6,7 +6,6 @@ import {
   LeadCreateRequest,
   LeadUpdateRequest,
   LeadStatus,
-  DealDto,
   PaginationMeta,
   SpringPageResponse,
 } from '@frontend/shared-models';
@@ -80,10 +79,19 @@ export class LeadService {
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('q', query);
-    this.http.get<LeadDto[]>(`${this.basePath}/search`, { params })
+    // Interceptor rebuilds List+PageInfo into SpringPageResponse
+    this.http.get<SpringPageResponse<LeadDto>>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (leads) => this.leads.set(leads),
+        next: (p) => {
+          this.leads.set(p.content ?? p);
+          if (p.totalElements !== undefined) {
+            this.pagination.set({
+              page: p.number ?? 0, size: p.size ?? 20,
+              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
+            });
+          }
+        },
         error: (err) => {
           this.error.set(err?.error?.message || 'An error occurred');
         }
@@ -98,8 +106,9 @@ export class LeadService {
     return this.http.post<LeadDto>(`${this.basePath}/${id}/qualify`, {});
   }
 
-  convertToDeal(id: number): Observable<DealDto> {
-    return this.http.post<DealDto>(`${this.basePath}/${id}/convert`, {});
+  /** POST convert returns LeadDto with convertedDealId (not DealDto). */
+  convertToDeal(id: number): Observable<LeadDto> {
+    return this.http.post<LeadDto>(`${this.basePath}/${id}/convert`, {});
   }
 
   markLost(id: number, reason: string): Observable<LeadDto> {

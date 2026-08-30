@@ -290,12 +290,14 @@ class OrganizationControllerIntegrationTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request3)));
 
-        // Search for "Acme"
+        // Search for "Acme" — data is T[] + pagination (same contract as list)
         mockMvc.perform(get("/api/v1/organizations/search")
                         .param("q", "Acme"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data", hasSize(2)));
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.pagination").exists())
+                .andExpect(jsonPath("$.pagination.totalElements").value(2));
     }
 }
