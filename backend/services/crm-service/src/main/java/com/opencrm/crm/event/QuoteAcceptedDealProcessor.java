@@ -18,12 +18,22 @@ public class QuoteAcceptedDealProcessor {
 
     private final DealRepository dealRepository;
 
+    /**
+     * Marks the deal WON from quote acceptance fields.
+     *
+     * @return {@code true} if the deal was found and updated; {@code false} if missing (no-op).
+     *         Callers must not retain the Redis idempotency key when this returns {@code false}.
+     */
     @Transactional
-    public void applyWinFromQuote(QuoteAcceptedCrmMessage event, String dealExternalId) {
-        dealRepository.findByUuid(dealExternalId).ifPresentOrElse(
-                deal -> applyToDeal(deal, event),
-                () -> log.warn("Deal with UUID {} not found for QuoteAcceptedCrmMessage", dealExternalId)
-        );
+    public boolean applyWinFromQuote(QuoteAcceptedCrmMessage event, String dealExternalId) {
+        return dealRepository.findByUuid(dealExternalId).map(deal -> {
+            applyToDeal(deal, event);
+            return true;
+        }).orElseGet(() -> {
+            log.warn("Deal with UUID {} not found for QuoteAcceptedCrmMessage; not retaining idempotency key",
+                    dealExternalId);
+            return false;
+        });
     }
 
     private void applyToDeal(Deal deal, QuoteAcceptedCrmMessage event) {

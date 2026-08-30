@@ -21,6 +21,7 @@ import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,7 +47,7 @@ class QuoteAcceptedEventListenerTest {
 
     @BeforeEach
     void setUp() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
@@ -61,7 +62,11 @@ class QuoteAcceptedEventListenerTest {
                 .build();
         byte[] body = objectMapper.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
 
-        when(valueOperations.setIfAbsent(any(String.class), eq("1"), any(Duration.class))).thenReturn(true);
+        String expectedKey = QuoteAcceptedIdempotency.redisKey("quote-uuid-1");
+        when(valueOperations.setIfAbsent(eq(expectedKey), eq("1"), eq(QuoteAcceptedIdempotency.TTL)))
+                .thenReturn(true);
+        when(quoteAcceptedDealProcessor.applyWinFromQuote(any(QuoteAcceptedCrmMessage.class),
+                eq("550e8400-e29b-41d4-a716-446655440001"))).thenReturn(true);
 
         Message message = mock(Message.class);
         when(message.getBody()).thenReturn(body);
@@ -70,6 +75,7 @@ class QuoteAcceptedEventListenerTest {
 
         verify(quoteAcceptedDealProcessor).applyWinFromQuote(any(QuoteAcceptedCrmMessage.class),
                 eq("550e8400-e29b-41d4-a716-446655440001"));
+        verify(stringRedisTemplate, never()).delete(any(String.class));
     }
 
     @Test
@@ -80,7 +86,9 @@ class QuoteAcceptedEventListenerTest {
                 .build();
         byte[] body = objectMapper.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
 
-        when(valueOperations.setIfAbsent(any(String.class), eq("1"), any(Duration.class))).thenReturn(false);
+        String expectedKey = QuoteAcceptedIdempotency.redisKey("quote-uuid-2");
+        when(valueOperations.setIfAbsent(eq(expectedKey), eq("1"), eq(QuoteAcceptedIdempotency.TTL)))
+                .thenReturn(false);
 
         Message message = mock(Message.class);
         when(message.getBody()).thenReturn(body);
@@ -88,5 +96,68 @@ class QuoteAcceptedEventListenerTest {
         listener.onMessage(message, null);
 
         verify(quoteAcceptedDealProcessor, never()).applyWinFromQuote(any(), any());
+        verify(stringRedisTemplate, never()).delete(any(String.class));
+    }
+
+    @Test
+    void onMessage_skipsWhenDealExternalIdBlank() throws Exception {
+        QuoteAcceptedCrmMessage payload = QuoteAcceptedCrmMessage.builder()
+                .dealExternalId("   ")
+                .quoteUuid("quote-uuid-blank")
+                .build();
+        byte[] body = objectMapper.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
+
+        Message message = mock(Message.class);
+        when(message.getBody()).thenReturn(body);
+
+        listener.onMessage(message, null);
+
+        verify(valueOperations, never()).setIfAbsent(any(), any(), any(Duration.class));
+        verify(quoteAcceptedDealProcessor, never()).applyWinFromQuote(any(), any());
+    }
+
+    @Test
+    void onMessage_deletesKeyWhenDealMissing() throws Exception {
+        QuoteAcceptedCrmMessage payload = QuoteAcceptedCrmMessage.builder()
+                .dealExternalId("550e8400-e29b-41d4-a716-446655440003")
+                .quoteUuid("quote-uuid-missing-deal")
+                .build();
+        byte[] body = objectMapper.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
+
+        String expectedKey = QuoteAcceptedIdempotency.redisKey("quote-uuid-missing-deal");
+        when(valueOperations.setIfAbsent(eq(expectedKey), eq("1"), eq(QuoteAcceptedIdempotency.TTL)))
+                .thenReturn(true);
+        when(quoteAcceptedDealProcessor.applyWinFromQuote(any(QuoteAcceptedCrmMessage.class),
+                eq("550e8400-e29b-41d4-a716-446655440003"))).thenReturn(false);
+
+        Message message = mock(Message.class);
+        when(message.getBody()).thenReturn(body);
+
+        listener.onMessage(message, null);
+
+        verify(stringRedisTemplate).delete(expectedKey);
+    }
+
+    @Test
+    void onMessage_deletesKeyWhenProcessorThrows() throws Exception {
+        QuoteAcceptedCrmMessage payload = QuoteAcceptedCrmMessage.builder()
+                .dealExternalId("550e8400-e29b-41d4-a716-446655440004")
+                .quoteUuid("quote-uuid-throw")
+                .build();
+        byte[] body = objectMapper.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8);
+
+        String expectedKey = QuoteAcceptedIdempotency.redisKey("quote-uuid-throw");
+        when(valueOperations.setIfAbsent(eq(expectedKey), eq("1"), eq(QuoteAcceptedIdempotency.TTL)))
+                .thenReturn(true);
+        when(quoteAcceptedDealProcessor.applyWinFromQuote(any(QuoteAcceptedCrmMessage.class),
+                eq("550e8400-e29b-41d4-a716-446655440004")))
+                .thenThrow(new RuntimeException("db down"));
+
+        Message message = mock(Message.class);
+        when(message.getBody()).thenReturn(body);
+
+        listener.onMessage(message, null);
+
+        verify(stringRedisTemplate).delete(expectedKey);
     }
 }
