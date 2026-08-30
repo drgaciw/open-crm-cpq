@@ -1,7 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
+  inject,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -17,13 +19,12 @@ import {
   SearchInputComponent,
   TableColumn,
 } from '@frontend/shared-ui';
-import { PaginationMeta } from '@frontend/shared-models';
 import {
-  CatalogProduct,
-  CatalogProductCategory,
-  CatalogProductStatus,
-} from '../catalog.model';
-import { MOCK_CATALOG_PRODUCTS } from '../catalog.mock';
+  ProductCategory,
+  ProductDto,
+  ProductStatus,
+} from '@frontend/shared-models';
+import { ProductService } from '../product.service';
 
 interface CatalogTableRow {
   id: number;
@@ -51,7 +52,7 @@ interface CatalogTableRow {
   template: `
     <app-page-header
       title="Product Catalog"
-      subtitle="Browse sellable products (presentational stub — mock data)"
+      subtitle="Browse sellable products from the product catalog API"
     >
       <div actions>
         <button mat-stroked-button type="button" disabled aria-disabled="true">
@@ -114,7 +115,7 @@ interface CatalogTableRow {
     } @else {
       <app-data-table
         [columns]="columns"
-        [data]="pagedRows()"
+        [data]="tableRows()"
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
@@ -163,15 +164,18 @@ interface CatalogTableRow {
     `,
   ],
 })
-export class CatalogListComponent {
-  readonly categories: CatalogProductCategory[] = [
+export class CatalogListComponent implements OnInit {
+  readonly service = inject(ProductService);
+  private readonly router = inject(Router);
+
+  readonly categories: ProductCategory[] = [
     'SUBSCRIPTION',
     'LICENSE',
     'SUPPORT',
     'SERVICES',
     'ADD_ON',
   ];
-  readonly statuses: CatalogProductStatus[] = [
+  readonly statuses: ProductStatus[] = [
     'DRAFT',
     'ACTIVE',
     'DEPRECATED',
@@ -186,70 +190,49 @@ export class CatalogListComponent {
     { key: 'listPrice', header: 'List Price', type: 'currency', sortable: true },
   ];
 
-  private readonly allProducts = signal<CatalogProduct[]>([...MOCK_CATALOG_PRODUCTS]);
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly categoryFilter = signal('');
   readonly statusFilter = signal('');
-  readonly pageIndex = signal(0);
-  readonly pageSize = signal(10);
 
-  readonly filteredProducts = computed(() => {
-    const q = this.searchTerm().trim().toLowerCase();
+  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  readonly loading = computed(() => this.service.loading());
+  readonly error = computed(() => this.service.error());
+  readonly pagination = computed(() => this.service.pagination());
+
+  /**
+   * When a text search is active, category/status are refined client-side on the
+   * current search page (search API has no category/status params).
+   */
+  readonly tableRows = computed<CatalogTableRow[]>(() => {
     const category = this.categoryFilter();
     const status = this.statusFilter();
+    const searching = this.searchTerm().trim().length > 0;
 
-    return this.allProducts().filter((p) => {
-      if (category && p.category !== category) {
-        return false;
-      }
-      if (status && p.status !== status) {
-        return false;
-      }
-      if (!q) {
+    return this.service
+      .products()
+      .filter((p) => {
+        if (!searching) {
+          return true;
+        }
+        if (category && p.category !== category) {
+          return false;
+        }
+        if (status && p.status !== status) {
+          return false;
+        }
         return true;
-      }
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        (p.description?.toLowerCase().includes(q) ?? false)
-      );
-    });
-  });
-
-  readonly tableRows = computed<CatalogTableRow[]>(() =>
-    this.filteredProducts().map((p) => ({
-      id: p.id,
-      sku: p.sku,
-      name: p.name,
-      category: p.category,
-      status: p.status,
-      listPrice: p.listPrice,
-    })),
-  );
-
-  readonly pagination = computed<PaginationMeta>(() => {
-    const total = this.tableRows().length;
-    const size = this.pageSize();
-    return {
-      page: this.pageIndex(),
-      size,
-      totalElements: total,
-      totalPages: Math.max(1, Math.ceil(total / size) || 1),
-    };
-  });
-
-  readonly pagedRows = computed(() => {
-    const start = this.pageIndex() * this.pageSize();
-    return this.tableRows().slice(start, start + this.pageSize());
+      })
+      .map((p) => this.toRow(p));
   });
 
   readonly isEmpty = computed(
     () => this.tableRows().length === 0 && !this.loading(),
   );
 
-  constructor(private readonly router: Router) {}
+  ngOnInit(): void {
+    this.reload();
+  }
 
   hasActiveFilters(): boolean {
     return (
@@ -261,22 +244,24 @@ export class CatalogListComponent {
 
   onSearch(term: string): void {
     this.searchTerm.set(term);
-    this.pageIndex.set(0);
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+    this.searchTimeout = setTimeout(() => this.reload(0), 300);
   }
 
   onCategoryChange(value: string): void {
     this.categoryFilter.set(value ?? '');
-    this.pageIndex.set(0);
+    this.reload(0);
   }
 
   onStatusChange(value: string): void {
     this.statusFilter.set(value ?? '');
-    this.pageIndex.set(0);
+    this.reload(0);
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageIndex.set(event.pageIndex);
-    this.pageSize.set(event.pageSize);
+    this.reload(event.pageIndex, event.pageSize);
   }
 
   onRowClick(row: CatalogTableRow): void {
@@ -284,22 +269,32 @@ export class CatalogListComponent {
   }
 
   clearError(): void {
-    this.error.set(null);
+    this.service.error.set(null);
   }
 
-  /** Test helper: replace catalog rows (e.g. empty list). */
-  setProductsForTest(products: CatalogProduct[]): void {
-    this.allProducts.set(products);
-    this.pageIndex.set(0);
+  private reload(page = 0, size = this.service.pagination().size || 10): void {
+    const q = this.searchTerm().trim();
+    if (q) {
+      this.service.search(q, page, size);
+      return;
+    }
+
+    const category = this.categoryFilter();
+    const status = this.statusFilter();
+    this.service.list(page, size, 'name,asc', {
+      category: (category || undefined) as ProductCategory | undefined,
+      status: (status || undefined) as ProductStatus | undefined,
+    });
   }
 
-  /** Test helper: surface the error banner. */
-  setErrorForTest(message: string | null): void {
-    this.error.set(message);
-  }
-
-  /** Test helper: toggle loading overlay. */
-  setLoadingForTest(value: boolean): void {
-    this.loading.set(value);
+  private toRow(p: ProductDto): CatalogTableRow {
+    return {
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      category: p.category,
+      status: p.status,
+      listPrice: p.listPrice ?? 0,
+    };
   }
 }

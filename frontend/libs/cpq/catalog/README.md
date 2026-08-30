@@ -18,7 +18,7 @@ HTTP services use the **DealService signal-state pattern** (`HttpClient` + `sign
 import { ProductService, CATALOG_ROUTES } from '@frontend/cpq-catalog';
 ```
 
-Presentational list/detail (PR-FE-CPQ-05 lite) still use mock data until UI wires `ProductService`.
+List/detail happy path uses `ProductService` (`GET /api/v1/products`, `GET /api/v1/products/:id`). `MOCK_CATALOG_PRODUCTS` remains for Vitest fixtures only.
 
 ## Running unit tests
 
