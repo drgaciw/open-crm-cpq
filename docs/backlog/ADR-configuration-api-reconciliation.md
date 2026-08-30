@@ -102,16 +102,16 @@ This ADR reconciles ownership while preserving agent-stable URLs via the gateway
 |--------|------|----------------|-------------------|
 | POST | `/api/v1/configuration/validate` | gateway-service (route + adapter) | configuration-engine |
 
-**Decision:** `POST /api/v1/configuration/validate` **remains the agent-facing URL**. It is **not** removed or renamed. Implementation is delivered in **S2B-11**, not S2A-8.
+**Decision:** `POST /api/v1/configuration/validate` **remains the agent-facing URL**. It is **not** removed or renamed. Implementation was scoped to **S2B-11** (not S2A-8) and the **hybrid path is landed** (Waves F–H).
 
-Gateway behavior (S2B-11 — **implementation deferred**; defaults frozen at Accept):
+Gateway behavior (S2B-11 — **landed Wave F hybrid**; Accept defaults from Wave E applied in F1–F4, extended G/H):
 
-1. Accept agent PRD payload (product/option/configuration state — structured DTO, not raw `List<Long>` long-term).
-2. **Prefer:** map payload to configuration-engine **`POST /internal/v1/configurations/evaluate`** (stateless). Ephemeral-session-only agent path is rejected as the long-term default (session validate remains available for UI session flows).
-3. **Translate** configuration-engine result to agent PRD shape: `{ valid, violations: [{ ruleId, ruleType, description, remediation }] }` using a shared DTO in `backend/libs/common`.
+1. Accept agent PRD payload (product ID list today; structured configuration state may expand additively).
+2. **Landed:** map payload to configuration-engine **`POST /internal/v1/configurations/evaluate`** (stateless). Ephemeral-session-only agent path remains rejected as the long-term default (session validate stays available for UI session flows).
+3. **Landed:** translate configuration-engine result to agent PRD shape via shared DTO `ConfigurationValidationResult` in `backend/libs/common` (`{ valid, violations: [{ ruleId, ruleType, description, remediation }] }`).
 4. **Do not** embed domain validation logic in the gateway — routing, auth, correlation IDs, and response adaptation only.
 
-**No breaking removal:** Existing `product-service` routes under `/api/v1/configuration/*` must not be deleted without a gateway shim or documented deprecation window. Retain product-service `POST /api/v1/configuration/validate` (current `List<String>` error shape per contract matrix) until contract-test parity — **no removal date** until S2B-11 lands. During S2B-11, product-service continues to serve rule CRUD directly; validate may be proxied or dual-run under contract tests until parity is proven.
+**No breaking removal:** Existing `product-service` routes under `/api/v1/configuration/*` must not be deleted without a gateway shim or documented deprecation window. Retain product-service `POST /api/v1/configuration/validate` (current `List<String>` error shape for direct/parity callers) — **no removal date**. product-service continues to serve rule CRUD directly; agent-facing validate is dual-run capable (gateway → CE evaluate authoritative for agents; product path retained transitional).
 
 ### 4. Evaluation vs persistence split
 
@@ -138,7 +138,7 @@ Gateway behavior (S2B-11 — **implementation deferred**; defaults frozen at Acc
 ### Negative
 
 - **Gateway adapter complexity:** request/response mapping between agent DTO and configuration-engine session/evaluator models (S2B-11 scope).
-- **Transitional duplication:** until S2B-11 lands, product-service still runs inline validation — contract tests must detect drift.
+- **Transitional duplication:** hybrid S2B-11 landed, but product-service still runs inline validation for direct/parity callers — contract tests must detect drift until any future retirement.
 - **Cross-service latency:** validate path adds a network hop (gateway → configuration-engine → rule projection from product-service).
 - **Rule freshness:** configuration-engine must handle stale compiled rules when product-service publishes rule changes (S2B-9).
 
@@ -150,11 +150,11 @@ Gateway behavior (S2B-11 — **implementation deferred**; defaults frozen at Acc
 | Matrix | S2A-7 | Register routes, owners, stability tiers in `CPQ_API_CONTRACT_MATRIX.md` |
 | Implement | S2B-7 | ConfigurationSession, selections, validation result model |
 | Implement | S2B-8 | Full rule-type evaluation in `ConstraintSolver`; consume rules from product-service |
-| Implement | S2B-11 | **Deferred** (not Wave E). When scheduled: gateway route for `POST /api/v1/configuration/validate`; contract tests; harden rule CRUD on product-service; prefer `POST /internal/v1/configurations/evaluate` + `libs/common` DTO per frozen defaults |
+| Implement | S2B-11 | **Landed (Wave F hybrid):** gateway route for `POST /api/v1/configuration/validate` → CE `POST /internal/v1/configurations/evaluate`; `ConfigurationValidationResult` in `libs/common`; contract/parity tests (F1–F4). Waves G–H extended shared rule core / VALIDATES dialect / AI parse / thin TTL — full S2B-8 ConstraintSolver still follow-on |
 | Consume | S2D-3a | Quote preflight calls validate via gateway/client — not inline logic |
-| Retire | Post-S2B-11 | product-service `POST /api/v1/configuration/validate` may become internal-only or removed **only after** gateway shim proves parity in contract tests — **no removal date** at Accept |
+| Retire | Post-S2B-11 | product-service `POST /api/v1/configuration/validate` may become internal-only or removed **only after** dual-run parity is proven — **no removal date** (retained transitional) |
 
-**Response shape migration:** Current product-service validate returns `ApiResponse<List<String>>`. Agent PRDs expect structured violations. S2B-11 defines the canonical response DTO; gateway adapts for backward compatibility if needed.
+**Response shape migration:** product-service validate still returns `ApiResponse<List<String>>` on the retained direct path. Agent-facing gateway path returns `ApiResponse<ConfigurationValidationResult>` (`{ valid, violations[] }`).
 
 ---
 
@@ -219,7 +219,7 @@ Matches backlog amendment specifications in `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.m
 - [x] **AC-5:** Explicit decision documented: **configuration-engine owns constraint evaluation**; **product-service owns rule persistence**.
 - [x] **AC-6:** No breaking removal of product-service `/api/v1/configuration/*` routes without gateway shim — documented in migration notes.
 - [x] **AC-7:** Service boundary table and validate-flow sequence diagram included.
-- [x] **AC-8:** S2B-11 implementation scope referenced; Accept / S2A-8 introduce **no compile changes** (documentation only). S2B-11 code remains **deferred**.
+- [x] **AC-8:** S2B-11 implementation scope referenced; Accept / S2A-8 introduce **no compile changes** (documentation only). *(Accept-time note: S2B-11 code was deferred at E3; hybrid implementation later landed in Waves F–H — see Post-implementation status below.)*
 
 **Verification (S2A-8 / E3 Accept):** ADR review + Status Accepted + frozen open-question defaults + **no** Java/product/gateway code changes.
 
@@ -230,7 +230,9 @@ Matches backlog amendment specifications in `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.m
 | Document | Relevance |
 |----------|-----------|
 | `docs/backlog/GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md` | S2A-8, S2B-11 acceptance criteria |
-| `docs/backlog/CPQ_API_CONTRACT_MATRIX.md` | S2A-7 route registry (still documents current `List<String>` validate shape until S2B-11) |
+| `docs/backlog/CPQ_API_CONTRACT_MATRIX.md` | S2A-7 route registry — agent validate = gateway → CE evaluate + `ConfigurationValidationResult`; product retained path = `List<String>` |
+| `docs/forge/impl/f5-s2b11-docs.md` | Wave F closeout: hybrid S2B-11 matrix row |
+| `docs/forge/impl/i1-adr-matrix-hygiene.md` | Wave I ADR/matrix hygiene (this reconciliation) |
 | `docs/forge/14-wave-e-architecture.md` | Wave E Accept authority; frozen open-question defaults |
 | `docs/forge/impl/e3-adr-accept.md` | Forge E3 status note |
 | `agents/compatibility-rules.md` | cpq-agent-015 validate + rule CRUD paths |
@@ -244,13 +246,31 @@ Matches backlog amendment specifications in `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.m
 
 ## Resolved open questions (Wave E freeze for S2B-11)
 
-Open questions below were **frozen at Accept** (2026-08-30) per `docs/forge/14-wave-e-architecture.md`. They constrain a **future** S2B-11 implementation wave. **S2B-11 implementation is deferred** — this Accept changes documentation only; **do not** land gateway validate shim, shared DTO types, configuration-engine evaluate endpoint, or product-service validate removal in the Accept PR.
+Open questions below were **frozen at Accept** (2026-08-30) per `docs/forge/14-wave-e-architecture.md`. **Historical Accept freeze** — at E3 these constrained the then-future S2B-11 wave; Accept itself changed documentation only and did **not** land gateway validate shim, shared DTO types, configuration-engine evaluate endpoint, or product-service validate removal in the Accept PR.
 
 | # | Question | Frozen default | Rejected |
 |---|----------|----------------|----------|
 | 1 | Stateless evaluator shape | Prefer **`POST /internal/v1/configurations/evaluate`** (stateless) on configuration-engine for agent payloads | Ephemeral-session-only as the long-term agent path |
 | 2 | Response DTO canonical type | Shared DTO in **`backend/libs/common`** | Gateway-local DTOs as the long-term home |
 | 3 | Rule projection mechanism | **Sync REST** rule fetch first (`GET /api/v1/configuration/rules/product/{productId}` and related) | Compiled cache / event invalidation as day-1 (that remains **S2B-9**) |
-| 4 | product-service validate deprecation | **Retain** product-service `POST /api/v1/configuration/validate` until contract-test parity — **no removal date** until S2B-11 lands | Setting a calendar removal date at Accept |
+| 4 | product-service validate deprecation | **Retain** product-service `POST /api/v1/configuration/validate` until contract-test parity — **no removal date** | Setting a calendar removal date at Accept |
 
-**Runtime today (unchanged by Accept):** product-service validate remains authoritative; contract matrix still lists body `List<Long>` / response `List<String>` errors. Agent-facing `{ valid, violations[] }` and gateway shim land only when S2B-11 is scheduled.
+**Accept-time runtime note (historical):** At E3 Accept, product-service validate remained authoritative; the contract matrix still listed body `List<Long>` / response `List<String>` errors for that path. Agent-facing `{ valid, violations[] }` and gateway shim were scheduled for S2B-11 (later delivered as Wave F hybrid).
+
+---
+
+## Post-implementation status (Waves F–H)
+
+**S2B-11 hybrid is LANDED** — not deferred. Readers must not treat Accept-time “implementation deferred” prose above as current runtime.
+
+| Concern | Post-F/G/H reality |
+|---------|-------------------|
+| Agent validate URL | Unchanged: `POST /api/v1/configuration/validate` (gateway contract owner) |
+| Gateway shim | **Landed (F3):** route + adapt only → CE `POST /internal/v1/configurations/evaluate` |
+| Shared DTO | **Landed (F1):** `ConfigurationValidationResult` in `backend/libs/common` |
+| CE evaluate | **Landed (F2):** thin REQUIRES/EXCLUDES; G1–G2 shared `ProductRuleEvaluationCore`; H1 VALIDATES `attr:key=value` dialect; H6 thin TTL on rule fetch (full Kafka S2B-9 still follow-on) |
+| Agent / AI consumers | Structured `{ valid, violations[] }` via gateway; H2 AI tool parse for validate |
+| product-service validate | **Retained** transitional (`List<String>` errors) for direct/parity — **no removal date** |
+| Full S2B-8 ConstraintSolver | Still follow-on (not claimed complete by hybrid S2B-11) |
+
+**Forge notes:** `docs/forge/impl/f1-validation-dto.md` … `f5-s2b11-docs.md`; Wave G/H impl notes; Wave I hygiene `docs/forge/impl/i1-adr-matrix-hygiene.md`.
