@@ -20,6 +20,9 @@ jobs:
           java-version: '21'
           distribution: temurin
           cache: maven
+      # Manual fallback has no Toolchain job; mirror blocking non-AI drift gate (ADR-003).
+      - name: CI contract drift check
+        run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
       - name: Verify shared libraries
         run: bash scripts/ci/run-core.sh shared-libraries
       - name: Upload shared library test reports
