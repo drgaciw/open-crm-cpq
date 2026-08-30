@@ -6,11 +6,10 @@ import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { OrganizationService } from '../organization.service';
 import { OrganizationDto } from '@frontend/shared-models';
+import { SearchInputComponent } from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-organization-list',
@@ -22,9 +21,8 @@ import { OrganizationDto } from '@frontend/shared-models';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatMenuModule,
+    SearchInputComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -34,12 +32,10 @@ import { OrganizationDto } from '@frontend/shared-models';
         <p class="subtitle">Manage your business relationships</p>
       </div>
       <div class="header-actions">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search organizations..." #searchInput
-                 (input)="onSearch(searchInput.value)"
-                 aria-label="Search organizations">
-        </mat-form-field>
+        <app-search-input
+          placeholder="Search organizations..."
+          (searchChange)="onSearch($event)"
+        />
         <button mat-raised-button color="primary" (click)="onCreate()">
           <mat-icon>add</mat-icon>
           New Organization
@@ -137,8 +133,7 @@ import { OrganizationDto } from '@frontend/shared-models';
     .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
     .subtitle { margin: 4px 0 0; color: #666; }
     .header-actions { display: flex; gap: 12px; align-items: center; }
-    .search-field { width: 280px; }
-    .search-field .mat-mdc-form-field-subscript-wrapper { display: none; }
+    .header-actions app-search-input { width: 280px; }
     .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
     table { width: 100%; }
     .link { color: #1976d2; cursor: pointer; text-decoration: none; font-weight: 500; }
@@ -168,7 +163,6 @@ export class OrganizationListComponent implements OnInit {
 
   displayedColumns = ['name', 'industry', 'city', 'phone', 'actions'];
   private currentSort = 'name,asc';
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   trackById(index: number, item: OrganizationDto): string | number {
     return item.id;
@@ -178,16 +172,12 @@ export class OrganizationListComponent implements OnInit {
     this.orgService.list(0, 20, this.currentSort);
   }
 
-  
   onSearch(query: string): void {
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => {
-      if (query.trim()) {
-        this.orgService.search(query.trim());
-      } else {
-        this.orgService.list(0, 20, this.currentSort);
-      }
-    }, 300);
+    if (query.trim()) {
+      this.orgService.search(query.trim());
+    } else {
+      this.orgService.list(0, 20, this.currentSort);
+    }
   }
 
   onPageChange(event: PageEvent): void {

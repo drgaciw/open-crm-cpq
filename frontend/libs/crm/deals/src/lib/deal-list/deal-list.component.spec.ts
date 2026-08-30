@@ -21,6 +21,7 @@ describe('DealListComponent action wiring', () => {
   let fixture: ComponentFixture<DealListComponent>;
   let component: DealListComponent;
   let listSpy: ReturnType<typeof vi.fn>;
+  let searchSpy: ReturnType<typeof vi.fn>;
   let advanceSpy: ReturnType<typeof vi.fn>;
   let markWonSpy: ReturnType<typeof vi.fn>;
   let markLostSpy: ReturnType<typeof vi.fn>;
@@ -37,6 +38,7 @@ describe('DealListComponent action wiring', () => {
 
   beforeEach(async () => {
     listSpy = vi.fn();
+    searchSpy = vi.fn();
     advanceSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'QUALIFICATION' })));
     markWonSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'WON' })));
     markLostSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'LOST' })));
@@ -48,7 +50,7 @@ describe('DealListComponent action wiring', () => {
       pagination,
       isEmpty: computed(() => deals().length === 0 && !loading()),
       list: listSpy,
-      search: vi.fn(),
+      search: searchSpy,
       delete: vi.fn(() => of(void 0)),
       advanceStage: advanceSpy,
       markWon: markWonSpy,
@@ -76,6 +78,26 @@ describe('DealListComponent action wiring', () => {
 
   it('ngOnInit loads the deal list', () => {
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc');
+  });
+
+  it('renders shared SearchInput instead of raw input', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-search-input')).toBeTruthy();
+    expect(el.querySelector('input[aria-label="Search deals"]')).toBeNull();
+  });
+
+  it('onSearch with term calls DealService.search', () => {
+    component.onSearch('  acme  ');
+    expect(searchSpy).toHaveBeenCalledWith('acme');
+  });
+
+  it('onSearch with blank term reloads list for current stage', () => {
+    listSpy.mockClear();
+    component.onTabChange(2); // QUALIFICATION
+    listSpy.mockClear();
+    component.onSearch('   ');
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', 'QUALIFICATION');
+    expect(searchSpy).not.toHaveBeenCalled();
   });
 
   it('gates advance: open stages yes, NEGOTIATION/WON/LOST no', () => {
