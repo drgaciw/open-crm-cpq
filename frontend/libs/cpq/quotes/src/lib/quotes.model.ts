@@ -1,7 +1,7 @@
 /**
- * Lightweight quote shape for the presentational stub.
+ * Lightweight quote shape for Vitest fixtures / local mapping.
  * Mirrors QuoteDto fields used by list/detail UI (@frontend/shared-models).
- * HTTP quote service remains PR-FE-CPQ-03 / PR-FE-CPQ-06 full.
+ * Runtime happy path uses QuoteDto via QuoteService HTTP.
  */
 export type QuoteListStatus =
   | 'DRAFT'

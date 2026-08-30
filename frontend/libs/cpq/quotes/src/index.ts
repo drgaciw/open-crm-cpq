@@ -8,4 +8,4 @@ export type {
   QuoteListStatus,
   QuoteListDealType,
 } from './lib/quotes.model';
-export { MOCK_QUOTES, findMockQuote } from './lib/quotes.mock';
+// MOCK_QUOTES / findMockQuote stay in quotes.mock.ts (Vitest only).
