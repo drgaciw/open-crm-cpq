@@ -1,6 +1,6 @@
 # Wave D architecture — Security hardening (architect-only)
 
-**Status:** DESIGN READY — awaiting PM go-ahead to forge  
+**Status:** COMPLETE — merged to main  
 **Architect:** `opencrm-architect` agent + `/opencrm-architect` skill  
 **Evidence date:** 2026-08-30 against `main` @ `6f1844d`  
 **Sources:** GitHub Sentinel issues; `SecurityConfig.java` × N; gateway `application.yml` + `CsrfProtectionFilter`
@@ -98,3 +98,79 @@ Implement Open CRM/CPQ Wave D security hardening per docs/forge/13-wave-d-archit
 - [x] Jules “fixed” claims contradicted by tree evidence  
 - [x] PR DAG parallelizable without same-file fights (D1 vs D2)  
 - [ ] PM authorizes forge execution  
+
+## Architect review notes
+
+**Reviewer:** `opencrm-architect` (plan mode, no code)  
+**Re-verified:** 2026-08-30 against HEAD `9e3aecd` (doc evidence SHA `6f1844d` is an ancestor; vulnerability presence unchanged)  
+**Forge recommendation:** **APPROVE** — DAG D1∥D2→D3 remains sound; treat notes below as mandatory implementer constraints, not a redesign.
+
+### 1) `security.open` — confirmed present
+
+Exact main-source inventory (**9** services), matching §1:
+
+| Service | Path |
+|---------|------|
+| crm-service | `.../crm/config/SecurityConfig.java` |
+| pricing-service | `.../pricing/config/SecurityConfig.java` |
+| pricebook-service | `.../pricebook/config/SecurityConfig.java` |
+| product-service | `.../product/config/SecurityConfig.java` |
+| quote-service | `.../quote/config/SecurityConfig.java` |
+| approval-routing | `.../approval/config/SecurityConfig.java` |
+| configuration-engine | `.../configuration/config/SecurityConfig.java` |
+| contract-asset-management | `.../contract/config/SecurityConfig.java` |
+| document-generation | `.../document/config/SecurityConfig.java` |
+
+Also still present:
+
+- `crm-service` `BaseIntegrationTest` → `registry.add("security.open", () -> "true")`
+- `backend/docker-compose.yml` → `SECURITY_OPEN: "false"` on crm, pricing, pricebook, product, quote (safe default, still an env footgun)
+
+**Explicit non-hits (do not invent D2 work):**
+
+- **gateway-service** `SecurityConfig` — no `security.open`; uses `@Profile("dev")` `permitAll()` (separate bypass; remains **out of scope** per §6 unless PM expands wave)
+- **ai-service** — no `SecurityConfig` class (depends on `libs/security` artifact only); nothing to strip for D2
+
+None of the nine domain `SecurityConfig`s configure `oauth2ResourceServer`. Closed mode already requires `.authenticated()` with no resource-server wiring (compose default `SECURITY_OPEN=false`). D2’s job is **remove the bypass property**, not add full Azure AD B2C enforcement (still §6).
+
+### 2) Gateway CORS/CSRF wildcards — confirmed present
+
+Still on tree:
+
+- `gateway-service` `application.yml` `spring.cloud.gateway.globalcors...allowedOrigins` → `https://*.azurewebsites.net`
+- `gateway-service` `application.yml` `security.csrf.allowed-origins` → same
+- `CsrfProtectionFilter.matchesPattern` — explicit `*.` suffix matching (any Azure App Service subdomain can pass Origin/Referer when cookies present)
+- **No** existing gateway unit tests covering CSRF/CORS origin matching
+
+**Additional tree hit for D1 “no `*.azurewebsites.net` in tree” acceptance:**
+
+- `microsite-prompt.xml` (`allowed_origins` includes `https://*.azurewebsites.net`) — include in **D1** (or D1+D3 scrub), not leave as residual
+
+OK to leave: `docs/scripts/staging-gateway-smoke.ps1` example hostname (concrete URL in docs, not an allow-list wildcard).
+
+**CORS API nuance (implementer constraint):** Spring `allowedOrigins` does **not** accept host wildcards; patterns belong in `allowedOriginPatterns`. The YAML wildcard may already be ineffective for CORS while **CSRF still honors it**. D1 must replace with explicit origins via `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS` — do **not** “fix” by moving the Azure wildcard into `allowedOriginPatterns` (already rejected in §2).
+
+### 3) PR DAG D1∥D2→D3 — validated
+
+Parallelism and ownership split are correct (gateway vs domain `SecurityConfig`s; no same-file fights). Sequencing to D3 docs/closeout is correct.
+
+| PR | Amendment / risk |
+|----|------------------|
+| **D1** | Also scrub `microsite-prompt.xml`. Harden `CsrfProtectionFilter` to **reject** patterns containing `*.` (fail closed). Add unit tests (none today). Document `FRONTEND_URL` + optional `CORS_ALLOWED_ORIGINS` in `docs/CRM_GATEWAY_ENV.md` (section absent today). Risk remains **MED**. |
+| **D2** | Scope remains the nine services above. **Must** remove `SECURITY_OPEN` keys from `docker-compose.yml`. **Primary test risk:** CRM `BaseIntegrationTest` + MockMvc controller/lifecycle ITs currently depend on `security.open=true` with filters **enabled** — switch to `@AutoConfigureMockMvc(addFilters = false)` and/or `@WithMockUser` / Security test support; do **not** reintroduce a same-named property. Other services show little/no MockMvc IT coupling to the flag today; still run module tests after config edits. Risk remains **HIGH**. |
+| **D3** | Unchanged; run after D1/D2 land. Optional D4 duplicate-issue hygiene still valid. |
+
+**Missing services?** No — inventory is complete for `security.open`. Do not expand D2 to ai-service or gateway profile bypass in this wave.
+
+### 4) GitNexus blast-radius note
+
+Upstream `impact` on `CsrfProtectionFilter` and ambiguous `SecurityConfig` candidates returns **risk: UNKNOWN** (0 resolved callers; index reported **16 commits behind** HEAD). Per project rules, UNKNOWN is unresolved — confirm via text inventory (done above) before edits; forge agents must re-run impact per symbol/file before changing, and prefer re-analyze if operating far behind index.
+
+### 5) Sign-off
+
+- [x] Live-tree confirmation of D-CRIT / D-HIGH  
+- [x] DAG structure approved for forge  
+- [x] Amendments captured for implementers  
+- [ ] PM authorizes forge execution (`forge-wave-d` / goal text in §7)
+
+**ARCH_REVIEW_DONE — recommendation: APPROVE for forge** (with notes above binding on D1/D2 agents).
