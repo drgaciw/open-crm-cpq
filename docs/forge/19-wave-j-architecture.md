@@ -1,6 +1,6 @@
 # Wave J architecture — quote typed pricing apply ∥ VALIDATES `attr:in:` ∥ FE CPQ create+lifecycle ∥ dual-read readiness
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (architect pick + orchestrator review after Wave I land)  
+**Status:** COMPLETE on main (J1–J5 merged; J6 closeout) — PM authorized 2026-08-30 (architect pick + orchestrator review after Wave I land)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** Wave I COMPLETE on forging tip (I1–I4 merged; I5 closeout in same docs PR as this authorize)  
@@ -284,8 +284,8 @@ Implement Open CRM/CPQ Wave J per docs/forge/19-wave-j-architecture.md in five p
 - [x] Wave I COMPLETE on forging tip (gate before `/goal`)  
 - [x] Orchestrator → Wave J FORGING  
 - [x] Forge execution authorized (PM standing orchestrator + architect pick)  
-- [ ] Day-1 + closeout merged; J6 matrix + orchestrator COMPLETE  
+- [x] Day-1 + closeout merged; J6 matrix + orchestrator COMPLETE  
 
-**PM WARNING:** Re-analyze before quote/CE edits (**UNKNOWN** / stale index ≠ unused/safe). Do **not** flip approval legacy dual-read default in this wave (**HIGH**). J1 **must NEVER** `RestClient.body(JsonNode.class)` — String+Jackson 2 parse (I2 Jackson 3 bind bug; quote client still broken). J5 docs-only; default stays `true`.
+**PM WARNING:** Re-analyze before quote/CE edits (**UNKNOWN** / stale index ≠ unused/safe). Do **not** flip approval legacy dual-read default (**HIGH**). J1 uses String+Jackson 2 parse (never `body(JsonNode.class)`). J5 docs-only; default stays `true`.
 
-**WAVE J — APPROVED FOR FORGE.**
+**WAVE J — COMPLETE.**
