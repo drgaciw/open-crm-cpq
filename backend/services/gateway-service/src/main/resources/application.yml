@@ -21,9 +21,9 @@ spring:
       globalcors:
         corsConfigurations:
           '[/**]':
-            allowedOrigins:
-              - "http://localhost:4200"
-              - "https://*.azurewebsites.net"
+            # Explicit origins only — no *. wildcards. Prefer FRONTEND_URL;
+            # set CORS_ALLOWED_ORIGINS (comma-separated) to replace the default list.
+            allowedOrigins: ${CORS_ALLOWED_ORIGINS:${FRONTEND_URL:http://localhost:4200}}
             allowedMethods:
               - GET
               - POST
@@ -219,9 +219,8 @@ spring:
 
 security:
   csrf:
-    allowed-origins:
-      - "http://localhost:4200"
-      - "https://*.azurewebsites.net"
+    # Same explicit allow-list as CORS (no *. patterns; filter rejects wildcards at bind).
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:${FRONTEND_URL:http://localhost:4200}}
 
 # Azure AD B2C Configuration
 azure:
