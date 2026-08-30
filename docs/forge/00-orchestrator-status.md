@@ -1,33 +1,33 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave I FORGING** (contract/docs hygiene ∥ AI JsonNode remainder ∥ Bolt #412 ∥ FE CPQ polish)  
+**Session state:** **Wave J FORGING** (quote typed pricing apply ∥ VALIDATES `attr:in:` ∥ FE CPQ create+lifecycle ∥ dual-read docs)  
 **Architect:** `/opencrm-architect`  
-**Plan:** `docs/forge/18-wave-i-architecture.md`  
-**Baseline:** `d90b489` (Waves A–H COMPLETE)
+**Plan:** `docs/forge/19-wave-j-architecture.md`  
+**Baseline:** Wave I COMPLETE on main (I1–I4 merged + I5)
 
-## Wave H results (prior)
-- **H1** VALIDATES `attr:key=value` dialect in `ProductRuleEvaluationCore` + session attrs  
-- **H2** AI `CpqAgentToolClients` structured `ConfigurationValidationResult` parse  
-- **H3** CRM JPA projections (#437; supersedes #411/#417)  
-- **H4** Deal kanban O(N) (#436)  
-- **H5** SearchInput deals+orgs (#403 remainder)  
-- **H6** S2B-9 thin TTL rule cache  
-- **H7** Dual-read flag-off **prep** (default stays true)  
-- **H8** Docs closeout  
+## Wave I results (prior)
 
-## Wave I plan (architect pick)
-- **I1** ADR + matrix S2B-11 text drift (hybrid landed, not “deferred”)  
-- **I2** AI structured parse for `executePricing` + `getQuoteLineItems`  
-- **I3** Bolt #412 product validate O(N) (tree gap confirmed)  
-- **I4** FE CPQ polish (stub comments / MOCK barrels / disabled CTAs)  
-- **I5** Docs closeout  
+- **I1** ADR + matrix S2B-11 hybrid documented **LANDED**; product validate retained, no removal date
+- **I2** AI `executePricing` / `getQuoteLineItems` unwrap `ApiResponse` via String + Jackson 2
+- **I3** Product validate O(rules) — Bolt #412 salvage
+- **I4** FE CPQ stub comments / MOCK barrels / disabled CTA titles
+- **I5** Docs closeout
 
-**Day-1 panes:** I1 ∥ I2 ∥ I3 ∥ I4  
+## Wave J plan (architect pick + orchestrator review)
+
+- **J1** Quote `PricingServiceClient` typed apply-path; **never** `body(JsonNode.class)` (I2 Jackson 3 proof)
+- **J2** VALIDATES `attr:key in:v1,v2` dialect
+- **J3** FE quote create + detail Calculate/Submit
+- **J4** FE catalog product create
+- **J5** Dual-read cutover checklist (**docs-only**; default stays `true`)
+- **J6** Docs closeout
+
+**Day-1 panes:** J1 ∥ J2 ∥ J3 ∥ J4 ∥ J5
 
 ## Still held
-- Activities API, CI runners (#238), agent Kafka (#241)  
-- Delete product-service validate; gateway domain validation  
-- Flip `approvals.legacy-local-read-enabled` default → false (HIGH)  
-- Bolt #430 WhatsApp; full SpEL; Kafka S2B-9 events  
-- Quote `PricingServiceClient` / `ProductServiceClient` JsonNode rewrite  
+
+- Activities API, CI runners (#238), agent Kafka (#241)
+- Delete product-service validate; gateway domain validation
+- Flip `approvals.legacy-local-read-enabled` default → false (HIGH)
+- Bolt #430 WhatsApp; full SpEL; Kafka S2B-9 events

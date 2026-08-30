@@ -1,6 +1,6 @@
 # Wave I architecture — contract/docs hygiene ∥ AI JsonNode remainder ∥ Bolt #412 ∥ FE CPQ polish
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (architect pick)  
+**Status:** COMPLETE on main (I1–I4 merged; I5 closeout) — PM authorized 2026-08-30 (architect pick)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** worktree / `origin/main` @ `d90b489` (Waves A–H COMPLETE)  
