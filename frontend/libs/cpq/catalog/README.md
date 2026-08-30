@@ -1,15 +1,32 @@
 # cpq-catalog
 
-Nx library stub for `@frontend/cpq-catalog`.
+Product catalog feature library (`@frontend/cpq-catalog`).
 
-Product catalog feature library (list/detail/form). UI lands in PR-FE-CPQ-05.
+PR-FE-CPQ-05 **lite**: presentational list/detail using `@frontend/shared-ui` primitives and mock data. No HTTP service or quote builder.
 
 ## Import
 
 ```ts
-import { CPQ_CATALOG_LIB } from '@frontend/cpq-catalog';
+import { CATALOG_ROUTES, CatalogListComponent } from '@frontend/cpq-catalog';
 ```
+
+## Routes
+
+Lazy-load from the CRM shell:
+
+```ts
+{
+  path: 'catalog',
+  loadChildren: () =>
+    import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
+}
+```
+
+- `/catalog` — list (`PageHeader`, `SearchInput`, `DataTable`, `EmptyState`)
+- `/catalog/:id` — detail (`StatusBadge` product type, `CurrencyFormatPipe`)
 
 ## Running unit tests
 
-Run `nx test cpq-catalog` to execute the unit tests.
+```bash
+npx nx test cpq-catalog
+```

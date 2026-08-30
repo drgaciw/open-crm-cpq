@@ -1,0 +1,81 @@
+import { CatalogProduct } from './catalog.model';
+
+/** Mock catalog rows for the presentational stub (no HTTP). */
+export const MOCK_CATALOG_PRODUCTS: CatalogProduct[] = [
+  {
+    id: 1,
+    uuid: 'prod-uuid-001',
+    sku: 'CRM-SEAT-NAMED',
+    name: 'CRM Named Seat',
+    description: 'Per-user named seat subscription for the CRM portal.',
+    category: 'SUBSCRIPTION',
+    status: 'ACTIVE',
+    listPrice: 49.0,
+    currency: 'USD',
+    productType: 'SAAS_SEAT_NAMED',
+  },
+  {
+    id: 2,
+    uuid: 'prod-uuid-002',
+    sku: 'CPQ-FLAT',
+    name: 'CPQ Flat Rate',
+    description: 'Flat-rate CPQ module for quote configuration.',
+    category: 'SUBSCRIPTION',
+    status: 'ACTIVE',
+    listPrice: 299.0,
+    currency: 'USD',
+    productType: 'SAAS_FLAT_RATE',
+  },
+  {
+    id: 3,
+    uuid: 'prod-uuid-003',
+    sku: 'SUP-PREM',
+    name: 'Premium Support',
+    description: '24x7 premium support add-on.',
+    category: 'SUPPORT',
+    status: 'ACTIVE',
+    listPrice: 1200.0,
+    currency: 'USD',
+    productType: 'SUPPORT_PREMIUM',
+  },
+  {
+    id: 4,
+    uuid: 'prod-uuid-004',
+    sku: 'ADDON-API',
+    name: 'API Access Add-on',
+    description: 'Metered API access package.',
+    category: 'ADD_ON',
+    status: 'DRAFT',
+    listPrice: 99.0,
+    currency: 'USD',
+    productType: 'ADD_ON_API',
+  },
+  {
+    id: 5,
+    uuid: 'prod-uuid-005',
+    sku: 'LIC-ONPREM',
+    name: 'On-Prem Perpetual License',
+    description: 'Perpetual on-premises license (legacy SKU).',
+    category: 'LICENSE',
+    status: 'DEPRECATED',
+    listPrice: 15000.0,
+    currency: 'USD',
+    productType: 'ONPREM_PERPETUAL',
+  },
+  {
+    id: 6,
+    uuid: 'prod-uuid-006',
+    sku: 'TRAIN-STD',
+    name: 'Standard Training',
+    description: 'Retired classroom training package.',
+    category: 'SERVICES',
+    status: 'RETIRED',
+    listPrice: 2500.0,
+    currency: 'USD',
+    productType: 'TRAINING',
+  },
+];
+
+export function findMockCatalogProduct(id: number): CatalogProduct | undefined {
+  return MOCK_CATALOG_PRODUCTS.find((p) => p.id === id);
+}

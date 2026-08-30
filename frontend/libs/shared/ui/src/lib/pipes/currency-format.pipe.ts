@@ -24,10 +24,12 @@ export class CurrencyFormatPipe implements PipeTransform {
     }
 
     try {
+      const currencyDisplay: Intl.NumberFormatOptions['currencyDisplay'] =
+        display === 'symbol-narrow' ? 'narrowSymbol' : display;
       return new Intl.NumberFormat(locale, {
         style: 'currency',
         currency: currencyCode,
-        currencyDisplay: display,
+        currencyDisplay,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(value);
