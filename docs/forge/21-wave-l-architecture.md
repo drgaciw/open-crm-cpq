@@ -1,6 +1,6 @@
 # Wave L architecture — quote documents+terminal lifecycle ∥ catalog delete ∥ price-books portal
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (architect pick after Wave K COMPLETE; Herdr Grok 4.5 implementers)  
+**Status:** COMPLETE on main (L1–L3 merged; L4 closeout) — PM authorized 2026-08-30 (architect pick after Wave K COMPLETE; Herdr Grok 4.5 implementers)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** Wave K COMPLETE on `main` @ `3d8ea3d` (K1–K4 merged; K5 closeout + matrix notes)  
@@ -259,7 +259,7 @@ Implement Open CRM/CPQ Wave L per docs/forge/21-wave-l-architecture.md in three 
 - [x] Herdr forge layout with Grok 4.5 implementer panes documented  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
 - [x] Orchestrator → Wave L FORGING (orchestrator owns `00-orchestrator-status.md`)  
-- [ ] Day-1 + closeout merged; L4 COMPLETE  
+- [x] Day-1 + closeout merged; L4 COMPLETE  
 
 **PM WARNING:** Re-analyze before any Java touches (none planned in L — FE-only; still WARN on stale index). Do **not** flip approval legacy dual-read default (**HIGH**). L1 download must use **blob**, not ApiResponse unwrap assumptions. L1 must not claim clone copies lines. L3 must use `/api/v1/price-books/**` only.
 
