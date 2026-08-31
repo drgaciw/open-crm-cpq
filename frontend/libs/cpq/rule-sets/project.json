@@ -1,0 +1,24 @@
+{
+  "name": "cpq-rule-sets",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/rule-sets/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": [
+    "scope:cpq",
+    "type:feature",
+    "domain:rule-sets"
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/cpq/rule-sets"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
