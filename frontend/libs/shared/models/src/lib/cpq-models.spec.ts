@@ -24,6 +24,19 @@ import {
   isApprovalRequestStatus,
   isApprovalTier,
 } from './approval.model';
+import {
+  ADJUSTMENT_TYPES,
+  ADJUSTMENT_TYPE_LABELS,
+  SELECTION_TYPES,
+  SELECTION_TYPE_LABELS,
+  isAdjustmentType,
+  isSelectionType,
+} from './product-option.model';
+import {
+  ATTRIBUTE_DATA_TYPES,
+  ATTRIBUTE_DATA_TYPE_LABELS,
+  isAttributeDataType,
+} from './product-attribute.model';
 
 describe('CPQ shared models', () => {
   describe('CatalogProductType vs PricingProductType', () => {
@@ -115,6 +128,36 @@ describe('CPQ shared models', () => {
       }
       for (const status of APPROVAL_REQUEST_STATUSES) {
         expect(APPROVAL_REQUEST_STATUS_LABELS[status]).toBeTruthy();
+      }
+    });
+  });
+
+  describe('Product option / attribute unions (Wave O2)', () => {
+    it('isSelectionType / isAdjustmentType guard known values', () => {
+      expect(isSelectionType('SINGLE')).toBe(true);
+      expect(isSelectionType('MULTIPLE')).toBe(true);
+      expect(isSelectionType('REQUIRED_SINGLE')).toBe(true);
+      expect(isSelectionType('MULTI')).toBe(false);
+      expect(isAdjustmentType('ABSOLUTE')).toBe(true);
+      expect(isAdjustmentType('PERCENTAGE')).toBe(true);
+      expect(isAdjustmentType('FIXED')).toBe(false);
+    });
+
+    it('provides a label for every selection and adjustment type', () => {
+      for (const type of SELECTION_TYPES) {
+        expect(SELECTION_TYPE_LABELS[type]).toBeTruthy();
+      }
+      for (const type of ADJUSTMENT_TYPES) {
+        expect(ADJUSTMENT_TYPE_LABELS[type]).toBeTruthy();
+      }
+    });
+
+    it('isAttributeDataType guards known values and labels', () => {
+      expect(isAttributeDataType('STRING')).toBe(true);
+      expect(isAttributeDataType('ENUM')).toBe(true);
+      expect(isAttributeDataType('INTEGER')).toBe(false);
+      for (const type of ATTRIBUTE_DATA_TYPES) {
+        expect(ATTRIBUTE_DATA_TYPE_LABELS[type]).toBeTruthy();
       }
     });
   });
