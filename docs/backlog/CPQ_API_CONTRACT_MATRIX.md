@@ -23,7 +23,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 | Gateway / platform | Route predicates must preserve **external path**; delegate to owner in §3–§7. |
 | Reviewers | Cross-check PR diffs against this file and `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md` Post-Review Amendment **S2A-7**. |
 
-**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients).
+**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). Dual-read default flip still **held**.
 
 **Source documents:** `cpq-pricing-prd.md` §10.1, agent PRDs above, controller source under `backend/services/*/src/main/java`.
 
@@ -136,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. Flipping the default to `false` is a separate **HIGH** ops gate — not authorized in Wave J.
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–K** (YAML untouched).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -179,10 +179,11 @@ Routes used by cpq-agent-016 (and related catalog checks) outside configuration/
 | GET | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | **agent-contract** | cpq-agent-016 | Required/type/range validation. |
 | POST | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | stable | — | Set attribute values (configuration workflow). |
 | GET | `/api/v1/product-bundles/{id}` | product-service (8083) | stable | — | Single bundle fetch. |
-| POST | `/api/v1/products` | product-service (8083) | stable | — | Create product. |
+| POST | `/api/v1/products` | product-service (8083) | stable | — | Create product (FE catalog create — Wave J4). |
+| PUT | `/api/v1/products/{id}` | product-service (8083) | stable | — | Update product (FE catalog-detail Edit/Save — Wave K3). |
 | GET | `/api/v1/products/search` | product-service (8083) | stable | — | Search by name/SKU. |
 
-**Subsection row count:** 9
+**Subsection row count:** 10
 
 ### 7b. CRM (crm-service)
 
@@ -207,7 +208,7 @@ Agent PRDs reference ERP paths; **no `erp` backend controllers** exist under `ba
 
 **Subsection row count:** 3
 
-**§7 total row count:** 16 (9 + 4 + 3)
+**§7 total row count:** 17 (10 + 4 + 3)
 
 ---
 
@@ -217,7 +218,7 @@ Agent PRDs reference ERP paths; **no `erp` backend controllers** exist under `ba
 |---------|---------------|----------------|----------------|
 | **Stateless vs session validate** | Agent path: gateway **does** delegate `POST /api/v1/configuration/validate` → CE `POST /internal/v1/configurations/evaluate` (Wave F / F3 hybrid). product-service `POST /validate` **retained** for direct/parity. Session path: `POST /api/v1/configurations/{id}/validate` on configuration-engine. | Agents **must** use `/api/v1/configuration/validate` only. | **S2A-8 ADR + S2B-11 landed:** rule CRUD stays on product-service; session validate stays on configuration-engine; gateway preserves agent path and delegates to CE evaluate. |
 | **Validate response shape** | Agent/gateway path returns `ConfigurationValidationResult` (`{ valid, violations[] }`); product retained path still `List<String>` messages. | agent-contract path unchanged; body may evolve additively. | Hybrid S2B-11 contract tests landed; **no** breaking removal of product-service handler — retained, **no removal date**. |
-| **Quote vs approval-routing approvals** | Duplicate pending/approve paths under `/api/v1/quotes/...` and `/api/v1/approvals/...`. Dual-read legacy local still **default on**. | Agents use **quote-service BFF** paths only. | S2C-12: pricing emits events; approval-routing owns state machine; quote-service orchestrates. Cutover readiness: `docs/forge/impl/j5-dual-read-readiness.md` (default remains true until HIGH gate). |
+| **Quote vs approval-routing approvals** | Duplicate pending/approve paths under `/api/v1/quotes/...` and `/api/v1/approvals/...`. Dual-read legacy local still **default on** (Waves J–K). FE inbox (K4) uses quote BFF only. | Agents **and** CPQ portal use **quote-service BFF** paths only. | S2C-12: pricing emits events; approval-routing owns state machine; quote-service orchestrates. Cutover readiness: `docs/forge/impl/j5-dual-read-readiness.md` (default remains true until HIGH gate). |
 | **ERP cost paths** | Gateway **501 stub** at `/api/v1/erp/**` (S2A-7); no erp-adapter yet. | agent-contract paths reserved. | Introduce erp-adapter-service; until then agents treat **501** as adapter unavailable per PRD fail-safes. |
 | **Price-book path drift** | Skills historically documented `/api/v1/pricing/price-books`. Impl + gateway use `/api/v1/price-books` on **pricebook-service**. | Agents **must** use `/api/v1/price-books/**` only. | Corrected in agent skills (B0-6 / forge PR-B). Do not add a pricing-service mount without ADR. |
 
@@ -246,8 +247,8 @@ External clients and agents should call **only through the gateway** (default po
 
 **Internal clients (reference):**
 
-- `ProductServiceClient` → `GET /api/v1/products/{id}`, `POST /api/v1/configuration/validate`
-- `PricingServiceClient` → `POST /api/v1/pricing/execute`, `POST /api/v1/pricing/simulate`
+- `ProductServiceClient` (quote-service) → `POST /api/v1/configuration/validate` only (**Wave K1** removed unused product GET/`JsonNode` getters)
+- `PricingServiceClient` → `POST /api/v1/pricing/execute`, `POST /api/v1/pricing/simulate` (typed views; never `body(JsonNode.class)`)
 - `PriceBookResolutionClient` → `POST /internal/v1/price-books/resolve-batch` (pricing → pricebook; not agent-facing)
 
 ---
@@ -280,7 +281,7 @@ External clients and agents should call **only through the gateway** (default po
 | §4b Price book APIs | 11 |
 | §5 Rules / DRL APIs | 14 |
 | §6 Quote & approval APIs | 18 |
-| §7 Cross-service integrity | 16 |
-| **Total matrix rows** | **80** |
+| §7 Cross-service integrity | 17 |
+| **Total matrix rows** | **81** |
 
 **Routes not assignable to an implemented backend service:** 0 (§7c ERP rows route through gateway stub; erp-adapter-service is future work).
