@@ -23,7 +23,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 | Gateway / platform | Route predicates must preserve **external path**; delegate to owner in §3–§7. |
 | Reviewers | Cross-check PR diffs against this file and `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md` Post-Review Amendment **S2A-7**. |
 
-**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). **Wave M:** FE quote header `PUT` (M1); price-book **entry** CRUD on `/api/v1/price-books/{id}/entries` (M2); `POST .../quotes/{id}/clone` copies non-deleted line items (M3). Dual-read default flip still **held**.
+**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). **Wave M:** FE quote header `PUT` (M1); price-book **entry** CRUD on `/api/v1/price-books/{id}/entries` (M2); `POST .../quotes/{id}/clone` copies non-deleted line items (M3). **Wave N:** price-book **header** FE update/delete (N1); pricing-customers portal FE on `/api/v1/pricing-customers` (N2); quote soft-delete FE (N3, ACCEPTED blocked). Dual-read default flip still **held**.
 
 **Source documents:** `cpq-pricing-prd.md` §10.1, agent PRDs above, controller source under `backend/services/*/src/main/java`.
 
@@ -78,7 +78,7 @@ Deterministic pricing execution and customer context for margin and validation a
 | POST | `/api/v1/pricing/simulate/bulk` | pricing-service (8082) | beta | — | Implemented in `PricingExecutionController`; PRD §10.2 previously "not started". |
 | GET | `/api/v1/pricing/audit/{quoteExternalId}` | pricing-service (8082) | beta | — | Audit trail query; margin audit / compliance cross-ref. |
 | POST | `/api/v1/pricing-customers` | pricing-service (8082) | stable | — | Admin/catalog; not in three agent PRDs. |
-| GET | `/api/v1/pricing-customers` | pricing-service (8082) | stable | — | List/filter by segment. |
+| GET | `/api/v1/pricing-customers` | pricing-service (8082) | stable | — | List/filter by segment. FE portal (Wave N2). |
 | GET | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | **agent-contract** | cpq-agent-011, cpq-agent-016 | Segment, churn, margin policy context (`CustomerController`). |
 | PUT | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | stable | — | Update pricing customer. |
 | DELETE | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | stable | — | Soft delete. |
