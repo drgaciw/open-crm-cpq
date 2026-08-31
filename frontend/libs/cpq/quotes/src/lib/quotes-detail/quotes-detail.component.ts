@@ -34,6 +34,7 @@ import {
 } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 import { QuoteDocumentsPanelComponent } from '../quote-documents-panel/quote-documents-panel.component';
+import { QuoteHeaderEditComponent } from '../quote-header-edit/quote-header-edit.component';
 
 function httpErrorMessage(err: unknown): string {
   const e = err as { error?: { message?: string }; message?: string } | null;
@@ -56,6 +57,7 @@ function httpErrorMessage(err: unknown): string {
     EmptyStateComponent,
     CurrencyFormatPipe,
     QuoteDocumentsPanelComponent,
+    QuoteHeaderEditComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -203,7 +205,7 @@ function httpErrorMessage(err: unknown): string {
             type="button"
             (click)="onClone()"
             [disabled]="actionBusy()"
-            title="Clone header into a new DRAFT. Line items are not copied."
+            title="Clone header and line items into a new DRAFT. Run Calculate for waterfall/ARR."
           >
             <mat-icon>content_copy</mat-icon>
             Clone
@@ -277,6 +279,12 @@ function httpErrorMessage(err: unknown): string {
             </div>
           </mat-card-content>
         </mat-card>
+
+        <cpq-quote-header-edit
+          [quote]="quote"
+          [editable]="canEditLines()"
+          (saved)="onHeaderSaved()"
+        />
 
         <mat-card class="line-item-card">
           <mat-card-header>
@@ -453,8 +461,8 @@ function httpErrorMessage(err: unknown): string {
         <cpq-quote-documents-panel [quoteId]="numericId()" />
 
         <p class="clone-note" role="note">
-          Clone creates a new DRAFT from this quote header only. Line items are not
-          copied by the backend today.
+          Clone creates a new DRAFT and copies the quote header and line items.
+          Pricing waterfall and ARR are not copied — run Calculate on the clone.
         </p>
       </div>
     } @else {
@@ -709,6 +717,12 @@ export class QuotesDetailComponent {
     this.actionError.set(null);
   }
 
+  /** After header PUT succeeds, child already calls getById; clear line edit state. */
+  onHeaderSaved(): void {
+    this.actionError.set(null);
+    this.editingLineId.set(null);
+  }
+
   onCalculate(): void {
     this.runQuoteAction(
       () => this.canCalculate(),
@@ -844,7 +858,8 @@ export class QuotesDetailComponent {
         title: 'Clone quote',
         message:
           `Clone quote #${numericId} into a new DRAFT?\n\n` +
-          'The backend copies the quote header only. Line items are not copied.',
+          'The backend copies the quote header and line items. ' +
+          'Pricing waterfall and ARR are not copied — run Calculate on the clone.',
         confirmText: 'Clone',
         cancelText: 'Cancel',
         confirmColor: 'primary' as const,

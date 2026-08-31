@@ -58,6 +58,7 @@ describe('QuotesDetailComponent', () => {
   let expireSpy: ReturnType<typeof vi.fn>;
   let cancelSpy: ReturnType<typeof vi.fn>;
   let cloneQuoteSpy: ReturnType<typeof vi.fn>;
+  let updateSpy: ReturnType<typeof vi.fn>;
   let listDocumentsSpy: ReturnType<typeof vi.fn>;
   let addLineItemSpy: ReturnType<typeof vi.fn>;
   let updateLineItemSpy: ReturnType<typeof vi.fn>;
@@ -130,7 +131,13 @@ describe('QuotesDetailComponent', () => {
         id: 99,
         name: 'Acme CRM Seat Rollout (Copy)',
         status: 'DRAFT',
-        lineItems: [],
+        lineItems: toQuoteDto(MOCK_QUOTES[0]).lineItems,
+      }),
+    );
+    updateSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[0]),
+        name: 'Header updated',
       }),
     );
     listDocumentsSpy = vi.fn(() => of([]));
@@ -180,6 +187,7 @@ describe('QuotesDetailComponent', () => {
       expire: expireSpy,
       cancel: cancelSpy,
       cloneQuote: cloneQuoteSpy,
+      update: updateSpy,
       listDocuments: listDocumentsSpy,
       generateDocuments: vi.fn(() => of(null)),
       downloadDocument: vi.fn(() => of(new Blob())),
@@ -512,13 +520,16 @@ describe('QuotesDetailComponent', () => {
     expect(component.canCancel()).toBe(false);
   });
 
-  it('clones with ConfirmDialog, notes lines not copied, navigates to new DRAFT', () => {
+  it('clones with ConfirmDialog, notes header and lines copied, navigates to new DRAFT', () => {
     component.onClone();
     expect(dialogOpen).toHaveBeenCalled();
     const dialogData = dialogOpen.mock.calls[0][1].data as {
       message: string;
     };
-    expect(dialogData.message).toMatch(/line items are not copied/i);
+    expect(dialogData.message).toMatch(/header and line items/i);
+    expect(dialogData.message).toMatch(/Calculate/i);
+    expect(dialogData.message).not.toMatch(/line items are not copied/i);
+    expect(dialogData.message).toMatch(/waterfall|ARR/i);
     expect(cloneQuoteSpy).toHaveBeenCalledWith(1);
     expect(router.navigate).toHaveBeenCalledWith(['/quotes', 99]);
   });
@@ -529,10 +540,28 @@ describe('QuotesDetailComponent', () => {
     expect(cloneQuoteSpy).not.toHaveBeenCalled();
   });
 
-  it('renders documents panel and clone honesty note', () => {
+  it('renders documents panel, header edit, and clone note (lines copied; Calculate required)', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('cpq-quote-documents-panel')).toBeTruthy();
-    expect(el.textContent).toMatch(/line items are not copied/i);
+    expect(el.querySelector('cpq-quote-header-edit')).toBeTruthy();
+    expect(el.textContent).toMatch(/header and line items/i);
+    expect(el.textContent).toMatch(/Calculate/i);
     expect(listDocumentsSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('shows header Edit when DRAFT and hides it when not editable', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(component.canEditLines()).toBe(true);
+    expect(el.querySelector('cpq-quote-header-edit')?.textContent).toMatch(/\bEdit\b/);
+
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW
+    fixture.detectChanges();
+    expect(component.canEditLines()).toBe(false);
+    expect(el.querySelector('cpq-quote-header-edit')?.textContent).toMatch(
+      /DRAFT or REJECTED/,
+    );
+    expect(el.querySelector('cpq-quote-header-edit')?.textContent).not.toMatch(
+      /\bEdit\b/,
+    );
   });
 });
