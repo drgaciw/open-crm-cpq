@@ -1,21 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave M FORGING** (M3 + M1 merged; M2 in progress)  
+**Session state:** **Wave M COMPLETE** (quote header edit ∥ price-book entry CRUD ∥ clone copies line items)  
 **Architect:** `/opencrm-architect` (Herdr `w8`)  
 **Plan:** `docs/forge/22-wave-m-architecture.md`  
-**Tip:** `51805d7` on `main`
+**Baseline:** Wave L COMPLETE; Wave M M1–M3 merged + M4 closeout
 
-## Wave M tracks
+## Wave M results
 
-| ID | Status | Tip |
-|----|--------|-----|
-| **M3** | MERGED | `6d25bae` clone copies line items |
-| **M1** | MERGED | `51805d7` header PUT + clone copy (after M3) |
-| **M2** | FORGING | Herdr `wm-pb-entries` still writing |
-| **M4** | PENDING | Closeout after M2 |
-
-**Merge gate honored:** M3 landed before M1.
+- **M3** BE `QuoteService.clone` copies commercial line snapshot (`6d25bae`)
+- **M1** FE quote header `PUT` + clone copy (`51805d7`, after M3)
+- **M2** FE price-book entry create/update/delete (`1c674f7`)
+- **M4** Docs closeout
 
 ## Still held
 

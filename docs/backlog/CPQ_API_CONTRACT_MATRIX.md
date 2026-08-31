@@ -23,7 +23,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 | Gateway / platform | Route predicates must preserve **external path**; delegate to owner in §3–§7. |
 | Reviewers | Cross-check PR diffs against this file and `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md` Post-Review Amendment **S2A-7**. |
 
-**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). Dual-read default flip still **held**.
+**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). **Wave M:** FE quote header `PUT` (M1); price-book **entry** CRUD on `/api/v1/price-books/{id}/entries` (M2); `POST .../quotes/{id}/clone` copies non-deleted line items (M3). Dual-read default flip still **held**.
 
 **Source documents:** `cpq-pricing-prd.md` §10.1, agent PRDs above, controller source under `backend/services/*/src/main/java`.
 
@@ -136,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–K** (YAML untouched).
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–M** (YAML untouched).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -150,7 +150,8 @@ Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Can
 | POST | `/api/v1/quotes/approvals/{approvalId}/reject` | quote-service (8084) | stable | — | BFF → routing reject; legacy local on 404. |
 | POST | `/api/v1/approvals` | approval-routing (8085) | internal | quote BFF | G3 create/submit for quote orchestration. |
 | POST | `/api/v1/quotes` | quote-service (8084) | stable | — | Create quote (supporting workflow). |
-| PUT | `/api/v1/quotes/{id}` | quote-service (8084) | stable | — | Update DRAFT/REJECTED. |
+| PUT | `/api/v1/quotes/{id}` | quote-service (8084) | stable | — | Update DRAFT/REJECTED. FE header form (Wave M1). |
+| POST | `/api/v1/quotes/{id}/clone` | quote-service (8084) | stable | — | New DRAFT; Wave M3 copies non-deleted line commercial snapshot (not waterfall/ARR). |
 | POST | `/api/v1/quotes/{quoteId}/line-items` | quote-service (8084) | stable | — | Add line item. |
 | PUT | `/api/v1/quotes/{quoteId}/line-items/{lineItemId}` | quote-service (8084) | stable | — | Update line item. |
 | DELETE | `/api/v1/quotes/{quoteId}/line-items/{lineItemId}` | quote-service (8084) | stable | — | Remove line item. |
@@ -160,7 +161,7 @@ Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Can
 | POST | `/api/v1/approvals/{id}/approve` | approval-routing (8085) | internal | — | Canonical approve. |
 | POST | `/api/v1/approvals/{id}/reject` | approval-routing (8085) | internal | — | Canonical reject. |
 
-**Section row count:** 19
+**Section row count:** 20
 
 ---
 
