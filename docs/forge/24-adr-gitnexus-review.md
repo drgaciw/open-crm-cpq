@@ -60,3 +60,18 @@ Status: stale (~5) + possible false stale from untracked .worktrees/
 | `docs/forge/24-adr-gitnexus-review.md` | This table |
 
 `docs/forge/00-orchestrator-status.md` **not** edited.
+
+---
+
+## Addendum (2026-08-31, after hygiene N′ + Wave O plan)
+
+**Tip:** `origin/main` @ `9e1df5b` (Wave O FORGING). GitNexus primary index should match `main` SHA; CLI stale from untracked `.worktrees/` is **false stale**. Hygiene H1+H2 on `main` (`2061638`, `31d5cf9`). Wave O architecture `fda176b`.
+
+| Item | Update |
+|------|--------|
+| Dual-read | Still `${APPROVALS_LEGACY_LOCAL_READ:true}`; matrix hold **J–N**; ADR-005 still **Proposed** |
+| ADR-006 | Still **Proposed**. Wave **O3 forging** DTO+list (no FE). **Do not Accept** until O3 is on `main` |
+| ADR-002 | Unchanged — GLM-5 not runtime |
+| Steering | [AGENT.md](../../AGENT.md) landed-vs-target; [docs/ARCHITECTURE.md](../ARCHITECTURE.md) |
+
+No Java/FE in the artifacts job. `SubscriptionController` GitNexus **UNKNOWN** until O3 merges and re-analyze.

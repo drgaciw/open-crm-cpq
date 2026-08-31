@@ -9,13 +9,14 @@ Canonical ADR directory for Open CRM/CPQ. Historical Wave E published ADR-004 un
 | ADR-003 | CI LLM integration / Jenkins primary | **Accepted** (matches Jenkins + GHA manual fallback) | [ADR-003-ci-llm-integration.md](./ADR-003-ci-llm-integration.md) |
 | ADR-004 | CSRF edge-only (gateway vs STATELESS) | **Accepted**; E2 inventory current | [ADR-004-csrf-edge-boundary.md](./ADR-004-csrf-edge-boundary.md) |
 | ADR-005 | Approvals legacy dual-read default `true` | **Proposed** — do **not** flip YAML | [ADR-005-approvals-legacy-dual-read.md](./ADR-005-approvals-legacy-dual-read.md) |
-| ADR-006 | Entities never at API boundary | **Proposed** — `Subscription` leak | [ADR-006-entities-never-at-api-boundary.md](./ADR-006-entities-never-at-api-boundary.md) |
+| ADR-006 | Entities never at API boundary | **Proposed** — `Subscription` leak; Wave **O3 forging** DTO+list (**do not Accept** until O3 is on `main`; **no FE**) | [ADR-006-entities-never-at-api-boundary.md](./ADR-006-entities-never-at-api-boundary.md) |
 
-Related (not numbered in this folder):
+Related (not numbered in this folder — **no ADR-007 file**; keep this path):
 
 | Doc | Status | Path |
 |-----|--------|------|
 | Configuration API reconciliation (S2A-8 / S2B-11) | **Accepted**; hybrid Wave F landed; product validate **retained** | [docs/backlog/ADR-configuration-api-reconciliation.md](../backlog/ADR-configuration-api-reconciliation.md) |
-| GitNexus ADR review (2026-08-31) | Review table | [docs/forge/24-adr-gitnexus-review.md](../forge/24-adr-gitnexus-review.md) |
+| GitNexus ADR review | Table + 2026-08-31 addendum | [docs/forge/24-adr-gitnexus-review.md](../forge/24-adr-gitnexus-review.md) |
+| Architecture index | Landed vs target navigation | [docs/ARCHITECTURE.md](../ARCHITECTURE.md) |
 
-**Rules:** Status **Proposed** is documentation-only. Do not Accept dual-read flip or treat GLM-5 as production runtime until implementation PRs land. CSRF `SecurityConfig` GitNexus is often **UNKNOWN** — confirm with `rg`.
+**Rules:** Status **Proposed** is documentation-only. Do **not** Accept dual-read flip (ADR-005) or ADR-006 while O3 is forging. Do **not** treat GLM-5 (ADR-002) as production runtime (Azure OpenAI `gpt-4o` in `ai-service`). CSRF `SecurityConfig` GitNexus is often **UNKNOWN** — confirm with `rg`.

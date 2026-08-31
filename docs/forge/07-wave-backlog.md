@@ -1,8 +1,8 @@
 # Forge wave backlog (synthesized)
 
-**Status:** Ready for PM approval of implementation wave 1 (all six track plans landed).  
-**Gate:** Plan-only until PM approves; then isolated worktrees per PR.  
-**Sources:** `docs/forge/01-crm-api-parity.md` … `06-gateway-ci.md` + scout JSON.
+**Status:** **HISTORICAL** — Wave 1 plan from early forge. **Do not** treat as current work.  
+**Current:** Waves **A–N COMPLETE**; hygiene N′ COMPLETE; **Wave O FORGING** — [docs/ARCHITECTURE.md](../ARCHITECTURE.md), [23](./23-wave-n-architecture.md)–[26](./26-wave-o-architecture.md).  
+**Sources (original):** `docs/forge/01-crm-api-parity.md` … `06-gateway-ci.md` + scout JSON.
 
 ## Executive summary
 
