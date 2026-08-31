@@ -26,6 +26,10 @@ import {
   PriceBookEntryDialogComponent,
   PriceBookEntryDialogData,
 } from '../price-book-entry-dialog/price-book-entry-dialog.component';
+import {
+  PriceBookEditDialogComponent,
+  PriceBookEditDialogData,
+} from '../price-book-edit-dialog/price-book-edit-dialog.component';
 
 interface EntryTableRow {
   id: number;
@@ -35,7 +39,7 @@ interface EntryTableRow {
   currency: string | null;
 }
 
-function entryHttpErrorMessage(err: unknown, fallback: string): string {
+function bookHttpErrorMessage(err: unknown, fallback: string): string {
   const e = err as {
     errorCode?: string;
     error?: { message?: string; errorCode?: string };
@@ -93,6 +97,27 @@ export function isPriceBookPublished(
     } @else if (book(); as book) {
       <app-page-header [title]="book.name" [subtitle]="subtitle(book)">
         <div actions class="header-actions">
+          <button
+            mat-stroked-button
+            type="button"
+            class="edit-book-btn"
+            [disabled]="!canEditEntries() || mutating()"
+            (click)="openEditBook()"
+          >
+            <mat-icon>edit</mat-icon>
+            Edit
+          </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            class="delete-book-btn"
+            [disabled]="!canEditEntries() || mutating()"
+            (click)="confirmDeleteBook()"
+          >
+            <mat-icon>delete</mat-icon>
+            Delete
+          </button>
           <button mat-stroked-button type="button" (click)="goBack()">
             <mat-icon>arrow_back</mat-icon>
             Back to price books
@@ -168,8 +193,8 @@ export function isPriceBookPublished(
 
           @if (!canEditEntries()) {
             <p class="published-note" role="status">
-              Published price books are immutable. Entry create, edit, and
-              delete are disabled.
+              Published price books are immutable. Header edit/delete and entry
+              create, edit, and delete are disabled.
             </p>
           }
 
@@ -443,7 +468,10 @@ export class PriceBookDetailComponent implements OnInit {
     return selected;
   });
 
-  /** Disable Add/Edit/Delete when published (effectiveDate <= today). */
+  /**
+   * Disable header Edit/Delete and entry Add/Edit/Delete when published
+   * (effectiveDate present and <= today). Reuses isPriceBookPublished.
+   */
   readonly canEditEntries = computed(
     () => !!this.book() && !isPriceBookPublished(this.book()),
   );
@@ -485,6 +513,73 @@ export class PriceBookDetailComponent implements OnInit {
 
   goBack(): void {
     void this.router.navigate(['/price-books']);
+  }
+
+  openEditBook(): void {
+    if (!this.canEditEntries() || this.mutating()) {
+      return;
+    }
+    const book = this.book();
+    if (!book) {
+      return;
+    }
+
+    const data: PriceBookEditDialogData = { book };
+    const ref = this.dialog.open(PriceBookEditDialogComponent, {
+      width: '520px',
+      disableClose: true,
+      data,
+    });
+
+    ref.afterClosed().subscribe((saved: PriceBookDto | undefined) => {
+      if (!saved) {
+        return;
+      }
+      this.actionError.set(null);
+      this.service.getById(book.id);
+    });
+  }
+
+  confirmDeleteBook(): void {
+    if (!this.canEditEntries() || this.mutating()) {
+      return;
+    }
+    const book = this.book();
+    if (!book) {
+      return;
+    }
+
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete price book',
+        message: `Soft-delete "${book.name}"? It will be removed from the active price book list.`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        confirmColor: 'warn' as const,
+      },
+    });
+
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.actionError.set(null);
+      this.mutating.set(true);
+      this.service.delete(book.id).subscribe({
+        next: () => {
+          this.mutating.set(false);
+          this.service.selectedPriceBook.set(null);
+          void this.router.navigate(['/price-books']);
+        },
+        error: (err: unknown) => {
+          this.mutating.set(false);
+          this.actionError.set(
+            bookHttpErrorMessage(err, 'Failed to delete price book'),
+          );
+        },
+      });
+    });
   }
 
   openCreateEntry(): void {
@@ -551,7 +646,7 @@ export class PriceBookDetailComponent implements OnInit {
         error: (err: unknown) => {
           this.mutating.set(false);
           this.actionError.set(
-            entryHttpErrorMessage(err, 'Failed to delete price book entry'),
+            bookHttpErrorMessage(err, 'Failed to delete price book entry'),
           );
         },
       });
