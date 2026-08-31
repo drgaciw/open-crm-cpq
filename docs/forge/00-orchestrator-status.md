@@ -1,21 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave N FORGING** (N1 + N3 merged; N2 in progress)  
+**Session state:** **Wave N COMPLETE** (price-book header ∥ pricing-customers portal ∥ quote soft-delete)  
 **Architect:** `/opencrm-architect` (Herdr `w8`)  
 **Plan:** `docs/forge/23-wave-n-architecture.md`  
-**Tip:** `9dbab29` on `main`
+**Baseline:** Wave M COMPLETE; Wave N N1–N3 merged + N4 closeout
 
-## Wave N tracks
+## Wave N results
 
-| ID | Status | Tip |
-|----|--------|-----|
-| **N1** | MERGED | `9dbab29` price-book header update/delete |
-| **N3** | MERGED | `e995488` quote soft-delete |
-| **N2** | FORGING | Herdr `wn-fe-pricing-customers` still writing |
-| **N4** | PENDING | Closeout after N2 |
-
-**Shell owner:** N2 only.
+- **N1** Price-book header update/delete (`9dbab29`)
+- **N3** Quote soft-delete (`e995488`)
+- **N2** Pricing-customers portal (`ac1d049`)
+- **N4** Docs closeout
 
 ## Still held
 

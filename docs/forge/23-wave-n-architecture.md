@@ -1,6 +1,6 @@
 # Wave N architecture — price-book header write-back ∥ pricing-customers portal ∥ quote soft-delete
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-31 (architect pick after Wave M COMPLETE; Herdr Grok 4.5 implementers)  
+**Status:** COMPLETE on main (N1–N3 merged; N4 closeout) — PM authorized 2026-08-31 (architect pick after Wave M COMPLETE; Herdr Grok 4.5 implementers; N2 owned shell)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-31  
 **Baseline:** Wave M COMPLETE on `main` @ `e09a4a3` (M1–M3 merged; M4 closeout; merge gate M3 before M1)  
@@ -291,7 +291,7 @@ Implement Open CRM/CPQ Wave N per docs/forge/23-wave-n-architecture.md in three 
 - [x] Herdr forge layout with Grok 4.5 implementer panes documented  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
 - [x] Orchestrator → Wave N FORGING (orchestrator owns `00-orchestrator-status.md`)  
-- [ ] Day-1 + closeout merged; N4 COMPLETE  
+- [x] Day-1 + closeout merged; N4 COMPLETE  
 
 **PM WARNING:** Primary GitNexus **matches `e09a4a3`**; do not treat CLI stale from `.worktrees/` as behind. Do **not** flip approval legacy dual-read default (**HIGH**). N2 **owns** shell — N1/N3 must not edit routes/sidebar. N1 must not regress entry CRUD. N3 must not claim hard-delete or allow ACCEPTED delete. Pricing-customers path is **`/api/v1/pricing-customers`**, not CRM customers. No Java planned.
 
