@@ -26,6 +26,7 @@ describe('price-books API contract', () => {
       'lib/price-book-list/price-book-list.component.ts',
       'lib/price-book-detail/price-book-detail.component.ts',
       'lib/price-book-create-dialog/price-book-create-dialog.component.ts',
+      'lib/price-book-entry-dialog/price-book-entry-dialog.component.ts',
       'lib/price-books.routes.ts',
       'index.ts',
     ];
@@ -33,5 +34,15 @@ describe('price-books API contract', () => {
       const src = readFileSync(join(libRoot, rel), 'utf8');
       expect(src).not.toContain('/api/v1/pricing/price-books');
     }
+  });
+
+  it('entry writes go through PriceBookService entry methods (no pricing prefix)', () => {
+    expect(serviceSource).toContain('createEntry(');
+    expect(serviceSource).toContain('updateEntry(');
+    expect(serviceSource).toContain('deleteEntry(');
+    expect(serviceSource).toContain('`${this.basePath}/${bookId}/entries`');
+    expect(serviceSource).toContain(
+      '`${this.basePath}/${bookId}/entries/${entryId}`',
+    );
   });
 });
