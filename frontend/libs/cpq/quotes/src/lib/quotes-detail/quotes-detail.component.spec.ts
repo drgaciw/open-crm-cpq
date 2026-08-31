@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { QuotesDetailComponent } from './quotes-detail.component';
@@ -54,9 +55,14 @@ describe('QuotesDetailComponent', () => {
   let rejectSpy: ReturnType<typeof vi.fn>;
   let sendSpy: ReturnType<typeof vi.fn>;
   let acceptSpy: ReturnType<typeof vi.fn>;
+  let expireSpy: ReturnType<typeof vi.fn>;
+  let cancelSpy: ReturnType<typeof vi.fn>;
+  let cloneQuoteSpy: ReturnType<typeof vi.fn>;
+  let listDocumentsSpy: ReturnType<typeof vi.fn>;
   let addLineItemSpy: ReturnType<typeof vi.fn>;
   let updateLineItemSpy: ReturnType<typeof vi.fn>;
   let removeLineItemSpy: ReturnType<typeof vi.fn>;
+  let dialogOpen: ReturnType<typeof vi.fn>;
 
   const selectedQuote = signal<QuoteDto | null>(null);
   const loading = signal(false);
@@ -106,6 +112,28 @@ describe('QuotesDetailComponent', () => {
         status: 'ACCEPTED',
       }),
     );
+    expireSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[4]),
+        status: 'EXPIRED',
+      }),
+    );
+    cancelSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[0]),
+        status: 'CANCELLED',
+      }),
+    );
+    cloneQuoteSpy = vi.fn(() =>
+      of({
+        ...toQuoteDto(MOCK_QUOTES[0]),
+        id: 99,
+        name: 'Acme CRM Seat Rollout (Copy)',
+        status: 'DRAFT',
+        lineItems: [],
+      }),
+    );
+    listDocumentsSpy = vi.fn(() => of([]));
     addLineItemSpy = vi.fn(() =>
       of({
         id: 50,
@@ -131,6 +159,9 @@ describe('QuotesDetailComponent', () => {
       } satisfies QuoteLineItemDto),
     );
     removeLineItemSpy = vi.fn(() => of(undefined));
+    dialogOpen = vi.fn(() => ({
+      afterClosed: () => of(true),
+    }));
     selectedQuote.set(null);
     loading.set(false);
     error.set(null);
@@ -146,6 +177,12 @@ describe('QuotesDetailComponent', () => {
       reject: rejectSpy,
       send: sendSpy,
       accept: acceptSpy,
+      expire: expireSpy,
+      cancel: cancelSpy,
+      cloneQuote: cloneQuoteSpy,
+      listDocuments: listDocumentsSpy,
+      generateDocuments: vi.fn(() => of(null)),
+      downloadDocument: vi.fn(() => of(new Blob())),
       addLineItem: addLineItemSpy,
       updateLineItem: updateLineItemSpy,
       removeLineItem: removeLineItemSpy,
@@ -157,6 +194,7 @@ describe('QuotesDetailComponent', () => {
         provideRouter([]),
         provideNoopAnimations(),
         { provide: QuoteService, useValue: serviceMock },
+        { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
 
@@ -423,5 +461,78 @@ describe('QuotesDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Not authorized to approve',
     );
+  });
+
+  it('enables Expire only for SENT and confirms before expire', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[4])); // SENT
+    fixture.detectChanges();
+    expect(component.canExpire()).toBe(true);
+
+    component.onExpire();
+    expect(dialogOpen).toHaveBeenCalled();
+    expect(expireSpy).toHaveBeenCalledWith(1);
+    expect(selectedQuote()?.status).toBe('EXPIRED');
+  });
+
+  it('does not expire when status is not SENT', () => {
+    // DRAFT
+    expect(component.canExpire()).toBe(false);
+    component.onExpire();
+    expect(dialogOpen).not.toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips expire when ConfirmDialog is dismissed', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[4]));
+    fixture.detectChanges();
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
+
+    component.onExpire();
+    expect(dialogOpen).toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
+  });
+
+  it('enables Cancel when not ACCEPTED or CANCELLED and confirms', () => {
+    expect(component.canCancel()).toBe(true);
+    component.onCancelQuote();
+    expect(dialogOpen).toHaveBeenCalled();
+    expect(cancelSpy).toHaveBeenCalledWith(1);
+    expect(selectedQuote()?.status).toBe('CANCELLED');
+  });
+
+  it('disables Cancel for ACCEPTED and CANCELLED', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[4]), status: 'ACCEPTED' });
+    fixture.detectChanges();
+    expect(component.canCancel()).toBe(false);
+    component.onCancelQuote();
+    expect(cancelSpy).not.toHaveBeenCalled();
+
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'CANCELLED' });
+    fixture.detectChanges();
+    expect(component.canCancel()).toBe(false);
+  });
+
+  it('clones with ConfirmDialog, notes lines not copied, navigates to new DRAFT', () => {
+    component.onClone();
+    expect(dialogOpen).toHaveBeenCalled();
+    const dialogData = dialogOpen.mock.calls[0][1].data as {
+      message: string;
+    };
+    expect(dialogData.message).toMatch(/line items are not copied/i);
+    expect(cloneQuoteSpy).toHaveBeenCalledWith(1);
+    expect(router.navigate).toHaveBeenCalledWith(['/quotes', 99]);
+  });
+
+  it('skips clone when ConfirmDialog is dismissed', () => {
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
+    component.onClone();
+    expect(cloneQuoteSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders documents panel and clone honesty note', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('cpq-quote-documents-panel')).toBeTruthy();
+    expect(el.textContent).toMatch(/line items are not copied/i);
+    expect(listDocumentsSpy).toHaveBeenCalledWith(1);
   });
 });

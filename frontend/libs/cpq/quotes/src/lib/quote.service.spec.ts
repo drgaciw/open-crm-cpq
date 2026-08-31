@@ -121,6 +121,86 @@ describe('QuoteService', () => {
     await expect(clone).resolves.toMatchObject({ id: 99 });
   });
 
+  it('expire / cancel POSTs hit expected paths', async () => {
+    const expire = firstValueFrom(service.expire(3));
+    httpMock.expectOne('/api/v1/quotes/3/expire').flush(
+      quote({ id: 3, name: 'Q', customerExternalId: 'c', status: 'EXPIRED' }),
+    );
+    await expect(expire).resolves.toMatchObject({ status: 'EXPIRED' });
+
+    const cancel = firstValueFrom(service.cancel(3));
+    httpMock.expectOne('/api/v1/quotes/3/cancel').flush(
+      quote({ id: 3, name: 'Q', customerExternalId: 'c', status: 'CANCELLED' }),
+    );
+    await expect(cancel).resolves.toMatchObject({ status: 'CANCELLED' });
+  });
+
+  it('document generate/list/download hit /documents paths; download uses blob', async () => {
+    const generate = firstValueFrom(service.generateDocuments(8, 'ORDER_FORM'));
+    const genReq = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/quotes/8/documents/generate' &&
+        r.params.get('type') === 'ORDER_FORM',
+    );
+    expect(genReq.request.method).toBe('POST');
+    genReq.flush({
+      id: 11,
+      uuid: 'doc-11',
+      quoteId: 8,
+      documentType: 'ORDER_FORM',
+      fileName: 'quote-8-order.pdf',
+      contentType: 'application/pdf',
+      fileSize: 1024,
+      createdAt: '2026-08-30T12:00:00Z',
+    });
+    await expect(generate).resolves.toMatchObject({
+      id: 11,
+      documentType: 'ORDER_FORM',
+    });
+
+    const list = firstValueFrom(service.listDocuments(8));
+    const listReq = httpMock.expectOne('/api/v1/quotes/8/documents');
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush([
+      {
+        id: 11,
+        uuid: 'doc-11',
+        quoteId: 8,
+        documentType: 'ORDER_FORM',
+        fileName: 'quote-8-order.pdf',
+        createdAt: '2026-08-30T12:00:00Z',
+      },
+    ]);
+    await expect(list).resolves.toHaveLength(1);
+
+    const download = firstValueFrom(service.downloadDocument(8, 11));
+    const dlReq = httpMock.expectOne('/api/v1/quotes/8/documents/11/download');
+    expect(dlReq.request.method).toBe('GET');
+    expect(dlReq.request.responseType).toBe('blob');
+    const pdf = new Blob(['%PDF'], { type: 'application/pdf' });
+    dlReq.flush(pdf);
+    const blob = await download;
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('generateDocuments defaults type to PROPOSAL', async () => {
+    const generate = firstValueFrom(service.generateDocuments(9));
+    const genReq = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/quotes/9/documents/generate' &&
+        r.params.get('type') === 'PROPOSAL',
+    );
+    expect(genReq.request.method).toBe('POST');
+    genReq.flush({
+      id: 12,
+      uuid: 'doc-12',
+      quoteId: 9,
+      documentType: 'PROPOSAL',
+      createdAt: '2026-08-30T12:00:00Z',
+    });
+    await expect(generate).resolves.toMatchObject({ documentType: 'PROPOSAL' });
+  });
+
   it('line-item CRUD hits /api/v1/quotes/:id/line-items', async () => {
     service.listLineItems(7);
     const listReq = httpMock.expectOne('/api/v1/quotes/7/line-items');

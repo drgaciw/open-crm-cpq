@@ -219,3 +219,45 @@ export interface QuoteUpdateRequest {
   endDate?: string;
   notes?: string;
 }
+
+/**
+ * Mirrors: com.opencrm.quote.document.DocumentType
+ * Quote PDF generation types (quote-service documents API).
+ * Distinct from document-generation microservice DocumentType.
+ */
+export type DocumentType = 'PROPOSAL' | 'ORDER_FORM' | 'SOW';
+
+export const DOCUMENT_TYPES: readonly DocumentType[] = [
+  'PROPOSAL',
+  'ORDER_FORM',
+  'SOW',
+];
+
+export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  PROPOSAL: 'Proposal',
+  ORDER_FORM: 'Order form',
+  SOW: 'Statement of work',
+};
+
+export function isDocumentType(value: unknown): value is DocumentType {
+  return (
+    typeof value === 'string' &&
+    (DOCUMENT_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Mirrors: com.opencrm.quote.document.QuoteDocumentDto
+ * Returned by POST/GET /api/v1/quotes/:id/documents (metadata only; PDF via download).
+ */
+export interface QuoteDocumentDto {
+  id: number;
+  uuid: string;
+  quoteId: number;
+  documentType: DocumentType;
+  fileName?: string;
+  contentType?: string;
+  fileSize?: number;
+  generatedBy?: string;
+  createdAt: string;
+}
