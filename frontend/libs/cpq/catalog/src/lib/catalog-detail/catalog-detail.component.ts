@@ -15,12 +15,14 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import {
+  ConfirmDialogComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
@@ -36,9 +38,12 @@ import {
 } from '@frontend/shared-models';
 import { ProductService } from '../product.service';
 
-function httpErrorMessage(err: unknown): string {
+function httpErrorMessage(
+  err: unknown,
+  fallback = 'Failed to update product',
+): string {
   const e = err as { error?: { message?: string }; message?: string } | null;
-  return e?.error?.message || e?.message || 'Failed to update product';
+  return e?.error?.message || e?.message || fallback;
 }
 
 @Component({
@@ -67,14 +72,39 @@ function httpErrorMessage(err: unknown): string {
     } @else if (product(); as product) {
       <app-page-header [title]="product.name" [subtitle]="product.sku">
         <div actions class="header-actions">
-          <button mat-stroked-button type="button" (click)="goBack()" [disabled]="saving()">
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="goBack()"
+            [disabled]="saving() || deleting()"
+          >
             <mat-icon>arrow_back</mat-icon>
             Back to catalog
           </button>
           @if (!editing()) {
-            <button mat-raised-button color="primary" type="button" (click)="startEdit()">
+            <button
+              mat-raised-button
+              color="primary"
+              type="button"
+              (click)="startEdit()"
+              [disabled]="deleting()"
+            >
               <mat-icon>edit</mat-icon>
               Edit
+            </button>
+            <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              (click)="onDelete()"
+              [disabled]="deleting()"
+            >
+              @if (deleting()) {
+                <mat-spinner diameter="20" />
+              } @else {
+                <mat-icon>delete</mat-icon>
+                Delete
+              }
             </button>
           } @else {
             <button mat-button type="button" (click)="cancelEdit()" [disabled]="saving()">
@@ -349,6 +379,7 @@ function httpErrorMessage(err: unknown): string {
 })
 export class CatalogDetailComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
   private readonly fb = inject(FormBuilder);
   readonly service = inject(ProductService);
 
@@ -360,6 +391,7 @@ export class CatalogDetailComponent implements OnInit {
 
   readonly editing = signal(false);
   readonly saving = signal(false);
+  readonly deleting = signal(false);
   readonly saveError = signal<string | null>(null);
 
   readonly productTypes: CatalogProductType[] = [...CATALOG_PRODUCT_TYPES];
@@ -485,6 +517,45 @@ export class CatalogDetailComponent implements OnInit {
         this.saving.set(false);
         this.saveError.set(httpErrorMessage(err));
       },
+    });
+  }
+
+  onDelete(): void {
+    const product = this.product();
+    if (!product || this.deleting() || this.editing()) {
+      return;
+    }
+
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete product',
+        message: `Soft-delete "${product.name}" (${product.sku})? It will be removed from the active catalog.`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        confirmColor: 'warn' as const,
+      },
+    });
+
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.saveError.set(null);
+      this.deleting.set(true);
+      this.service.delete(product.id).subscribe({
+        next: () => {
+          this.deleting.set(false);
+          this.service.selectedProduct.set(null);
+          void this.router.navigate(['/catalog']);
+        },
+        error: (err: unknown) => {
+          this.deleting.set(false);
+          this.saveError.set(
+            httpErrorMessage(err, 'Failed to delete product'),
+          );
+        },
+      });
     });
   }
 
