@@ -46,3 +46,5 @@ Index: ~77 commits behind HEAD at edit time (CLI impact via main `.gitnexus/run.
 cd frontend
 NX_DAEMON=false npx nx test cpq-catalog --skip-nx-cache
 ```
+
+Result: 5 files / 37 tests passed.
