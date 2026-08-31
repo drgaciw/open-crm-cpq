@@ -1,16 +1,16 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave N COMPLETE**; **hygiene N′ FORGING** (H1 errorCode ∥ H2 matrix)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — recommended A; Wave O deferred  
-**Plan:** `docs/forge/25-wave-n-hygiene.md`  
-**Baseline:** Wave N COMPLETE @ `5f126ca`
+**Session state:** **Wave N COMPLETE**; **hygiene N′ COMPLETE**; **Wave O pending architect**  
+**Architect:** `/opencrm-architect` (Herdr `w8`)  
+**Plan:** `docs/forge/25-wave-n-hygiene.md` COMPLETE  
+**Baseline:** hygiene H1+H2 on `main` @ `31d5cf9`
 
-## Hygiene tracks
+## Hygiene landed
 
-- **H1** Quote delete banner uses `errorCode` (`cpq-quotes`)
-- **H2** Matrix DELETE quotes row + N1 notes + dual-read J–N
-- **H3** TestBed hookTimeout optional, not blocker
+- **H1** Quote delete banner `message [errorCode]` (`3158620` / merge `2061638`)
+- **H2** Matrix `DELETE /api/v1/quotes/{id}` + N1 PUT/DELETE notes + dual-read J–N (`9e1fc3e` / merge `31d5cf9`)
+- **H3** TestBed hookTimeout not opened (optional)
 
 ## Still held
 
