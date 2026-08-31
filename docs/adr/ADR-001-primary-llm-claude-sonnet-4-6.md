@@ -5,6 +5,8 @@
 **Superseded by:** ADR-002 (cost — GLM-5 is 3–5x cheaper)
 **Deciders:** DRGAMTD (Enterprise Architect / Platform Owner)
 
+**Runtime (2026-08-31):** Neither ADR-001 (Anthropic starter) nor ADR-002 (Zhipu `glm-5`) is implemented. `ai-service` still uses Azure OpenAI `gpt-4o` (`application.yml` + `spring-ai-azure-openai-spring-boot-starter` 0.8.1). `AGENT.md` still lists Azure OpenAI + Claude Agent SDK. See ADR-002 residual drift.
+
 ---
 
 ## Context

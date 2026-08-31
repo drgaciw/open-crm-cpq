@@ -1,9 +1,20 @@
 # ADR-002: Primary LLM — GLM-5 via Zhipu AI (supersedes ADR-001)
 
-**Status:** Accepted
+**Status:** Accepted *(architecture decision — implementation **not** landed)*
 **Date:** 2026-03-15
 **Supersedes:** ADR-001 (Claude Sonnet 4.6)
 **Deciders:** DRGAMTD (Enterprise Architect / Platform Owner)
+
+### Runtime vs decision (verified 2026-08-31)
+
+| Surface | ADR-002 says | Tree says |
+|---------|--------------|-----------|
+| Primary model | GLM-5 via Zhipu (`glm-5`) | Azure OpenAI **gpt-4o** |
+| `ai-service` YAML | `spring.ai.zhipuai` / `ZHIPUAI_API_KEY` | `spring.ai.azure.openai` / `AZURE_OPENAI_*` / `deployment-name: gpt-4o` |
+| Starter / BOM | `spring-ai-starter-model-zhipuai` 1.1.0 | `spring-ai-azure-openai-spring-boot-starter`, `<spring-ai.version>0.8.1</spring-ai.version>` |
+| `AGENT.md` | (action item: update) | Spring AI 1.1.7 + **Azure OpenAI** + Claude Agent SDK; ADR table “Azure OpenAI primary, Claude for agent workflows” |
+
+**Do not treat this ADR as describing production runtime.** Action items below remain **unchecked**. Changing YAML/pom is a separate implementation PR (not this docs review). CI LLM path is **ADR-003** (`LLM_ENDPOINT` for Jenkins ai-assist) — do not conflate with `ai-service`.
 
 ---
 

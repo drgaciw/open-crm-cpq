@@ -4,6 +4,8 @@
 
 Accepted
 
+**Verified 2026-08-31:** `.github/workflows/ci.yml` is `on: workflow_dispatch` only (no push/PR; no `ai-assist`). `Jenkinsfile` gates advisory stages on `AI_CI_ENABLED`. `docs/ci-contract.yaml` forbids adding ai-assist to GHA without amending this ADR. Matches decision.
+
 ## Context
 
 OpenCRM CPQ uses:
