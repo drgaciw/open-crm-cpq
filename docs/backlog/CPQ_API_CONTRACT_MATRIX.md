@@ -127,8 +127,8 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 | GET | `/api/v1/rule-sets/{id}` | pricing-service (8082) | stable | — | Get rule set. |
 | PUT | `/api/v1/rule-sets/{id}` | pricing-service (8082) | stable | — | Update rule set. |
 | DELETE | `/api/v1/rule-sets/{id}` | pricing-service (8082) | stable | — | Soft delete. |
-| POST | `/api/v1/rule-sets/{id}/activate` | pricing-service (8082) | stable | — | DRAFT → ACTIVE. |
-| POST | `/api/v1/rule-sets/{id}/deprecate` | pricing-service (8082) | stable | — | ACTIVE → DEPRECATED. |
+| POST | `/api/v1/rule-sets/{id}/activate` | pricing-service (8082) | stable | — | DRAFT → ACTIVE. FE ConfirmDialog (Wave O1 `@frontend/cpq-rule-sets`). |
+| POST | `/api/v1/rule-sets/{id}/deprecate` | pricing-service (8082) | stable | — | ACTIVE → DEPRECATED. FE ConfirmDialog (Wave O1). |
 
 **Section row count:** 14
 
@@ -136,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–N** (YAML untouched; default still `true`).
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–O** (YAML untouched; default still `true`).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -177,9 +177,9 @@ Routes used by cpq-agent-016 (and related catalog checks) outside configuration/
 | GET | `/api/v1/products/{id}` | product-service (8083) | **agent-contract** | cpq-agent-015, cpq-agent-016 | Lifecycle status (ACTIVE, DRAFT, DEPRECATED, END_OF_LIFE). |
 | GET | `/api/v1/products` | product-service (8083) | stable | — | List/filter catalog. |
 | GET | `/api/v1/product-bundles/product/{productId}` | product-service (8083) | **agent-contract** | cpq-agent-016 | Bundle component status checks. |
-| GET | `/api/v1/product-attributes` | product-service (8083) | **agent-contract** | cpq-agent-016 | Attribute definitions for data-quality validation. |
-| GET | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | **agent-contract** | cpq-agent-016 | Required/type/range validation. |
-| POST | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | stable | — | Set attribute values (configuration workflow). |
+| GET | `/api/v1/product-attributes` | product-service (8083) | **agent-contract** | cpq-agent-016 | Attribute definitions for data-quality validation. FE catalog-detail picker (Wave O2). |
+| GET | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | **agent-contract** | cpq-agent-016 | Required/type/range validation. FE nested on catalog-detail (Wave O2). |
+| POST | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | stable | — | Set attribute values (configuration workflow). FE catalog-detail (Wave O2). |
 | GET | `/api/v1/product-bundles/{id}` | product-service (8083) | stable | — | Single bundle fetch. |
 | POST | `/api/v1/products` | product-service (8083) | stable | — | Create product (FE catalog create — Wave J4). |
 | PUT | `/api/v1/products/{id}` | product-service (8083) | stable | — | Update product (FE catalog-detail Edit/Save — Wave K3). |
