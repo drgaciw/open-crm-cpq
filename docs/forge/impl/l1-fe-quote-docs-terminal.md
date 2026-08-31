@@ -21,7 +21,7 @@ Wave L1: FE quote documents panel + terminal lifecycle on existing quote-service
 | Expire SENT-only + ConfirmDialog | Yes |
 | Cancel not ACCEPTED (also not CANCELLED) + ConfirmDialog | Yes |
 | Clone → navigate new DRAFT; UX says lines not copied | Yes — dialog + page note |
-| Vitest | `nx test cpq-quotes` + `shared-models` DocumentType |
+| Vitest | `nx test cpq-quotes` — 57 passed; `shared-models` — 11 passed |
 | No BE Java / app.routes / sidebar / dual-read flip | Confirmed |
 
 ## Files
