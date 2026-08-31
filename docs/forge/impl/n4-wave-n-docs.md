@@ -23,3 +23,11 @@ Wave N forge closeout. Dual-read default still `true`. Product-service validate 
 - Delete product-service validate; gateway domain validation
 - Flip `approvals.legacy-local-read-enabled` default → false (**HIGH**)
 - Full SpEL; Kafka S2B-9; contract-asset FE; NgRx CPQ store; rule-set admin; product bundles
+
+## Hygiene addendum (H2)
+
+Matrix completeness after Wave N (docs only; YAML dual-read default still `true`):
+
+- §6: `DELETE /api/v1/quotes/{id}` (quote-service 8084, stable) — FE soft-delete N3; ACCEPTED → `QUOTE_ACCEPTED_NO_DELETE`
+- §4b: N1 FE header update/delete notes on `PUT`/`DELETE /api/v1/price-books/{id}` (not entries)
+- Dual-read flip hold text: Waves **J–N** (was J–M)
