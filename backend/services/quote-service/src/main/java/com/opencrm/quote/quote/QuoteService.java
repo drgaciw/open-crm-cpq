@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -338,7 +339,54 @@ public class QuoteService {
                 .build();
 
         Quote saved = quoteRepository.save(cloned);
-        log.info("Cloned quote {} to {}", original.getQuoteNumber(), saved.getQuoteNumber());
+
+        List<QuoteLineItem> sourceLines =
+                quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        List<QuoteLineItem> clonedLines = new ArrayList<>(sourceLines.size());
+        for (QuoteLineItem source : sourceLines) {
+            // Commercial snapshot only — skip pricingExplanationCode / pricingWaterfallJson
+            QuoteLineItem copy = QuoteLineItem.builder()
+                    .quote(saved)
+                    .productExternalId(source.getProductExternalId())
+                    .productName(source.getProductName())
+                    .productType(source.getProductType())
+                    .lineItemType(source.getLineItemType())
+                    .quantity(source.getQuantity())
+                    .unitOfMeasure(source.getUnitOfMeasure())
+                    .listPrice(source.getListPrice())
+                    .unitPrice(source.getUnitPrice())
+                    .discountRate(source.getDiscountRate())
+                    .discountAmount(source.getDiscountAmount())
+                    .netPrice(source.getNetPrice())
+                    .extendedAmount(source.getExtendedAmount())
+                    .billingFrequency(source.getBillingFrequency())
+                    .sortOrder(source.getSortOrder())
+                    .notes(source.getNotes())
+                    .metadata(source.getMetadata())
+                    .build();
+            clonedLines.add(copy);
+        }
+
+        if (!clonedLines.isEmpty()) {
+            quoteLineItemRepository.saveAll(clonedLines);
+        }
+
+        // Same rollup as QuoteLineItemService.recalculateQuoteTotals — do not call Quote.recalculateTotals()
+        BigDecimal subtotal = clonedLines.stream()
+                .map(i -> i.getExtendedAmount() != null ? i.getExtendedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalDiscount = clonedLines.stream()
+                .map(i -> i.getDiscountAmount() != null ? i.getDiscountAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        saved.setSubtotal(subtotal);
+        saved.setTotalDiscount(totalDiscount);
+        saved.setTotalAmount(subtotal.subtract(totalDiscount));
+        saved = quoteRepository.save(saved);
+
+        saved.getLineItems().addAll(clonedLines);
+
+        log.info("Cloned quote {} to {} with {} line items",
+                original.getQuoteNumber(), saved.getQuoteNumber(), clonedLines.size());
         return quoteMapper.toDto(saved);
     }
 
