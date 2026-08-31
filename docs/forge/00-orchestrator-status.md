@@ -1,10 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave N COMPLETE**; **hygiene N′ COMPLETE**; **Wave O COMPLETE**  
-**Architect:** `/opencrm-architect` (Herdr `w8`)  
-**Plan:** `docs/forge/26-wave-o-architecture.md` COMPLETE  
-**Baseline:** Wave O on `main` — O1 `d81d417`, O2 `900a24f`, O3 `14b1a6e`
+**Session state:** **Wave O COMPLETE**; **Wave P FORGING** (P1 bundles ∥ P2 rule impact ∥ P3 catalog config-rules)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — `docs/forge/28-wave-p-architecture.md`  
+**Plan:** Wave P @ `3db7700` (cherry-pick of architect `eb85d21`)  
+**Baseline:** Wave O COMPLETE on `main` @ `fc7e631`
+
+## Wave P tracks
+
+- **P1** FE product-bundles portal (owns shell)
+- **P2** FE rule-sets analyzeImpact (no shell)
+- **P3** FE catalog nested configuration-rules (no shell)
+- **P4** docs closeout after Day-1
 
 ## Wave O landed
 
@@ -24,4 +31,4 @@
 - Activities API, CI #238, agent Kafka #241
 - Delete product-service validate; gateway domain validation
 - Flip `approvals.legacy-local-read-enabled` default → false (HIGH)
-- Full SpEL; Kafka S2B-9; contract-asset FE; NgRx; product bundles portal
+- Full SpEL; Kafka S2B-9; contract-asset FE; NgRx
