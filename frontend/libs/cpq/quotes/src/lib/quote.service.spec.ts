@@ -76,6 +76,15 @@ describe('QuoteService', () => {
     expect(service.quotes()).toEqual(page.content);
   });
 
+  it('delete DELETEs /api/v1/quotes/:id (soft-delete)', async () => {
+    const del = firstValueFrom(service.delete(42));
+    const req = httpMock.expectOne('/api/v1/quotes/42');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toBeNull();
+    req.flush(null);
+    await expect(del).resolves.toBeNull();
+  });
+
   it('update PUTs /api/v1/quotes/:id with QuoteUpdateRequest body', async () => {
     const body: QuoteUpdateRequest = {
       name: 'Renamed quote',

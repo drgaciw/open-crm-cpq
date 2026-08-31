@@ -210,6 +210,21 @@ function httpErrorMessage(err: unknown): string {
             <mat-icon>content_copy</mat-icon>
             Clone
           </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            (click)="onDelete()"
+            [disabled]="!canDelete() || actionBusy()"
+            [title]="
+              canDelete()
+                ? 'Soft-delete this quote'
+                : 'Accepted quotes cannot be deleted'
+            "
+          >
+            <mat-icon>delete</mat-icon>
+            Delete
+          </button>
         </div>
       </app-page-header>
 
@@ -691,6 +706,15 @@ export class QuotesDetailComponent {
     return status != null && status !== 'ACCEPTED' && status !== 'CANCELLED';
   });
 
+  /**
+   * Soft-delete allowed for all statuses except ACCEPTED
+   * (matches BE `QUOTE_ACCEPTED_NO_DELETE`). CANCELLED/EXPIRED/DRAFT allowed.
+   */
+  readonly canDelete = computed(() => {
+    const status = this.quote()?.status;
+    return status != null && status !== 'ACCEPTED';
+  });
+
   readonly lineForm = this.fb.nonNullable.group({
     productExternalId: ['', Validators.required],
     productName: [''],
@@ -875,6 +899,47 @@ export class QuotesDetailComponent {
         next: (cloned) => {
           this.actionBusy.set(false);
           void this.router.navigate(['/quotes', cloned.id]);
+        },
+        error: (err) => {
+          this.actionBusy.set(false);
+          this.actionError.set(httpErrorMessage(err));
+        },
+      });
+    });
+  }
+
+  /** Soft-delete via ConfirmDialog; blocked for ACCEPTED (BE QUOTE_ACCEPTED_NO_DELETE). */
+  onDelete(): void {
+    if (!this.canDelete() || this.actionBusy()) {
+      return;
+    }
+    const quote = this.quote();
+    const numericId = this.numericId();
+    if (quote == null || numericId == null) {
+      return;
+    }
+    const label = quote.quoteNumber ?? `Quote ${numericId}`;
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Delete quote',
+        message: `Soft-delete "${quote.name}" (${label})? It will be removed from the active quote list.`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        confirmColor: 'warn' as const,
+      },
+    });
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.actionBusy.set(true);
+      this.actionError.set(null);
+      this.quoteService.delete(numericId).subscribe({
+        next: () => {
+          this.actionBusy.set(false);
+          this.quoteService.selectedQuote.set(null);
+          void this.router.navigate(['/quotes']);
         },
         error: (err) => {
           this.actionBusy.set(false);

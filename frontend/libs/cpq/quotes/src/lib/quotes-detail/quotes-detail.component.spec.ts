@@ -58,6 +58,7 @@ describe('QuotesDetailComponent', () => {
   let expireSpy: ReturnType<typeof vi.fn>;
   let cancelSpy: ReturnType<typeof vi.fn>;
   let cloneQuoteSpy: ReturnType<typeof vi.fn>;
+  let deleteSpy: ReturnType<typeof vi.fn>;
   let updateSpy: ReturnType<typeof vi.fn>;
   let listDocumentsSpy: ReturnType<typeof vi.fn>;
   let addLineItemSpy: ReturnType<typeof vi.fn>;
@@ -134,6 +135,7 @@ describe('QuotesDetailComponent', () => {
         lineItems: toQuoteDto(MOCK_QUOTES[0]).lineItems,
       }),
     );
+    deleteSpy = vi.fn(() => of(undefined));
     updateSpy = vi.fn(() =>
       of({
         ...toQuoteDto(MOCK_QUOTES[0]),
@@ -187,6 +189,7 @@ describe('QuotesDetailComponent', () => {
       expire: expireSpy,
       cancel: cancelSpy,
       cloneQuote: cloneQuoteSpy,
+      delete: deleteSpy,
       update: updateSpy,
       listDocuments: listDocumentsSpy,
       generateDocuments: vi.fn(() => of(null)),
@@ -538,6 +541,78 @@ describe('QuotesDetailComponent', () => {
     dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
     component.onClone();
     expect(cloneQuoteSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders Delete and soft-deletes via ConfirmDialog then navigates to list', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Delete');
+    expect(component.canDelete()).toBe(true);
+
+    component.onDelete();
+    expect(dialogOpen).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete quote',
+          confirmText: 'Delete',
+          confirmColor: 'warn',
+          message: expect.stringMatching(/Soft-delete/i),
+        }),
+      }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(selectedQuote()).toBeNull();
+    expect(router.navigate).toHaveBeenCalledWith(['/quotes']);
+    expect(component.actionBusy()).toBe(false);
+    expect(component.actionError()).toBeNull();
+  });
+
+  it('allows Delete for CANCELLED and EXPIRED (not only DRAFT)', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'CANCELLED' });
+    fixture.detectChanges();
+    expect(component.canDelete()).toBe(true);
+
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'EXPIRED' });
+    fixture.detectChanges();
+    expect(component.canDelete()).toBe(true);
+  });
+
+  it('disables Delete when status is ACCEPTED', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[4]), status: 'ACCEPTED' });
+    fixture.detectChanges();
+    expect(component.canDelete()).toBe(false);
+
+    component.onDelete();
+    expect(dialogOpen).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips delete when ConfirmDialog is dismissed', () => {
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(false) });
+    component.onDelete();
+    expect(dialogOpen).toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalledWith(['/quotes']);
+  });
+
+  it('shows QUOTE_ACCEPTED_NO_DELETE banner on delete failure and stays on detail', () => {
+    deleteSpy.mockReturnValueOnce(
+      throwError(() => ({
+        error: { message: 'QUOTE_ACCEPTED_NO_DELETE: Accepted quotes cannot be deleted' },
+      })),
+    );
+
+    component.onDelete();
+    fixture.detectChanges();
+
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(component.actionBusy()).toBe(false);
+    expect(component.actionError()).toContain('QUOTE_ACCEPTED_NO_DELETE');
+    expect(router.navigate).not.toHaveBeenCalledWith(['/quotes']);
+    expect(selectedQuote()?.id).toBe(1);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('QUOTE_ACCEPTED_NO_DELETE');
   });
 
   it('renders documents panel, header edit, and clone note (lines copied; Calculate required)', () => {
