@@ -1,21 +1,21 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave N FORGING** (price-book header ∥ pricing-customers portal ∥ quote soft-delete)  
+**Session state:** **Wave N FORGING** (N1 + N3 merged; N2 in progress)  
 **Architect:** `/opencrm-architect` (Herdr `w8`)  
 **Plan:** `docs/forge/23-wave-n-architecture.md`  
-**Baseline:** Wave M COMPLETE @ `e09a4a3`; Wave N authorized 2026-08-31
+**Tip:** `9dbab29` on `main`
 
 ## Wave N tracks
 
-- **N1** FE price-book header update/delete (`cpq-price-books`, no shell)
-- **N2** FE pricing-customers portal + shell (`@frontend/cpq-pricing-customers`)
-- **N3** FE quote soft-delete on detail (no shell)
-- **N4** Docs closeout after Day-1
+| ID | Status | Tip |
+|----|--------|-----|
+| **N1** | MERGED | `9dbab29` price-book header update/delete |
+| **N3** | MERGED | `e995488` quote soft-delete |
+| **N2** | FORGING | Herdr `wn-fe-pricing-customers` still writing |
+| **N4** | PENDING | Closeout after N2 |
 
-**Shell owner:** N2 only (`app.routes` + sidebar + `test:cpq`).
-
-**Implementers:** Herdr Grok 4.5 panes (not idle dual-write subagents on those trees). Workflow `forge-wave-n` is the DAG/verify overlay.
+**Shell owner:** N2 only.
 
 ## Still held
 
