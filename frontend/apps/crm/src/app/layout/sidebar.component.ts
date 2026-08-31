@@ -53,6 +53,10 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-icon matListItemIcon>groups</mat-icon>
         <span matListItemTitle>Pricing customers</span>
       </a>
+      <a mat-list-item routerLink="/rule-sets" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>rule</mat-icon>
+        <span matListItemTitle>Rule sets</span>
+      </a>
       <a mat-list-item routerLink="/pricing/simulator" routerLinkActive="active-link">
         <mat-icon matListItemIcon>science</mat-icon>
         <span matListItemTitle>Pricing Simulator</span>

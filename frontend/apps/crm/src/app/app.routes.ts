@@ -60,6 +60,11 @@ export const appRoutes: Route[] = [
           ),
       },
       {
+        path: 'rule-sets',
+        loadChildren: () =>
+          import('@frontend/cpq-rule-sets').then((m) => m.RULE_SETS_ROUTES),
+      },
+      {
         path: 'pricing/simulator',
         loadChildren: () =>
           import('@frontend/cpq-pricing-simulator').then(
