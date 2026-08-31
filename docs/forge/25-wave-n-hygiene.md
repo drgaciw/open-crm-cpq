@@ -1,6 +1,6 @@
 # Wave N hygiene (N′) — quote errorCode banner ∥ matrix completeness
 
-**Status:** APPROVED FOR FORGE — PM picked architect option **A** (hygiene before Wave O) 2026-08-31  
+**Status:** COMPLETE on main 2026-08-31 — H1 merge `2061638`, H2 merge `31d5cf9`  
 **Architect:** `opencrm-architect` (Herdr `w8` verdict)  
 **Baseline:** Wave N COMPLETE `main` @ `5f126ca`
 
