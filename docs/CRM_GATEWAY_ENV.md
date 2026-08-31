@@ -38,7 +38,7 @@ export CORS_ALLOWED_ORIGINS=https://crm-portal.azurewebsites.net,https://admin.e
 
 ## CSRF enforcement boundary
 
-Browser Cookie CSRF is **gateway-only**. Domain services use `csrf.disable()` + `SessionCreationPolicy.STATELESS` (Bearer / mesh); do **not** enable Cookie CSRF on downstream services. See [ADR-004: CSRF edge-only boundary](./ADR-004-csrf-edge-boundary.md).
+Browser Cookie CSRF is **gateway-only**. Domain services use `csrf.disable()` + `SessionCreationPolicy.STATELESS` (Bearer / mesh); do **not** enable Cookie CSRF on downstream services. See [ADR-004: CSRF edge-only boundary](./adr/ADR-004-csrf-edge-boundary.md) (stub at [docs/ADR-004-csrf-edge-boundary.md](./ADR-004-csrf-edge-boundary.md)).
 
 ## `CRM_SERVICE_URI`
 

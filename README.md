@@ -15,6 +15,7 @@ On-prem or local Jenkins mirrors the same `scripts/ci/*` stages as GitHub Action
 | Resource | Purpose |
 |----------|---------|
 | [infra/jenkins/README.md](infra/jenkins/README.md) | Docker stack, production build agents, troubleshooting, first green build |
+| [docs/adr/README.md](docs/adr/README.md) | ADR catalog (001–006 + configuration reconciliation) |
 | [docs/adr/ADR-003-ci-llm-integration.md](docs/adr/ADR-003-ci-llm-integration.md) | CI LLM boundaries, execution model, GHA vs Jenkins |
 | [docs/plans/jenkins-ai-ci-plan-summary.md](docs/plans/jenkins-ai-ci-plan-summary.md) | Plan objectives and delivery status |
 

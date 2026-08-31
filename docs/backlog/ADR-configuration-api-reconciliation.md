@@ -38,18 +38,20 @@ Rule management agents expect rule CRUD on the same prefix:
 
 ### Current implementation state
 
-**product-service** (`ConfigurationRuleController`, port 8083):
+**product-service** (`ConfigurationRuleController`, port 8083) — **retained dual-run path**:
 
 - Owns rule persistence (`ConfigurationRule` entity, `ConfigurationRuleRepository`).
-- Implements `POST /api/v1/configuration/validate` inline: accepts `List<Long> selectedProductIds`, evaluates REQUIRES/EXCLUDES rules from the local database, returns `List<String>` error messages.
-- Does **not** evaluate RECOMMENDS, DEFAULT, or VALIDATES rule types in the current validator.
+- Implements `POST /api/v1/configuration/validate` inline: accepts `List<Long> selectedProductIds`, returns `ApiResponse<List<String>>` error messages.
+- **I3 (landed):** `validateConfiguration` is a **flat O(rules)** pass over `findBySourceProductIdInAndDeletedFalse` (no `groupingBy` + nested product loop). Semantics unchanged: **REQUIRES / EXCLUDES only**.
+- Does **not** evaluate RECOMMENDS, DEFAULT, or VALIDATES on this path (those live on CE `ProductRuleEvaluationCore` for the agent/gateway evaluate path).
 - Does **not** manage configuration sessions or option-level selections.
+- **Do not delete** this endpoint (frozen Accept default #4 — no removal date).
 
 **configuration-engine**:
 
 - Owns `ConfigurationSession` aggregate (selections map, validity flag, lifecycle: IN_PROGRESS → COMPLETED/CANCELLED).
 - Exposes `POST /api/v1/configurations/{id}/validate` returning the updated session with `valid` and `validationErrors`.
-- Uses `ConstraintSolver` for constraint evaluation (currently placeholder logic; S2B-7/S2B-8 will wire REQUIRES/EXCLUDES/RECOMMENDS/DEFAULT/VALIDATES and graph conflict checks).
+- **Landed (Waves F–H):** stateless `POST /internal/v1/configurations/evaluate` used by the gateway shim; shared `ProductRuleEvaluationCore` evaluates REQUIRES/EXCLUDES/VALIDATES (hard), RECOMMENDS (soft), DEFAULT (expand). Full S2B-8 `ConstraintSolver` / graph conflict remains follow-on.
 - Does **not** expose rule CRUD endpoints.
 
 ### Problem
@@ -111,7 +113,7 @@ Gateway behavior (S2B-11 — **landed Wave F hybrid**; Accept defaults from Wave
 3. **Landed:** translate configuration-engine result to agent PRD shape via shared DTO `ConfigurationValidationResult` in `backend/libs/common` (`{ valid, violations: [{ ruleId, ruleType, description, remediation }] }`).
 4. **Do not** embed domain validation logic in the gateway — routing, auth, correlation IDs, and response adaptation only.
 
-**No breaking removal:** Existing `product-service` routes under `/api/v1/configuration/*` must not be deleted without a gateway shim or documented deprecation window. Retain product-service `POST /api/v1/configuration/validate` (current `List<String>` error shape for direct/parity callers) — **no removal date**. product-service continues to serve rule CRUD directly; agent-facing validate is dual-run capable (gateway → CE evaluate authoritative for agents; product path retained transitional).
+**No breaking removal:** Existing `product-service` routes under `/api/v1/configuration/*` must not be deleted without a gateway shim or documented deprecation window. Retain product-service `POST /api/v1/configuration/validate` (`List<Long>` in / `List<String>` errors out; I3 O(rules) REQUIRES/EXCLUDES) for direct/parity callers — **no removal date**. product-service continues to serve rule CRUD directly; agent-facing validate is dual-run (gateway → CE evaluate **authoritative for agents**; product path retained transitional).
 
 ### 4. Evaluation vs persistence split
 
@@ -190,14 +192,14 @@ sequenceDiagram
         GW->>CE: POST /api/v1/configurations/{id}/validate
         CE->>PS: GET rules (product scope)<br/>[cache or projection]
         PS-->>CE: ConfigurationRule[] 
-        CE->>CE: ConstraintSolver.evaluate()
+        CE->>CE: ProductRuleEvaluationCore / session ConstraintSolver
         CE-->>GW: ConfigurationSession<br/>(valid, validationErrors)
     else Stateless agent payload
-        GW->>CE: POST /internal/v1/configurations/evaluate<br/>(S2B-11 — preferred stateless path)
-        CE->>PS: GET /api/v1/configuration/rules/product/{productId}<br/>(sync REST first; cache = S2B-9)
+        GW->>CE: POST /internal/v1/configurations/evaluate<br/>(S2B-11 hybrid — landed Wave F)
+        CE->>PS: GET /api/v1/configuration/rules/product/{productId}<br/>(sync REST first; thin TTL = H6; event bus = S2B-9 hold)
         PS-->>CE: ConfigurationRule[]
-        CE->>CE: ConstraintSolver.evaluate()
-        CE-->>GW: ValidationResult (shared libs/common DTO)
+        CE->>CE: ProductRuleEvaluationCore (REQUIRES/EXCLUDES/VALIDATES;<br/>soft RECOMMENDS; DEFAULT expand)
+        CE-->>GW: ConfigurationValidationResult (libs/common DTO)
     end
 
     GW->>GW: Map to agent PRD shape<br/>{ valid, violations[] }
@@ -233,6 +235,9 @@ Matches backlog amendment specifications in `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.m
 | `docs/backlog/CPQ_API_CONTRACT_MATRIX.md` | S2A-7 route registry — agent validate = gateway → CE evaluate + `ConfigurationValidationResult`; product retained path = `List<String>` |
 | `docs/forge/impl/f5-s2b11-docs.md` | Wave F closeout: hybrid S2B-11 matrix row |
 | `docs/forge/impl/i1-adr-matrix-hygiene.md` | Wave I ADR/matrix hygiene (this reconciliation) |
+| `docs/forge/impl/i3-product-validate-on.md` | I3 flat O(rules) on retained product validate |
+| `docs/forge/24-adr-gitnexus-review.md` | 2026-08-31 ADR vs code / GitNexus table |
+| `docs/adr/README.md` | Numbered ADR catalog |
 | `docs/forge/14-wave-e-architecture.md` | Wave E Accept authority; frozen open-question defaults |
 | `docs/forge/impl/e3-adr-accept.md` | Forge E3 status note |
 | `agents/compatibility-rules.md` | cpq-agent-015 validate + rule CRUD paths |
@@ -268,9 +273,9 @@ Open questions below were **frozen at Accept** (2026-08-30) per `docs/forge/14-w
 | Agent validate URL | Unchanged: `POST /api/v1/configuration/validate` (gateway contract owner) |
 | Gateway shim | **Landed (F3):** route + adapt only → CE `POST /internal/v1/configurations/evaluate` |
 | Shared DTO | **Landed (F1):** `ConfigurationValidationResult` in `backend/libs/common` |
-| CE evaluate | **Landed (F2):** thin REQUIRES/EXCLUDES; G1–G2 shared `ProductRuleEvaluationCore`; H1 VALIDATES `attr:key=value` dialect; H6 thin TTL on rule fetch (full Kafka S2B-9 still follow-on) |
-| Agent / AI consumers | Structured `{ valid, violations[] }` via gateway; H2 AI tool parse for validate |
-| product-service validate | **Retained** transitional (`List<String>` errors) for direct/parity — **no removal date** |
-| Full S2B-8 ConstraintSolver | Still follow-on (not claimed complete by hybrid S2B-11) |
+| CE evaluate | **Landed (F2):** G1–G2 shared `ProductRuleEvaluationCore` — hard REQUIRES/EXCLUDES/VALIDATES (`attr:key=value` / `attr:in:` per H1/J2 when attrs present); soft RECOMMENDS; DEFAULT expands selection; H6 thin TTL on rule fetch (full Kafka S2B-9 still follow-on) |
+| Agent / AI consumers | Structured `{ valid, violations[] }` via gateway; H2 AI tool parse for validate; quote preflight `ProductServiceClient` → gateway validate (S2D-3a / K1) |
+| product-service validate | **Retained** — I3 flat O(rules) REQUIRES/EXCLUDES; `ApiResponse<List<String>>`; **no removal date**; **do not delete** |
+| Full S2B-8 ConstraintSolver | Still follow-on (session path uses the same core; not claimed complete by hybrid S2B-11) |
 
 **Forge notes:** `docs/forge/impl/f1-validation-dto.md` … `f5-s2b11-docs.md`; Wave G/H impl notes; Wave I hygiene `docs/forge/impl/i1-adr-matrix-hygiene.md`.
