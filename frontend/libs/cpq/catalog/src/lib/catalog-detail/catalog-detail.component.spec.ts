@@ -6,9 +6,20 @@ import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { CatalogDetailComponent } from './catalog-detail.component';
 import { ProductService } from '../product.service';
+import { ProductOptionService } from '../product-option.service';
+import { ProductAttributeService } from '../product-attribute.service';
 import { MOCK_CATALOG_PRODUCTS } from '../catalog.mock';
-import { ProductDto, ProductUpdateRequest } from '@frontend/shared-models';
+import {
+  AttributeValueDto,
+  ProductAttributeDto,
+  ProductDto,
+  ProductOptionGroupDto,
+  ProductUpdateRequest,
+  SpringPageResponse,
+} from '@frontend/shared-models';
 import { ConfirmDialogComponent } from '@frontend/shared-ui';
+import { OptionGroupCreateDialogComponent } from '../option-group-create-dialog/option-group-create-dialog.component';
+import { OptionCreateDialogComponent } from '../option-create-dialog/option-create-dialog.component';
 
 function toProductDto(
   mock: (typeof MOCK_CATALOG_PRODUCTS)[number],
@@ -31,6 +42,48 @@ function toProductDto(
   };
 }
 
+const SAMPLE_GROUP: ProductOptionGroupDto = {
+  id: 50,
+  uuid: 'g-50',
+  productId: 1,
+  name: 'Tier features',
+  selectionType: 'MULTIPLE',
+  minSelections: 0,
+  maxSelections: 3,
+  sortOrder: 0,
+  options: [
+    {
+      id: 501,
+      uuid: 'o-501',
+      productId: 1,
+      name: 'SSO',
+      defaultOption: false,
+      sortOrder: 0,
+      priceAdjustment: 10,
+      adjustmentType: 'ABSOLUTE',
+    },
+  ],
+};
+
+const SAMPLE_VALUE: AttributeValueDto = {
+  id: 70,
+  uuid: 'v-70',
+  productId: 1,
+  attributeId: 9,
+  attributeName: 'region',
+  value: 'US',
+};
+
+const SAMPLE_DEF: ProductAttributeDto = {
+  id: 9,
+  uuid: 'a-9',
+  name: 'region',
+  displayName: 'Region',
+  dataType: 'STRING',
+  required: false,
+  sortOrder: 0,
+};
+
 describe('CatalogDetailComponent', () => {
   let fixture: ComponentFixture<CatalogDetailComponent>;
   let component: CatalogDetailComponent;
@@ -38,6 +91,11 @@ describe('CatalogDetailComponent', () => {
   let getByIdSpy: ReturnType<typeof vi.fn>;
   let updateSpy: ReturnType<typeof vi.fn>;
   let deleteSpy: ReturnType<typeof vi.fn>;
+  let listGroupsSpy: ReturnType<typeof vi.fn>;
+  let deleteGroupSpy: ReturnType<typeof vi.fn>;
+  let listValuesSpy: ReturnType<typeof vi.fn>;
+  let listDefinitionsSpy: ReturnType<typeof vi.fn>;
+  let setValueSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let navigateSpy: ReturnType<typeof vi.fn>;
 
@@ -56,6 +114,19 @@ describe('CatalogDetailComponent', () => {
     });
     updateSpy = vi.fn();
     deleteSpy = vi.fn(() => of(undefined));
+    listGroupsSpy = vi.fn(() => of([SAMPLE_GROUP]));
+    deleteGroupSpy = vi.fn(() => of(undefined));
+    listValuesSpy = vi.fn(() => of([SAMPLE_VALUE]));
+    listDefinitionsSpy = vi.fn(() =>
+      of({
+        content: [SAMPLE_DEF],
+        number: 0,
+        size: 50,
+        totalElements: 1,
+        totalPages: 1,
+      } satisfies SpringPageResponse<ProductAttributeDto>),
+    );
+    setValueSpy = vi.fn();
     dialogOpen = vi.fn(() => ({
       afterClosed: () => of(true),
     }));
@@ -70,12 +141,27 @@ describe('CatalogDetailComponent', () => {
       delete: deleteSpy,
     };
 
+    const optionServiceMock = {
+      listGroupsByProduct: listGroupsSpy,
+      deleteGroup: deleteGroupSpy,
+      createGroup: vi.fn(),
+      addOption: vi.fn(),
+    };
+
+    const attributeServiceMock = {
+      listValues: listValuesSpy,
+      listDefinitions: listDefinitionsSpy,
+      setValue: setValueSpy,
+    };
+
     await TestBed.configureTestingModule({
       imports: [CatalogDetailComponent],
       providers: [
         provideRouter([]),
         provideNoopAnimations(),
         { provide: ProductService, useValue: serviceMock },
+        { provide: ProductOptionService, useValue: optionServiceMock },
+        { provide: ProductAttributeService, useValue: attributeServiceMock },
         { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
@@ -101,6 +187,19 @@ describe('CatalogDetailComponent', () => {
     expect(compiled.textContent).toContain('CRM Named Seat');
     expect(compiled.textContent).toContain('CRM-SEAT-NAMED');
     expect(compiled.textContent).not.toContain('mock data');
+  });
+
+  it('loads option groups and attribute values for the product', () => {
+    expect(listGroupsSpy).toHaveBeenCalledWith(1);
+    expect(listValuesSpy).toHaveBeenCalledWith(1);
+    expect(listDefinitionsSpy).toHaveBeenCalled();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Option groups');
+    expect(compiled.textContent).toContain('Tier features');
+    expect(compiled.textContent).toContain('SSO');
+    expect(compiled.textContent).toContain('Attribute values');
+    expect(compiled.textContent).toContain('region');
+    expect(compiled.textContent).toContain('US');
   });
 
   it('shows empty state when product is missing', () => {
@@ -317,5 +416,143 @@ describe('CatalogDetailComponent', () => {
 
     expect(dialogOpen).not.toHaveBeenCalled();
     expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('opens create-group dialog and appends created group', () => {
+    const created: ProductOptionGroupDto = {
+      id: 99,
+      uuid: 'g-99',
+      productId: 1,
+      name: 'Hardware',
+      selectionType: 'SINGLE',
+      minSelections: 1,
+      sortOrder: 1,
+      options: [],
+    };
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(created),
+    });
+
+    component.openCreateGroup();
+    fixture.detectChanges();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      OptionGroupCreateDialogComponent,
+      expect.objectContaining({
+        data: { productId: 1 },
+      }),
+    );
+    expect(component.optionGroups().some((g) => g.id === 99)).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Hardware',
+    );
+  });
+
+  it('opens add-option dialog and replaces the updated group', () => {
+    const updated: ProductOptionGroupDto = {
+      ...SAMPLE_GROUP,
+      options: [
+        ...(SAMPLE_GROUP.options ?? []),
+        {
+          id: 502,
+          uuid: 'o-502',
+          productId: 1,
+          name: 'Analytics',
+          defaultOption: false,
+          sortOrder: 1,
+        },
+      ],
+    };
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(updated),
+    });
+
+    component.openAddOption(SAMPLE_GROUP);
+    fixture.detectChanges();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      OptionCreateDialogComponent,
+      expect.objectContaining({
+        data: {
+          groupId: 50,
+          groupName: 'Tier features',
+          productId: 1,
+        },
+      }),
+    );
+    expect(
+      component.optionGroups()[0].options?.some((o) => o.name === 'Analytics'),
+    ).toBe(true);
+  });
+
+  it('confirms then deletes an option group', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(true),
+    });
+
+    component.confirmDeleteGroup(SAMPLE_GROUP);
+    fixture.detectChanges();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete option group',
+          confirmColor: 'warn',
+        }),
+      }),
+    );
+    expect(deleteGroupSpy).toHaveBeenCalledWith(50);
+    expect(component.optionGroups().find((g) => g.id === 50)).toBeUndefined();
+  });
+
+  it('does not delete option group when ConfirmDialog is cancelled', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(false),
+    });
+
+    component.confirmDeleteGroup(SAMPLE_GROUP);
+
+    expect(deleteGroupSpy).not.toHaveBeenCalled();
+    expect(component.optionGroups().some((g) => g.id === 50)).toBe(true);
+  });
+
+  it('sets attribute value via ProductAttributeService.setValue', () => {
+    const saved: AttributeValueDto = {
+      id: 71,
+      uuid: 'v-71',
+      productId: 1,
+      attributeId: 9,
+      attributeName: 'region',
+      value: 'EU',
+    };
+    setValueSpy.mockReturnValue(of(saved));
+
+    component.attrForm.setValue({ attributeId: 9, value: '  EU  ' });
+    component.onSetAttributeValue();
+    fixture.detectChanges();
+
+    expect(setValueSpy).toHaveBeenCalledWith(1, {
+      attributeId: 9,
+      value: 'EU',
+    });
+    expect(
+      component.attributeValues().find((v) => v.attributeId === 9)?.value,
+    ).toBe('EU');
+  });
+
+  it('shows attribute error when setValue fails', () => {
+    setValueSpy.mockReturnValue(
+      throwError(() => ({ error: { message: 'Invalid attribute value' } })),
+    );
+
+    component.attrForm.setValue({ attributeId: 9, value: 'bad' });
+    component.onSetAttributeValue();
+    fixture.detectChanges();
+
+    expect(component.attrsError()).toBe('Invalid attribute value');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Invalid attribute value',
+    );
   });
 });
