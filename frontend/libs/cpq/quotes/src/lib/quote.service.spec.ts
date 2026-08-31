@@ -3,7 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { QuoteService } from './quote.service';
-import { QuoteDto, QuoteLineItemDto, SpringPageResponse } from '@frontend/shared-models';
+import {
+  QuoteDto,
+  QuoteLineItemDto,
+  QuoteUpdateRequest,
+  SpringPageResponse,
+} from '@frontend/shared-models';
 
 function quote(
   partial: Partial<QuoteDto> & Pick<QuoteDto, 'id' | 'name' | 'customerExternalId'>,
@@ -69,6 +74,42 @@ describe('QuoteService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(page);
     expect(service.quotes()).toEqual(page.content);
+  });
+
+  it('update PUTs /api/v1/quotes/:id with QuoteUpdateRequest body', async () => {
+    const body: QuoteUpdateRequest = {
+      name: 'Renamed quote',
+      description: 'Updated description',
+      dealExternalId: 'deal-9',
+      subscriptionType: 'RENEWAL',
+      currency: 'USD',
+      region: 'EMEA',
+      durationInMonths: 24,
+      startDate: '2026-02-01',
+      endDate: '2028-01-31',
+      notes: 'Header notes',
+    };
+    const update = firstValueFrom(service.update(42, body));
+    const req = httpMock.expectOne('/api/v1/quotes/42');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual(body);
+    expect(req.request.body).not.toHaveProperty('customerExternalId');
+    expect(req.request.body).not.toHaveProperty('status');
+    expect(req.request.body).not.toHaveProperty('totalAmount');
+    req.flush(
+      quote({
+        id: 42,
+        name: 'Renamed quote',
+        customerExternalId: 'c',
+        region: 'EMEA',
+        durationInMonths: 24,
+      }),
+    );
+    await expect(update).resolves.toMatchObject({
+      id: 42,
+      name: 'Renamed quote',
+      region: 'EMEA',
+    });
   });
 
   it('lifecycle POSTs hit quote action paths', async () => {
