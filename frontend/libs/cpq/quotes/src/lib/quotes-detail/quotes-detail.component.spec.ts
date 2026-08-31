@@ -598,7 +598,10 @@ describe('QuotesDetailComponent', () => {
   it('shows QUOTE_ACCEPTED_NO_DELETE banner on delete failure and stays on detail', () => {
     deleteSpy.mockReturnValueOnce(
       throwError(() => ({
-        error: { message: 'QUOTE_ACCEPTED_NO_DELETE: Accepted quotes cannot be deleted' },
+        error: {
+          message: 'Cannot delete an accepted quote',
+          errorCode: 'QUOTE_ACCEPTED_NO_DELETE',
+        },
       })),
     );
 
@@ -607,12 +610,16 @@ describe('QuotesDetailComponent', () => {
 
     expect(deleteSpy).toHaveBeenCalledWith(1);
     expect(component.actionBusy()).toBe(false);
-    expect(component.actionError()).toContain('QUOTE_ACCEPTED_NO_DELETE');
+    expect(component.actionError()).toBe(
+      'Cannot delete an accepted quote [QUOTE_ACCEPTED_NO_DELETE]',
+    );
     expect(router.navigate).not.toHaveBeenCalledWith(['/quotes']);
     expect(selectedQuote()?.id).toBe(1);
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('QUOTE_ACCEPTED_NO_DELETE');
+    expect(compiled.textContent).toContain(
+      'Cannot delete an accepted quote [QUOTE_ACCEPTED_NO_DELETE]',
+    );
   });
 
   it('renders documents panel, header edit, and clone note (lines copied; Calculate required)', () => {
