@@ -21,6 +21,7 @@ import {
 } from '@frontend/shared-models';
 import { ConfirmDialogComponent } from '@frontend/shared-ui';
 import { PriceBookEntryDialogComponent } from '../price-book-entry-dialog/price-book-entry-dialog.component';
+import { PriceBookEditDialogComponent } from '../price-book-edit-dialog/price-book-edit-dialog.component';
 
 describe('isPriceBookPublished', () => {
   const today = new Date('2026-08-30T12:00:00Z');
@@ -53,6 +54,8 @@ describe('PriceBookDetailComponent', () => {
   let router: Router;
   let getByIdSpy: ReturnType<typeof vi.fn>;
   let getEntriesSpy: ReturnType<typeof vi.fn>;
+  let updateSpy: ReturnType<typeof vi.fn>;
+  let deleteSpy: ReturnType<typeof vi.fn>;
   let createEntrySpy: ReturnType<typeof vi.fn>;
   let updateEntrySpy: ReturnType<typeof vi.fn>;
   let deleteEntrySpy: ReturnType<typeof vi.fn>;
@@ -117,6 +120,8 @@ describe('PriceBookDetailComponent', () => {
         totalPages: 1,
       });
     });
+    updateSpy = vi.fn();
+    deleteSpy = vi.fn().mockReturnValue(of(void 0));
     createEntrySpy = vi.fn();
     updateEntrySpy = vi.fn();
     deleteEntrySpy = vi.fn().mockReturnValue(of(void 0));
@@ -132,6 +137,8 @@ describe('PriceBookDetailComponent', () => {
       entriesPagination,
       getById: getByIdSpy,
       getEntries: getEntriesSpy,
+      update: updateSpy,
+      delete: deleteSpy,
       createEntry: createEntrySpy,
       updateEntry: updateEntrySpy,
       deleteEntry: deleteEntrySpy,
@@ -186,9 +193,15 @@ describe('PriceBookDetailComponent', () => {
     expect(compiled.textContent).toContain('Add entry');
   });
 
-  it('enables Add/Edit/Delete when book is unpublished', () => {
+  it('enables header Edit/Delete and entry Add/Edit/Delete when unpublished', () => {
     expect(component.canEditEntries()).toBe(true);
     const compiled = fixture.nativeElement as HTMLElement;
+    expect(
+      compiled.querySelector('.edit-book-btn')?.hasAttribute('disabled'),
+    ).toBe(false);
+    expect(
+      compiled.querySelector('.delete-book-btn')?.hasAttribute('disabled'),
+    ).toBe(false);
     expect(compiled.querySelector('.add-entry-btn')?.hasAttribute('disabled')).toBe(
       false,
     );
@@ -197,7 +210,7 @@ describe('PriceBookDetailComponent', () => {
     expect(compiled.textContent).toContain('Draft (editable)');
   });
 
-  it('disables Add/Edit/Delete when book is published', () => {
+  it('disables header and entry writes when book is published', () => {
     selectedPriceBook.set(publishedBook);
     entries.set([...MOCK_PRICE_BOOK_ENTRIES]);
     fixture.componentRef.setInput('id', String(publishedBook.id));
@@ -206,12 +219,105 @@ describe('PriceBookDetailComponent', () => {
     expect(component.canEditEntries()).toBe(false);
     const compiled = fixture.nativeElement as HTMLElement;
     expect(
+      compiled.querySelector('.edit-book-btn')?.hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      compiled.querySelector('.delete-book-btn')?.hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
       compiled.querySelector('.add-entry-btn')?.hasAttribute('disabled'),
     ).toBe(true);
     expect(compiled.querySelector('.row-edit-btn')).toBeNull();
     expect(compiled.querySelector('.row-delete-btn')).toBeNull();
     expect(compiled.textContent).toContain('Published (read-only)');
     expect(compiled.textContent).toContain('immutable');
+  });
+
+  it('opens edit dialog and reloads getById after save', () => {
+    const saved: PriceBookDto = {
+      ...unpublishedBook,
+      name: 'APAC Promo Renamed',
+    };
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(saved),
+    });
+    getByIdSpy.mockClear();
+
+    component.openEditBook();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      PriceBookEditDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          book: expect.objectContaining({ id: unpublishedBook.id }),
+        }),
+      }),
+    );
+    expect(getByIdSpy).toHaveBeenCalledWith(unpublishedBook.id);
+  });
+
+  it('deletes book after ConfirmDialog and navigates to list', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(true),
+    });
+
+    component.confirmDeleteBook();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete price book',
+          confirmText: 'Delete',
+          confirmColor: 'warn',
+        }),
+      }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(unpublishedBook.id);
+    expect(router.navigate).toHaveBeenCalledWith(['/price-books']);
+  });
+
+  it('does not delete book when ConfirmDialog is cancelled', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(false),
+    });
+
+    component.confirmDeleteBook();
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('surfaces PRICE_BOOK_PUBLISHED_IMMUTABLE on book delete failure', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(true),
+    });
+    deleteSpy.mockReturnValueOnce(
+      throwError(() => ({
+        error: {
+          message: 'Published price books are immutable',
+          errorCode: 'PRICE_BOOK_PUBLISHED_IMMUTABLE',
+        },
+      })),
+    );
+
+    component.confirmDeleteBook();
+    fixture.detectChanges();
+
+    expect(component.bannerError()).toContain('PRICE_BOOK_PUBLISHED_IMMUTABLE');
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('PRICE_BOOK_PUBLISHED_IMMUTABLE');
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not open edit dialog when published', () => {
+    selectedPriceBook.set(publishedBook);
+    fixture.componentRef.setInput('id', String(publishedBook.id));
+    fixture.detectChanges();
+    dialogOpen.mockClear();
+
+    component.openEditBook();
+    expect(dialogOpen).not.toHaveBeenCalled();
   });
 
   it('opens create entry dialog and reloads getEntries after save', () => {
