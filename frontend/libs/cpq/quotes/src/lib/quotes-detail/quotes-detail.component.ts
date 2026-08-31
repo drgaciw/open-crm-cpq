@@ -1,11 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -15,11 +16,13 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
+  ConfirmDialogComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
@@ -30,6 +33,7 @@ import {
   QuoteLineItemDto,
 } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
+import { QuoteDocumentsPanelComponent } from '../quote-documents-panel/quote-documents-panel.component';
 
 function httpErrorMessage(err: unknown): string {
   const e = err as { error?: { message?: string }; message?: string } | null;
@@ -51,6 +55,7 @@ function httpErrorMessage(err: unknown): string {
     StatusBadgeComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
+    QuoteDocumentsPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -163,6 +168,45 @@ function httpErrorMessage(err: unknown): string {
           >
             <mat-icon>done_all</mat-icon>
             Accept
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="onExpire()"
+            [disabled]="!canExpire() || actionBusy()"
+            [title]="
+              canExpire()
+                ? 'Mark sent quote as expired'
+                : 'Expire is available only for SENT quotes'
+            "
+          >
+            <mat-icon>hourglass_empty</mat-icon>
+            Expire
+          </button>
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            (click)="onCancelQuote()"
+            [disabled]="!canCancel() || actionBusy()"
+            [title]="
+              canCancel()
+                ? 'Cancel this quote'
+                : 'Cancel is unavailable for ACCEPTED or CANCELLED quotes'
+            "
+          >
+            <mat-icon>block</mat-icon>
+            Cancel quote
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="onClone()"
+            [disabled]="actionBusy()"
+            title="Clone header into a new DRAFT. Line items are not copied."
+          >
+            <mat-icon>content_copy</mat-icon>
+            Clone
           </button>
         </div>
       </app-page-header>
@@ -405,6 +449,13 @@ function httpErrorMessage(err: unknown): string {
             </mat-card-content>
           </mat-card>
         }
+
+        <cpq-quote-documents-panel [quoteId]="numericId()" />
+
+        <p class="clone-note" role="note">
+          Clone creates a new DRAFT from this quote header only. Line items are not
+          copied by the backend today.
+        </p>
       </div>
     } @else {
       <app-empty-state
@@ -550,6 +601,13 @@ function httpErrorMessage(err: unknown): string {
         margin-top: 0;
       }
 
+      .clone-note {
+        margin: 0;
+        font-size: 13px;
+        color: #757575;
+        line-height: 1.5;
+      }
+
       @media (max-width: 768px) {
         .error-banner {
           margin: 16px;
@@ -570,10 +628,11 @@ function httpErrorMessage(err: unknown): string {
     `,
   ],
 })
-export class QuotesDetailComponent implements OnInit {
+export class QuotesDetailComponent {
   readonly quoteService = inject(QuoteService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly dialog = inject(MatDialog);
 
   /** Route param `:id` (string from Angular router). */
   readonly id = input.required<string>();
@@ -587,6 +646,12 @@ export class QuotesDetailComponent implements OnInit {
   readonly actionBusy = signal(false);
   readonly actionError = signal<string | null>(null);
   readonly editingLineId = signal<number | null>(null);
+
+  /** Reload when route `:id` changes (e.g. after clone navigation). */
+  private readonly loadOnIdChange = effect(() => {
+    const _id = this.id();
+    untracked(() => this.load());
+  });
 
   /** Submit only from DRAFT (matches quote-service). */
   readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT');
@@ -609,6 +674,15 @@ export class QuotesDetailComponent implements OnInit {
 
   readonly canAccept = computed(() => this.quote()?.status === 'SENT');
 
+  /** Expire only from SENT (matches quote-service). */
+  readonly canExpire = computed(() => this.quote()?.status === 'SENT');
+
+  /** Cancel when not ACCEPTED and not already CANCELLED. */
+  readonly canCancel = computed(() => {
+    const status = this.quote()?.status;
+    return status != null && status !== 'ACCEPTED' && status !== 'CANCELLED';
+  });
+
   readonly lineForm = this.fb.nonNullable.group({
     productExternalId: ['', Validators.required],
     productName: [''],
@@ -622,10 +696,6 @@ export class QuotesDetailComponent implements OnInit {
     listPrice: [null as number | null, Validators.required],
     quantity: [1 as number | null, Validators.required],
   });
-
-  ngOnInit(): void {
-    this.load();
-  }
 
   goBack(): void {
     void this.router.navigate(['/quotes']);
@@ -700,6 +770,103 @@ export class QuotesDetailComponent implements OnInit {
       () => this.canAccept(),
       (id) => this.quoteService.accept(id),
     );
+  }
+
+  onExpire(): void {
+    if (!this.canExpire() || this.actionBusy()) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Expire quote',
+        message: `Mark quote #${numericId} as expired? This applies only to SENT quotes.`,
+        confirmText: 'Expire',
+        cancelText: 'Keep',
+        confirmColor: 'warn' as const,
+      },
+    });
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.runQuoteAction(
+        () => this.canExpire(),
+        (id) => this.quoteService.expire(id),
+      );
+    });
+  }
+
+  onCancelQuote(): void {
+    if (!this.canCancel() || this.actionBusy()) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Cancel quote',
+        message: `Cancel quote #${numericId}? Accepted quotes cannot be cancelled.`,
+        confirmText: 'Cancel quote',
+        cancelText: 'Keep',
+        confirmColor: 'warn' as const,
+      },
+    });
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.runQuoteAction(
+        () => this.canCancel(),
+        (id) => this.quoteService.cancel(id),
+      );
+    });
+  }
+
+  onClone(): void {
+    if (this.actionBusy()) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '480px',
+      data: {
+        title: 'Clone quote',
+        message:
+          `Clone quote #${numericId} into a new DRAFT?\n\n` +
+          'The backend copies the quote header only. Line items are not copied.',
+        confirmText: 'Clone',
+        cancelText: 'Cancel',
+        confirmColor: 'primary' as const,
+      },
+    });
+    ref.afterClosed().subscribe((confirmed) => {
+      if (confirmed !== true) {
+        return;
+      }
+      this.actionBusy.set(true);
+      this.actionError.set(null);
+      this.quoteService.cloneQuote(numericId).subscribe({
+        next: (cloned) => {
+          this.actionBusy.set(false);
+          void this.router.navigate(['/quotes', cloned.id]);
+        },
+        error: (err) => {
+          this.actionBusy.set(false);
+          this.actionError.set(httpErrorMessage(err));
+        },
+      });
+    });
   }
 
   onAddLineItem(): void {
@@ -853,7 +1020,8 @@ export class QuotesDetailComponent implements OnInit {
     });
   }
 
-  private numericId(): number | null {
+  /** Exposed for documents panel binding and action handlers. */
+  numericId(): number | null {
     const numericId = Number(this.id());
     return Number.isFinite(numericId) ? numericId : null;
   }

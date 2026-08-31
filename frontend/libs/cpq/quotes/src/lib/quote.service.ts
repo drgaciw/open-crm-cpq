@@ -9,6 +9,8 @@ import {
   QuoteDealType,
   QuoteLineItemDto,
   LineItemCreateRequest,
+  QuoteDocumentDto,
+  DocumentType,
   PaginationMeta,
   SpringPageResponse,
 } from '@frontend/shared-models';
@@ -192,6 +194,40 @@ export class QuoteService {
   removeLineItem(quoteId: number, lineItemId: number): Observable<void> {
     return this.http.delete<void>(
       `${this.basePath}/${quoteId}/line-items/${lineItemId}`,
+    );
+  }
+
+  /**
+   * Generate a quote PDF document.
+   * POST /api/v1/quotes/:id/documents/generate?type= (default PROPOSAL).
+   */
+  generateDocuments(
+    quoteId: number,
+    type: DocumentType = 'PROPOSAL',
+  ): Observable<QuoteDocumentDto> {
+    const params = new HttpParams().set('type', type);
+    return this.http.post<QuoteDocumentDto>(
+      `${this.basePath}/${quoteId}/documents/generate`,
+      {},
+      { params },
+    );
+  }
+
+  /** List document metadata for a quote. */
+  listDocuments(quoteId: number): Observable<QuoteDocumentDto[]> {
+    return this.http.get<QuoteDocumentDto[]>(
+      `${this.basePath}/${quoteId}/documents`,
+    );
+  }
+
+  /**
+   * Download raw PDF bytes (not ApiResponse).
+   * MUST use responseType blob — interceptor passes non-envelope bodies through.
+   */
+  downloadDocument(quoteId: number, documentId: number): Observable<Blob> {
+    return this.http.get(
+      `${this.basePath}/${quoteId}/documents/${documentId}/download`,
+      { responseType: 'blob' },
     );
   }
 }

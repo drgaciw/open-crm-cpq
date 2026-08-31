@@ -9,8 +9,11 @@ import {
   isPricingProductType,
 } from './pricing.model';
 import {
+  DOCUMENT_TYPES,
+  DOCUMENT_TYPE_LABELS,
   QUOTE_STATUS_LABELS,
   QUOTE_STATUSES,
+  isDocumentType,
   isQuoteStatus,
 } from './quote.model';
 import {
@@ -78,6 +81,22 @@ describe('CPQ shared models', () => {
     it('provides a label for every quote status', () => {
       for (const status of QUOTE_STATUSES) {
         expect(QUOTE_STATUS_LABELS[status]).toBeTruthy();
+      }
+    });
+  });
+
+  describe('DocumentType', () => {
+    it('isDocumentType guards known quote document types', () => {
+      expect(isDocumentType('PROPOSAL')).toBe(true);
+      expect(isDocumentType('ORDER_FORM')).toBe(true);
+      expect(isDocumentType('SOW')).toBe(true);
+      expect(isDocumentType('QUOTE_PDF')).toBe(false);
+      expect(isDocumentType(null)).toBe(false);
+    });
+
+    it('provides a label for every document type', () => {
+      for (const type of DOCUMENT_TYPES) {
+        expect(DOCUMENT_TYPE_LABELS[type]).toBeTruthy();
       }
     });
   });
