@@ -1,6 +1,6 @@
 # Wave O architecture — rule-set admin portal ∥ catalog options+attributes ∥ subscription DTO+list
 
-**Status:** READY FOR FORGE — PM authorized 2026-08-31 (architect pick after hygiene N′ COMPLETE; Herdr Grok 4.5 implementers)  
+**Status:** COMPLETE on main 2026-08-31 — O1 `8bdd38f`/`d81d417`, O2 `15f2aef`/`900a24f`, O3 `29f2960`/`14b1a6e`  
 **Architect:** `opencrm-architect` (Herdr `w8`)  
 **Evidence date:** 2026-08-31  
 **Baseline:** Wave N COMPLETE + hygiene H1+H2 on `main` @ `4794d82`  
