@@ -96,8 +96,8 @@ Owned by **pricebook-service** (`PriceBookController` → `/api/v1/price-books`)
 | GET | `/api/v1/price-books` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-032, cpq-agent-035 | List/filter by `region` (and currency via client filter); regional / default book resolution. |
 | GET | `/api/v1/price-books/{id}` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-035 | Single book fetch after resolution. |
 | POST | `/api/v1/price-books` | pricebook-service (8089) | stable | cpq-agent-035 | Create book; advisory agent — human confirmation required. |
-| PUT | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Update book metadata. |
-| DELETE | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Soft delete. |
+| PUT | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Update book metadata. FE header update on unpublished books (Wave N1; not entries). |
+| DELETE | `/api/v1/price-books/{id}` | pricebook-service (8089) | stable | cpq-agent-035 | Soft delete. FE header delete on unpublished books (Wave N1; not entries). |
 | GET | `/api/v1/price-books/{id}/entries` | pricebook-service (8089) | **agent-contract** | cpq-agent-004, cpq-agent-032, cpq-agent-035 | List prices / floor prices for products on a quote. |
 | GET | `/api/v1/price-books/{id}/entries/{entryId}` | pricebook-service (8089) | stable | cpq-agent-035 | Single entry fetch. |
 | POST | `/api/v1/price-books/{id}/entries` | pricebook-service (8089) | stable | cpq-agent-035 | Create entry; human-gated for agent 035. |
@@ -136,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–M** (YAML untouched).
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–N** (YAML untouched; default still `true`).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -151,6 +151,7 @@ Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Can
 | POST | `/api/v1/approvals` | approval-routing (8085) | internal | quote BFF | G3 create/submit for quote orchestration. |
 | POST | `/api/v1/quotes` | quote-service (8084) | stable | — | Create quote (supporting workflow). |
 | PUT | `/api/v1/quotes/{id}` | quote-service (8084) | stable | — | Update DRAFT/REJECTED. FE header form (Wave M1). |
+| DELETE | `/api/v1/quotes/{id}` | quote-service (8084) | stable | — | Soft-delete. FE soft-delete Wave N3; ACCEPTED blocked (`QUOTE_ACCEPTED_NO_DELETE`). |
 | POST | `/api/v1/quotes/{id}/clone` | quote-service (8084) | stable | — | New DRAFT; Wave M3 copies non-deleted line commercial snapshot (not waterfall/ARR). |
 | POST | `/api/v1/quotes/{quoteId}/line-items` | quote-service (8084) | stable | — | Add line item. |
 | PUT | `/api/v1/quotes/{quoteId}/line-items/{lineItemId}` | quote-service (8084) | stable | — | Update line item. |
@@ -161,7 +162,7 @@ Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Can
 | POST | `/api/v1/approvals/{id}/approve` | approval-routing (8085) | internal | — | Canonical approve. |
 | POST | `/api/v1/approvals/{id}/reject` | approval-routing (8085) | internal | — | Canonical reject. |
 
-**Section row count:** 20
+**Section row count:** 21
 
 ---
 
@@ -281,8 +282,8 @@ External clients and agents should call **only through the gateway** (default po
 | §4 Pricing APIs | 9 |
 | §4b Price book APIs | 11 |
 | §5 Rules / DRL APIs | 14 |
-| §6 Quote & approval APIs | 18 |
+| §6 Quote & approval APIs | 21 |
 | §7 Cross-service integrity | 17 |
-| **Total matrix rows** | **81** |
+| **Total matrix rows** | **84** |
 
 **Routes not assignable to an implemented backend service:** 0 (§7c ERP rows route through gateway stub; erp-adapter-service is future work).
