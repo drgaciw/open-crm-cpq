@@ -1,6 +1,6 @@
 # Wave M architecture — quote header edit ∥ price-book entry CRUD ∥ clone copies line items
 
-**Status:** APPROVED FOR FORGE — PM authorized 2026-08-30 (architect pick after Wave L COMPLETE; Herdr Grok 4.5 implementers; orchestrator merge-order + GitNexus refresh)  
+**Status:** COMPLETE on main (M1–M3 merged; M4 closeout) — PM authorized 2026-08-30 (architect pick after Wave L COMPLETE; Herdr Grok 4.5 implementers; merge gate M3 before M1)  
 **Architect:** `opencrm-architect`  
 **Evidence date:** 2026-08-30  
 **Baseline:** Wave L COMPLETE on `main` @ `a00c4b0` (L1–L3 merged; L4 closeout)  
@@ -287,7 +287,7 @@ Implement Open CRM/CPQ Wave M per docs/forge/22-wave-m-architecture.md in three 
 - [x] Herdr forge layout with Grok 4.5 implementer panes documented  
 - [x] PM authorized architect pick from GitNexus+GitHub evidence  
 - [x] Orchestrator → Wave M FORGING (orchestrator owns `00-orchestrator-status.md`)  
-- [ ] Day-1 + closeout merged; M4 COMPLETE  
+- [x] Day-1 + closeout merged; M4 COMPLETE  
 
 **PM WARNING:** Impact before Java/FE symbol edits (index **HEAD `a00c4b0`**). Do **not** flip approval legacy dual-read default (**HIGH**). M3 must **not** edit `quotes-detail`. M1 must **not** claim clone copies waterfall. Merge **M3 before or with M1**. M2 must use `/api/v1/price-books/**` only and honor published immutability. Do **not** return `Subscription` entities from a new FE client this wave.
 
