@@ -1,12 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { CatalogDetailComponent } from './catalog-detail.component';
 import { ProductService } from '../product.service';
 import { MOCK_CATALOG_PRODUCTS } from '../catalog.mock';
 import { ProductDto, ProductUpdateRequest } from '@frontend/shared-models';
+import { ConfirmDialogComponent } from '@frontend/shared-ui';
 
 function toProductDto(
   mock: (typeof MOCK_CATALOG_PRODUCTS)[number],
@@ -35,6 +37,8 @@ describe('CatalogDetailComponent', () => {
   let router: Router;
   let getByIdSpy: ReturnType<typeof vi.fn>;
   let updateSpy: ReturnType<typeof vi.fn>;
+  let deleteSpy: ReturnType<typeof vi.fn>;
+  let dialogOpen: ReturnType<typeof vi.fn>;
   let navigateSpy: ReturnType<typeof vi.fn>;
 
   const selectedProduct = signal<ProductDto | null>(null);
@@ -51,6 +55,10 @@ describe('CatalogDetailComponent', () => {
       loading.set(false);
     });
     updateSpy = vi.fn();
+    deleteSpy = vi.fn(() => of(undefined));
+    dialogOpen = vi.fn(() => ({
+      afterClosed: () => of(true),
+    }));
 
     const serviceMock = {
       selectedProduct,
@@ -59,6 +67,7 @@ describe('CatalogDetailComponent', () => {
       products: signal<ProductDto[]>([]),
       getById: getByIdSpy,
       update: updateSpy,
+      delete: deleteSpy,
     };
 
     await TestBed.configureTestingModule({
@@ -67,6 +76,7 @@ describe('CatalogDetailComponent', () => {
         provideRouter([]),
         provideNoopAnimations(),
         { provide: ProductService, useValue: serviceMock },
+        { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
 
@@ -244,5 +254,68 @@ describe('CatalogDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Product details',
     );
+  });
+
+  it('renders Delete in view mode', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Delete');
+  });
+
+  it('confirms then soft-deletes via ProductService.delete and navigates to list', () => {
+    component.onDelete();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete product',
+          confirmText: 'Delete',
+          confirmColor: 'warn',
+        }),
+      }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(selectedProduct()).toBeNull();
+    expect(navigateSpy).toHaveBeenCalledWith(['/catalog']);
+    expect(component.deleting()).toBe(false);
+    expect(component.saveError()).toBeNull();
+  });
+
+  it('does not delete when ConfirmDialog is cancelled', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(false),
+    });
+
+    component.onDelete();
+
+    expect(dialogOpen).toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows error banner on delete failure and stays on detail', () => {
+    deleteSpy.mockReturnValueOnce(
+      throwError(() => ({ error: { message: 'Cannot delete linked product' } })),
+    );
+
+    component.onDelete();
+    fixture.detectChanges();
+
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(component.deleting()).toBe(false);
+    expect(component.saveError()).toBe('Cannot delete linked product');
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(selectedProduct()?.id).toBe(1);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Cannot delete linked product');
+  });
+
+  it('does not open delete dialog while editing', () => {
+    component.startEdit();
+    component.onDelete();
+
+    expect(dialogOpen).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 });
