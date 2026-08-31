@@ -1,5 +1,10 @@
 # Open CRM/CPQ Modernization Plan
 
+> **Landed vs target (2026-08-31):** This file is a **16-month target** roadmap, **not** the current forge SSOT.  
+> **Landed:** Forge waves **A–N COMPLETE**; hygiene N′ COMPLETE; **Wave O FORGING**. Spring microservices + Angular Nx CRM/CPQ exist (`AGENT.md`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).  
+> **Do not** implement from the week-by-week MVP below as if the repo were empty. **Holds:** Activities API, NgRx, dual-read YAML flip, GLM-5 runtime (ADR-002 not implemented — `ai-service` still Azure OpenAI `gpt-4o`), #238/#241, contract-asset FE, Kafka S2B-9.  
+> **ADRs:** [docs/adr/README.md](docs/adr/README.md). **CI:** Jenkins primary ([ADR-003](docs/adr/ADR-003-ci-llm-integration.md)).
+
 ## Executive Summary
 
 This document outlines a comprehensive greenfield rebuild of the existing Frappe-based CRM into a modern, enterprise-grade CRM/CPQ platform using:

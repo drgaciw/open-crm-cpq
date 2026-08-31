@@ -43,3 +43,12 @@ This project is indexed by GitNexus as **open-crm-cpq** (13865 symbols, 32495 re
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Project steering (not generated)
+
+GitNexus block above is **code-intelligence only**. For what to build vs hold, read:
+
+- [AGENT.md](AGENT.md) — landed vs target; dual-read / NgRx / Activities holds
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — index
+- [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 still **Proposed**)
+

@@ -101,4 +101,4 @@ Improve Open CRM/CPQ steering docs per docs/forge/27-architecture-artifacts-plan
 - [x] Dual-read YAML stays true  
 - [x] ADR-006 stays Proposed  
 - [x] No Wave O code files  
-- [ ] A1–A5 implemented in this worktree after this plan commits  
+- [x] A1–A5 implemented in this worktree after this plan commits  

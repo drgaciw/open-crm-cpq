@@ -3,6 +3,7 @@
 **Status:** Proposed  
 **Date:** 2026-08-31  
 **Deciders:** (not accepted — documents a forge non-negotiable + current leak)  
+**Wave O3:** **FORGING** (not on `main`) — `SubscriptionDto` + paginated list, **no FE**. **Do not Accept** this ADR until O3 is merged to `main`.  
 **Does not authorize:** contract-asset / subscriptions **FE**, ERP adapter changes, or deleting `POST /api/v1/configuration/validate`
 
 ---
