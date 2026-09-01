@@ -13,6 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
       <h2 class="sidebar-title">Open CRM</h2>
     </div>
     <mat-nav-list>
+      <h3 class="nav-group">CRM</h3>
       <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
         <mat-icon matListItemIcon>dashboard</mat-icon>
         <span matListItemTitle>Dashboard</span>
@@ -33,6 +34,8 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-icon matListItemIcon>handshake</mat-icon>
         <span matListItemTitle>Deals</span>
       </a>
+
+      <h3 class="nav-group">CPQ</h3>
       <a mat-list-item routerLink="/catalog" routerLinkActive="active-link">
         <mat-icon matListItemIcon>inventory_2</mat-icon>
         <span matListItemTitle>Catalog</span>
@@ -51,11 +54,11 @@ import { MatIconModule } from '@angular/material/icon';
       </a>
       <a mat-list-item routerLink="/pricing-customers" routerLinkActive="active-link">
         <mat-icon matListItemIcon>groups</mat-icon>
-        <span matListItemTitle>Pricing customers</span>
+        <span matListItemTitle>Pricing Customers</span>
       </a>
       <a mat-list-item routerLink="/rule-sets" routerLinkActive="active-link">
         <mat-icon matListItemIcon>rule</mat-icon>
-        <span matListItemTitle>Rule sets</span>
+        <span matListItemTitle>Rule Sets</span>
       </a>
       <a mat-list-item routerLink="/product-bundles" routerLinkActive="active-link">
         <mat-icon matListItemIcon>inventory</mat-icon>
@@ -67,26 +70,36 @@ import { MatIconModule } from '@angular/material/icon';
       </a>
     </mat-nav-list>
   `,
-  styles: [`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    .sidebar-header {
-      padding: 16px 24px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-    }
-    .sidebar-title {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #1976d2;
-    }
-    .active-link {
-      background-color: rgba(25, 118, 210, 0.08) !important;
-      color: #1976d2 !important;
-    }
-  `],
+  styles: [
+    `
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .sidebar-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      }
+      .sidebar-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1976d2;
+      }
+      .nav-group {
+        margin: 16px 16px 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(0, 0, 0, 0.54);
+      }
+      .active-link {
+        background-color: rgba(25, 118, 210, 0.08) !important;
+        color: #1976d2 !important;
+      }
+    `,
+  ],
 })
 export class SidebarComponent {}
