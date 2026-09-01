@@ -115,4 +115,24 @@ describe('ConfirmDialogComponent', () => {
     const confirmButton = component.nativeElement.querySelector('.confirm-button');
     expect(component.componentInstance['data'].confirmColor).toBe('warn');
   });
+
+  it('should set type="button" on cancel and confirm buttons', () => {
+    const cancelButton = component.nativeElement.querySelector('.cancel-button') as HTMLButtonElement;
+    const confirmButton = component.nativeElement.querySelector('.confirm-button') as HTMLButtonElement;
+    expect(cancelButton.getAttribute('type')).toBe('button');
+    expect(confirmButton.getAttribute('type')).toBe('button');
+  });
+
+  it('should put cdkFocusInitial on the confirm button', () => {
+    const confirmButton = component.nativeElement.querySelector('.confirm-button') as HTMLButtonElement;
+    expect(confirmButton.hasAttribute('cdkFocusInitial')).toBe(true);
+  });
+
+  it('should associate dialog with message via aria-describedby', () => {
+    const root = component.nativeElement.querySelector('.confirm-dialog') as HTMLElement;
+    const message = component.nativeElement.querySelector('.dialog-message') as HTMLElement;
+    const describedBy = root.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    expect(message.id).toBe(describedBy);
+  });
 });

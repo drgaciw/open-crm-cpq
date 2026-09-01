@@ -21,7 +21,7 @@ import { MatButtonModule } from '@angular/material/button';
   imports: [CommonModule, MatIconModule, MatButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="empty-state">
+    <div class="empty-state" role="status" aria-live="polite">
       @if (icon()) {
         <mat-icon class="empty-state-icon">{{ icon() }}</mat-icon>
       }
@@ -36,6 +36,7 @@ import { MatButtonModule } from '@angular/material/button';
 
       @if (actionLabel()) {
         <button
+          type="button"
           mat-raised-button
           color="primary"
           (click)="onAction()"
