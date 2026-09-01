@@ -8,6 +8,7 @@ import { CatalogDetailComponent } from './catalog-detail.component';
 import { ProductService } from '../product.service';
 import { ProductOptionService } from '../product-option.service';
 import { ProductAttributeService } from '../product-attribute.service';
+import { ConfigurationRuleService } from '../configuration-rule.service';
 import { MOCK_CATALOG_PRODUCTS } from '../catalog.mock';
 import {
   AttributeValueDto,
@@ -96,6 +97,7 @@ describe('CatalogDetailComponent', () => {
   let listValuesSpy: ReturnType<typeof vi.fn>;
   let listDefinitionsSpy: ReturnType<typeof vi.fn>;
   let setValueSpy: ReturnType<typeof vi.fn>;
+  let listConfigRulesSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let navigateSpy: ReturnType<typeof vi.fn>;
 
@@ -127,6 +129,7 @@ describe('CatalogDetailComponent', () => {
       } satisfies SpringPageResponse<ProductAttributeDto>),
     );
     setValueSpy = vi.fn();
+    listConfigRulesSpy = vi.fn(() => of([]));
     dialogOpen = vi.fn(() => ({
       afterClosed: () => of(true),
     }));
@@ -154,6 +157,12 @@ describe('CatalogDetailComponent', () => {
       setValue: setValueSpy,
     };
 
+    const configRuleServiceMock = {
+      listByProduct: listConfigRulesSpy,
+      create: vi.fn(),
+      delete: vi.fn(() => of(undefined)),
+    };
+
     await TestBed.configureTestingModule({
       imports: [CatalogDetailComponent],
       providers: [
@@ -162,6 +171,7 @@ describe('CatalogDetailComponent', () => {
         { provide: ProductService, useValue: serviceMock },
         { provide: ProductOptionService, useValue: optionServiceMock },
         { provide: ProductAttributeService, useValue: attributeServiceMock },
+        { provide: ConfigurationRuleService, useValue: configRuleServiceMock },
         { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
@@ -200,6 +210,14 @@ describe('CatalogDetailComponent', () => {
     expect(compiled.textContent).toContain('Attribute values');
     expect(compiled.textContent).toContain('region');
     expect(compiled.textContent).toContain('US');
+  });
+
+  it('hosts extracted config-rules panel for the product', () => {
+    expect(listConfigRulesSpy).toHaveBeenCalledWith(1);
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('cpq-config-rules-panel')).toBeTruthy();
+    expect(compiled.textContent).toContain('Configuration rules');
+    expect(compiled.textContent?.toLowerCase()).not.toContain('validate configuration');
   });
 
   it('shows empty state when product is missing', () => {
