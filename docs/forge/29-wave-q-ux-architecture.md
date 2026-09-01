@@ -1,12 +1,12 @@
 # Wave Q architecture — UX/UI polish of existing CPQ/CRM surfaces
 
-**Status:** READY FOR FORGE — orchestrator locked 2026-08-31: **N COMPLETE**; **no N′′**; next wave is **Q UX**  
+**Status:** COMPLETE on main 2026-08-31 — Q1 `d2ebf70`, Q2 `3404bae`, Q3 `f7eed4c`, Q4 `0729289` (Q5 this closeout)  
 **Architect:** `opencrm-architect` (Herdr `w8`) — **plan only; do not spawn implementers from this pane**  
 **Evidence date:** 2026-08-31  
 **Baseline:** Wave P COMPLETE + N review on `main` @ `0b4cd6f` (`e14d832` = N adversarial review; P4 merge `68082c7`)  
-**Survey tip:** `origin/main` @ `0b4cd6f`  
-**Sources:** tree `rg` + **read templates** (quotes, catalog, sidebar/shell, price-books, pricing-customers, rule-sets, approvals, product-bundles, shared-ui). GitNexus index **`fc7e631`** vs HEAD **`0b4cd6f`** — **stale**; **analyze skipped** per orchestrator; UNKNOWN ≠ unused — confirm with `rg`.  
-**N residuals:** **R1 folded into Q2**; **R2 skipped** (list-row delete hold); **R3 in Q5 closeout**.
+**Survey tip:** Day-1 tip `origin/main` @ `d2ebf70` (Q1 a11y squash)  
+**Sources:** tree `rg` + **read templates** (quotes, catalog, sidebar/shell, price-books, pricing-customers, rule-sets, approvals, product-bundles, shared-ui). GitNexus index **`fc7e631`** vs plan HEAD **`0b4cd6f`** — **stale** at plan time; **analyze skipped** per orchestrator; UNKNOWN ≠ unused — confirm with `rg`.  
+**N residuals (R3):** **R1 landed in Q2** (quotes-create + documents `errorCode`); **R2 still HELD** (price-book list-row delete — do not start Wave R2); **R3 this Q5 closeout**.
 
 ---
 
@@ -149,7 +149,7 @@ catalog-detail `@media (max-width: 768px)` collapses `info-grid` only; nested op
 
 ### Track 5 — docs
 
-R3: N residuals closed (R1 in Q2; R2 still held). Dual-read hold **J–Q**. ADR-006 stays **Proposed**. No `00-orchestrator-status.md`.
+R3: N residuals closed (**R1** landed in Q2; **R2** still **HELD** — price-book list-row delete). Dual-read hold **J–Q** (YAML/env untouched; still `${APPROVALS_LEGACY_LOCAL_READ:true}`). ADR-006 stays **Proposed**. No `00-orchestrator-status.md`.
 
 ---
 
@@ -274,9 +274,9 @@ Implement Open CRM/CPQ Wave Q UX per docs/forge/29-wave-q-ux-architecture.md in 
 - [x] PR DAG 4 Day-1 panes → Q5; overall **LOW–MED**; no HIGH in-scope  
 - [x] Holds listed  
 - [x] Architect w8 **does not spawn** implementers  
-- [ ] Orchestrator → Wave Q FORGING (`00-*`)  
-- [ ] Q1–Q5 merged  
+- [x] Orchestrator → Wave Q FORGING (`00-*`) — orchestrator-owned; implementers do not edit  
+- [x] Day-1 + closeout; Q1–Q5 COMPLETE (Q5 this PR)  
 
-**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** reopen N. Do **not** add a portal. Q4 must not fight P1 Bundles.
+**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** reopen N. Do **not** add a portal. Do **not** start R2. Q4 must not fight P1 Bundles.
 
-**WAVE Q — APPROVED FOR FORGE.**
+**WAVE Q — COMPLETE.**
