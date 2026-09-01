@@ -1,6 +1,6 @@
 # Wave P architecture — product-bundles portal ∥ rule impact ∥ catalog configuration-rules nest
 
-**Status:** READY FOR FORGE — PM authorized 2026-08-31 (architect pick after Wave O COMPLETE; Herdr Grok 4.5 implementers)  
+**Status:** COMPLETE on main 2026-08-31 — P1 `c6db558`/`21c032c`, P2 `ddf7e5a`/`cd45c17`, P3 `d9757ac`/`03766a4` (P4 this closeout)  
 **Architect:** `opencrm-architect` (Herdr `w8`)  
 **Evidence date:** 2026-08-31  
 **Baseline:** Wave O COMPLETE on `main` @ `fc7e631` (O1 rule-sets portal owns shell; O2 catalog options+attrs; O3 `SubscriptionDto` + paginated `GET /`; O4 closeout)  
@@ -285,7 +285,7 @@ Implement Open CRM/CPQ Wave P per docs/forge/28-wave-p-architecture.md in three 
 - [x] Herdr Grok 4.5 implementer panes documented  
 - [x] PM authorized pick from GitNexus+GitHub  
 - [ ] Orchestrator → Wave P FORGING (orchestrator owns `00-*`)  
-- [ ] Day-1 + closeout merged; P4 COMPLETE  
+- [x] Day-1 + closeout merged; P4 COMPLETE  
 
 **PM WARNING:** Do **not** flip dual-read (**HIGH**). P1 owns shell. Do **not** start subscriptions FE this wave (ERP on activate). Product validate **retained**. Gateway route+adapt only. UNKNOWN HTTP controllers — `rg` before treating unused. ADR-006 stays **Proposed** (other entity leaks remain).
 

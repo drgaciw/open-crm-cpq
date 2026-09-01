@@ -23,7 +23,7 @@ This matrix is the **canonical registry of agent-critical REST routes** for Open
 | Gateway / platform | Route predicates must preserve **external path**; delegate to owner in §3–§7. |
 | Reviewers | Cross-check PR diffs against this file and `GRAPHITE_CPQ_MICROSERVICE_BACKLOG.md` Post-Review Amendment **S2A-7**. |
 
-**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). **Wave M:** FE quote header `PUT` (M1); price-book **entry** CRUD on `/api/v1/price-books/{id}/entries` (M2); `POST .../quotes/{id}/clone` copies non-deleted line items (M3). **Wave N:** price-book **header** FE update/delete (N1); pricing-customers portal FE on `/api/v1/pricing-customers` (N2); quote soft-delete FE (N3, ACCEPTED blocked). Dual-read default flip still **held**.
+**Related work:** S2A-8 (configuration API ADR), S2B-11 (compatibility layer), S2C-12 (approval ownership), S2E-2 (typed frontend clients). **Wave K** portal cutover: quote lifecycle+lines (K2), catalog update (K3), approval inbox vs quote BFF (K4); JsonNode product-client landmine cleared (K1). **Wave M:** FE quote header `PUT` (M1); price-book **entry** CRUD on `/api/v1/price-books/{id}/entries` (M2); `POST .../quotes/{id}/clone` copies non-deleted line items (M3). **Wave N:** price-book **header** FE update/delete (N1); pricing-customers portal FE on `/api/v1/pricing-customers` (N2); quote soft-delete FE (N3, ACCEPTED blocked). **Wave O:** rule-sets portal (O1); catalog options+attrs (O2); subscription DTO+paginated list (O3, **no FE**). **Wave P:** product-bundles portal (P1 owns shell); rule-sets `analyzeImpact` (P2); catalog config-rules nest (P3). Dual-read default flip still **held**.
 
 **Source documents:** `cpq-pricing-prd.md` §10.1, agent PRDs above, controller source under `backend/services/*/src/main/java`.
 
@@ -48,11 +48,11 @@ Configuration **rule CRUD** is owned by **product-service** (`ConfigurationRuleC
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
-| POST | `/api/v1/configuration/rules` | product-service (8083) | stable | cpq-agent-015 | `ConfigurationRuleController.create`; semi-autonomous rule creation after human approval. |
+| POST | `/api/v1/configuration/rules` | product-service (8083) | stable | cpq-agent-015 | `ConfigurationRuleController.create`; semi-autonomous rule creation after human approval. FE catalog nested create (Wave P3 `@frontend/cpq-catalog`). |
 | GET | `/api/v1/configuration/rules` | product-service (8083) | stable | cpq-agent-015 | Paginated list; constraint graph / coverage analysis. |
 | GET | `/api/v1/configuration/rules/{id}` | product-service (8083) | stable | cpq-agent-015 | Single rule fetch (implied by create/verify flow; not in PRD text but required for admin UI). |
-| GET | `/api/v1/configuration/rules/product/{productId}` | product-service (8083) | stable | cpq-agent-015, cpq-agent-016 | Product-scoped rule set for validation and status checks. |
-| DELETE | `/api/v1/configuration/rules/{id}` | product-service (8083) | stable | cpq-agent-015 | Rule retirement; requires impact assessment per agent PRD. |
+| GET | `/api/v1/configuration/rules/product/{productId}` | product-service (8083) | stable | cpq-agent-015, cpq-agent-016 | Product-scoped rule set for validation and status checks. FE catalog-detail nest (Wave P3). |
+| DELETE | `/api/v1/configuration/rules/{id}` | product-service (8083) | stable | cpq-agent-015 | Rule retirement; requires impact assessment per agent PRD. FE ConfirmDialog delete (Wave P3). |
 | POST | `/api/v1/configuration/validate` | **gateway** → configuration-engine (8088) evaluate; product-service (8083) path **retained** | **agent-contract** | cpq-agent-015, cpq-agent-016 | **Canonical agent path.** Body `List<Long>` product IDs; gateway response `ApiResponse<ConfigurationValidationResult>`. Internal: `POST /internal/v1/configurations/evaluate`. Wave G/H: shared `ProductRuleEvaluationCore` — hard REQUIRES/EXCLUDES/VALIDATES (`attr:key=value` when attrs present); soft RECOMMENDS; DEFAULT expands selection. Thin TTL cache on rule fetch (S2B-9). Session `ConstraintSolver` uses same core. AI tools parse `valid`+`violations`. |
 | POST | `/api/v1/configurations` | configuration-engine (8088) | beta | — | Session create (`productId`, `userId` query params); not in three agent PRDs; related to S2B-7. |
 | GET | `/api/v1/configurations/{id}` | configuration-engine (8088) | beta | — | Session read. |
@@ -121,7 +121,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 | PUT | `/api/v1/rules/{id}` | pricing-service (8082) | stable | — | Update rule. |
 | DELETE | `/api/v1/rules/{id}` | pricing-service (8082) | stable | — | Soft delete. |
 | POST | `/api/v1/rules/{id}/validate` | pricing-service (8082) | **agent-contract** | cpq-agent-016 | DRL compile/syntax check via `RuleService.validate`; blocks activation of malformed rules. |
-| GET | `/api/v1/rules/{id}/impact` | pricing-service (8082) | beta | — | `RuleController.impact`; PRD §10.2 planned—**now implemented**. |
+| GET | `/api/v1/rules/{id}/impact` | pricing-service (8082) | beta | — | `RuleController.impact`; PRD §10.2 planned—**now implemented**. FE rule-set detail Impact dialog (Wave P2 `@frontend/cpq-rule-sets`). |
 | POST | `/api/v1/rule-sets` | pricing-service (8082) | stable | — | Rule set lifecycle (`RuleSetController`). |
 | GET | `/api/v1/rule-sets` | pricing-service (8082) | stable | — | List rule sets. |
 | GET | `/api/v1/rule-sets/{id}` | pricing-service (8082) | stable | — | Get rule set. |
@@ -136,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 
 ## 6. Quote and approval APIs
 
-Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–O** (YAML untouched; default still `true`).
+Quote lifecycle and **BFF approval** paths used by agents (`quote-service`). Canonical workflow state on **approval-routing** (`/api/v1/approvals/*`) is **internal** to agents per S2C-12. **Wave G4:** BFF is **single-writer** to routing (`POST /api/v1/approvals`); quote persists Quote projection only; dual-read pending may fall back to legacy local rows (see `docs/forge/impl/g4-approval-bff.md`). **Dual-read default stays `approvals.legacy-local-read-enabled=true`** (`APPROVALS_LEGACY_LOCAL_READ`). **Wave H7** proved flag-off reads; **Wave J5** cutover checklist (empty local PENDING → env flag-off soak → rollback) is in `docs/forge/impl/j5-dual-read-readiness.md`. **Wave K4** FE approval inbox (`@frontend/cpq-approvals`) calls quote BFF pending/approve/reject only — not approval-routing direct. Flipping the default to `false` is a separate **HIGH** ops gate — **not authorized in Waves J–P** (YAML untouched; default still `true`).
 
 | Method | Path | Owning service | Stability | Consumer agents | Notes |
 |--------|------|----------------|-----------|-----------------|-------|
@@ -176,16 +176,26 @@ Routes used by cpq-agent-016 (and related catalog checks) outside configuration/
 |--------|------|----------------|-----------|-----------------|-------|
 | GET | `/api/v1/products/{id}` | product-service (8083) | **agent-contract** | cpq-agent-015, cpq-agent-016 | Lifecycle status (ACTIVE, DRAFT, DEPRECATED, END_OF_LIFE). |
 | GET | `/api/v1/products` | product-service (8083) | stable | — | List/filter catalog. |
-| GET | `/api/v1/product-bundles/product/{productId}` | product-service (8083) | **agent-contract** | cpq-agent-016 | Bundle component status checks. |
+| GET | `/api/v1/product-bundles` | product-service (8083) | stable | — | Paginated list. FE portal list (Wave P1 `@frontend/cpq-product-bundles`). |
+| GET | `/api/v1/product-bundles/product/{productId}` | product-service (8083) | **agent-contract** | cpq-agent-016 | Bundle component status checks. FE optional productId filter (Wave P1). |
+| GET | `/api/v1/product-bundles/{id}` | product-service (8083) | stable | — | Single bundle fetch. FE detail + items (Wave P1). |
+| POST | `/api/v1/product-bundles` | product-service (8083) | stable | — | Create bundle. FE create dialog (Wave P1). |
+| POST | `/api/v1/product-bundles/{id}/items` | product-service (8083) | stable | — | Add bundle item. FE add-item dialog (Wave P1). |
+| DELETE | `/api/v1/product-bundles/{bundleId}/items/{itemId}` | product-service (8083) | stable | — | Remove bundle item. FE (Wave P1). |
+| DELETE | `/api/v1/product-bundles/{id}` | product-service (8083) | stable | — | Soft delete bundle. FE ConfirmDialog (Wave P1). |
+| GET | `/api/v1/product-options/groups/product/{productId}` | product-service (8083) | stable | — | Option groups for a product. FE catalog-detail (Wave O2). |
+| POST | `/api/v1/product-options/groups` | product-service (8083) | stable | — | Create option group. FE catalog-detail (Wave O2). |
+| POST | `/api/v1/product-options/groups/{groupId}/options` | product-service (8083) | stable | — | Add option to group. FE catalog-detail (Wave O2). |
+| DELETE | `/api/v1/product-options/groups/{id}` | product-service (8083) | stable | — | Delete option group. FE ConfirmDialog (Wave O2). |
 | GET | `/api/v1/product-attributes` | product-service (8083) | **agent-contract** | cpq-agent-016 | Attribute definitions for data-quality validation. FE catalog-detail picker (Wave O2). |
 | GET | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | **agent-contract** | cpq-agent-016 | Required/type/range validation. FE nested on catalog-detail (Wave O2). |
 | POST | `/api/v1/product-attributes/products/{productId}/values` | product-service (8083) | stable | — | Set attribute values (configuration workflow). FE catalog-detail (Wave O2). |
-| GET | `/api/v1/product-bundles/{id}` | product-service (8083) | stable | — | Single bundle fetch. |
 | POST | `/api/v1/products` | product-service (8083) | stable | — | Create product (FE catalog create — Wave J4). |
 | PUT | `/api/v1/products/{id}` | product-service (8083) | stable | — | Update product (FE catalog-detail Edit/Save — Wave K3). |
 | GET | `/api/v1/products/search` | product-service (8083) | stable | — | Search by name/SKU. |
+| GET | `/api/v1/subscriptions` | contract-asset-management | stable | — | Paginated `SubscriptionDto` list (Wave O3). **No FE.** |
 
-**Subsection row count:** 10
+**Subsection row count:** 20
 
 ### 7b. CRM (crm-service)
 
@@ -210,7 +220,7 @@ Agent PRDs reference ERP paths; **no `erp` backend controllers** exist under `ba
 
 **Subsection row count:** 3
 
-**§7 total row count:** 17 (10 + 4 + 3)
+**§7 total row count:** 27 (20 + 4 + 3)
 
 ---
 
@@ -242,6 +252,7 @@ External clients and agents should call **only through the gateway** (default po
 | `/api/v1/quotes/**` | quote-service | quotes, line-items, quote-scoped approvals |
 | `/api/v1/approvals/**` | approval-routing | internal (orchestration only) |
 | `/api/v1/products/**`, `/api/v1/product-bundles/**`, `/api/v1/product-options/**`, `/api/v1/product-attributes/**` | product-service | catalog integrity |
+| `/api/v1/subscriptions/**` | contract-asset-management | subscription DTO API (O3; **no FE**) |
 | `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` | crm-service | deal/contact integrity |
 | `/api/v1/erp/**` | **gateway-service** (`erp-stub` → 501 fallback) | Agent-contract paths return **501** until erp-adapter-service exists (S2A-7) |
 
@@ -283,7 +294,7 @@ External clients and agents should call **only through the gateway** (default po
 | §4b Price book APIs | 11 |
 | §5 Rules / DRL APIs | 14 |
 | §6 Quote & approval APIs | 21 |
-| §7 Cross-service integrity | 17 |
-| **Total matrix rows** | **84** |
+| §7 Cross-service integrity | 27 |
+| **Total matrix rows** | **94** |
 
 **Routes not assignable to an implemented backend service:** 0 (§7c ERP rows route through gateway stub; erp-adapter-service is future work).
