@@ -1,4 +1,14 @@
-import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  viewChild,
+  ElementRef,
+  afterNextRender,
+  signal,
+  Injector,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 /**
@@ -42,11 +52,14 @@ import { CommonModule } from '@angular/common';
         </div>
       </div>
 
-      @if (hasSearchSlot()) {
-        <div class="page-header-search">
-          <ng-content select="[search]"></ng-content>
-        </div>
-      }
+      <!-- ng-content must stay mounted so projection can be detected; hide when unused -->
+      <div
+        class="page-header-search"
+        #searchContainer
+        [hidden]="!hasSearchSlot()"
+      >
+        <ng-content select="[search]"></ng-content>
+      </div>
     </div>
   `,
   styles: [`
@@ -99,6 +112,11 @@ import { CommonModule } from '@angular/common';
       padding: 0 32px 24px;
     }
 
+    .page-header-search[hidden] {
+      display: none;
+      padding: 0;
+    }
+
     @media (max-width: 768px) {
       .page-header-top {
         padding: 16px 16px;
@@ -144,16 +162,29 @@ import { CommonModule } from '@angular/common';
   `],
 })
 export class PageHeaderComponent {
+  private readonly injector = inject(Injector);
+
   // Inputs using signal-based API
   title = input.required<string>();
   subtitle = input<string>('');
 
-  // Helper method to check if search slot has content
-  // Note: In a real app, you might use ViewChild or ContentChild to detect projected content
-  // For simplicity, we're assuming the slot exists if it's used
+  private readonly searchContainer = viewChild<ElementRef<HTMLElement>>('searchContainer');
+  private readonly searchSlotPresent = signal(false);
+
+  constructor() {
+    // Detect projected [search] content after first render (before paint).
+    // contentChild(Directive) would require every caller to import a marker directive.
+    afterNextRender(
+      () => {
+        const el = this.searchContainer()?.nativeElement;
+        this.searchSlotPresent.set(!!el && el.childElementCount > 0);
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /** True when a `[search]` projection is present; false avoids empty search padding. */
   protected hasSearchSlot(): boolean {
-    // This is a simplified implementation
-    // In production, you might want to use ContentChildren to detect projected content
-    return true;
+    return this.searchSlotPresent();
   }
 }

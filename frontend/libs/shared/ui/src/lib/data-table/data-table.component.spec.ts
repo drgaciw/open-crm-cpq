@@ -58,6 +58,17 @@ describe('DataTableComponent', () => {
     expect(spinner).toBeTruthy();
   });
 
+  it('should announce loading overlay as a polite live region', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', []);
+    component.componentRef.setInput('loading', true);
+    component.detectChanges();
+
+    const overlay = component.nativeElement.querySelector('.loading-overlay') as HTMLElement;
+    expect(overlay.getAttribute('role')).toBe('status');
+    expect(overlay.getAttribute('aria-live')).toBe('polite');
+  });
+
   it('should display empty state when data is empty and not loading', async () => {
     component.componentRef.setInput('columns', mockColumns);
     component.componentRef.setInput('data', []);
@@ -111,6 +122,56 @@ describe('DataTableComponent', () => {
 
     component.componentInstance.onRowClick(mockData[0]);
     expect(clickedRow).toEqual(mockData[0]);
+  });
+
+  it('should set tabindex="0" on clickable rows', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.componentRef.setInput('clickable', true);
+    component.detectChanges();
+
+    const rows = component.nativeElement.querySelectorAll('tr.table-row');
+    expect(rows.length).toBeGreaterThan(0);
+    rows.forEach((row: HTMLElement) => {
+      expect(row.getAttribute('tabindex')).toBe('0');
+    });
+  });
+
+  it('should emit rowClick on Enter and Space keydown', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.detectChanges();
+
+    const clicks: unknown[] = [];
+    component.componentInstance.rowClick.subscribe((row) => clicks.push(row));
+
+    component.componentInstance.onRowKeydown(
+      new KeyboardEvent('keydown', { key: 'Enter' }),
+      mockData[0],
+    );
+    component.componentInstance.onRowKeydown(
+      new KeyboardEvent('keydown', { key: ' ' }),
+      mockData[1],
+    );
+
+    expect(clicks).toEqual([mockData[0], mockData[1]]);
+  });
+
+  it('should not emit rowClick on other keys', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.detectChanges();
+
+    let clicked = false;
+    component.componentInstance.rowClick.subscribe(() => {
+      clicked = true;
+    });
+
+    component.componentInstance.onRowKeydown(
+      new KeyboardEvent('keydown', { key: 'Tab' }),
+      mockData[0],
+    );
+    expect(clicked).toBe(false);
   });
 
   it('should display paginator when pagination data is provided', () => {
