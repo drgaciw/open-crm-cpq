@@ -18,6 +18,7 @@ import {
   findMockRulesForSet,
 } from '../rule-sets.mock';
 import { RuleDialogComponent } from '../rule-dialog/rule-dialog.component';
+import { RuleImpactDialogComponent } from '../rule-impact-dialog/rule-impact-dialog.component';
 
 describe('RuleSetDetailComponent', () => {
   let fixture: ComponentFixture<RuleSetDetailComponent>;
@@ -45,6 +46,7 @@ describe('RuleSetDetailComponent', () => {
     totalPages: 1,
   });
 
+  // Angular TestBed compile can exceed Vitest's default 10s hookTimeout under load.
   beforeEach(async () => {
     getByIdSpy = vi.fn((id: number) => {
       selectedRuleSet.set(findMockRuleSet(id) ?? null);
@@ -108,7 +110,7 @@ describe('RuleSetDetailComponent', () => {
     router = TestBed.inject(Router);
     navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture.detectChanges();
-  });
+  }, 30000);
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -185,6 +187,19 @@ describe('RuleSetDetailComponent', () => {
       }),
     );
     expect(listByRuleSetSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('opens rule impact dialog for a nested rule row', () => {
+    dialogOpen.mockClear();
+    const row = component.ruleRows()[0];
+    component.openRuleImpact(row);
+    expect(dialogOpen).toHaveBeenCalledWith(
+      RuleImpactDialogComponent,
+      expect.objectContaining({
+        width: '560px',
+        data: { ruleId: row.id, ruleName: row.name },
+      }),
+    );
   });
 
   it('deletes a rule via ConfirmDialog + RuleService.delete', () => {

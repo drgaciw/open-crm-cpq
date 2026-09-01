@@ -4,14 +4,14 @@ Pricing rule-set admin portal (`@frontend/cpq-rule-sets`).
 
 ## Pattern
 
-Uses existing `RuleSetService` / `RuleService` from `@frontend/cpq-pricing-data-access` (signal-state). List (optional status filter), detail with Activate/Deprecate ConfirmDialog, nested rules via `listByRuleSet`, create/edit rule with DRL textarea + `validateSyntax`. Standalone + OnPush; no NgRx.
+Uses existing `RuleSetService` / `RuleService` from `@frontend/cpq-pricing-data-access` (signal-state). List (optional status filter), detail with Activate/Deprecate ConfirmDialog, nested rules via `listByRuleSet`, create/edit rule with DRL textarea + `validateSyntax`, per-rule **Impact** dialog via `analyzeImpact`. Standalone + OnPush; no NgRx.
 
 ## HTTP
 
 | Surface | Path |
 |---------|------|
 | Rule sets list/get/create/activate/deprecate | `/api/v1/rule-sets` |
-| Rules by set / CRUD / validate | `/api/v1/rules` (`listByRuleSet` only — no bare list) |
+| Rules by set / CRUD / validate / impact | `/api/v1/rules` (`listByRuleSet` only — no bare list; impact `GET /{id}/impact`) |
 
 **Never** call `/api/v1/configuration/rules` or `/api/v1/pricing/rule-sets`.
 
