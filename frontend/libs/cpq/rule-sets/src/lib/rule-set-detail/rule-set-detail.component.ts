@@ -47,8 +47,17 @@ interface RuleTableRow {
 }
 
 function httpErrorMessage(err: unknown, fallback: string): string {
-  const e = err as { error?: { message?: string }; message?: string } | null;
-  return e?.error?.message || e?.message || fallback;
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
 }
 
 @Component({
@@ -395,6 +404,24 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 
         .info-grid {
           grid-template-columns: 1fr;
+        }
+
+        .header-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .header-actions button {
+          width: 100%;
+        }
+
+        .rules-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .rules-header button {
+          width: 100%;
         }
       }
     `,

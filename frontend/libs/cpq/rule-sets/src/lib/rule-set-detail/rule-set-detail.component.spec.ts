@@ -166,11 +166,18 @@ describe('RuleSetDetailComponent', () => {
 
   it('surfaces activate failure in banner', () => {
     activateSpy.mockReturnValueOnce(
-      throwError(() => ({ error: { message: 'Only DRAFT can activate' } })),
+      throwError(() => ({
+        error: {
+          message: 'Only DRAFT can activate',
+          errorCode: 'RULE_SET_INVALID_STATUS',
+        },
+      })),
     );
     component.confirmActivate();
     fixture.detectChanges();
-    expect(component.actionError()).toBe('Only DRAFT can activate');
+    expect(component.actionError()).toBe(
+      'Only DRAFT can activate [RULE_SET_INVALID_STATUS]',
+    );
   });
 
   it('opens create rule dialog and reloads listByRuleSet', () => {

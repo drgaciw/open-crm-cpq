@@ -71,13 +71,22 @@ describe('RuleImpactDialogComponent', () => {
   it('surfaces analyzeImpact errors and allows retry', async () => {
     await setup({ ruleId: 10 });
     analyzeImpactSpy.mockReturnValueOnce(
-      throwError(() => ({ error: { message: 'Impact unavailable' } })),
+      throwError(() => ({
+        error: {
+          message: 'Impact unavailable',
+          errorCode: 'RULE_IMPACT_UNAVAILABLE',
+        },
+      })),
     );
     component.load();
     fixture.detectChanges();
-    expect(component.error()).toBe('Impact unavailable');
+    expect(component.error()).toBe(
+      'Impact unavailable [RULE_IMPACT_UNAVAILABLE]',
+    );
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Impact unavailable');
+    expect(compiled.textContent).toContain(
+      'Impact unavailable [RULE_IMPACT_UNAVAILABLE]',
+    );
     expect(compiled.querySelector('.retry-btn')).toBeTruthy();
 
     analyzeImpactSpy.mockReturnValueOnce(of(IMPACT));

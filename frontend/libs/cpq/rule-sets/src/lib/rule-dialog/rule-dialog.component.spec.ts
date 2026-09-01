@@ -108,7 +108,12 @@ describe('RuleDialogComponent', () => {
   it('surfaces post-save validate error and does not close', async () => {
     await setup({ ruleSetId: 1 });
     validateSpy.mockReturnValueOnce(
-      throwError(() => ({ error: { message: 'DRL parse error' } })),
+      throwError(() => ({
+        error: {
+          message: 'DRL parse error',
+          errorCode: 'RULE_DRL_INVALID',
+        },
+      })),
     );
     component.form.patchValue({
       name: 'Bad',
@@ -120,7 +125,7 @@ describe('RuleDialogComponent', () => {
     fixture.detectChanges();
 
     expect(createSpy).toHaveBeenCalled();
-    expect(component.error()).toBe('DRL parse error');
+    expect(component.error()).toBe('DRL parse error [RULE_DRL_INVALID]');
     expect(dialogClose).not.toHaveBeenCalled();
   });
 });
