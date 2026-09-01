@@ -33,8 +33,17 @@ export interface OptionGroupCreateDialogData {
 }
 
 function httpErrorMessage(err: unknown, fallback: string): string {
-  const e = err as { error?: { message?: string }; message?: string } | null;
-  return e?.error?.message || e?.message || fallback;
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
 }
 
 @Component({
