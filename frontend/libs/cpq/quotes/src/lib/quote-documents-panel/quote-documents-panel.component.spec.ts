@@ -123,6 +123,26 @@ describe('QuoteDocumentsPanelComponent', () => {
     );
   });
 
+  it('appends errorCode to banner as message [CODE]', () => {
+    listDocumentsSpy.mockReturnValue(
+      throwError(() => ({
+        error: {
+          message: 'Documents unavailable',
+          errorCode: 'DOCUMENTS_UNAVAILABLE',
+        },
+      })),
+    );
+    fixture.componentRef.setInput('quoteId', 6);
+    fixture.detectChanges();
+
+    expect(component.error()).toBe(
+      'Documents unavailable [DOCUMENTS_UNAVAILABLE]',
+    );
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Documents unavailable [DOCUMENTS_UNAVAILABLE]',
+    );
+  });
+
   it('shows empty state when no documents', () => {
     listDocumentsSpy.mockReturnValue(of([]));
     fixture.componentRef.setInput('quoteId', 7);

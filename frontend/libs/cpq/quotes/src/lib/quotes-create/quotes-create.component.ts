@@ -20,8 +20,17 @@ import { QuoteCreateRequest } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 
 function httpErrorMessage(err: unknown): string {
-  const e = err as { error?: { message?: string }; message?: string } | null;
-  return e?.error?.message || e?.message || 'An error occurred';
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || 'An error occurred';
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
 }
 
 @Component({

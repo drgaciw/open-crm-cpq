@@ -141,6 +141,42 @@ describe('QuotesListComponent', () => {
     expect(compiled.textContent).toContain('No quotes yet');
   });
 
+  it('shows New Quote empty-state CTA when unfiltered and navigates on action', () => {
+    quotes.set([]);
+    pagination.set({ page: 0, size: 10, totalElements: 0, totalPages: 0 });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const emptyState = compiled.querySelector('app-empty-state');
+    expect(emptyState).toBeTruthy();
+    expect(emptyState?.textContent).toContain('New Quote');
+
+    const actionBtn = Array.from(
+      emptyState?.querySelectorAll('button') ?? [],
+    ).find((b) => b.textContent?.includes('New Quote')) as
+      | HTMLButtonElement
+      | undefined;
+    expect(actionBtn).toBeTruthy();
+    actionBtn?.click();
+    expect(router.navigate).toHaveBeenCalledWith(['/quotes', 'new']);
+  });
+
+  it('hides New Quote empty-state CTA when filters are active', () => {
+    quotes.set([]);
+    pagination.set({ page: 0, size: 10, totalElements: 0, totalPages: 0 });
+    component.onSearch('zzz-no-match');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const emptyState = compiled.querySelector('app-empty-state');
+    expect(emptyState).toBeTruthy();
+    expect(compiled.textContent).toContain('No matching quotes');
+    const actionBtn = Array.from(
+      emptyState?.querySelectorAll('button') ?? [],
+    ).find((b) => b.textContent?.trim() === 'New Quote');
+    expect(actionBtn).toBeUndefined();
+  });
+
   it('shows error banner when QuoteService error is set', () => {
     error.set('Failed to load quotes');
     fixture.detectChanges();

@@ -117,6 +117,8 @@ interface QuoteTableRow {
             ? 'Try another search, status, or deal type filter.'
             : 'Quotes will appear here once loaded.'
         "
+        [actionLabel]="hasActiveFilters() ? '' : 'New Quote'"
+        (action)="onNewQuote()"
       />
     } @else {
       <app-data-table
