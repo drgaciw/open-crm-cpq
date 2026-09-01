@@ -33,6 +33,10 @@ import {
   RuleDialogComponent,
   RuleDialogData,
 } from '../rule-dialog/rule-dialog.component';
+import {
+  RuleImpactDialogComponent,
+  RuleImpactDialogData,
+} from '../rule-impact-dialog/rule-impact-dialog.component';
 
 interface RuleTableRow {
   id: number;
@@ -200,6 +204,15 @@ function httpErrorMessage(err: unknown, fallback: string): string {
                       <td>{{ row.priority != null ? row.priority : '—' }}</td>
                       <td>{{ row.status }}</td>
                       <td class="actions-col">
+                        <button
+                          mat-button
+                          type="button"
+                          class="row-impact-btn"
+                          [disabled]="mutating()"
+                          (click)="openRuleImpact(row)"
+                        >
+                          Impact
+                        </button>
                         <button
                           mat-button
                           type="button"
@@ -566,6 +579,20 @@ export class RuleSetDetailComponent implements OnInit {
       }
       this.actionError.set(null);
       this.ruleService.listByRuleSet(ruleSet.id);
+    });
+  }
+
+  openRuleImpact(row: RuleTableRow): void {
+    if (this.mutating()) {
+      return;
+    }
+    const data: RuleImpactDialogData = {
+      ruleId: row.id,
+      ruleName: row.name,
+    };
+    this.dialog.open(RuleImpactDialogComponent, {
+      width: '560px',
+      data,
     });
   }
 
