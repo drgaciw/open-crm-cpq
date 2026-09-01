@@ -65,12 +65,20 @@ export const appRoutes: Route[] = [
           import('@frontend/cpq-rule-sets').then((m) => m.RULE_SETS_ROUTES),
       },
       {
+        path: 'product-bundles',
+        loadChildren: () =>
+          import('@frontend/cpq-product-bundles').then(
+            (m) => m.PRODUCT_BUNDLES_ROUTES,
+          ),
+      },
+      {
         path: 'pricing/simulator',
         loadChildren: () =>
           import('@frontend/cpq-pricing-simulator').then(
             (m) => m.SIMULATOR_ROUTES,
           ),
       },
+
     ],
   },
 ];
