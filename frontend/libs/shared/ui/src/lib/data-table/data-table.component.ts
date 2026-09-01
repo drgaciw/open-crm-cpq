@@ -52,7 +52,7 @@ export interface RowActionEvent<T = unknown> {
     <div class="data-table-container">
       <!-- Loading Overlay -->
       @if (loading()) {
-        <div class="loading-overlay">
+        <div class="loading-overlay" role="status" aria-live="polite" aria-label="Loading">
           <mat-spinner diameter="50"></mat-spinner>
         </div>
       }
@@ -71,7 +71,7 @@ export interface RowActionEvent<T = unknown> {
               >
                 {{ column.header }}
               </th>
-              <td mat-cell *matCellDef="let row" (click)="onRowClick(row)">
+              <td mat-cell *matCellDef="let row">
                 @switch (column.type) {
                   @case ('number') {
                     {{ row[column.key] | number }}
@@ -96,6 +96,9 @@ export interface RowActionEvent<T = unknown> {
             *matRowDef="let row; columns: displayedColumns();"
             class="table-row"
             [class.clickable]="clickable()"
+            [attr.tabindex]="clickable() ? 0 : null"
+            (click)="onRowClick(row)"
+            (keydown)="onRowKeydown($event, row)"
           ></tr>
 
           <!-- Empty State Row -->
@@ -169,6 +172,11 @@ export interface RowActionEvent<T = unknown> {
       cursor: pointer;
     }
 
+    .table-row.clickable:focus-visible {
+      outline: 2px solid #1976d2;
+      outline-offset: -2px;
+    }
+
     .empty-state-cell {
       text-align: center;
       padding: 48px 24px;
@@ -235,7 +243,20 @@ export class DataTableComponent<T = unknown> {
   }
 
   onRowClick(row: T): void {
+    if (!this.clickable()) {
+      return;
+    }
     this.rowClick.emit(row);
+  }
+
+  onRowKeydown(event: KeyboardEvent, row: T): void {
+    if (!this.clickable()) {
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.onRowClick(row);
+    }
   }
 
   emitRowAction(action: string, row: T): void {

@@ -42,15 +42,16 @@ export interface ConfirmDialogData {
   imports: [CommonModule, MatDialogModule, MatButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="confirm-dialog">
+    <div class="confirm-dialog" [attr.aria-describedby]="messageId">
       <h2 mat-dialog-title class="dialog-title">{{ data.title }}</h2>
 
       <mat-dialog-content class="dialog-content">
-        <p class="dialog-message">{{ data.message }}</p>
+        <p class="dialog-message" [id]="messageId">{{ data.message }}</p>
       </mat-dialog-content>
 
       <mat-dialog-actions class="dialog-actions">
         <button
+          type="button"
           mat-button
           (click)="onCancel()"
           class="cancel-button"
@@ -58,7 +59,9 @@ export interface ConfirmDialogData {
           {{ data.cancelText || 'Cancel' }}
         </button>
         <button
+          type="button"
           mat-raised-button
+          cdkFocusInitial
           [color]="data.confirmColor || 'primary'"
           (click)="onConfirm()"
           class="confirm-button"
@@ -114,6 +117,9 @@ export interface ConfirmDialogData {
 export class ConfirmDialogComponent {
   protected readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);
   private readonly dialogRef = inject(MatDialogRef<ConfirmDialogComponent>);
+
+  /** Stable id for aria-describedby → message association. */
+  protected readonly messageId = 'confirm-dialog-message';
 
   onConfirm(): void {
     this.dialogRef.close(true);
