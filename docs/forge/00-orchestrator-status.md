@@ -1,10 +1,10 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave Q COMPLETE** (Q1 shared-ui ∥ Q2 quotes+R1 ∥ Q3 catalog/rule-sets ∥ Q4 chrome ∥ Q5 docs); **no N′′**; R2 still held  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
-**Plan:** Wave Q @ `af3098c` (cherry-pick of architect `f03bc24`)  
-**Baseline:** Wave Q COMPLETE on `main` @ `c295e12`
+**Session state:** **Wave S FORGING** (S1 CRM empty-state ∥ S2 quotes overflow ∥ S3 bundles errorCode ∥ S4 sim+PB errorCode; **no N′′**; R2 still held)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/31-wave-s-ux-architecture.md`  
+**Plan:** Wave S @ `d0285e6` (cherry-pick of architect `1cb568c`)  
+**Baseline:** Wave Q COMPLETE on `main` @ `857e724`; S plan on `main` @ `d0285e6`
 
 ## Wave Q landed
 
