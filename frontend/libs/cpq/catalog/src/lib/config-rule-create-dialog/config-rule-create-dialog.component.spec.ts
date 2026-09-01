@@ -88,7 +88,12 @@ describe('ConfigRuleCreateDialogComponent', () => {
 
   it('shows error on create failure', () => {
     createSpy.mockReturnValue(
-      throwError(() => ({ error: { message: 'Duplicate rule' } })),
+      throwError(() => ({
+        error: {
+          message: 'Duplicate rule',
+          errorCode: 'CONFIG_RULE_DUPLICATE',
+        },
+      })),
     );
     component.form.patchValue({
       name: 'Dup',
@@ -97,7 +102,7 @@ describe('ConfigRuleCreateDialogComponent', () => {
     component.onSubmit();
     fixture.detectChanges();
 
-    expect(component.error()).toBe('Duplicate rule');
+    expect(component.error()).toBe('Duplicate rule [CONFIG_RULE_DUPLICATE]');
     expect(dialogClose).not.toHaveBeenCalled();
   });
 

@@ -141,15 +141,22 @@ describe('ConfigRulesPanelComponent', () => {
 
   it('shows error when list fails', () => {
     listByProductSpy.mockReturnValue(
-      throwError(() => ({ error: { message: 'Rules unavailable' } })),
+      throwError(() => ({
+        error: {
+          message: 'Rules unavailable',
+          errorCode: 'CONFIG_RULES_UNAVAILABLE',
+        },
+      })),
     );
     fixture.componentRef.setInput('productId', 9);
     fixture.detectChanges();
 
-    expect(component.error()).toBe('Rules unavailable');
-    expect(
-      (fixture.nativeElement as HTMLElement).textContent,
-    ).toContain('Rules unavailable');
+    expect(component.error()).toBe(
+      'Rules unavailable [CONFIG_RULES_UNAVAILABLE]',
+    );
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Rules unavailable [CONFIG_RULES_UNAVAILABLE]',
+    );
   });
 
   it('never exposes validate UI (product POST /validate)', () => {

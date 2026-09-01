@@ -336,7 +336,12 @@ describe('CatalogDetailComponent', () => {
 
   it('shows error banner on save failure and stays in edit mode', () => {
     updateSpy.mockReturnValue(
-      throwError(() => ({ error: { message: 'Name already taken' } })),
+      throwError(() => ({
+        error: {
+          message: 'Name already taken',
+          errorCode: 'PRODUCT_NAME_CONFLICT',
+        },
+      })),
     );
 
     component.startEdit();
@@ -346,11 +351,15 @@ describe('CatalogDetailComponent', () => {
 
     expect(component.editing()).toBe(true);
     expect(component.saving()).toBe(false);
-    expect(component.saveError()).toBe('Name already taken');
+    expect(component.saveError()).toBe(
+      'Name already taken [PRODUCT_NAME_CONFLICT]',
+    );
     expect(navigateSpy).not.toHaveBeenCalled();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Name already taken');
+    expect(compiled.textContent).toContain(
+      'Name already taken [PRODUCT_NAME_CONFLICT]',
+    );
   });
 
   it('does not save when form is invalid', () => {
@@ -412,7 +421,12 @@ describe('CatalogDetailComponent', () => {
 
   it('shows error banner on delete failure and stays on detail', () => {
     deleteSpy.mockReturnValueOnce(
-      throwError(() => ({ error: { message: 'Cannot delete linked product' } })),
+      throwError(() => ({
+        error: {
+          message: 'Cannot delete linked product',
+          errorCode: 'PRODUCT_IN_USE',
+        },
+      })),
     );
 
     component.onDelete();
@@ -420,12 +434,16 @@ describe('CatalogDetailComponent', () => {
 
     expect(deleteSpy).toHaveBeenCalledWith(1);
     expect(component.deleting()).toBe(false);
-    expect(component.saveError()).toBe('Cannot delete linked product');
+    expect(component.saveError()).toBe(
+      'Cannot delete linked product [PRODUCT_IN_USE]',
+    );
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(selectedProduct()?.id).toBe(1);
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Cannot delete linked product');
+    expect(compiled.textContent).toContain(
+      'Cannot delete linked product [PRODUCT_IN_USE]',
+    );
   });
 
   it('does not open delete dialog while editing', () => {
@@ -561,16 +579,23 @@ describe('CatalogDetailComponent', () => {
 
   it('shows attribute error when setValue fails', () => {
     setValueSpy.mockReturnValue(
-      throwError(() => ({ error: { message: 'Invalid attribute value' } })),
+      throwError(() => ({
+        error: {
+          message: 'Invalid attribute value',
+          errorCode: 'ATTR_VALUE_INVALID',
+        },
+      })),
     );
 
     component.attrForm.setValue({ attributeId: 9, value: 'bad' });
     component.onSetAttributeValue();
     fixture.detectChanges();
 
-    expect(component.attrsError()).toBe('Invalid attribute value');
+    expect(component.attrsError()).toBe(
+      'Invalid attribute value [ATTR_VALUE_INVALID]',
+    );
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
-      'Invalid attribute value',
+      'Invalid attribute value [ATTR_VALUE_INVALID]',
     );
   });
 });
