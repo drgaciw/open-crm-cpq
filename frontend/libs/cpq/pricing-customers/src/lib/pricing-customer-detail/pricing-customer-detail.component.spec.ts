@@ -123,6 +123,28 @@ describe('PricingCustomerDetailComponent', () => {
     );
   });
 
+  it('appends errorCode to update failure banners', () => {
+    updateSpy.mockReturnValueOnce(
+      throwError(() => ({
+        error: {
+          message: 'Name already taken',
+          errorCode: 'PRICING_CUSTOMER_NAME_TAKEN',
+        },
+      })),
+    );
+    component.startEdit();
+    component.form.patchValue({ name: 'Taken' });
+    component.onSave();
+    fixture.detectChanges();
+
+    expect(component.actionError()).toBe(
+      'Name already taken [PRICING_CUSTOMER_NAME_TAKEN]',
+    );
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Name already taken [PRICING_CUSTOMER_NAME_TAKEN]',
+    );
+  });
+
   it('does not save when form is invalid', () => {
     component.startEdit();
     component.form.patchValue({ name: '' });
@@ -200,6 +222,28 @@ describe('PricingCustomerDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Cannot delete linked pricing customer',
     );
+  });
+
+  it('appends errorCode to delete failure banners', () => {
+    deleteSpy.mockReturnValueOnce(
+      throwError(() => ({
+        error: {
+          message: 'Cannot delete linked pricing customer',
+          errorCode: 'PRICING_CUSTOMER_IN_USE',
+        },
+      })),
+    );
+
+    component.onDelete();
+    fixture.detectChanges();
+
+    expect(component.actionError()).toBe(
+      'Cannot delete linked pricing customer [PRICING_CUSTOMER_IN_USE]',
+    );
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Cannot delete linked pricing customer [PRICING_CUSTOMER_IN_USE]',
+    );
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('does not open delete dialog while editing', () => {

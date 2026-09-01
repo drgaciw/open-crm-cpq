@@ -123,6 +123,21 @@ describe('ApprovalsInboxComponent', () => {
     expect(component.actionError()).toBe('Already decided');
   });
 
+  it('appends errorCode to action HTTP error banners', () => {
+    approveSpy.mockReturnValueOnce(
+      throwError(() => ({
+        error: {
+          message: 'Already decided',
+          errorCode: 'APPROVAL_ALREADY_DECIDED',
+        },
+      })),
+    );
+    component.onApprove(MOCK_PENDING_APPROVALS[0]);
+    expect(component.actionError()).toBe(
+      'Already decided [APPROVAL_ALREADY_DECIDED]',
+    );
+  });
+
   it('shows empty state when no pending rows', () => {
     pending.set([]);
     fixture.detectChanges();
