@@ -1,17 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave O COMPLETE**; **Wave P FORGING** (P1 bundles ∥ P2 rule impact ∥ P3 catalog config-rules)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — `docs/forge/28-wave-p-architecture.md`  
+**Session state:** **Wave P COMPLETE** (P1 bundles portal ∥ P2 rule impact ∥ P3 catalog config-rules ∥ P4 docs)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; Wave Q UX plan not on disk yet  
 **Plan:** Wave P @ `3db7700` (cherry-pick of architect `eb85d21`)  
-**Baseline:** Wave O COMPLETE on `main` @ `fc7e631`
+**Baseline:** Wave P COMPLETE on `main` @ `68082c7`
 
-## Wave P tracks
+## Wave P landed
 
-- **P1** FE product-bundles portal (owns shell)
-- **P2** FE rule-sets analyzeImpact (no shell)
-- **P3** FE catalog nested configuration-rules (no shell)
-- **P4** docs closeout after Day-1
+- **P1** FE product-bundles portal (owns shell) — `21c032c` / merge `c6db558` (#459)
+- **P2** FE rule-sets analyzeImpact (no shell) — `cd45c17` / merge `ddf7e5a` (#460)
+- **P3** FE catalog nested configuration-rules (no shell) — `03766a4` / merge `d9757ac` (#461)
+- **P4** docs closeout (ADR-006 still **Proposed**; matrix J–P) — `76ca32c` / merge `68082c7` (#462)
 
 ## Wave O landed
 
