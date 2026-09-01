@@ -1,10 +1,10 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave N COMPLETE** (adversarial `e00e832` / cherry-pick `e14d832`); **Wave P COMPLETE**; **next Wave Q UX** (R1 folded; R2 skipped; **no N′′**)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — write `docs/forge/29-wave-q-ux-architecture.md` (architect-only; do not spawn workers)  
-**Plan:** Wave Q pending; N review `docs/forge/30-wave-n-adversarial-review.md` @ `e14d832`  
-**Baseline:** Wave P COMPLETE on `main` @ `68082c7` / orchestrator `c2e7b3f`; N review on `main` @ `e14d832`
+**Session state:** **Wave Q FORGING** (Q1 shared-ui ∥ Q2 quotes+R1 ∥ Q3 catalog/rule-sets ∥ Q4 chrome; **no N′′**; R2 skipped)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/29-wave-q-ux-architecture.md`  
+**Plan:** Wave Q @ `af3098c` (cherry-pick of architect `f03bc24`)  
+**Baseline:** Wave P COMPLETE + N review on `main` @ `0b4cd6f`; Q plan on `main` @ `af3098c`
 
 ## Wave P landed
 
