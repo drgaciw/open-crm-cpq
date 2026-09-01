@@ -47,6 +47,7 @@ describe('rule-sets API contract', () => {
       'lib/rule-set-detail/rule-set-detail.component.ts',
       'lib/rule-set-create-dialog/rule-set-create-dialog.component.ts',
       'lib/rule-dialog/rule-dialog.component.ts',
+      'lib/rule-impact-dialog/rule-impact-dialog.component.ts',
       'lib/rule-sets.routes.ts',
       'index.ts',
     ];
@@ -71,12 +72,21 @@ describe('rule-sets API contract', () => {
       join(libRoot, 'lib/rule-dialog/rule-dialog.component.ts'),
       'utf8',
     );
+    const impactDialogSrc = readFileSync(
+      join(libRoot, 'lib/rule-impact-dialog/rule-impact-dialog.component.ts'),
+      'utf8',
+    );
     expect(listSrc).toContain('RuleSetService');
     expect(detailSrc).toContain('RuleSetService');
     expect(detailSrc).toContain('RuleService');
     expect(detailSrc).toContain('listByRuleSet');
+    expect(detailSrc).toContain('RuleImpactDialogComponent');
+    expect(detailSrc).toContain('openRuleImpact');
     expect(ruleDialogSrc).toContain('validateSyntax');
+    expect(impactDialogSrc).toContain('analyzeImpact');
+    expect(impactDialogSrc).toContain('/api/v1/rules/');
     expect(listSrc).toContain('@frontend/cpq-pricing-data-access');
     expect(detailSrc).toContain('@frontend/cpq-pricing-data-access');
+    expect(impactDialogSrc).toContain('@frontend/cpq-pricing-data-access');
   });
 });
