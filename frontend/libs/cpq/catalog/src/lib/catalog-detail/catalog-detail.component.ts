@@ -51,6 +51,7 @@ import {
   OptionCreateDialogComponent,
   OptionCreateDialogData,
 } from '../option-create-dialog/option-create-dialog.component';
+import { ConfigRulesPanelComponent } from '../config-rules-panel/config-rules-panel.component';
 
 function httpErrorMessage(
   err: unknown,
@@ -76,6 +77,7 @@ function httpErrorMessage(
     StatusBadgeComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
+    ConfigRulesPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -458,6 +460,8 @@ function httpErrorMessage(
             </form>
           }
         </section>
+
+        <cpq-config-rules-panel [productId]="product.id" />
       </div>
     } @else {
       <app-empty-state
