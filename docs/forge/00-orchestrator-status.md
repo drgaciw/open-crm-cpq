@@ -1,10 +1,18 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave Q FORGING** (Q1 shared-ui ∥ Q2 quotes+R1 ∥ Q3 catalog/rule-sets ∥ Q4 chrome; **no N′′**; R2 skipped)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/29-wave-q-ux-architecture.md`  
+**Session state:** **Wave Q COMPLETE** (Q1 shared-ui ∥ Q2 quotes+R1 ∥ Q3 catalog/rule-sets ∥ Q4 chrome ∥ Q5 docs); **no N′′**; R2 still held  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
 **Plan:** Wave Q @ `af3098c` (cherry-pick of architect `f03bc24`)  
-**Baseline:** Wave P COMPLETE + N review on `main` @ `0b4cd6f`; Q plan on `main` @ `af3098c`
+**Baseline:** Wave Q COMPLETE on `main` @ `c295e12`
+
+## Wave Q landed
+
+- **Q1** shared-ui ConfirmDialog/EmptyState/PageHeader/DataTable a11y — `d2ebf70` (#466)
+- **Q2** quotes-create + documents `errorCode` (R1) + list empty CTA — `3404bae` (#463)
+- **Q3** catalog + rule-sets `errorCode` + density — `f7eed4c` (#464)
+- **Q4** mobile sidenav + Title Case nav + approvals/PC banners — `0729289` (#465)
+- **Q5** docs closeout (R3; dual-read J–Q; ADR-006 still **Proposed**) — `c295e12` (#467)
 
 ## Wave P landed
 
