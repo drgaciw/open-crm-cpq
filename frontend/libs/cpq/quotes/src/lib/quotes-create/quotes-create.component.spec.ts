@@ -112,6 +112,29 @@ describe('QuotesCreateComponent', () => {
     );
   });
 
+  it('appends errorCode to banner as message [CODE]', () => {
+    createSpy.mockReturnValue(
+      throwError(() => ({
+        error: {
+          message: 'Customer not found',
+          errorCode: 'CUSTOMER_NOT_FOUND',
+        },
+      })),
+    );
+    component.form.patchValue({
+      name: 'Fail Quote',
+      customerExternalId: 'cust-missing',
+    });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('Customer not found [CUSTOMER_NOT_FOUND]');
+    expect(component.saving()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Customer not found [CUSTOMER_NOT_FOUND]',
+    );
+  });
+
   it('navigates back to list on cancel', () => {
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/quotes']);
