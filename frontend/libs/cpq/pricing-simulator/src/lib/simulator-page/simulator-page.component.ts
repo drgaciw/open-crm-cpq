@@ -28,6 +28,21 @@ import {
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
 import { MOCK_PRICING_CONTEXT } from '../pricing-simulator.mock';
 
+/** Prefer message; append errorCode when present (H1 shape). */
+function httpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 @Component({
   selector: 'cpq-simulator-page',
   standalone: true,
@@ -373,11 +388,9 @@ export class SimulatorPageComponent {
         }
         this.loading.set(false);
       },
-      error: (err: { error?: { message?: string }; message?: string }) => {
+      error: (err: unknown) => {
         this.result.set(null);
-        this.error.set(
-          err?.error?.message || err?.message || 'Failed to execute pricing',
-        );
+        this.error.set(httpErrorMessage(err, 'Failed to execute pricing'));
         this.loading.set(false);
       },
     });

@@ -115,4 +115,24 @@ describe('PriceBookCreateDialogComponent', () => {
     expect(component.error()).toBe('Name already exists');
     expect(component.saving()).toBe(false);
   });
+
+  it('appends known errorCode to banner as message [CODE]', () => {
+    createSpy.mockReturnValue(
+      throwError(() => ({
+        error: {
+          message: 'Published price book is immutable',
+          errorCode: 'PRICE_BOOK_PUBLISHED_IMMUTABLE',
+        },
+      })),
+    );
+    component.form.patchValue({ name: 'Published' });
+
+    component.onSubmit();
+
+    expect(dialogClose).not.toHaveBeenCalled();
+    expect(component.error()).toBe(
+      'Published price book is immutable [PRICE_BOOK_PUBLISHED_IMMUTABLE]',
+    );
+    expect(component.saving()).toBe(false);
+  });
 });
