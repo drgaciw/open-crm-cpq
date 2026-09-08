@@ -1,10 +1,10 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave S COMPLETE** (S1 CRM empty-state ∥ S2 quotes overflow ∥ S3 bundles errorCode ∥ S4 sim+PB errorCode ∥ S5 docs); **N COMPLETE** (re-review `4e3b5a3`); **no N′′**; R2 still held  
+**Session state:** **Wave S COMPLETE** (adversarial `84671bd` / cherry-pick `a7d5b6d`); **no S reopen**; **Wave T skipped** (T1/T2 optional LOW); **N COMPLETE**; **no N′′**; R2 still held  
 **Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
-**Plan:** Wave S @ `d0285e6` (cherry-pick of architect `1cb568c`)  
-**Baseline:** Wave S COMPLETE on `main` @ `91ffa43`; N re-review addendum `4e3b5a3`
+**Plan:** Wave S @ `d0285e6`; S review `docs/forge/32-wave-s-adversarial-review.md` @ `a7d5b6d`  
+**Baseline:** Wave S COMPLETE on `main` @ `91ffa43` / orchestrator `377e806`; S review on `main` @ `a7d5b6d`
 
 ## Wave S landed
 
