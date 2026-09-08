@@ -1,5 +1,5 @@
 /**
- * Prefer message; append known bundle errorCodes in banners.
+ * Prefer message; append any errorCode in banners (H1 shape: `message [CODE]`).
  * Handles HttpErrorResponse body and ApiError from apiResponseInterceptor.
  */
 export function bundleHttpErrorMessage(err: unknown, fallback: string): string {
@@ -10,10 +10,7 @@ export function bundleHttpErrorMessage(err: unknown, fallback: string): string {
   } | null;
   const code = e?.errorCode || e?.error?.errorCode;
   const message = e?.error?.message || e?.message || fallback;
-  if (
-    code === 'BUNDLE_MAX_ITEMS_EXCEEDED' ||
-    code === 'BUNDLE_MIN_ITEMS_REQUIRED'
-  ) {
+  if (code) {
     return `${message} [${code}]`;
   }
   return message;
