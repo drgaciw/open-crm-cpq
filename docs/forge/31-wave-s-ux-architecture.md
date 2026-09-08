@@ -1,12 +1,12 @@
 # Wave S architecture — UX/UI polish (post-Q leftovers)
 
-**Status:** READY FOR FORGE — orchestrator locked 2026-08-31: Waves **A–Q COMPLETE**; **N COMPLETE** (no N′′); **R2 list-row delete remains HELD**  
+**Status:** COMPLETE on main 2026-09-07 — S1 `cfe719d`, S3 `7159e9d`, S4 `04070c7`, S2 `7437cde` (S5 this closeout)  
 **Architect:** `opencrm-architect` (Herdr `w8`) — **plan only; do not spawn implementers**  
-**Evidence date:** 2026-08-31  
+**Evidence date:** 2026-08-31 (plan); closeout 2026-09-07  
 **Baseline:** `origin/main` @ `857e724` (Q closeout `c295e12`; orchestrator status `857e724`)  
-**Survey tip:** `origin/main` @ `857e724`  
-**Sources:** `rg` + **read templates**. GitNexus index **`fc7e631`** vs HEAD **`857e724`** — **stale**; **analyze skipped**; UNKNOWN ≠ unused; `-r /home/username01/Projects/open-crm-cpq --file`.  
-**Letter skip:** Wave **S** (no Wave R) so tracks are never named R1/R2.
+**Survey tip:** Day-1 tip `origin/main` @ `7437cde` (S2 squash; S1–S4 landed)  
+**Sources:** `rg` + **read templates**. GitNexus index **`fc7e631`** vs plan HEAD **`857e724`** — **stale** at plan time; **analyze skipped**; UNKNOWN ≠ unused; `-r /home/username01/Projects/open-crm-cpq --file`.  
+**Letter skip:** Wave **S** (no Wave R) so tracks are never named R1/R2. **R2** price-book list-row delete still **HELD**; no N′′.
 
 ---
 
@@ -132,7 +132,7 @@ ConfirmDialog / EmptyState / PageHeader / DataTable APIs; shell skip-link + mobi
 
 ### Track 5 — docs
 
-Dual-read hold **J–S**. Note R2 still held. No `00-orchestrator-status.md`.
+Dual-read hold **J–S** (YAML/env untouched; still `${APPROVALS_LEGACY_LOCAL_READ:true}`). **R2** price-book list-row delete still **HELD**. No N′′. ADR-006 stays **Proposed**. No `00-orchestrator-status.md`.
 
 ---
 
@@ -238,9 +238,9 @@ Implement Open CRM/CPQ Wave S UX per docs/forge/31-wave-s-ux-architecture.md in 
 - [x] Zero new portal; **no** chrome owner  
 - [x] GitNexus stale — analyze skipped; `rg` used  
 - [x] Architect **does not spawn** implementers  
-- [ ] Orchestrator → Wave S FORGING (`00-*`)  
-- [ ] S1–S5 merged  
+- [x] Orchestrator → Wave S FORGING (`00-*`) — orchestrator-owned; implementers do not edit  
+- [x] Day-1 + closeout; S1–S5 COMPLETE (S5 this PR)  
 
-**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** un-hold price-book list-row delete. Do **not** rewrite H1 `quotes-detail` helper.
+**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** un-hold price-book list-row delete. Do **not** rewrite H1 `quotes-detail` helper. Do **not** reopen N′′.
 
-**WAVE S — APPROVED FOR FORGE.**
+**WAVE S — COMPLETE.**
