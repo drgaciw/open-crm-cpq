@@ -7,6 +7,7 @@ import {
   ProductBundleCreateRequest,
   BundleItemCreateRequest,
 } from './product-bundle.model';
+import { bundleHttpErrorMessage } from './bundle-http-error';
 
 /**
  * Product bundle HTTP service.
@@ -58,7 +59,7 @@ export class ProductBundleService {
         },
         error: (err) => {
           this.error.set(
-            err?.error?.message || err?.message || 'An error occurred',
+            bundleHttpErrorMessage(err, 'An error occurred'),
           );
         },
       });
@@ -86,7 +87,7 @@ export class ProductBundleService {
         },
         error: (err) => {
           this.error.set(
-            err?.error?.message || err?.message || 'An error occurred',
+            bundleHttpErrorMessage(err, 'An error occurred'),
           );
         },
       });
@@ -102,7 +103,7 @@ export class ProductBundleService {
         next: (bundle) => this.selectedBundle.set(bundle),
         error: (err) => {
           this.error.set(
-            err?.error?.message || err?.message || 'An error occurred',
+            bundleHttpErrorMessage(err, 'An error occurred'),
           );
         },
       });
