@@ -105,4 +105,44 @@ describe('ProductBundleService', () => {
 
     expect(service.bundles().length).toBe(2);
   });
+
+  it('list sets error banner with message [errorCode]', () => {
+    service.list();
+
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v1/product-bundles',
+    );
+    req.flush(
+      { message: 'Upstream unavailable', errorCode: 'SERVICE_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+
+    expect(service.error()).toBe(
+      'Upstream unavailable [SERVICE_UNAVAILABLE]',
+    );
+  });
+
+  it('listByProductId sets error banner with message [errorCode]', () => {
+    service.listByProductId(10);
+
+    const req = httpMock.expectOne('/api/v1/product-bundles/product/10');
+    req.flush(
+      { message: 'Product not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+
+    expect(service.error()).toBe('Product not found [RESOURCE_NOT_FOUND]');
+  });
+
+  it('getById sets error banner with message [errorCode]', () => {
+    service.getById(99);
+
+    const req = httpMock.expectOne('/api/v1/product-bundles/99');
+    req.flush(
+      { message: 'Bundle not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+
+    expect(service.error()).toBe('Bundle not found [RESOURCE_NOT_FOUND]');
+  });
 });

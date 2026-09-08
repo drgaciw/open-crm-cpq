@@ -78,7 +78,7 @@ describe('ProductBundleCreateDialogComponent', () => {
     component.onSubmit();
     fixture.detectChanges();
 
-    expect(component.error()).toContain('Product not found');
+    expect(component.error()).toBe('Product not found [RESOURCE_NOT_FOUND]');
     expect(dialogClose).not.toHaveBeenCalled();
   });
 });

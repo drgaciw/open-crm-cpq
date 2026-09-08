@@ -29,13 +29,13 @@ describe('bundleHttpErrorMessage', () => {
     ).toBe('Bundle requires minimum 2 items [BUNDLE_MIN_ITEMS_REQUIRED]');
   });
 
-  it('returns message without code for other errors', () => {
+  it('appends any errorCode as message [CODE]', () => {
     expect(
       bundleHttpErrorMessage(
         { message: 'Not found', errorCode: 'RESOURCE_NOT_FOUND' },
         'fallback',
       ),
-    ).toBe('Not found');
+    ).toBe('Not found [RESOURCE_NOT_FOUND]');
   });
 
   it('uses fallback when err is empty', () => {
