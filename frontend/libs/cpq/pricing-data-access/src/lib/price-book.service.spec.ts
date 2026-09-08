@@ -64,6 +64,28 @@ describe('PriceBookService', () => {
     expect(service.priceBooks()[0].name).toBe('NA Default');
   });
 
+  it('list error.set appends errorCode as message [CODE]', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/price-books');
+    req.flush(
+      { message: 'Failed to load price books', errorCode: 'PRICE_BOOKS_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe(
+      'Failed to load price books [PRICE_BOOKS_UNAVAILABLE]',
+    );
+  });
+
+  it('getById error.set appends errorCode as message [CODE]', () => {
+    service.getById(99);
+    const req = httpMock.expectOne('/api/v1/price-books/99');
+    req.flush(
+      { message: 'Price book not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Price book not found [RESOURCE_NOT_FOUND]');
+  });
+
   it('entry CRUD uses /api/v1/price-books/:id/entries', async () => {
     service.getEntries(3);
     const listReq = httpMock.expectOne(
