@@ -168,3 +168,18 @@ Optional Open CRM/CPQ N residual (not a reopen of Wave N) per docs/forge/30-wave
 - [x] Dual-read still `${APPROVALS_LEGACY_LOCAL_READ:true}`  
 - [x] Residual R1/R2 optional; default fold into Q  
 - [x] Orchestrator notified (Herdr `w1:p1`) — do not edit `00-*` from this review PR  
+
+---
+
+## 9. Re-review addendum (`origin/main` @ `7437cde`)
+
+Adversarial re-check after Q COMPLETE + Wave S Day-1 (S1–S4) on `main`. **N Day-1 remains 100% complete. Do not spawn N workers.**
+
+| Residual (was) | Now |
+|----------------|-----|
+| R1 quotes-create + documents `errorCode` | **Closed in Q2** (`3404bae`) — create helper reads `errorCode` |
+| quotes-detail overflow + `quote.service` list `errorCode` | **Closed in S2** (`7437cde`) — `More` menu present; H1 helper still reads `errorCode` |
+| H3 hookTimeout | Still **not required** (no `hookTimeout` in N libs) |
+| **R2** price-book **list-row delete** | **Still HELD** — `price-book-list` has **zero** delete (`rg` confirm). Do **not** un-hold |
+
+**Plan for orchestrator:** **no N′′ panes.** Finish Wave S closeout (`ws-docs` already working). Dual-read still `${APPROVALS_LEGACY_LOCAL_READ:true}`. Holds: Activities, #238, #241, WhatsApp #430, NgRx, Accept ADR-006, subscriptions FE, **R2**.
