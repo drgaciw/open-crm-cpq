@@ -543,9 +543,41 @@ describe('QuotesDetailComponent', () => {
     expect(cloneQuoteSpy).not.toHaveBeenCalled();
   });
 
-  it('renders Delete and soft-deletes via ConfirmDialog then navigates to list', () => {
+  function openMoreMenu(): HTMLElement {
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="quote-more-actions"]',
+    ) as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
+    trigger!.click();
+    fixture.detectChanges();
+    const panel = document.querySelector('.mat-mdc-menu-panel, .mat-menu-panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    return panel!;
+  }
+
+  it('exposes Expire, Cancel quote, Clone, and Delete via More menu', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Delete');
+    expect(compiled.textContent).toContain('More');
+    expect(compiled.querySelector('[data-testid="quote-more-actions"]')).toBeTruthy();
+    // Primaries stay outside the menu
+    expect(compiled.textContent).toMatch(/\bCalculate\b/);
+    expect(compiled.textContent).toMatch(/\bSubmit\b/);
+    expect(compiled.textContent).toMatch(/\bSend\b/);
+    expect(compiled.textContent).toMatch(/\bAccept\b/);
+
+    const panel = openMoreMenu();
+    // Icon ligature text is concatenated with labels (no word boundary before Expire/Clone/…).
+    expect(panel.textContent).toContain('Expire');
+    expect(panel.textContent).toContain('Cancel quote');
+    expect(panel.textContent).toContain('Clone');
+    expect(panel.textContent).toContain('Delete');
+    expect(panel.textContent).toContain('Approve');
+    expect(panel.textContent).toContain('Reject');
+  });
+
+  it('renders Delete in More menu and soft-deletes via ConfirmDialog then navigates to list', () => {
+    const panel = openMoreMenu();
+    expect(panel.textContent).toContain('Delete');
     expect(component.canDelete()).toBe(true);
 
     component.onDelete();
