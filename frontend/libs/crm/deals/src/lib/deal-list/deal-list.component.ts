@@ -13,7 +13,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { DealService } from '../deal.service';
 import { DealDto, DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
-import { SearchInputComponent } from '@frontend/shared-ui';
+import {
+  EmptyStateComponent,
+  PageHeaderComponent,
+  SearchInputComponent,
+} from '@frontend/shared-ui';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 
 @Component({
@@ -23,20 +27,15 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
     MatIconModule, MatProgressSpinnerModule,
     MatMenuModule, MatTabsModule, MatChipsModule, CurrencyPipe, DatePipe,
-    SearchInputComponent,
+    PageHeaderComponent, SearchInputComponent, EmptyStateComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="page-header">
-      <div class="header-left">
-        <h1>Deals</h1>
-        <p class="subtitle">Track your sales pipeline</p>
-      </div>
-      <div class="header-actions">
-        <app-search-input
-          placeholder="Search deals..."
-          (searchChange)="onSearch($event)"
-        />
+    <app-page-header
+      title="Deals"
+      subtitle="Track your sales pipeline"
+    >
+      <div actions>
         <button mat-stroked-button (click)="router.navigate(['/deals/kanban'])">
           <mat-icon>view_kanban</mat-icon> Kanban
         </button>
@@ -44,7 +43,13 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
           <mat-icon>add</mat-icon> New Deal
         </button>
       </div>
-    </div>
+      <div search>
+        <app-search-input
+          placeholder="Search deals..."
+          (searchChange)="onSearch($event)"
+        />
+      </div>
+    </app-page-header>
 
     <mat-tab-group (selectedTabChange)="onTabChange($event.index)" class="stage-tabs">
       <mat-tab label="All"></mat-tab>
@@ -54,19 +59,22 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     </mat-tab-group>
 
     @if (service.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
     }
 
     @if (!service.loading() && service.isEmpty()) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon">handshake</mat-icon>
-        <h3>No deals yet</h3>
-        <p>Create your first deal or convert a lead.</p>
-        <button mat-raised-button color="primary" (click)="onCreate()">
-          <mat-icon>add</mat-icon> Create Deal
-        </button>
-      </div>
-    } @else {
+      <app-empty-state
+        icon="handshake"
+        [title]="hasActiveFilters() ? 'No matching deals' : 'No deals yet'"
+        [message]="hasActiveFilters()
+          ? 'Try another stage filter, or clear filters to see all deals.'
+          : 'Create your first deal or convert a lead.'"
+        [actionLabel]="hasActiveFilters() ? '' : 'Create Deal'"
+        (action)="onCreate()"
+      />
+    } @else if (!service.loading()) {
       <div class="table-container">
         <table mat-table [dataSource]="service.deals()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
@@ -144,11 +152,6 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     }
   `,
   styles: `
-    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-    .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
-    .subtitle { margin: 4px 0 0; color: #666; }
-    .header-actions { display: flex; gap: 12px; align-items: center; }
-    .header-actions app-search-input { width: 280px; }
     .stage-tabs { margin-bottom: 16px; }
     .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
     table { width: 100%; }
@@ -158,10 +161,6 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     .clickable-row:hover { background: #f5f5f5; }
     .stage-badge { color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
     .loading { display: flex; justify-content: center; padding: 48px; }
-    .empty-state { display: flex; flex-direction: column; align-items: center; padding: 64px 24px; text-align: center; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-    .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #ccc; margin-bottom: 16px; }
-    .empty-state h3 { margin: 0 0 8px; }
-    .empty-state p { color: #666; margin: 0 0 24px; }
   `,
 })
 export class DealListComponent implements OnInit {
@@ -221,6 +220,10 @@ export class DealListComponent implements OnInit {
   onSort(s: Sort): void {
     this.currentSort = s.active && s.direction ? `${s.active},${s.direction}` : 'createdAt,desc';
     this.service.list(0, this.service.pagination().size, this.currentSort, this.currentStage);
+  }
+
+  hasActiveFilters(): boolean {
+    return this.currentStage !== undefined;
   }
 
   onCreate(): void {
