@@ -76,6 +76,27 @@ describe('QuoteService', () => {
     expect(service.quotes()).toEqual(page.content);
   });
 
+  it('list error.set is message [CODE] when errorCode present', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/quotes');
+    req.flush(
+      { message: 'List failed', errorCode: 'QUOTE_LIST_DENIED' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    expect(service.error()).toBe('List failed [QUOTE_LIST_DENIED]');
+  });
+
+  it('getById error.set is message [CODE] when errorCode present', () => {
+    service.getById(42);
+    const req = httpMock.expectOne('/api/v1/quotes/42');
+    req.flush(
+      { message: 'Quote missing', errorCode: 'QUOTE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Quote missing [QUOTE_NOT_FOUND]');
+    expect(service.selectedQuote()).toBeNull();
+  });
+
   it('delete DELETEs /api/v1/quotes/:id (soft-delete)', async () => {
     const del = firstValueFrom(service.delete(42));
     const req = httpMock.expectOne('/api/v1/quotes/42');

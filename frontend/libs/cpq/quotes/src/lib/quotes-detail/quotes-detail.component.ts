@@ -20,6 +20,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   ConfirmDialogComponent,
@@ -60,6 +61,7 @@ function httpErrorMessage(err: unknown): string {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
     PageHeaderComponent,
     StatusBadgeComponent,
@@ -121,36 +123,6 @@ function httpErrorMessage(err: unknown): string {
             Submit
           </button>
           <button
-            mat-stroked-button
-            color="primary"
-            type="button"
-            (click)="onApprove()"
-            [disabled]="!canApproveReject() || actionBusy()"
-            [title]="
-              canApproveReject()
-                ? 'Approve this quote'
-                : 'Approve is available for IN_REVIEW or PENDING_APPROVAL'
-            "
-          >
-            <mat-icon>check_circle</mat-icon>
-            Approve
-          </button>
-          <button
-            mat-stroked-button
-            color="warn"
-            type="button"
-            (click)="onReject()"
-            [disabled]="!canApproveReject() || actionBusy()"
-            [title]="
-              canApproveReject()
-                ? 'Reject this quote (optional reason)'
-                : 'Reject is available for IN_REVIEW or PENDING_APPROVAL'
-            "
-          >
-            <mat-icon>cancel</mat-icon>
-            Reject
-          </button>
-          <button
             mat-raised-button
             color="primary"
             type="button"
@@ -183,57 +155,96 @@ function httpErrorMessage(err: unknown): string {
           <button
             mat-stroked-button
             type="button"
-            (click)="onExpire()"
-            [disabled]="!canExpire() || actionBusy()"
-            [title]="
-              canExpire()
-                ? 'Mark sent quote as expired'
-                : 'Expire is available only for SENT quotes'
-            "
-          >
-            <mat-icon>hourglass_empty</mat-icon>
-            Expire
-          </button>
-          <button
-            mat-stroked-button
-            color="warn"
-            type="button"
-            (click)="onCancelQuote()"
-            [disabled]="!canCancel() || actionBusy()"
-            [title]="
-              canCancel()
-                ? 'Cancel this quote'
-                : 'Cancel is unavailable for ACCEPTED or CANCELLED quotes'
-            "
-          >
-            <mat-icon>block</mat-icon>
-            Cancel quote
-          </button>
-          <button
-            mat-stroked-button
-            type="button"
-            (click)="onClone()"
+            [matMenuTriggerFor]="moreActions"
             [disabled]="actionBusy()"
-            title="Clone header and line items into a new DRAFT. Run Calculate for waterfall/ARR."
+            aria-label="More quote actions"
+            data-testid="quote-more-actions"
           >
-            <mat-icon>content_copy</mat-icon>
-            Clone
+            <mat-icon>more_vert</mat-icon>
+            More
           </button>
-          <button
-            mat-stroked-button
-            color="warn"
-            type="button"
-            (click)="onDelete()"
-            [disabled]="!canDelete() || actionBusy()"
-            [title]="
-              canDelete()
-                ? 'Soft-delete this quote'
-                : 'Accepted quotes cannot be deleted'
-            "
-          >
-            <mat-icon>delete</mat-icon>
-            Delete
-          </button>
+          <mat-menu #moreActions="matMenu">
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onApprove()"
+              [disabled]="!canApproveReject() || actionBusy()"
+              [title]="
+                canApproveReject()
+                  ? 'Approve this quote'
+                  : 'Approve is available for IN_REVIEW or PENDING_APPROVAL'
+              "
+            >
+              <mat-icon>check_circle</mat-icon>
+              <span>Approve</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onReject()"
+              [disabled]="!canApproveReject() || actionBusy()"
+              [title]="
+                canApproveReject()
+                  ? 'Reject this quote (optional reason)'
+                  : 'Reject is available for IN_REVIEW or PENDING_APPROVAL'
+              "
+            >
+              <mat-icon>cancel</mat-icon>
+              <span>Reject</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onExpire()"
+              [disabled]="!canExpire() || actionBusy()"
+              [title]="
+                canExpire()
+                  ? 'Mark sent quote as expired'
+                  : 'Expire is available only for SENT quotes'
+              "
+            >
+              <mat-icon>hourglass_empty</mat-icon>
+              <span>Expire</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onCancelQuote()"
+              [disabled]="!canCancel() || actionBusy()"
+              [title]="
+                canCancel()
+                  ? 'Cancel this quote'
+                  : 'Cancel is unavailable for ACCEPTED or CANCELLED quotes'
+              "
+            >
+              <mat-icon>block</mat-icon>
+              <span>Cancel quote</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onClone()"
+              [disabled]="actionBusy()"
+              title="Clone header and line items into a new DRAFT. Run Calculate for waterfall/ARR."
+            >
+              <mat-icon>content_copy</mat-icon>
+              <span>Clone</span>
+            </button>
+            <button
+              mat-menu-item
+              type="button"
+              (click)="onDelete()"
+              [disabled]="!canDelete() || actionBusy()"
+              [title]="
+                canDelete()
+                  ? 'Soft-delete this quote'
+                  : 'Accepted quotes cannot be deleted'
+              "
+            >
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
         </div>
       </app-page-header>
 
