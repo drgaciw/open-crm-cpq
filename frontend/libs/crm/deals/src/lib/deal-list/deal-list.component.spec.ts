@@ -86,6 +86,40 @@ describe('DealListComponent action wiring', () => {
     expect(el.querySelector('input[aria-label="Search deals"]')).toBeNull();
   });
 
+  it('renders app-page-header and app-empty-state when unfiltered empty', () => {
+    deals.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-page-header')).toBeTruthy();
+    expect(el.querySelector('app-empty-state')).toBeTruthy();
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No deals yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Deal');
+  });
+
+  it('hides Create Deal action when a stage filter is active and empty', () => {
+    deals.set([]);
+    loading.set(false);
+    component.onTabChange(1); // PROSPECTING
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching deals');
+    expect(el.querySelector('.empty-state-action')).toBeNull();
+  });
+
+  it('loading spinner wrapper exposes role=status and aria-live=polite', () => {
+    loading.set(true);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const loadingEl = el.querySelector('.loading') as HTMLElement;
+    expect(loadingEl).toBeTruthy();
+    expect(loadingEl.getAttribute('role')).toBe('status');
+    expect(loadingEl.getAttribute('aria-live')).toBe('polite');
+  });
+
   it('onSearch with term calls DealService.search', () => {
     component.onSearch('  acme  ');
     expect(searchSpy).toHaveBeenCalledWith('acme');

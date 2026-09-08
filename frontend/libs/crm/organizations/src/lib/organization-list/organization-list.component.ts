@@ -9,7 +9,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { OrganizationService } from '../organization.service';
 import { OrganizationDto } from '@frontend/shared-models';
-import { SearchInputComponent } from '@frontend/shared-ui';
+import {
+  EmptyStateComponent,
+  PageHeaderComponent,
+  SearchInputComponent,
+} from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-organization-list',
@@ -22,44 +26,45 @@ import { SearchInputComponent } from '@frontend/shared-ui';
     MatIconModule,
     MatProgressSpinnerModule,
     MatMenuModule,
+    PageHeaderComponent,
     SearchInputComponent,
+    EmptyStateComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="page-header">
-      <div class="header-left">
-        <h1>Organizations</h1>
-        <p class="subtitle">Manage your business relationships</p>
-      </div>
-      <div class="header-actions">
-        <app-search-input
-          placeholder="Search organizations..."
-          (searchChange)="onSearch($event)"
-        />
+    <app-page-header
+      title="Organizations"
+      subtitle="Manage your business relationships"
+    >
+      <div actions>
         <button mat-raised-button color="primary" (click)="onCreate()">
           <mat-icon>add</mat-icon>
           New Organization
         </button>
       </div>
-    </div>
+      <div search>
+        <app-search-input
+          placeholder="Search organizations..."
+          (searchChange)="onSearch($event)"
+        />
+      </div>
+    </app-page-header>
 
     @if (orgService.loading()) {
-      <div class="loading-overlay">
+      <div class="loading-overlay" role="status" aria-live="polite">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
     }
 
     @if (!orgService.loading() && orgService.isEmpty()) {
-      <div class="empty-state">
-        <mat-icon class="empty-icon">business</mat-icon>
-        <h3>No organizations yet</h3>
-        <p>Create your first organization to get started.</p>
-        <button mat-raised-button color="primary" (click)="onCreate()">
-          <mat-icon>add</mat-icon>
-          Create Organization
-        </button>
-      </div>
-    } @else {
+      <app-empty-state
+        icon="business"
+        title="No organizations yet"
+        message="Create your first organization to get started."
+        actionLabel="Create Organization"
+        (action)="onCreate()"
+      />
+    } @else if (!orgService.loading()) {
       <div class="table-container">
         <table mat-table [dataSource]="orgService.organizations()" [trackBy]="trackById" matSort
                (matSortChange)="onSort($event)">
@@ -122,18 +127,6 @@ import { SearchInputComponent } from '@frontend/shared-ui';
     }
   `,
   styles: [`
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .header-left h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
-    .subtitle { margin: 4px 0 0; color: #666; }
-    .header-actions { display: flex; gap: 12px; align-items: center; }
-    .header-actions app-search-input { width: 280px; }
     .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
     table { width: 100%; }
     .link { color: #1976d2; cursor: pointer; text-decoration: none; font-weight: 500; }
@@ -141,19 +134,6 @@ import { SearchInputComponent } from '@frontend/shared-ui';
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background-color: #f5f5f5; }
     .loading-overlay { display: flex; justify-content: center; padding: 48px; }
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 64px 24px;
-      text-align: center;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-    }
-    .empty-icon { font-size: 64px; width: 64px; height: 64px; color: #ccc; margin-bottom: 16px; }
-    .empty-state h3 { margin: 0 0 8px; }
-    .empty-state p { color: #666; margin: 0 0 24px; }
     .delete-action { color: #d32f2f; }
   `],
 })

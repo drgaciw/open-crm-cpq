@@ -65,6 +65,29 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect(el.querySelector('input[aria-label="Search organizations"]')).toBeNull();
   });
 
+  it('renders app-page-header and app-empty-state with Create Organization CTA', () => {
+    organizations.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-page-header')).toBeTruthy();
+    expect(el.querySelector('app-empty-state')).toBeTruthy();
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No organizations yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Organization');
+  });
+
+  it('loading spinner wrapper exposes role=status and aria-live=polite', () => {
+    loading.set(true);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const loadingEl = el.querySelector('.loading-overlay') as HTMLElement;
+    expect(loadingEl).toBeTruthy();
+    expect(loadingEl.getAttribute('role')).toBe('status');
+    expect(loadingEl.getAttribute('aria-live')).toBe('polite');
+  });
+
   it('onSearch with term calls OrganizationService.search', () => {
     component.onSearch('  acme  ');
     expect(searchSpy).toHaveBeenCalledWith('acme');
