@@ -1,10 +1,18 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave S FORGING** (S1 CRM empty-state ∥ S2 quotes overflow ∥ S3 bundles errorCode ∥ S4 sim+PB errorCode; **no N′′**; R2 still held)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/31-wave-s-ux-architecture.md`  
+**Session state:** **Wave S COMPLETE** (S1 CRM empty-state ∥ S2 quotes overflow ∥ S3 bundles errorCode ∥ S4 sim+PB errorCode ∥ S5 docs); **N COMPLETE** (re-review `4e3b5a3`); **no N′′**; R2 still held  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
 **Plan:** Wave S @ `d0285e6` (cherry-pick of architect `1cb568c`)  
-**Baseline:** Wave Q COMPLETE on `main` @ `857e724`; S plan on `main` @ `d0285e6`
+**Baseline:** Wave S COMPLETE on `main` @ `91ffa43`; N re-review addendum `4e3b5a3`
+
+## Wave S landed
+
+- **S1** CRM deal + org `app-empty-state` — `cfe719d` (#468)
+- **S2** quotes-detail More menu + list `errorCode` — `7437cde` (#471)
+- **S3** product-bundles list/get `errorCode` — `7159e9d` (#469)
+- **S4** simulator + price-book create/list `errorCode` (no list-row delete) — `04070c7` (#470)
+- **S5** docs closeout (dual-read J–S; R2 still **HELD**; no N′′) — `91ffa43` (#472)
 
 ## Wave Q landed
 
