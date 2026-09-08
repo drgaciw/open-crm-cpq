@@ -25,6 +25,23 @@ import {
 } from '@frontend/shared-models';
 import { PriceBookService } from '@frontend/cpq-pricing-data-access';
 
+function bookHttpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (
+    code === 'PRICE_BOOK_PUBLISHED_IMMUTABLE' ||
+    code === 'DUPLICATE_PRICE_BOOK_ENTRY'
+  ) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 /**
  * New Price Book dialog matching PriceBookCreateRequest.
  * Required: name. Optional: region, currency, isDefault, effectiveDate, expirationDate.
@@ -226,10 +243,10 @@ export class PriceBookCreateDialogComponent {
         this.saving.set(false);
         this.dialogRef.close(book);
       },
-      error: (err: { error?: { message?: string }; message?: string }) => {
+      error: (err: unknown) => {
         this.saving.set(false);
         this.error.set(
-          err?.error?.message || err?.message || 'Failed to create price book',
+          bookHttpErrorMessage(err, 'Failed to create price book'),
         );
       },
     });

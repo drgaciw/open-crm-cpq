@@ -148,6 +148,31 @@ describe('SimulatorPageComponent', () => {
     expect(compiled.querySelector('.success-banner')).toBeFalsy();
   });
 
+  it('appends errorCode to HTTP failure empty-state as message [CODE]', () => {
+    executeMock.mockReturnValue(
+      throwError(() => ({
+        error: {
+          message: 'Pricing execute rejected',
+          errorCode: 'PRICING_CONTEXT_INVALID',
+        },
+      })),
+    );
+
+    component.onSimulate();
+    fixture.detectChanges();
+
+    expect(component.result()).toBeNull();
+    expect(component.error()).toBe(
+      'Pricing execute rejected [PRICING_CONTEXT_INVALID]',
+    );
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Simulation failed');
+    expect(compiled.textContent).toContain(
+      'Pricing execute rejected [PRICING_CONTEXT_INVALID]',
+    );
+  });
+
   it('shows error empty-state when execute returns success=false', () => {
     const failed: PricingResult = {
       success: false,
