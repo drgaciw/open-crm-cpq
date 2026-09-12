@@ -39,6 +39,7 @@ describe('LeadListComponent action wiring', () => {
   const loading = signal(false);
   const error = signal<string | null>(null);
 
+  // Angular TestBed compile can exceed Vitest's default 10s hookTimeout under load.
   beforeEach(async () => {
     listSpy = vi.fn();
     qualifySpy = vi.fn(() => of(lead({ id: 2, title: 'Q', status: 'QUALIFIED' })));
@@ -87,7 +88,7 @@ describe('LeadListComponent action wiring', () => {
     router = TestBed.inject(Router);
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture.detectChanges();
-  });
+  }, 30000);
 
   afterEach(() => {
     vi.restoreAllMocks();
