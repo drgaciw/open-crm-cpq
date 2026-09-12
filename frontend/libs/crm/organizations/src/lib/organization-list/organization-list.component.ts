@@ -50,13 +50,22 @@ import {
       </div>
     </app-page-header>
 
+    @if (orgService.error()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ orgService.error() }}</span>
+        <button mat-button type="button" (click)="onRetry()">Retry</button>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
     @if (orgService.loading()) {
       <div class="loading-overlay" role="status" aria-live="polite">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
     }
 
-    @if (!orgService.loading() && orgService.isEmpty()) {
+    @if (!orgService.loading() && !orgService.error() && orgService.isEmpty()) {
       <app-empty-state
         icon="business"
         title="No organizations yet"
@@ -64,7 +73,7 @@ import {
         actionLabel="Create Organization"
         (action)="onCreate()"
       />
-    } @else if (!orgService.loading()) {
+    } @else if (!orgService.loading() && !orgService.isEmpty()) {
       <div class="table-container">
         <table mat-table [dataSource]="orgService.organizations()" [trackBy]="trackById" matSort
                (matSortChange)="onSort($event)">
@@ -135,6 +144,16 @@ import {
     .clickable-row:hover { background-color: #f5f5f5; }
     .loading-overlay { display: flex; justify-content: center; padding: 48px; }
     .delete-action { color: #d32f2f; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
   `],
 })
 export class OrganizationListComponent implements OnInit {
@@ -143,6 +162,7 @@ export class OrganizationListComponent implements OnInit {
 
   displayedColumns = ['name', 'industry', 'city', 'phone', 'actions'];
   private currentSort = 'name,asc';
+  private lastSearchQuery = '';
 
   trackById(index: number, item: OrganizationDto): string | number {
     return item.id;
@@ -153,10 +173,28 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onSearch(query: string): void {
-    if (query.trim()) {
-      this.orgService.search(query.trim());
+    const trimmed = query.trim();
+    this.lastSearchQuery = trimmed;
+    if (trimmed) {
+      this.orgService.search(trimmed);
     } else {
       this.orgService.list(0, 20, this.currentSort);
+    }
+  }
+
+  clearError(): void {
+    this.orgService.error.set(null);
+  }
+
+  onRetry(): void {
+    if (this.lastSearchQuery) {
+      this.orgService.search(this.lastSearchQuery);
+    } else {
+      this.orgService.list(
+        this.orgService.pagination().page,
+        this.orgService.pagination().size,
+        this.currentSort,
+      );
     }
   }
 

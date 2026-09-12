@@ -21,10 +21,12 @@ describe('OrganizationListComponent SearchInput wiring', () => {
   });
   const organizations = signal<OrganizationDto[]>([]);
   const loading = signal(false);
+  const error = signal<string | null>(null);
 
   beforeEach(async () => {
     listSpy = vi.fn();
     searchSpy = vi.fn();
+    error.set(null);
 
     await TestBed.configureTestingModule({
       imports: [OrganizationListComponent],
@@ -36,6 +38,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
           useValue: {
             organizations,
             loading,
+            error,
             pagination,
             isEmpty: computed(() => organizations().length === 0 && !loading()),
             list: listSpy,
@@ -68,6 +71,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
   it('renders app-page-header and app-empty-state with Create Organization CTA', () => {
     organizations.set([]);
     loading.set(false);
+    error.set(null);
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
@@ -75,6 +79,36 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect(el.querySelector('app-empty-state')).toBeTruthy();
     expect(el.querySelector('.empty-state-title')?.textContent).toContain('No organizations yet');
     expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Organization');
+  });
+
+  it('shows error banner and hides empty-state on failed load', () => {
+    organizations.set([]);
+    loading.set(false);
+    error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const banner = el.querySelector('.error-banner') as HTMLElement;
+    expect(banner).toBeTruthy();
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.textContent).toContain('Failed to load organizations [ORGS_UNAVAILABLE]');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('clearError dismisses the banner', () => {
+    error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+    component.clearError();
+    fixture.detectChanges();
+    expect(error()).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
+  });
+
+  it('onRetry reloads list when not searching', () => {
+    listSpy.mockClear();
+    error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
+    component.onRetry();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
   });
 
   it('loading spinner wrapper exposes role=status and aria-live=polite', () => {

@@ -35,6 +35,7 @@ describe('DealListComponent action wiring', () => {
   });
   const deals = signal<DealDto[]>([]);
   const loading = signal(false);
+  const error = signal<string | null>(null);
 
   beforeEach(async () => {
     listSpy = vi.fn();
@@ -43,10 +44,12 @@ describe('DealListComponent action wiring', () => {
     markWonSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'WON' })));
     markLostSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'LOST' })));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    error.set(null);
 
     const serviceMock = {
       deals,
       loading,
+      error,
       pagination,
       isEmpty: computed(() => deals().length === 0 && !loading()),
       list: listSpy,
@@ -89,6 +92,7 @@ describe('DealListComponent action wiring', () => {
   it('renders app-page-header and app-empty-state when unfiltered empty', () => {
     deals.set([]);
     loading.set(false);
+    error.set(null);
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
@@ -101,12 +105,43 @@ describe('DealListComponent action wiring', () => {
   it('hides Create Deal action when a stage filter is active and empty', () => {
     deals.set([]);
     loading.set(false);
+    error.set(null);
     component.onTabChange(1); // PROSPECTING
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching deals');
     expect(el.querySelector('.empty-state-action')).toBeNull();
+  });
+
+  it('shows error banner and hides empty-state on failed load', () => {
+    deals.set([]);
+    loading.set(false);
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const banner = el.querySelector('.error-banner') as HTMLElement;
+    expect(banner).toBeTruthy();
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.textContent).toContain('Failed to load deals [DEALS_UNAVAILABLE]');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('clearError dismisses the banner', () => {
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    fixture.detectChanges();
+    component.clearError();
+    fixture.detectChanges();
+    expect(error()).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
+  });
+
+  it('onRetry reloads list when not searching', () => {
+    listSpy.mockClear();
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    component.onRetry();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined);
   });
 
   it('loading spinner wrapper exposes role=status and aria-live=polite', () => {

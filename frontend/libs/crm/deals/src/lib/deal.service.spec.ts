@@ -95,4 +95,24 @@ describe('DealService', () => {
     expect(service.pipelineSummary()).toEqual(summary);
     expect(service.loading()).toBe(false);
   });
+
+  it('list error.set appends errorCode as message [CODE]', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/deals');
+    req.flush(
+      { message: 'Failed to load deals', errorCode: 'DEALS_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe('Failed to load deals [DEALS_UNAVAILABLE]');
+  });
+
+  it('getById error.set appends errorCode as message [CODE]', () => {
+    service.getById(99);
+    const req = httpMock.expectOne('/api/v1/deals/99');
+    req.flush(
+      { message: 'Deal not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Deal not found [RESOURCE_NOT_FOUND]');
+  });
 });
