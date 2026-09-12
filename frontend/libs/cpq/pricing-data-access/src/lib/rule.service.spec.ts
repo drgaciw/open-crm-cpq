@@ -56,6 +56,28 @@ describe('RuleService', () => {
     expect(service.rules()).toHaveLength(1);
   });
 
+  it('listByRuleSet error.set appends errorCode as message [CODE]', () => {
+    service.listByRuleSet(4);
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v1/rules/by-rule-set/4',
+    );
+    req.flush(
+      { message: 'Failed to load rules', errorCode: 'RULES_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe('Failed to load rules [RULES_UNAVAILABLE]');
+  });
+
+  it('getById error.set appends errorCode as message [CODE]', () => {
+    service.getById(99);
+    const req = httpMock.expectOne('/api/v1/rules/99');
+    req.flush(
+      { message: 'Rule not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Rule not found [RESOURCE_NOT_FOUND]');
+  });
+
   it('validateSyntax POSTs /api/v1/rules/:id/validate', async () => {
     const promise = firstValueFrom(service.validateSyntax(12));
     const req = httpMock.expectOne('/api/v1/rules/12/validate');
