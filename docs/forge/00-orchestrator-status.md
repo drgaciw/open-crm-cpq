@@ -1,10 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave U COMPLETE** (U1 dashboard ∥ U2 leads/contacts ∥ U3 deals/orgs ∥ U4 pricing-da ∥ U5 docs); **T skipped**; **no S reopen**; **N COMPLETE**; **no N′′**; R2 still held  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
-**Plan:** Wave U @ `d1d3349` (cherry-pick of architect `db02714`); closeout `33c9694`  
-**Baseline:** Wave U COMPLETE on `main` @ `33c9694`; S COMPLETE `64c4948`
+**Session state:** **Wave V FORGING** (V1 crm sass+budget ∥ V2 catalog product errorCode ∥ V3 deal-kanban; **T skipped**; **no N/S/U reopen**; **no N′′**; R2 still held)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/34-wave-v-architecture.md`  
+**Plan:** Wave V @ `734162f` (cherry-pick of architect `949e361`)  
+**Baseline:** Wave U COMPLETE on `main` @ `33c9694`; tip `4dc72c1`; V plan on `main` @ `734162f`
+
+## Wave V in flight
+
+- **V1** crm Tailwind CSS entry + initial budget warning 750kb — `fix/forge-v1-fe-crm-sass-budget` (`wv-fe-crm-sass-budget`)
+- **V2** catalog `ProductService` `errorCode` — `fix/forge-v2-fe-catalog-product-error` (`wv-fe-catalog-error`)
+- **V3** deal-kanban load error + loading a11y — `fix/forge-v3-fe-deal-kanban-ux` (`wv-fe-deal-kanban`)
+- **V4** docs closeout after Day-1 (no `00-orchestrator-status`)
 
 ## Wave U landed
 
