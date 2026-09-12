@@ -382,9 +382,73 @@ describe('CatalogDetailComponent', () => {
     );
   });
 
-  it('renders Delete in view mode', () => {
+  it('renders Delete button with icon in view mode and deletes on click', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Delete');
+    const deleteBtn = Array.from(
+      compiled.querySelectorAll('button'),
+    ).find((btn) => btn.textContent?.includes('Delete'));
+
+    expect(deleteBtn).toBeTruthy();
+    expect(deleteBtn?.querySelector('mat-icon')?.textContent?.trim()).toBe(
+      'delete',
+    );
+    expect(compiled.textContent).not.toContain('Save');
+
+    deleteBtn?.click();
+    fixture.detectChanges();
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      ConfirmDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete product',
+          confirmText: 'Delete',
+          confirmColor: 'warn',
+        }),
+      }),
+    );
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(selectedProduct()).toBeNull();
+    expect(navigateSpy).toHaveBeenCalledWith(['/catalog']);
+    expect(component.deleting()).toBe(false);
+    expect(component.saveError()).toBeNull();
+  });
+
+  it('renders Save button with icon in edit mode and saves on click', () => {
+    const updated: ProductDto = {
+      ...toProductDto(MOCK_CATALOG_PRODUCTS[0]),
+      name: 'CRM Named Seat Saved',
+    };
+    updateSpy.mockReturnValue(of(updated));
+
+    component.startEdit();
+    component.form.patchValue({ name: 'CRM Named Seat Saved' });
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const saveBtn = Array.from(compiled.querySelectorAll('button')).find(
+      (btn) => btn.textContent?.includes('Save'),
+    );
+
+    expect(saveBtn).toBeTruthy();
+    expect(saveBtn?.querySelector('mat-icon')?.textContent?.trim()).toBe(
+      'save',
+    );
+    const headerDeleteBtn = Array.from(
+      compiled.querySelectorAll('.header-actions button'),
+    ).find((btn) => btn.textContent?.includes('Delete'));
+    expect(headerDeleteBtn).toBeUndefined();
+
+    saveBtn?.click();
+    fixture.detectChanges();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ name: 'CRM Named Seat Saved' }),
+    );
+    expect(component.editing()).toBe(false);
+    expect(component.saving()).toBe(false);
+    expect(selectedProduct()?.name).toBe('CRM Named Seat Saved');
   });
 
   it('confirms then soft-deletes via ProductService.delete and navigates to list', () => {
