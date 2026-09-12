@@ -97,6 +97,18 @@ describe('QuoteHeaderEditComponent', () => {
     expect(el.querySelector('form')).toBeNull();
   });
 
+  it('renders Save with mat-icon when editing and not saving (NG8011 icon slot)', () => {
+    component.startEdit();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const saveBtn = Array.from(el.querySelectorAll('button')).find((b) =>
+      (b.textContent ?? '').includes('Save'),
+    );
+    expect(saveBtn).toBeTruthy();
+    expect(saveBtn!.querySelector('mat-icon')?.textContent?.trim()).toBe('save');
+    expect(component.saving()).toBe(false);
+  });
+
   it('hides Edit/Save when not editable', () => {
     fixture.componentRef.setInput('editable', false);
     fixture.detectChanges();
