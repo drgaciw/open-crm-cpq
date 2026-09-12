@@ -23,6 +23,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
   const loading = signal(false);
   const error = signal<string | null>(null);
 
+  // Angular TestBed compile can exceed Vitest's default 10s hookTimeout under load.
   beforeEach(async () => {
     listSpy = vi.fn();
     searchSpy = vi.fn();
@@ -52,7 +53,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     fixture = TestBed.createComponent(OrganizationListComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
+  }, 30000);
 
   afterEach(() => {
     vi.restoreAllMocks();
