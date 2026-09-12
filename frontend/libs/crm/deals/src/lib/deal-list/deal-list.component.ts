@@ -58,13 +58,22 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
       }
     </mat-tab-group>
 
+    @if (service.error()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ service.error() }}</span>
+        <button mat-button type="button" (click)="onRetry()">Retry</button>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
     @if (service.loading()) {
       <div class="loading" role="status" aria-live="polite">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
     }
 
-    @if (!service.loading() && service.isEmpty()) {
+    @if (!service.loading() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="handshake"
         [title]="hasActiveFilters() ? 'No matching deals' : 'No deals yet'"
@@ -74,7 +83,7 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
         [actionLabel]="hasActiveFilters() ? '' : 'Create Deal'"
         (action)="onCreate()"
       />
-    } @else if (!service.loading()) {
+    } @else if (!service.loading() && !service.isEmpty()) {
       <div class="table-container">
         <table mat-table [dataSource]="service.deals()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
@@ -161,6 +170,19 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
     .clickable-row:hover { background: #f5f5f5; }
     .stage-badge { color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
+    @media (max-width: 768px) {
+      .error-banner { margin: 0 0 16px; }
+    }
   `,
 })
 export class DealListComponent implements OnInit {
@@ -174,6 +196,7 @@ export class DealListComponent implements OnInit {
   stages: DealStage[] = ['PROSPECTING', 'QUALIFICATION', 'NEEDS_ANALYSIS', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
   private currentSort = 'createdAt,desc';
   private currentStage?: DealStage;
+  private lastSearchQuery = '';
 
   trackById(index: number, item: DealDto): string | number {
     return item.id;
@@ -206,10 +229,29 @@ export class DealListComponent implements OnInit {
   }
 
   onSearch(q: string): void {
-    if (q.trim()) {
-      this.service.search(q.trim());
+    const trimmed = q.trim();
+    this.lastSearchQuery = trimmed;
+    if (trimmed) {
+      this.service.search(trimmed);
     } else {
       this.service.list(0, 20, this.currentSort, this.currentStage);
+    }
+  }
+
+  clearError(): void {
+    this.service.error.set(null);
+  }
+
+  onRetry(): void {
+    if (this.lastSearchQuery) {
+      this.service.search(this.lastSearchQuery);
+    } else {
+      this.service.list(
+        this.service.pagination().page,
+        this.service.pagination().size,
+        this.currentSort,
+        this.currentStage,
+      );
     }
   }
 

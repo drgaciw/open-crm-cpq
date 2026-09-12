@@ -22,8 +22,17 @@ import { OrganizationService } from '../organization.service';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    @if (orgService.error()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ orgService.error() }}</span>
+        <button mat-button type="button" (click)="onRetry()">Retry</button>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
     @if (orgService.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (orgService.selectedOrganization(); as org) {
       <div class="detail-header">
         <button mat-icon-button (click)="goBack()" aria-label="Go back to organizations">
@@ -147,6 +156,16 @@ import { OrganizationService } from '../organization.service';
   `,
   styles: [`
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
     .detail-header {
       display: flex;
       align-items: center;
@@ -188,6 +207,16 @@ export class OrganizationDetailComponent implements OnInit {
   id = input.required<string>();
 
   ngOnInit(): void {
+    const id = Number(this.id());
+    this.orgService.getById(id);
+    this.orgService.loadOrganizationContacts(id);
+  }
+
+  clearError(): void {
+    this.orgService.error.set(null);
+  }
+
+  onRetry(): void {
     const id = Number(this.id());
     this.orgService.getById(id);
     this.orgService.loadOrganizationContacts(id);

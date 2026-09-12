@@ -10,6 +10,21 @@ import {
   SpringPageResponse,
 } from '@frontend/shared-models';
 
+/** Local H1 helper: message [CODE] when errorCode present (Wave U3). */
+function httpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrganizationService {
   private readonly http = inject(HttpClient);
@@ -57,7 +72,7 @@ export class OrganizationService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -71,7 +86,7 @@ export class OrganizationService {
       .subscribe({
         next: (org) => this.selectedOrganization.set(org),
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -109,7 +124,7 @@ export class OrganizationService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -131,7 +146,7 @@ export class OrganizationService {
         next: (p) => this.organizationContacts.set(p.content ?? p),
         error: (err) => {
           this.organizationContacts.set([]);
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
   }
