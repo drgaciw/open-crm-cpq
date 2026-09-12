@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 
 /**
  * Create/submit payload for quote BFF → approval-routing (S2C-12 / Wave G3).
- * Internal to agents; agent-facing URLs remain under {@code /api/v1/quotes/**/approvals*}.
+ * Internal to agents; agent-facing URLs remain under {@code /api/v1/quotes/{id}/approvals}.
  */
 @Data
 @Builder
