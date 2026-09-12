@@ -1,10 +1,18 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave U FORGING** (U1 dashboard ∥ U2 leads/contacts ∥ U3 deals/orgs ∥ U4 pricing-da; **T skipped**; **no S reopen**; **no N′′**; R2 still held)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/33-wave-u-ux-architecture.md`  
-**Plan:** Wave U @ `d1d3349` (cherry-pick of architect `db02714`)  
-**Baseline:** Wave S COMPLETE on `main` @ `64c4948`; U plan on `main` @ `d1d3349`
+**Session state:** **Wave U COMPLETE** (U1 dashboard ∥ U2 leads/contacts ∥ U3 deals/orgs ∥ U4 pricing-da ∥ U5 docs); **T skipped**; **no S reopen**; **N COMPLETE**; **no N′′**; R2 still held  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
+**Plan:** Wave U @ `d1d3349` (cherry-pick of architect `db02714`); closeout `33c9694`  
+**Baseline:** Wave U COMPLETE on `main` @ `33c9694`; S COMPLETE `64c4948`
+
+## Wave U landed
+
+- **U1** CRM dashboard loading a11y + load-error banner — `3cec4cf` (#474)
+- **U2** lead + contact `errorCode` banners — `2af5a75` (#476)
+- **U3** deal + organization `errorCode` banners — `2c7bf0a` (#475)
+- **U4** pricing-data-access `errorCode` — `2168719` (#473)
+- **U5** docs closeout (dual-read J–U; R2 still **HELD**; T skipped; no N′′) — `33c9694` (#477)
 
 ## Wave S landed
 
