@@ -101,4 +101,34 @@ describe('LeadService', () => {
     } satisfies LeadDto);
     await expect(promise).resolves.toMatchObject({ id: 4, status: 'QUALIFIED' });
   });
+
+  it('list error.set is message [CODE] when errorCode present', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/leads');
+    req.flush(
+      { message: 'List failed', errorCode: 'LEAD_LIST_DENIED' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    expect(service.error()).toBe('List failed [LEAD_LIST_DENIED]');
+  });
+
+  it('getById error.set is message [CODE] when errorCode present', () => {
+    service.getById(42);
+    const req = httpMock.expectOne('/api/v1/leads/42');
+    req.flush(
+      { message: 'Lead missing', errorCode: 'LEAD_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Lead missing [LEAD_NOT_FOUND]');
+  });
+
+  it('search error.set is message [CODE] when errorCode present', () => {
+    service.search('acme');
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/leads/search');
+    req.flush(
+      { message: 'Search failed', errorCode: 'LEAD_SEARCH_DENIED' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe('Search failed [LEAD_SEARCH_DENIED]');
+  });
 });

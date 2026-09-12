@@ -71,11 +71,20 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
       <mat-tab label="Lost"></mat-tab>
     </mat-tab-group>
 
-    @if (service.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+    @if (service.error(); as err) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ err }}</span>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+        <button mat-button type="button" (click)="retry()">Retry</button>
+      </div>
     }
 
-    @if (!service.loading() && service.isEmpty()) {
+    @if (service.loading()) {
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+    }
+
+    @if (!service.loading() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="trending_up"
         [title]="hasActiveFilters() ? 'No matching leads' : 'No leads yet'"
@@ -85,7 +94,7 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
         [actionLabel]="hasActiveFilters() ? '' : 'Create Lead'"
         (action)="onCreate()"
       />
-    } @else if (!service.loading()) {
+    } @else if (!service.loading() && !service.error()) {
       <div class="table-container">
         <table mat-table [dataSource]="service.leads()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="title">
@@ -200,6 +209,16 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background: #f5f5f5; }
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
 
     @media (max-width: 768px) {
       .list-filters { flex-direction: column; }
@@ -378,6 +397,14 @@ export class LeadListComponent implements OnInit {
 
   hasActiveFilters(): boolean {
     return this.currentStatus !== undefined || this.currentPriority() !== undefined;
+  }
+
+  clearError(): void {
+    this.service.error.set(null);
+  }
+
+  retry(): void {
+    this.refreshList(this.service.pagination().page, this.service.pagination().size || 20);
   }
 
   private refreshList(page: number, size: number): void {

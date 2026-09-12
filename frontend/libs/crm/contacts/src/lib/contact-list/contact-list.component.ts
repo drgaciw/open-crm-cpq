@@ -44,11 +44,20 @@ import {
       </div>
     </app-page-header>
 
-    @if (service.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+    @if (service.error(); as err) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ err }}</span>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+        <button mat-button type="button" (click)="retry()">Retry</button>
+      </div>
     }
 
-    @if (!service.loading() && service.isEmpty()) {
+    @if (service.loading()) {
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+    }
+
+    @if (!service.loading() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="people"
         title="No contacts yet"
@@ -56,7 +65,7 @@ import {
         actionLabel="Create Contact"
         (action)="onCreate()"
       />
-    } @else if (!service.loading()) {
+    } @else if (!service.loading() && !service.error()) {
       <div class="table-container">
         <table mat-table [dataSource]="service.contacts()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
           <ng-container matColumnDef="name">
@@ -117,6 +126,16 @@ import {
     .clickable-row { cursor: pointer; }
     .clickable-row:hover { background: #f5f5f5; }
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
   `],
 })
 export class ContactListComponent implements OnInit {
@@ -149,6 +168,19 @@ export class ContactListComponent implements OnInit {
   onCreate(): void { this.router.navigate(['/contacts', 'new']); }
   onRowClick(c: ContactDto): void { this.router.navigate(['/contacts', c.id]); }
   onEdit(c: ContactDto): void { this.router.navigate(['/contacts', c.id, 'edit']); }
+
+  clearError(): void {
+    this.service.error.set(null);
+  }
+
+  retry(): void {
+    this.service.list(
+      this.service.pagination().page,
+      this.service.pagination().size || 20,
+      this.currentSort,
+    );
+  }
+
   onDelete(c: ContactDto): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       width: '400px',
