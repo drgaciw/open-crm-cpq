@@ -51,6 +51,18 @@ describe('PricingExecutionService', () => {
     expect(service.loading()).toBe(false);
   });
 
+  it('execute error.set appends errorCode as message [CODE]', () => {
+    service.execute(ctx).subscribe({ error: () => undefined });
+    const req = httpMock.expectOne('/api/v1/pricing/execute');
+    req.flush(
+      { message: 'Pricing execute failed', errorCode: 'PRICING_EXECUTE_FAILED' },
+      { status: 500, statusText: 'Server Error' },
+    );
+    expect(service.error()).toBe(
+      'Pricing execute failed [PRICING_EXECUTE_FAILED]',
+    );
+  });
+
   it('simulate POSTs /api/v1/pricing/simulate and appends simulationResults', async () => {
     const promise = firstValueFrom(service.simulate(ctx));
     const req = httpMock.expectOne('/api/v1/pricing/simulate');
@@ -94,5 +106,17 @@ describe('PricingExecutionService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(logs);
     expect(service.auditTrail()).toEqual(logs);
+  });
+
+  it('getAuditTrail error.set appends errorCode as message [CODE]', () => {
+    service.getAuditTrail('quote-1');
+    const req = httpMock.expectOne('/api/v1/pricing/audit/quote-1');
+    req.flush(
+      { message: 'Audit unavailable', errorCode: 'PRICING_AUDIT_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe(
+      'Audit unavailable [PRICING_AUDIT_UNAVAILABLE]',
+    );
   });
 });

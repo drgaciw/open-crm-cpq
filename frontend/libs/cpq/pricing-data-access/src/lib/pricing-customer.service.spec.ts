@@ -50,6 +50,33 @@ describe('PricingCustomerService', () => {
     expect(service.customers()).toEqual(page.content);
   });
 
+  it('list error.set appends errorCode as message [CODE]', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/pricing-customers');
+    req.flush(
+      {
+        message: 'Failed to load pricing customers',
+        errorCode: 'PRICING_CUSTOMERS_UNAVAILABLE',
+      },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.error()).toBe(
+      'Failed to load pricing customers [PRICING_CUSTOMERS_UNAVAILABLE]',
+    );
+  });
+
+  it('getById error.set appends errorCode as message [CODE]', () => {
+    service.getById(99);
+    const req = httpMock.expectOne('/api/v1/pricing-customers/99');
+    req.flush(
+      { message: 'Pricing customer not found', errorCode: 'RESOURCE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe(
+      'Pricing customer not found [RESOURCE_NOT_FOUND]',
+    );
+  });
+
   it('listBySegment forwards segment filter', () => {
     service.listBySegment('SMB');
     const req = httpMock.expectOne(
