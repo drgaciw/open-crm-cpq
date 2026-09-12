@@ -4,7 +4,8 @@
   "productShape": "ApiResponse<List<String>> errors (empty ⇒ valid)",
   "ceShape": "ApiResponse<ConfigurationValidationResult> { valid, violations[{ruleId,ruleType,description,remediation}] }",
   "equivalence": "product errors empty ⇔ CE.valid=true; each product hard-failure string ⇔ a CE violation.description for REQUIRES/EXCLUDES only (RECOMMENDS/DEFAULT/VALIDATES ignored both sides until S2B-8)",
-  "waitingOn": "F2 StatelessConfigurationEvaluator / POST /internal/v1/configurations/evaluate for live dual-run",
+  "waitingOn": "F2 StatelessConfigurationEvaluator landed — live dual-run wired in ConfigurationValidateParityFixtureTest",
+  "liveDualRun": "StatelessConfigurationEvaluator against same List<Long> cases (REQUIRES/EXCLUDES hard-failure parity)",
   "cases": [
     {
       "id": "empty-selection",
