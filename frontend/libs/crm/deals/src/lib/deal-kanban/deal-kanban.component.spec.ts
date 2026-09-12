@@ -34,6 +34,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
     deal({ id: 4, name: 'D', stage: 'NEGOTIATION' }),
   ]);
   const loading = signal(false);
+  const error = signal<string | null>(null);
   const pipelineSummary = signal<PipelineSummaryDto[] | null>([
     { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100 },
     { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500 },
@@ -47,10 +48,19 @@ describe('DealKanbanComponent pipeline wiring', () => {
     markWonSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'WON' })));
     markLostSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'LOST' })));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    deals.set([
+      deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000 }),
+      deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000 }),
+      deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250 }),
+      deal({ id: 4, name: 'D', stage: 'NEGOTIATION' }),
+    ]);
+    error.set(null);
+    loading.set(false);
 
     const serviceMock = {
       deals,
       loading,
+      error,
       pipelineSummary,
       isEmpty: computed(() => deals().length === 0 && !loading()),
       list: listSpy,
@@ -150,5 +160,65 @@ describe('DealKanbanComponent pipeline wiring', () => {
   it('hides advance for NEGOTIATION terminal close path', () => {
     expect(component.canAdvance('NEGOTIATION')).toBe(false);
     expect(component.canClose('NEGOTIATION')).toBe(true);
+  });
+
+  it('shows error banner and hides board on failed load', () => {
+    deals.set([]);
+    loading.set(false);
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const banner = el.querySelector('.error-banner') as HTMLElement;
+    expect(banner).toBeTruthy();
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.textContent).toContain('Failed to load deals [DEALS_UNAVAILABLE]');
+    expect(banner.textContent).toContain('Retry');
+    expect(el.querySelector('.kanban-board')).toBeNull();
+    expect(el.querySelector('.empty-column')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('shows per-column empty state only when load succeeded', () => {
+    deals.set([]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.kanban-board')).toBeTruthy();
+    expect(el.querySelectorAll('.empty-column').length).toBeGreaterThan(0);
+    expect(el.querySelector('.error-banner')).toBeNull();
+  });
+
+  it('clearError dismisses the banner', () => {
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    fixture.detectChanges();
+    component.clearError();
+    fixture.detectChanges();
+    expect(error()).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
+  });
+
+  it('onRetry reloads list and pipeline summary', () => {
+    listSpy.mockClear();
+    loadPipelineSpy.mockClear();
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    component.onRetry();
+    expect(listSpy).toHaveBeenCalledWith(0, 200, 'createdAt,desc');
+    expect(loadPipelineSpy).toHaveBeenCalled();
+  });
+
+  it('loading spinner wrapper exposes role=status and aria-live=polite', () => {
+    loading.set(true);
+    error.set(null);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const loadingEl = el.querySelector('.loading') as HTMLElement;
+    expect(loadingEl).toBeTruthy();
+    expect(loadingEl.getAttribute('role')).toBe('status');
+    expect(loadingEl.getAttribute('aria-live')).toBe('polite');
+    expect(el.querySelector('.kanban-board')).toBeNull();
   });
 });
