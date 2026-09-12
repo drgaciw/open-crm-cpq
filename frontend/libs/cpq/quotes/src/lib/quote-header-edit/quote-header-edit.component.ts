@@ -101,8 +101,10 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
                 @if (saving()) {
                   <mat-spinner diameter="20" />
                 } @else {
-                  <mat-icon>save</mat-icon>
-                  Save
+                  <span>
+                    <mat-icon>save</mat-icon>
+                    Save
+                  </span>
                 }
               </button>
             }
