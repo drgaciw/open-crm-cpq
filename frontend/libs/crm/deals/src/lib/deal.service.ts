@@ -11,6 +11,21 @@ import {
   SpringPageResponse,
 } from '@frontend/shared-models';
 
+/** Local H1 helper: message [CODE] when errorCode present (Wave U3). */
+function httpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DealService {
   private readonly http = inject(HttpClient);
@@ -47,7 +62,7 @@ export class DealService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -60,7 +75,7 @@ export class DealService {
       .subscribe({
         next: (d) => this.selectedDeal.set(d),
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -95,7 +110,7 @@ export class DealService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -120,7 +135,7 @@ export class DealService {
     this.http.get<PipelineSummaryDto[]>(`${this.basePath}/pipeline`).subscribe({
       next: (summary) => this.pipelineSummary.set(summary),
       error: (err) => {
-        this.error.set(err?.error?.message || 'An error occurred');
+        this.error.set(httpErrorMessage(err, 'An error occurred'));
       },
     });
   }
