@@ -37,6 +37,7 @@ describe('LeadListComponent action wiring', () => {
   });
   const leads = signal<LeadDto[]>([]);
   const loading = signal(false);
+  const error = signal<string | null>(null);
 
   beforeEach(async () => {
     listSpy = vi.fn();
@@ -47,10 +48,14 @@ describe('LeadListComponent action wiring', () => {
     markContactedSpy = vi.fn(() => of(lead({ id: 1, title: 'N', status: 'CONTACTED' })));
     markLostSpy = vi.fn(() => of(lead({ id: 1, title: 'L', status: 'LOST' })));
     dialogOpenSpy = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    error.set(null);
+    leads.set([]);
+    loading.set(false);
 
     const serviceMock = {
       leads,
       loading,
+      error,
       pagination,
       isEmpty: computed(() => leads().length === 0 && !loading()),
       list: listSpy,
@@ -186,5 +191,32 @@ describe('LeadListComponent action wiring', () => {
     qualifySpy.mockReturnValueOnce(throwError(() => new Error('fail')));
     component.onQualify(lead({ id: 5, title: 'Warm', status: 'CONTACTED' }));
     expect(component.actionLoading()).toBe(false);
+  });
+
+  it('shows error banner and hides empty-state when load fails', () => {
+    error.set('List failed [LEAD_LIST_DENIED]');
+    fixture.detectChanges();
+
+    const banner = fixture.nativeElement.querySelector('.error-banner[role="alert"]');
+    expect(banner?.textContent).toContain('List failed [LEAD_LIST_DENIED]');
+    expect(fixture.nativeElement.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('clearError dismisses the banner', () => {
+    error.set('List failed [LEAD_LIST_DENIED]');
+    fixture.detectChanges();
+
+    component.clearError();
+    fixture.detectChanges();
+
+    expect(error()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.error-banner')).toBeNull();
+  });
+
+  it('retry reloads the list', () => {
+    listSpy.mockClear();
+    error.set('List failed [LEAD_LIST_DENIED]');
+    component.retry();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
   });
 });

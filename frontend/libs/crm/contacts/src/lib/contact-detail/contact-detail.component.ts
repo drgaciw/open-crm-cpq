@@ -14,7 +14,14 @@ import { ContactService } from '../contact.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (service.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+    } @else if (service.error(); as err) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ err }}</span>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+        <button mat-button type="button" (click)="retry()">Retry</button>
+      </div>
     } @else if (service.selectedContact(); as contact) {
       <div class="detail-header">
         <button mat-icon-button (click)="goBack()" aria-label="Go back to contacts"><mat-icon>arrow_back</mat-icon></button>
@@ -65,6 +72,16 @@ import { ContactService } from '../contact.service';
   `,
   styles: [`
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .header-info { flex: 1; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
@@ -87,6 +104,15 @@ export class ContactDetailComponent implements OnInit {
   id = input.required<string>();
 
   ngOnInit(): void { this.service.getById(Number(this.id())); }
+
+  clearError(): void {
+    this.service.error.set(null);
+  }
+
+  retry(): void {
+    this.service.getById(Number(this.id()));
+  }
+
   goBack(): void { this.router.navigate(['/contacts']); }
   onEdit(): void { this.router.navigate(['/contacts', this.id(), 'edit']); }
   onDelete(): void {
