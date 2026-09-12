@@ -1,10 +1,10 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave S COMPLETE** (adversarial `84671bd` / cherry-pick `a7d5b6d`); **no S reopen**; **Wave T skipped** (T1/T2 optional LOW); **N COMPLETE**; **no N′′**; R2 still held  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
-**Plan:** Wave S @ `d0285e6`; S review `docs/forge/32-wave-s-adversarial-review.md` @ `a7d5b6d`  
-**Baseline:** Wave S COMPLETE on `main` @ `91ffa43` / orchestrator `377e806`; S review on `main` @ `a7d5b6d`
+**Session state:** **Wave U FORGING** (U1 dashboard ∥ U2 leads/contacts ∥ U3 deals/orgs ∥ U4 pricing-da; **T skipped**; **no S reopen**; **no N′′**; R2 still held)  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/33-wave-u-ux-architecture.md`  
+**Plan:** Wave U @ `d1d3349` (cherry-pick of architect `db02714`)  
+**Baseline:** Wave S COMPLETE on `main` @ `64c4948`; U plan on `main` @ `d1d3349`
 
 ## Wave S landed
 
