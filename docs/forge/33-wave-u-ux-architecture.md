@@ -1,10 +1,10 @@
 # Wave U architecture — UX/UI polish (post-S leftovers)
 
-**Status:** READY FOR FORGE — orchestrator locked: Waves **A–S COMPLETE**; **N COMPLETE**; **S COMPLETE**; **Wave T skipped** (do not name T1/T2)  
+**Status:** COMPLETE on main 2026-09-12 — U4 `2168719`, U1 `3cec4cf`, U3 `2c7bf0a`, U2 `2af5a75` (U5 this closeout); **R2** still **HELD**; **Wave T skipped**  
 **Architect:** `opencrm-architect` (Herdr `w8`) — **plan only; do not spawn implementers**  
-**Evidence date:** 2026-09-07  
-**Baseline:** `origin/main` @ `64c4948` (S review `a7d5b6d`; S5 `91ffa43`)  
-**Survey tip:** `origin/main` @ `64c4948`  
+**Evidence date:** 2026-09-07 (plan); closeout 2026-09-12  
+**Baseline:** `origin/main` @ `64c4948` (S review `a7d5b6d`; S5 `91ffa43`); FORGING `3c30a4a`; plan `d1d3349`  
+**Survey tip:** Day-1 tip `origin/main` @ `2af5a75` (U2 squash; U1–U4 landed)  
 **Sources:** `rg` + **read templates**. GitNexus **skip analyze** (likely stale); UNKNOWN ≠ unused; `-r /home/username01/Projects/open-crm-cpq --file`. Linear/Notion Open CRM hits: **none** (cmano-clone / Aegis **out**).  
 **Letter skip:** Wave **U** (no Wave T).
 
@@ -242,9 +242,9 @@ Implement Open CRM/CPQ Wave U UX per docs/forge/33-wave-u-ux-architecture.md in 
 - [x] Zero new portal; **no** chrome owner  
 - [x] GitNexus analyze skipped; `rg` used  
 - [x] Architect **does not spawn** implementers  
-- [ ] Orchestrator → Wave U FORGING (`00-*`)  
-- [ ] U1–U5 merged  
+- [x] Orchestrator → Wave U FORGING (`00-*`) — `3c30a4a`  
+- [x] U1–U5 COMPLETE (U5 this PR); R2 still held; T skipped  
 
 **PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** un-hold R2. Do **not** name T1/T2. Do **not** put 400px empty-state on dashboard cards.
 
-**WAVE U — APPROVED FOR FORGE.**
+**WAVE U — COMPLETE.**
