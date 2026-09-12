@@ -35,12 +35,16 @@ describe('ContactListComponent shared-ui wiring', () => {
   });
   const contacts = signal<ContactDto[]>([]);
   const loading = signal(false);
+  const error = signal<string | null>(null);
 
   beforeEach(async () => {
     listSpy = vi.fn();
     searchSpy = vi.fn();
     deleteSpy = vi.fn(() => of(void 0));
     dialogOpenSpy = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    error.set(null);
+    contacts.set([]);
+    loading.set(false);
 
     await TestBed.configureTestingModule({
       imports: [ContactListComponent],
@@ -52,6 +56,7 @@ describe('ContactListComponent shared-ui wiring', () => {
           useValue: {
             contacts,
             loading,
+            error,
             pagination,
             isEmpty: computed(() => contacts().length === 0 && !loading()),
             list: listSpy,
@@ -109,5 +114,32 @@ describe('ContactListComponent shared-ui wiring', () => {
     component.onDelete(contact({ id: 12, firstName: 'Ada', lastName: 'Lovelace' }));
 
     expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows error banner and hides empty-state when load fails', () => {
+    error.set('List failed [CONTACT_LIST_DENIED]');
+    fixture.detectChanges();
+
+    const banner = fixture.nativeElement.querySelector('.error-banner[role="alert"]');
+    expect(banner?.textContent).toContain('List failed [CONTACT_LIST_DENIED]');
+    expect(fixture.nativeElement.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('clearError dismisses the banner', () => {
+    error.set('List failed [CONTACT_LIST_DENIED]');
+    fixture.detectChanges();
+
+    component.clearError();
+    fixture.detectChanges();
+
+    expect(error()).toBeNull();
+    expect(fixture.nativeElement.querySelector('.error-banner')).toBeNull();
+  });
+
+  it('retry reloads the list', () => {
+    listSpy.mockClear();
+    error.set('List failed [CONTACT_LIST_DENIED]');
+    component.retry();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'lastName,asc');
   });
 });

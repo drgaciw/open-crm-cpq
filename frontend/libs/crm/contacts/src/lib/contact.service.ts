@@ -9,6 +9,19 @@ import {
   SpringPageResponse,
 } from '@frontend/shared-models';
 
+/** H1-shaped banner text: `message [CODE]` when errorCode is present. */
+function httpErrorMessage(err: unknown): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || 'An error occurred';
+  if (code) return `${message} [${code}]`;
+  return message;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ContactService {
   private readonly http = inject(HttpClient);
@@ -42,7 +55,7 @@ export class ContactService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err));
         }
       });
   }
@@ -55,7 +68,7 @@ export class ContactService {
       .subscribe({
         next: (c) => this.selectedContact.set(c),
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err));
         }
       });
   }
@@ -90,7 +103,7 @@ export class ContactService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err));
         }
       });
   }
