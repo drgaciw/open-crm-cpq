@@ -58,8 +58,9 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
             @if (actionLoading()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
-              <mat-icon>phone</mat-icon> Mark Contacted
+              <mat-icon>phone</mat-icon>
             }
+            Mark Contacted
           </button>
           <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
             <mat-icon>close</mat-icon> Mark Lost
@@ -70,8 +71,9 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
             @if (actionLoading()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
-              <mat-icon>check_circle</mat-icon> Qualify
+              <mat-icon>check_circle</mat-icon>
             }
+            Qualify
           </button>
           <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
             <mat-icon>close</mat-icon> Mark Lost
@@ -82,8 +84,9 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
             @if (actionLoading()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
-              <mat-icon>arrow_forward</mat-icon> Convert to Deal
+              <mat-icon>arrow_forward</mat-icon>
             }
+            Convert to Deal
           </button>
           <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
             <mat-icon>close</mat-icon> Mark Lost
