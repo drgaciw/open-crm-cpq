@@ -1,10 +1,10 @@
 # Wave V architecture — FE polish + non-failing clean-build leftovers
 
-**Status:** READY FOR FORGE — orchestrator locked: Waves **A–U COMPLETE** on `origin/main` @ `4dc72c1`; **N/S/U COMPLETE**; **Wave T skipped**  
+**Status:** COMPLETE on main 2026-09-12 — V1 `32ccdd8`, V2 `56b9c77`, V3 `2235cc9` (V4 this closeout); **R2** still **HELD**; **Wave T skipped**  
 **Architect:** `opencrm-architect` (Herdr `w8`) — **plan only; do not spawn implementers**  
 **Evidence date:** 2026-09-12  
-**Baseline:** `origin/main` @ `4dc72c1` (U closeout `33c9694`; orchestrator `f816101`; TDD NG8011+CE dual-run #478–#482)  
-**Survey tip:** `origin/main` @ `4dc72c1`  
+**Baseline:** `origin/main` @ `4dc72c1` (U closeout `33c9694`; orchestrator `f816101`; TDD NG8011+CE dual-run #478–#482); FORGING `c179207`; plan `734162f`  
+**Survey tip:** Day-1 tip `origin/main` @ `2235cc9` (V3 squash; V1–V3 landed)  
 **Sources:** `rg` + **read files**. GitNexus **skip analyze**. UNKNOWN ≠ unused; `-r /home/username01/Projects/open-crm-cpq --file`. Linear/Notion Open CRM: **none**.  
 **Do not** edit `docs/forge/00-orchestrator-status.md`.
 
@@ -237,9 +237,9 @@ Implement Open CRM/CPQ Wave V per docs/forge/34-wave-v-architecture.md in three 
 - [x] Zero new portal; **no** chrome owner  
 - [x] GitNexus analyze skipped; `rg` used  
 - [x] Architect **does not spawn** implementers  
-- [ ] Orchestrator → Wave V FORGING (`00-*`)  
-- [ ] V1–V4 merged  
+- [x] Orchestrator → Wave V FORGING (`00-*`) — `c179207`  
+- [x] V1–V4 COMPLETE (V4 this PR); R2 still held; T skipped  
 
 **PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** `@use` Tailwind. Do **not** un-hold R2. Do **not** reopen CE.
 
-**WAVE V — APPROVED FOR FORGE.**
+**WAVE V — COMPLETE.**
