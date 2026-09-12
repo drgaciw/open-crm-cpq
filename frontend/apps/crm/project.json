@@ -20,14 +20,18 @@
             "input": "apps/crm/public"
           }
         ],
-        "styles": ["apps/crm/src/styles.scss"]
+        "styles": [
+          "apps/crm/src/styles.scss",
+          "apps/crm/src/tailwind.css"
+        ]
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
+              // Measured initial ~630.44 kB (Wave V seed); warn at 750kb, error stays 1mb
+              "maximumWarning": "750kb",
               "maximumError": "1mb"
             },
             {
