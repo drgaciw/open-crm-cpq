@@ -85,6 +85,36 @@ describe('ProductService', () => {
     expect(service.products()[0].name).toBe('Core Plus');
   });
 
+  it('list error.set is message [CODE] when errorCode present', () => {
+    service.list();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/products');
+    req.flush(
+      { message: 'List failed', errorCode: 'PRODUCT_LIST_DENIED' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    expect(service.error()).toBe('List failed [PRODUCT_LIST_DENIED]');
+  });
+
+  it('getById error.set is message [CODE] when errorCode present', () => {
+    service.getById(9);
+    const req = httpMock.expectOne('/api/v1/products/9');
+    req.flush(
+      { message: 'Product missing', errorCode: 'PRODUCT_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.error()).toBe('Product missing [PRODUCT_NOT_FOUND]');
+  });
+
+  it('search error.set is message [CODE] when errorCode present', () => {
+    service.search('core');
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    req.flush(
+      { message: 'Search failed', errorCode: 'PRODUCT_SEARCH_DENIED' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    expect(service.error()).toBe('Search failed [PRODUCT_SEARCH_DENIED]');
+  });
+
   it('create POSTs to /api/v1/products', async () => {
     const promise = firstValueFrom(
       service.create({
