@@ -10,20 +10,39 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, STAGE_COLORS, STAGE_LABELS, STATUS_COLORS } from '@frontend/shared-models';
 import { LeadService } from '@frontend/crm-leads';
+import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatTableModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe],
+  imports: [
+    RouterLink,
+    MatCardModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTableModule,
+    MatProgressSpinnerModule,
+    CurrencyPipe,
+    DatePipe,
+    PageHeaderComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="dashboard-header">
-      <h1>Dashboard</h1>
-      <p class="subtitle">Overview of your CRM pipeline</p>
-    </div>
+    <app-page-header
+      title="Dashboard"
+      subtitle="Overview of your CRM pipeline"
+    />
 
     @if (loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+    } @else if (loadError()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ loadError() }}</span>
+        <button mat-button type="button" (click)="retry()">Retry</button>
+      </div>
     } @else {
       <!-- KPI Cards -->
       <div class="kpi-grid">
@@ -89,7 +108,7 @@ import { LeadService } from '@frontend/crm-leads';
           </mat-card-header>
           <mat-card-content>
             @if (recentDeals().length === 0) {
-              <p class="empty-text">No recent deals.</p>
+              <p class="empty-text" role="status">No recent deals.</p>
             } @else {
               <table mat-table [dataSource]="recentDeals()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="name">
@@ -121,7 +140,7 @@ import { LeadService } from '@frontend/crm-leads';
           </mat-card-header>
           <mat-card-content>
             @if (recentLeads().length === 0) {
-              <p class="empty-text">No recent leads.</p>
+              <p class="empty-text" role="status">No recent leads.</p>
             } @else {
               <table mat-table [dataSource]="recentLeads()" [trackBy]="trackById" class="compact-table">
                 <ng-container matColumnDef="title">
@@ -148,10 +167,18 @@ import { LeadService } from '@frontend/crm-leads';
     }
   `,
   styles: [`
-    .dashboard-header { margin-bottom: 24px; }
-    .dashboard-header h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
-    .subtitle { margin: 4px 0 0; color: #666; }
     .loading { display: flex; justify-content: center; padding: 48px; }
+
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
 
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .kpi-card { display: flex; align-items: center; gap: 16px; padding: 20px !important; }
@@ -182,6 +209,7 @@ export class DashboardComponent implements OnInit {
   private readonly leadService = inject(LeadService);
 
   loading = signal(true);
+  loadError = signal<string | null>(null);
   pipeline = signal<PipelineSummaryDto[]>([]);
   recentDeals = signal<DealDto[]>([]);
   recentLeads = signal<LeadDto[]>([]);
@@ -227,6 +255,17 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadDashboard();
+  }
+
+  retry(): void {
+    this.loadDashboard();
+  }
+
+  private loadDashboard(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+
     forkJoin({
       pipeline: this.http.get<PipelineSummaryDto[]>('/api/v1/deals/pipeline'),
       deals: this.http.get<SpringPageResponse<DealDto>>('/api/v1/deals', { params: { page: '0', size: '5', sort: 'createdAt,desc' } }),
@@ -241,7 +280,12 @@ export class DashboardComponent implements OnInit {
         this.totalLeadCount.set(sum);
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: (err: { error?: { message?: string }; message?: string }) => {
+        this.loadError.set(
+          err?.error?.message || err?.message || 'Failed to load dashboard data.',
+        );
+        this.loading.set(false);
+      },
     });
   }
 }
