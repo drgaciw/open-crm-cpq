@@ -20,6 +20,9 @@ export default defineConfig(() => ({
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     setupFiles: ['src/test-setup.ts'],
     reporters: ['default'],
+    // TestBed compile under shared/symlink node_modules can exceed Vitest defaults.
+    hookTimeout: 30000,
+    testTimeout: 30000,
     coverage: {
       reportsDirectory: '../../../coverage/libs/crm/leads',
       provider: 'v8' as const,

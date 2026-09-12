@@ -40,40 +40,47 @@ describe('PageHeaderComponent', () => {
     fixture.detectChanges();
   }
 
-  it('should create', async () => {
-    await TestBed.configureTestingModule({
-      imports: [HostWithoutSearchComponent],
-    }).compileComponents();
+  // Angular TestBed compile can exceed Vitest's default timeouts under load.
+  describe('without search projection', () => {
+    let fixture: ComponentFixture<HostWithoutSearchComponent>;
 
-    const fixture = TestBed.createComponent(HostWithoutSearchComponent);
-    await settle(fixture);
-    expect(fixture.nativeElement.querySelector('app-page-header')).toBeTruthy();
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [HostWithoutSearchComponent],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(HostWithoutSearchComponent);
+      await settle(fixture);
+    }, 30000);
+
+    it('should create', () => {
+      expect(fixture.nativeElement.querySelector('app-page-header')).toBeTruthy();
+    });
+
+    it('should hide search slot when no [search] projection is provided', () => {
+      const search = fixture.nativeElement.querySelector('.page-header-search') as HTMLElement;
+      expect(search).toBeTruthy();
+      expect(search.hidden).toBe(true);
+    });
   });
 
-  it('should hide search slot when no [search] projection is provided', async () => {
-    await TestBed.configureTestingModule({
-      imports: [HostWithoutSearchComponent],
-    }).compileComponents();
+  describe('with search projection', () => {
+    let fixture: ComponentFixture<HostWithSearchComponent>;
 
-    const fixture = TestBed.createComponent(HostWithoutSearchComponent);
-    await settle(fixture);
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [HostWithSearchComponent],
+      }).compileComponents();
 
-    const search = fixture.nativeElement.querySelector('.page-header-search') as HTMLElement;
-    expect(search).toBeTruthy();
-    expect(search.hidden).toBe(true);
-  });
+      fixture = TestBed.createComponent(HostWithSearchComponent);
+      await settle(fixture);
+    }, 30000);
 
-  it('should show search slot when [search] projection is provided', async () => {
-    await TestBed.configureTestingModule({
-      imports: [HostWithSearchComponent],
-    }).compileComponents();
-
-    const fixture = TestBed.createComponent(HostWithSearchComponent);
-    await settle(fixture);
-
-    const search = fixture.nativeElement.querySelector('.page-header-search') as HTMLElement;
-    expect(search).toBeTruthy();
-    expect(search.hidden).toBe(false);
-    expect(search.querySelector('input[type="search"]')).toBeTruthy();
+    it('should show search slot when [search] projection is provided', () => {
+      const search = fixture.nativeElement.querySelector('.page-header-search') as HTMLElement;
+      expect(search).toBeTruthy();
+      expect(search.hidden).toBe(false);
+      expect(search.querySelector('input[type="search"]')).toBeTruthy();
+    });
   });
 });
