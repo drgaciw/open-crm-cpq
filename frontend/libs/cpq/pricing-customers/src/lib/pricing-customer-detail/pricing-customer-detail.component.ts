@@ -117,8 +117,10 @@ function httpErrorMessage(
               @if (deleting()) {
                 <mat-spinner diameter="20" />
               } @else {
-                <mat-icon>delete</mat-icon>
-                Delete
+                <ng-container>
+                  <mat-icon>delete</mat-icon>
+                  Delete
+                </ng-container>
               }
             </button>
           } @else {
@@ -140,8 +142,10 @@ function httpErrorMessage(
               @if (saving()) {
                 <mat-spinner diameter="20" />
               } @else {
-                <mat-icon>save</mat-icon>
-                Save
+                <ng-container>
+                  <mat-icon>save</mat-icon>
+                  Save
+                </ng-container>
               }
             </button>
           }

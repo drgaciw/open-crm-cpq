@@ -165,9 +165,29 @@ describe('PricingCustomerDetailComponent', () => {
     );
   });
 
-  it('renders Delete in view mode', () => {
+  it('renders Delete idle state with mat-icon + label (MatButton icon slot)', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Delete');
+    const deleteBtn = Array.from(compiled.querySelectorAll('button')).find((b) =>
+      (b.textContent ?? '').includes('Delete'),
+    );
+    expect(deleteBtn).toBeTruthy();
+    expect(deleteBtn!.querySelector('mat-icon')?.textContent?.trim()).toBe(
+      'delete',
+    );
+    expect(deleteBtn!.textContent).toContain('Delete');
+  });
+
+  it('renders Save idle state with mat-icon + label (MatButton icon slot)', () => {
+    component.startEdit();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const saveBtn = Array.from(compiled.querySelectorAll('button')).find((b) =>
+      (b.textContent ?? '').includes('Save'),
+    );
+    expect(saveBtn).toBeTruthy();
+    expect(saveBtn!.querySelector('mat-icon')?.textContent?.trim()).toBe('save');
+    expect(saveBtn!.textContent).toContain('Save');
   });
 
   it('confirms then soft-deletes via PricingCustomerService.delete and navigates to list', () => {
