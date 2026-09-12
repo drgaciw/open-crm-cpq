@@ -47,17 +47,14 @@ describe('RuleDialogComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it(
-    'requires name, ruleType, priority, and DRL content on create',
-    async () => {
-      await setup({ ruleSetId: 1 });
-      component.form.patchValue({ name: '', content: '' });
-      component.onSubmit();
-      expect(createSpy).not.toHaveBeenCalled();
-      expect(component.form.invalid).toBe(true);
-    },
-    15000,
-  );
+  // First TestBed compile can exceed 15s under parallel nx load; use project testTimeout.
+  it('requires name, ruleType, priority, and DRL content on create', async () => {
+    await setup({ ruleSetId: 1 });
+    component.form.patchValue({ name: '', content: '' });
+    component.onSubmit();
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(component.form.invalid).toBe(true);
+  });
 
   it('creates rule then calls validateSyntax after save', async () => {
     await setup({ ruleSetId: 1 });
