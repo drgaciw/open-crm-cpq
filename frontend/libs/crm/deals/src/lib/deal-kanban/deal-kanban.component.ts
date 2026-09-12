@@ -46,9 +46,18 @@ interface KanbanColumn {
       </button>
     </div>
 
+    @if (service.error()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ service.error() }}</span>
+        <button mat-button type="button" (click)="onRetry()">Retry</button>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
     @if (service.loading()) {
-      <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
-    } @else {
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+    } @else if (!service.error()) {
       <div class="kanban-board">
         @for (col of columns(); track col.stage) {
           <div class="kanban-column">
@@ -128,6 +137,16 @@ interface KanbanColumn {
     .total-chip.weighted { background: #fff3e0; color: #ef6c00; }
     .spacer { flex: 1; }
     .loading { display: flex; justify-content: center; padding: 48px; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+    }
     .kanban-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; min-height: 500px; }
     .kanban-column { flex: 0 0 280px; background: #f5f5f5; border-radius: 8px; display: flex; flex-direction: column; }
     .column-header {
@@ -209,6 +228,14 @@ export class DealKanbanComponent implements OnInit {
   ngOnInit(): void {
     this.service.list(0, 200, 'createdAt,desc');
     this.service.loadPipelineSummary();
+  }
+
+  clearError(): void {
+    this.service.error.set(null);
+  }
+
+  onRetry(): void {
+    this.refreshBoard();
   }
 
   canAdvance(stage: DealStage): boolean {
