@@ -10,6 +10,21 @@ import {
   SpringPageResponse,
 } from '@frontend/shared-models';
 
+/** Prefer message; append errorCode when present (H1 shape). */
+function httpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 /**
  * Pricing DRL rule HTTP service.
  * Signal-state pattern matches DealService (not BaseCrudService).
@@ -55,7 +70,7 @@ export class RuleService {
           }
         },
         error: (err) => {
-          this.error.set(err?.error?.message || err?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
   }
@@ -69,7 +84,7 @@ export class RuleService {
       .subscribe({
         next: (rule) => this.selectedRule.set(rule),
         error: (err) => {
-          this.error.set(err?.error?.message || err?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
   }

@@ -9,6 +9,21 @@ import {
   PricingAuditLogDto,
 } from '@frontend/shared-models';
 
+/** Prefer message; append errorCode when present (H1 shape). */
+function httpErrorMessage(err: unknown, fallback: string): string {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || fallback;
+  if (code) {
+    return `${message} [${code}]`;
+  }
+  return message;
+}
+
 /**
  * Pricing execute / simulate / audit HTTP service (non-CRUD).
  * Signal-state pattern matches DealService.
@@ -32,7 +47,7 @@ export class PricingExecutionService {
       tap({
         next: (result) => this.lastResult.set(result),
         error: (err) => {
-          this.error.set(err?.error?.message || err?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       }),
       finalize(() => this.loading.set(false)),
@@ -49,7 +64,7 @@ export class PricingExecutionService {
           this.simulationResults.update((prev) => [...prev, result]);
         },
         error: (err) => {
-          this.error.set(err?.error?.message || err?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       }),
       finalize(() => this.loading.set(false)),
@@ -70,7 +85,7 @@ export class PricingExecutionService {
             }
           },
           error: (err) => {
-            this.error.set(err?.error?.message || err?.message || 'An error occurred');
+            this.error.set(httpErrorMessage(err, 'An error occurred'));
           },
         }),
         finalize(() => this.loading.set(false)),
@@ -88,7 +103,7 @@ export class PricingExecutionService {
       .subscribe({
         next: (logs) => this.auditTrail.set(logs ?? []),
         error: (err) => {
-          this.error.set(err?.error?.message || err?.message || 'An error occurred');
+          this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
   }
