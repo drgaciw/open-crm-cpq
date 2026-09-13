@@ -46,7 +46,8 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
           <div class="form-row three-col">
             <mat-form-field appearance="outline">
               <mat-label>Amount ($)</mat-label>
-              <input matInput type="number" formControlName="amount">
+              <input matInput type="number" formControlName="amount" min="0">
+              @if (form.get('amount')?.hasError('min')) { <mat-error>Amount cannot be negative</mat-error> }
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Stage</mat-label>
@@ -107,8 +108,8 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving">
-              @if (saving) { <mat-spinner diameter="20"></mat-spinner> }
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
+              @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
           </div>
@@ -140,7 +141,8 @@ export class DealFormComponent implements OnInit {
   id = input<string>();
   form!: FormGroup;
   isEditMode = false;
-  saving = false;
+  /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
+  saving = signal(false);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
   filteredContacts = signal<ContactDto[]>([]);
@@ -177,7 +179,7 @@ export class DealFormComponent implements OnInit {
   ngOnInit(): void {
     this.form = this.fb.group({
       name: ['', Validators.required],
-      amount: [null],
+      amount: [null, [Validators.min(0)]],
       stage: ['PROSPECTING'],
       probability: [10, [Validators.min(0), Validators.max(100)]],
       expectedCloseDate: [null],
@@ -227,7 +229,7 @@ export class DealFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.form.invalid) return;
-    this.saving = true;
+    this.saving.set(true);
     const { contactSearch, orgSearch, expectedCloseDate, stage, ...formValue } = this.form.value;
 
     const idVal = this.id();
@@ -242,7 +244,7 @@ export class DealFormComponent implements OnInit {
       };
       this.dealService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/deals', idVal]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     } else {
       // Create request: exclude stage (backend doesn't accept it on create)
@@ -254,7 +256,7 @@ export class DealFormComponent implements OnInit {
       };
       this.dealService.create(data).subscribe({
         next: (d) => this.router.navigate(['/deals', d.id]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     }
   }

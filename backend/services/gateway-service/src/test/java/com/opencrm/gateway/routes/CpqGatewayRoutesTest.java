@@ -119,6 +119,38 @@ class CpqGatewayRoutesTest {
     }
 
     @Test
+    @DisplayName("Boot 4 / SCG server-webflux: routes live under spring.cloud.gateway.server.webflux")
+    void applicationYamlUsesServerWebfluxGatewayPropertyPrefix() {
+        assertTrue(
+                yaml.contains("server:\n        webflux:")
+                        || yaml.contains("server:\r\n        webflux:"),
+                "Gateway routes must use spring.cloud.gateway.server.webflux (SCG 5 / Boot 4); "
+                        + "legacy spring.cloud.gateway.routes is ignored and yields empty routing");
+        assertTrue(yaml.contains("webflux:\n          routes:")
+                        || yaml.contains("webflux:\r\n          routes:"),
+                "webflux.routes must be nested under gateway.server.webflux");
+    }
+
+    @Test
+    @DisplayName("management.endpoint.gateway.access must not nest under server.webflux")
+    void applicationYamlEnablesGatewayActuatorEndpoint() {
+        assertTrue(
+                yaml.contains("include: health,info,metrics,gateway,prometheus"),
+                "gateway must be in management.endpoints.web.exposure.include");
+        assertTrue(
+                yaml.contains("gateway:\n      access: read-only")
+                        || yaml.contains("gateway:\r\n      access: read-only")
+                        || yaml.contains("gateway:\n      enabled: true")
+                        || yaml.contains("gateway:\r\n      enabled: true"),
+                "management.endpoint.gateway must set access (Boot 4) or enabled");
+        assertFalse(
+                yaml.contains("gateway:\n      server:\n        webflux:\n          enabled:")
+                        || yaml.contains("gateway:\r\n      server:\r\n        webflux:\r\n          enabled:"),
+                "management.endpoint.gateway must not nest under server.webflux "
+                        + "(that namespace is for routes/filters only)");
+    }
+
+    @Test
     void applicationYamlDeclaresCpqRouteIds() {
         assertTrue(yaml.contains(CpqGatewayRoutes.CPQ_API_PREFIX + "/"),
                 "CPQ public prefix must be configured");

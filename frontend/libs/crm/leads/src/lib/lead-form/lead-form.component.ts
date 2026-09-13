@@ -131,8 +131,8 @@ import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-mode
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving">
-              @if (saving) {
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
+              @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 {{ isEditMode ? 'Update' : 'Create' }}
@@ -167,7 +167,8 @@ export class LeadFormComponent implements OnInit {
   id = input<string>();
   form!: FormGroup;
   isEditMode = false;
-  saving = false;
+  /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
+  saving = signal(false);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
   filteredContacts = signal<ContactDto[]>([]);
@@ -268,7 +269,7 @@ export class LeadFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.form.invalid) return;
-    this.saving = true;
+    this.saving.set(true);
 
     const formValue = this.form.value;
     delete formValue.contactSearch;
@@ -284,12 +285,12 @@ export class LeadFormComponent implements OnInit {
     if (this.isEditMode && idVal) {
       this.leadService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/leads', idVal]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     } else {
       this.leadService.create(data).subscribe({
         next: (lead) => this.router.navigate(['/leads', lead.id]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     }
   }
