@@ -25,7 +25,7 @@ public class ContactCreateRequest {
     @Size(max = 255, message = "Last name must not exceed 255 characters")
     private String lastName;
 
-    @NotBlank(message = "Email is required")
+    // Optional on create — matches Contact entity nullability and Angular CRM form.
     @Email(message = "Email must be valid")
     @Size(max = 255, message = "Email must not exceed 255 characters")
     private String email;
@@ -67,7 +67,10 @@ public class ContactCreateRequest {
 
     private String notes;
 
-    private boolean primary;
+    // Boolean (not primitive): Jackson 3 FAIL_ON_NULL_FOR_PRIMITIVES rejects omitted/null primary
+    // from the SPA create form. Treat null as false in persistence/mapping.
+    @Builder.Default
+    private Boolean primary = Boolean.FALSE;
 
     private String ownerId;
 }
