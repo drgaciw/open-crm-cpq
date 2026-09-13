@@ -193,10 +193,13 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.11</version>
                 <configuration>
-                    <!-- Generated protobuf/gRPC and MapStruct impls are not hand-written. Gate stays 0.80. -->
+                    <!-- Generated protobuf/gRPC and MapStruct impls are not hand-written. Gate stays 0.80.
+                         Skip Drools parser instrumentation (MethodTooLargeException on DRL6Lexer). -->
                     <excludes>
                         <exclude>com/opencrm/common/grpc/**</exclude>
                         <exclude>**/*MapperImpl.class</exclude>
+                        <exclude>org/drools/**</exclude>
+                        <exclude>org/antlr/**</exclude>
                     </excludes>
                 </configuration>
                 <executions>
