@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: green
 ---
 # tdd-be-it-reactor
 
@@ -44,9 +44,8 @@ ITs **not** skipped. Dual-read YAML untouched. No `00-orchestrator-status`. Jaco
 
 ## Result
 
-- **status:** `green_partial`
-- Docker: `newgrp docker` + `docker info` OK
-- Non-CRM / non-pricing: `./mvnw -B -U verify -pl '!services/crm-service,!services/pricing-service'` **EXIT=0** (~3m20s)
-- CRM ITs: deferred to **w14** (no `crm-service` edits in this branch)
-- Pricing Jacoco 0.80: deferred (gate unchanged)
-- Holds: dual-read untouched; no `00-orchestrator-status`; ITs not skipped on included modules; Jacoco not lowered
+- **status:** `green`
+- Rebased onto `origin/main` @ `04909db` (#499); **no crm-service diffs** vs main (`appendQueryParam` kept)
+- Full reactor: `./mvnw -B -U clean verify` under `newgrp docker` — **EXIT=0** (~4m33s)
+- CRM Service SUCCESS; Pricing Service SUCCESS (Jacoco **0.80** gate held)
+- Holds: Boot **4.0.6**; dual-read untouched; no `00-orchestrator-status`; ITs not skipped
