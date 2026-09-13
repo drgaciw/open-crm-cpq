@@ -1,6 +1,6 @@
 # Open CRM/CPQ - AI Agent Development Guide
 
-**Steering (read first):** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/adr/README.md](docs/adr/README.md) · forge waves [23](docs/forge/23-wave-n-architecture.md)–[34](docs/forge/34-wave-v-architecture.md).  
+**Steering (read first):** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/adr/README.md](docs/adr/README.md) · forge waves [23](docs/forge/23-wave-n-architecture.md)–[35](docs/forge/35-wave-w-architecture.md).  
 **Do not** treat `MODERNIZATION_PLAN.md` or the phase tables below as “what to build this week.” They are **target-state** roadmaps. Forge **holds** (do not implement unless a wave plan says so): Activities API, CI #238, agent Kafka #241, dual-read YAML flip, NgRx, contract-asset FE, full SpEL, Kafka S2B-9, gateway domain validation, product-validate deletion, WhatsApp #430 undo, R2 price-book list-row delete.
 
 ## Project Overview
@@ -16,7 +16,7 @@
 | AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`); ADR-002 GLM-5 **Accepted but not implemented** | GLM-5 via Zhipu **or** keep Azure — do not assume GLM-5 is live |
 | Rules | None | Drools DRL on pricing-service; CE `ProductRuleEvaluationCore`; OpenL **not** required for forge | OpenL Tablets + full Drools |
 
-**Current implementation status (2026-09-12):** **Not early stage.** Forge waves **A–U COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave V** this closeout (V1 CRM Tailwind CSS entry + initial budget warning 750kb; V2 catalog `product.service` `errorCode`; V3 deal-kanban load error + loading a11y — [34-wave-v-architecture.md](docs/forge/34-wave-v-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–V**). Activities API **does not exist** — do not invent `/api/v1/activities/**`. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
+**Current implementation status (2026-09-13):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities API **does not exist** — do not invent `/api/v1/activities/**`. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
 
 ---
 
@@ -223,8 +223,8 @@ Before marking any task as complete, verify:
 |-------|---------------------------|--------------------------------------------------------------|
 | CSRF | Gateway Cookie CSRF only; domain `csrf.disable()` + STATELESS — [ADR-004](docs/adr/ADR-004-csrf-edge-boundary.md) | — |
 | Config validate | Gateway → CE evaluate + `ConfigurationValidationResult`; product `POST /validate` **retained** — [backlog ADR](docs/backlog/ADR-configuration-api-reconciliation.md) | Full S2B-8 ConstraintSolver; Kafka S2B-9 **held** |
-| Dual-read approvals | `${APPROVALS_LEGACY_LOCAL_READ:true}` — [ADR-005 Proposed](docs/adr/ADR-005-approvals-legacy-dual-read.md); J5 gate; hold **J–V** | Flip to `false` is **HIGH** — not authorized |
-| API entities | Subscription API is DTO-only + paginated list (O3 on `main`) — [ADR-006 Proposed](docs/adr/ADR-006-entities-never-at-api-boundary.md) | Other controllers still return **entities** (`ConfigurationSession`, `ApprovalRequest`, `DocumentGenerationJob`); **do not Accept** ADR-006; subscriptions **FE** held |
+| Dual-read approvals | `${APPROVALS_LEGACY_LOCAL_READ:true}` — [ADR-005 Proposed](docs/adr/ADR-005-approvals-legacy-dual-read.md); J5 gate; hold **J–W** | Flip to `false` is **HIGH** — not authorized |
+| API entities | Subscription + configuration-session + approval-routing + document-job APIs are DTO-only (O3 + W1–W3 on `main`) — [ADR-006 Accepted](docs/adr/ADR-006-entities-never-at-api-boundary.md) | Subscriptions **FE** held; do **not** re-expose JPA entities at `/api/v1/**` |
 | Frontend state | Signals + service HTTP | NgRx 19+ **held** |
 | AI | Runtime **Azure OpenAI gpt-4o** in `ai-service` | ADR-002 GLM-5 **Accepted, not landed** — do not treat GLM-5 as production |
 | CI | Jenkins primary; GHA manual — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | — |

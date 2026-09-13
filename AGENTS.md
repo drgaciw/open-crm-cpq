@@ -50,5 +50,5 @@ GitNexus block above is **code-intelligence only**. For what to build vs hold, r
 
 - [AGENT.md](AGENT.md) — landed vs target; dual-read / NgRx / Activities holds
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — index
-- [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 still **Proposed**)
+- [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 **Accepted**; dual-read ADR-005 still **Proposed**)
 

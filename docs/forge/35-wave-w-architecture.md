@@ -1,13 +1,13 @@
 # Wave W architecture — ADR-006 remaining entity leaks (BE DTO)
 
-**Status:** READY FOR FORGE — orchestrator locked: Waves **A–V COMPLETE** on `origin/main` @ `5e9c28d`; **N/S/U/V COMPLETE**; **Wave T skipped**  
+**Status:** COMPLETE on main 2026-09-13 — W1 `e6d3b23` (#503), W2 `29cac5b` (#501), W3 `0a3d9a4` (#502) (W4 this closeout Accept ADR-006); **R2** still **HELD**; **Wave T skipped**  
 **Architect:** `opencrm-architect` (Herdr `w8`) — **plan only; do not spawn implementers**  
 **Evidence date:** 2026-09-13  
-**Baseline:** `origin/main` @ `5e9c28d` (V closeout `6831672`; TDD ITs #498–#500; Boot **4.0.6**)  
-**Survey tip:** `origin/main` @ `5e9c28d`  
+**Baseline:** `origin/main` @ `5e9c28d` (V closeout `6831672`; TDD ITs #498–#500; Boot **4.0.6**); plan `a7017bf`; FORGING `77e4b66`  
+**Survey tip:** Day-1 tip `origin/main` @ `d9b8c8f` (W1 merge #503; W1–W3 landed)  
 **Sources:** `rg` + **read controllers/entities**. GitNexus **skip analyze**. UNKNOWN ≠ unused; `-r /home/username01/Projects/open-crm-cpq --file`. Linear/Notion Open CRM: **none**.  
 **Do not** edit `docs/forge/00-orchestrator-status.md`.  
-**Do not** Accept ADR-006 until **W1+W2+W3** are on `main` (then W4 Accept).
+**ADR-006 Accepted** in W4 after W1+W2+W3 on `main`.
 
 ---
 
@@ -221,9 +221,9 @@ Implement Open CRM/CPQ Wave W per docs/forge/35-wave-w-architecture.md in three 
 - [x] Zero portal / chrome; no FE  
 - [x] GitNexus analyze skipped; `rg` used  
 - [x] Architect **does not spawn** implementers  
-- [ ] Orchestrator → Wave W FORGING (`00-*`)  
-- [ ] W1–W4 merged; ADR-006 Accepted  
+- [x] Orchestrator → Wave W FORGING (`00-*`) — `77e4b66`  
+- [x] W1–W4 COMPLETE (W4 this PR); ADR-006 Accepted; R2 still held; T skipped  
 
-**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** Accept ADR-006 in Day-1 PRs. Do **not** edit quote BFF. Do **not** downgrade Boot 4.0.6.
+**PM WARNING:** Do **not** flip dual-read (**HIGH**). Do **not** Accept ADR-005. Do **not** edit quote BFF. Do **not** downgrade Boot 4.0.6.
 
-**WAVE W — APPROVED FOR FORGE.**
+**WAVE W — COMPLETE.**
