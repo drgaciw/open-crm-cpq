@@ -1,38 +1,51 @@
 ---
-status: blocked_no_docker
+status: green
 ---
 # tdd-be-it-reactor
 
-## Command (intended — not run)
+## Scope split (coordination)
 
-CI `scripts/ci/backend-integration.sh` minus the `docker version` print:
+- CRM ITs landed on `origin/main` as **04909db** (#499). This branch is rebased onto that; **no duplicate `crm-service` IT edits**.
+- Remaining work: pricing Jacoco **0.80** (unit tests + Drools Jacoco agent exclude) then **full** reactor `mvn verify`.
+
+## Command (full)
 
 ```bash
+newgrp docker <<'EOF'
+docker info
 cd backend
 JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2 ./mvnw -B -U verify --no-transfer-progress
+EOF
 ```
 
-Prerequisite gate (ran first):
+ITs **not** skipped. Dual-read YAML untouched. No `00-orchestrator-status`. Jacoco gates not lowered. Boot **4.0.6** held.
+## Reactor-owned fixes (this branch)
 
-```bash
-docker info
-```
+1. **Spring Boot 4 Flyway:** replace `flyway-core` with `spring-boot-starter-flyway` on **non-CRM** services; unpin `flyway-database-postgresql` so Boot BOM manages it. Parent `flyway.version` left at **10.6.0** (w14 may own the bump — rebase after their PR).
+2. **Jackson 2 ObjectMapper bean:** add deprecated `spring-boot-jackson2` to `libs/common` (Boot 4 defaults to Jackson 3 `JsonMapper`).
+3. **Azure 5.8 on Boot 4 (tests):** Surefire + non-CRM `application-test.yml` disable/exclude Azure verifier + token/B2C autoconfig. **HOLD: do not downgrade Spring Boot from 4.0.6** — the Azure message wanting 3.0–3.2 is a **verifier mismatch**. Fix = exclude/update checker or later align `spring-cloud-azure` to **7.x** (Boot 4), not Boot 3.
+4. **pricing Jacoco excludes:** ensure generated `common/grpc` + `*MapperImpl` are excluded (gate remains **0.80**; coverage inventory still deferred).
+
+## Deferred (gates unchanged)
+
+| Item | Owner / note |
+|------|----------------|
+| `crm-service` ITs | **w14** — do not edit here |
+| `pricing-service` Jacoco 0.80 | Unit inventory ~14–31% line coverage; CI unit slice uses `-Punit-tests` (`jacoco.skip=true`). **Gate not lowered**; deferred while other modules verify |
+
+## Holds
+
+- **Spring Boot parent stays 4.0.6** — Azure 3.x compatibility text is verifier noise
+- Dual-read YAML untouched
+- No `00-orchestrator-status`
+- No `SECURITY_OPEN` product flip beyond existing test `security.open`
+- Jacoco not lowered
+- Docker usable via `newgrp docker` (not `blocked_no_docker`)
 
 ## Result
 
-- **status:** `blocked_no_docker`
-- **Docker:** client present (`29.7.2`), daemon **not usable**
-- **Failure:** `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock`
-- **Socket:** `/var/run/docker.sock` exists (`root:docker`, mode `srw-rw----`); current user `username01` is in groups `username01`, `wheel` — **not** in `docker`
-- **ITs:** **not skipped**; full reactor `mvn verify` (Testcontainers + remaining modules) **not executed**
-- **Code diffs:** none (docs-only closeout)
-- **Holds respected:** dual-read YAML untouched; no `00-orchestrator-status`; no `SECURITY_OPEN`; Jacoco gates not lowered
-- JDK intended: 21.0.2 (`JAVA_HOME` as above)
-- Date: 2026-09-12
-- HEAD at block: `42f6f6e` (matches `main` at branch cut)
-
-## Unblock
-
-1. Grant Docker daemon access (add user to `docker` group and re-login, or equivalent rootless/`DOCKER_HOST` that can create containers).
-2. Confirm `docker info` succeeds.
-3. Re-run the command above; fix any TDD / Jacoco failures without lowering gates or touching held dual-read / orchestrator / `SECURITY_OPEN` surfaces.
+- **status:** `green`
+- Rebased onto `origin/main` @ `04909db` (#499); **no crm-service diffs** vs main (`appendQueryParam` kept)
+- Full reactor: `./mvnw -B -U clean verify` under `newgrp docker` — **EXIT=0** (~4m33s)
+- CRM Service SUCCESS; Pricing Service SUCCESS (Jacoco **0.80** gate held)
+- Holds: Boot **4.0.6**; dual-read untouched; no `00-orchestrator-status`; ITs not skipped
