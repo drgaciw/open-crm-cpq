@@ -1,6 +1,6 @@
 package com.opencrm.crm.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.BaseIntegrationTest;
 import com.opencrm.crm.deal.Deal;
@@ -13,10 +13,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -29,7 +25,7 @@ import static org.awaitility.Awaitility.await;
 /**
  * Redis pub/sub integration: quote-accepted → deal WON + duplicate-message idempotency.
  * <p>
- * Requires Docker (Testcontainers Postgres via {@link BaseIntegrationTest} + Redis).
+ * Requires Docker (Testcontainers Postgres + Redis via {@link BaseIntegrationTest}).
  * Gated behind {@code @Tag("integration")} / {@code -Pintegration-tests}; unit profile stays Docker-free.
  * <p>
  * Deal-missing key poisoning (scout G3) is owned by B0-2 / PR-A; this IT covers the happy path
@@ -39,22 +35,6 @@ import static org.awaitility.Awaitility.await;
 @Tag("integration")
 @Tag("docker")
 class QuoteAcceptedRedisIntegrationTest extends BaseIntegrationTest {
-
-    private static final DockerImageName REDIS_IMAGE = DockerImageName.parse("redis:7-alpine");
-
-    @SuppressWarnings("resource")
-    static final GenericContainer<?> REDIS = new GenericContainer<>(REDIS_IMAGE)
-            .withExposedPorts(6379);
-
-    static {
-        REDIS.start();
-    }
-
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379).toString());
-    }
 
     @Autowired
     private DealRepository dealRepository;

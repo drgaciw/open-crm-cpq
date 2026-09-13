@@ -1,6 +1,6 @@
 package com.opencrm.crm.deal;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.opencrm.crm.BaseIntegrationTest;
 import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;

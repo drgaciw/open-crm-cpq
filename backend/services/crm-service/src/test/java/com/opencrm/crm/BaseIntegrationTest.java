@@ -10,11 +10,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Base class for integration tests.
- * Configures a shared Testcontainers PostgreSQL instance and Spring Boot test environment.
+ * Shared Testcontainers PostgreSQL + Redis (RedisMessageListenerContainer requires a live Redis).
  */
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
@@ -23,7 +25,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @Tag("integration")
 public abstract class BaseIntegrationTest {
 
+    private static final DockerImageName REDIS_IMAGE = DockerImageName.parse("redis:7-alpine");
+
     static final PostgreSQLContainer<?> POSTGRES;
+    static final GenericContainer<?> REDIS;
 
     static {
         POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -32,6 +37,11 @@ public abstract class BaseIntegrationTest {
                 .withPassword("test")
                 .withInitScript("db/init-test.sql");
         POSTGRES.start();
+
+        @SuppressWarnings("resource")
+        GenericContainer<?> redis = new GenericContainer<>(REDIS_IMAGE).withExposedPorts(6379);
+        REDIS = redis;
+        REDIS.start();
     }
 
     @Autowired
@@ -42,15 +52,23 @@ public abstract class BaseIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl() + "?currentSchema=crm");
+        // Testcontainers may already append query params (e.g. loggerLevel=OFF); use & not a second ?.
+        registry.add("spring.datasource.url", () -> appendQueryParam(POSTGRES.getJdbcUrl(), "currentSchema", "crm"));
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // Default Redis endpoints for ITs that do not start a Redis container.
-        // QuoteAcceptedRedisIntegrationTest overrides these via its own @DynamicPropertySource.
-        registry.add("spring.data.redis.host", () -> "localhost");
-        registry.add("spring.data.redis.port", () -> "6379");
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379).toString());
         registry.add("spring.cache.type", () -> "none");
+        registry.add("spring.cloud.azure.compatibility-verifier.enabled", () -> "false");
+        registry.add("spring.autoconfigure.exclude", () ->
+                "com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,"
+                        + "com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration");
+    }
+
+    static String appendQueryParam(String jdbcUrl, String name, String value) {
+        String separator = jdbcUrl.contains("?") ? "&" : "?";
+        return jdbcUrl + separator + name + "=" + value;
     }
 
     @BeforeEach

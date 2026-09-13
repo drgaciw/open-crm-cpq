@@ -20,6 +20,15 @@ spring:
     redis:
       host: localhost
       port: 6379
+  # security lib pulls spring-cloud-azure 5.8 (Boot 3-era); exclude for Boot 4 ITs.
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
 
 logging:
   level:
