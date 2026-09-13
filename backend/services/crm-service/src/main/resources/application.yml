@@ -40,6 +40,18 @@ spring:
     redis:
       time-to-live: 600000
       cache-null-values: false
+  # security lib pulls spring-cloud-azure 5.8 (Boot 3-era). Keep Boot 4.0.6;
+  # disable the verifier instead of downgrading (parent surefire + ITs do the same).
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
 
 springdoc:
   api-docs:

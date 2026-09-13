@@ -187,8 +187,18 @@ export class ContactFormComponent implements OnInit {
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving = true;
-    const { organizationSearch, ...formValue } = this.form.value;
-    const data = { ...formValue, organizationId: this.selectedOrgId };
+    const { organizationSearch, email, phone, jobTitle, department, notes, ...rest } =
+      this.form.value;
+    const data = {
+      ...rest,
+      email: email?.trim() ? email.trim() : undefined,
+      phone: phone?.trim() ? phone.trim() : undefined,
+      jobTitle: jobTitle?.trim() ? jobTitle.trim() : undefined,
+      department: department?.trim() ? department.trim() : undefined,
+      notes: notes?.trim() ? notes.trim() : undefined,
+      ...(this.selectedOrgId != null ? { organizationId: this.selectedOrgId } : {}),
+      primary: false,
+    };
 
     const idVal = this.id();
     if (this.isEditMode && idVal) {
