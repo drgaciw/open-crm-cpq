@@ -24,8 +24,9 @@ ITs **not** skipped on non-CRM modules. Dual-read YAML untouched. No `00-orchest
 
 1. **Spring Boot 4 Flyway:** replace `flyway-core` with `spring-boot-starter-flyway` on **non-CRM** services; unpin `flyway-database-postgresql` so Boot BOM manages it. Parent `flyway.version` left at **10.6.0** (w14 may own the bump — rebase after their PR).
 2. **Jackson 2 ObjectMapper bean:** add deprecated `spring-boot-jackson2` to `libs/common` (Boot 4 defaults to Jackson 3 `JsonMapper`).
-3. **Azure 5.8 on Boot 4 (tests):** Surefire system props + non-CRM `application-test.yml` exclude Azure token/B2C/verifier autoconfig; `compatibility-verifier.enabled=false`.
+3. **Azure 5.8 on Boot 4 (tests):** Surefire + non-CRM `application-test.yml` disable/exclude Azure verifier + token/B2C autoconfig. **HOLD: do not downgrade Spring Boot from 4.0.6** — the Azure message wanting 3.0–3.2 is a **verifier mismatch**. Fix = exclude/update checker or later align `spring-cloud-azure` to **7.x** (Boot 4), not Boot 3.
 4. **pricing Jacoco excludes:** ensure generated `common/grpc` + `*MapperImpl` are excluded (gate remains **0.80**; coverage inventory still deferred).
+
 ## Deferred (gates unchanged)
 
 | Item | Owner / note |
@@ -35,6 +36,7 @@ ITs **not** skipped on non-CRM modules. Dual-read YAML untouched. No `00-orchest
 
 ## Holds
 
+- **Spring Boot parent stays 4.0.6** — Azure 3.x compatibility text is verifier noise
 - Dual-read YAML untouched
 - No `00-orchestrator-status`
 - No `SECURITY_OPEN` product flip beyond existing test `security.open`
