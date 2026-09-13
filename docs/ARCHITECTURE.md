@@ -6,13 +6,13 @@
 
 | Item | State |
 |------|--------|
-| Product waves A–U | **COMPLETE** on `main` |
+| Product waves A–V | **COMPLETE** on `main` |
 | Hygiene N′ (H1+H2) | **COMPLETE** |
 | Wave T | **skipped** (do not name T1/T2) |
-| Wave V | **this closeout** — [34-wave-v-architecture.md](forge/34-wave-v-architecture.md) (V1 CRM Tailwind CSS entry + budget ∥ V2 catalog product errorCode ∥ V3 deal-kanban load a11y) |
-| Dual-read | `${APPROVALS_LEGACY_LOCAL_READ:true}` — **HIGH** to flip; hold **J–V** ([ADR-005](adr/ADR-005-approvals-legacy-dual-read.md) Proposed) |
+| Wave W | **this closeout** — [35-wave-w-architecture.md](forge/35-wave-w-architecture.md) (W1 CE `ConfigurationSessionDto` ∥ W2 routing `ApprovalRequestDto` ∥ W3 `DocumentGenerationJobDto`; W4 Accept ADR-006) |
+| Dual-read | `${APPROVALS_LEGACY_LOCAL_READ:true}` — **HIGH** to flip; hold **J–W** ([ADR-005](adr/ADR-005-approvals-legacy-dual-read.md) Proposed) |
 | GLM-5 | ADR-002 **Accepted**, **runtime** Azure OpenAI `gpt-4o` |
-| ADR-006 | **Proposed**; O3 **on `main`** (subscription DTO+list; **no FE**); other entity leaks remain — **do not Accept** |
+| ADR-006 | **Accepted** — O3 + W1–W3 **on `main`** (subscription / configuration-session / approval-routing / document-job DTOs; **no** subscriptions FE) |
 | N residuals | **R1** landed in Q2; **R2** price-book list-row delete **HELD**; no N′′ |
 | Open GitHub issues | **#238**, **#241** only (**HOLD**) |
 
@@ -20,7 +20,7 @@
 
 1. [AGENT.md](../AGENT.md) — landed vs target (always_applied)  
 2. [docs/adr/README.md](adr/README.md) — ADRs  
-3. Latest forge plan: [34-wave-v-architecture.md](forge/34-wave-v-architecture.md)  
+3. Latest forge plan: [35-wave-w-architecture.md](forge/35-wave-w-architecture.md)  
 4. [CPQ_API_CONTRACT_MATRIX.md](backlog/CPQ_API_CONTRACT_MATRIX.md)  
 5. [ci-contract.yaml](ci-contract.yaml) — Jenkins primary ([ADR-003](adr/ADR-003-ci-llm-integration.md))  
 6. [ADR-004 CSRF](adr/ADR-004-csrf-edge-boundary.md) (stub: [ADR-004-csrf-edge-boundary.md](ADR-004-csrf-edge-boundary.md))  
@@ -38,10 +38,11 @@
 | [29-wave-q-ux-architecture.md](forge/29-wave-q-ux-architecture.md) | Wave Q COMPLETE |
 | [31-wave-s-ux-architecture.md](forge/31-wave-s-ux-architecture.md) | Wave S COMPLETE |
 | [33-wave-u-ux-architecture.md](forge/33-wave-u-ux-architecture.md) | Wave U COMPLETE |
-| [34-wave-v-architecture.md](forge/34-wave-v-architecture.md) | Wave V closeout |
+| [34-wave-v-architecture.md](forge/34-wave-v-architecture.md) | Wave V COMPLETE |
+| [35-wave-w-architecture.md](forge/35-wave-w-architecture.md) | Wave W closeout |
 | [27-architecture-docs-plan.md](forge/27-architecture-docs-plan.md) | Steering-docs job |
 | [24-adr-gitnexus-review.md](forge/24-adr-gitnexus-review.md) | ADR vs code |
 
 ## Holds (do not forge unless a new wave plan says so)
 
-Activities API; CI #238; Kafka #241; product-validate deletion; gateway domain validation; dual-read flip (hold **J–V**); WhatsApp #430 undo; full SpEL; Kafka S2B-9; contract-asset / subscriptions **FE**; NgRx; Accept ADR-006; **R2** price-book list-row delete; named Wave T / T1 / T2.
+Activities API; CI #238; Kafka #241; product-validate deletion; gateway domain validation; dual-read flip (hold **J–W**); WhatsApp #430 undo; full SpEL; Kafka S2B-9; contract-asset / subscriptions **FE**; NgRx; Accept ADR-005; **R2** price-book list-row delete; named Wave T / T1 / T2.
