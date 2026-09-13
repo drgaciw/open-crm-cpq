@@ -7,6 +7,8 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
+import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.configuration.mapper.ConfigurationSessionMapper;
 import com.opencrm.configuration.model.ConfigurationModel;
 import com.opencrm.configuration.model.ConfigurationModelCache;
 import com.opencrm.configuration.model.ConfigurationModelCompiler;
@@ -23,6 +25,7 @@ import java.util.UUID;
 /**
  * Service layer for configuration session management.
  * Ensures only valid configuration combinations pass to pricing/quote flows.
+ * Public API returns {@link ConfigurationSessionDto} only.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,8 +38,9 @@ public class ConfigurationSessionService {
     private final OutboxEventPublisher outboxEventPublisher;
     private final ConfigurationModelCache configurationModelCache;
     private final ConfigurationModelCompiler configurationModelCompiler;
+    private final ConfigurationSessionMapper sessionMapper;
 
-    public ConfigurationSession create(String productId, String userId) {
+    public ConfigurationSessionDto create(String productId, String userId) {
         log.debug("Creating configuration session for product: {}, user: {}", productId, userId);
 
         ConfigurationSession session = ConfigurationSession.builder()
@@ -49,22 +53,21 @@ public class ConfigurationSessionService {
 
         ConfigurationSession saved = sessionRepository.save(session);
         log.info("Created configuration session ID: {}", saved.getId());
-        return saved;
+        return sessionMapper.toDto(saved);
     }
 
     @Transactional(readOnly = true)
-    public ConfigurationSession getById(Long id) {
-        return sessionRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("ConfigurationSession", id));
+    public ConfigurationSessionDto getById(Long id) {
+        return sessionMapper.toDto(findEntityById(id));
     }
 
     @Transactional(readOnly = true)
-    public List<ConfigurationSession> getByUserAndStatus(String userId, ConfigurationStatus status) {
-        return sessionRepository.findByUserIdAndStatus(userId, status);
+    public List<ConfigurationSessionDto> getByUserAndStatus(String userId, ConfigurationStatus status) {
+        return sessionMapper.toDtoList(sessionRepository.findByUserIdAndStatus(userId, status));
     }
 
-    public ConfigurationSession addSelection(Long sessionId, String optionKey, String optionValue) {
-        ConfigurationSession session = getById(sessionId);
+    public ConfigurationSessionDto addSelection(Long sessionId, String optionKey, String optionValue) {
+        ConfigurationSession session = findEntityById(sessionId);
 
         if (session.getStatus() != ConfigurationStatus.IN_PROGRESS) {
             throw new IllegalStateException("Cannot modify a session that is not IN_PROGRESS");
@@ -72,11 +75,11 @@ public class ConfigurationSessionService {
 
         session.addSelection(optionKey, optionValue);
         applyConstraintResult(session, constraintSolver.evaluate(session));
-        return sessionRepository.save(session);
+        return sessionMapper.toDto(sessionRepository.save(session));
     }
 
-    public ConfigurationSession removeSelection(Long sessionId, String optionKey) {
-        ConfigurationSession session = getById(sessionId);
+    public ConfigurationSessionDto removeSelection(Long sessionId, String optionKey) {
+        ConfigurationSession session = findEntityById(sessionId);
 
         if (session.getStatus() != ConfigurationStatus.IN_PROGRESS) {
             throw new IllegalStateException("Cannot modify a session that is not IN_PROGRESS");
@@ -84,14 +87,14 @@ public class ConfigurationSessionService {
 
         session.removeSelection(optionKey);
         applyConstraintResult(session, constraintSolver.evaluate(session));
-        return sessionRepository.save(session);
+        return sessionMapper.toDto(sessionRepository.save(session));
     }
 
-    public ConfigurationSession validate(Long sessionId) {
-        ConfigurationSession session = getById(sessionId);
+    public ConfigurationSessionDto validate(Long sessionId) {
+        ConfigurationSession session = findEntityById(sessionId);
         configurationModelCache.getOrCompile(session.getProductId(), configurationModelCompiler);
         applyConstraintResult(session, constraintSolver.evaluate(session));
-        return sessionRepository.save(session);
+        return sessionMapper.toDto(sessionRepository.save(session));
     }
 
     /**
@@ -108,12 +111,12 @@ public class ConfigurationSessionService {
         }
     }
 
-    public ConfigurationSession complete(Long sessionId) {
-        ConfigurationSession session = getById(sessionId);
+    public ConfigurationSessionDto complete(Long sessionId) {
+        ConfigurationSession session = findEntityById(sessionId);
         session.complete(); // Throws if not valid
         ConfigurationSession saved = sessionRepository.save(session);
         publishConfigurationCommitted(saved);
-        return saved;
+        return sessionMapper.toDto(saved);
     }
 
     private void publishConfigurationCommitted(ConfigurationSession session) {
@@ -143,14 +146,19 @@ public class ConfigurationSessionService {
         );
     }
 
-    public ConfigurationSession cancel(Long sessionId) {
-        ConfigurationSession session = getById(sessionId);
+    public ConfigurationSessionDto cancel(Long sessionId) {
+        ConfigurationSession session = findEntityById(sessionId);
 
         if (session.getStatus() == ConfigurationStatus.COMPLETED) {
             throw new IllegalStateException("Cannot cancel a completed session");
         }
 
         session.setStatus(ConfigurationStatus.CANCELLED);
-        return sessionRepository.save(session);
+        return sessionMapper.toDto(sessionRepository.save(session));
+    }
+
+    private ConfigurationSession findEntityById(Long id) {
+        return sessionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ConfigurationSession", id));
     }
 }
