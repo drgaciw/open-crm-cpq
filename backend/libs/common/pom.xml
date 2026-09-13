@@ -35,7 +35,14 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- Jackson for JSON -->
+        <!-- Jackson for JSON.
+             Boot 4 defaults to Jackson 3 (tools.jackson JsonMapper). Shared code and
+             services still inject com.fasterxml.jackson.databind.ObjectMapper — bring
+             deprecated spring-boot-jackson2 so that bean is auto-configured. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
