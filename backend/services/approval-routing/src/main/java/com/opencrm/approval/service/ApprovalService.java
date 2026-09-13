@@ -2,7 +2,9 @@ package com.opencrm.approval.service;
 
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
+import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.ApprovalSubmitRequest;
+import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
@@ -19,21 +21,23 @@ import java.util.List;
 
 /**
  * Approval service with state machine transitions and event publishing.
+ * Public API returns {@link ApprovalRequestDto} only — never the JPA entity.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class ApprovalService {
-    
+
     private final ApprovalRequestRepository approvalRequestRepository;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final ApprovalRequestMapper approvalRequestMapper;
 
     /**
      * Create a PENDING approval for quote BFF orchestration (S2C-12).
      * Additive to {@link com.opencrm.approval.event.DiscountApprovalEventConsumer}.
      */
-    public ApprovalRequest submit(ApprovalSubmitRequest request) {
+    public ApprovalRequestDto submit(ApprovalSubmitRequest request) {
         if (request == null) {
             throw new BusinessException("Approval submit request is required", "INVALID_APPROVAL_SUBMIT");
         }
@@ -63,62 +67,68 @@ public class ApprovalService {
         ApprovalRequest saved = approvalRequestRepository.save(entity);
         log.info("Created PENDING approval id={} quoteId={} tier={} type={}",
                 saved.getId(), saved.getQuoteId(), saved.getApprovalTier(), saved.getApprovalType());
-        return saved;
+        return approvalRequestMapper.toDto(saved);
     }
-    
-    public ApprovalRequest getById(Long id) {
-        return approvalRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
+
+    @Transactional(readOnly = true)
+    public ApprovalRequestDto getById(Long id) {
+        return approvalRequestMapper.toDto(findEntityById(id));
     }
-    
-    public List<ApprovalRequest> getPendingApprovals() {
-        return approvalRequestRepository.findByStatus(ApprovalStatus.PENDING);
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getPendingApprovals() {
+        return approvalRequestMapper.toDtoList(
+                approvalRequestRepository.findByStatus(ApprovalStatus.PENDING));
     }
-    
-    public List<ApprovalRequest> getPendingApprovalsByTier(String tier) {
-        return approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING);
+
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getPendingApprovalsByTier(String tier) {
+        return approvalRequestMapper.toDtoList(
+                approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING));
     }
-    
-    public ApprovalRequest approve(Long id, String approverId) {
+
+    public ApprovalRequestDto approve(Long id, String approverId) {
         log.debug("Approving request ID: {}", id);
-        
-        ApprovalRequest request = getById(id);
+
+        ApprovalRequest request = findEntityById(id);
         request.approve(approverId);
-        
+
         ApprovalRequest saved = approvalRequestRepository.save(request);
-        
-        // Publish approval approved event
-        // In production, this would have a proper event DTO
+
         log.info("Approved request ID: {} for quote: {}", id, request.getQuoteId());
-        
-        return saved;
+
+        return approvalRequestMapper.toDto(saved);
     }
-    
-    public ApprovalRequest reject(Long id, String approverId, String rejectionReason) {
+
+    public ApprovalRequestDto reject(Long id, String approverId, String rejectionReason) {
         log.debug("Rejecting request ID: {}", id);
-        
-        ApprovalRequest request = getById(id);
+
+        ApprovalRequest request = findEntityById(id);
         request.reject(approverId, rejectionReason);
-        
+
         ApprovalRequest saved = approvalRequestRepository.save(request);
-        
-        // Publish rejection event via Transactional Outbox
+
         ApprovalRejectedEvent event = new ApprovalRejectedEvent(
                 request.getQuoteId(),
                 request.getRejectedAt(),
                 rejectionReason,
                 "REVISE_QUOTE"
         );
-        
+
         outboxEventPublisher.publish(
                 "ApprovalRequest",
                 request.getQuoteId(),
                 KafkaTopics.QUOTE_APPROVAL_REJECTED,
                 event
         );
-        
+
         log.info("Rejected request ID: {} for quote: {}", id, request.getQuoteId());
-        
-        return saved;
+
+        return approvalRequestMapper.toDto(saved);
+    }
+
+    private ApprovalRequest findEntityById(Long id) {
+        return approvalRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
     }
 }
