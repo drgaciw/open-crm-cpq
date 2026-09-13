@@ -1,17 +1,17 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave W FORGING** (W1 CE session DTO ∥ W2 routing ApprovalRequest DTO ∥ W3 document job DTO; **T skipped**; **no N/S/U/V reopen**; **no N′′**; R2 still held; ADR-006 still **Proposed** until W4)  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — architect-only; plan `docs/forge/35-wave-w-architecture.md`  
+**Session state:** **Wave W COMPLETE** (W1 CE session DTO ∥ W2 routing ApprovalRequest DTO ∥ W3 document job DTO ∥ W4 Accept ADR-006); **T skipped**; **no N/S/U/V reopen**; **no N′′**; R2 still held; ADR-006 **Accepted**; ADR-005 still **Proposed**  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
 **Plan:** Wave W @ `a7017bf` (cherry-pick of architect `96800b5`)  
-**Baseline:** Wave V COMPLETE on `main` @ `6831672`; tip `5e9c28d`; W plan on `main` @ `a7017bf`
+**Baseline:** Wave W COMPLETE on `main` @ `0b6d3ad`
 
-## Wave W in flight
+## Wave W landed
 
-- **W1** CE `ConfigurationSessionDto` — `feat/forge-w1-be-config-session-dto` (`ww-be-config-session`)
-- **W2** approval-routing `ApprovalRequestDto` — `feat/forge-w2-be-approval-request-dto` (`ww-be-approval-dto`)
-- **W3** document-generation job DTO — `feat/forge-w3-be-document-job-dto` (`ww-be-document-job`)
-- **W4** docs closeout + Accept ADR-006 after Day-1 (no `00-orchestrator-status`)
+- **W1** CE `ConfigurationSessionDto` — `d9b8c8f` (#503)
+- **W2** approval-routing `ApprovalRequestDto` — `2582aee` (#501)
+- **W3** document-generation job DTO — `431967d` (#502)
+- **W4** Accept ADR-006 (dual-read J–W still true; no subscriptions FE) — `0b6d3ad` (#504)
 
 ## Wave V landed
 
