@@ -1,25 +1,24 @@
 ---
-status: green_partial
+status: in_progress
 ---
 # tdd-be-it-reactor
 
 ## Scope split (coordination)
 
-- **w14 `tdd-be-it-crm`** owns CRM IT schema/context: `crm-service` Flyway starter, `BaseIntegrationTest` JDBC `currentSchema` separator, `application-test.yml` Azure excludes, Redis IT wiring.
-- **This worktree** does **not** edit those `crm-service` paths. Full-reactor `mvn verify` still fails on CRM until w14 lands; reactor continues with **`-pl '!services/crm-service'`**.
+- CRM ITs landed on `origin/main` as **04909db** (#499). This branch is rebased onto that; **no duplicate `crm-service` IT edits**.
+- Remaining work: pricing Jacoco **0.80** (unit tests + Drools Jacoco agent exclude) then **full** reactor `mvn verify`.
 
-## Command (non-CRM)
+## Command (full)
 
 ```bash
 newgrp docker <<'EOF'
 docker info
 cd backend
-JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2 ./mvnw -B -U verify --no-transfer-progress -pl '!services/crm-service'
+JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2 ./mvnw -B -U verify --no-transfer-progress
 EOF
 ```
 
-ITs **not** skipped on non-CRM modules. Dual-read YAML untouched. No `00-orchestrator-status`. Jacoco gates not lowered.
-
+ITs **not** skipped. Dual-read YAML untouched. No `00-orchestrator-status`. Jacoco gates not lowered. Boot **4.0.6** held.
 ## Reactor-owned fixes (this branch)
 
 1. **Spring Boot 4 Flyway:** replace `flyway-core` with `spring-boot-starter-flyway` on **non-CRM** services; unpin `flyway-database-postgresql` so Boot BOM manages it. Parent `flyway.version` left at **10.6.0** (w14 may own the bump — rebase after their PR).
