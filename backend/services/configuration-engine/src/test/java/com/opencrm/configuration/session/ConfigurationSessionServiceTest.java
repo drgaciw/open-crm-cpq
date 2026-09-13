@@ -6,6 +6,8 @@ import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
+import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.configuration.mapper.ConfigurationSessionMapper;
 import com.opencrm.configuration.model.ConfigurationModel;
 import com.opencrm.configuration.model.ConfigurationModelCache;
 import com.opencrm.configuration.model.ConfigurationModelCompiler;
@@ -18,7 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,7 +31,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * JUnit 5 tests for Configuration Engine session management.
- * Validates constraint solving and session state transitions.
+ * Validates constraint solving and session state transitions; service returns DTOs.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Configuration Engine - Session Service")
@@ -48,6 +52,9 @@ class ConfigurationSessionServiceTest {
     @Mock
     private ConfigurationModelCompiler configurationModelCompiler;
 
+    @Mock
+    private ConfigurationSessionMapper sessionMapper;
+
     @InjectMocks
     private ConfigurationSessionService sessionService;
 
@@ -60,8 +67,18 @@ class ConfigurationSessionServiceTest {
                 .userId("user-1")
                 .status(ConfigurationStatus.IN_PROGRESS)
                 .valid(false)
+                .selections(new HashMap<>())
                 .build();
         session.setId(1L);
+
+        lenient().when(sessionMapper.toDto(any(ConfigurationSession.class)))
+                .thenAnswer(inv -> dto(inv.getArgument(0)));
+        lenient().when(sessionMapper.toDtoList(anyList()))
+                .thenAnswer(inv -> {
+                    @SuppressWarnings("unchecked")
+                    List<ConfigurationSession> sessions = inv.getArgument(0);
+                    return sessions.stream().map(ConfigurationSessionServiceTest::dto).toList();
+                });
     }
 
     @Test
@@ -73,7 +90,7 @@ class ConfigurationSessionServiceTest {
             return s;
         });
 
-        ConfigurationSession result = sessionService.create("PROD-001", "user-1");
+        ConfigurationSessionDto result = sessionService.create("PROD-001", "user-1");
 
         assertNotNull(result);
         assertEquals("PROD-001", result.getProductId());
@@ -88,7 +105,7 @@ class ConfigurationSessionServiceTest {
         when(constraintSolver.evaluate(any())).thenReturn(ConfigurationValidationResult.ok());
         when(sessionRepository.save(any())).thenReturn(session);
 
-        ConfigurationSession result = sessionService.addSelection(1L, "color", "red");
+        ConfigurationSessionDto result = sessionService.addSelection(1L, "color", "red");
 
         assertTrue(result.getSelections().containsKey("color"));
         assertTrue(result.isValid());
@@ -108,7 +125,7 @@ class ConfigurationSessionServiceTest {
         )));
         when(sessionRepository.save(any())).thenReturn(session);
 
-        ConfigurationSession result = sessionService.addSelection(1L, "premium_feature", "yes");
+        ConfigurationSessionDto result = sessionService.addSelection(1L, "premium_feature", "yes");
 
         assertFalse(result.isValid());
         assertEquals("Color is required", result.getValidationErrors());
@@ -126,7 +143,7 @@ class ConfigurationSessionServiceTest {
         )));
         when(sessionRepository.save(any())).thenReturn(session);
 
-        ConfigurationSession result = sessionService.addSelection(1L, "base", "10");
+        ConfigurationSessionDto result = sessionService.addSelection(1L, "base", "10");
 
         assertTrue(result.isValid());
         assertEquals("Consider warranty", result.getValidationErrors());
@@ -141,7 +158,7 @@ class ConfigurationSessionServiceTest {
         when(configurationModelCache.getOrCompile(any(), any()))
                 .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
 
-        ConfigurationSession result = sessionService.complete(1L);
+        ConfigurationSessionDto result = sessionService.complete(1L);
 
         assertEquals(ConfigurationStatus.COMPLETED, result.getStatus());
         assertNotNull(result.getCompletedAt());
@@ -168,7 +185,7 @@ class ConfigurationSessionServiceTest {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(sessionRepository.save(any())).thenReturn(session);
 
-        ConfigurationSession result = sessionService.cancel(1L);
+        ConfigurationSessionDto result = sessionService.cancel(1L);
 
         assertEquals(ConfigurationStatus.CANCELLED, result.getStatus());
     }
@@ -179,5 +196,25 @@ class ConfigurationSessionServiceTest {
         when(sessionRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> sessionService.getById(99L));
+    }
+
+    private static ConfigurationSessionDto dto(ConfigurationSession s) {
+        return ConfigurationSessionDto.builder()
+                .id(s.getId())
+                .uuid(s.getUuid())
+                .productId(s.getProductId())
+                .userId(s.getUserId())
+                .status(s.getStatus())
+                .selections(s.getSelections() == null ? Map.of() : Map.copyOf(s.getSelections()))
+                .valid(s.isValid())
+                .validationErrors(s.getValidationErrors())
+                .completedAt(s.getCompletedAt())
+                .expiresAt(s.getExpiresAt())
+                .createdAt(s.getCreatedAt())
+                .updatedAt(s.getUpdatedAt())
+                .createdBy(s.getCreatedBy())
+                .updatedBy(s.getUpdatedBy())
+                .version(s.getVersion())
+                .build();
     }
 }
