@@ -4,7 +4,9 @@ import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
 import com.opencrm.approval.domain.QuoteApprovalTier;
+import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.ApprovalSubmitRequest;
+import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
@@ -40,6 +42,9 @@ class ApprovalServiceTest {
     @Mock
     private OutboxEventPublisher outboxEventPublisher;
 
+    @Mock
+    private ApprovalRequestMapper approvalRequestMapper;
+
     @InjectMocks
     private ApprovalService approvalService;
 
@@ -60,6 +65,14 @@ class ApprovalServiceTest {
                 .approvalTier("MANAGER")
                 .build();
         pendingRequest.setId(1L);
+
+        lenient().when(approvalRequestMapper.toDto(any(ApprovalRequest.class)))
+                .thenAnswer(inv -> toDto(inv.getArgument(0)));
+        lenient().when(approvalRequestMapper.toDtoList(anyList()))
+                .thenAnswer(inv -> {
+                    List<ApprovalRequest> list = inv.getArgument(0);
+                    return list.stream().map(this::toDto).toList();
+                });
     }
 
     @Test
@@ -68,7 +81,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
         when(approvalRequestRepository.save(any())).thenReturn(pendingRequest);
 
-        ApprovalRequest result = approvalService.approve(1L, "manager-1");
+        ApprovalRequestDto result = approvalService.approve(1L, "manager-1");
 
         assertEquals(ApprovalStatus.APPROVED, result.getStatus());
         assertEquals("manager-1", result.getApproverId());
@@ -81,7 +94,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
         when(approvalRequestRepository.save(any())).thenReturn(pendingRequest);
 
-        ApprovalRequest result = approvalService.reject(1L, "manager-1", "Discount too high");
+        ApprovalRequestDto result = approvalService.reject(1L, "manager-1", "Discount too high");
 
         assertEquals(ApprovalStatus.REJECTED, result.getStatus());
         assertEquals("Discount too high", result.getRejectionReason());
@@ -110,7 +123,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findByStatus(ApprovalStatus.PENDING))
                 .thenReturn(List.of(pendingRequest));
 
-        List<ApprovalRequest> result = approvalService.getPendingApprovals();
+        List<ApprovalRequestDto> result = approvalService.getPendingApprovals();
 
         assertEquals(1, result.size());
         assertEquals(ApprovalStatus.PENDING, result.get(0).getStatus());
@@ -122,7 +135,7 @@ class ApprovalServiceTest {
         when(approvalRequestRepository.findByApprovalTierAndStatus("MANAGER", ApprovalStatus.PENDING))
                 .thenReturn(List.of(pendingRequest));
 
-        List<ApprovalRequest> result = approvalService.getPendingApprovalsByTier("MANAGER");
+        List<ApprovalRequestDto> result = approvalService.getPendingApprovalsByTier("MANAGER");
 
         assertEquals(1, result.size());
         assertEquals("MANAGER", result.get(0).getApprovalTier());
@@ -144,7 +157,7 @@ class ApprovalServiceTest {
                 .reason("Margin below 35%")
                 .build();
 
-        ApprovalRequest result = approvalService.submit(request);
+        ApprovalRequestDto result = approvalService.submit(request);
 
         assertEquals(42L, result.getId());
         assertEquals(ApprovalStatus.PENDING, result.getStatus());
@@ -162,7 +175,7 @@ class ApprovalServiceTest {
     void submitSalesVpCreatesPendingQuoteApproval() {
         when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ApprovalRequest result = approvalService.submit(ApprovalSubmitRequest.builder()
+        ApprovalRequestDto result = approvalService.submit(ApprovalSubmitRequest.builder()
                 .quoteId("Q-77")
                 .tier(QuoteApprovalTier.SALES_VP)
                 .build());
@@ -182,7 +195,7 @@ class ApprovalServiceTest {
             return saved;
         });
 
-        ApprovalRequest result = approvalService.submit(ApprovalSubmitRequest.builder()
+        ApprovalRequestDto result = approvalService.submit(ApprovalSubmitRequest.builder()
                 .quoteId("2002")
                 .tier(QuoteApprovalTier.CFO)
                 .requesterId("desk-9")
@@ -216,5 +229,32 @@ class ApprovalServiceTest {
     void submitRejectsNullRequest() {
         assertThrows(BusinessException.class, () -> approvalService.submit(null));
         verify(approvalRequestRepository, never()).save(any());
+    }
+
+    private ApprovalRequestDto toDto(ApprovalRequest a) {
+        return ApprovalRequestDto.builder()
+                .id(a.getId())
+                .uuid(a.getUuid())
+                .quoteId(a.getQuoteId())
+                .lineId(a.getLineId())
+                .approvalType(a.getApprovalType())
+                .status(a.getStatus())
+                .requestedDiscount(a.getRequestedDiscount())
+                .marginDelta(a.getMarginDelta())
+                .currencyCode(a.getCurrencyCode())
+                .requesterId(a.getRequesterId())
+                .approverId(a.getApproverId())
+                .approvalTier(a.getApprovalTier())
+                .reason(a.getReason())
+                .rejectionReason(a.getRejectionReason())
+                .submittedAt(a.getSubmittedAt())
+                .approvedAt(a.getApprovedAt())
+                .rejectedAt(a.getRejectedAt())
+                .createdAt(a.getCreatedAt())
+                .updatedAt(a.getUpdatedAt())
+                .createdBy(a.getCreatedBy())
+                .updatedBy(a.getUpdatedBy())
+                .version(a.getVersion())
+                .build();
     }
 }
