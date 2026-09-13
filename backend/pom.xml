@@ -185,9 +185,12 @@
                     <systemPropertyVariables>
                         <!-- Docker Engine 29+ requires API >= 1.44 (Testcontainers 1.x default is 1.32). -->
                         <api.version>1.44</api.version>
-                        <!-- spring-cloud-azure 5.8.0 is Boot 3-era; ITs do not need Azure AD. -->
+                        <!-- HOLD: keep Spring Boot 4.0.6. Azure 5.8 "compatible with 3.0–3.2" is a verifier
+                             mismatch, not a Boot downgrade signal. Disable/exclude checker (or later bump
+                             spring-cloud-azure to 7.x for Boot 4). Do not lower parent to Boot 3.x. -->
                         <spring.cloud.azure.compatibility-verifier.enabled>false</spring.cloud.azure.compatibility-verifier.enabled>
-                        <spring.autoconfigure.exclude>com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration</spring.autoconfigure.exclude>
+                        <!-- Azure 5.8 token credential uses removed Boot 3 TaskExecutorBuilder on Boot 4. -->
+                        <spring.autoconfigure.exclude>com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration,com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration,com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration</spring.autoconfigure.exclude>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

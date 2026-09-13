@@ -1,4 +1,14 @@
 spring:
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
   datasource:
     url: jdbc:tc:postgresql:16-alpine:///opencrm?TC_INITSCRIPT=db/init-test.sql
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
