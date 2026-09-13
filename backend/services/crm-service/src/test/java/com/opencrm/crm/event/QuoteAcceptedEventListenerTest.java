@@ -1,7 +1,7 @@
 package com.opencrm.crm.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 class QuoteAcceptedEventListenerTest {
 
     @Spy
-    private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @Mock
     private StringRedisTemplate stringRedisTemplate;
