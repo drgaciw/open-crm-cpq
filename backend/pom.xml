@@ -46,7 +46,8 @@
 
         <!-- Database -->
         <postgresql.version>42.7.1</postgresql.version>
-        <flyway.version>10.6.0</flyway.version>
+        <!-- Align with Spring Boot 4.0.6 BOM (spring-boot-flyway requires Flyway 11). -->
+        <flyway.version>11.14.1</flyway.version>
 
         <!-- Utilities -->
         <mapstruct.version>1.5.5.Final</mapstruct.version>
@@ -184,6 +185,9 @@
                     <systemPropertyVariables>
                         <!-- Docker Engine 29+ requires API >= 1.44 (Testcontainers 1.x default is 1.32). -->
                         <api.version>1.44</api.version>
+                        <!-- spring-cloud-azure 5.8.0 is Boot 3-era; ITs do not need Azure AD. -->
+                        <spring.cloud.azure.compatibility-verifier.enabled>false</spring.cloud.azure.compatibility-verifier.enabled>
+                        <spring.autoconfigure.exclude>com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration</spring.autoconfigure.exclude>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

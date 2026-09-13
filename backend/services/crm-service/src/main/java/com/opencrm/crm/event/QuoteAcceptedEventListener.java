@@ -1,6 +1,6 @@
 package com.opencrm.crm.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
