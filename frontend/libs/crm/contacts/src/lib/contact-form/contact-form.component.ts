@@ -93,8 +93,8 @@ import { OrganizationDto } from '@frontend/shared-models';
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving">
-              @if (saving) { <mat-spinner diameter="20"></mat-spinner> }
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
+              @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
           </div>
@@ -124,7 +124,8 @@ export class ContactFormComponent implements OnInit {
   id = input<string>();
   form!: FormGroup;
   isEditMode = false;
-  saving = false;
+  /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
+  saving = signal(false);
   selectedOrgId: number | null = null;
   filteredOrgs = signal<OrganizationDto[]>([]);
 
@@ -186,7 +187,7 @@ export class ContactFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.form.invalid) return;
-    this.saving = true;
+    this.saving.set(true);
     const { organizationSearch, email, phone, jobTitle, department, notes, ...rest } =
       this.form.value;
     const data = {
@@ -204,12 +205,12 @@ export class ContactFormComponent implements OnInit {
     if (this.isEditMode && idVal) {
       this.contactService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/contacts', idVal]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     } else {
       this.contactService.create(data).subscribe({
         next: (c) => this.router.navigate(['/contacts', c.id]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     }
   }

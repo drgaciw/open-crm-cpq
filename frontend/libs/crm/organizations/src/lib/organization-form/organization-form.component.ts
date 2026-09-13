@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, input, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
+import { Component, inject, OnInit, input, effect, signal, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -117,8 +117,8 @@ import { OrganizationService } from '../organization.service';
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
             <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving">
-              @if (saving) {
+                    [disabled]="form.invalid || saving()">
+              @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 {{ isEditMode ? 'Update' : 'Create' }}
@@ -152,7 +152,8 @@ export class OrganizationFormComponent implements OnInit {
 
   form!: FormGroup;
   isEditMode = false;
-  saving = false;
+  /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
+  saving = signal(false);
 
   industries = [
     'Technology', 'Healthcare', 'Finance', 'Education', 'Manufacturing',
@@ -191,7 +192,7 @@ export class OrganizationFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.form.invalid) return;
-    this.saving = true;
+    this.saving.set(true);
 
     const data = this.form.value;
     const idVal = this.id();
@@ -199,12 +200,12 @@ export class OrganizationFormComponent implements OnInit {
     if (this.isEditMode && idVal) {
       this.orgService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/organizations', idVal]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     } else {
       this.orgService.create(data).subscribe({
         next: (org) => this.router.navigate(['/organizations', org.id]),
-        error: () => (this.saving = false),
+        error: () => this.saving.set(false),
       });
     }
   }

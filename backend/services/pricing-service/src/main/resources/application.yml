@@ -51,6 +51,20 @@ grpc:
   server:
     port: 9090
 
+  # Boot 4 + azure-spring 5.x: disable verifier and Event Hubs Kafka OAuth2
+  # (KafkaProperties moved; ClassNotFoundException without spring-boot kafka starter).
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
+
 springdoc:
   api-docs:
     path: /api-docs

@@ -63,7 +63,8 @@ public final class CpqGatewayRoutes {
     );
 
     /**
-     * Every route id declared under the default spring.cloud.gateway.routes list
+     * Every route id declared under the default
+     * {@code spring.cloud.gateway.server.webflux.routes} list
      * (owners + CPQ aliases). Removing any of these from yaml must fail unit tests.
      */
     public static final List<String> DEFAULT_PROFILE_ROUTE_IDS = List.of(
