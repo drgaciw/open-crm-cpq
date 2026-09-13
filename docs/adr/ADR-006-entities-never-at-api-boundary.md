@@ -1,10 +1,11 @@
 # ADR-006: Entities never at the API boundary
 
-**Status:** Proposed  
-**Date:** 2026-08-31  
-**Deciders:** (not accepted — documents a forge non-negotiable + remaining leaks)  
-**Wave O3:** **on `main`** — subscription leak **gone**; `SubscriptionDto` + MapStruct + paginated `GET /api/v1/subscriptions` (**no FE**). **Do not Accept** this ADR while other controllers still return entities.  
-**Does not authorize:** contract-asset / subscriptions **FE**, ERP adapter changes, or deleting `POST /api/v1/configuration/validate`
+**Status:** Accepted  
+**Date:** 2026-08-31 (Proposed); **Accepted** 2026-09-13 (Wave W4 — W1+W2+W3 on `main`)  
+**Deciders:** forge Wave W closeout after remaining three entity leaks DTO-wrapped  
+**Wave O3:** **on `main`** — subscription leak **gone**; `SubscriptionDto` + MapStruct + paginated `GET /api/v1/subscriptions` (**no FE**).  
+**Wave W1–W3:** **on `main`** — `ConfigurationSessionDto` (#503 / `e6d3b23`), approval-routing `ApprovalRequestDto` (#501 / `29cac5b`), `DocumentGenerationJobDto` (#502 / `0a3d9a4`).  
+**Does not authorize:** contract-asset / subscriptions **FE**, ERP adapter changes, deleting `POST /api/v1/configuration/validate`, dual-read flip, or Accept ADR-005
 
 ---
 
@@ -28,40 +29,43 @@ public ApiResponse<SubscriptionDto> activate(...)  // still calls ErpAdapter.syn
 
 Gateway already routes `/api/v1/subscriptions/**`. There is **no** subscriptions FE portal (held).
 
-**Remaining entity leaks (tree 2026-08-31) — why Status stays Proposed:**
+**Remaining entity leaks resolved (Wave W1∥W2∥W3 on `main`):**
 
-| Controller | Returns |
-|------------|---------|
-| `ConfigurationSessionController` | `ApiResponse<ConfigurationSession>` |
-| `ApprovalController` (approval-routing) | `ApiResponse<ApprovalRequest>` |
-| `DocumentController` (document-generation) | `ApiResponse<DocumentGenerationJob>` |
+| Controller | Was | Now (Accepted) |
+|------------|-----|----------------|
+| `ConfigurationSessionController` | `ApiResponse<ConfigurationSession>` | `ConfigurationSessionDto` (W1) |
+| `ApprovalController` (approval-routing) | `ApiResponse<ApprovalRequest>` | `ApprovalRequestDto` (W2) |
+| `DocumentController` (document-generation) | `ApiResponse<DocumentGenerationJob>` | `DocumentGenerationJobDto` (W3) |
 
-GitNexus: these controllers are often **UNKNOWN** (HTTP entry). **UNKNOWN ≠ unused.** Confirm with `rg` before treating as unused.
+Quote-service BFF `ApprovalController` was already DTO-only before Wave W. Product `POST /api/v1/configuration/validate` returning `ApiResponse<List<String>>` is a **documented** envelope, not an entity leak — **retained**.
+
+GitNexus: HTTP controllers are often **UNKNOWN**. **UNKNOWN ≠ unused.** Confirm with `rg` before treating as unused.
 
 ---
 
-## Decision (Proposed)
+## Decision (Accepted)
 
 1. **Normative rule:** public `/api/v1/**` responses MUST be DTOs (or documented primitives/envelopes such as `ApiResponse<List<String>>` on retained product validate). Never `ApiResponse<Entity>`.
 2. **Subscription API:** DTO-only + paginated list is **landed** (O3). Forge still **holds** subscriptions FE until a dedicated portal wave (activate → ERP).
-3. **Do not** Accept this ADR as “DTO-only API everywhere.” Accept later when remaining entity returns (`ConfigurationSession`, `ApprovalRequest`, `DocumentGenerationJob`) are DTO-wrapped (or exceptions are explicitly listed and time-boxed).
+3. **Configuration session / approval-routing / document-generation job APIs:** DTO-only is **landed** (W1–W3). Omit soft-delete `deleted` from response DTOs.
 4. **Activate/ERP** stays server-side; FE must not call ERP.
 
 ### Rejected
 
 | Option | Why not |
 |--------|---------|
-| Accept ADR-006 because O3 landed | Other controllers still return entities |
-| Ship subscriptions FE against the DTO API this wave | Shell + ERP on activate; Wave P held FE |
+| Accept ADR-006 because O3 landed alone | Other controllers still returned entities until W1–W3 |
+| Ship subscriptions FE against the DTO API in Wave O/W | Shell + ERP on activate; still held |
 | Invent `/api/v1/activities/**` | Separate hold; no schema/controller |
+| Flip dual-read / Accept ADR-005 in the same closeout | Independent **HIGH** gate; still Proposed |
 
 ---
 
 ## Consequences
 
-- **Positive:** Reviewers have a numbered ADR for entity-at-boundary instead of only AGENT.md; subscription boundary matches convention.
-- **Negative:** Runtime still leaks session / approval-routing / document-job entities until dedicated PRs.
-- **Residual:** GitNexus **UNKNOWN** on HTTP controllers; confirm with `rg`. `activate` ERP failure mode is independent of DTO work.
+- **Positive:** Reviewers have a numbered **Accepted** ADR for entity-at-boundary; subscription, configuration session, approval-routing, and document-job APIs match convention.
+- **Negative:** New controllers must continue the DTO + MapStruct pattern; regressions that re-expose entities fail review against this ADR.
+- **Residual:** GitNexus **UNKNOWN** on HTTP controllers; confirm with `rg`. `activate` ERP failure mode is independent of DTO work. Subscriptions FE still held.
 
 ## Prerequisites for subscriptions FE (not this ADR’s implementation)
 
@@ -74,6 +78,10 @@ GitNexus: these controllers are often **UNKNOWN** (HTTP entry). **UNKNOWN ≠ un
 
 - `AGENT.md` — DTOs at API boundary  
 - `docs/forge/26-wave-o-architecture.md` — O3 DTO+list  
-- `docs/forge/28-wave-p-architecture.md` — P4 header hygiene; Accept rejected  
+- `docs/forge/35-wave-w-architecture.md` — W1–W3 DTO wraps; W4 Accept  
+- `docs/forge/impl/w4-wave-w-docs.md` — closeout  
 - `backend/services/contract-asset-management/.../SubscriptionController.java`  
+- `backend/services/configuration-engine/.../ConfigurationSessionController.java`  
+- `backend/services/approval-routing/.../ApprovalController.java`  
+- `backend/services/document-generation/.../DocumentController.java`  
 - `docs/backlog/ADR-configuration-api-reconciliation.md` — product validate `List<String>` is a **documented** envelope, not an entity leak  
