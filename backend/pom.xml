@@ -58,7 +58,7 @@
         <commons-io.version>2.15.1</commons-io.version>
 
         <!-- Rules Engines -->
-        <drools.version>8.44.0.Final</drools.version>
+        <drools.version>10.2.0</drools.version>
         <openl-tablets.version>5.27.6</openl-tablets.version>
 
         <!-- Document Generation -->
