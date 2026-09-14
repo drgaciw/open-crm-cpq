@@ -1,0 +1,32 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import com.opencrm.rules.model.CustomerFact;
+import java.math.BigDecimal;
+
+/**
+ * Metric-gated policy (T1-3 / §5.1a): quote-level churn discount for non-renewal deals.
+ * Skips {@code dealType == RENEWAL} — Phase 0 {@code Renewal Uplift and Retention Offer}
+ * already adjusts uplift / retention for high churn on renewals (avoid double-write).
+ */
+rule "Churn Risk Adjustment"
+salience 535
+when
+    $quote: QuoteFact(finalPrice != null, $finalPrice: finalPrice, customer != null, $cust: customer)
+    eval($cust.getChurnScore() != null
+         && !"RENEWAL".equals($quote.getString("dealType")))
+then
+    Integer churnScore = $cust.getChurnScore();
+    BigDecimal churnAdjustment = BigDecimal.ZERO;
+
+    if (churnScore > 70)
+        churnAdjustment = new BigDecimal("-0.05");
+    else if (churnScore > 50)
+        churnAdjustment = new BigDecimal("-0.03");
+
+    if (churnAdjustment.compareTo(BigDecimal.ZERO) != 0) {
+        $quote.setFinalPrice($finalPrice.multiply(BigDecimal.ONE.add(churnAdjustment)));
+        $quote.setDecimal("churnAdjustment", churnAdjustment);
+        $quote.setString("explanationCode", "CHURN_ADJUSTMENT");
+    }
+end

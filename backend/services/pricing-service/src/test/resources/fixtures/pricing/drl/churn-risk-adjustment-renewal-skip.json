@@ -1,0 +1,17 @@
+{
+  "id": "t1-3-drl-churn-risk-adjustment-renewal-skip",
+  "matrixRef": "docs/plans/pricing-ai-rules-capability-matrix-t1.md#4-drl-corpus--metric-gated-policy",
+  "description": "Churn Risk Adjustment does not fire on RENEWAL (Phase 0 renewal-uplift owns churn retention).",
+  "ruleClasspath": "rules/churn-risk-adjustment.drl",
+  "facts": {
+    "finalPrice": 1000.00,
+    "dealType": "RENEWAL",
+    "churnScore": 80
+  },
+  "expected": {
+    "rulesFired": 0,
+    "finalPrice": 1000.00,
+    "churnAdjustment": null,
+    "explanationCode": null
+  }
+}
