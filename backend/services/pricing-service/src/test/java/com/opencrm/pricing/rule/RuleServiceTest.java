@@ -6,11 +6,13 @@ import com.opencrm.pricing.execution.PricingAuditLogRepository;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
+import com.opencrm.rules.drools.DroolsRuleCompiler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -30,6 +32,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("RuleService")
 class RuleServiceTest {
 
+    private static final String MINIMAL_DRL = """
+            package com.example
+            rule "ok"
+            when
+            then
+            end
+            """;
+
     @Mock
     private RuleRepository ruleRepository;
     @Mock
@@ -38,6 +48,8 @@ class RuleServiceTest {
     private PricingAuditLogRepository pricingAuditLogRepository;
     @Mock
     private RuleMapper ruleMapper;
+    @Spy
+    private DroolsRuleCompiler droolsRuleCompiler = new DroolsRuleCompiler();
 
     @InjectMocks
     private RuleService ruleService;
@@ -45,7 +57,7 @@ class RuleServiceTest {
     @Test
     void create_savesWhenRuleSetDraft() {
         RuleCreateRequest request = RuleCreateRequest.builder()
-                .ruleSetId(9L).name("r1").ruleType(RuleType.PRICING).priority(100).content("x").build();
+                .ruleSetId(9L).name("r1").ruleType(RuleType.PRICING).priority(100).content(MINIMAL_DRL).build();
         RuleSet ruleSet = RuleSet.builder().name("set").status(RuleSetStatus.DRAFT).build();
         ruleSet.setId(9L);
         Rule entity = Rule.builder().name("r1").ruleSetId(9L).build();
@@ -75,6 +87,17 @@ class RuleServiceTest {
     }
 
     @Test
+    void create_rejectsInvalidDrl() {
+        RuleCreateRequest request = RuleCreateRequest.builder()
+                .ruleSetId(9L).name("r1").ruleType(RuleType.PRICING).priority(100).content("not a drl").build();
+        RuleSet ruleSet = RuleSet.builder().name("set").status(RuleSetStatus.DRAFT).build();
+        when(ruleSetRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(ruleSet));
+        assertThatThrownBy(() -> ruleService.create(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Failed to compile rule");
+    }
+
+    @Test
     void getById_returnsDto() {
         Rule rule = Rule.builder().name("r1").build();
         RuleDto dto = RuleDto.builder().id(1L).name("r1").build();
@@ -92,7 +115,7 @@ class RuleServiceTest {
     @Test
     void update_savesWhenDraft() {
         RuleUpdateRequest request = new RuleUpdateRequest();
-        Rule rule = Rule.builder().name("old").ruleSetId(9L).build();
+        Rule rule = Rule.builder().name("old").ruleSetId(9L).content(MINIMAL_DRL).build();
         rule.setId(1L);
         RuleSet ruleSet = RuleSet.builder().name("set").status(RuleSetStatus.DRAFT).build();
         RuleDto dto = RuleDto.builder().id(1L).name("new").build();
@@ -112,6 +135,17 @@ class RuleServiceTest {
         when(ruleSetRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(ruleSet));
         assertThatThrownBy(() -> ruleService.update(1L, new RuleUpdateRequest()))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void update_rejectsInvalidDrl() {
+        Rule rule = Rule.builder().name("old").ruleSetId(9L).content("not a drl").build();
+        RuleSet ruleSet = RuleSet.builder().name("set").status(RuleSetStatus.DRAFT).build();
+        when(ruleRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(rule));
+        when(ruleSetRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(ruleSet));
+        assertThatThrownBy(() -> ruleService.update(1L, new RuleUpdateRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Failed to compile rule");
     }
 
     @Test
@@ -151,25 +185,45 @@ class RuleServiceTest {
     void validate_rejectsEmptyContent() {
         Rule rule = Rule.builder().name("r").content("  ").build();
         when(ruleRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(rule));
-        assertThatThrownBy(() -> ruleService.validate(1L)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> ruleService.validate(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Rule content cannot be empty");
     }
 
     @Test
     void validate_rejectsInvalidDrl() {
         Rule rule = Rule.builder().name("r").content("not a drl").build();
         when(ruleRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(rule));
-        assertThatThrownBy(() -> ruleService.validate(1L)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> ruleService.validate(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Invalid DRL syntax");
+    }
+
+    @Test
+    void validate_rejectsUnknownFactType() {
+        Rule rule = Rule.builder().name("r").content("""
+                package com.example
+                rule "unknown"
+                when
+                    UnknownFact(id == 1)
+                then
+                end
+                """).build();
+        when(ruleRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(rule));
+        assertThatThrownBy(() -> ruleService.validate(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Invalid DRL syntax");
+    }
+
+    @Test
+    void validate_rejectsMissingRule() {
+        when(ruleRepository.findByIdAndDeletedFalse(999L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> ruleService.validate(999L)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void validate_acceptsMinimalDrl() {
-        Rule rule = Rule.builder().name("r").content("""
-                package com.example
-                rule "ok"
-                when
-                then
-                end
-                """).build();
+        Rule rule = Rule.builder().name("r").content(MINIMAL_DRL).build();
         when(ruleRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(rule));
         ruleService.validate(1L);
     }

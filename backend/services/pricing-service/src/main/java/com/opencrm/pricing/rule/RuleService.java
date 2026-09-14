@@ -6,20 +6,16 @@ import com.opencrm.pricing.execution.PricingAuditLogRepository;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
+import com.opencrm.rules.drools.DroolsCompilationResult;
+import com.opencrm.rules.drools.DroolsRuleCompiler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.kie.api.KieServices;
-import org.kie.api.builder.KieBuilder;
-import org.kie.api.builder.KieFileSystem;
-import org.kie.api.builder.Message;
-import org.kie.api.builder.Results;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.stream.Collectors;
 
 /**
  * Service for managing rules.
@@ -34,6 +30,7 @@ public class RuleService {
     private final RuleSetRepository ruleSetRepository;
     private final PricingAuditLogRepository pricingAuditLogRepository;
     private final RuleMapper ruleMapper;
+    private final DroolsRuleCompiler droolsRuleCompiler;
 
     /**
      * Create a new rule.
@@ -52,6 +49,8 @@ public class RuleService {
                     "INVALID_STATE_TRANSITION"
             );
         }
+
+        assertCompiles(request.getContent(), request.getName());
 
         Rule rule = ruleMapper.toEntity(request);
         Rule saved = ruleRepository.save(rule);
@@ -94,6 +93,7 @@ public class RuleService {
         }
 
         ruleMapper.updateEntity(request, rule);
+        assertCompiles(rule.getContent(), rule.getName());
 
         Rule updated = ruleRepository.save(rule);
         log.info("Updated rule ID: {}", updated.getId());
@@ -155,20 +155,28 @@ public class RuleService {
             throw new BusinessException("Rule content cannot be empty", "INVALID_RULE_CONTENT");
         }
 
-        KieServices kieServices = KieServices.Factory.get();
-        KieFileSystem kfs = kieServices.newKieFileSystem();
-        kfs.write("src/main/resources/rule.drl", rule.getContent());
-        KieBuilder kieBuilder = kieServices.newKieBuilder(kfs).buildAll();
-
-        Results results = kieBuilder.getResults();
-        if (results.hasMessages(Message.Level.ERROR)) {
-            String errorMsg = results.getMessages(Message.Level.ERROR).stream()
-                    .map(Message::getText)
-                    .collect(Collectors.joining(", "));
-            throw new BusinessException("Invalid DRL syntax: " + errorMsg, "INVALID_DRL_SYNTAX");
+        DroolsCompilationResult result = droolsRuleCompiler.validateDrl(rule.getContent());
+        if (!result.isValid()) {
+            throw new BusinessException("Invalid DRL syntax: " + result.joinedErrors(), "INVALID_DRL_SYNTAX");
         }
 
         log.info("Validated rule ID: {}", id);
+    }
+
+    /**
+     * Source {@code DroolsService.compileRule} on write: fail the mutation when Kie reports ERROR.
+     */
+    private void assertCompiles(String content, String name) {
+        if (content == null || content.trim().isEmpty()) {
+            throw new BusinessException("Rule content cannot be empty", "INVALID_RULE_CONTENT");
+        }
+        DroolsCompilationResult result = droolsRuleCompiler.validateDrl(content);
+        if (!result.isValid()) {
+            throw new BusinessException(
+                    "Failed to compile rule: " + name + ": " + result.joinedErrors(),
+                    "INVALID_DRL_SYNTAX"
+            );
+        }
     }
 
     /**
