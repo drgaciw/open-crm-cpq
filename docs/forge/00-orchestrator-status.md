@@ -1,10 +1,10 @@
 # Forge orchestrator status
 
 **Authority:** PM full autonomous forge (delegated)  
-**Session state:** **Wave W COMPLETE** (W1 CE session DTO ∥ W2 routing ApprovalRequest DTO ∥ W3 document job DTO ∥ W4 Accept ADR-006); **T skipped**; **no N/S/U/V reopen**; **no N′′**; R2 still held; ADR-006 **Accepted**; ADR-005 still **Proposed**  
-**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only  
+**Session state:** **Wave W COMPLETE** (W1 CE session DTO ∥ W2 routing ApprovalRequest DTO ∥ W3 document job DTO ∥ W4 Accept ADR-006); **T skipped**; **no N/S/U/V reopen**; **no N′′**; R2 still held; ADR-006 **Accepted**; ADR-005 still **Proposed**; dual-read `${APPROVALS_LEGACY_LOCAL_READ:true}`  
+**Architect:** `/opencrm-architect` (Herdr `w8`) — idle; architect-only; delivered agent-facing `docs/ARCHITECTURE.md`  
 **Plan:** Wave W @ `a7017bf` (cherry-pick of architect `96800b5`)  
-**Baseline:** Wave W COMPLETE on `main` @ `0b6d3ad`
+**Baseline:** Wave W COMPLETE on `main` @ `0b6d3ad`; architecture SSOT on `origin/main` @ `ff0c179` (cherry-pick of architect `fb880a0`)
 
 ## Wave W landed
 
