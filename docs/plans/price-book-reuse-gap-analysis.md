@@ -2,7 +2,9 @@
 
 **Status:** Plan / recommendations (not an implementation PR)  
 **Date:** 2026-09-14  
-**Source:** [drgaciw/price-book-service](https://github.com/drgaciw/price-book-service) (`main`)  
+**Source:** [drgaciw/price-book-service](https://github.com/drgaciw/price-book-service) (`main` @ **`1349a190a6a1f7c6e0396fe333a13d811e427744`**, 2025-04-07 — **stale vs 2026 harvest**)  
+**Local clone:** `/home/username01/Projects/price-book-service`  
+**E0 pin:** 2026-09-14 (Queue E / P0) — inventory + secret-scan in **§P0 pin** below  
 **Target:** this monorepo (`open-crm-cpq`)  
 **Priority (decided 2026-09-14):** **(1) Catalog domain parity** — entry effective dating, selective book metadata, `resolve-batch` fidelity  
 **Related plans:**  
@@ -184,15 +186,11 @@ Run a **pricebook-first** gap analysis (1.5–2.5 days) that:
 
 Work is split into **Track P1** (priority 1, authorized) then later tracks only after the P1 done gate.
 
-### Phase P0 — Access & freeze (shared, 0.5 day)
+### Phase P0 — Access & freeze (shared, 0.5 day) — **DONE 2026-09-14 (E0)**
 
-1. Clone at **pinned SHA**; record SHA (source is older — note staleness).  
-2. Attempt `backend/price-book-service` build (JDK 21, Boot 3.2) — document failures.  
-3. Inventory all controllers → CSV/MD with path remap to `/api/v1`.  
-4. Secret scan: `.env`, Supabase keys — **read-only**; never copy.  
-5. Cross-link: Drools/AI/SpEL rows tagged for sibling plans / exclude.
+See **§P0 pin** (below, after §10). Do not re-clone; do not rewrite Track P1 recommendations.
 
-**Exit:** pinned SHA + inventory + secret note.
+**Exit:** pinned SHA + inventory + secret note — **met**.
 
 ---
 
@@ -310,9 +308,9 @@ Rows **only** for:
 
 ## 7. Deliverables
 
-1. This plan (done; priority **catalog domain parity** locked).  
-2. `docs/plans/price-book-capability-matrix-p1.md` — Track P1 at pinned SHA.  
-3. `docs/plans/price-book-harvest-backlog-p1.md` — ranked domain/resolve PRs.  
+1. This plan (done; priority **catalog domain parity** locked; **E0 pin** recorded).  
+2. `docs/plans/price-book-capability-matrix-p1.md` — Track P1 at pinned SHA (E1).  
+3. `docs/plans/price-book-harvest-backlog-p1.md` — ranked domain/resolve PRs (E2).  
 4. `docs/plans/price-book-harvest-backlog-p2.md` — **done** (scored bulk/coverage/UX candidates; not implementation-authorized until P1 gate).  
 5. Optional ADR: “Cost ledger / margin-from-cost” — only if prioritized.  
 6. Optional ADR: “Price book hierarchy (customer-specific)” — if extending beyond region/default.
@@ -358,6 +356,90 @@ Rows **only** for:
 
 1. If multiple dated entries overlap, prefer **latest effectiveFrom**, **highest priority attribute**, or **reject overlapping writes**? (Architect lean during P1-Deep: **reject overlapping writes** + resolve by latest `effectiveFrom` ≤ as-of.)  
 2. Is source `salesPrice` needed, or do target `listPrice` + `floorPrice` remain sufficient? (Architect lean: **sufficient** — don’t add salesPrice unless quote/pricing contracts require it.)
+
+---
+
+## P0 pin (E0 — 2026-09-14)
+
+E0 **only** records clone pin, controller inventory with `/api/v1` remap, secret-scan, and source-build notes. Track P1 recommendations above are unchanged. Full domain rows live in [price-book-capability-matrix-p1.md](./price-book-capability-matrix-p1.md). Ranked PRs: [price-book-harvest-backlog-p1.md](./price-book-harvest-backlog-p1.md).
+
+### Pin
+
+| Field | Value |
+|-------|-------|
+| Source repo | https://github.com/drgaciw/price-book-service |
+| Local clone | `/home/username01/Projects/price-book-service` |
+| Pinned commit | `1349a190a6a1f7c6e0396fe333a13d811e427744` |
+| Pin message | `Refactor code structure for improved readability and maintainability. Contined integration of Drools rules engine.` |
+| Pin author / date | gornelld / 2025-04-07 07:39:28 -0500 |
+| Staleness | Last push **~17 months** before this harvest (2026-09-14). Treat algorithms as a snapshot, not a living upstream. |
+| Verify | `git -C /home/username01/Projects/price-book-service rev-parse HEAD` → `1349a190a6a1f7c6e0396fe333a13d811e427744` |
+
+### Source build (optional; JAVA_HOME **21.0.2**; no `newgrp docker`)
+
+| Attempt | Result |
+|---------|--------|
+| Host `mvn` | **Not on PATH** (`command not found`, exit 127) |
+| Wrapper | `JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2` + open-crm-cpq `backend/mvnw -B -f /home/username01/Projects/price-book-service/backend/price-book-service/pom.xml -DskipTests package` |
+| Outcome | **BUILD SUCCESS** (2026-09-14, ~50s). Boot **3.2.5** parent resolved from Maven Central; Java **21.0.2**. |
+| Not run | Tests / Testcontainers / `newgrp docker`. Companion modules `price-models-service`, `pricing-rules-service`, `eureka-server` **not** packaged (out of P1). |
+| Note | Source is Boot **3.2.5** / Mongo / Drools **8.41**. Target harvest still ports algorithms into Boot **4.0.6** / PostgreSQL — do not merge the source module. |
+
+### Secret-scan (read-only; **never copy**)
+
+| Location | Finding | Action |
+|----------|---------|--------|
+| Clone root `.env` | `OPENAI_API_KEY` present (`sk-proj-` prefix, live-looking); `AzureOpenAIKey=` empty; `VITE_API_URL=http://localhost:8080/api` | **Do not** copy into `open-crm-cpq`. Recommend rotating the source-repo key if still valid. |
+| `src/lib/supabase.ts` | Reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from Vite env (empty fallback). Keys **not** committed in `.env`. | Exclude React/Supabase harvest. |
+| `backend/pricing-rules-service` `application.properties` / `application.yml` | `openai.api.key=${OPENAI_API_KEY:your-api-key-here}` | Placeholder + env interpolation only. |
+| `docker-compose.yml` | Passes `OPENAI_API_KEY=${OPENAI_API_KEY}` | Do not import compose secrets. |
+| `backend/eureka-server` `application.yml` | Default `EUREKA_SECURITY_PASSWORD:admin` | Eureka **excluded**. |
+
+No `.env` / API keys / Supabase project ids were copied into this monorepo.
+
+### Controller inventory + `/api/v1` remap
+
+Source prefixes are **not** `/api/v1`. Target external paths stay under `/api/v1/price-books/**` (never `/api/v1/pricing/price-books`). Internal resolve stays `/internal/v1/price-books/resolve-batch`. New **external** paths need a contract-matrix row (P1 expects **none**).
+
+#### `backend/price-book-service` (`com.pricebook.controller`)
+
+| Source path | Method | Target analog / remap | Disposition |
+|-------------|--------|------------------------|-------------|
+| `/api/pricebooks` | GET | `GET /api/v1/price-books` | **landed** (paginated + `?region=`) |
+| `/api/pricebooks/{id}` | GET | `GET /api/v1/price-books/{id}` | **landed** |
+| `/api/pricebooks` | POST | `POST /api/v1/price-books` | **landed** (DTO, not entity) |
+| `/api/pricebooks/{id}` | PUT | `PUT /api/v1/price-books/{id}` | **landed** (unpublished only) |
+| `/api/pricebooks/{id}` | DELETE | `DELETE /api/v1/price-books/{id}` | **landed** (soft-delete; FE list-row delete **R2 HELD**) |
+| `/api/pricebooks/type/{type}` | GET | — | **defer / residual** (selective header; P1-4) |
+| `/api/pricebooks/name/{name}` | GET | — | **defer** (P2-4 filters) |
+| `/api/pricebooks/search` | GET | — | **defer** (P2-4) |
+| `/api/pricebooks/created-between` | GET | — | **defer** (P2-4) |
+| `/api/pricebooks/updated-between` | GET | — | **defer** (P2-4) |
+| `/api/pricebooks/paginated` | GET | `GET /api/v1/price-books` already paginated | **won't-do** extra path |
+| `/api/pricebooks/price-range` | GET | — | **defer** (P2-4) |
+| `/api/pricebooks/product/{productId}` | GET | — | source stub (empty); **defer** (P2-1 coverage) |
+| *(no source entry REST)* | — | `/api/v1/price-books/{id}/entries/**` | **target-ahead** CRUD |
+| `/api/products/**` | * | `product-service` `/api/v1/products/**` | **exclude** |
+| `/api/costs/**` | * | none (phantom `/api/v1/erp/costs` already removed) | **exclude** / Cost ADR |
+| `/api/pricing-rules/apply/entry/{entryId}` | POST | `pricing-service` Drools | **hand off** Track 1 (closed) |
+| `/api/pricing-rules/apply/price-book/{priceBookId}` | POST | same | **hand off** |
+| `/api/pricing-rules/apply/product/{productId}` | POST | same | **hand off** |
+| `/api/rules/apply-pricing/{priceBookId}/{productId}` | POST | same | **hand off** — **no Drools in pricebook** |
+
+#### Companion modules (not P1)
+
+| Source path | Module | Disposition |
+|-------------|--------|-------------|
+| `/api/price-models/**` | `price-models-service` | **defer** P2-6 |
+| `POST /api/price-models/{id}/apply/{priceBookId}` | same | **defer** P2-2 bulk idea |
+| `GET /api/price-models/price-books/{priceBookId}/analysis` | same | **hand off / exclude** market stats (P2-7) |
+| `/api/pricing-rules/**` (CRUD + recommendations) | `pricing-rules-service` | AI → Track 2 **HOLD**; SpEL **exclude** |
+| `POST /api/pricing/recommendations` | same | Track 2 **HOLD** |
+| `POST /api/pricing/azure-recommendations` | same | Track 2 **HOLD** |
+| `POST /api/spel/evaluate`, `/api/spel/apply-rules` | same | **exclude** (full SpEL held) |
+| Eureka | `eureka-server` | **exclude** |
+
+Source `PriceBookController` returns JPA/Mongo **entities**. Target stays ADR-006 DTOs + `ApiResponse<T>`.
 
 ---
 
