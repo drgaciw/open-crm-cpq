@@ -1,0 +1,75 @@
+{
+  "id": "t1-1-04-evaluate-mapped-happy-path",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "sourceGolden": "pricing-ai-rules-service/.kilo/artifacts/golden-fixtures/pricing-evaluate-001.json",
+  "sourceEndpoint": "POST /v1/pricing/evaluate",
+  "targetEndpoint": "POST /api/v1/pricing/execute",
+  "description": "Adapted source evaluate happy path → flat execute DTO. Nested quote/customer flattened; product.name → productExternalId; list-price waterfall with no active Drools (source enterprise-2026 discount deferred to later Track 1 DRL work).",
+  "request": {
+    "customerExternalId": "C-001",
+    "quoteExternalId": "Q-001",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 12,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-PLATFORM-CORE",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 10
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {
+      "externalId": "C-001",
+      "name": "Acme Corp",
+      "region": "NA",
+      "churnScore": 15
+    },
+    "priceBookEntries": {
+      "PROD-PLATFORM-CORE": {
+        "entryMatched": true,
+        "listPrice": 1200.00,
+        "currency": "USD"
+      }
+    },
+    "activeRules": []
+  },
+  "expected": {
+    "success": true,
+    "approvalState": "APPROVED",
+    "lineResults": [
+      {
+        "productExternalId": "PROD-PLATFORM-CORE",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 10,
+        "listPrice": 1200.00,
+        "unitPrice": 1200.00,
+        "discountRate": 0,
+        "discountAmount": 0,
+        "surchargeAmount": 0,
+        "finalPrice": 12000.00
+      }
+    ],
+    "waterfall": {
+      "listPrice": 1200.00,
+      "basePrice": 1200.00,
+      "netPrice": 12000.00,
+      "approvalState": "APPROVED",
+      "steps": []
+    },
+    "financialMetrics": {
+      "arr": 144000,
+      "tcv": 144000,
+      "acv": 12000.00,
+      "clv": 288000,
+      "churnScore": 15,
+      "discountRate": 0.0000,
+      "totalDiscount": 0,
+      "totalSurcharge": 0,
+      "priceMultiplier": 1.0000,
+      "estimatedMarginPct": 40.0
+    }
+  }
+}
