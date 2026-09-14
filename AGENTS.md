@@ -52,3 +52,19 @@ GitNexus block above is **code-intelligence only**. For what to build vs hold, r
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — index
 - [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 **Accepted**; dual-read ADR-005 still **Proposed**)
 
+## Learned User Preferences
+
+- Prefer browser automation (Playwright, Cursor browser; Chrome DevTools when Google Chrome is available) for UAT and chaos testing across pages, fields, and workflows with mock data; fix failures with a TDD loop.
+- When given bug reports, verify each issue in the repo before changing code; leave false positives untouched.
+- When restarting local apps, kill all related dev servers first, then bring the stack back up cleanly.
+- Keep committed `frontend/proxy.conf.json` targeting the gateway (`:8080`), not a temporary CRM-direct workaround.
+
+## Learned Workspace Facts
+
+- Local default ports: Angular CRM UI `:4200`, API gateway `:8080`, CRM service `:8081`; the UI proxies `/api` to the gateway.
+- Spring Cloud Gateway 5 / Boot 4 registers routes and filters under `spring.cloud.gateway.server.webflux.*`; the old `spring.cloud.gateway.routes` root yields empty routes and API 404s through the proxy.
+- Gateway actuator config belongs under `management.endpoint.gateway` (e.g. `access: read-only`), not under `server.webflux`.
+- Frontend unit tests use Vitest (`@nx/vitest:test`, `vitest/globals`, Analog `setupTestBed`); `TestBed` + `vi.fn()` is the intended pattern, not Jasmine spies.
+- Chrome DevTools MCP needs Google Chrome stable; hosts with only Chromium should rely on Playwright and the Cursor browser for UI automation.
+- CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them).
+
