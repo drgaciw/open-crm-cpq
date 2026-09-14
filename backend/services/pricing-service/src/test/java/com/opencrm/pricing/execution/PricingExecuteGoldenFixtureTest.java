@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.opencrm.common.exception.BusinessException;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.customer.CustomerRegion;
 import com.opencrm.pricing.customer.CustomerRepository;
@@ -19,6 +20,7 @@ import com.opencrm.rules.drools.DroolsRulesEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentMatchers;
@@ -35,6 +37,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,12 +46,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * S2C-1b golden fixtures for {@code POST /api/v1/pricing/execute} orchestration.
+ * S2C-1b + T1-1 golden fixtures for {@code POST /api/v1/pricing/execute} orchestration.
  * Docker-free: stubbed price book + repositories; real validator/metrics.
+ * T1-1 harvests source {@code /v1/pricing/evaluate} goldens mapped to execute (do not rename paths).
  * Matrix: {@code docs/backlog/CPQ_API_CONTRACT_MATRIX.md} §4.
  */
 @Tag("unit")
-@DisplayName("Pricing execute golden fixtures (S2C-1b)")
+@DisplayName("Pricing execute golden fixtures (S2C-1b + T1-1)")
 class PricingExecuteGoldenFixtureTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
@@ -67,7 +71,8 @@ class PricingExecuteGoldenFixtureTest {
         return Stream.of(
                 "01-list-price-baseline.json",
                 "02-multi-line-override.json",
-                "03-override-only.json"
+                "03-override-only.json",
+                "04-evaluate-mapped-happy-path.json"
         );
     }
 
@@ -116,6 +121,22 @@ class PricingExecuteGoldenFixtureTest {
         assertThat(result.getExecutionTimeMs()).isNotNull();
         assertGolden(expected, result);
         verify(auditLogRepository).save(any(PricingAuditLog.class));
+    }
+
+    @Test
+    @DisplayName("execute() maps source missing-quote error → INVALID_CONTEXT (blank customer)")
+    void executeErrorMissingCustomerMatchesGolden() throws Exception {
+        JsonNode root = readFixture(FIXTURE_DIR + "05-error-missing-customer.json");
+        PricingContext request = MAPPER.treeToValue(root.get("request"), PricingContext.class);
+        JsonNode expected = root.get("expected");
+
+        assertThatThrownBy(() -> executionService.execute(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException businessException = (BusinessException) ex;
+                    assertThat(businessException.getErrorCode()).isEqualTo(expected.get("errorCode").asText());
+                    assertThat(businessException.getMessage()).contains(expected.get("messageContains").asText());
+                });
     }
 
     private void stubCustomer(JsonNode customerNode) {

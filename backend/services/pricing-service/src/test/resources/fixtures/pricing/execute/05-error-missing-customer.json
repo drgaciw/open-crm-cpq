@@ -1,0 +1,28 @@
+{
+  "id": "t1-1-05-error-missing-customer",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "sourceGolden": "pricing-ai-rules-service/.kilo/artifacts/golden-fixtures/error-pricing-missing-quote-001.json",
+  "sourceEndpoint": "POST /v1/pricing/evaluate",
+  "targetEndpoint": "POST /api/v1/pricing/execute",
+  "description": "Adapted source missing-quote error. Target execute DTO has no nested quote; null/blank customerExternalId is the closest required-field failure (INVALID_CONTEXT).",
+  "request": {
+    "customerExternalId": "",
+    "quoteExternalId": "Q-ERR-001",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 12,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-001",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 1
+      }
+    ]
+  },
+  "expected": {
+    "exception": "BusinessException",
+    "errorCode": "INVALID_CONTEXT",
+    "messageContains": "Customer external ID is required"
+  }
+}
