@@ -1,0 +1,30 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+/**
+ * Metric-gated policy (T1-3 / §5.1a): consumes precomputed {@code acv} on QuoteFact metadata.
+ * Quote-level floor after a finalPrice exists (e.g. from TCV tiers).
+ */
+rule "ACV-based Minimum Commitment"
+salience 545
+when
+    $quote: QuoteFact(finalPrice != null, $finalPrice: finalPrice)
+    eval($quote.getDecimal("acv") != null)
+then
+    BigDecimal acv = $quote.getDecimal("acv");
+    BigDecimal minCommitment = BigDecimal.ZERO;
+
+    if (acv.compareTo(new BigDecimal("50000")) < 0)
+        minCommitment = new BigDecimal("50000");
+    else if (acv.compareTo(new BigDecimal("100000")) < 0)
+        minCommitment = new BigDecimal("100000");
+
+    if (minCommitment.compareTo(BigDecimal.ZERO) > 0
+            && $finalPrice.compareTo(minCommitment) < 0) {
+        $quote.setFinalPrice(minCommitment);
+        $quote.setDecimal("minCommitment", minCommitment);
+        $quote.setString("explanationCode", "ACV_MIN_COMMITMENT");
+    }
+end

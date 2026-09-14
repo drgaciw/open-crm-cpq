@@ -1,0 +1,29 @@
+package com.opencrm.pricing.rules;
+
+import com.opencrm.rules.model.QuoteFact;
+import java.math.BigDecimal;
+
+/**
+ * Metric-gated policy (T1-3 / §5.1a): consumes precomputed {@code tcv} on QuoteFact metadata.
+ * Quote-level writer — does not touch line-item discount fields (Named Seat Volume Discount).
+ */
+rule "TCV-based Pricing Tiers"
+salience 550
+when
+    $quote: QuoteFact(basePrice != null, finalPrice == null, $basePrice: basePrice)
+    eval($quote.getDecimal("tcv") != null)
+then
+    BigDecimal tcv = $quote.getDecimal("tcv");
+    BigDecimal priceMultiplier = BigDecimal.ONE;
+
+    if (tcv.compareTo(new BigDecimal("5000000")) >= 0)
+        priceMultiplier = new BigDecimal("1.20");
+    else if (tcv.compareTo(new BigDecimal("2000000")) >= 0)
+        priceMultiplier = new BigDecimal("1.15");
+    else if (tcv.compareTo(new BigDecimal("500000")) >= 0)
+        priceMultiplier = new BigDecimal("1.10");
+
+    $quote.setFinalPrice($basePrice.multiply(priceMultiplier));
+    $quote.setDecimal("priceMultiplier", priceMultiplier);
+    $quote.setString("explanationCode", "TCV_MULTIPLIER");
+end

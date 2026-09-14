@@ -1,0 +1,16 @@
+{
+  "id": "t1-3-drl-acv-minimum-commitment-floor",
+  "matrixRef": "docs/plans/pricing-ai-rules-capability-matrix-t1.md#4-drl-corpus--metric-gated-policy",
+  "description": "ACV-based Minimum Commitment (salience 545): ACV < 50K raises finalPrice to 50K floor.",
+  "ruleClasspath": "rules/acv-minimum-commitment.drl",
+  "facts": {
+    "finalPrice": 30000.00,
+    "acv": 40000.00
+  },
+  "expected": {
+    "rulesFired": 1,
+    "finalPrice": 50000.00,
+    "minCommitment": 50000.00,
+    "explanationCode": "ACV_MIN_COMMITMENT"
+  }
+}
