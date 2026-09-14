@@ -60,10 +60,10 @@
       "steps": []
     },
     "financialMetrics": {
-      "arr": 144000,
-      "tcv": 144000,
+      "arr": 144000.00,
+      "tcv": 144000.00,
       "acv": 12000.00,
-      "clv": 288000,
+      "clv": 288000.00,
       "churnScore": 15,
       "discountRate": 0.0000,
       "totalDiscount": 0,
