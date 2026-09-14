@@ -2,7 +2,8 @@
 
 **Status:** Plan / recommendations (not an implementation PR)  
 **Date:** 2026-09-14  
-**Source:** [drgaciw/deal-desk-service](https://github.com/drgaciw/deal-desk-service) (`main`)  
+**Source:** [drgaciw/deal-desk-service](https://github.com/drgaciw/deal-desk-service) (`main` @ **`d9bf654a487846d54964c13d1f9363fe99f747aa`**, 2026-05-25)  
+**C0 pin (2026-09-14):** clone `/home/username01/Projects/deal-desk-service` @ that SHA; controller inventory + secret-scan below. **No** `.env` copy into this monorepo.  
 **Target:** this monorepo (`open-crm-cpq`)  
 **Priority (architect decision 2026-09-14):** **(1) Approval / state-machine parity** → **(2) TCV / repricing edge-case handoff to pricing Track 1**  
 **Related plan:** [pricing-ai-rules-reuse-gap-analysis.md](./pricing-ai-rules-reuse-gap-analysis.md) (pricing/TCV Track 1 already owns financial-metric harvest)  
@@ -175,6 +176,39 @@ Work is split into **Track D1** then **Track D2**. D0 is shared. Salesforce is *
 5. Cross-link pricing plan: list source TCV types for Track D2 handoff (do not start pricing PRs here).
 
 **Exit:** pinned SHA + inventory + secret-scan note.
+
+#### D0 evidence (C0, 2026-09-14) — pin + inventory + secret-scan only
+
+| Field | Value |
+|-------|-------|
+| Local clone | `/home/username01/Projects/deal-desk-service` |
+| Pinned commit | `d9bf654a487846d54964c13d1f9363fe99f747aa` |
+| Pin message | `Merge pull request #56 from drgaciw/cursor/gitnexus-readme-mcp-b635` |
+| Pin date | 2026-05-25 |
+| Verify | `git -C /home/username01/Projects/deal-desk-service rev-parse HEAD` → `d9bf654…` |
+| Source stack (verified at pin) | Java **21**, Spring Boot parent **4.0.2**, MongoDB, easy-rules-core, OAuth2 JWT. Gap-analysis Thought 2 said Boot 3.4.x — **pin evidence supersedes** that stack note for harvest; recommendations in §1 / §6 are unchanged. |
+| Source package | `JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2`; host `mvn` not on PATH; used monorepo `backend/mvnw -f /home/username01/Projects/deal-desk-service/pom.xml -DskipTests package` → **BUILD SUCCESS** (2026-09-14). **No** `newgrp docker`. `deal-desk-rules/` is a sibling module, not in this reactor. |
+| Track D1 docs | [deal-desk-capability-matrix-d1.md](./deal-desk-capability-matrix-d1.md) · [deal-desk-harvest-backlog-d1.md](./deal-desk-harvest-backlog-d1.md) |
+
+**Controllers (production):**
+
+| Class | Base path | Methods | Harvest |
+|-------|-----------|---------|---------|
+| `DealController` | `/api/v1/deals` | POST `/`; GET/PUT/DELETE `/{id}`; GET `/` (filters); POST `/{id}/submit`; POST `/{id}/approve` (`X-User-ID`); POST `/{id}/reject` (`X-User-ID` + `reason`); POST `/{id}/sync`; POST `/batch-sync` | Submit/approve/reject → quote BFF + `approval-routing`. CRUD is Quote/CRM analog — **no** third `/api/v1/deals` CPQ aggregate. Sync/batch-sync = **Salesforce parked**. |
+| `RuleDefinitionController` | `/api/v1/rules` | CRUD + category list | **Exclude** — Easy Rules catalog, not Drools rule-sets |
+
+**`DealService` methods with no controller mapping:** `cancelDeal`, `batchUpdateStatus`, `updateFromSalesforce`, `validateSalesforceOpportunity`, plus list/count helpers (`getHighValueDeals`, `getRecentDeals`, `countDealsByStatus`, `calculateTotalValue`). Cancel is D1-relevant (see matrix).
+
+**Secret-scan (read-only; do not copy):**
+
+| Finding | Note |
+|---------|------|
+| `.env` | **Tracked** (`git ls-files .env`) even though `.gitignore` lists `.env`. Keys: `MONGO_USERNAME`, `MONGO_PASSWORD`, `JWT_ISSUER_URI`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. Mongo/Postgres password values are **not** placeholder-length. **Never copy** this file or its values into `open-crm-cpq`. |
+| `src/main/resources/application.yml` | Salesforce `client-secret` / `password` / `security-token` via `${SALESFORCE_*:test-*}` defaults. Test yml/properties use `test-client-secret` stubs. |
+| Duplicate `title=src/main/resources/application.yml` | Tree artifact; same Salesforce stub keys. |
+| `.github/workflows/claude.yml` | References `${{ secrets.ANTHROPIC_API_KEY }}` (Actions secret name only). |
+
+**TCV types for Track D2 handoff (catalog only — no pricing PRs, no D2 file now):** `TCVCalculationStrategy` (`calculateTCV`, `calculateNPV`, `validateComponents`, `applyDiscounts`); `TCVCalculationRules` / `TCVRuleExecutorService`; contingent revenue / contract term / discounts; `RepricingTriggerService` (Salesforce-coupled — parked with SF). Assign into a **pricing residual** backlog after C-GATE; **do not** reopen closed Queue A T1-1…T1-5.
 
 ---
 
