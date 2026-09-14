@@ -1,0 +1,17 @@
+{
+  "id": "t1-3-drl-churn-risk-adjustment-high",
+  "matrixRef": "docs/plans/pricing-ai-rules-capability-matrix-t1.md#4-drl-corpus--metric-gated-policy",
+  "description": "Churn Risk Adjustment (salience 535): non-RENEWAL + churnScore > 70 → 5% quote discount.",
+  "ruleClasspath": "rules/churn-risk-adjustment.drl",
+  "facts": {
+    "finalPrice": 1000.00,
+    "dealType": "NEW",
+    "churnScore": 75
+  },
+  "expected": {
+    "rulesFired": 1,
+    "finalPrice": 950.00,
+    "churnAdjustment": -0.05,
+    "explanationCode": "CHURN_ADJUSTMENT"
+  }
+}
