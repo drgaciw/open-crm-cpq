@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
-import { ProductCreateDialogComponent } from './product-create-dialog.component';
+import { ProductCreateDialogComponent, ProductCreateFormModel } from './product-create-dialog.component';
 import { ProductService } from '../product.service';
 import { ProductCreateRequest, ProductDto } from '@frontend/shared-models';
 
@@ -27,6 +27,10 @@ describe('ProductCreateDialogComponent', () => {
     createdAt: '',
     updatedAt: '',
   };
+
+  function fillForm(patch: Partial<ProductCreateFormModel>): void {
+    component.productModel.update((current) => ({ ...current, ...patch }));
+  }
 
   beforeEach(async () => {
     createSpy = vi.fn();
@@ -54,21 +58,21 @@ describe('ProductCreateDialogComponent', () => {
   });
 
   it('requires sku, name, productType, and category (no status control)', () => {
-    expect(component.form.contains('status')).toBe(false);
-    expect(component.form.valid).toBe(false);
+    expect('status' in component.productModel()).toBe(false);
+    expect(component.productForm().valid()).toBe(false);
 
-    component.form.patchValue({
+    fillForm({
       sku: 'NEW-SKU',
       name: 'New Catalog Product',
       productType: 'HARDWARE',
       category: 'ADD_ON',
     });
-    expect(component.form.valid).toBe(true);
+    expect(component.productForm().valid()).toBe(true);
   });
 
-  it('creates via ProductService and closes with the product', () => {
+  it('creates via ProductService and closes with the product', async () => {
     createSpy.mockReturnValue(of(createdProduct));
-    component.form.patchValue({
+    fillForm({
       sku: '  NEW-SKU  ',
       name: ' New Catalog Product ',
       productType: 'HARDWARE',
@@ -77,7 +81,7 @@ describe('ProductCreateDialogComponent', () => {
       currency: 'usd',
     });
 
-    component.onSubmit();
+    await component.onSubmit();
 
     expect(createSpy).toHaveBeenCalledWith({
       sku: 'NEW-SKU',
@@ -92,9 +96,9 @@ describe('ProductCreateDialogComponent', () => {
     expect(component.error()).toBeNull();
   });
 
-  it('omits optional listPrice and currency when empty', () => {
+  it('omits optional listPrice and currency when empty', async () => {
     createSpy.mockReturnValue(of(createdProduct));
-    component.form.patchValue({
+    fillForm({
       sku: 'SKU-1',
       name: 'Minimal',
       productType: 'CUSTOM',
@@ -103,7 +107,7 @@ describe('ProductCreateDialogComponent', () => {
       currency: '',
     });
 
-    component.onSubmit();
+    await component.onSubmit();
 
     expect(createSpy).toHaveBeenCalledWith({
       sku: 'SKU-1',
@@ -113,18 +117,18 @@ describe('ProductCreateDialogComponent', () => {
     });
   });
 
-  it('shows error banner when create fails and keeps dialog open', () => {
+  it('shows error banner when create fails and keeps dialog open', async () => {
     createSpy.mockReturnValue(
       throwError(() => ({ error: { message: 'SKU already exists' } })),
     );
-    component.form.patchValue({
+    fillForm({
       sku: 'DUP',
       name: 'Dup',
       productType: 'CUSTOM',
       category: 'ADD_ON',
     });
 
-    component.onSubmit();
+    await component.onSubmit();
     fixture.detectChanges();
 
     expect(dialogClose).not.toHaveBeenCalled();
@@ -135,8 +139,8 @@ describe('ProductCreateDialogComponent', () => {
     );
   });
 
-  it('does not submit when form is invalid', () => {
-    component.onSubmit();
+  it('does not submit when form is invalid', async () => {
+    await component.onSubmit();
     expect(createSpy).not.toHaveBeenCalled();
   });
 });
