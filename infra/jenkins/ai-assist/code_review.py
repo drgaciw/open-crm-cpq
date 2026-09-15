@@ -11,7 +11,7 @@ import sys
 from ai_client import chat_completion, is_ai_enabled, sanitize_text, skip_report, write_report
 
 SYSTEM_PROMPT = """You are a senior code reviewer for the OpenCRM CPQ monorepo.
-Stack: Java 21 Spring Boot microservices (backend/), Angular 21 Nx (frontend/), optional Frappe cpq_beta/.
+Stack: Java 25 Spring Boot 4.0.6 microservices (backend/), Angular 22 Nx (frontend/), optional Frappe cpq_beta/.
 Focus on: correctness, security (OWASP), concurrency, test gaps, API contract breaks, and maintainability.
 Output markdown with sections: Summary, Critical, Warnings, Suggestions, Test Recommendations.
 Be concise. Do not invent issues not supported by the diff."""
