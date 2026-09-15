@@ -58,7 +58,7 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         logger.warn("Validation failed: {} [traceId={}]", fieldErrors, traceId);
         ApiResponse<Void> response = ApiResponse.error(errorMessage, "VALIDATION_ERROR", traceId);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -70,7 +70,7 @@ public class GlobalExceptionHandler {
         String errorMessage = "Constraint violation: " + violations;
         logger.warn("Constraint violation: {} [traceId={}]", violations, traceId);
         ApiResponse<Void> response = ApiResponse.error(errorMessage, "CONSTRAINT_VIOLATION", traceId);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
