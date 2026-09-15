@@ -141,7 +141,7 @@ class QuoteServiceSubmitForReviewTest {
 
         quoteService.submitForReview(1L);
 
-        ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<Long>> captor = ArgumentCaptor.captor();
         verify(productServiceClient).validateConfiguration(captor.capture());
         assertThat(captor.getValue()).containsExactly(10L, 20L);
     }
