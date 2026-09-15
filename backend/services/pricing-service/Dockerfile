@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="OpenCRM Team"
 LABEL description="Pricing Service - Pricing engine with Drools and OpenL Tablets rules"
