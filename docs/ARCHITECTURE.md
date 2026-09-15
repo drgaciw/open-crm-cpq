@@ -27,8 +27,8 @@ Copy this table into planning. **Do not present the Target column as current.**
 
 | Dimension | Landed (forge, 2026-09) | Target / held |
 |-----------|-------------------------|---------------|
-| Backend | Spring Boot **4.0.6** parent / Java 21 reactor (`backend/pom.xml`): crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service | Azure AKS; remaining identity & comms. **Do not** downgrade Boot |
-| Frontend | Angular Nx `frontend/apps/crm` + `libs/cpq/*` + `libs/crm/*` + `libs/shared/*`. **Signals + HttpClient** | NgRx 19+ **held**; customer-portal / admin-console apps **not** in tree |
+| Backend | Spring Boot **4.0.6** parent / Java **25** reactor (`backend/pom.xml`): crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service | Azure AKS; remaining identity & comms. **Do not** downgrade Boot |
+| Frontend | Angular **22** Nx `frontend/apps/crm` + `libs/cpq/*` + `libs/crm/*` + `libs/shared/*`. **Signals + HttpClient** | NgRx 19+ **held**; customer-portal / admin-console apps **not** in tree |
 | Database | PostgreSQL 16 + Redis 7 (compose); **one DB `opencrm`, schemas per service** | Same + production Azure. pgvector extension commented until needed |
 | Infrastructure | Docker Compose local; **Jenkins primary CI**; GHA `workflow_dispatch` fallback — [ADR-003](adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
 | AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-002](adr/ADR-002-primary-llm-glm-5.md) GLM-5 **Accepted, not landed** — **not** production |
@@ -152,7 +152,7 @@ Vitest: `cd frontend && NX_DAEMON=false npx nx test <proj> --skip-nx-cache`.
 **ITs:** Testcontainers (Postgres 16, Redis 7). If login `id` lacks `docker` but `getent group docker` includes the user, wrap Maven:
 
 ```bash
-export JAVA_HOME=/home/username01/.local/share/mise/installs/java/21.0.2
+export JAVA_HOME=/home/username01/.local/share/mise/installs/java/temurin-25
 newgrp docker <<'EOF'
 cd backend && ./mvnw -B -pl services/<module> -am test
 EOF
@@ -238,7 +238,7 @@ Plans: [23](forge/23-wave-n-architecture.md)–[35](forge/35-wave-w-architecture
 
 | Path | Role |
 |------|------|
-| `backend/pom.xml` | Reactor, Boot **4.0.6**, Java 21 |
+| `backend/pom.xml` | Reactor, Boot **4.0.6**, Java **25** |
 | `backend/docker-compose.yml` | Postgres 16, Redis 7, service ports |
 | `backend/scripts/init-db.sql` | Schemas `crm`, `cpq`, `pricing`, `product`, `quote`, `communication`, `ai` |
 | `backend/libs/common/` | `BaseEntity`, `ApiResponse`, exceptions |

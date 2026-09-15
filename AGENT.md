@@ -9,8 +9,8 @@
 
 | Dimension | Legacy (Frappe) | Landed (forge, 2026-08) | Target (not all landed) |
 |-----------|-----------------|-------------------------|-------------------------|
-| Backend | Frappe Framework (Python) | Spring Boot 4.0.6 parent / Java 21 microservices (crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service) | Azure AKS / remaining identity & comms |
-| Frontend | Vue 3 / Frappe UI | Angular Nx CRM app + CPQ libs (catalog, quotes, approvals, price-books, pricing-customers, rule-sets, product-bundles, simulator); **signals + HttpClient**, **not** NgRx | NgRx 19+ (**held**); customer-portal / admin-console apps |
+| Backend | Frappe Framework (Python) | Spring Boot 4.0.6 parent / Java 25 microservices (crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service) | Azure AKS / remaining identity & comms |
+| Frontend | Vue 3 / Frappe UI | Angular **22** Nx CRM app + CPQ libs (catalog, quotes, approvals, price-books, pricing-customers, rule-sets, product-bundles, simulator); **signals + HttpClient**, **not** NgRx | NgRx 19+ (**held**); customer-portal / admin-console apps |
 | Database | MariaDB 10.6 | PostgreSQL 16 + pgvector (compose); schemas per service | Same + production Azure |
 | Infrastructure | Docker / GitHub Actions | Docker Compose local; **Jenkins primary CI** (GHA `workflow_dispatch` fallback) — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
 | AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`); ADR-002 GLM-5 **Accepted but not implemented** | GLM-5 via Zhipu **or** keep Azure — do not assume GLM-5 is live |
