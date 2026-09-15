@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -49,7 +50,7 @@ public class OutboxRelayPublisherTest {
         outboxRelayPublisher.publishPendingEvents();
 
         verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        verify(outboxEventRepository, never()).saveAll(any());
+        verify(outboxEventRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -59,7 +60,8 @@ public class OutboxRelayPublisherTest {
 
         when(outboxEventRepository.findUnpublishedEventsWithRetryLimit(anyInt())).thenReturn(Arrays.asList(event1, event2));
 
-        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        SendResult<String, String> sendResult = mock();
+        CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(future);
 
         outboxRelayPublisher.publishPendingEvents();
@@ -132,6 +134,6 @@ public class OutboxRelayPublisherTest {
 
         outboxRelayPublisher.cleanupOldEvents();
 
-        verify(outboxEventRepository, never()).deleteAll(any());
+        verify(outboxEventRepository, never()).deleteAll(anyList());
     }
 }
