@@ -3,7 +3,7 @@
     Builds and boots the Open CRM/CPQ AI Service (GLM-5 / ADR-002).
 
 .DESCRIPTION
-    1. Validates prerequisites (Java 21+, Maven 3.9+, Docker).
+    1. Validates prerequisites (Java 25, Maven 3.9+, Docker).
     2. Compiles the ai-service Maven module (skip tests for fast startup).
     3. Ensures the .env file has ZHIPUAI_API_KEY set.
     4. Starts the full Docker Compose stack (postgres + redis + ai-service).
@@ -30,7 +30,7 @@
     .\Start-AiService.ps1 -SkipBuild
 
 .NOTES
-    Requires: Java 21+, Maven 3.9+, Docker Desktop (or Docker Engine)
+    Requires: Java 25, Maven 3.9+, Docker Desktop (or Docker Engine)
     LLM: GLM-5 via Zhipu AI (ADR-002)
     ⚠️  Data residency: Zhipu AI routes traffic through Chinese infrastructure.
          Complete DPA/compliance review before using with real customer data.
@@ -55,12 +55,12 @@ function Write-Fail  { param($msg) Write-Host "   ✗  $msg" -ForegroundColor Re
 # ─── 1. Prerequisites ──────────────────────────────────────────────────────────
 Write-Step "Checking prerequisites"
 
-# Java 21+
+# Java 25 (CI/Docker already enforce 25; do not use 21 or 27)
 $javaVer = & java -version 2>&1 | Select-String 'version "(\d+)' | ForEach-Object {
     [int]($_.Matches[0].Groups[1].Value)
 }
-if (-not $javaVer) { Write-Fail "java not found. Install JDK 21+ and add to PATH." }
-if ($javaVer -lt 21) { Write-Fail "Java $javaVer found but Java 21+ is required." }
+if (-not $javaVer) { Write-Fail "java not found. Install JDK 25 and add to PATH (JAVA_HOME=…/temurin-25)." }
+if ($javaVer -lt 25) { Write-Fail "Java $javaVer found but Java 25 is required." }
 Write-OK "Java $javaVer"
 
 # Maven 3.9+
