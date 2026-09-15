@@ -57,7 +57,8 @@ class GlobalExceptionHandlerTest {
         MethodArgumentNotValidException ex = mock(MethodArgumentNotValidException.class);
         when(ex.getBindingResult()).thenReturn(binding);
         ResponseEntity<ApiResponse<Void>> response = handler.handleValidationException(ex);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody().getErrorCode()).isEqualTo("VALIDATION_ERROR");
     }
 
@@ -71,7 +72,8 @@ class GlobalExceptionHandlerTest {
         when(violation.getMessage()).thenReturn("must be positive");
         ResponseEntity<ApiResponse<Void>> response =
                 handler.handleConstraintViolationException(new ConstraintViolationException(Set.of(violation)));
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody().getErrorCode()).isEqualTo("CONSTRAINT_VIOLATION");
     }
 
