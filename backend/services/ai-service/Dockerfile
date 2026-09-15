@@ -1,4 +1,4 @@
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="OpenCRM Team"
 LABEL description="AI Agent Service — 37 CPQ agents via GLM-5 (Zhipu AI, ADR-002)"
