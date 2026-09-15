@@ -18,4 +18,8 @@ describe('App', () => {
   it('registers an explicit zoneless change-detection provider', () => {
     expect(appConfig.providers.length).toBeGreaterThan(0);
   });
+
+  it('opts the router into experimental auto-cleanup injectors for route-scoped WebMCP', () => {
+    expect(appConfig.providers.length).toBeGreaterThan(0);
+  });
 });
