@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Service, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, finalize } from 'rxjs';
 import {
@@ -35,7 +35,7 @@ function httpErrorMessage(err: unknown): string {
  * Signal-state pattern matches {@link DealService} (HttpClient + signals; not BaseCrudService).
  * Base path: `/api/v1/quotes` (quote-service via gateway).
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class QuoteService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/quotes';
