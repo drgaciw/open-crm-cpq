@@ -3,7 +3,7 @@
 # Usage: ./scripts/build-and-run.sh
 #
 # Prerequisites:
-#   - Java 21+ and Maven installed
+#   - Java 25 and Maven installed
 #   - Docker and Docker Compose installed
 
 set -e

@@ -1,6 +1,6 @@
 # Open CRM Backend
 
-A Spring Boot 3.2 microservices backend for CRM and CPQ operations, built with Java 21.
+A Spring Boot 4.0.6 microservices backend for CRM and CPQ operations, built with Java 25.
 
 ## Stacked pull requests (Graphite)
 
@@ -32,9 +32,25 @@ backend/
 
 ## Prerequisites
 
-- **Java 21** (Microsoft OpenJDK or any JDK 21+)
+- **Java 25** (Eclipse Temurin 25 LTS). Do not use JDK 27 (non-LTS; Boot 4.0.6 supports 17–25).
 - **Maven 3.9+**
 - **Docker** and **Docker Compose** (for PostgreSQL and Redis)
+
+### Toolchain (`JAVA_HOME`)
+
+Host `PATH` `java` may resolve to a newer non-LTS (for example 27). Pin **Temurin 25** for local Maven and scripts — CI, Jenkins Maven, and service images already enforce 25 (`eclipse-temurin:25-jre-alpine`):
+
+```bash
+export JAVA_HOME=/home/username01/.local/share/mise/installs/java/temurin-25
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version   # 25.x LTS — never 21.0.2, never 27
+```
+
+If the `temurin-25` symlink is missing, resolve the mise install:
+
+```bash
+export JAVA_HOME=$(ls -d ~/.local/share/mise/installs/java/temurin-25* | head -1)
+```
 
 ## Quick Start
 
@@ -189,7 +205,7 @@ $env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 
 ## Tech Stack
 
-- **Java 21**, **Spring Boot 3.2.2**, **Spring Cloud 2023.0.0**
+- **Java 25**, **Spring Boot 4.0.6**, **Spring Cloud 2025.1.1**
 - **Spring Data JPA** + **PostgreSQL 16** (schema-per-service isolation)
 - **Flyway 10.6** for database migrations
 - **MapStruct 1.5.5** + **Lombok** for entity/DTO mapping
