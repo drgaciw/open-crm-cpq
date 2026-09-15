@@ -177,13 +177,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
               <div class="metric">
                 <span class="metric-label">Net</span>
                 <span class="metric-value">{{
-                  result()!.waterfall?.netPrice | currencyFormat: currencyCode()
+                  $safeNavigationMigration(result()!.waterfall?.netPrice) | currencyFormat: currencyCode()
                 }}</span>
               </div>
               <div class="metric">
                 <span class="metric-label">ARR</span>
                 <span class="metric-value">{{
-                  result()!.financialMetrics?.arr | currencyFormat: currencyCode()
+                  $safeNavigationMigration(result()!.financialMetrics?.arr) | currencyFormat: currencyCode()
                 }}</span>
               </div>
               <div class="metric">
