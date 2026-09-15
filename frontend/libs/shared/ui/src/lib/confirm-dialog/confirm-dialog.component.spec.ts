@@ -128,10 +128,19 @@ describe('ConfirmDialogComponent', () => {
     expect(confirmButton.hasAttribute('cdkFocusInitial')).toBe(true);
   });
 
-  it('should associate dialog with message via aria-describedby', () => {
+  it('should trap focus in the dialog overlay region', () => {
     const root = component.nativeElement.querySelector('.confirm-dialog') as HTMLElement;
+    expect(root.hasAttribute('cdkTrapFocus')).toBe(true);
+  });
+
+  it('should associate dialog with title and message via aria-labelledby and aria-describedby', () => {
+    const root = component.nativeElement.querySelector('.confirm-dialog') as HTMLElement;
+    const title = component.nativeElement.querySelector('.dialog-title') as HTMLElement;
     const message = component.nativeElement.querySelector('.dialog-message') as HTMLElement;
+    const labelledBy = root.getAttribute('aria-labelledby');
     const describedBy = root.getAttribute('aria-describedby');
+    expect(labelledBy).toBeTruthy();
+    expect(title.id).toBe(labelledBy);
     expect(describedBy).toBeTruthy();
     expect(message.id).toBe(describedBy);
   });

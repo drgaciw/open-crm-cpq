@@ -1,14 +1,20 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal,
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  min,
+  required,
+  submit,
+} from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MatDialogModule,
@@ -28,16 +34,26 @@ import {
 } from '@frontend/shared-models';
 import { ProductService } from '../product.service';
 
+export interface ProductCreateFormModel {
+  sku: string;
+  name: string;
+  productType: CatalogProductType | '';
+  category: ProductCategory | '';
+  listPrice: number | null;
+  currency: string;
+}
+
 /**
  * Minimal New Product dialog matching ProductCreateRequest.
  * Required: sku, name, productType, category. Optional: listPrice, currency.
  * No status field on create DTO.
+ * NG3: Signal Form (`@angular/forms/signals`) — the one v22 form conversion.
  */
 @Component({
   selector: 'cpq-product-create-dialog',
-  standalone: true,
   imports: [
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -56,51 +72,53 @@ import { ProductService } from '../product.service';
           <span>{{ error() }}</span>
         </div>
       }
-      <form [formGroup]="form" class="create-form" (ngSubmit)="onSubmit()">
+      <form [formRoot]="productForm" class="create-form">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>SKU</mat-label>
-          <input matInput formControlName="sku" maxlength="100" autocomplete="off" />
-          @if (form.get('sku')?.hasError('required')) {
-            <mat-error>SKU is required</mat-error>
-          }
-          @if (form.get('sku')?.hasError('maxlength')) {
-            <mat-error>SKU must be at most 100 characters</mat-error>
+          <input matInput [formField]="productForm.sku" autocomplete="off" />
+          @if (productForm.sku().touched() && productForm.sku().invalid()) {
+            @for (err of productForm.sku().errors(); track err.kind) {
+              <mat-error>{{ err.message }}</mat-error>
+            }
           }
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Name</mat-label>
-          <input matInput formControlName="name" maxlength="255" autocomplete="off" />
-          @if (form.get('name')?.hasError('required')) {
-            <mat-error>Name is required</mat-error>
-          }
-          @if (form.get('name')?.hasError('maxlength')) {
-            <mat-error>Name must be at most 255 characters</mat-error>
+          <input matInput [formField]="productForm.name" autocomplete="off" />
+          @if (productForm.name().touched() && productForm.name().invalid()) {
+            @for (err of productForm.name().errors(); track err.kind) {
+              <mat-error>{{ err.message }}</mat-error>
+            }
           }
         </mat-form-field>
 
         <div class="row">
           <mat-form-field appearance="outline" class="half">
             <mat-label>Product type</mat-label>
-            <mat-select formControlName="productType" aria-label="Product type">
+            <mat-select [formField]="productForm.productType" aria-label="Product type">
               @for (t of productTypes; track t) {
                 <mat-option [value]="t">{{ t }}</mat-option>
               }
             </mat-select>
-            @if (form.get('productType')?.hasError('required')) {
-              <mat-error>Product type is required</mat-error>
+            @if (productForm.productType().touched() && productForm.productType().invalid()) {
+              @for (err of productForm.productType().errors(); track err.kind) {
+                <mat-error>{{ err.message }}</mat-error>
+              }
             }
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="half">
             <mat-label>Category</mat-label>
-            <mat-select formControlName="category" aria-label="Category">
+            <mat-select [formField]="productForm.category" aria-label="Category">
               @for (c of categories; track c) {
                 <mat-option [value]="c">{{ c }}</mat-option>
               }
             </mat-select>
-            @if (form.get('category')?.hasError('required')) {
-              <mat-error>Category is required</mat-error>
+            @if (productForm.category().touched() && productForm.category().invalid()) {
+              @for (err of productForm.category().errors(); track err.kind) {
+                <mat-error>{{ err.message }}</mat-error>
+              }
             }
           </mat-form-field>
         </div>
@@ -111,8 +129,7 @@ import { ProductService } from '../product.service';
             <input
               matInput
               type="number"
-              formControlName="listPrice"
-              min="0"
+              [formField]="productForm.listPrice"
               step="0.01"
             />
           </mat-form-field>
@@ -121,13 +138,14 @@ import { ProductService } from '../product.service';
             <mat-label>Currency</mat-label>
             <input
               matInput
-              formControlName="currency"
-              maxlength="3"
+              [formField]="productForm.currency"
               placeholder="USD"
               autocomplete="off"
             />
-            @if (form.get('currency')?.hasError('maxlength')) {
-              <mat-error>Currency must be 3 characters</mat-error>
+            @if (productForm.currency().touched() && productForm.currency().invalid()) {
+              @for (err of productForm.currency().errors(); track err.kind) {
+                <mat-error>{{ err.message }}</mat-error>
+              }
             }
           </mat-form-field>
         </div>
@@ -141,7 +159,7 @@ import { ProductService } from '../product.service';
         mat-raised-button
         color="primary"
         type="button"
-        [disabled]="form.invalid || saving()"
+        [disabled]="productForm().invalid() || saving()"
         (click)="onSubmit()"
       >
         @if (saving()) {
@@ -192,7 +210,6 @@ import { ProductService } from '../product.service';
   `,
 })
 export class ProductCreateDialogComponent {
-  private readonly fb = inject(FormBuilder);
   private readonly productService = inject(ProductService);
   private readonly dialogRef = inject(MatDialogRef<ProductCreateDialogComponent, ProductDto>);
 
@@ -205,29 +222,44 @@ export class ProductCreateDialogComponent {
     'ADD_ON',
   ];
 
-  readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
-  readonly form = this.fb.nonNullable.group({
-    sku: ['', [Validators.required, Validators.maxLength(100)]],
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    productType: this.fb.nonNullable.control<CatalogProductType | ''>('', {
-      validators: [Validators.required],
-    }),
-    category: this.fb.nonNullable.control<ProductCategory | ''>('', {
-      validators: [Validators.required],
-    }),
-    listPrice: this.fb.control<number | null>(null),
-    currency: ['', [Validators.maxLength(3)]],
+  readonly productModel = signal<ProductCreateFormModel>({
+    sku: '',
+    name: '',
+    productType: '',
+    category: '',
+    listPrice: null,
+    currency: '',
   });
 
-  onSubmit(): void {
-    if (this.form.invalid || this.saving()) {
-      this.form.markAllAsTouched();
-      return;
-    }
+  readonly productForm = form(
+    this.productModel,
+    (path) => {
+      required(path.sku, { message: 'SKU is required' });
+      maxLength(path.sku, 100, { message: 'SKU must be at most 100 characters' });
+      required(path.name, { message: 'Name is required' });
+      maxLength(path.name, 255, { message: 'Name must be at most 255 characters' });
+      required(path.productType, { message: 'Product type is required' });
+      required(path.category, { message: 'Category is required' });
+      min(path.listPrice, 0, { message: 'List price must be at least 0' });
+      maxLength(path.currency, 3, { message: 'Currency must be 3 characters' });
+    },
+    {
+      submission: {
+        action: (field) => this.createProduct(field().value()),
+      },
+    },
+  );
 
-    const value = this.form.getRawValue();
+  readonly saving = computed(() => this.productForm().submitting());
+
+  async onSubmit(): Promise<void> {
+    this.error.set(null);
+    await submit(this.productForm, () => this.createProduct(this.productForm().value()));
+  }
+
+  private async createProduct(value: ProductCreateFormModel) {
     const request: ProductCreateRequest = {
       sku: value.sku.trim(),
       name: value.name.trim(),
@@ -243,19 +275,15 @@ export class ProductCreateDialogComponent {
       request.currency = currency.toUpperCase();
     }
 
-    this.error.set(null);
-    this.saving.set(true);
-    this.productService.create(request).subscribe({
-      next: (product) => {
-        this.saving.set(false);
-        this.dialogRef.close(product);
-      },
-      error: (err: { error?: { message?: string }; message?: string }) => {
-        this.saving.set(false);
-        this.error.set(
-          err?.error?.message || err?.message || 'Failed to create product',
-        );
-      },
-    });
+    try {
+      const product = await firstValueFrom(this.productService.create(request));
+      this.dialogRef.close(product);
+      return;
+    } catch (err: unknown) {
+      const e = err as { error?: { message?: string }; message?: string };
+      const message = e?.error?.message || e?.message || 'Failed to create product';
+      this.error.set(message);
+      return { kind: 'serverError', message };
+    }
   }
 }

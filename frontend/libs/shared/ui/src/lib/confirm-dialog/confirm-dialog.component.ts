@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -38,12 +38,16 @@ export interface ConfirmDialogData {
  */
 @Component({
   selector: 'app-confirm-dialog',
-  standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule],
+  imports: [CdkTrapFocus, MatDialogModule, MatButtonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="confirm-dialog" [attr.aria-describedby]="messageId">
-      <h2 mat-dialog-title class="dialog-title">{{ data.title }}</h2>
+    <div
+      class="confirm-dialog"
+      cdkTrapFocus
+      [attr.aria-labelledby]="titleId"
+      [attr.aria-describedby]="messageId"
+    >
+      <h2 mat-dialog-title class="dialog-title" [id]="titleId">{{ data.title }}</h2>
 
       <mat-dialog-content class="dialog-content">
         <p class="dialog-message" [id]="messageId">{{ data.message }}</p>
@@ -118,7 +122,8 @@ export class ConfirmDialogComponent {
   protected readonly data: ConfirmDialogData = inject(MAT_DIALOG_DATA);
   private readonly dialogRef = inject(MatDialogRef<ConfirmDialogComponent>);
 
-  /** Stable id for aria-describedby → message association. */
+  /** Stable ids for overlay a11y (labelledby + describedby). */
+  protected readonly titleId = 'confirm-dialog-title';
   protected readonly messageId = 'confirm-dialog-message';
 
   onConfirm(): void {
