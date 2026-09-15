@@ -5,13 +5,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +41,19 @@ class PricingServiceClientTest {
     @AfterEach
     void verifyServer() {
         server.verify();
+    }
+
+    @Test
+    @DisplayName("Spring can select an injection constructor (UAT-1: no default ctor)")
+    void springInjectionConstructorIsUnambiguous() {
+        Constructor<?>[] declared = PricingServiceClient.class.getDeclaredConstructors();
+        long autowired = Arrays.stream(declared)
+                .filter(c -> c.getAnnotation(Autowired.class) != null)
+                .count();
+        assertThat(declared.length == 1 || autowired == 1)
+                .as("Spring cannot pick among %s declared constructors without @Autowired (UAT-1 BeanCreationException: No default constructor found)",
+                        declared.length)
+                .isTrue();
     }
 
     @Test

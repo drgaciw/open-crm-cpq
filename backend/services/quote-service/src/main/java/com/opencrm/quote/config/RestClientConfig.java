@@ -20,7 +20,7 @@ public class RestClientConfig {
     @Value("${services.approval-routing.url}")
     private String approvalRoutingServiceUrl;
 
-    @Bean
+    @Bean("pricingRestClient")
     public RestClient pricingRestClient() {
         return RestClient.builder()
                 .baseUrl(pricingServiceUrl)
@@ -29,7 +29,7 @@ public class RestClientConfig {
     }
 
     /** Gateway RestClient for S2D-3a validate (structured ConfigurationValidationResult). */
-    @Bean
+    @Bean("gatewayRestClient")
     public RestClient gatewayRestClient() {
         return RestClient.builder()
                 .baseUrl(gatewayServiceUrl)
@@ -38,7 +38,7 @@ public class RestClientConfig {
     }
 
     /** approval-routing RestClient for S2C-12 single-writer approval records (G4). */
-    @Bean
+    @Bean("approvalRoutingRestClient")
     public RestClient approvalRoutingRestClient() {
         return RestClient.builder()
                 .baseUrl(approvalRoutingServiceUrl)
