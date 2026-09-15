@@ -30,15 +30,14 @@ public class PricingServiceClient {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public PricingServiceClient(
-            @Qualifier("pricingRestClient") RestClient restClient,
-            ObjectMapper objectMapper) {
+    /**
+     * Single injection constructor. A second ctor (even package-private) makes Spring
+     * look for a no-arg default and fail boot (UAT-1: {@code BeanCreationException}
+     * {@code pricingServiceClient} — no default constructor found).
+     */
+    public PricingServiceClient(@Qualifier("pricingRestClient") RestClient restClient) {
         this.restClient = restClient;
-        this.objectMapper = objectMapper;
-    }
-
-    PricingServiceClient(RestClient restClient) {
-        this(restClient, new ObjectMapper());
+        this.objectMapper = new ObjectMapper();
     }
 
     public ApiResponse<PricingExecuteView> executePricing(Map<String, Object> pricingContext) {
