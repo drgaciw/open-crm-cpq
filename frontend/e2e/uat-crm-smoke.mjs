@@ -2,12 +2,11 @@
  * Lightweight Playwright UAT smoke for Open CRM (no Nx e2e project yet).
  * Prerequisites: frontend :4200, CRM API reachable via /api proxy.
  *
- *   cd frontend && npx --yes playwright@1.55.0 install chromium
- *   cd frontend && node e2e/uat-crm-smoke.mjs
+ *   cd frontend && npx playwright install chromium   # once; playwright is a devDependency
+ *   cd frontend && npm run e2e:smoke
  */
-import { chromium } from 'playwright';
+import { launch, BASE } from './lib/browser.mjs';
 
-const BASE = process.env.UAT_BASE_URL || 'http://127.0.0.1:4200';
 const stamp = Date.now();
 const results = [];
 
@@ -21,13 +20,7 @@ function fail(name, detail) {
 }
 
 async function main() {
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-  page.setDefaultTimeout(45000);
+  const { browser, page } = await launch({ timeoutMs: 45000 });
 
   async function gotoApp(path) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
