@@ -7,10 +7,9 @@
  *
  *   cd frontend && node e2e/chaos-crm.mjs
  */
-import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { launch, BASE } from './lib/browser.mjs';
 
-const BASE = process.env.UAT_BASE_URL || 'http://127.0.0.1:4200';
 const stamp = Date.now();
 const findings = [];
 
@@ -73,12 +72,9 @@ async function uncaughtErrors(page) {
 }
 
 async function main() {
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
-    args: [
-      '--no-sandbox',
-      '--disable-dev-shm-usage',
+  const { browser, context, page } = await launch({
+    timeoutMs: 20000,
+    extraArgs: [
       '--headless=new',
       '--disable-gpu',
       '--disable-extensions',
@@ -86,13 +82,8 @@ async function main() {
       '--renderer-process-limit=2',
       '--disable-software-rasterizer',
     ],
+    contextOptions: { ignoreHTTPSErrors: true },
   });
-  const context = await browser.newContext({
-    viewport: { width: 1400, height: 900 },
-    ignoreHTTPSErrors: true,
-  });
-  const page = await context.newPage();
-  page.setDefaultTimeout(20000);
   page.on('crash', () => record('page-crash', 'FAIL', 'renderer crashed', 'critical'));
   const runtimeErrors = await uncaughtErrors(page);
 
