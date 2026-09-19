@@ -3,6 +3,7 @@ package com.opencrm.configuration.product;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -36,6 +37,7 @@ public class ProductConfigurationRuleClient {
     private final InstantSource clock;
     private final ConcurrentHashMap<Long, CacheEntry> rulesByProductId = new ConcurrentHashMap<>();
 
+    @Autowired
     public ProductConfigurationRuleClient(
             @Qualifier("productServiceRestClient") RestClient productServiceRestClient,
             @Value("${services.product.rules-cache-ttl:30s}") Duration rulesCacheTtl) {
