@@ -108,7 +108,7 @@ interface QuoteTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (!loading() && !error() && isEmpty()) {
       <app-empty-state
         icon="request_quote"
         [title]="hasActiveFilters() ? 'No matching quotes' : 'No quotes yet'"
@@ -120,7 +120,7 @@ interface QuoteTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Quote'"
         (action)="onNewQuote()"
       />
-    } @else {
+    } @else if (!error() || tableRows().length > 0) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"

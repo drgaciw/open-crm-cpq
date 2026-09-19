@@ -46,11 +46,6 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
-# gRPC server configuration
-grpc:
-  server:
-    port: 9090
-
   # Boot 4 + azure-spring 5.x: disable verifier and Event Hubs Kafka OAuth2
   # (KafkaProperties moved; ClassNotFoundException without spring-boot kafka starter).
   autoconfigure:
@@ -64,6 +59,11 @@ grpc:
     azure:
       compatibility-verifier:
         enabled: false
+
+# gRPC server configuration
+grpc:
+  server:
+    port: 9090
 
 springdoc:
   api-docs:

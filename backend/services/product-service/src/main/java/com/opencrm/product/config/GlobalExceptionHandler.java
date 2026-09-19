@@ -10,6 +10,7 @@ import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -78,6 +79,14 @@ public class GlobalExceptionHandler {
         logger.warn("Data integrity violation [traceId={}]: {}", traceId, ex.getMessage(), ex);
         ApiResponse<Void> response = ApiResponse.error("Data integrity violation: The operation conflicts with existing data constraints.", "DATA_INTEGRITY_VIOLATION", traceId);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableRequest(HttpMessageNotReadableException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        logger.warn("Unreadable request body [traceId={}]", traceId);
+        ApiResponse<Void> response = ApiResponse.error("Request body is malformed or contains invalid values.", "INVALID_REQUEST_BODY", traceId);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(Exception.class)
