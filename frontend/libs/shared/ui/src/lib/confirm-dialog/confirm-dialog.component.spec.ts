@@ -2,14 +2,17 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ConfirmDialogComponent, ConfirmDialogData } from './confirm-dialog.component';
+import { vi } from 'vitest';
 
 describe('ConfirmDialogComponent', () => {
   let component: ComponentFixture<ConfirmDialogComponent>;
-  let mockDialogRef: jasmine.SpyObj<MatDialogRef<ConfirmDialogComponent>>;
+  let mockDialogRef: any;
   let mockData: ConfirmDialogData;
 
   beforeEach(async () => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
+    mockDialogRef = {
+      close: vi.fn()
+    };
     mockData = {
       title: 'Confirm Action',
       message: 'Are you sure you want to proceed?',
@@ -88,7 +91,7 @@ describe('ConfirmDialogComponent', () => {
 
   it('should apply confirm button color from data', () => {
     const confirmButton = component.nativeElement.querySelector('.confirm-button');
-    expect(confirmButton.getAttribute('ng-reflect-color')).toBe('primary');
+    expect(confirmButton.classList.contains('mat-primary')).toBe(true);
   });
 
   it('should handle warn color for dangerous actions', async () => {
@@ -112,6 +115,6 @@ describe('ConfirmDialogComponent', () => {
     component.detectChanges();
 
     const confirmButton = component.nativeElement.querySelector('.confirm-button');
-    expect(confirmButton.getAttribute('ng-reflect-color')).toBe('warn');
+    expect(confirmButton.classList.contains('mat-warn')).toBe(true);
   });
 });
