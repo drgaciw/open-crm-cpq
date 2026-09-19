@@ -1,5 +1,6 @@
 package com.opencrm.product.catalog;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,7 +13,8 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-@NoArgsConstructor
+// Omitted optional flags retain primitive defaults; explicit nulls remain invalid.
+@NoArgsConstructor(onConstructor_ = @JsonCreator)
 @AllArgsConstructor
 public class ProductCreateRequest {
 

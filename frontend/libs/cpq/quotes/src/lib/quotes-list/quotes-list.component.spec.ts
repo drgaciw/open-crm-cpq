@@ -177,6 +177,21 @@ describe('QuotesListComponent', () => {
     expect(actionBtn).toBeUndefined();
   });
 
+  it('does not present a failed load as a successfully empty list', () => {
+    quotes.set([]);
+    error.set('Service unavailable');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[role="alert"]')?.textContent).toContain(
+      'Service unavailable',
+    );
+    expect(compiled.querySelector('app-empty-state')).toBeNull();
+    expect(compiled.textContent).not.toContain('No data available');
+    expect(compiled.querySelector('app-data-table')).toBeNull();
+    expect(compiled.textContent).not.toContain('No quotes yet');
+  });
+
   it('shows error banner when QuoteService error is set', () => {
     error.set('Failed to load quotes');
     fixture.detectChanges();

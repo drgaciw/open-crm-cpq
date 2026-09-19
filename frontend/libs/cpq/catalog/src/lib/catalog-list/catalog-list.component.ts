@@ -108,7 +108,7 @@ interface CatalogTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (!loading() && !error() && isEmpty()) {
       <app-empty-state
         icon="inventory_2"
         [title]="hasActiveFilters() ? 'No matching products' : 'No products yet'"
@@ -120,7 +120,7 @@ interface CatalogTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Product'"
         (action)="openCreateDialog()"
       />
-    } @else {
+    } @else if (!error() || tableRows().length > 0) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
