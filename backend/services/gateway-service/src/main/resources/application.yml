@@ -4,11 +4,19 @@ server:
 spring:
   application:
     name: gateway-service
+  # Azure 5.8's unused credential bootstrap references a removed Boot 3 class.
+  # Gateway authentication uses SecurityConfig's standard JWT resource server.
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
   threads:
     virtual:
       enabled: true
 
   cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
     gateway:
       server:
         webflux:
