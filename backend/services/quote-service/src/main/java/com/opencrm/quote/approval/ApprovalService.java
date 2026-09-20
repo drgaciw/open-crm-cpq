@@ -120,7 +120,7 @@ public class ApprovalService {
         Set<Long> seenIds = new HashSet<>();
 
         try {
-            for (RoutingApprovalDto remote : approvalRoutingClient.getPending()) {
+            for (RoutingApprovalDto remote : approvalRoutingClient.getByQuoteId(quoteId)) {
                 if (!String.valueOf(quoteId).equals(remote.getQuoteId())) {
                     continue;
                 }
@@ -131,7 +131,7 @@ public class ApprovalService {
                 result.add(dto);
             }
         } catch (BusinessException ex) {
-            log.warn("Dual-read: routing pending unavailable for quote {}: {}", quoteId, ex.getMessage());
+            log.warn("Dual-read: routing history unavailable for quote {}: {}", quoteId, ex.getMessage());
             if (!legacyLocalReadEnabled) {
                 throw ex;
             }
