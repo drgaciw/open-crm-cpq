@@ -1,7 +1,7 @@
 FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="OpenCRM Team"
-LABEL description="AI Agent Service — 37 CPQ agents via GLM-5 (Zhipu AI, ADR-002)"
+LABEL description="AI Agent Service — Azure baseline with gated Jev/OpenRouter selection (ADR-014)"
 
 WORKDIR /app
 
@@ -14,13 +14,11 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
-EXPOSE 8086
+EXPOSE 8090
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
-  CMD wget -qO- http://localhost:8086/actuator/health || exit 1
+  CMD wget -qO- http://localhost:8090/actuator/health || exit 1
 
-# ⚠️ Data residency: Zhipu AI (GLM-5) routes traffic through Chinese infrastructure.
-# Requires ZHIPUAI_API_KEY env var and DPA/compliance review before production use.
 ENTRYPOINT ["java", \
   "-Xms256m", "-Xmx1g", \
   "-XX:+UseContainerSupport", \

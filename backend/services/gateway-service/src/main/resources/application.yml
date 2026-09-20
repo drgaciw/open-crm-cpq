@@ -219,7 +219,7 @@ spring:
 
             # AI Service routes
             - id: ai-service
-              uri: ${AI_SERVICE_URI:lb://ai-service}
+              uri: ${AI_SERVICE_URI:http://localhost:8090}
               predicates:
                 - Path=/api/v1/ai/**,/api/v1/copilot/**
               filters:
@@ -453,3 +453,8 @@ spring:
               uri: forward:/fallback/erp/unavailable
               predicates:
                 - Path=/api/v1/erp/**
+
+            - id: ai-service
+              uri: ${AI_SERVICE_URI:http://localhost:8090}
+              predicates:
+                - Path=/api/v1/ai/**,/api/v1/copilot/**
