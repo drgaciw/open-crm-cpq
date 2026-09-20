@@ -14,7 +14,10 @@ spring:
     baseline-on-migrate: true
   kafka:
     bootstrap-servers: localhost:9092
+    listener:
+      ack-mode: record
     consumer:
+      enable-auto-commit: false
       group-id: contract-asset-management
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -40,3 +43,8 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+oms:
+  activation-consumer-enabled: ${OMS_ACTIVATION_CONSUMER_ENABLED:false}
+  trusted-source-scopes: ${OMS_TRUSTED_SOURCE_SCOPES:}
+  managed-customers: ${OMS_MANAGED_CUSTOMERS:}
