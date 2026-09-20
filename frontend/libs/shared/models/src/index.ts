@@ -1,5 +1,6 @@
 // API Response
 export * from './lib/api-response.model';
+export * from './lib/jev-suggestion.model';
 
 // Domain Models — CRM
 export * from './lib/organization.model';

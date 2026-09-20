@@ -4,6 +4,7 @@ export * from './lib/confirm-dialog/confirm-dialog.component';
 export * from './lib/status-badge/status-badge.component';
 export * from './lib/empty-state/empty-state.component';
 export * from './lib/page-header/page-header.component';
+export * from './lib/advisory-suggestion/advisory-suggestion.component';
 export * from './lib/search-input/search-input.component';
 
 // Pipes

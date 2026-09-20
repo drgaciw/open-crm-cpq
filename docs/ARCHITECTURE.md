@@ -309,7 +309,8 @@ Observations from code that plans should account for (none authorize change by t
 | WhatsApp #430 undo | On `main` |
 | **R2** price-book list-row delete | N stretch; still held |
 | Named Wave T / T1 / T2 | Skipped |
-| Jev/OpenRouter selection as runtime | ADR-014 Accepted; implementation in backlog. ADR-002 GLM-5 direction superseded |
+| Jev/OpenRouter model **selection** as runtime | ADR-014 Accepted; implementation in backlog. ADR-002 GLM-5 direction superseded. **Still held** |
+| Enabling any Jev advisory flag outside local/offline | [ADR-015](adr/ADR-015-jev-advisory-decision-support.md) un-holds advisory + shadow **code** only (`enabled:false`, no-op transport). Turning a flag on beyond local/offline needs the ADR-015 shadow → canary gates; `names` duplicate mode needs data-processing sign-off |
 | Accept ADR-005 | Flip not authorized |
 
 Open GitHub issues: **#238**, **#241** only. Linear/Notion Open CRM: **none** (ignore cmano-clone / Aegis).
@@ -356,6 +357,7 @@ Plans: [23](forge/23-wave-n-architecture.md)–[35](forge/35-wave-w-architecture
 | ADR-001 LLM Claude Sonnet 4.6 | **Superseded** by ADR-002 | [adr/ADR-001-primary-llm-claude-sonnet-4-6.md](adr/ADR-001-primary-llm-claude-sonnet-4-6.md) |
 | ADR-002 GLM-5 | **Superseded** by ADR-014; never implemented | [adr/ADR-002-primary-llm-glm-5.md](adr/ADR-002-primary-llm-glm-5.md) |
 | ADR-014 Jev/OpenRouter selection | **Accepted** decision; implementation backlog (runtime Azure gpt-4o) | [adr/ADR-014-jev-openrouter-model-selection.md](adr/ADR-014-jev-openrouter-model-selection.md) |
+| ADR-015 Jev advisory decision support | **Accepted** decision; advisory + shadow in domain services, flag-off + no-op transport — not runtime behavior | [adr/ADR-015-jev-advisory-decision-support.md](adr/ADR-015-jev-advisory-decision-support.md) |
 | ADR-003 CI / Jenkins | Accepted | [adr/ADR-003-ci-llm-integration.md](adr/ADR-003-ci-llm-integration.md) |
 | ADR-004 CSRF edge | Accepted | [adr/ADR-004-csrf-edge-boundary.md](adr/ADR-004-csrf-edge-boundary.md) |
 | ADR-005 dual-read | **Proposed** — do not flip | [adr/ADR-005-approvals-legacy-dual-read.md](adr/ADR-005-approvals-legacy-dual-read.md) |

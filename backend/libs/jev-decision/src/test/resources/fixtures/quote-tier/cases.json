@@ -1,0 +1,761 @@
+{
+  "synthetic": true,
+  "note": "SYNTHETIC fixture (ADR-015 offline stage). Answers are hand-made to exercise the pipeline; they are not recordings of the real model and carry no evidence about its quality.",
+  "useCase": "quote-tier-suggestion",
+  "schema": {
+    "name": "quote-tier",
+    "version": 1
+  },
+  "cases": [
+    {
+      "name": "quote-00",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 42.7,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 1,
+        "currency": "EUR",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.79,
+          "probabilities": {
+            "DEAL_DESK": 0.105,
+            "SALES_VP": 0.79,
+            "CFO": 0.105
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-01",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 37.1,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 2,
+        "currency": "EUR",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.78,
+          "probabilities": {
+            "DEAL_DESK": 0.11,
+            "SALES_VP": 0.78,
+            "CFO": 0.11
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-02",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 34.1,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 3,
+        "currency": "USD",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.91,
+          "probabilities": {
+            "DEAL_DESK": 0.045,
+            "SALES_VP": 0.91,
+            "CFO": 0.045
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-03",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 30.4,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 4,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.51,
+          "probabilities": {
+            "DEAL_DESK": 0.51,
+            "SALES_VP": 0.245,
+            "CFO": 0.245
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-04",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 2.9,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 5,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.81,
+          "probabilities": {
+            "DEAL_DESK": 0.095,
+            "SALES_VP": 0.81,
+            "CFO": 0.095
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-05",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 25.4,
+        "duration_months": 24,
+        "deal_type": "NEW",
+        "line_count": 6,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.92,
+          "probabilities": {
+            "DEAL_DESK": 0.92,
+            "SALES_VP": 0.04,
+            "CFO": 0.04
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-06",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 38.0,
+        "duration_months": 24,
+        "deal_type": "NEW",
+        "line_count": 7,
+        "currency": "EUR",
+        "region": "APAC"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.84,
+          "probabilities": {
+            "DEAL_DESK": 0.08,
+            "SALES_VP": 0.84,
+            "CFO": 0.08
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-07",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 32.4,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 8,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.87,
+          "probabilities": {
+            "DEAL_DESK": 0.065,
+            "SALES_VP": 0.87,
+            "CFO": 0.065
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-08",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 33.9,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 9,
+        "currency": "USD",
+        "region": "APAC"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.91,
+          "probabilities": {
+            "DEAL_DESK": 0.045,
+            "SALES_VP": 0.045,
+            "CFO": 0.91
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-09",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 42.1,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 1,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.78,
+          "probabilities": {
+            "DEAL_DESK": 0.11,
+            "SALES_VP": 0.11,
+            "CFO": 0.78
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-10",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 40.2,
+        "duration_months": 12,
+        "deal_type": "UPSELL",
+        "line_count": 2,
+        "currency": "EUR",
+        "region": "APAC"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.58,
+          "probabilities": {
+            "DEAL_DESK": 0.21,
+            "SALES_VP": 0.21,
+            "CFO": 0.58
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-11",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 17.5,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 3,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.83,
+          "probabilities": {
+            "DEAL_DESK": 0.83,
+            "SALES_VP": 0.085,
+            "CFO": 0.085
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-12",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 44.4,
+        "duration_months": 12,
+        "deal_type": "UPSELL",
+        "line_count": 4,
+        "currency": "EUR",
+        "region": "EMEA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.78,
+          "probabilities": {
+            "DEAL_DESK": 0.11,
+            "SALES_VP": 0.78,
+            "CFO": 0.11
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-13",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 14.3,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 5,
+        "currency": "EUR",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.85,
+          "probabilities": {
+            "DEAL_DESK": 0.075,
+            "SALES_VP": 0.85,
+            "CFO": 0.075
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-14",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 38.5,
+        "duration_months": 36,
+        "deal_type": "UPSELL",
+        "line_count": 6,
+        "currency": "USD",
+        "region": "APAC"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.86,
+          "probabilities": {
+            "DEAL_DESK": 0.07,
+            "SALES_VP": 0.07,
+            "CFO": 0.86
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-15",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 25.9,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 7,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.78,
+          "probabilities": {
+            "DEAL_DESK": 0.78,
+            "SALES_VP": 0.11,
+            "CFO": 0.11
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-16",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 15.5,
+        "duration_months": 36,
+        "deal_type": "UPSELL",
+        "line_count": 8,
+        "currency": "EUR",
+        "region": "APAC"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.88,
+          "probabilities": {
+            "DEAL_DESK": 0.88,
+            "SALES_VP": 0.06,
+            "CFO": 0.06
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-17",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 40.8,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 9,
+        "currency": "USD",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.51,
+          "probabilities": {
+            "DEAL_DESK": 0.245,
+            "SALES_VP": 0.245,
+            "CFO": 0.51
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-18",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 31.9,
+        "duration_months": 12,
+        "deal_type": "UPSELL",
+        "line_count": 1,
+        "currency": "USD",
+        "region": "APAC"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.82,
+          "probabilities": {
+            "DEAL_DESK": 0.09,
+            "SALES_VP": 0.09,
+            "CFO": 0.82
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-19",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 24.5,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 2,
+        "currency": "EUR",
+        "region": "NA"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.85,
+          "probabilities": {
+            "DEAL_DESK": 0.075,
+            "SALES_VP": 0.075,
+            "CFO": 0.85
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-20",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 44.1,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 3,
+        "currency": "EUR",
+        "region": "APAC"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.86,
+          "probabilities": {
+            "DEAL_DESK": 0.07,
+            "SALES_VP": 0.86,
+            "CFO": 0.07
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-21",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 7.0,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 4,
+        "currency": "EUR",
+        "region": "NA"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.88,
+          "probabilities": {
+            "DEAL_DESK": 0.88,
+            "SALES_VP": 0.06,
+            "CFO": 0.06
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-22",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 12.3,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 5,
+        "currency": "USD",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.73,
+          "probabilities": {
+            "DEAL_DESK": 0.135,
+            "SALES_VP": 0.73,
+            "CFO": 0.135
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-23",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 21.0,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 6,
+        "currency": "USD",
+        "region": "NA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.95,
+          "probabilities": {
+            "DEAL_DESK": 0.025,
+            "SALES_VP": 0.95,
+            "CFO": 0.025
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-24",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 29.1,
+        "duration_months": 36,
+        "deal_type": "NEW",
+        "line_count": 7,
+        "currency": "EUR",
+        "region": "APAC"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.48,
+          "probabilities": {
+            "DEAL_DESK": 0.48,
+            "SALES_VP": 0.26,
+            "CFO": 0.26
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-25",
+      "features": {
+        "total_amount_band": "LT_10K",
+        "discount_pct": 7.3,
+        "duration_months": 24,
+        "deal_type": "NEW",
+        "line_count": 8,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.92,
+          "probabilities": {
+            "DEAL_DESK": 0.92,
+            "SALES_VP": 0.04,
+            "CFO": 0.04
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-26",
+      "features": {
+        "total_amount_band": "10K_50K",
+        "discount_pct": 18.8,
+        "duration_months": 12,
+        "deal_type": "RENEWAL",
+        "line_count": 9,
+        "currency": "USD",
+        "region": "APAC"
+      },
+      "authoritative": "DEAL_DESK",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DEAL_DESK",
+          "confidence": 0.8,
+          "probabilities": {
+            "DEAL_DESK": 0.8,
+            "SALES_VP": 0.1,
+            "CFO": 0.1
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-27",
+      "features": {
+        "total_amount_band": "50K_250K",
+        "discount_pct": 7.8,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 1,
+        "currency": "USD",
+        "region": "EMEA"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.95,
+          "probabilities": {
+            "DEAL_DESK": 0.025,
+            "SALES_VP": 0.95,
+            "CFO": 0.025
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-28",
+      "features": {
+        "total_amount_band": "250K_1M",
+        "discount_pct": 3.1,
+        "duration_months": 24,
+        "deal_type": "UPSELL",
+        "line_count": 2,
+        "currency": "USD",
+        "region": "APAC"
+      },
+      "authoritative": "SALES_VP",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "SALES_VP",
+          "confidence": 0.77,
+          "probabilities": {
+            "DEAL_DESK": 0.115,
+            "SALES_VP": 0.77,
+            "CFO": 0.115
+          }
+        }
+      }
+    },
+    {
+      "name": "quote-29",
+      "features": {
+        "total_amount_band": "GT_1M",
+        "discount_pct": 42.6,
+        "duration_months": 24,
+        "deal_type": "RENEWAL",
+        "line_count": 3,
+        "currency": "USD",
+        "region": "NA"
+      },
+      "authoritative": "CFO",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "CFO",
+          "confidence": 0.71,
+          "probabilities": {
+            "DEAL_DESK": 0.145,
+            "SALES_VP": 0.145,
+            "CFO": 0.71
+          }
+        }
+      }
+    }
+  ]
+}

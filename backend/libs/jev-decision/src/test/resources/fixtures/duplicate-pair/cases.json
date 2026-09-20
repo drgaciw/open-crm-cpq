@@ -1,0 +1,611 @@
+{
+  "synthetic": true,
+  "note": "SYNTHETIC fixture (ADR-015 offline stage). Answers are hand-made to exercise the pipeline; they are not recordings of the real model and carry no evidence about its quality.",
+  "useCase": "duplicate-hints",
+  "schema": {
+    "name": "duplicate-pair",
+    "version": 1
+  },
+  "cases": [
+    {
+      "name": "pair-00",
+      "features": {
+        "trigram_similarity": 0.3,
+        "token_jaccard": 0.255,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": true,
+        "length_delta": 0
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.17
+        }
+      }
+    },
+    {
+      "name": "pair-01",
+      "features": {
+        "trigram_similarity": 0.324,
+        "token_jaccard": 0.275,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 1
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.192
+        }
+      }
+    },
+    {
+      "name": "pair-02",
+      "features": {
+        "trigram_similarity": 0.348,
+        "token_jaccard": 0.296,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 2
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.213
+        }
+      }
+    },
+    {
+      "name": "pair-03",
+      "features": {
+        "trigram_similarity": 0.371,
+        "token_jaccard": 0.315,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 3
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.234
+        }
+      }
+    },
+    {
+      "name": "pair-04",
+      "features": {
+        "trigram_similarity": 0.395,
+        "token_jaccard": 0.336,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 4
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.256
+        }
+      }
+    },
+    {
+      "name": "pair-05",
+      "features": {
+        "trigram_similarity": 0.419,
+        "token_jaccard": 0.356,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": true,
+        "length_delta": 5
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.277
+        }
+      }
+    },
+    {
+      "name": "pair-06",
+      "features": {
+        "trigram_similarity": 0.443,
+        "token_jaccard": 0.377,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 6
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.299
+        }
+      }
+    },
+    {
+      "name": "pair-07",
+      "features": {
+        "trigram_similarity": 0.467,
+        "token_jaccard": 0.397,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 7
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.32
+        }
+      }
+    },
+    {
+      "name": "pair-08",
+      "features": {
+        "trigram_similarity": 0.49,
+        "token_jaccard": 0.416,
+        "shared_token_count": 1,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 8
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.341
+        }
+      }
+    },
+    {
+      "name": "pair-09",
+      "features": {
+        "trigram_similarity": 0.514,
+        "token_jaccard": 0.437,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 9
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.613
+        }
+      }
+    },
+    {
+      "name": "pair-10",
+      "features": {
+        "trigram_similarity": 0.538,
+        "token_jaccard": 0.457,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": true,
+        "length_delta": 10
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.384
+        }
+      }
+    },
+    {
+      "name": "pair-11",
+      "features": {
+        "trigram_similarity": 0.562,
+        "token_jaccard": 0.478,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 0
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.406
+        }
+      }
+    },
+    {
+      "name": "pair-12",
+      "features": {
+        "trigram_similarity": 0.586,
+        "token_jaccard": 0.498,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 1
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.677
+        }
+      }
+    },
+    {
+      "name": "pair-13",
+      "features": {
+        "trigram_similarity": 0.609,
+        "token_jaccard": 0.518,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 2
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.448
+        }
+      }
+    },
+    {
+      "name": "pair-14",
+      "features": {
+        "trigram_similarity": 0.633,
+        "token_jaccard": 0.538,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 3
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.47
+        }
+      }
+    },
+    {
+      "name": "pair-15",
+      "features": {
+        "trigram_similarity": 0.657,
+        "token_jaccard": 0.558,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": false,
+        "same_city": true,
+        "length_delta": 4
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.741
+        }
+      }
+    },
+    {
+      "name": "pair-16",
+      "features": {
+        "trigram_similarity": 0.681,
+        "token_jaccard": 0.579,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 5
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.513
+        }
+      }
+    },
+    {
+      "name": "pair-17",
+      "features": {
+        "trigram_similarity": 0.704,
+        "token_jaccard": 0.598,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 6
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.534
+        }
+      }
+    },
+    {
+      "name": "pair-18",
+      "features": {
+        "trigram_similarity": 0.728,
+        "token_jaccard": 0.619,
+        "shared_token_count": 2,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 7
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.805
+        }
+      }
+    },
+    {
+      "name": "pair-19",
+      "features": {
+        "trigram_similarity": 0.752,
+        "token_jaccard": 0.639,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 8
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.577
+        }
+      }
+    },
+    {
+      "name": "pair-20",
+      "features": {
+        "trigram_similarity": 0.776,
+        "token_jaccard": 0.66,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": true,
+        "length_delta": 9
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.598
+        }
+      }
+    },
+    {
+      "name": "pair-21",
+      "features": {
+        "trigram_similarity": 0.8,
+        "token_jaccard": 0.68,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 10
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.87
+        }
+      }
+    },
+    {
+      "name": "pair-22",
+      "features": {
+        "trigram_similarity": 0.823,
+        "token_jaccard": 0.7,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 0
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.641
+        }
+      }
+    },
+    {
+      "name": "pair-23",
+      "features": {
+        "trigram_similarity": 0.847,
+        "token_jaccard": 0.72,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 1
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.662
+        }
+      }
+    },
+    {
+      "name": "pair-24",
+      "features": {
+        "trigram_similarity": 0.871,
+        "token_jaccard": 0.74,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": true,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 2
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.934
+        }
+      }
+    },
+    {
+      "name": "pair-25",
+      "features": {
+        "trigram_similarity": 0.895,
+        "token_jaccard": 0.761,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": false,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": true,
+        "length_delta": 3
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.706
+        }
+      }
+    },
+    {
+      "name": "pair-26",
+      "features": {
+        "trigram_similarity": 0.919,
+        "token_jaccard": 0.781,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": true,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 4
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.727
+        }
+      }
+    },
+    {
+      "name": "pair-27",
+      "features": {
+        "trigram_similarity": 0.942,
+        "token_jaccard": 0.801,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": true,
+        "same_domain": true,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 5
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.99
+        }
+      }
+    },
+    {
+      "name": "pair-28",
+      "features": {
+        "trigram_similarity": 0.966,
+        "token_jaccard": 0.821,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": true,
+        "same_domain": false,
+        "same_country": true,
+        "same_city": false,
+        "length_delta": 6
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.769
+        }
+      }
+    },
+    {
+      "name": "pair-29",
+      "features": {
+        "trigram_similarity": 0.99,
+        "token_jaccard": 0.842,
+        "shared_token_count": 3,
+        "suffix_stripped_equal": true,
+        "same_domain": false,
+        "same_country": false,
+        "same_city": false,
+        "length_delta": 7
+      },
+      "authoritative": null,
+      "answers": {
+        "same": {
+          "type": "noul",
+          "noul": 0.791
+        }
+      }
+    }
+  ]
+}

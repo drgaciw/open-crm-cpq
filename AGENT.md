@@ -1,7 +1,7 @@
 # Open CRM/CPQ - AI Agent Development Guide
 
 **Steering (read first):** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/adr/README.md](docs/adr/README.md) · forge waves [23](docs/forge/23-wave-n-architecture.md)–[35](docs/forge/35-wave-w-architecture.md).  
-**Do not** treat `MODERNIZATION_PLAN.md` or the phase tables below as “what to build this week.” They are **target-state** roadmaps. Forge **holds** (do not implement unless a wave plan says so): Activities API, CI #238, agent Kafka #241, dual-read YAML flip, NgRx, contract-asset FE, full SpEL, Kafka S2B-9, gateway domain validation, product-validate deletion, WhatsApp #430 undo, R2 price-book list-row delete.
+**Do not** treat `MODERNIZATION_PLAN.md` or the phase tables below as “what to build this week.” They are **target-state** roadmaps. Forge **holds** (do not implement unless a wave plan says so): Activities API, CI #238, agent Kafka #241, dual-read YAML flip, NgRx, contract-asset FE, full SpEL, Kafka S2B-9, gateway domain validation, product-validate deletion, WhatsApp #430 undo, R2 price-book list-row delete, Jev/OpenRouter model **selection** as runtime (ADR-014). Narrow exception: [ADR-015](docs/adr/ADR-015-jev-advisory-decision-support.md) authorizes advisory + shadow Jev **code** in domain services, flag-off with a no-op transport — it never gates a decision, and enabling a flag beyond local/offline is itself held behind the ADR-015 gates.
 
 ## Project Overview
 
