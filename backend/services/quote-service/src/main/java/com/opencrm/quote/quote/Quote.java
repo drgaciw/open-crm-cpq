@@ -123,6 +123,17 @@ public class Quote extends BaseEntity {
     
     @Column(name = "accepted_at")
     private Instant acceptedAt;
+
+    @Column(name = "accepted_revision", nullable = false)
+    @Builder.Default
+    private int acceptedRevision = 0;
+
+    @Column(name = "oms_approval_reference")
+    private String omsApprovalReference;
+
+    @Column(name = "fulfillment_owner", nullable = false)
+    @Builder.Default
+    private String fulfillmentOwner = "LEGACY";
     
     /**
      * Synchronized total calculation - ensures quote totals match line item sums.
