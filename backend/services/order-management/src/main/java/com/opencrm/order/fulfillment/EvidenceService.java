@@ -65,6 +65,7 @@ public class EvidenceService {
         if(!identity.isEmpty() && semantic.equals(identity.getFirst().get("semantic_hash"))) {
             String evidenceId=str(identity.getFirst(),"id");remember(scope,c.operationKey(),body,orderId,evidenceId);return receipt(orderId,evidenceId);
         }
+        if("ALLOCATION".equals(c.kind()) && !c.expiresAt().isAfter(Instant.now())) throw OrderProblem.invalid("Allocation expiry must be in the future");
         if(!Set.of("SUBMITTED","IN_PROGRESS").contains(str(order,"status"))) throw OrderProblem.conflict("Evidence requires an active submitted order");
         validateKind(order,line,c.kind());
         db.update("UPDATE orders SET status='IN_PROGRESS' WHERE id=? AND status='SUBMITTED'",orderId);
@@ -223,6 +224,7 @@ public class EvidenceService {
         if("DELIVERY".equals(c.kind())) text(c.shipmentReference(),500,"shipment reference");
         if(c.allocationReference()!=null) text(c.allocationReference(),500,"allocation reference");
         if(c.shipmentReference()!=null) text(c.shipmentReference(),500,"shipment reference");
+        if("ALLOCATION".equals(c.kind()) && c.expiresAt()==null) throw OrderProblem.invalid("Allocation expiry is required");
         if(c.expiresAt()!=null && (!"ALLOCATION".equals(c.kind()) || !c.expiresAt().isAfter(c.occurredAt()))) throw OrderProblem.invalid("Invalid allocation expiry");
     }
     private String semantic(String orderId,EvidenceCommand c) {
