@@ -35,7 +35,8 @@ public final class SelectionEvaluationCli {
                 throw new IllegalArgumentException("Explicit benchmark configuration required");
             modelIds = Set.copyOf(modelIds);
             for (String id : modelIds)
-                if (!id.matches("[A-Za-z0-9._:-]+/[A-Za-z0-9._:-]+")) throw new IllegalArgumentException("Invalid model ID");
+                if (!id.matches("[A-Za-z0-9._:~-]+/[A-Za-z0-9._:~-]+")
+                        || List.of(id.split("/")).contains("..")) throw new IllegalArgumentException("Invalid model ID");
             Set<String> required = "tools".equals(fixtureSuite) ? Set.of("tools", "parallel_tool_calls") : Set.of("response_format");
             if (!profile.requiredParameters().containsAll(required)) throw new IllegalArgumentException("Unqualified fixture capabilities");
             if ((long) settings.repetitions() * 2 < profile.minSamples()) throw new IllegalArgumentException("Insufficient fixture samples");

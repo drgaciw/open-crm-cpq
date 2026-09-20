@@ -151,4 +151,18 @@ class SelectionEvaluationCliTest {
         assertThat(requests.get()).isEqualTo(3);
         assertThat(Path.of(result.directory()).resolve("proposed-policy.json")).doesNotExist();
     }
+
+    @Test void catalogTildeModelIdentifiersValidateButPathTraversalDoesNot() throws Exception {
+        var c = config("advice", 10);
+        java.util.function.Function<String, SelectionEvaluationCli.Config> withModel = id ->
+                new SelectionEvaluationCli.Config(c.profile(), c.catalogBaseUri(), c.catalogTtl(), Set.of(id),
+                        c.evaluator(), c.completionsUri(), c.completionsTimeout(), c.fixtureSuite(), c.settings(),
+                        c.maxCalls(), c.spendCap(), c.outputDirectory());
+        var outcome = SelectionEvaluationCli.run(withModel.apply("~deepseek/deepseek-pro-latest"),
+                false, null, Clock.systemUTC());
+        assertThat(outcome.mode()).isEqualTo("dry-run");
+        assertThat(requests.get()).isZero();
+        for (String invalid : List.of("../model", "vendor/..", "vendor/model/extra", "vendor/model?key=value"))
+            assertThatThrownBy(() -> withModel.apply(invalid)).isInstanceOf(IllegalArgumentException.class);
+    }
 }
