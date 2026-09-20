@@ -77,11 +77,13 @@ public final class SelectionTypes {
         }
     }
 
-    public record EvaluationEvidence(String endpointKey, String benchmarkVersion, int attempts, int successes,
+    public record EvaluationEvidence(String endpointKey, String profileId, String profileVersion,
+            String catalogVersion, String benchmarkVersion, int attempts, int successes,
             BigDecimal totalCost, BigDecimal quality, long p95LatencyMillis, boolean capabilityProbePassed,
             Instant evaluatedAt, JevVerdict verdict) {
         public EvaluationEvidence {
-            requireText(endpointKey); requireText(benchmarkVersion); nonnegative(totalCost); unit(quality);
+            requireText(endpointKey); requireText(profileId); requireText(profileVersion); requireText(catalogVersion);
+            requireText(benchmarkVersion); nonnegative(totalCost); unit(quality);
             if (attempts < 0 || successes < 0 || successes > attempts || p95LatencyMillis < 0)
                 throw new IllegalArgumentException("Invalid benchmark evidence");
         }
