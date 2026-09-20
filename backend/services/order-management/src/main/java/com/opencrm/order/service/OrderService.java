@@ -70,7 +70,8 @@ public class OrderService {
   db.update("INSERT INTO orders(id,order_number,scope_id,customer_id,quote_id,quote_number,accepted_revision,snapshot_id,snapshot_json,snapshot_hash,status,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,"ORD-"+id,s.scopeId(),s.customerId(),s.quoteId(),s.quoteNumber(),s.acceptedRevision(),s.snapshotId(),source.get("payload"),source.get("payload_hash"),"DRAFT",Timestamp.from(now),Timestamp.from(now),actor,actor);
   for(var line:s.lines()) {
    String lineId=UUID.randomUUID().toString();db.update("INSERT INTO order_lines(id,order_id,source_line_id,description,ordered) VALUES(?,?,?,?,?)",lineId,id,line.sourceLineId(),line.description(),line.quantity());
-   List<String> kinds=new ArrayList<>(switch(line.fulfillmentType()) { case "PHYSICAL" -> List.of("ALLOCATION","SHIPMENT","DELIVERY");case "DIGITAL" -> List.of("PROVISION");default -> List.of("SERVICE"); });
+   if(holds.contains("MAPPING:"+line.sourceLineId())) continue;
+   List<String> kinds=new ArrayList<>(switch(line.fulfillmentType()) { case "PHYSICAL" -> List.of("ALLOCATION","SHIPMENT","DELIVERY");case "DIGITAL" -> List.of("PROVISION");case "SERVICE" -> List.of("SERVICE");default -> throw OrderProblem.invalid("Unsupported fulfillment mapping"); });
    if("RECURRING".equals(line.chargeType())) kinds.add("ACTIVATION");kinds.add("FINANCE_ACK");
    String predecessor=null;
    for(String kind:kinds) {
