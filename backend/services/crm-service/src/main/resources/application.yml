@@ -86,6 +86,34 @@ logging:
     org.hibernate.SQL: INFO
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
 
+# Jev advisory decision support (ADR-015). Inert by default: every flag is false and the
+# transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so
+# the service boots without it; a blank key forces the no-op transport.
+opencrm:
+  jev:
+    enabled: ${JEV_ENABLED:false}
+    transport: ${JEV_TRANSPORT:noop}
+    api-key: ${JEV_API_KEY:}
+    base-url: ${JEV_BASE_URL:}
+    # Pinned evaluator model; a *latest alias is rejected. Ignored by wire-format FACADE.
+    model: ${JEV_MODEL:}
+    wire-format: ${JEV_WIRE_FORMAT:NATIVE}
+    daily-call-budget: ${JEV_DAILY_CALL_BUDGET:500}
+    lead-score:
+      enabled: ${JEV_LEAD_SCORE_ENABLED:false}
+      rubric-version: lead-score-v1
+      min-confidence: 0.6
+    duplicate-hints:
+      enabled: ${JEV_DUPLICATE_HINTS_ENABLED:false}
+      rubric-version: duplicate-pair-v1
+      min-confidence: 0.0
+      # NAMES sends organization names and needs the ADR-015 data-processing sign-off.
+      pii-mode: FEATURES_ONLY
+  crm:
+    # Local pg_trgm candidate lookup only; no data leaves the service.
+    duplicate-hints:
+      enabled: ${CRM_DUPLICATE_HINTS_ENABLED:false}
+
 ---
 # Development profile
 spring:
