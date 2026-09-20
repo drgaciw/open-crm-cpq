@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-    Builds and boots the Open CRM/CPQ AI Service (GLM-5 / ADR-002).
+    Builds and boots the Open CRM/CPQ AI Service (Azure baseline / ADR-014).
 
 .DESCRIPTION
     1. Validates prerequisites (Java 25, Maven 3.9+, Docker).
     2. Compiles the ai-service Maven module (skip tests for fast startup).
-    3. Ensures the .env file has ZHIPUAI_API_KEY set.
+    3. Ensures a local .env configuration exists.
     4. Starts the full Docker Compose stack (postgres + redis + ai-service).
-    5. Tails the ai-service logs and waits for the health endpoint to go green.
+    5. Waits for health, then optionally tails the ai-service logs.
 
 .PARAMETER SkipBuild
     Skip the Maven build step (use if JAR is already current).
@@ -31,9 +31,7 @@
 
 .NOTES
     Requires: Java 25, Maven 3.9+, Docker Desktop (or Docker Engine)
-    LLM: GLM-5 via Zhipu AI (ADR-002)
-    ⚠️  Data residency: Zhipu AI routes traffic through Chinese infrastructure.
-         Complete DPA/compliance review before using with real customer data.
+    LLM: Azure baseline; Jev/OpenRouter selection stays disabled pending rollout gates.
 #>
 param(
     [switch]$SkipBuild,
@@ -87,16 +85,8 @@ if (-not (Test-Path $envFile)) {
     Copy-Item "$ProjectRoot\.env.example" $envFile
 }
 
-$envContent = Get-Content $envFile -Raw
-if ($envContent -notmatch 'ZHIPUAI_API_KEY=\S+') {
-    Write-Fail @"
-ZHIPUAI_API_KEY is not set in $envFile.
-  1. Open $envFile
-  2. Set: ZHIPUAI_API_KEY=<your-key-from-open.bigmodel.cn>
-  3. Re-run this script.
-"@
-}
-Write-OK ".env has ZHIPUAI_API_KEY"
+# Provider credentials are configured in .env only when their provider is enabled.
+Write-OK ".env configuration present"
 
 # ─── 3. Maven build ────────────────────────────────────────────────────────────
 if (-not $SkipBuild) {
@@ -126,48 +116,36 @@ $services = if ($FullStack) {
     "postgres redis ai-service"
 }
 
-$detachFlag = if ($Detach) { "-d" } else { "" }
-
 Write-Host "   Services: $services" -ForegroundColor DarkCyan
 try {
-    if ($Detach) {
-        & docker compose --env-file .env up --build -d $services.Split(" ")
-    } else {
-        # Build silently first then attach to ai-service logs
-        & docker compose --env-file .env up --build -d $services.Split(" ")
-        Write-OK "Containers starting. Waiting for ai-service health..."
-        Start-Sleep -Seconds 5
-        & docker compose logs -f ai-service
-    }
+    & docker compose --env-file .env up --build -d $services.Split(" ")
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Docker Compose startup failed." }
 } finally {
     Pop-Location
 }
 
-# ─── 5. Health check ───────────────────────────────────────────────────────────
-if ($Detach) {
-    Write-Step "Waiting for ai-service health endpoint (up to 90s)"
-    $timeout = 90
-    $elapsed = 0
-    $healthy = $false
-    while ($elapsed -lt $timeout) {
-        try {
-            $r = Invoke-WebRequest -Uri "http://localhost:8086/actuator/health" -TimeoutSec 3 -ErrorAction Stop
-            if ($r.StatusCode -eq 200) { $healthy = $true; break }
-        } catch { }
-        Start-Sleep -Seconds 5
-        $elapsed += 5
-        Write-Host "   ... $elapsed`s elapsed" -ForegroundColor DarkGray
-    }
-    if ($healthy) {
-        Write-OK "ai-service is UP at http://localhost:8086"
-        Write-OK "Agent list: GET http://localhost:8086/api/v1/ai/agents"
-        Write-OK "Example invoke: POST http://localhost:8086/api/v1/ai/agents/cpq-agent-004/invoke"
-    } else {
-        Write-Warn "Health check timed out. Check logs: docker compose logs ai-service"
-    }
-} else {
-    Write-Host "`n   Agents endpoint: GET  http://localhost:8086/api/v1/ai/agents" -ForegroundColor Cyan
-    Write-Host "   Example invoke:  POST http://localhost:8086/api/v1/ai/agents/cpq-agent-004/invoke" -ForegroundColor Cyan
+# Health must pass before reporting success, including when following logs.
+Write-Step "Waiting for ai-service health endpoint (up to 90s)"
+$deadline = [DateTime]::UtcNow.AddSeconds(90)
+$healthy = $false
+while ([DateTime]::UtcNow -lt $deadline) {
+    try {
+        $r = Invoke-RestMethod -Uri "http://localhost:8090/actuator/health" -TimeoutSec 3 -ErrorAction Stop
+        if ($r.status -eq 'UP') { $healthy = $true; break }
+    } catch { }
+    Start-Sleep -Seconds 5
 }
-
-Write-Host ""
+if (-not $healthy) {
+    Write-Fail "Health check timed out. Check logs: docker compose logs ai-service"
+}
+Write-OK "ai-service is UP at http://localhost:8090"
+Write-OK "Agent list: GET http://localhost:8090/api/v1/ai/agents"
+Write-OK "Example invoke: POST http://localhost:8090/api/v1/ai/agents/cpq-agent-004/invoke"
+if (-not $Detach) {
+    Push-Location $ProjectRoot
+    try {
+        & docker compose logs -f ai-service
+    } finally {
+        Pop-Location
+    }
+}
