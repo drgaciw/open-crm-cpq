@@ -90,6 +90,8 @@ export async function ordersSuite(page, baseUrl) {
   let deny = false;
   let conflict = false;
   let listDelay = false;
+  let loseEvidenceResponse = false;
+  let unresolvedKey = null;
   const wrap = (data) => ({ success: true, timestamp: stamp, data });
   const paged = (data) => ({
     ...wrap(data),
@@ -125,7 +127,23 @@ export async function ordersSuite(page, baseUrl) {
       assert.equal(typeof body.expectedVersion, 'number');
       assert.ok(body.reason);
       assert.ok(body.operationKey);
+      if (loseEvidenceResponse && url.pathname.endsWith('/evidence')) {
+        loseEvidenceResponse = false;
+        unresolvedKey = body.operationKey;
+        return route.abort('failed');
+      }
       return respond(wrap({}), 202);
+    }
+    if (url.pathname.includes('/operations/')) {
+      const key = url.pathname.split('/').at(-1);
+      return respond(
+        wrap({
+          operationKey: key,
+          orderId: order.id,
+          status: key === unresolvedKey ? 'NOT_FOUND' : 'SUCCEEDED',
+          orderVersion: order.version,
+        }),
+      );
     }
     if (url.pathname === '/api/v1/orders') {
       if (listDelay) await new Promise((resolve) => setTimeout(resolve, 400));
@@ -219,6 +237,37 @@ export async function ordersSuite(page, baseUrl) {
     .click();
   await page.getByText(/Command persisted; processing is pending/).waitFor();
   assert.equal(commands.at(-1).body.externalReference, 'POD-101');
+  loseEvidenceResponse = true;
+  await page.getByLabel('External reference', { exact: true }).fill('POD-102');
+  await page
+    .getByRole('button', { name: 'Record evidence', exact: true })
+    .click();
+  await page.getByRole('alert').filter({ hasText: 'unknown' }).waitFor();
+  const uncertainCount = commands.length;
+  await page.reload();
+  await page.getByText(/earlier command outcome is unresolved/).waitFor();
+  assert.equal(
+    await page
+      .getByRole('button', { name: 'Record evidence', exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(commands.length, uncertainCount);
+  const stored = await page.evaluate(() =>
+    sessionStorage.getItem('oms:pending:order:order-1'),
+  );
+  assert.ok(stored.includes(unresolvedKey));
+  assert.ok(!stored.includes('POD-102'));
+  unresolvedKey = null;
+  await page.getByRole('button', { name: 'Reload order' }).click();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('button')].some(
+      (button) =>
+        button.textContent.trim() === 'Record evidence' &&
+        !button.disabled &&
+        !button.closest('fieldset[disabled]'),
+    ),
+  );
   await page.getByRole('link', { name: 'Exception queue' }).click();
   await page.getByRole('button', { name: 'Manage exception' }).click();
   await page.getByLabel('Owner', { exact: true }).fill('operator-1');
@@ -278,6 +327,7 @@ export async function ordersSuite(page, baseUrl) {
       'cancel confirmation',
       'version conflict blocks commands',
       'evidence 202 pending',
+      'lost evidence response survives browser reload without duplicate',
       'exception assignment',
       'unknown outcome retry denied',
       'source reference conversion',

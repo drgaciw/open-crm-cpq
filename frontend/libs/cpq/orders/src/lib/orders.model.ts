@@ -12,17 +12,17 @@ export interface SourceReference {
 }
 export interface SnapshotLine {
   sourceLineId: string;
-  productId: string;
-  description: string;
-  fulfillmentType: string;
-  chargeType: string;
+  productId: string | null;
+  description: string | null;
+  fulfillmentType: string | null;
+  chargeType: string | null;
   quantity: number;
-  uom: string;
-  unitPrice: string;
-  discount: string;
-  tax: string;
-  total: string;
-  billingFrequency: string;
+  uom: string | null;
+  unitPrice: string | null;
+  discount: string | null;
+  tax: string | null;
+  total: string | null;
+  billingFrequency: string | null;
   startDate: string | null;
   endDate: string | null;
 }
@@ -33,10 +33,10 @@ export interface OrderSnapshot extends SourceReference {
   customerId: string;
   acceptedAt: string;
   currency: string;
-  subtotal: string;
-  discount: string;
-  tax: string;
-  total: string;
+  subtotal: string | null;
+  discount: string | null;
+  tax: string | null;
+  total: string | null;
   address: string | null;
   approvalReference: string | null;
   taxEvidence: string | null;
@@ -108,7 +108,15 @@ export type EvidenceKind =
   | 'SHIPMENT'
   | 'DELIVERY'
   | 'SERVICE'
+  | 'PROVISION'
+  | 'RELEASE'
   | 'FINANCE_ACK';
+export interface OperationStatus {
+  operationKey: string;
+  orderId: string;
+  status: 'SUCCEEDED' | 'NOT_FOUND' | 'UNKNOWN' | 'PENDING';
+  orderVersion: number;
+}
 export const ORDER_STATUSES = [
   'DRAFT',
   'SUBMITTED',

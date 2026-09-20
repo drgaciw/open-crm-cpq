@@ -19,6 +19,27 @@
 @if (error()) {
   <p class="error" role="alert">{{ error() }}</p>
 }
+@if (signInRequired()) {
+  <a href="/oauth2/authorization/oms">Sign in to OMS</a>
+}
+@if (unresolved() > 0) {
+  <p class="notice" role="status">
+    An earlier command outcome is unresolved. New side-effect commands remain
+    blocked, including after reload. Reload checks the recorded operation key;
+    NOT_FOUND is not proof of failure. Reconcile or ask an operator to
+    investigate.
+  </p>
+  <label
+    >Reconciliation reason<textarea [(ngModel)]="commandReason"></textarea>
+  </label>
+  <button
+    type="button"
+    [disabled]="pending() || loading() || stale()"
+    (click)="reconcile()"
+  >
+    Reconcile uncertain outcome
+  </button>
+}
 @if (notice()) {
   <p class="notice" role="status">{{ notice() }}</p>
 }
@@ -64,13 +85,19 @@
       </dl>
       <dl>
         <dt>Subtotal</dt>
-        <dd>{{ o.snapshot.currency }} {{ o.snapshot.subtotal }}</dd>
+        <dd>
+          {{ o.snapshot.currency }}
+          {{ o.snapshot.subtotal ?? 'Missing source amount' }}
+        </dd>
         <dt>Discount</dt>
-        <dd>{{ o.snapshot.discount }}</dd>
+        <dd>{{ o.snapshot.discount ?? 'Missing source amount' }}</dd>
         <dt>Tax</dt>
-        <dd>{{ o.snapshot.tax }}</dd>
+        <dd>{{ o.snapshot.tax ?? 'Missing source amount' }}</dd>
         <dt>Total</dt>
-        <dd>{{ o.snapshot.currency }} {{ o.snapshot.total }}</dd>
+        <dd>
+          {{ o.snapshot.currency }}
+          {{ o.snapshot.total ?? 'Missing source amount' }}
+        </dd>
         <dt>Address</dt>
         <dd>{{ o.snapshot.address || 'Missing source evidence' }}</dd>
       </dl>
@@ -102,15 +129,18 @@
           <tbody>
             @for (line of o.snapshot.lines; track line.sourceLineId) {
               <tr>
-                <td>{{ line.description }}</td>
-                <td>{{ line.fulfillmentType }} / {{ line.chargeType }}</td>
-                <td>{{ line.quantity }} {{ line.uom }}</td>
-                <td>{{ line.unitPrice }}</td>
-                <td>{{ line.discount }}</td>
-                <td>{{ line.tax }}</td>
-                <td>{{ line.total }}</td>
+                <td>{{ line.description ?? 'Missing source description' }}</td>
                 <td>
-                  {{ line.billingFrequency }} ·
+                  {{ line.fulfillmentType ?? 'Missing' }} /
+                  {{ line.chargeType ?? 'Missing' }}
+                </td>
+                <td>{{ line.quantity }} {{ line.uom ?? 'Missing UOM' }}</td>
+                <td>{{ line.unitPrice ?? 'Missing' }}</td>
+                <td>{{ line.discount ?? 'Missing' }}</td>
+                <td>{{ line.tax ?? 'Missing' }}</td>
+                <td>{{ line.total ?? 'Missing' }}</td>
+                <td>
+                  {{ line.billingFrequency ?? 'Missing billing frequency' }} ·
                   {{ line.startDate || 'Missing start' }} –
                   {{ line.endDate || 'Missing end' }}
                 </td>
@@ -154,7 +184,7 @@
       </table>
     </div>
   </section>
-  <fieldset [disabled]="pending() || loading() || stale()">
+  <fieldset [disabled]="pending() || loading() || stale() || unresolved() > 0">
     <section>
       <h2>Order commands</h2>
       <p>
@@ -331,6 +361,7 @@
                     pending() ||
                     loading() ||
                     stale() ||
+                    unresolved() > 0 ||
                     (task.status !== 'FAILED' && task.status !== 'EXHAUSTED')
                   "
                   (click)="retry(task)"

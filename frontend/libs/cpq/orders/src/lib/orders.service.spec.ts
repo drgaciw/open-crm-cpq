@@ -29,7 +29,13 @@ describe('OrdersService HTTP contract', () => {
   it('preserves envelope pagination and filters through the real app interceptor', () => {
     const received = vi.fn();
     service
-      .list(2, { q: 'ACME', status: 'DRAFT', customerId: 'a' })
+      .list(2, {
+        q: 'ACME',
+        status: 'DRAFT',
+        customerId: 'a',
+        externalReference: 'POD-1',
+        hasExceptions: 'false',
+      })
       .subscribe(received);
     const req = http.expectOne((r) => r.url === '/api/v1/orders');
     expect(req.request.params.get('page')).toBe('2');
@@ -37,6 +43,8 @@ describe('OrdersService HTTP contract', () => {
     expect(req.request.params.get('q')).toBe('ACME');
     expect(req.request.params.get('customerId')).toBe('a');
     expect(req.request.params.get('status')).toBe('DRAFT');
+    expect(req.request.params.get('externalReference')).toBe('POD-1');
+    expect(req.request.params.get('hasExceptions')).toBe('false');
     req.flush({
       ...envelope([{ id: 'o' }]),
       pagination: { page: 2, size: 20, totalElements: 43, totalPages: 3 },

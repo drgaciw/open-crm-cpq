@@ -57,6 +57,7 @@ const envelope = (data: unknown) => ({
 describe('Orders workspace', () => {
   let http: HttpTestingController;
   beforeEach(() => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -145,12 +146,23 @@ describe('Orders workspace', () => {
       }),
     );
     req.flush(envelope({}), { status: 202, statusText: 'Accepted' });
+    http
+      .expectOne(`/api/v1/orders/o/operations/${req.request.body.operationKey}`)
+      .flush(
+        envelope({
+          operationKey: req.request.body.operationKey,
+          orderId: 'o',
+          status: 'PENDING',
+          orderVersion: 4,
+        }),
+      );
     http.expectOne('/api/v1/orders/o').flush(envelope(order));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('pending');
     expect(c.order()?.lines[0].delivered).toBe(0);
+    expect(c.unresolved()).toBe(1);
   });
   it('keeps unknown command outcomes blocked until the operator reloads', () => {
     const fixture = loadDetail();
@@ -162,6 +174,61 @@ describe('Orders workspace', () => {
     http.expectNone((r) => r.method === 'POST');
     expect(c.stale()).toBe(true);
     expect(c.error()).toContain('unknown');
+  });
+  it('does not create a new evidence operation after an uncertain outcome and reload', () => {
+    const fixture = loadDetail();
+    const c = fixture.componentInstance;
+    c.evidenceLine = 'l';
+    c.evidenceKind = 'DELIVERY';
+    c.evidenceQuantity = 1;
+    c.evidenceReference = 'POD-private';
+    c.evidenceAt = '2026-09-20T12:30';
+    c.evidenceReason = 'private reason';
+    c.recordEvidence();
+    const req = http.expectOne('/api/v1/orders/o/evidence');
+    const key = req.request.body.operationKey;
+    req.error(new ProgressEvent('error'));
+    fixture.destroy();
+    const restored = TestBed.createComponent(OrdersDetailComponent);
+    restored.detectChanges();
+    http.expectOne('/api/v1/orders/o').flush(envelope(order));
+    http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    const lookup = http.expectOne(`/api/v1/orders/o/operations/${key}`);
+    lookup.flush(
+      envelope({
+        operationKey: key,
+        orderId: 'o',
+        status: 'NOT_FOUND',
+        orderVersion: 4,
+      }),
+    );
+    restored.componentInstance.commandReason = 'Changed request';
+    restored.componentInstance.submit();
+    http.expectNone((r) => r.method === 'POST');
+    expect(sessionStorage.getItem('oms:pending:order:o')).not.toContain(
+      'POD-private',
+    );
+    expect(sessionStorage.getItem('oms:pending:order:o')).not.toContain(
+      'private reason',
+    );
+    restored.componentInstance.load();
+    http.expectOne('/api/v1/orders/o').flush(envelope(order));
+    http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http
+      .expectOne(`/api/v1/orders/o/operations/${key}`)
+      .flush(
+        envelope({
+          operationKey: key,
+          orderId: 'o',
+          status: 'SUCCEEDED',
+          orderVersion: 4,
+        }),
+      );
+    expect(restored.componentInstance.unresolved()).toBe(0);
+    expect(sessionStorage.getItem('oms:pending:order:o')).toBeNull();
+    restored.destroy();
   });
   it('submits and holds with reasons and trusts only the refreshed server projection', () => {
     const fixture = loadDetail();
@@ -285,5 +352,51 @@ describe('Orders workspace', () => {
     );
     req.flush({}, { status: 403, statusText: 'Forbidden' });
     expect(c.error()).toContain('permission');
+  });
+  it('blocks repeated exception recovery across a reload while the earlier operation is unknown', () => {
+    const fixture = TestBed.createComponent(OrdersExceptionsComponent);
+    fixture.detectChanges();
+    const exception = {
+      id: 'e',
+      orderId: 'o',
+      status: 'OPEN',
+      category: 'ERROR',
+      version: 7,
+    };
+    const page = {
+      ...envelope([exception]),
+      pagination: { page: 0, size: 20, totalElements: 1, totalPages: 1 },
+    };
+    http.expectOne((r) => r.url === '/api/v1/order-exceptions').flush(page);
+    const c = fixture.componentInstance;
+    c.select(c.rows()[0]);
+    c.owner = 'operator';
+    c.reason = 'Investigating';
+    c.assign();
+    const req = http.expectOne('/api/v1/order-exceptions/e/assign');
+    const key = req.request.body.operationKey;
+    req.error(new ProgressEvent('error'));
+    fixture.destroy();
+    const restored = TestBed.createComponent(OrdersExceptionsComponent);
+    restored.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/order-exceptions').flush(page);
+    http
+      .expectOne(`/api/v1/order-exceptions/e/operations/${key}`)
+      .flush(
+        envelope({
+          operationKey: key,
+          orderId: 'o',
+          status: 'UNKNOWN',
+          orderVersion: 4,
+        }),
+      );
+    const next = restored.componentInstance;
+    next.select(next.rows()[0]);
+    next.owner = 'other';
+    next.reason = 'Changed';
+    next.assign();
+    http.expectNone((r) => r.method === 'POST');
+    expect(next.blocked().has('e')).toBe(true);
+    restored.destroy();
   });
 });
