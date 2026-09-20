@@ -58,6 +58,9 @@ public class QuoteService {
     private final ObjectMapper objectMapper;
     private final OutboxEventPublisher outboxEventPublisher;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.opencrm.quote.snapshot.AcceptedSnapshotService acceptedSnapshotService;
+
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
     public QuoteDto create(QuoteCreateRequest request) {
@@ -224,6 +227,7 @@ public class QuoteService {
 
         quote.setStatus(QuoteStatus.APPROVED);
         quote.setApprovalState(ApprovalState.APPROVED);
+        if (acceptedSnapshotService.owns(quote)) quote.setOmsApprovalReference(java.util.UUID.randomUUID().toString());
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} approved", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
@@ -271,14 +275,16 @@ public class QuoteService {
 
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
-        quote.recalculateTotals();
+        if (!acceptedSnapshotService.owns(quote)) quote.recalculateTotals();
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
+        if (acceptedSnapshotService.owns(saved)) acceptedSnapshotService.capture(saved, lineItems);
         QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
+        kafkaEvent.setFulfillmentOwner(saved.getFulfillmentOwner());
         outboxEventPublisher.publish(
                 "Quote",
                 saved.getQuoteNumber(),
@@ -396,6 +402,11 @@ public class QuoteService {
     public QuoteDto calculate(Long id) {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+
+        if ((quote.getStatus() == QuoteStatus.ACCEPTED && "OMS".equals(quote.getFulfillmentOwner()))
+                || (quote.getOmsApprovalReference() != null && !EDITABLE_STATUSES.contains(quote.getStatus()))) {
+            throw new BusinessException("Cannot reprice an accepted OMS quote", "QUOTE_NOT_EDITABLE");
+        }
 
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         if (lineItems.isEmpty()) {
@@ -590,13 +601,16 @@ public class QuoteService {
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
         
         // Recalculate totals to ensure synchronization
-        quote.recalculateTotals();
+        if (!acceptedSnapshotService.owns(quote)) quote.recalculateTotals();
         
         // Use state machine method
         quote.accept();
         
         Quote saved = quoteRepository.save(quote);
         
+        List<QuoteLineItem> acceptedLines = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        if (acceptedSnapshotService.owns(saved)) acceptedSnapshotService.capture(saved, acceptedLines);
+
         // Publish event via Transactional Outbox
         com.opencrm.common.event.dto.QuoteAcceptedEvent event = 
                 new com.opencrm.common.event.dto.QuoteAcceptedEvent(
@@ -607,6 +621,7 @@ public class QuoteService {
                         saved.getCurrency()
                 );
         
+        event.setFulfillmentOwner(saved.getFulfillmentOwner());
         outboxEventPublisher.publish(
                 "Quote",
                 saved.getQuoteNumber(),
