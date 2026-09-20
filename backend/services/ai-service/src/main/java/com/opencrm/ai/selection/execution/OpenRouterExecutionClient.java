@@ -132,10 +132,19 @@ public final class OpenRouterExecutionClient {
         }
         JsonNode usage = root.path("usage");
         long input = requiredLong(usage, "prompt_tokens"), output = requiredLong(usage, "completion_tokens");
-        long cached = usage.path("prompt_tokens_details").path("cached_tokens").asLong(0);
+        JsonNode details = usage.path("prompt_tokens_details");
+        if (!details.isMissingNode() && !details.isObject()) throw new TransportFailure("INVALID_CACHE_USAGE", false);
+        long cached = optionalLong(details, "cached_tokens");
+        long written = optionalLong(details, "cache_write_tokens");
+        if ((cached > 0 && route.prices().cacheRead() == null) || (written > 0 && route.prices().cacheWrite() == null))
+            throw new TransportFailure("UNKNOWN_CACHE_PRICE", false);
         JsonNode cost = usage.path("cost");
         if (!cost.isNumber() || cost.decimalValue().signum() < 0) throw new TransportFailure("MISSING_BILLED_COST", false);
-        return new Completion(content, calls, new Usage(input, output, cached, 0, 1, cost.decimalValue()), root.path("model").asText(), provider);
+        return new Completion(content, calls, new Usage(input, output, cached, written, 1, cost.decimalValue()), root.path("model").asText(), provider);
+    }
+
+    private long optionalLong(JsonNode root, String name) throws TransportFailure {
+        return root.has(name) ? requiredLong(root, name) : 0;
     }
 
     private long requiredLong(JsonNode root, String name) throws TransportFailure {
