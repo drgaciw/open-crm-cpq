@@ -71,3 +71,25 @@ Manual capability: operator-assigned allocation, release, dispatch evidence, sta
 No automatic ATP guarantee, no synthetic invoice/provisioning identifiers. Unknown response never
 counts as success. Exceptions include category, owner, next action, first/last timestamps. Daily
 reconciliation and pre-redispatch reconciliation preserve contradictory facts for operator review.
+
+## Additive pilot correction and evidence contracts
+
+Evidence kinds additionally include RELEASE and PROVISION. Allocation evidence carries expiresAt
+and allocationReference; shipment/release consumes that allocationReference. DELIVERY references
+shipmentReference, retaining a pending fact if the shipment has not arrived yet. No pending fact
+increments delivered quantities until its valid causal shipment is reconciled.
+
+POST /orders/{id}/replacement-requests carries the standard versioned Command. OMS requires no
+external dispatch, allocation, fulfillment, activation or finance effect and no unresolved operation.
+It atomically cancels the original obligations and emits oms.quote-revision-requested.v1 with
+{schemaVersion:1,eventId,operationKey,orderId,quoteId,acceptedRevision,scopeId,customerId,reason}.
+Quote service verifies trusted producer/scope and locks the exact OMS-owned ACCEPTED revision;
+a durable inbox makes replay harmless. It returns the source quote to DRAFT and invalidates prior
+approval. acceptedRevision increments only at the next fresh approved acceptance. Old snapshots
+and the cancelled order remain immutable. A new order for that revision records replacement lineage.
+This contract grants no in-flight amendment or cancellation of externally started work.
+
+GET /orders/{id}/operations/{operationKey} and /order-exceptions/{id}/operations/{operationKey}
+return {operationKey,orderId,status,orderVersion}. SUCCEEDED means the command transaction was
+committed, not that external effects succeeded. NOT_FOUND is not permission to resend using a new
+key. UNKNOWN/PENDING require reconciliation. Same-body retries retain the original operation key.
