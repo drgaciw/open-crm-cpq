@@ -57,6 +57,8 @@ Any further use case requires an amendment to this table.
 
 - `JevProperties` is the backend's first `@ConfigurationProperties` class. It is confined to the library; services keep constructor `@Value("${opencrm.jev.<use-case>.enabled:false}")` plus a guard clause.
 - `opencrm.jev.api-key: ${JEV_API_KEY:}` has an empty default, unlike other secrets, so that a flag-off service boots without the variable. An empty key forces the no-op transport.
+- `leads.score_probabilities` is `TEXT` holding JSON, not `JSONB`. `crm-service` boots with `ddl-auto=validate`, the value is only read back whole, and a JSON type mapping could not be boot-tested without Docker when it landed. Revisit if it ever needs querying.
+- Lead scoring has no event/listener layer: `JevAdvisoryRunner` already defers to after-commit, so `LeadService` gains one collaborator and one call per save.
 
 ## Rollout and gates
 
