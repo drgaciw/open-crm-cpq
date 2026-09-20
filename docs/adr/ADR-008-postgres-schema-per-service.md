@@ -14,17 +14,17 @@ Eleven backend services in one Maven reactor need relational storage. The target
 Verified on the tree (2026-09-19):
 
 - `backend/scripts/init-db.sql` — **one database `opencrm`**, schemas `crm, cpq, pricing, product, quote, communication, ai`; extensions `uuid-ossp` + `pg_trgm`; **pgvector commented out**; bootstrap role `opencrm_app` with schema-scoped grants.
-- Every service datasource: `jdbc:postgresql://…/opencrm?currentSchema={schema}` + `spring.flyway.schemas: {schema}` (crm yml, quote yml, compose env verified).
+- Shared-database defaults align JDBC schema, Hibernate schema and Flyway history. Configuration-engine, approval-routing, document-generation and contract-asset-management use `configuration`, `approval`, `document` and `contract`; existing standalone installations retain explicit `DB_NAME` and `DB_SCHEMA=public` until a reviewed data move.
 - `docker-compose.yml` — single `postgres:16-alpine` + `redis:7-alpine`; compose sets `SPRING_FLYWAY_SCHEMAS` per service.
 - Hibernate runs `ddl-auto: validate` — schema drift fails fast; all DDL flows through Flyway (`V{version}__{description}.sql`).
-- Exception noted in [ARCHITECTURE.md §16](../ARCHITECTURE.md): document-generation yml defaults `DB_NAME:cpq_document` (drift; service not in compose).
+- Pricing-service owns migrations for the shared `pricing` schema, including price-book tables. Pricebook-service intentionally keeps Flyway disabled. See [migration ownership and compatibility](../database-schema-alignment.md).
 
 ## Decision
 
 **Operate one shared PostgreSQL instance and one database (`opencrm`). Each service owns exactly one PostgreSQL schema, its Flyway history, and all tables in it. No cross-schema table access — service integration happens over HTTP (gateway/client) or Kafka events, never by joining another service's tables.**
 
 1. Schema names: `crm` (crm-service), `pricing` (pricing-service **and** pricebook-service — shared schema name, distinct table sets), `product`, `quote`; `cpq`, `communication`, `ai` reserved/used per service (ai-service Hikari `schema: ai`).
-2. Flyway per service (`spring.flyway.schemas` + `classpath:db/migration`); Hibernate `ddl-auto: validate` everywhere.
+2. Flyway per owned schema (`spring.flyway.schemas` + `classpath:db/migration`); pricing-service is the sole migration owner for both pricing and pricebook. Hibernate uses `ddl-auto: validate`.
 3. Redis 7 is the shared cache/rate-limit tier (quote 10-min TTL cache; gateway Redis rate limiter).
 4. pgvector stays disabled until the RAG wave needs it.
 5. Cross-schema reads are forbidden; the approvals dual-read ([ADR-005](ADR-005-approvals-legacy-dual-read.md)) is a same-schema legacy-table exception inside quote-service, not a cross-service read.
@@ -34,13 +34,13 @@ Verified on the tree (2026-09-19):
 | Option | Verdict |
 |--------|---------|
 | **A. One DB, schema-per-service (landed)** | Flyway isolation + ownership per service; trivial local dev (one container); cheap schema-scoped grants. Con: shared instance is a single failure domain; noisy-neighbor risk; schema name `pricing` reused by two services. |
-| B. Database-per-service | Strongest isolation, but 11 local containers and heavier ops for a pre-AKS phase; nothing in the tree uses it (except document-generation's default drift). **Rejected for now.** |
+| B. Database-per-service | Existing standalone configurations remain supported through explicit overrides; the default installation uses shared `opencrm`. Consolidating existing records is a separate reviewed operation. |
 | C. Single shared schema (legacy Frappe style) | No ownership boundaries; Flyway conflicts; rejected — contradicts microservice ownership model. |
 
 ## Consequences
 
 - **Positive:** Services migrate independently; local stack is one container; backup/restore story is simple pre-production; `ddl-auto: validate` makes drift visible in tests.
-- **Negative / residual:** Single Postgres instance is a blast-radius and scaling bottleneck (accepted until AKS); the `pricing` schema being shared by pricing + pricebook requires naming discipline; document-generation's `cpq_document` default must be reconciled or ratified before it ships in compose.
+- **Negative / residual:** Shared PostgreSQL is a common failure domain. Pricing/pricebook require one migration owner. Existing standalone databases must be pinned to their previous connection/schema until a rehearsed migration and rollback are approved.
 - **Migration path:** Moving any service to its own database later is a connection-string + schema dump exercise because ownership is already schema-clean.
 
 ## Verification evidence (2026-09-19)

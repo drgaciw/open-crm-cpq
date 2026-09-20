@@ -50,4 +50,4 @@ The original ADR-001–013 records were reviewed against the working tree on 202
 | ADR-006 | No entity leaks at `/api/v1/**` | grep: zero `ApiResponse<{Subscription,ConfigurationSession,ApprovalRequest,DocumentGenerationJob}>` (non-Dto) in controllers | ✅ |
 | backlog ADR | Product validate retained; gateway → CE evaluate | gateway route order (`configuration-validate` before `product-service`), `ConfigurationValidationResult` in `libs/common` | ✅ |
 
-**New drift found during verification (recorded, not authorized to fix):** ai-service `server.port: 8086` collides with document-generation `:8086`; document-generation defaults to DB `cpq_document` instead of shared `opencrm` — see [ARCHITECTURE.md §16](../ARCHITECTURE.md).
+**Follow-up implementation:** AI now uses `8090`; four standalone service defaults are aligned to isolated `opencrm` schemas; canonical approval history retains completed decisions. Existing-data cutovers remain separate. See [implementation evidence and rollout gates](../adr-gap-implementation.md).
