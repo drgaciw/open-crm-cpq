@@ -16,6 +16,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@frontend/cpq-orders": ["libs/cpq/orders/src/index.ts"],
       "@frontend/shared-models": ["libs/shared/models/src/index.ts"],
       "@frontend/shared-data-access": ["libs/shared/data-access/src/index.ts"],
       "@frontend/shared-ui": ["libs/shared/ui/src/index.ts"],

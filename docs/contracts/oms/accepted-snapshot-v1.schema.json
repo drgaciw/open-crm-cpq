@@ -27,7 +27,8 @@
       "type": "string"
     },
     "quoteId": {
-      "type": "string"
+      "type": "string",
+      "format": "uuid"
     },
     "quoteNumber": {
       "type": "string"
@@ -39,20 +40,32 @@
       "type": "string"
     },
     "subtotal": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d{2}$"
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
     },
     "discount": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d{2}$"
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
     },
     "tax": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d{2}$"
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
     },
     "total": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d{2}$"
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
     },
     "address": {
       "type": [
@@ -119,53 +132,78 @@
             "type": "string"
           },
           "productId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "uom": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "unitPrice": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
           },
           "discount": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
           },
           "tax": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
           },
           "total": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d{2}$"
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{1,14}(\\.[0-9]{1,2})?$"
           },
           "fulfillmentType": {
-            "enum": [
-              "PHYSICAL",
-              "DIGITAL",
-              "SERVICE"
-            ]
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "chargeType": {
-            "enum": [
-              "ONE_TIME",
-              "RECURRING"
-            ]
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "quantity": {
             "type": "integer",
             "minimum": 1
           },
           "billingFrequency": {
-            "enum": [
-              "ONE_TIME",
-              "MONTHLY",
-              "ANNUAL"
-            ]
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Preserved source fact; missing or unsupported values hold execution."
           },
           "startDate": {
             "type": [

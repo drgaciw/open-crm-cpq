@@ -9,6 +9,14 @@ It is **not** the 16-month [MODERNIZATION_PLAN.md](../MODERNIZATION_PLAN.md) (ta
 
 ---
 
+## Authorized OMS pilot work
+
+The narrow [OMS wave](forge/36-oms-pilot.md) adds a new order-management service/schema and
+Angular orders workspace on an isolated integration branch. Its [contract](contracts/oms-pilot-v1.md)
+and [manual operating runbook](runbooks/oms-pilot.md) govern the work. Intake and side-effecting
+workers default disabled; this authorization does not lift unrelated holds below. Integration-branch
+implementation is not a claim of deployment or production acceptance.
+
 ## 1. Purpose
 
 Agents (forge panes, coding assistants) must:

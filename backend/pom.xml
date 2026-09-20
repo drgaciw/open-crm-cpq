@@ -28,6 +28,7 @@
         <module>services/pricebook-service</module>
         <module>services/product-service</module>
         <module>services/quote-service</module>
+        <module>services/order-management</module>
         <module>services/ai-service</module>
         <module>services/configuration-engine</module>
         <module>services/approval-routing</module>

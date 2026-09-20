@@ -38,6 +38,10 @@ export const appRoutes: Route[] = [
           import('@frontend/cpq-catalog').then((m) => m.CATALOG_ROUTES),
       },
       {
+        path: 'orders',
+        loadChildren: () => import('@frontend/cpq-orders').then((m) => m.ORDERS_ROUTES),
+      },
+      {
         path: 'quotes',
         loadChildren: () =>
           import('@frontend/cpq-quotes').then((m) => m.QUOTES_ROUTES),

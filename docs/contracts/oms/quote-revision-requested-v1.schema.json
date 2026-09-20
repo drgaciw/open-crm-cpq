@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opencrm:oms:quote-revision-requested-v1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "operationKey",
+    "orderId",
+    "quoteId",
+    "scopeId",
+    "customerId",
+    "reason",
+    "acceptedRevision",
+    "schemaVersion"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operationKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "orderId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "quoteId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scopeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "customerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acceptedRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    }
+  }
+}
