@@ -48,3 +48,7 @@ oms:
   activation-consumer-enabled: ${OMS_ACTIVATION_CONSUMER_ENABLED:false}
   trusted-source-scopes: ${OMS_TRUSTED_SOURCE_SCOPES:}
   managed-customers: ${OMS_MANAGED_CUSTOMERS:}
+  source-consumer-enabled: ${OMS_SOURCE_CONSUMER_ENABLED:false}
+  trusted-producer-configured: ${OMS_TRUSTED_PRODUCER_CONFIGURED:false}
+  quote-producer-principal: ${OMS_QUOTE_PRODUCER_PRINCIPAL:}
+  activation-producer-principal: ${OMS_ACTIVATION_PRODUCER_PRINCIPAL:}
