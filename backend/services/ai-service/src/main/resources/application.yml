@@ -36,7 +36,7 @@ spring:
             deployment-name: gpt-4o
 
 server:
-  port: 8086
+  port: 8090
 
 opencrm:
   gateway:
