@@ -93,6 +93,33 @@ class ApprovalControllerTest {
                 .build();
     }
 
+
+    @Test
+    void quoteHistoryReturnsAllStatesAsDtos() throws Exception {
+        when(approvalService.getByQuoteId("42")).thenReturn(List.of(sampleDto,
+                sampleDto.toBuilder().id(9002L).status(ApprovalStatus.APPROVED).build(),
+                sampleDto.toBuilder().id(9003L).status(ApprovalStatus.REJECTED).build()));
+
+        MvcResult result = mockMvc.perform(get("/api/v1/approvals/quote/42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].quoteId").value("42"))
+                .andExpect(jsonPath("$.data[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data[1].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data[2].status").value("REJECTED"))
+                .andReturn();
+        assertNoEntityLeakFields(result.getResponse().getContentAsString());
+    }
+
+    @Test
+    void quoteHistoryReturnsEmptyListForUnknownQuote() throws Exception {
+        when(approvalService.getByQuoteId("unknown")).thenReturn(List.of());
+        mockMvc.perform(get("/api/v1/approvals/quote/unknown"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
     @Test
     @DisplayName("POST / returns DTO with RoutingApprovalDto wire fields and no deleted")
     void submitReturnsDtoOnly() throws Exception {

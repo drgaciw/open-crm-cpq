@@ -231,6 +231,31 @@ class ApprovalServiceTest {
         verify(approvalRequestRepository, never()).save(any());
     }
 
+
+    @Test
+    void historyReturnsAllStatesForRequestedQuote() {
+        ApprovalRequest approved = ApprovalRequest.builder().id(2L).quoteId("Q-001")
+                .approvalType(ApprovalType.QUOTE).status(ApprovalStatus.APPROVED).build();
+        ApprovalRequest rejected = ApprovalRequest.builder().id(3L).quoteId("Q-001")
+                .approvalType(ApprovalType.QUOTE).status(ApprovalStatus.REJECTED).build();
+        when(approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc("Q-001"))
+                .thenReturn(List.of(pendingRequest, approved, rejected));
+
+        List<ApprovalRequestDto> history = approvalService.getByQuoteId("Q-001");
+
+        assertEquals(List.of(ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.REJECTED),
+                history.stream().map(ApprovalRequestDto::getStatus).toList());
+        assertTrue(history.stream().allMatch(row -> "Q-001".equals(row.getQuoteId())));
+        verify(approvalRequestRepository, never()).findByStatus(any());
+    }
+
+    @Test
+    void historyForQuoteWithoutApprovalsIsEmpty() {
+        when(approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc("unknown"))
+                .thenReturn(List.of());
+        assertTrue(approvalService.getByQuoteId("unknown").isEmpty());
+    }
+
     private ApprovalRequestDto toDto(ApprovalRequest a) {
         return ApprovalRequestDto.builder()
                 .id(a.getId())

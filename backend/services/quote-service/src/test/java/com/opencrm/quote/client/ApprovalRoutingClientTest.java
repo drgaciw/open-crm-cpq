@@ -39,6 +39,52 @@ class ApprovalRoutingClientTest {
         server.verify();
     }
 
+
+    @Test
+    void quoteHistoryUsesScopedEndpointAndRetainsDecisions() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/quote/42"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":[
+                          {"id":1,"quoteId":"42","status":"PENDING","approvalTier":"DEAL_DESK"},
+                          {"id":2,"quoteId":"42","status":"APPROVED","approvalTier":"DEAL_DESK"},
+                          {"id":3,"quoteId":"42","status":"REJECTED","approvalTier":"CFO"}]}
+                        """, MediaType.APPLICATION_JSON));
+        assertThat(client.getByQuoteId(42L)).extracting(RoutingApprovalDto::getStatus)
+                .containsExactly("PENDING", "APPROVED", "REJECTED");
+    }
+
+    @Test
+    void quoteHistoryTreatsMissingEndpointAsUpstreamFailure() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/quote/42"))
+                .andRespond(withResourceNotFound());
+        assertThatThrownBy(() -> client.getByQuoteId(42L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo("APPROVAL_ROUTING_HISTORY_FAILED");
+    }
+
+    @Test
+    void quoteHistoryRejectsUnsuccessfulEnvelope() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/quote/42"))
+                .andRespond(withSuccess("""
+                        {"success":false,"message":"Unavailable"}
+                        """, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.getByQuoteId(42L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo("APPROVAL_ROUTING_HISTORY_FAILED");
+    }
+
+    @Test
+    void quoteHistoryAcceptsEmptyData() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/quote/42"))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":[]}
+                        """, MediaType.APPLICATION_JSON));
+        assertThat(client.getByQuoteId(42L)).isEmpty();
+    }
+
     @Test
     @DisplayName("submit POSTs to /api/v1/approvals and parses PENDING")
     void submitParsesCreated() {
