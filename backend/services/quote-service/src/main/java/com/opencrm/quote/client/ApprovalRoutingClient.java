@@ -90,6 +90,38 @@ public class ApprovalRoutingClient {
         }
     }
 
+    public List<RoutingApprovalDto> getByQuoteId(Long quoteId) {
+        log.debug("Fetching approval history for quote {} from routing", quoteId);
+        try {
+            ApiResponse<List<RoutingApprovalDto>> response = approvalRoutingRestClient.get()
+                    .uri("/api/v1/approvals/quote/{quoteId}", quoteId)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing history failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_HISTORY_FAILED"
+                        );
+                    })
+                    .body(LIST);
+            if (response == null || !response.isSuccess()) {
+                String message = response != null && response.getMessage() != null
+                        ? response.getMessage()
+                        : "approval-routing history returned an empty response";
+                throw new BusinessException(message, HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_HISTORY_FAILED");
+            }
+            return response.getData() != null ? response.getData() : Collections.emptyList();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing history: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
     public List<RoutingApprovalDto> getPending() {
         log.debug("Fetching pending approvals from routing");
         try {

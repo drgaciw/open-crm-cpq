@@ -1,5 +1,6 @@
 package com.opencrm.quote.approval;
 
+import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.ApprovalRoutingClient;
 import com.opencrm.quote.client.RoutingApprovalDto;
 import com.opencrm.quote.client.RoutingApprovalSubmitRequest;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -204,5 +206,73 @@ class ApprovalServiceSingleWriterTest {
         assertThat(pending).extracting(ApprovalRequestDto::getId).containsExactly(10L);
         verify(approvalRepository, never()).findByStatusAndDeletedFalse(any());
         verify(approvalRepository, never()).findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(any());
+    }
+
+    @Test
+    void historyRetainsDecisionsAndIsolatesQuoteWithLegacyDisabled() {
+        ApprovalService routingOnly = new ApprovalService(
+                approvalRepository, quoteRepository, approvalRoutingClient, false);
+        when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(
+                historyRow(1L, "42", "PENDING"),
+                historyRow(2L, "42", "APPROVED"),
+                historyRow(3L, "42", "REJECTED"),
+                historyRow(4L, "99", "PENDING")));
+
+        List<ApprovalRequestDto> history = routingOnly.getByQuoteId(42L);
+
+        assertThat(history).extracting(ApprovalRequestDto::getStatus)
+                .containsExactly(ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.REJECTED);
+        assertThat(history).extracting(ApprovalRequestDto::getQuoteId).containsOnly(42L);
+        verify(approvalRepository, never()).findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(any());
+    }
+
+
+    @Test
+    void historyWithLegacyEnabledPrefersRoutingAndRetainsLocalDecisions() {
+        when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(
+                historyRow(1L, "42", "PENDING"), historyRow(2L, "42", "APPROVED"),
+                historyRow(3L, "42", "REJECTED")));
+        ApprovalRequest duplicateId = ApprovalRequest.builder().id(2L).quoteId(42L)
+                .tier(ApprovalTier.DEAL_DESK).status(ApprovalStatus.APPROVED).build();
+        ApprovalRequest duplicatePending = ApprovalRequest.builder().id(99L).quoteId(42L)
+                .tier(ApprovalTier.DEAL_DESK).status(ApprovalStatus.PENDING).build();
+        ApprovalRequest legacyDecision = ApprovalRequest.builder().id(100L).quoteId(42L)
+                .tier(ApprovalTier.CFO).status(ApprovalStatus.REJECTED).build();
+        when(approvalRepository.findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(42L))
+                .thenReturn(List.of(duplicateId, duplicatePending, legacyDecision));
+
+        assertThat(approvalService.getByQuoteId(42L)).extracting(ApprovalRequestDto::getId)
+                .containsExactly(1L, 2L, 3L, 100L);
+        verify(approvalRoutingClient, never()).getPending();
+        verify(approvalRepository, never()).save(any());
+    }
+
+    @Test
+    void historyFallsBackOnRoutingFailureOnlyWhenLegacyEnabled() {
+        BusinessException failure = new BusinessException("unavailable", "APPROVAL_ROUTING_UNAVAILABLE");
+        when(approvalRoutingClient.getByQuoteId(42L)).thenThrow(failure);
+        ApprovalRequest local = ApprovalRequest.builder().id(100L).quoteId(42L)
+                .tier(ApprovalTier.CFO).status(ApprovalStatus.APPROVED).build();
+        when(approvalRepository.findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(42L))
+                .thenReturn(List.of(local));
+
+        assertThat(approvalService.getByQuoteId(42L)).extracting(ApprovalRequestDto::getId)
+                .containsExactly(100L);
+    }
+
+    @Test
+    void historyPropagatesRoutingFailureWhenLegacyDisabled() {
+        ApprovalService routingOnly = new ApprovalService(
+                approvalRepository, quoteRepository, approvalRoutingClient, false);
+        BusinessException failure = new BusinessException("unavailable", "APPROVAL_ROUTING_UNAVAILABLE");
+        when(approvalRoutingClient.getByQuoteId(42L)).thenThrow(failure);
+
+        assertThatThrownBy(() -> routingOnly.getByQuoteId(42L)).isSameAs(failure);
+        verify(approvalRepository, never()).findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(any());
+    }
+
+    private RoutingApprovalDto historyRow(Long id, String quoteId, String status) {
+        return RoutingApprovalDto.builder().id(id).quoteId(quoteId).status(status)
+                .approvalTier("DEAL_DESK").build();
     }
 }
