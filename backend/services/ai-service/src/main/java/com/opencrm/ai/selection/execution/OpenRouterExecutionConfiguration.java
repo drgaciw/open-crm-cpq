@@ -19,6 +19,13 @@ import java.time.Duration;
 @Configuration
 @ConditionalOnProperty(name = "opencrm.ai.selection.execution-enabled", havingValue = "true")
 public class OpenRouterExecutionConfiguration {
+    /** Legacy direct-client workflows have no approved selection profile or policy bridge. */
+    @Bean
+    @Primary
+    UnavailableLegacyChatClient unavailableLegacyChatClient() {
+        return new UnavailableLegacyChatClient();
+    }
+
     @Bean
     @Primary
     OpenRouterLlmAdapter openRouterLlmAdapter(
