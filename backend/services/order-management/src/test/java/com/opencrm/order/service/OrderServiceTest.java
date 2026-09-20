@@ -58,4 +58,21 @@ class OrderServiceTest {
  @Test void snapshotHashAndVerbatimBytesArePreserved() {String payload=json.writeValueAsString(snapshot());service.acceptTrustedSnapshot(payload,OrderService.hash(payload));var v=service.fromQuote(request(),"convert");assertEquals(payload,db.queryForObject("SELECT snapshot_json FROM orders WHERE id=?",String.class,v.id()));assertEquals(OrderService.hash(payload),db.queryForObject("SELECT snapshot_hash FROM orders WHERE id=?",String.class,v.id()));}
 
  @Test void unmappedLineIsVisibleHeldWithoutDefaultServiceTasks() {String payload=json.writeValueAsString(snapshot()).replace("\"fulfillmentType\":\"PHYSICAL\"","\"fulfillmentType\":null");service.acceptTrustedSnapshot(payload,OrderService.hash(payload));var v=service.fromQuote(request(),"convert");assertTrue(v.holds().contains("MAPPING:line"));assertEquals("DRAFT",v.status());assertEquals(1,v.lines().size());assertTrue(service.plan(v.id()).isEmpty());assertEquals(422,assertThrows(OrderProblem.class,()->service.submit(v.id(),new Command(0,"go","submit"))).status());}
+ @Test void incompleteCommercialFactsRemainVisibleAndHeld() {
+  String payload=json.writeValueAsString(snapshot()).replace("\"productId\":\"product\"","\"productId\":null").replace("\"description\":\"Widget\"","\"description\":null").replace("\"tax\":\"0\"","\"tax\":null").replace("\"chargeType\":\"ONE_TIME\"","\"chargeType\":null");
+  service.acceptTrustedSnapshot(payload,OrderService.hash(payload));var v=service.fromQuote(request(),"convert");
+  assertTrue(v.holds().contains("SOURCE_PRODUCT:line"));assertTrue(v.holds().contains("SOURCE_ECONOMICS:line"));assertTrue(v.holds().contains("SOURCE_BILLING:line"));
+  assertNull(v.snapshot().lines().getFirst().productId());assertNull(v.snapshot().lines().getFirst().tax());assertEquals(payload,db.queryForObject("SELECT snapshot_json FROM orders WHERE id=?",String.class,v.id()));
+  assertEquals(422,assertThrows(OrderProblem.class,()->service.submit(v.id(),new Command(0,"go","submit"))).status());
+ }
+ @Test void concurrentCrossOrderOperationKeyConflictRollsBackLoser() throws Exception {
+  var first=convert();String payload=json.writeValueAsString(snapshot()).replace("\"snapshot\"","\"snapshot2\"").replace("000000000001","000000000002").replace("Q-123","Q-124");
+  service.acceptTrustedSnapshot(payload,OrderService.hash(payload));var second=service.fromQuote(new FromQuote("snapshot2","Q-124",1),"convert2");
+  var barrier=new CyclicBarrier(2);var calls=new java.util.concurrent.atomic.AtomicInteger();when(access.actor()).thenAnswer(inv->{if(calls.incrementAndGet()<=2) barrier.await(10,TimeUnit.SECONDS);return "operator";});
+  try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+   var results=new ArrayList<Future<Integer>>();for(var order:List.of(first,second)) results.add(executor.submit(()->{try {service.hold(order.id(),new Hold(0,"hold","shared",true));return 200;}catch(OrderProblem e){return e.status();}}));
+   var statuses=new HashSet<Integer>();for(var f:results) statuses.add(f.get(20,TimeUnit.SECONDS));assertEquals(Set.of(200,409),statuses);
+  }
+  assertEquals(1,db.queryForObject("SELECT SUM(version) FROM orders",Integer.class));assertEquals(3,db.queryForObject("SELECT COUNT(*) FROM order_audit",Integer.class));
+ }
 }
