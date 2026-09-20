@@ -1,7 +1,7 @@
 # Requirements: Jev-driven OpenRouter LLM selection
 
 **ID:** REQ-AI-014
-**Status:** Backlog — implementation not started
+**Status:** Implementation delivered behind disabled flags; live qualification and rollout evidence outstanding
 **Created:** 2026-09-19
 **Architecture:** [ADR-014](../adr/ADR-014-jev-openrouter-model-selection.md)
 **Superseded direction:** fixed GLM-5 implementation tasks in ADR-002
@@ -10,7 +10,7 @@
 
 For each supported application AI task, use Jev to determine which OpenRouter models meet the task's requirements and select the qualifying model with the lowest expected total cost per successful task. Make the selection explainable, reproducible, budget-limited, and reversible.
 
-Current baseline: AI-service YAML uses Azure OpenAI `gpt-4o`; the existing Jev UAT client is reference material. No production catalog ingestion, model-selection policy, or OpenRouter execution adapter is assumed to exist.
+Runtime default remains Azure OpenAI `gpt-4o`. Backend implementation is under `com.opencrm.ai.selection`; the existing Jev UAT client remains separate. [Implementation evidence](../adr-gap-implementation.md) distinguishes offline/mock verification from live qualification. This backlog item remains open until its rollout and completion criteria are evidenced.
 
 ## Functional requirements
 

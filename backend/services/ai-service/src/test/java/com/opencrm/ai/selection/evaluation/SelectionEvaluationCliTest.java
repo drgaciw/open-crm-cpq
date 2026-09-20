@@ -120,6 +120,16 @@ class SelectionEvaluationCliTest {
         assertThat(directory.resolve("evidence.json")).exists();
         var replay = new EvaluationReplayStore().load(directory.resolve("evaluation.json"));
         assertThat(replay.candidates().getFirst().evidence().successes()).isEqualTo(2);
+        assertThat(replay.candidates().getFirst().samples()).allSatisfy(sample -> {
+            assertThat(sample.usage().inputTokens()).isEqualTo(100);
+            assertThat(sample.usage().outputTokens()).isEqualTo(30);
+            assertThat(sample.usage().reportedCost()).isEqualByComparingTo("0.00016");
+            assertThat(sample.model()).isEqualTo("vendor/model");
+            assertThat(sample.provider()).isEqualTo("Provider A");
+            var independentlyRecomputed = new com.opencrm.ai.selection.catalog.CostCalculator()
+                    .usageCost(replay.catalog().endpoints().getFirst().prices(), sample.usage());
+            assertThat(sample.cost()).isEqualByComparingTo(independentlyRecomputed);
+        });
         assertThat(Files.readString(directory.resolve("evaluation.json"))).doesNotContain("test-credential");
         assertThat(directory.resolve("active-policy.json")).doesNotExist();
     }

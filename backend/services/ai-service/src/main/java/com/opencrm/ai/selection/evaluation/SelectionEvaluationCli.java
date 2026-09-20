@@ -117,7 +117,7 @@ public final class SelectionEvaluationCli {
                     }
                     if (response.usage().inputTokens() > profile.maxInputTokens()
                             || response.usage().outputTokens() > profile.maxOutputTokens()) output = "{}";
-                    return new EvaluationHarness.Generated(output, actual);
+                    return new EvaluationHarness.Generated(output, actual, response.usage(), response.model(), response.provider());
                 }
             };
             EvaluationHarness.Report report = new EvaluationHarness(clock).run(config.profile(), catalog, eligible, fixtures,

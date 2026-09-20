@@ -19,7 +19,7 @@ Canonical ADR directory for Open CRM/CPQ. Historical Wave E published ADR-004 un
 | ADR-011 | Shared Maven modules as published language | **Accepted** (reverse-engineered) | [ADR-011-shared-maven-libs-published-language.md](./ADR-011-shared-maven-libs-published-language.md) |
 | ADR-012 | Rules engine port — Drools landed, OpenL/SpEL deferred, CE shared core | **Accepted** (reverse-engineered) | [ADR-012-rules-engine-port-abstraction.md](./ADR-012-rules-engine-port-abstraction.md) |
 | ADR-013 | Quote-service approvals BFF — single-writer routing | **Accepted** (reverse-engineered) | [ADR-013-quote-bff-approvals-single-writer.md](./ADR-013-quote-bff-approvals-single-writer.md) |
-| ADR-014 | Jev-driven OpenRouter model selection | **Accepted** (decision); implementation in backlog; runtime remains Azure `gpt-4o` | [ADR-014-jev-openrouter-model-selection.md](./ADR-014-jev-openrouter-model-selection.md) |
+| ADR-014 | Jev-driven OpenRouter model selection | **Accepted** (decision); implementation behind a disabled flag; live rollout pending; runtime remains Azure `gpt-4o` | [ADR-014-jev-openrouter-model-selection.md](./ADR-014-jev-openrouter-model-selection.md) |
 
 **About ADR-007…013 (reverse-engineered):** these were authored 2026-09-19 by a reverse-engineering pass ([docs/ARCHITECTURE.md](../ARCHITECTURE.md)) that documented decisions already embedded and verified in `main` — they record **landed behavior, not new direction**, and every evidence claim cites files on the tree. They are **not** authorizations: NgRx stays held (007), no new schemas (008), no gateway domain logic (009), S2B-9/#241 stay held (010), no business logic in libs (011), SpEL/OpenL/S2B-8/S2B-9 stay held (012), dual-read flip stays gated by ADR-005/J5 (013).
 
@@ -33,17 +33,17 @@ Related (not numbered in this folder — the configuration reconciliation ADR ke
 | Jev/OpenRouter selection requirements | **Backlog** — catalog/pricing, qualification, selection, execution, and rollout criteria | [REQ-jev-openrouter-model-selection.md](../backlog/REQ-jev-openrouter-model-selection.md) |
 | Architecture index | Landed vs target navigation | [docs/ARCHITECTURE.md](../ARCHITECTURE.md) |
 
-**Rules:** Status **Proposed** is documentation-only. Do **not** Accept dual-read flip (ADR-005). ADR-006 is **Accepted** (W1–W3 entity leaks gone) — still **do not** ship subscriptions FE from this ADR. ADR-014 replaces the fixed GLM-5 direction; Jev/OpenRouter model selection is backlog, while Azure OpenAI `gpt-4o` remains configured in `ai-service`. CSRF `SecurityConfig` GitNexus is often **UNKNOWN** — confirm with `rg`.
+**Rules:** Status **Proposed** is documentation-only. Do **not** Accept dual-read flip (ADR-005). ADR-006 is **Accepted** (W1–W3 entity leaks gone) — still **do not** ship subscriptions FE from this ADR. ADR-014 replaces the fixed GLM-5 direction; Jev/OpenRouter model selection is implemented behind a disabled flag, while Azure OpenAI `gpt-4o` remains configured in `ai-service`. CSRF `SecurityConfig` GitNexus is often **UNKNOWN** — confirm with `rg`.
 
 ## Code verification (reverse-engineering pass, 2026-09-19)
 
-The original ADR-001–013 records were reviewed against the working tree on 2026-09-19 (evidence in each file; summary in [ARCHITECTURE.md §16](../ARCHITECTURE.md)). ADR-014 was accepted afterward and is not implemented:
+The original ADR-001–013 records were reviewed against the working tree on 2026-09-19 (evidence in each file; summary in [ARCHITECTURE.md §16](../ARCHITECTURE.md)). ADR-014 was accepted afterward; its implementation is now behind a disabled flag with live qualification outstanding:
 
 | ADR | Claim | Code evidence (2026-09-19) | Match |
 |-----|-------|---------------------------|-------|
 | ADR-001 | Superseded by ADR-002 | No Anthropic starter in tree | ✅ |
 | ADR-002 | Superseded by ADR-014; GLM-5 never landed | `ai-service/application.yml` — `spring.ai.azure.openai`, `deployment-name: gpt-4o` | Historical direction superseded |
-| ADR-014 | Jev selects qualifying OpenRouter models at lowest total cost | Requirements recorded; backend selector/execution not implemented | Backlog |
+| ADR-014 | Jev selects qualifying OpenRouter models at lowest total cost | Catalog, Jev evaluation, selector and gated execution implemented; offline tests | Live qualification pending |
 | ADR-003 | Jenkins primary, GHA `workflow_dispatch` only | `docs/ci-contract.yaml` (`execution.primary: jenkins`, GHA `push_branches: []`) | ✅ |
 | ADR-004 | Gateway CSRF ON; domain `csrf.disable()` + STATELESS | gateway `SecurityConfig` (`CookieServerCsrfTokenRepository`); crm `SecurityConfig:34-35,44-45` | ✅ |
 | ADR-005 | Flag default still `true`; Proposed | `quote-service/application.yml:89`; `ApprovalService` `@Value` + 7 branches | ✅ |

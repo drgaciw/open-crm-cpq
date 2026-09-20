@@ -1,6 +1,6 @@
 # ADR-014: Jev selects the best qualifying LLM at the lowest cost through OpenRouter
 
-**Status:** Accepted (decision); implementation backlog, not runtime behavior
+**Status:** Accepted; implemented behind a disabled flag, live qualification and activation pending
 **Date:** 2026-09-19
 **Decision authority:** Project owner instruction, 2026-09-19
 **Supersedes:** [ADR-002](ADR-002-primary-llm-glm-5.md); replaces the fixed-model direction originating in [ADR-001](ADR-001-primary-llm-claude-sonnet-4-6.md)
@@ -10,7 +10,7 @@
 
 ADR-002 selected GLM-5 using a static provider and price comparison but was never implemented. The project now requires Jev to determine the best LLM at the lowest cost using OpenRouter's available models and current prices. A fixed model cannot satisfy that requirement as models, prices, and workload performance change.
 
-The checked-in AI service still configures Azure OpenAI `gpt-4o`. The existing Jev client in `frontend/e2e/lib/decide.mjs` demonstrates typed decisions and response validation for UAT; it is not a production model selector. This decision does not claim either OpenRouter execution or Jev selection has landed in the backend.
+The checked-in AI service still defaults to Azure OpenAI `gpt-4o`. Backend catalog ingestion, Jev evaluation, deterministic selection, versioned policies and restricted OpenRouter execution now exist under `com.opencrm.ai.selection`, behind an explicit disabled execution flag. The existing frontend Jev UAT client remains separate. Offline tests establish implementation behavior; they do not establish live model quality, cost reconciliation or production readiness. See [implementation evidence](../adr-gap-implementation.md).
 
 ## Decision
 

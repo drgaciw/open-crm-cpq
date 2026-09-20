@@ -18,8 +18,10 @@ When explicitly enabling execution, set:
 | `opencrm.ai.selection.max-attempts` | Default 1; bounded 1–5 eligible routes, no same-route retries |
 
 Exclude the old Azure autoconfiguration when using OpenRouter alone:
-`spring.autoconfigure.exclude=org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration`.
+`spring.autoconfigure.exclude=com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration`.
 Append any other deployment exclusions. Spring AI 0.8.1's chat/embedding `enabled=false` flags alone do not stop its Azure connection bean from requiring a credential. Default Azure and isolated OpenRouter bean paths have application-context tests on Boot 4/Java 25; live Azure transport compatibility remains a rollout check (the SDK reports a Netty version alignment warning).
+
+In opt-in policy mode, legacy agents that inject Spring AI `ChatClient` or `StreamingChatClient` directly receive an unavailable client. They return `LEGACY_AI_WORKFLOW_NOT_QUALIFIED` without calling Azure or OpenRouter. Modern agents using `LlmAdapter` use the policy-backed adapter. This keeps the whole agent package constructible without Azure while preventing unqualified legacy workflows from bypassing policy restrictions. Default Azure mode keeps its original clients. Full-package component-scan tests cover both paths; this is not a claim that every legacy workflow has an OpenRouter qualification profile.
 
 The string `LlmAdapter` requests the benchmarked `json_object` response format and returns a complete buffered response. Its `stream()` emits one complete value on a blocking scheduler; it does **not** claim provider token streaming. The typed `PolicyExecutor` accepts client-side function tools and JSON response formats; it returns validated tool calls without executing them. Profiles requiring tools reject requests without tool definitions; profiles requiring a response format reject requests without it. Existing string agents cannot silently opt into tool execution. Callers must explicitly pass tool schemas and mark requests carrying prior tool results, which disables retry/fallback to avoid replay.
 
