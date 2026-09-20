@@ -249,6 +249,38 @@ class EvaluationHarnessTest {
         assertThat(report.candidates().getFirst().evidence().capabilityProbePassed()).isFalse();
     }
 
+
+    @Test void exactBillingDecimalAndMissingProviderAreValidated() {
+        responder = body -> response(body, "suitable", "0.95").replace("0.02", "0.01234567890123456789");
+        EvaluationBudget budget = new EvaluationBudget(1, BigDecimal.ONE);
+        adapter(0).evaluate(request(), new BigDecimal("0.9"), budget, ignored -> {});
+        assertThat(budget.spent()).isEqualByComparingTo("0.01234567890123456789");
+        responder = body -> response(body, "suitable", "0.95").replace(",\"provider\":\"TypeSafe\"", "");
+        assertThatThrownBy(() -> adapter(0).evaluate(request(), new BigDecimal("0.9"),
+                new EvaluationBudget(1, BigDecimal.ONE), ignored -> {}))
+                .isInstanceOf(JevDecisionAdapter.InvalidDecision.class);
+    }
+
+    @Test void oversizedResponseIsBoundedAndChargedConservatively() {
+        responder = body -> "x".repeat(2 * 1024 * 1024 + 1);
+        EvaluationBudget budget = new EvaluationBudget(1, BigDecimal.ONE);
+        assertThatThrownBy(() -> adapter(0).evaluate(request(), new BigDecimal("0.9"), budget, ignored -> {}))
+                .isInstanceOf(JevDecisionAdapter.InvalidDecision.class);
+        assertThat(budget.spent()).isEqualByComparingTo("0.1");
+    }
+
+    @Test void oversizedEvidenceAndUnsafeEvaluatorConfigFailBeforeNetwork() {
+        assertThatThrownBy(() -> new JevDecisionAdapter.Request("candidate", "rubric", Map.of("f", "x".repeat(65537))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JevDecisionAdapter.Config(uri.resolve("/decisions?key=secret"), MODEL,
+                "rubric", Set.of("TypeSafe"), Duration.ofSeconds(1), 0, BigDecimal.ONE))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JevDecisionAdapter.Config(uri, MODEL, "rubric",
+                Set.of("TypeSafe"), Duration.ofMinutes(3), 0, BigDecimal.ONE))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(received.get()).isZero();
+    }
+
     @Test void fixtureSuiteCoversStructuredAdviceAndSafeToolArguments() {
         assertThat(CpqEvaluationFixtures.toolArguments()).hasSize(2);
         assertThat(CpqEvaluationFixtures.toolArguments().getLast().heldOut()).isTrue();

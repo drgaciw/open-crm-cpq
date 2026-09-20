@@ -19,26 +19,33 @@ import java.util.*;
  */
 public final class JevDecisionAdapter {
     public record Config(URI endpoint, String modelVersion, String rubricVersion, Set<String> providers,
-                         Duration timeout, int retries, BigDecimal maximumAttemptCost) {
+                         Duration timeout, int retries, BigDecimal maximumAttemptCost, Set<String> responseProviders) {
+        public Config(URI endpoint, String modelVersion, String rubricVersion, Set<String> providers,
+                      Duration timeout, int retries, BigDecimal maximumAttemptCost) {
+            this(endpoint, modelVersion, rubricVersion, providers, timeout, retries, maximumAttemptCost, providers);
+        }
         public Config {
-            if (endpoint == null || endpoint.getUserInfo() != null || modelVersion == null || modelVersion.isBlank()
+            if (endpoint == null || endpoint.getUserInfo() != null || endpoint.getQuery() != null || endpoint.getFragment() != null || modelVersion == null || modelVersion.isBlank()
                     || modelVersion.endsWith("latest") || rubricVersion == null || rubricVersion.isBlank()
                     || providers == null || providers.isEmpty() || timeout == null || timeout.isNegative()
-                    || timeout.isZero() || retries < 0 || retries > 3 || maximumAttemptCost == null
+                    || timeout.isZero() || timeout.compareTo(Duration.ofMinutes(2)) > 0 || retries < 0 || retries > 3 || maximumAttemptCost == null
                     || maximumAttemptCost.signum() < 0) throw new IllegalArgumentException("Explicit evaluator configuration required");
             if (!"https".equals(endpoint.getScheme()) && !Set.of("localhost", "127.0.0.1").contains(endpoint.getHost()))
                 throw new IllegalArgumentException("Evaluator requires HTTPS");
             providers = Set.copyOf(providers);
+            responseProviders = responseProviders == null ? providers : Set.copyOf(responseProviders);
+            if (responseProviders.isEmpty() || providers.stream().anyMatch(String::isBlank)
+                    || responseProviders.stream().anyMatch(String::isBlank)) throw new IllegalArgumentException("Missing evaluator provider identities");
         }
     }
     public record Request(String candidateId, String rubric, Map<String, String> evidence) {
         public Request {
             if (candidateId == null || !candidateId.matches("[A-Za-z0-9_-]+") || rubric == null || rubric.isBlank()
-                    || evidence == null || evidence.isEmpty() || evidence.size() > 200)
+                    || evidence == null || evidence.isEmpty() || evidence.size() > 200 || rubric.length() > 8192)
                 throw new IllegalArgumentException("Candidate and bounded evidence required");
             evidence = Collections.unmodifiableMap(new TreeMap<>(evidence));
             evidence.forEach((id, value) -> {
-                if (!id.matches("[A-Za-z0-9_-]+") || value == null || value.isBlank())
+                if (!id.matches("[A-Za-z0-9_-]+") || value == null || value.isBlank() || value.length() > 65536)
                     throw new IllegalArgumentException("Invalid evidence");
             });
         }
@@ -50,6 +57,7 @@ public final class JevDecisionAdapter {
     }
     private final HttpClient http;
     private final ObjectMapper json = new ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
             .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     private final Config config;
@@ -57,7 +65,7 @@ public final class JevDecisionAdapter {
 
     public JevDecisionAdapter(HttpClient http, Config config, String apiKey) {
         if (http.followRedirects() != HttpClient.Redirect.NEVER) throw new IllegalArgumentException("Redirects forbidden");
-        if (apiKey == null || apiKey.isBlank()) throw new IllegalArgumentException("Evaluator credential required");
+        if (apiKey == null || apiKey.isBlank() || apiKey.contains("\r") || apiKey.contains("\n")) throw new IllegalArgumentException("Evaluator credential required");
         this.http = http; this.config = config; this.apiKey = apiKey;
     }
     public Config config() { return config; }
@@ -70,27 +78,30 @@ public final class JevDecisionAdapter {
         String body;
         try { body = json.writeValueAsString(payload(request)); }
         catch (IOException e) { throw new InvalidDecision("Cannot serialize evidence"); }
+        if (body.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 256 * 1024)
+            throw new InvalidDecision("Evaluator request size limit exceeded");
         List<Exchange> exchanges = new ArrayList<>();
         for (int attempt = 0; attempt <= config.retries(); attempt++) {
             EvaluationBudget.Reservation reservation = budget.reserve(config.maximumAttemptCost());
             long started = System.nanoTime();
             try {
-                HttpResponse<String> response = http.send(HttpRequest.newBuilder(config.endpoint())
+                HttpResponse<byte[]> response = http.send(HttpRequest.newBuilder(config.endpoint())
                         .timeout(config.timeout()).header("Authorization", "Bearer " + apiKey)
                         .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),
-                        HttpResponse.BodyHandlers.ofString());
-                Exchange exchange = new Exchange(body, response.statusCode(), response.body(),
+                        ignored -> new LimitedBodySubscriber());
+                String responseBody = new String(response.body(), java.nio.charset.StandardCharsets.UTF_8);
+                Exchange exchange = new Exchange(body, response.statusCode(), responseBody,
                         Duration.ofNanos(System.nanoTime() - started).toMillis());
                 exchanges.add(exchange); sink.accept(exchange);
                 JsonNode root;
-                try { root = json.readTree(response.body()); }
+                try { root = json.readTree(responseBody); }
                 catch (IOException e) { root = null; }
                 JsonNode cost = root == null ? null : root.path("usage").get("cost");
                 reservation.reconcile(cost != null && cost.isNumber() && cost.decimalValue().signum() >= 0
                         ? cost.decimalValue() : null);
                 if (budget.breached()) throw new InvalidDecision("Evaluator billing exceeded reserved maximum");
                 if (response.statusCode() == 200)
-                    return new Result(validate(response.body(), request, minimumConfidence), List.copyOf(exchanges));
+                    return new Result(validate(responseBody, request, minimumConfidence), List.copyOf(exchanges));
                 if (response.statusCode() != 429 && response.statusCode() < 500)
                     throw new InvalidDecision("Evaluator HTTP " + response.statusCode());
                 if (attempt == config.retries()) throw new InvalidDecision("Evaluator retry budget exhausted");
@@ -113,7 +124,8 @@ public final class JevDecisionAdapter {
             JsonNode root = json.readTree(raw);
             if (root == null || !root.isObject()) throw new InvalidDecision("Missing response");
             if (!config.modelVersion().equals(root.path("model").asText())) throw new InvalidDecision("Evaluator model mismatch");
-            if (root.has("provider") && !config.providers().contains(root.path("provider").asText()))
+            if (!root.path("provider").isTextual() || config.responseProviders().stream()
+                    .noneMatch(name -> name.equalsIgnoreCase(root.path("provider").asText())))
                 throw new InvalidDecision("Evaluator provider mismatch");
             JsonNode answers = root.path("answers");
             Set<String> expected = new HashSet<>(request.evidence().keySet());
@@ -173,5 +185,26 @@ public final class JevDecisionAdapter {
         return Map.of("type", "choice", "instructions", instructions,
                 "criteria", Map.of("suitable", "Meets every applicable rubric requirement.",
                         "unsuitable", "Fails, contradicts, or lacks evidence for a requirement."));
+    }
+
+    private static final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
+        private final java.util.concurrent.CompletableFuture<byte[]> result = new java.util.concurrent.CompletableFuture<>();
+        private final java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        private java.util.concurrent.Flow.Subscription subscription;
+        public java.util.concurrent.CompletionStage<byte[]> getBody() { return result; }
+        public void onSubscribe(java.util.concurrent.Flow.Subscription value) { subscription = value; value.request(1); }
+        public void onNext(List<java.nio.ByteBuffer> chunks) {
+            for (var chunk : chunks) {
+                if ((long) bytes.size() + chunk.remaining() > 2 * 1024 * 1024) {
+                    subscription.cancel();
+                    result.completeExceptionally(new IOException("Evaluator response size limit exceeded"));
+                    return;
+                }
+                byte[] part = new byte[chunk.remaining()]; chunk.get(part); bytes.writeBytes(part);
+            }
+            subscription.request(1);
+        }
+        public void onError(Throwable error) { result.completeExceptionally(error); }
+        public void onComplete() { result.complete(bytes.toByteArray()); }
     }
 }
