@@ -218,6 +218,7 @@ services:
       PRICEBOOK_SERVICE_URI: http://pricebook-service:8089
       PRODUCT_SERVICE_URI: http://product-service:8083
       QUOTE_SERVICE_URI: http://quote-service:8084
+      AI_SERVICE_URI: http://ai-service:8090
       FRONTEND_URL: http://localhost:4200
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -239,6 +240,36 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+
+  # Opt-in AI runtime. Azure remains the default provider during ADR-014 rollout.
+  ai-service:
+    profiles: [ai]
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: opencrm
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      OPENCRM_GATEWAY_BASE_URL: http://gateway-service:8080
+      OPENCRM_AI_AGENTS_ENABLED: ${OPENCRM_AI_AGENTS_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/actuator/health"]
       interval: 10s
       timeout: 5s
       start_period: 40s
