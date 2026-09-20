@@ -107,11 +107,11 @@ class SelectionRefreshCoordinatorTest {
         activate(policy("old1", oldEndpoint, "0.5", clock.instant()));
         AtomicInteger catalogReads = new AtomicInteger();
         Supplier<CatalogSnapshot> evidence = () -> {
-            if (catalogReads.getAndIncrement() > 1) throw new IllegalStateException("catalog unavailable");
+            if (catalogReads.getAndIncrement() > 2) throw new IllegalStateException("catalog unavailable");
             return catalog.get();
         };
         try (var coordinator = new SelectionRefreshCoordinator(canary("0.5", Duration.ZERO), repository, () -> profile,
-                evidence, next::get, clock, outcomes::add)) {
+                evidence, () -> bind(next.get()), clock, outcomes::add)) {
             assertThat(coordinator.runOnce().reason()).isEqualTo("MINIMUM_BENEFIT_NOT_MET");
             assertThat(coordinator.runOnce().reason()).isEqualTo("RETAINED_EVIDENCE_UNAVAILABLE");
             assertThat(coordinator.lastOutcome().orElseThrow().usedCachedEvidence()).isTrue();
@@ -147,6 +147,54 @@ class SelectionRefreshCoordinatorTest {
             assertThat(coordinator.runOnce().reason()).isEqualTo("CONFLICTING_ROLLBACK_VERSION");
             assertThat(repository.active(profile.id()).orElseThrow().version()).isEqualTo("old1");
             assertThatThrownBy(() -> repository.read(candidate.version())).isInstanceOf(java.io.IOException.class);
+        }
+    }
+
+    @Test void staleRejectionCannotRevokeCurrentPolicyFromANewerCatalog() throws Exception {
+        activate(policy("old1", oldEndpoint, "0.5", clock.instant()));
+        SelectionPolicy candidate = next.get().proposedPolicy();
+        SelectionPolicy stale = new SelectionPolicy(candidate.version(), candidate.profileId(), candidate.profileVersion(),
+                "outdated-catalog", candidate.routes(), candidate.effectiveAt(), candidate.expiresAt(), null);
+        next.set(new SelectionReport(stale, Map.of(oldEndpoint.key(), "QUALITY_OR_LATENCY"), 1, 2, true, "QUALIFIED"));
+        try (var coordinator = coordinator(canary("0", Duration.ZERO), next::get)) {
+            coordinator.runOnce();
+            assertThat(repository.active(profile.id())).isPresent();
+            assertThat(repository.revoked("old1")).isFalse();
+        }
+    }
+
+    @Test void nullProposalNegativeEvidenceStillNeedsMatchingContextVersions() throws Exception {
+        activate(policy("old1", oldEndpoint, "0.5", clock.instant()));
+        SelectionReport rejected = new SelectionReport(null, Map.of(oldEndpoint.key(), "QUALITY_OR_LATENCY"), 1, 2, true, "NO_ELIGIBLE_MODEL");
+        try (var coordinator = new SelectionRefreshCoordinator(canary("0", Duration.ZERO), repository, () -> profile,
+                catalog::get, () -> new RefreshEvaluation(profile.id(), "obsolete-profile", "old-catalog", rejected), clock, outcomes::add)) {
+            assertThat(coordinator.runOnce().reason()).isEqualTo("RETAINED_STALE_EVALUATION");
+            assertThat(repository.revoked("old1")).isFalse();
+            assertThat(repository.active(profile.id()).orElseThrow().version()).isEqualTo("old1");
+        }
+    }
+
+    @Test void administrativeSupersessionDuringEvaluationCannotBeRevokedOrOverwritten() throws Exception {
+        activate(policy("old1", oldEndpoint, "0.5", clock.instant()));
+        SelectionPolicy newer = policy("admin-approved", newEndpoint, "0.4", clock.instant());
+        try (var coordinator = coordinator(canary("0", Duration.ZERO), () -> {
+            try { activate(newer); } catch (Exception error) { throw new IllegalStateException(error); }
+            return new SelectionReport(null, Map.of(newEndpoint.key(), "QUALITY_OR_LATENCY"), 1, 2, true, "NO_ELIGIBLE_MODEL");
+        })) {
+            assertThat(coordinator.runOnce().reason()).isEqualTo("SUPERSEDED_REFRESH");
+            assertThat(repository.active(profile.id()).orElseThrow().version()).isEqualTo("admin-approved");
+            assertThat(repository.revoked("admin-approved")).isFalse();
+        }
+    }
+
+    @Test void failedEvaluatorThatChangedCatalogCannotClaimPriorPolicyIsStillEligible() throws Exception {
+        activate(policy("old1", oldEndpoint, "0.5", clock.instant()));
+        try (var coordinator = coordinator(canary("0", Duration.ZERO), () -> {
+            catalog.set(new CatalogSnapshot("new-catalog", clock.instant(), clock.instant().plusSeconds(7200), List.of(newEndpoint), "newhash"));
+            throw new IllegalStateException("evaluation failed after refresh");
+        })) {
+            assertThat(coordinator.runOnce().reason()).isEqualTo("UNAVAILABLE_EVALUATOR_UNAVAILABLE");
+            assertThat(repository.revoked("old1")).isTrue();
         }
     }
 
@@ -202,12 +250,13 @@ class SelectionRefreshCoordinatorTest {
     }
 
     private SelectionRefreshCoordinator coordinator(Settings settings, Supplier<SelectionReport> evaluate) {
-        return new SelectionRefreshCoordinator(settings, repository, () -> profile, catalog::get, evaluate, clock, outcomes::add);
+        return new SelectionRefreshCoordinator(settings, repository, () -> profile, catalog::get, () -> bind(evaluate.get()), clock, outcomes::add);
     }
     private SelectionRefreshCoordinator coordinator(Settings settings, Supplier<SelectionReport> evaluate,
             Supplier<ScheduledExecutorService> workers) {
-        return new SelectionRefreshCoordinator(settings, repository, () -> profile, catalog::get, evaluate, clock, outcomes::add, workers);
+        return new SelectionRefreshCoordinator(settings, repository, () -> profile, catalog::get, () -> bind(evaluate.get()), clock, outcomes::add, workers);
     }
+    private RefreshEvaluation bind(SelectionReport report) { return new RefreshEvaluation(profile.id(), profile.version(), catalog.get().version(), report); }
     private void activate(SelectionPolicy policy) throws Exception {
         repository.saveProposal(policy);
         repository.activate(policy.version(), p -> PolicyEligibility.valid(p, profile, catalog.get(), clock.instant()));

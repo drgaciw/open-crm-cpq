@@ -41,13 +41,22 @@ public final class SelectionRefreshCoordinator implements AutoCloseable {
     public record Outcome(Instant checkedAt, String reason, String activeVersion, boolean activeEligible,
             SelectionPolicy proposal, SelectionReport selection, boolean usedCachedEvidence) { }
 
+    /** Negative findings need version binding even when no candidate qualifies and the proposal is null. */
+    public record RefreshEvaluation(String profileId, String profileVersion, String catalogVersion, SelectionReport report) {
+        public RefreshEvaluation {
+            if (profileId == null || profileId.isBlank() || profileVersion == null || profileVersion.isBlank()
+                    || catalogVersion == null || catalogVersion.isBlank() || report == null)
+                throw new IllegalArgumentException("Version-bound refresh evidence required");
+        }
+    }
+
     private record Context(TaskProfile profile, CatalogSnapshot catalog) { }
 
     private final Settings settings;
     private final FilePolicyRepository policies;
     private final Supplier<TaskProfile> profiles;
     private final Supplier<CatalogSnapshot> catalogs;
-    private final Supplier<SelectionReport> evaluate;
+    private final Supplier<RefreshEvaluation> evaluate;
     private final Clock clock;
     private final Consumer<Outcome> reports;
     private final Supplier<ScheduledExecutorService> workers;
@@ -58,7 +67,7 @@ public final class SelectionRefreshCoordinator implements AutoCloseable {
 
     public SelectionRefreshCoordinator(Settings settings, FilePolicyRepository policies,
             Supplier<TaskProfile> profiles, Supplier<CatalogSnapshot> catalogs,
-            Supplier<SelectionReport> evaluate, Clock clock, Consumer<Outcome> reports) {
+            Supplier<RefreshEvaluation> evaluate, Clock clock, Consumer<Outcome> reports) {
         this(settings, policies, profiles, catalogs, evaluate, clock, reports,
                 () -> Executors.newSingleThreadScheduledExecutor(task -> {
                     Thread thread = new Thread(task, "opencrm-selection-refresh");
@@ -69,7 +78,7 @@ public final class SelectionRefreshCoordinator implements AutoCloseable {
 
     SelectionRefreshCoordinator(Settings settings, FilePolicyRepository policies,
             Supplier<TaskProfile> profiles, Supplier<CatalogSnapshot> catalogs,
-            Supplier<SelectionReport> evaluate, Clock clock, Consumer<Outcome> reports,
+            Supplier<RefreshEvaluation> evaluate, Clock clock, Consumer<Outcome> reports,
             Supplier<ScheduledExecutorService> workers) {
         this.settings = Objects.requireNonNull(settings); this.policies = Objects.requireNonNull(policies);
         this.profiles = Objects.requireNonNull(profiles); this.catalogs = Objects.requireNonNull(catalogs);
@@ -92,57 +101,92 @@ public final class SelectionRefreshCoordinator implements AutoCloseable {
         Context context;
         try { context = readContext(); }
         catch (RuntimeException unavailable) { return failure(lastContext, "EVIDENCE_UNAVAILABLE", true); }
-        SelectionReport report;
-        try { report = Objects.requireNonNull(evaluate.get()); }
-        catch (RuntimeException unavailable) { return failure(context, "EVALUATOR_UNAVAILABLE", false); }
+        String expectedCurrentVersion;
+        try { expectedCurrentVersion = version(policies.active(context.profile().id()).orElse(null)); }
+        catch (IOException unavailable) { return failure(context, "POLICY_STORAGE_UNAVAILABLE", false); }
+        RefreshEvaluation evaluation;
+        try { evaluation = Objects.requireNonNull(evaluate.get()); }
+        catch (RuntimeException unavailable) {
+            // A failed supplier may already have refreshed its catalog/profile. Never assert stale retention.
+            try { return failure(readContext(), "EVALUATOR_UNAVAILABLE", false); }
+            catch (RuntimeException missing) { return failure(lastContext, "EVALUATOR_UNAVAILABLE", true); }
+        }
         // Evaluation may refresh catalog files or take long enough for evidence to expire.
         try { context = readContext(); }
         catch (RuntimeException unavailable) { return failure(lastContext, "EVIDENCE_UNAVAILABLE", true); }
-        Instant now = clock.instant();
         try {
-            SelectionPolicy current = policies.active(context.profile().id()).orElse(null);
-            boolean currentValid = valid(current, context, now);
-            if (report.complete() && current != null && explicitlyRejected(current, report)) currentValid = false;
-            if (!currentValid && current != null && settings.mode() == Mode.CANARY) policies.revoke(current.version());
-            SelectionPolicy proposal = report.proposedPolicy();
-            boolean complete = report.complete() && report.evaluatedCandidates() > 0
-                    && report.evaluatedCandidates() <= report.catalogCandidates();
-            if (!complete || proposal == null || proposal.routes().size() > report.evaluatedCandidates()
-                    || !valid(proposal, context, now) || policies.revoked(proposal.version())) {
-                return publish(new Outcome(now, currentValid ? "RETAINED_NO_ELIGIBLE_PROPOSAL" : "UNAVAILABLE_NO_ELIGIBLE_PROPOSAL",
-                        version(current), currentValid, null, report, false));
+            synchronized (policies) {
+                // Repository operations are synchronized on this same instance: compare and update are atomic
+                // for the documented single-writer integration, including administrative/canary actions.
+                context = readContext();
+                Instant now = clock.instant();
+                SelectionPolicy current = policies.active(context.profile().id()).orElse(null);
+                SelectionReport report = evaluation.report();
+                if (!Objects.equals(expectedCurrentVersion, version(current))) {
+                    return publish(new Outcome(now, "SUPERSEDED_REFRESH", version(current), valid(current, context, now), null, report, false));
+                }
+                if (!bound(evaluation, context) || (report.proposedPolicy() != null
+                        && !bound(report.proposedPolicy(), context))) {
+                    return failure(context, "STALE_EVALUATION", false);
+                }
+                boolean complete = report.complete() && report.evaluatedCandidates() > 0
+                        && report.evaluatedCandidates() <= report.catalogCandidates();
+                boolean currentValid = valid(current, context, now);
+                if (complete && current != null && explicitlyRejected(current, report)) currentValid = false;
+                if (!currentValid && current != null && settings.mode() == Mode.CANARY) policies.revoke(current.version());
+                SelectionPolicy proposal = report.proposedPolicy();
+                if (!complete || proposal == null || proposal.routes().size() > report.evaluatedCandidates()
+                        || !valid(proposal, context, now) || policies.revoked(proposal.version())) {
+                    return publish(new Outcome(now, currentValid ? "RETAINED_NO_ELIGIBLE_PROPOSAL" : "UNAVAILABLE_NO_ELIGIBLE_PROPOSAL",
+                            version(current), currentValid, null, report, false));
+                }
+                // Link only a still-eligible predecessor. An invalid policy is never a rollback target.
+                if (proposal.rollbackVersion() != null
+                        && (!currentValid || (!current.version().equals(proposal.version())
+                        && !current.version().equals(proposal.rollbackVersion())))) {
+                    return publish(new Outcome(now, "CONFLICTING_ROLLBACK_VERSION", version(current), currentValid, null, report, false));
+                }
+                if (currentValid && !current.version().equals(proposal.version()) && proposal.rollbackVersion() == null) {
+                    proposal = new SelectionPolicy(proposal.version(), proposal.profileId(), proposal.profileVersion(),
+                            proposal.catalogVersion(), proposal.routes(), proposal.effectiveAt(), proposal.expiresAt(), current.version());
+                }
+                policies.saveProposal(proposal);
+                if (settings.mode() == Mode.SHADOW) {
+                    return publish(new Outcome(now, "SHADOW_PROPOSAL", version(current), currentValid, proposal, report, false));
+                }
+                if (currentValid) {
+                    String reason = retainReason(current, proposal, now);
+                    if (reason != null) return publish(new Outcome(now, reason, current.version(), true, proposal, report, false));
+                }
+                SelectionPolicy selected = proposal;
+                String expectedBeforeActivation = version(policies.active(context.profile().id()).orElse(null));
+                policies.activate(selected.version(), candidate -> {
+                    if (closed) return false;
+                    Context latest = readContext();
+                    try {
+                        if (!Objects.equals(expectedBeforeActivation, version(policies.active(latest.profile().id()).orElse(null)))) return false;
+                    } catch (IOException unavailable) { return false; }
+                    return bound(evaluation, latest) && valid(candidate, latest, clock.instant());
+                });
+                return publish(new Outcome(clock.instant(), "ACTIVATED", selected.version(), true, selected, report, false));
             }
-            // Link only a still-eligible predecessor. An invalid policy is never a rollback target.
-            if (proposal.rollbackVersion() != null
-                    && (!currentValid || (!current.version().equals(proposal.version())
-                    && !current.version().equals(proposal.rollbackVersion())))) {
-                return publish(new Outcome(now, "CONFLICTING_ROLLBACK_VERSION", version(current), currentValid, null, report, false));
-            }
-            if (currentValid && !current.version().equals(proposal.version()) && proposal.rollbackVersion() == null) {
-                proposal = new SelectionPolicy(proposal.version(), proposal.profileId(), proposal.profileVersion(),
-                        proposal.catalogVersion(), proposal.routes(), proposal.effectiveAt(), proposal.expiresAt(), current.version());
-            }
-            policies.saveProposal(proposal);
-            if (settings.mode() == Mode.SHADOW) {
-                return publish(new Outcome(now, "SHADOW_PROPOSAL", version(current), currentValid, proposal, report, false));
-            }
-            if (currentValid) {
-                String reason = retainReason(current, proposal, now);
-                if (reason != null) return publish(new Outcome(now, reason, current.version(), true, proposal, report, false));
-            }
-            SelectionPolicy selected = proposal;
-            policies.activate(selected.version(), candidate -> {
-                if (closed) return false;
-                Context latest = readContext();
-                return valid(candidate, latest, clock.instant());
-            });
-            return publish(new Outcome(clock.instant(), "ACTIVATED", selected.version(), true, selected, report, false));
         } catch (IOException | RuntimeException failure) {
             return failure(context, "POLICY_UPDATE_FAILED", false);
         }
     }
 
     public Optional<Outcome> lastOutcome() { return Optional.ofNullable(lastOutcome); }
+
+    private static boolean bound(RefreshEvaluation evaluation, Context context) {
+        return evaluation.profileId().equals(context.profile().id())
+                && evaluation.profileVersion().equals(context.profile().version())
+                && evaluation.catalogVersion().equals(context.catalog().version());
+    }
+
+    private static boolean bound(SelectionPolicy policy, Context context) {
+        return policy.profileId().equals(context.profile().id()) && policy.profileVersion().equals(context.profile().version())
+                && policy.catalogVersion().equals(context.catalog().version());
+    }
 
     private String retainReason(SelectionPolicy current, SelectionPolicy proposal, Instant now) {
         if (current.version().equals(proposal.version())) return "CURRENT_VERSION_RETAINED";
@@ -182,9 +226,11 @@ public final class SelectionRefreshCoordinator implements AutoCloseable {
         boolean eligible = false;
         try {
             if (context != null) {
-                current = policies.active(context.profile().id()).orElse(null);
-                eligible = valid(current, context, now);
-                if (!eligible && current != null && settings.mode() == Mode.CANARY) policies.revoke(current.version());
+                synchronized (policies) {
+                    current = policies.active(context.profile().id()).orElse(null);
+                    eligible = valid(current, context, now);
+                    if (!eligible && current != null && settings.mode() == Mode.CANARY) policies.revoke(current.version());
+                }
             }
         } catch (IOException | RuntimeException ignored) { /* Fail closed; never activate in an error path. */ }
         return publish(new Outcome(now, (eligible ? "RETAINED_" : "UNAVAILABLE_") + reason,
