@@ -31,6 +31,10 @@ public final class PolicyExecutor {
     public Completion execute(Request request) {
         TaskProfile profile = profiles.get();
         if (client.inputAllowance(request) > profile.maxInputTokens()) throw new Unavailable("INPUT_LIMIT");
+        if (request.responseFormat() == null && profile.requiredParameters().contains("response_format"))
+            throw new Unavailable("REQUIRED_RESPONSE_FORMAT_MISSING");
+        if (request.tools().isEmpty() && profile.requiredParameters().contains("tools"))
+            throw new Unavailable("REQUIRED_TOOLS_MISSING");
         if (request.responseFormat() != null && !profile.requiredParameters().contains("response_format"))
             throw new Unavailable("UNQUALIFIED_RESPONSE_FORMAT");
         if (!request.tools().isEmpty() && (!profile.requiredParameters().contains("tools")
