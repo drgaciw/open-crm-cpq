@@ -131,6 +131,9 @@ public class Quote extends BaseEntity {
     @Column(name = "oms_approval_reference")
     private String omsApprovalReference;
 
+    @Column(name = "oms_correction_operation_key")
+    private String omsCorrectionOperationKey;
+
     @Column(name = "fulfillment_owner", nullable = false)
     @Builder.Default
     private String fulfillmentOwner = "LEGACY";

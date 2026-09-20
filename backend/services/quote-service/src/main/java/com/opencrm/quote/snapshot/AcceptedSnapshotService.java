@@ -35,6 +35,10 @@ public class AcceptedSnapshotService {
         if (!owns(quote)) throw new IllegalStateException("Quote is outside OMS cohort");
         if (quote.getAcceptedAt() == null || quote.getUuid() == null) throw new IllegalStateException("Acceptance identity required");
         UUID.fromString(quote.getUuid());
+        if (quote.getAcceptedRevision()>0 && (quote.getOmsCorrectionOperationKey()==null
+                || quote.getApprovalState()!=com.opencrm.quote.quote.ApprovalState.APPROVED
+                || quote.getOmsApprovalReference()==null))
+            throw new IllegalStateException("Corrected OMS source requires permit and fresh approval");
         Set<String> holds = new LinkedHashSet<>();
         JsonNode metadata = metadata(quote.getMetadata(), holds);
         String address = fact(metadata, "address", holds, "MISSING_ADDRESS");
@@ -93,6 +97,7 @@ public class AcceptedSnapshotService {
                 .holds(mapper.writeValueAsString(holds)).build();
             repository.save(stored);
             quote.setAcceptedRevision(revision);
+            quote.setOmsCorrectionOperationKey(null);
             quote.setFulfillmentOwner("OMS");
             outbox.publish("Quote", quote.getUuid(), "oms.quote-accepted.v1",
                 new AcceptedSnapshotEvent(UUID.randomUUID().toString(), snapshot, hash));
