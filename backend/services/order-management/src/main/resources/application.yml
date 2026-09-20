@@ -1,5 +1,7 @@
 server:
   port: 8090
+  error:
+    include-message: never
 spring:
   application:
     name: order-management
@@ -45,3 +47,7 @@ management:
     web:
       exposure:
         include: health,info
+logging:
+  level:
+    org.springframework.web: INFO
+    org.springframework.jdbc.core: INFO
