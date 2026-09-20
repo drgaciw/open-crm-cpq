@@ -26,11 +26,13 @@ public class QuoteAcceptedEventConsumer {
     private final SubscriptionRepository subscriptionRepository;
     private final ErpAdapter erpAdapter;
     private final ObjectMapper objectMapper;
+    private final LegacyOwnershipPolicy ownershipPolicy;
     
     @KafkaListener(topics = KafkaTopics.QUOTE_STATUS_ACCEPTED, groupId = "contract-asset-management")
     @Transactional
     public void handleQuoteAccepted(String message) {
         try {
+            if (!ownershipPolicy.legacyAllowed(objectMapper.readTree(message))) return;
             QuoteAcceptedEvent event = objectMapper.readValue(message, QuoteAcceptedEvent.class);
             
             log.info("Received quote accepted event for quote: {}", event.getQuoteId());
