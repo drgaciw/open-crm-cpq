@@ -37,7 +37,7 @@ public class ExecutionService {
         this.json = json;
         this.access = access;
         this.enabled = enabled;
-        this.scopes = Set.copyOf(Arrays.asList(scopes.split(",")));
+        this.scopes = Set.copyOf(Arrays.stream(scopes.split(",")).map(String::trim).filter(v -> !v.isEmpty()).toList());
     }
 
     /** Internal worker boundary, constrained by deployment allowlist rather than user-supplied scope. */
@@ -58,14 +58,16 @@ public class ExecutionService {
             if (operation != null && operation.get("next_attempt_at") != null && instant(operation, "next_attempt_at").isAfter(now())) return Optional.empty();
             if (operation != null && num(operation, "attempt") >= 3) {
                 db.update("UPDATE order_tasks SET status='RETRYABLE' WHERE id=?", taskId);
+                db.update("UPDATE task_operations SET status='RETRYABLE',lease_token=NULL,lease_until=NULL WHERE task_id=?",taskId);
                 exception(order, taskId, "ATTEMPTS_EXHAUSTED", "HIGH", "RETRY", "Undispatched claim attempts exhausted");
+                changed(order,"ATTEMPTS_EXHAUSTED","Undispatched claim attempts exhausted",null,"oms-executor");
                 return Optional.empty();
             }
             String key = ensureOperation(order, task);
             String token = UUID.randomUUID().toString();
             int attempt = operation == null ? 1 : num(operation, "attempt") + 1;
-            db.update("UPDATE task_operations SET status='CLAIMED',lease_token=?,lease_until=?,worker_id=?,attempt=?,updated_at=CURRENT_TIMESTAMP WHERE operation_key=?",
-                    token, Timestamp.from(now().plus(duration)), workerId, attempt, key);
+            db.update("UPDATE task_operations SET status='CLAIMED',lease_token=?,lease_until=clock_timestamp()+(? * interval '1 millisecond'),worker_id=?,attempt=?,next_attempt_at=clock_timestamp()+(? * interval '1 millisecond'),updated_at=CURRENT_TIMESTAMP WHERE operation_key=?",
+                    token, duration.toMillis(), workerId, attempt, duration.toMillis()+backoffSeconds(attempt)*1000L, key);
             db.update("UPDATE order_tasks SET status='CLAIMED' WHERE id=?", taskId);
             return Optional.of(new Lease(key, taskId, str(order, "id"), token, attempt));
         });
@@ -92,7 +94,7 @@ public class ExecutionService {
                 }
                 activation(order, task, lease.operationKey());
             } else if (!MANUAL.contains(kind)) throw OrderProblem.invalid("Unsupported pinned task kind");
-            db.update("UPDATE task_operations SET status='WAITING_EXTERNAL',deadline_at=?,updated_at=CURRENT_TIMESTAMP WHERE task_id=?",
+            db.update("UPDATE task_operations SET status='WAITING_EXTERNAL',deadline_at=?,dispatch_generation=dispatch_generation+1,last_dispatched_at=clock_timestamp(),updated_at=CURRENT_TIMESTAMP WHERE task_id=?",
                     Timestamp.from(now().plus(Duration.ofDays(1))), lease.taskId());
             db.update("UPDATE order_tasks SET status='WAITING_EXTERNAL',dispatched_at=COALESCE(dispatched_at,CURRENT_TIMESTAMP) WHERE id=?", lease.taskId());
             db.update("UPDATE orders SET status='IN_PROGRESS' WHERE id=?", lease.orderId());
@@ -103,7 +105,25 @@ public class ExecutionService {
     public void dispatchReady(int limit) {
         if (!enabled) return;
         if (limit < 1 || limit > 100) throw OrderProblem.invalid("Batch size must be 1..100");
-        var ids = db.queryForList("SELECT id FROM order_tasks WHERE status IN ('READY','CLAIMED') ORDER BY id LIMIT ?", String.class, limit);
+        if (scopes.isEmpty()) return;
+        String placeholders = String.join(",",Collections.nCopies(scopes.size(),"?"));
+        var args = new ArrayList<Object>(scopes); args.add(limit);
+        var ids = db.queryForList("""
+            SELECT t.id FROM order_tasks t JOIN orders o ON o.id=t.order_id JOIN order_lines l ON l.id=t.line_id
+            LEFT JOIN task_operations op ON op.task_id=t.id
+            WHERE o.scope_id IN (%s) AND o.is_deleted=false AND o.manual_hold=false
+              AND o.status IN ('SUBMITTED','IN_PROGRESS') AND t.status IN ('READY','CLAIMED')
+              AND NOT EXISTS (SELECT 1 FROM order_holds h WHERE h.order_id=o.id)
+              AND (op.status IS NULL OR op.status IN ('CLAIMED','RETRYABLE'))
+              AND (op.lease_until IS NULL OR op.lease_until<=clock_timestamp())
+              AND (op.next_attempt_at IS NULL OR op.next_attempt_at<=clock_timestamp())
+              AND l.cancelled<l.ordered
+              AND ((t.kind='SHIPMENT' AND l.allocated>0) OR (t.kind='DELIVERY' AND l.shipped>l.delivered)
+                OR (t.kind NOT IN ('SHIPMENT','DELIVERY') AND NOT EXISTS
+                  (SELECT 1 FROM order_task_dependencies d JOIN order_tasks p ON p.id=d.predecessor_id
+                   WHERE d.task_id=t.id AND p.status NOT IN ('SUCCESS','CANCELLED'))))
+            ORDER BY op.updated_at NULLS FIRST,t.id LIMIT ?
+            """.formatted(placeholders), String.class, args.toArray());
         for (String id : ids) claim(id, "oms-executor", Duration.ofSeconds(30)).ifPresent(lease -> {
             try { dispatch(lease); }
             catch (OrderProblem conflict) { if (conflict.status() != 409) throw conflict; }
@@ -160,10 +180,10 @@ public class ExecutionService {
             var task = task(taskId);
             if (!orderId.equals(str(task, "order_id"))) throw OrderProblem.missing();
             var operation = operation(taskId);
-            if (operation == null || !"RETRYABLE".equals(str(task, "status")) || task.get("dispatched_at") != null)
+            if (operation == null || !"RETRYABLE".equals(str(task, "status")) || (task.get("dispatched_at") != null && !hasNoEffectProof(operation)))
                 throw OrderProblem.conflict("Unknown or dispatched work must be reconciled before retry");
             if (held(order) || terminal(order)) throw OrderProblem.conflict("Order cannot dispatch");
-            db.update("UPDATE task_operations SET status='RETRYABLE',attempt=0,next_attempt_at=CURRENT_TIMESTAMP,lease_token=NULL,lease_until=NULL WHERE task_id=?", taskId);
+            db.update("UPDATE task_operations SET status='RETRYABLE',attempt=0,next_attempt_at=clock_timestamp()+interval '5 seconds',lease_token=NULL,lease_until=NULL WHERE task_id=?", taskId);
             db.update("UPDATE order_tasks SET status='READY' WHERE id=?", taskId);
             resolveTaskExceptions(taskId);
         });
@@ -176,7 +196,10 @@ public class ExecutionService {
     public void reconcileDue(int limit) {
         if (!enabled) return;
         if (limit < 1 || limit > 100) throw OrderProblem.invalid("Batch size must be 1..100");
-        var ids = db.queryForList("SELECT DISTINCT order_id FROM task_operations WHERE (status='WAITING_EXTERNAL' AND deadline_at<clock_timestamp()) OR (status='CLAIMED' AND lease_until<clock_timestamp()) LIMIT ?", String.class, limit);
+        if(scopes.isEmpty()) return;
+        var args=new ArrayList<Object>(scopes);args.add(limit);
+        String placeholders=String.join(",",Collections.nCopies(scopes.size(),"?"));
+        var ids = db.queryForList("SELECT DISTINCT op.order_id FROM task_operations op JOIN orders o ON o.id=op.order_id WHERE o.scope_id IN ("+placeholders+") AND ((op.status='WAITING_EXTERNAL' AND op.deadline_at<clock_timestamp()) OR (op.status='CLAIMED' AND op.attempt>=3 AND op.lease_until<clock_timestamp())) ORDER BY op.order_id LIMIT ?", String.class, args.toArray());
         for (String id : ids) tx.executeWithoutResult(t -> {
             var order = lockOrder(id);
             if (!allowed(order)) return;
@@ -224,6 +247,58 @@ public class ExecutionService {
         });
     }
 
+    /** Called by the evidence writer after persisting release or expiry, in the same transaction. */
+    public void refreshLineReadiness(String orderId,String lineId,String evidenceReference,Instant occurredAt) {
+        validateEvidence(evidenceReference,occurredAt);
+        tx.executeWithoutResult(t -> {
+            var order=lockOrder(orderId);
+            access.require("oms:evidence",str(order,"scope_id"),str(order,"customer_id"));
+            var line=line(lineId);if(!orderId.equals(str(line,"order_id"))) throw OrderProblem.missing();
+            if(num(line,"cancelled")<num(line,"ordered") && !completeQuantity("ALLOCATION",line)) {
+                var allocation=db.queryForList("SELECT id FROM order_tasks WHERE order_id=? AND line_id=? AND kind='ALLOCATION' AND status='SUCCESS'",orderId,lineId);
+                for(var task:allocation) {
+                    db.update("UPDATE order_tasks SET status='WAITING_EXTERNAL' WHERE id=?",str(task,"id"));
+                    db.update("UPDATE task_operations SET status='WAITING_EXTERNAL',lease_token=NULL,lease_until=NULL,deadline_at=clock_timestamp()+interval '1 day' WHERE task_id=?",str(task,"id"));
+                }
+            }
+            if(num(line,"allocated")==0) {
+                var shipments=db.queryForList("SELECT id FROM order_tasks WHERE order_id=? AND line_id=? AND kind='SHIPMENT' AND status IN ('READY','CLAIMED')",orderId,lineId);
+                for(var task:shipments) {
+                    db.update("UPDATE order_tasks SET status='BLOCKED' WHERE id=?",str(task,"id"));
+                    db.update("UPDATE task_operations SET status='RETRYABLE',lease_token=NULL,lease_until=NULL WHERE task_id=?",str(task,"id"));
+                }
+            }
+            releaseDependencies(orderId);
+            changed(order,"READINESS_REFRESHED","Readiness recomputed from verified quantity evidence",evidenceReference,access.actor());
+        });
+    }
+
+    /** Authoritative provider no-effect evidence is required; a timeout is never such evidence. */
+    public void recordNoEffect(String orderId,String taskId,Command command,String evidenceReference,Instant occurredAt) {
+        validateEvidence(evidenceReference,occurredAt);
+        command(orderId,"NO_EFFECT:"+taskId+":"+evidenceReference+":"+occurredAt,command,order -> {
+            var task=task(taskId);if(!orderId.equals(str(task,"order_id"))) throw OrderProblem.missing();
+            var operation=operation(taskId);
+            if(operation==null || !"UNKNOWN".equals(str(operation,"status")) || num(operation,"dispatch_generation")<1)
+                throw OrderProblem.conflict("No unknown dispatched operation to reconcile");
+            if(occurredAt.isBefore(instant(operation,"last_dispatched_at"))) throw OrderProblem.invalid("Reconciliation predates latest dispatch");
+            db.update("INSERT INTO operation_reconciliations(id,operation_key,dispatch_generation,result,evidence_reference,occurred_at,actor,reason) VALUES(?,?,?,'NO_EFFECT',?,?,?,?)",
+                UUID.randomUUID().toString(),str(operation,"operation_key"),num(operation,"dispatch_generation"),evidenceReference,Timestamp.from(occurredAt),access.actor(),command.reason());
+            db.update("UPDATE task_operations SET status='RETRYABLE',lease_token=NULL,lease_until=NULL WHERE task_id=?",taskId);
+            db.update("UPDATE order_tasks SET status='RETRYABLE' WHERE id=?",taskId);
+            resolveTaskExceptions(taskId);
+        });
+    }
+
+    private boolean hasNoEffectProof(Map<String,Object> operation) {
+        return db.queryForObject("SELECT COUNT(*) FROM operation_reconciliations WHERE operation_key=? AND dispatch_generation=? AND result='NO_EFFECT'",Integer.class,str(operation,"operation_key"),num(operation,"dispatch_generation"))>0;
+    }
+    private static long backoffSeconds(int attempt) { return Math.min(300,5L << Math.min(6,Math.max(0,attempt-1))); }
+    private static void validateEvidence(String reference,Instant occurredAt) {
+        text(reference,500,"evidence reference");
+        if(occurredAt==null || occurredAt.isAfter(now().plusSeconds(300))) throw OrderProblem.invalid("Valid evidence timestamp required");
+    }
+
     private void activation(Map<String,Object> order, Map<String,Object> task, String key) {
         var source = json.readValue(str(order, "snapshot_json"), AcceptedOrderSnapshot.class);
         var line = line(str(task, "line_id"));
@@ -240,6 +315,8 @@ public class ExecutionService {
         String id = str(order, "id");
         var expired = db.queryForList("SELECT * FROM task_operations WHERE order_id=? AND status='WAITING_EXTERNAL' AND deadline_at<clock_timestamp()", id);
         for (var op : expired) unknown(order, str(op, "task_id"), "Acknowledgment deadline expired; outcome remains unknown");
+        var exhausted=db.queryForList("SELECT task_id FROM task_operations WHERE order_id=? AND status='CLAIMED' AND lease_until<clock_timestamp() AND attempt>=3",id);
+        for(var operation:exhausted) exception(order,str(operation,"task_id"),"ATTEMPTS_EXHAUSTED","HIGH","RETRY","Undispatched claim attempts exhausted");
         db.update("UPDATE order_tasks SET status='RETRYABLE' WHERE order_id=? AND id IN (SELECT task_id FROM task_operations WHERE status='CLAIMED' AND lease_until<clock_timestamp() AND attempt>=3)", id);
         db.update("UPDATE task_operations SET status='RETRYABLE',lease_token=NULL,lease_until=NULL WHERE order_id=? AND status='CLAIMED' AND lease_until<clock_timestamp() AND attempt>=3", id);
         releaseDependencies(id);deriveTerminal(id);
