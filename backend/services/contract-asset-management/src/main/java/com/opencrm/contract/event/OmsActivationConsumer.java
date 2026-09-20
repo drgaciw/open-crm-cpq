@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -21,17 +20,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class OmsActivationConsumer {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
-    private final Set<String> scopes;
-    public OmsActivationConsumer(JdbcTemplate jdbc,ObjectMapper mapper,@Value("${oms.trusted-source-scopes:}") String scopes) {
-        this.jdbc=jdbc;this.mapper=mapper;
-        this.scopes=Set.copyOf(Arrays.stream(scopes.split(",")).map(String::trim).filter(s->!s.isEmpty()).toList());
+    private final OmsSourceRegistry sources;
+    private final OmsBrokerTrust trust;
+    public OmsActivationConsumer(JdbcTemplate jdbc,ObjectMapper mapper,OmsSourceRegistry sources,OmsBrokerTrust trust) {
+        this.jdbc=jdbc;this.mapper=mapper;this.sources=sources;this.trust=trust;
     }
     @Transactional
     @KafkaListener(topics="oms.activation-requested.v1",groupId="contract-oms-activation-v1")
     public void accept(String payload) throws Exception {
         ActivationRequest r=mapper.readValue(payload,ActivationRequest.class);
-        if (!scopes.contains(r.scopeId())) throw new IllegalArgumentException("Untrusted activation scope");
+        trust.requireScope(r.scopeId());
         var arr=ActivationTerms.arr(r);
+        sources.requireSource(r);
         String business=hash(mapper.writeValueAsString(List.of(r.scopeId(),r.quoteId(),r.acceptedRevision(),r.line().sourceLineId())));
         var normalized=mapper.valueToTree(r);((com.fasterxml.jackson.databind.node.ObjectNode)normalized).remove("eventId");
         String requestHash=hash(mapper.writeValueAsString(normalized));
@@ -46,9 +46,6 @@ public class OmsActivationConsumer {
         if (!existing.isEmpty()) {
             if (existing.size()!=1 || !requestHash.equals(existing.getFirst().get("request_hash"))) throw new IllegalStateException("Activation identity conflict");
             return;
-        }
-        if (jdbc.queryForObject("SELECT count(*) FROM subscriptions WHERE quote_id=? AND subscription_number NOT LIKE 'OMS-%'",Integer.class,r.quoteId())>0) {
-            throw new IllegalStateException("Legacy subscription requires reconciliation before activation");
         }
         String subscription=UUID.randomUUID().toString();
         jdbc.update("INSERT INTO subscriptions(uuid,subscription_number,customer_id,quote_id,status,plan_name,start_date,end_date,mrr,arr,currency_code,erp_sync_status,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",

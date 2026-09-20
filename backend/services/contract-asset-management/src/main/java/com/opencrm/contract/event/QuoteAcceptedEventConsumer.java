@@ -27,6 +27,7 @@ public class QuoteAcceptedEventConsumer {
     private final ErpAdapter erpAdapter;
     private final ObjectMapper objectMapper;
     private final LegacyOwnershipPolicy ownershipPolicy;
+    private final OmsSourceRegistry sourceRegistry;
     
     @KafkaListener(topics = KafkaTopics.QUOTE_STATUS_ACCEPTED, groupId = "contract-asset-management")
     @Transactional
@@ -34,6 +35,7 @@ public class QuoteAcceptedEventConsumer {
         try {
             if (!ownershipPolicy.legacyAllowed(objectMapper.readTree(message))) return;
             QuoteAcceptedEvent event = objectMapper.readValue(message, QuoteAcceptedEvent.class);
+            if (!sourceRegistry.permitsLegacy(event.getQuoteId())) return;
             
             log.info("Received quote accepted event for quote: {}", event.getQuoteId());
             
