@@ -1,0 +1,20 @@
+{
+  "name": "cpq-orders",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/orders/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": ["scope:cpq", "type:feature", "domain:order"],
+  "targets": {
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": ["{options.reportsDirectory}"],
+      "options": {
+        "reportsDirectory": "{projectRoot}/../../../coverage/libs/cpq/orders"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
