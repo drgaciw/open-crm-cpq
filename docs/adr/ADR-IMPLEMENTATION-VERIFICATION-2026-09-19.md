@@ -4,7 +4,7 @@
 
 **Question:** are the ADRs in [docs/adr/](README.md) actually implemented in the project?
 
-**Answer:** 11 of 13 fully implemented and verified; **ADR-002 is partial by design** (decision Accepted, GLM-5 runtime deliberately not landed — Azure OpenAI `gpt-4o` runs instead); **ADR-005's mechanism is implemented but its decision is intentionally still Proposed** (flag stays `true`).
+**Current interpretation:** The historical verdicts below are not a completeness score. ADR-001/002 are superseded decisions; ADR-005 remains a held operational cutover. Subsequent source review found four standalone database defaults, shared pricing/pricebook migration ownership, missing completed canonical approval history, and a legacy local-write compatibility exception. The implementation and its validation are tracked in [ADR gap implementation](../adr-gap-implementation.md). ADR-014 requires separate implementation and rollout evidence; the historical Jev scores do not establish it.
 
 ---
 
