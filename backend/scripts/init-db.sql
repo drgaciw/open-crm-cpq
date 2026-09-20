@@ -9,6 +9,10 @@ CREATE SCHEMA IF NOT EXISTS product;
 CREATE SCHEMA IF NOT EXISTS quote;
 CREATE SCHEMA IF NOT EXISTS communication;
 CREATE SCHEMA IF NOT EXISTS ai;
+CREATE SCHEMA IF NOT EXISTS configuration;
+CREATE SCHEMA IF NOT EXISTS approval;
+CREATE SCHEMA IF NOT EXISTS document;
+CREATE SCHEMA IF NOT EXISTS contract;
 
 -- Create application user with limited privileges
 DO $$
@@ -29,6 +33,14 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA crm, cpq, pricing, product, quote, communicat
     GRANT ALL PRIVILEGES ON SEQUENCES TO opencrm_app;
 
 -- Enable required extensions
+GRANT USAGE ON SCHEMA configuration, approval, document, contract TO opencrm_app;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA configuration, approval, document, contract TO opencrm_app;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA configuration, approval, document, contract TO opencrm_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA configuration, approval, document, contract
+    GRANT ALL PRIVILEGES ON TABLES TO opencrm_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA configuration, approval, document, contract
+    GRANT ALL PRIVILEGES ON SEQUENCES TO opencrm_app;
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";     -- For fuzzy text search
 -- pgvector extension (requires pgvector image, uncomment when needed)
