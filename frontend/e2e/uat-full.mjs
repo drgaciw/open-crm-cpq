@@ -8,6 +8,7 @@
  *   npm run e2e:uat -- --no-jev              # deterministic suites only; no API key needed
  *   npm run e2e:uat -- --strict              # known-defect tolerance off: expected FAILs count
  *   npm run e2e:uat -- --sweep               # delete UAT-* leftovers from older runs, then exit
+ *   npm run e2e:uat -- --name leads          # evidence file stem (default uat-full)
  *
  * Suites and hypotheses are auto-discovered from uat/suites and uat/hypotheses, so adding one
  * never means editing this file.
@@ -39,15 +40,30 @@ const option = (name) => {
 const onlySuites = option('suite');
 const onlyChecks = option('only');
 const useJev = !flag('no-jev');
+// Separate evidence file per invocation, so concurrent runs do not overwrite each other.
+const reportName = option('name')?.[0] ?? 'uat-full';
 const runId = newRunId();
 
-async function discover(folder) {
+/**
+ * Import every module in a folder. By convention a suite file is named after its suite id, so
+ * `--suite` filters by file name *before* importing: a half-written suite elsewhere (several
+ * authors work in this tree at once) can then never break an unrelated run. Whatever still
+ * fails to import is reported per file instead of aborting the whole run.
+ */
+async function discover(folder, { names = null, onError } = {}) {
   const dir = resolve(HERE, 'uat', folder);
-  const files = readdirSync(dir).filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs')).sort();
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs'))
+    .filter((f) => !names || names.includes(f.replace(/\.mjs$/, '')))
+    .sort();
   const modules = [];
   for (const file of files) {
-    const loaded = await import(pathToFileURL(resolve(dir, file)).href);
-    modules.push(loaded.default);
+    try {
+      const loaded = await import(pathToFileURL(resolve(dir, file)).href);
+      modules.push(loaded.default);
+    } catch (error) {
+      onError?.(file, error);
+    }
   }
   return modules;
 }
@@ -72,7 +88,7 @@ async function sweep(api, report) {
   }
 }
 
-const report = createReport('uat-full', { strict: flag('strict'), dir: resolve(HERE, '..', '.ci-tmp', 'uat-full') });
+const report = createReport(reportName, { strict: flag('strict'), dir: resolve(HERE, '..', '.ci-tmp', 'uat-full') });
 const evidenceDir = resolve(HERE, '..', '.ci-tmp', 'uat-full', 'evidence');
 let browser;
 let preflight = {};
@@ -93,8 +109,11 @@ try {
       report.info(`preflight.${key}`, `${result.state}${result.status ? ` (HTTP ${result.status})` : ''} — gates: ${result.gates}`);
     }
 
-    const hypotheses = (await discover('hypotheses')).flat();
-    const suites = (await discover('suites')).filter((s) => !onlySuites || onlySuites.includes(s.id));
+    const importFailed = (folder) => (file, error) =>
+      report.fail(`discover.${folder}.${file}`, String(error?.message ?? error).split('\n')[0]);
+    const hypotheses = (await discover('hypotheses', { onError: importFailed('hypotheses') })).flat();
+    const suites = (await discover('suites', { names: onlySuites, onError: importFailed('suites') }))
+      .filter((s) => !onlySuites || onlySuites.includes(s.id));
     if (onlySuites && !suites.length) throw new Error(`no suite matches --suite ${onlySuites.join(',')}`);
 
     /** Lazily built so deterministic suites never need an API key. */
