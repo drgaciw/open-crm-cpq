@@ -10,7 +10,8 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subscription } from 'rxjs';
+import { Subscription, catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { PendingOperations, definitiveRejection } from './pending-operations';
 import { OrdersService, orderError } from './orders.service';
 import { OrderException } from './orders.model';
 
@@ -56,6 +57,9 @@ import { OrderException } from './orders.model';
     @if (error()) {
       <p role="alert" class="error">{{ error() }}</p>
     }
+    @if (signInRequired()) {
+      <a href="/oauth2/authorization/oms">Sign in to OMS</a>
+    }
     @if (notice()) {
       <p role="status" class="notice">{{ notice() }}</p>
     }
@@ -92,7 +96,12 @@ import { OrderException } from './orders.model';
                   row.lastOccurredAt | date: 'medium'
                 }}
               </td>
-              <td>{{ row.status }}</td>
+              <td>
+                {{ row.status }}
+                @if (blocked().has(row.id)) {
+                  <span>Earlier command unresolved</span>
+                }
+              </td>
               <td>
                 <button
                   type="button"
@@ -131,7 +140,18 @@ import { OrderException } from './orders.model';
           Assignment needs oms:assign. Recovery needs oms:recover; unknown
           outcomes must reconcile before retry.
         </p>
-        <fieldset [disabled]="pending() || stale() || loading()">
+        @if (blocked().has(item.id)) {
+          <p role="status">
+            An earlier command is unresolved. Reload checks its original
+            operation key. Ask an operator to reconcile before sending another
+            recovery command.
+          </p>
+        }
+        <fieldset
+          [disabled]="
+            pending() || stale() || loading() || blocked().has(item.id)
+          "
+        >
           <label
             >Recovery reason<textarea
               [(ngModel)]="reason"
@@ -158,6 +178,7 @@ import { OrderException } from './orders.model';
 export class OrdersExceptionsComponent implements OnInit {
   private readonly api = inject(OrdersService);
   private readonly destroy = inject(DestroyRef);
+  private readonly journal = inject(PendingOperations);
   private request?: Subscription;
   readonly rows = signal<OrderException[]>([]);
   readonly selected = signal<OrderException | null>(null);
@@ -166,6 +187,8 @@ export class OrdersExceptionsComponent implements OnInit {
   readonly stale = signal(false);
   readonly error = signal('');
   readonly notice = signal('');
+  readonly blocked = signal(new Set<string>());
+  readonly signInRequired = signal(false);
   readonly page = signal(0);
   readonly pages = signal(0);
   status = 'OPEN';
@@ -185,9 +208,57 @@ export class OrdersExceptionsComponent implements OnInit {
     this.rows.set([]);
     this.request = this.api
       .exceptions(page, this.status)
-      .pipe(takeUntilDestroyed(this.destroy))
+      .pipe(
+        switchMap((data) => {
+          const requests = data.content.flatMap((row) =>
+            this.journal.read('exception', row.id).map((entry) =>
+              this.api.operation('exception', row.id, entry.operationKey).pipe(
+                map((outcome) => ({
+                  id: row.id,
+                  orderId: row.orderId,
+                  outcome,
+                })),
+                catchError(() => of(null)),
+              ),
+            ),
+          );
+          return (requests.length ? forkJoin(requests) : of([])).pipe(
+            map((outcomes) => ({ data, outcomes })),
+          );
+        }),
+        takeUntilDestroyed(this.destroy),
+      )
       .subscribe({
-        next: (data) => {
+        next: ({ data, outcomes }) => {
+          this.signInRequired.set(false);
+          try {
+            for (const result of outcomes)
+              if (
+                result?.outcome.status === 'SUCCEEDED' &&
+                result.outcome.orderId === result.orderId
+              )
+                this.journal.complete(
+                  'exception',
+                  result.id,
+                  result.outcome.operationKey,
+                );
+            this.blocked.set(
+              new Set(
+                data.content
+                  .filter(
+                    (row) => this.journal.read('exception', row.id).length > 0,
+                  )
+                  .map((row) => row.id),
+              ),
+            );
+          } catch {
+            this.error.set(
+              'Cannot update the operation journal. Ask an operator to reconcile.',
+            );
+            this.loading.set(false);
+            this.stale.set(true);
+            return;
+          }
           this.rows.set(data.content);
           this.page.set(data.number);
           this.pages.set(data.totalPages);
@@ -195,6 +266,7 @@ export class OrdersExceptionsComponent implements OnInit {
           this.stale.set(false);
         },
         error: (error) => {
+          this.signInRequired.set(error?.status === 401);
           this.error.set(orderError(error));
           this.loading.set(false);
           this.stale.set(true);
@@ -233,7 +305,14 @@ export class OrdersExceptionsComponent implements OnInit {
   }
   private run(action: 'assign' | 'resolve', extra: Record<string, unknown>) {
     const row = this.selected();
-    if (!row || this.pending() || this.stale() || this.loading()) return;
+    if (
+      !row ||
+      this.pending() ||
+      this.stale() ||
+      this.loading() ||
+      this.blocked().has(row.id)
+    )
+      return;
     if (!this.reason.trim()) {
       this.error.set('A recovery reason is required.');
       return;
@@ -241,16 +320,39 @@ export class OrdersExceptionsComponent implements OnInit {
     this.pending.set(true);
     this.error.set('');
     this.notice.set('');
+    const operationKey = crypto.randomUUID();
+    try {
+      this.journal.begin('exception', row.id, {
+        operationKey,
+        action,
+        expectedVersion: row.version,
+      });
+      this.blocked.set(new Set([...this.blocked(), row.id]));
+    } catch {
+      this.pending.set(false);
+      this.stale.set(true);
+      this.error.set(
+        'Cannot preserve this operation safely. No recovery command was sent.',
+      );
+      return;
+    }
     this.api
       .exceptionCommand(row.id, action, {
         ...extra,
         expectedVersion: row.version,
         reason: this.reason.trim(),
-        operationKey: crypto.randomUUID(),
+        operationKey,
       })
       .pipe(takeUntilDestroyed(this.destroy))
       .subscribe({
         next: (response) => {
+          if (response.status !== 202) {
+            try {
+              this.journal.complete('exception', row.id, operationKey);
+            } catch {
+              /* Reload verifies persisted outcome. */
+            }
+          }
           this.pending.set(false);
           this.notice.set(
             response.status === 202
@@ -260,6 +362,14 @@ export class OrdersExceptionsComponent implements OnInit {
           this.load(this.page());
         },
         error: (error) => {
+          if (definitiveRejection(error)) {
+            try {
+              this.journal.complete('exception', row.id, operationKey);
+            } catch {
+              /* Preserve gate if storage fails. */
+            }
+          }
+          this.signInRequired.set(error?.status === 401);
           this.pending.set(false);
           this.stale.set(true);
           this.error.set(orderError(error));

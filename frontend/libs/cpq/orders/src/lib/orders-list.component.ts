@@ -48,10 +48,25 @@ import { ORDER_STATUSES, OrderView } from './orders.model';
         >Customer ID<input name="customer" [(ngModel)]="customerId"
       /></label>
       <button type="submit">Apply filters</button>
+      <label
+        >External reference<input
+          name="externalReference"
+          [(ngModel)]="externalReference"
+      /></label>
+      <label
+        >Exceptions<select name="hasExceptions" [(ngModel)]="hasExceptions">
+          <option value="">Any</option>
+          <option value="true">Has exceptions</option>
+          <option value="false">No exceptions</option>
+        </select></label
+      >
     </form>
     @if (error()) {
       <p role="alert" class="error">{{ error() }}</p>
       <button type="button" (click)="load(page())">Retry loading</button>
+    }
+    @if (signInRequired()) {
+      <a href="/oauth2/authorization/oms">Sign in to OMS</a>
     }
     @if (loading()) {
       <p role="status">Loading orders…</p>
@@ -85,7 +100,10 @@ import { ORDER_STATUSES, OrderView } from './orders.model';
                   <td>
                     <span class="badge">{{ row.status }}</span>
                   </td>
-                  <td>{{ row.snapshot.currency }} {{ row.snapshot.total }}</td>
+                  <td>
+                    {{ row.snapshot.currency }}
+                    {{ row.snapshot.total ?? 'Missing source amount' }}
+                  </td>
                 </tr>
               }
             </tbody>
@@ -162,6 +180,7 @@ export class OrdersListComponent implements OnInit {
   readonly rows = signal<OrderView[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
+  readonly signInRequired = signal(false);
   readonly page = signal(0);
   readonly total = signal(0);
   readonly totalPages = signal(0);
@@ -170,6 +189,8 @@ export class OrdersListComponent implements OnInit {
   q = '';
   status = '';
   customerId = '';
+  externalReference = '';
+  hasExceptions = '';
   snapshotId = '';
   quoteId = '';
   revision = 1;
@@ -186,10 +207,13 @@ export class OrdersListComponent implements OnInit {
         q: this.q,
         status: this.status,
         customerId: this.customerId,
+        externalReference: this.externalReference,
+        hasExceptions: this.hasExceptions,
       })
       .pipe(takeUntilDestroyed(this.destroy))
       .subscribe({
         next: (data) => {
+          this.signInRequired.set(false);
           this.rows.set(data.content);
           this.page.set(data.number);
           this.total.set(data.totalElements);
@@ -197,6 +221,7 @@ export class OrdersListComponent implements OnInit {
           this.loading.set(false);
         },
         error: (error) => {
+          this.signInRequired.set(error?.status === 401);
           this.error.set(orderError(error));
           this.loading.set(false);
         },
@@ -236,6 +261,7 @@ export class OrdersListComponent implements OnInit {
           void this.router.navigate(['/orders', order.id]);
         },
         error: (error) => {
+          this.signInRequired.set(error?.status === 401);
           this.converting.set(false);
           this.conversionError.set(orderError(error));
         },

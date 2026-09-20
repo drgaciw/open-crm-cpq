@@ -10,7 +10,8 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, Subscription } from 'rxjs';
+import { catchError, forkJoin, of, Subscription } from 'rxjs';
+import { PendingOperations, definitiveRejection } from './pending-operations';
 import { OrdersService, orderError } from './orders.service';
 import {
   EvidenceKind,
@@ -31,6 +32,7 @@ export class OrdersDetailComponent implements OnInit {
   private readonly api = inject(OrdersService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroy = inject(DestroyRef);
+  private readonly journal = inject(PendingOperations);
   private request?: Subscription;
   private id = '';
   readonly order = signal<OrderView | null>(null);
@@ -41,11 +43,15 @@ export class OrdersDetailComponent implements OnInit {
   readonly stale = signal(false);
   readonly error = signal('');
   readonly notice = signal('');
+  readonly unresolved = signal(0);
+  readonly signInRequired = signal(false);
   readonly evidenceKinds: EvidenceKind[] = [
     'ALLOCATION',
     'SHIPMENT',
     'DELIVERY',
     'SERVICE',
+    'PROVISION',
+    'RELEASE',
     'FINANCE_ACK',
   ];
   commandReason = '';
@@ -76,15 +82,52 @@ export class OrdersDetailComponent implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.stale.set(true);
+    let operations;
+    try {
+      operations = this.journal.read('order', this.id);
+      this.unresolved.set(operations.length);
+    } catch {
+      this.error.set(
+        'Cannot read pending operations. Ask an operator to reconcile before continuing.',
+      );
+      this.loading.set(false);
+      return;
+    }
     this.request = forkJoin({
       order: this.api.detail(this.id),
       tasks: this.api.plan(this.id),
       timeline: this.api.timeline(this.id),
+      operations: operations.length
+        ? forkJoin(
+            operations.map((entry) =>
+              this.api
+                .operation('order', this.id, entry.operationKey)
+                .pipe(catchError(() => of(null))),
+            ),
+          )
+        : of([]),
     })
       .pipe(takeUntilDestroyed(this.destroy))
       .subscribe({
         next: (data) => {
+          try {
+            for (const outcome of data.operations)
+              if (
+                outcome?.status === 'SUCCEEDED' &&
+                outcome.orderId === this.id &&
+                data.order.version >= outcome.orderVersion
+              )
+                this.journal.complete('order', this.id, outcome.operationKey);
+            this.unresolved.set(this.journal.read('order', this.id).length);
+          } catch {
+            this.error.set(
+              'Cannot update pending operation journal. Reconcile with an operator before continuing.',
+            );
+            this.loading.set(false);
+            return;
+          }
           this.order.set(data.order);
+          this.signInRequired.set(false);
           this.tasks.set(data.tasks);
           this.timeline.set(data.timeline);
           this.loading.set(false);
@@ -92,6 +135,7 @@ export class OrdersDetailComponent implements OnInit {
           this.cancelConfirmed = false;
         },
         error: (error) => {
+          this.signInRequired.set(error?.status === 401);
           this.error.set(orderError(error));
           this.loading.set(false);
           this.order.set(null);
@@ -172,7 +216,14 @@ export class OrdersDetailComponent implements OnInit {
   }
   private run(action: string, extra: Record<string, unknown>, reason: string) {
     const order = this.order();
-    if (!order || this.pending() || this.loading() || this.stale()) return;
+    if (
+      !order ||
+      this.pending() ||
+      this.loading() ||
+      this.stale() ||
+      (this.unresolved() > 0 && action !== 'reconcile')
+    )
+      return;
     if (!reason.trim()) {
       this.error.set('A reason is required for every order command.');
       return;
@@ -180,16 +231,42 @@ export class OrdersDetailComponent implements OnInit {
     this.error.set('');
     this.notice.set('');
     this.pending.set(true);
+    const operationKey = crypto.randomUUID();
+    try {
+      this.journal.begin('order', order.id, {
+        operationKey,
+        action,
+        expectedVersion: order.version,
+      });
+      this.unresolved.set(this.journal.read('order', order.id).length);
+    } catch {
+      this.pending.set(false);
+      this.stale.set(true);
+      this.error.set(
+        'Cannot preserve this operation safely. Enable session storage or ask an operator to reconcile. No command was sent.',
+      );
+      return;
+    }
     this.api
       .command(order.id, action, {
         ...extra,
         reason: reason.trim(),
         expectedVersion: order.version,
-        operationKey: crypto.randomUUID(),
+        operationKey,
       })
       .pipe(takeUntilDestroyed(this.destroy))
       .subscribe({
         next: (response) => {
+          if (response.status !== 202) {
+            try {
+              this.journal.complete('order', order.id, operationKey);
+            } catch {
+              this.stale.set(true);
+              this.error.set(
+                'Command committed, but its local journal could not be updated. Reload to check its outcome.',
+              );
+            }
+          }
           this.pending.set(false);
           this.notice.set(
             response.status === 202
@@ -199,6 +276,14 @@ export class OrdersDetailComponent implements OnInit {
           this.load();
         },
         error: (error) => {
+          if (definitiveRejection(error)) {
+            try {
+              this.journal.complete('order', order.id, operationKey);
+            } catch {
+              /* Preserve gate if storage fails. */
+            }
+          }
+          this.signInRequired.set(error?.status === 401);
           this.pending.set(false);
           this.error.set(orderError(error));
           this.stale.set(true);

@@ -8,6 +8,7 @@ import {
   OrderException,
   SourceReference,
   Command,
+  OperationStatus,
 } from './orders.model';
 
 /** Uses the shell's ApiResponse interceptor, including its Spring-page pagination projection. */
@@ -17,7 +18,13 @@ export class OrdersService {
   private readonly base = '/api/v1/orders';
   list(
     page: number,
-    filters: { q?: string; status?: string; customerId?: string } = {},
+    filters: {
+      q?: string;
+      status?: string;
+      customerId?: string;
+      externalReference?: string;
+      hasExceptions?: string;
+    } = {},
   ) {
     let params = new HttpParams().set('page', page).set('size', 20);
     for (const [key, value] of Object.entries(filters))
@@ -26,6 +33,12 @@ export class OrdersService {
   }
   detail(id: string) {
     return this.http.get<OrderView>(`${this.base}/${encodeURIComponent(id)}`);
+  }
+  operation(kind: 'order' | 'exception', id: string, key: string) {
+    const base = kind === 'order' ? this.base : '/api/v1/order-exceptions';
+    return this.http.get<OperationStatus>(
+      `${base}/${encodeURIComponent(id)}/operations/${encodeURIComponent(key)}`,
+    );
   }
   plan(id: string) {
     return this.http.get<OrderTask[]>(
