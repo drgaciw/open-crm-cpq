@@ -6,6 +6,7 @@ import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -32,6 +33,7 @@ public class CpqAgentToolClients {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public CpqAgentToolClients(
             @Value("${opencrm.gateway.base-url:http://localhost:8080}") String gatewayBaseUrl,
             ObjectMapper objectMapper) {
