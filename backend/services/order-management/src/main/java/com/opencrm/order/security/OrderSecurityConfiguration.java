@@ -1,0 +1,38 @@
+package com.opencrm.order.security;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.web.SecurityFilterChain;
+
+/** Gateway owns CSRF; domain always verifies bearer tokens, including local development. */
+@Configuration
+public class OrderSecurityConfiguration {
+    @Bean
+    SecurityFilterChain orderSecurity(HttpSecurity http,
+            @Value("${oms.security.bypass:false}") boolean bypass) throws Exception {
+        if (bypass) throw new IllegalStateException("OMS authentication bypass is forbidden");
+        return http.csrf(csrf -> csrf.disable())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.requestMatchers("/actuator/health").permitAll().anyRequest().authenticated())
+            .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults())).build();
+    }
+    @Bean
+    JwtDecoder orderJwtDecoder(@Value("${oms.security.issuer-uri}") String issuer,
+            @Value("${oms.security.jwk-set-uri}") String jwks,
+            @Value("${oms.security.audience:order-management}") String audience) {
+        if (issuer.isBlank() || jwks.isBlank() || audience.isBlank()) throw new IllegalArgumentException("OMS issuer, JWKS and audience required");
+        var decoder = NimbusJwtDecoder.withJwkSetUri(jwks).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuer),
+            jwt -> jwt.getAudience().contains(audience) ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "OMS audience required", null))));
+        return decoder;
+    }
+}
