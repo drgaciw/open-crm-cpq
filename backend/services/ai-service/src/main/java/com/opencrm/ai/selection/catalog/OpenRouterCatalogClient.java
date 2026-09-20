@@ -122,6 +122,10 @@ public final class OpenRouterCatalogClient {
                 .put("expiresAt", snapshot.expiresAt().toString()).put("rawHash", hash);
         persisted.set("endpoints", json.valueToTree(endpoints));
         ObjectNode evidence = persisted.deepCopy();
+        evidence.put("source", base.toString());
+        evidence.put("currency", "USD");
+        evidence.put("tokenPriceUnit", "per_token");
+        evidence.put("requestPriceUnit", "per_request");
         evidence.set("rawResponses", raw);
         evidence.set("excluded", excluded);
         evidence.put("coverage", shortlist == null ? "full_catalog" : "explicit_shortlist");

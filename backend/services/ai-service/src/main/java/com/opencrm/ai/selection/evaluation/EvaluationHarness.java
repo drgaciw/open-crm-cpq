@@ -23,7 +23,12 @@ public final class EvaluationHarness {
                     || repetitions < 1 || maximumCandidates < 1) throw new IllegalArgumentException("Explicit evaluation settings required");
         }
     }
-    public record Generated(String rawResponse, BigDecimal actualCost) { }
+    public record Generated(String rawResponse, BigDecimal actualCost, Usage usage, String model, String provider) {
+        /** Offline fixture compatibility; absent usage is unknown, not zero. */
+        public Generated(String rawResponse, BigDecimal actualCost) {
+            this(rawResponse, actualCost, null, null, null);
+        }
+    }
     public interface CandidateExecutor {
         /** Guaranteed upper bound for one bounded call, including any overhead. Unknown prices must reject. */
         BigDecimal maximumCost(Endpoint candidate, TaskProfile profile, Fixture fixture);
@@ -31,7 +36,8 @@ public final class EvaluationHarness {
         Generated generate(Endpoint candidate, TaskProfile profile, Fixture fixture) throws Exception;
     }
     public record Sample(String candidateId, String fixtureId, int repetition, String rawResponse,
-                         boolean passed, boolean heldOut, long latencyMillis, BigDecimal cost, String failure) { }
+                         boolean passed, boolean heldOut, long latencyMillis, BigDecimal cost, String failure,
+                         Usage usage, String model, String provider) { }
     public record CandidateResult(String candidateId, String endpointKey, EvaluationEvidence evidence,
                                   List<Sample> samples, List<JevDecisionAdapter.Exchange> evaluatorExchanges,
                                   String reason, BigDecimal confidenceSquaredError) { }
@@ -76,10 +82,15 @@ public final class EvaluationHarness {
                         BigDecimal sampleBefore = budget.spent();
                         long started = System.nanoTime();
                         String raw = "", failure = "";
+                        Usage usage = null;
+                        String model = null, provider = null;
                         boolean passed = false;
                         try {
                             Generated generated = executor.generate(endpoint, profile, fixture);
                             raw = generated.rawResponse();
+                            usage = generated.usage();
+                            model = generated.model();
+                            provider = generated.provider();
                             reservation.reconcile(generated.actualCost());
                             passed = parse(fixture.expectedJson()).equals(parse(raw));
                         } catch (InterruptedException ex) {
@@ -90,7 +101,7 @@ public final class EvaluationHarness {
                         }
                         samples.add(new Sample(candidateId, fixture.id(), repetition, raw, passed, fixture.heldOut(),
                                 Duration.ofNanos(System.nanoTime() - started).toMillis(),
-                                budget.spent().subtract(sampleBefore).add(reserved), failure));
+                                budget.spent().subtract(sampleBefore).add(reserved), failure, usage, model, provider));
                         if (budget.breached()) throw new EvaluationBudget.Exhausted();
                     }
                 }

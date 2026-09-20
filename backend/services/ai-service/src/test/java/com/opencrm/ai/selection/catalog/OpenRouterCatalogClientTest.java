@@ -82,6 +82,10 @@ class OpenRouterCatalogClientTest {
         assertThat(restored).usingRecursiveComparison()
                 .withComparatorForType(java.math.BigDecimal::compareTo, java.math.BigDecimal.class).isEqualTo(snapshot);
         var persisted = json.readTree(Files.readString(snapshots.resolve(snapshot.version() + ".evidence.json")));
+        assertThat(persisted.path("source").asText()).isEqualTo("http://127.0.0.1:" + server.getAddress().getPort() + "/api/v1/");
+        assertThat(persisted.path("currency").asText()).isEqualTo("USD");
+        assertThat(persisted.path("tokenPriceUnit").asText()).isEqualTo("per_token");
+        assertThat(persisted.path("requestPriceUnit").asText()).isEqualTo("per_request");
         assertThat(persisted.path("rawResponses").path("models").asText()).isEqualTo(models);
         assertThat(persisted.toString()).doesNotContain("test-key");
         assertThat(persisted.path("rawHash").asText()).isEqualTo(snapshot.rawHash());

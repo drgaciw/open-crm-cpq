@@ -13,7 +13,7 @@
 | Frontend | Vue 3 / Frappe UI | Angular **22** Nx CRM app + CPQ libs (catalog, quotes, approvals, price-books, pricing-customers, rule-sets, product-bundles, simulator); **signals + HttpClient**, **not** NgRx | NgRx 19+ (**held**); customer-portal / admin-console apps |
 | Database | MariaDB 10.6 | PostgreSQL 16 + pgvector (compose); schemas per service | Same + production Azure |
 | Infrastructure | Docker / GitHub Actions | Docker Compose local; **Jenkins primary CI** (GHA `workflow_dispatch` fallback) — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
-| AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`) | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md): Jev selects qualifying OpenRouter models at lowest total cost; **implementation backlog**; supersedes GLM-5 ADR-002 |
+| AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`) | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md): Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending**; supersedes GLM-5 ADR-002 |
 | Rules | None | Drools DRL on pricing-service; CE `ProductRuleEvaluationCore`; OpenL **not** required for forge | OpenL Tablets + full Drools |
 
 **Current implementation status (2026-09-13):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities API **does not exist** — do not invent `/api/v1/activities/**`. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
@@ -226,7 +226,7 @@ Before marking any task as complete, verify:
 | Dual-read approvals | `${APPROVALS_LEGACY_LOCAL_READ:true}` — [ADR-005 Proposed](docs/adr/ADR-005-approvals-legacy-dual-read.md); J5 gate; hold **J–W** | Flip to `false` is **HIGH** — not authorized |
 | API entities | Subscription + configuration-session + approval-routing + document-job APIs are DTO-only (O3 + W1–W3 on `main`) — [ADR-006 Accepted](docs/adr/ADR-006-entities-never-at-api-boundary.md) | Subscriptions **FE** held; do **not** re-expose JPA entities at `/api/v1/**` |
 | Frontend state | Signals + service HTTP | NgRx 19+ **held** |
-| AI | Runtime **Azure OpenAI gpt-4o** in `ai-service` | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md) Jev/OpenRouter selection — [requirements in backlog](docs/backlog/REQ-jev-openrouter-model-selection.md); ADR-002 superseded |
+| AI | Runtime **Azure OpenAI gpt-4o** in `ai-service` | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md) Jev/OpenRouter selection — [rollout requirements](docs/backlog/REQ-jev-openrouter-model-selection.md); ADR-002 superseded |
 | CI | Jenkins primary; GHA manual — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | — |
 | DB | Shared PostgreSQL, separate schemas | — |
 | Search | CRM/quote list+PageInfo over gateway; **not** Elasticsearch in tree | Elasticsearch 8 (target) |

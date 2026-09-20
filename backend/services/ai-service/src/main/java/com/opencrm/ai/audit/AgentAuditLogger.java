@@ -43,7 +43,7 @@ public class AgentAuditLogger {
     }
 
     public void logInvocation(String agentId, String sessionId, Map<String, Object> inputContext) {
-        log.info("Agent Invoked | Agent: {} | Session: {} | Context: {}", agentId, sessionId, inputContext);
+        log.info("Agent Invoked | Agent: {} | Session: {}", agentId, sessionId);
 
         try {
             AiAuditLog auditLog = new AiAuditLog();

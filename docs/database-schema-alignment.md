@@ -36,7 +36,7 @@ The PostgreSQL init script only runs automatically for new container volumes. Ex
 From `backend`, with Docker running:
 
 ```powershell
-./mvnw.cmd -pl services/configuration-engine -am -Dtest=ServiceSchemaIsolationIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw.cmd -pl services/configuration-engine -am '-Dtest=ServiceSchemaIsolationIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
 ```
 
 The test uses a disposable PostgreSQL 16 container and reads the four real service configurations and SQL migration directories. It verifies isolated tables/outboxes/history, repeat migration validation, legacy database/public-schema overrides retaining existing records, and refusal to baseline unknown data. It never connects to the developer's database. SQL checksums are preserved by leaving all existing migrations unchanged.

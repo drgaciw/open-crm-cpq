@@ -18,7 +18,7 @@ Reverse-engineered from the working tree on **2026-09-19** (all claims verified 
 - **PostgreSQL 16** (single database `opencrm`, schema-per-service) + **Redis 7** (cache, rate limiting).
 - **Kafka** for async integration (document jobs, catalog lifecycle, quote-accepted) with a **transactional outbox** in `libs/common`.
 - **Rules**: Drools 10.2 DRL on pricing-service; shared `ProductRuleEvaluationCore` on configuration-engine; OpenL Tablets present **behind a port** but not required for forge.
-- **AI**: `ai-service` AgentRouter; runtime is **Azure OpenAI `gpt-4o`**. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) accepts Jev-driven OpenRouter model selection as the next direction; implementation is in backlog and ADR-002 is superseded.
+- **AI**: `ai-service` AgentRouter; runtime is **Azure OpenAI `gpt-4o`**. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) accepts Jev-driven OpenRouter model selection as the next direction; implementation is behind a disabled flag; live rollout is pending and ADR-002 is superseded.
 
 Agents using this repo must:
 
@@ -170,7 +170,7 @@ Per-service package convention: `com.opencrm.{service}/{config,controller,servic
 ## 9. AI
 
 - `ai-service` = **AgentRouter** (`/api/v1/ai/**`, `/api/v1/copilot/**` through the gateway). Agents disabled by default (`OPENCRM_AI_AGENTS_ENABLED:false`); Redis state store; Postgres `ai` schema audit logging.
-- **Runtime: Azure OpenAI `gpt-4o`** (`spring.ai.azure.openai`, `AZURE_OPENAI_*`, `deployment-name: gpt-4o`). Fixed-model ADR-001 and ADR-002 are historical. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) defines Jev-driven selection using OpenRouter models/prices; [implementation requirements](backlog/REQ-jev-openrouter-model-selection.md) are in backlog.
+- **Runtime: Azure OpenAI `gpt-4o`** (`spring.ai.azure.openai`, `AZURE_OPENAI_*`, `deployment-name: gpt-4o`). Fixed-model ADR-001 and ADR-002 are historical. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) defines Jev-driven selection using OpenRouter models/prices; [requirements](backlog/REQ-jev-openrouter-model-selection.md) retain live rollout gates.
 - CI LLM path is separate ([ADR-003](adr/ADR-003-ci-llm-integration.md)): `LLM_ENDPOINT`-driven advisory stages in Jenkins only — **never** point `ai-assist` at `ai-service:8086`.
 - `agents/` holds the CPQ agent PRD fleet (66 files — 28 numbered `cpq-agent-*` PRDs plus supporting docs; the ADR-001/002 fleet target is 37 agents); AI parse of validate results (H2) and quote preflight via `ProductServiceClient` are landed consumers.
 
@@ -267,7 +267,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | Frontend | Angular **22** Nx `apps/crm` + libs. **Signals + HttpClient** ([ADR-007](adr/ADR-007-frontend-signals-no-state-library.md)) | NgRx 19+ **held**; customer-portal / admin-console **not** in tree |
 | Database | PostgreSQL 16 + Redis 7 (compose); **one DB `opencrm`, schemas per service** ([ADR-008](adr/ADR-008-postgres-schema-per-service.md)) | Same + production Azure. pgvector commented until needed |
 | Infrastructure | Docker Compose local; **Jenkins primary CI**; GHA manual fallback — [ADR-003](adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
-| AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) Jev selects qualifying OpenRouter models at lowest total cost; **implementation backlog** |
+| AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending** |
 | Rules | Drools DRL on pricing; CE `ProductRuleEvaluationCore`; port abstraction ([ADR-012](adr/ADR-012-rules-engine-port-abstraction.md)); OpenL **not** required | OpenL Tablets + full Drools / full SpEL **held** |
 | Events | Kafka + outbox + `v1` published language ([ADR-010](adr/ADR-010-kafka-outbox-events.md)); document-generation consumer | Kafka S2B-9 rule invalidation, agent Kafka #241 **held** |
 | Identity | Gateway JWT config present; Azure AD B2C **`enabled: false` by default** | Full OAuth2/OIDC identity service |
@@ -309,7 +309,7 @@ Observations from code that plans should account for (none authorize change by t
 | WhatsApp #430 undo | On `main` |
 | **R2** price-book list-row delete | N stretch; still held |
 | Named Wave T / T1 / T2 | Skipped |
-| Jev/OpenRouter selection as runtime | ADR-014 Accepted; implementation in backlog. ADR-002 GLM-5 direction superseded |
+| Jev/OpenRouter selection as runtime | ADR-014 Accepted; implementation behind a disabled flag; live rollout pending. ADR-002 GLM-5 direction superseded |
 | Accept ADR-005 | Flip not authorized |
 
 Open GitHub issues: **#238**, **#241** only. Linear/Notion Open CRM: **none** (ignore cmano-clone / Aegis).
@@ -355,7 +355,7 @@ Plans: [23](forge/23-wave-n-architecture.md)–[35](forge/35-wave-w-architecture
 |-----|--------|------|
 | ADR-001 LLM Claude Sonnet 4.6 | **Superseded** by ADR-002 | [adr/ADR-001-primary-llm-claude-sonnet-4-6.md](adr/ADR-001-primary-llm-claude-sonnet-4-6.md) |
 | ADR-002 GLM-5 | **Superseded** by ADR-014; never implemented | [adr/ADR-002-primary-llm-glm-5.md](adr/ADR-002-primary-llm-glm-5.md) |
-| ADR-014 Jev/OpenRouter selection | **Accepted** decision; implementation backlog (runtime Azure gpt-4o) | [adr/ADR-014-jev-openrouter-model-selection.md](adr/ADR-014-jev-openrouter-model-selection.md) |
+| ADR-014 Jev/OpenRouter selection | **Accepted** decision; implementation behind a disabled flag (default Azure gpt-4o) | [adr/ADR-014-jev-openrouter-model-selection.md](adr/ADR-014-jev-openrouter-model-selection.md) |
 | ADR-003 CI / Jenkins | Accepted | [adr/ADR-003-ci-llm-integration.md](adr/ADR-003-ci-llm-integration.md) |
 | ADR-004 CSRF edge | Accepted | [adr/ADR-004-csrf-edge-boundary.md](adr/ADR-004-csrf-edge-boundary.md) |
 | ADR-005 dual-read | **Proposed** — do not flip | [adr/ADR-005-approvals-legacy-dual-read.md](adr/ADR-005-approvals-legacy-dual-read.md) |
