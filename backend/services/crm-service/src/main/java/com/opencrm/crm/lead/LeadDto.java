@@ -32,6 +32,8 @@ public class LeadDto {
     private BigDecimal estimatedValue;
     private String currency;
     private Integer score;
+    /** Advisory only (ADR-015); omitted unless Jev scored the lead. */
+    private com.opencrm.crm.lead.scoring.LeadScoreSuggestionDto scoreSuggestion;
     private String description;
     private String ownerId;
     private Instant assignedAt;

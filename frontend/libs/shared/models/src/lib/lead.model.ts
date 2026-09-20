@@ -1,3 +1,5 @@
+import { JevSuggestion } from './jev-suggestion.model';
+
 /**
  * Mirrors: com.opencrm.crm.lead.LeadStatus
  */
@@ -39,6 +41,8 @@ export interface LeadDto {
   estimatedValue?: number;
   currency?: string;
   score?: number;
+  /** Advisory only (ADR-015); present only when Jev scored the lead. Never a decision. */
+  scoreSuggestion?: JevSuggestion;
   description?: string;
   ownerId?: string;
   assignedAt?: string;
