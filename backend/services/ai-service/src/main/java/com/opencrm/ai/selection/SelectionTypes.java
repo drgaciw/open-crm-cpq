@@ -31,10 +31,14 @@ public final class SelectionTypes {
             BigDecimal cacheRead, BigDecimal cacheWrite) { }
 
     public record Endpoint(String modelId, String provider, Set<String> supportedParameters,
-            int contextLength, int maxCompletionTokens, PriceRates prices, boolean available) {
+            int contextLength, int maxCompletionTokens, PriceRates prices, boolean available, String responseProvider) {
         public Endpoint {
-            requireText(modelId); requireText(provider);
+            requireText(modelId); requireText(provider); requireText(responseProvider);
             supportedParameters = Set.copyOf(supportedParameters);
+        }
+        public Endpoint(String modelId, String provider, Set<String> supportedParameters,
+                int contextLength, int maxCompletionTokens, PriceRates prices, boolean available) {
+            this(modelId, provider, supportedParameters, contextLength, maxCompletionTokens, prices, available, provider);
         }
         public String key() { return modelId + "@" + provider; }
     }
