@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { LeadService } from '../lead.service';
 import { LeadStatus } from '@frontend/shared-models';
+import { AdvisorySuggestionComponent } from '@frontend/shared-ui';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
 
@@ -18,7 +19,7 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
   standalone: true,
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule,
-    MatChipsModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe,
+    MatChipsModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe, AdvisorySuggestionComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -51,6 +52,12 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
           }
         </div>
       </div>
+
+      <app-advisory-suggestion
+        class="score-suggestion"
+        [suggestion]="lead.scoreSuggestion"
+        heading="Likelihood to qualify (0–100)"
+        [labels]="scoreLevelLabels" />
 
       <div class="action-bar">
         @if (lead.status === 'NEW') {
@@ -192,6 +199,7 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
       background: #ffebee;
       color: #c62828;
     }
+    .score-suggestion { display: block; max-width: 480px; margin-bottom: 16px; }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
     .header-info { flex: 1; display: flex; align-items: center; gap: 12px; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
@@ -224,6 +232,11 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
   `],
 })
 export class LeadDetailComponent implements OnInit {
+  /** Rubric lead-score-v1: probability keys are rubric levels, lowest first. */
+  readonly scoreLevelLabels: Record<string, string> = {
+    '0': 'Very unlikely', '1': 'Unlikely', '2': 'Uncertain', '3': 'Likely', '4': 'Very likely',
+  };
+
   readonly service = inject(LeadService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);

@@ -60,6 +60,26 @@ public class Lead extends BaseEntity {
     @Builder.Default
     private Integer score = 0;
 
+    /** Null until something scores the lead; "JEV" marks an advisory score (ADR-015). */
+    @Column(name = "score_source")
+    private String scoreSource;
+
+    @Column(name = "score_confidence", precision = 5, scale = 4)
+    private BigDecimal scoreConfidence;
+
+    /** JSON object of probability per rubric level. */
+    @Column(name = "score_probabilities", columnDefinition = "TEXT")
+    private String scoreProbabilities;
+
+    @Column(name = "score_rubric_version")
+    private String scoreRubricVersion;
+
+    @Column(name = "score_model")
+    private String scoreModel;
+
+    @Column(name = "scored_at")
+    private Instant scoredAt;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
