@@ -79,8 +79,8 @@ public final class OpenRouterCatalogClient {
         Set<String> ids = new TreeSet<>();
         for (JsonNode model : entries) {
             String id = text(model, "id");
-            if (!id.matches("[A-Za-z0-9._:-]+/[A-Za-z0-9._:-]+")
-                    || List.of(id.split("/")).contains("..") || !ids.add(id)) {
+            if (!id.matches("[A-Za-z0-9._:~-]+/[A-Za-z0-9._:~-]+")
+                    || List.of(id.split("/")).stream().anyMatch(part -> part.equals(".") || part.equals("..")) || !ids.add(id)) {
                 throw new IOException("Invalid or duplicate model identifier");
             }
         }
@@ -235,9 +235,13 @@ public final class OpenRouterCatalogClient {
 
     private static void checkComplete(JsonNode node, int count) throws IOException {
         // These documented endpoints return all results with no cursor. Fail closed on a changed contract.
-        for (String field : List.of("next", "next_page", "next_cursor", "cursor", "pagination", "page", "has_more")) {
-            if (node.hasNonNull(field) && !(field.equals("has_more") && node.path(field).isBoolean() && !node.path(field).booleanValue())) {
-                throw new IOException("Unsupported catalog pagination contract");
+        for (JsonNode container : List.of(node, node.path("links"), node.path("meta"))) {
+            for (String field : List.of("next", "next_page", "next_cursor", "cursor", "pagination", "page", "has_more")) {
+                JsonNode value = container.path(field);
+                boolean terminal = value.isMissingNode() || value.isNull()
+                        || (value.isTextual() && value.asText().isBlank())
+                        || (field.equals("has_more") && value.isBoolean() && !value.booleanValue());
+                if (!terminal) throw new IOException("Unsupported catalog pagination contract");
             }
         }
         for (String field : List.of("total", "count", "total_count")) {

@@ -1,0 +1,11 @@
+# Catalog compatibility and prices
+
+`OpenRouterCatalogClient` uses the documented [model discovery](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) and [per-model endpoints](https://openrouter.ai/docs/api/api-reference/endpoints/list-all-endpoints-for-a-model) GET APIs. Provider `tag` is the routing identity; `provider_name` is the response identity. Endpoint prices are USD per token/request. Model headline prices are never substituted for endpoint prices.
+
+Discovery accepts current model identifiers including a `~` prefix and excludes path traversal. An explicit shortlist of 1–50 model IDs limits endpoint requests while retaining the entire discovery response and candidate-coverage exclusions. Unexpected HTTP/body pagination (`Link`, `next`, `links.next`, `meta.pagination`, inconsistent counts) fails the refresh, rather than silently treating a partial response as complete. No paid completion request is made by this client.
+
+Mandatory prompt, completion and request prices must all be explicit and nonnegative. Missing is unknown, including a missing per-request fee; it does not mean zero. Optional cache prices are required by the cost calculator whenever corresponding cache usage is present. Unsupported nonzero/unknown charge dimensions and non-text modalities are excluded.
+
+A read-only public API check on 2026-09-19 observed that discovery pricing and a sampled endpoint omitted `request`. Such endpoints remain **ineligible** with this implementation until the upstream metadata supplies a verified explicit fee or a separately reviewed price-evidence mechanism is added. No fee supplement or paid-model activation is inferred from the documentation's example value of zero. This limitation is reported in each evidence manifest's exclusions and does not authorize fabricating a free price.
+
+Every successful refresh persists a plain `<version>.json` `CatalogSnapshot` and a separate `<version>.evidence.json` with exact raw responses, retrieval/expiry timestamps, SHA-256 hash, normalized endpoints, exclusions and coverage. Both use exact decimal parsing. Offline replay consumers read the plain snapshot; audit/research consumers read the evidence manifest. No credentials are persisted.
