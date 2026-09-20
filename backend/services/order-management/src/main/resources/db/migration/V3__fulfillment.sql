@@ -4,7 +4,8 @@ CREATE TABLE fulfillment_evidence (
  external_reference varchar(500) NOT NULL, allocation_reference varchar(500), shipment_reference varchar(500),
  occurred_at timestamp with time zone NOT NULL, expires_at timestamp with time zone, actor varchar(200) NOT NULL,
  reason text NOT NULL, body_hash varchar(64) NOT NULL, semantic_hash varchar(64) NOT NULL,
- recorded_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+ recorded_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CHECK(kind<>'ALLOCATION' OR (expires_at IS NOT NULL AND expires_at>occurred_at))
 );
 CREATE INDEX fulfillment_evidence_order ON fulfillment_evidence(order_id,recorded_at);
 CREATE TABLE fulfillment_evidence_state (
@@ -23,7 +24,7 @@ CREATE TABLE allocation_lots (
  id varchar(36) PRIMARY KEY, order_id varchar(36) NOT NULL REFERENCES orders(id), line_id varchar(36) NOT NULL REFERENCES order_lines(id),
  evidence_id varchar(36) NOT NULL REFERENCES fulfillment_evidence(id), external_reference varchar(500) NOT NULL,
  quantity integer NOT NULL CHECK(quantity>0), consumed integer NOT NULL DEFAULT 0, released integer NOT NULL DEFAULT 0,
- occurred_at timestamp with time zone NOT NULL, expires_at timestamp with time zone,
+ occurred_at timestamp with time zone NOT NULL, expires_at timestamp with time zone NOT NULL,
  CHECK(consumed>=0 AND released>=0 AND consumed+released<=quantity), UNIQUE(order_id,line_id,external_reference)
 );
 CREATE INDEX allocation_lots_expiry ON allocation_lots(expires_at);
