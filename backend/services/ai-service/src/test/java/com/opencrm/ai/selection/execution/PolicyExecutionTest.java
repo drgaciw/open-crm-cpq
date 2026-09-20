@@ -244,8 +244,30 @@ class PolicyExecutionTest {
         assertFalse(PolicyEligibility.eligible(qualified(first), profile, duplicate, now));
     }
 
+    @Test void actualCacheReadsAndWritesArePreservedWithoutDoubleCountingPromptTokens() throws Exception {
+        var priced = new Endpoint(first.modelId(), first.provider(), first.supportedParameters(), first.contextLength(), first.maxCompletionTokens(),
+                new PriceRates(first.prices().prompt(), first.prices().completion(), first.prices().request(),
+                        new BigDecimal("0.0000005"), new BigDecimal("0.0000015")), true);
+        String body = success(priced, "0.00004").body().replace("\"prompt_tokens\":10", "\"prompt_tokens\":10,\"prompt_tokens_details\":{\"cached_tokens\":3,\"cache_write_tokens\":4}");
+        replies.add(new Reply(200, body));
+        var result = client.complete(priced, profile, request());
+        assertEquals(10, result.usage().inputTokens());
+        assertEquals(3, result.usage().cacheReadTokens());
+        assertEquals(4, result.usage().cacheWriteTokens());
+    }
+
+    @Test void malformedOrUnknownCacheUsageFailsClosedWithoutFallback() throws Exception {
+        activate(policy("v1", List.of(first, fallback), null));
+        String body = success(first, "0.00004").body().replace("\"prompt_tokens\":10", "\"prompt_tokens\":10,\"prompt_tokens_details\":{\"cached_tokens\":\"bad\"}");
+        replies.add(new Reply(200, body));
+        assertEquals("MISSING_USAGE", assertThrows(Unavailable.class, () -> executor(2).execute(request())).reason());
+        replies.add(new Reply(200, body.replace("\"cached_tokens\":\"bad\"", "\"cache_write_tokens\":2")));
+        assertEquals("UNKNOWN_CACHE_PRICE", assertThrows(Unavailable.class, () -> executor(2).execute(request())).reason());
+        assertEquals(2, requests.size());
+    }
+
     @Test void jsonAndNamedFunctionResponsesArePreservedWithoutExecutingTools() throws Exception {
-        profile = new TaskProfile("cpq", "1", Set.of("tools", "parallel_tool_calls", "response_format"), 1000, 100,
+        profile = new TaskProfile("cpq", "1", Set.of("tools", "parallel_tool_calls"), 1000, 100,
                 new BigDecimal("0.8"), new BigDecimal("0.9"), 5000, new BigDecimal("0.01"), Set.of("provider-a", "provider-b"),
                 3, Duration.ofHours(1), Duration.ofMinutes(10));
         activate(policy("v1", List.of(first), null));
@@ -257,6 +279,23 @@ class PolicyExecutionTest {
         Completion result = executor(1).execute(new Request("", "price", null, List.of(tool), false));
         assertEquals(1, result.toolCalls().size());
         assertFalse(requests.getFirst().path("parallel_tool_calls").asBoolean(true));
+    }
+
+    @Test void stringAdapterRequestsQualifiedJsonObjectAndCannotInvokeToolProfiles() throws Exception {
+        profile = new TaskProfile(profile.id(), profile.version(), Set.of("response_format"), profile.maxInputTokens(),
+                profile.maxOutputTokens(), profile.minQuality(), profile.minConfidence(), profile.maxP95LatencyMillis(),
+                profile.maxCostPerTask(), profile.allowedProviders(), profile.minSamples(), profile.evidenceTtl(), profile.policyTtl());
+        activate(policy("v1", List.of(first), null));
+        assertEquals("REQUIRED_RESPONSE_FORMAT_MISSING", assertThrows(Unavailable.class, () -> executor(1).execute(request())).reason());
+        replies.add(new Reply(200, success(first, "0.00004").body().replace("safe answer", "{}")));
+        assertEquals("{}", new OpenRouterLlmAdapter(executor(1)).generate("assist", "quote"));
+        assertEquals("json_object", requests.getFirst().path("response_format").path("type").asText());
+        profile = new TaskProfile(profile.id(), profile.version(), Set.of("response_format", "tools", "parallel_tool_calls"), profile.maxInputTokens(),
+                profile.maxOutputTokens(), profile.minQuality(), profile.minConfidence(), profile.maxP95LatencyMillis(),
+                profile.maxCostPerTask(), profile.allowedProviders(), profile.minSamples(), profile.evidenceTtl(), profile.policyTtl());
+        assertEquals("REQUIRED_TOOLS_MISSING", assertThrows(Unavailable.class,
+                () -> new OpenRouterLlmAdapter(executor(1)).generate("assist", "quote")).reason());
+        assertEquals(1, requests.size());
     }
 
     private PolicyExecutor executor(int attempts) {
