@@ -66,6 +66,7 @@ public class OrderService {
   var existing=db.queryForList("SELECT id FROM orders WHERE scope_id=? AND quote_id=? AND accepted_revision=?",s.scopeId(),s.quoteId(),s.acceptedRevision());
   if(!existing.isEmpty()) { String id=(String)existing.getFirst().get("id");remember(s.scopeId(),key,body,id);return view(id); }
   if(!intakeEnabled) throw new OrderProblem(422,"New order intake is disabled");
+  var replacement=s.acceptedRevision()>1 ? com.opencrm.order.replacement.ReplacementLineage.requirePermit(db,s) : null;
   var holds=validator.validate(s);String id=UUID.randomUUID().toString();Instant now=Instant.now();String actor=access.actor();
   db.update("INSERT INTO orders(id,order_number,scope_id,customer_id,quote_id,quote_number,accepted_revision,snapshot_id,snapshot_json,snapshot_hash,status,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,"ORD-"+id,s.scopeId(),s.customerId(),s.quoteId(),s.quoteNumber(),s.acceptedRevision(),s.snapshotId(),source.get("payload"),source.get("payload_hash"),"DRAFT",Timestamp.from(now),Timestamp.from(now),actor,actor);
   for(var line:s.lines()) {
@@ -82,6 +83,7 @@ public class OrderService {
    }
   }
   for(String hold:holds) db.update("INSERT INTO order_holds(order_id,code) VALUES(?,?)",id,hold);
+  if(replacement!=null) com.opencrm.order.replacement.ReplacementLineage.link(db,replacement,id);
   remember(s.scopeId(),key,body,id);audit(id,"CREATED","Accepted snapshot captured",0,null);return view(id);
  }
  public View get(String id) { return tx.execute(t -> {var row=row(id,false);access.require("oms:read",str(row,"scope_id"),str(row,"customer_id"));return view(id);}); }
