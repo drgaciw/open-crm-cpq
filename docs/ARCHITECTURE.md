@@ -108,12 +108,12 @@ PostgreSQL 16 :5432 (opencrm, schema-per-service)      Redis 7 :6379      Kafka 
 | pricing-service | 8082 | pricing | Execute/simulate pricing, rule-sets, rules (DRL), pricing-customers |
 | product-service | 8083 | product | Catalog, options, attributes, bundles, configuration **rules CRUD** + retained inline validate |
 | quote-service | 8084 | quote | Quotes, lines, documents API, **approvals BFF** (single-writer → approval-routing; dual-read legacy local reads) |
-| approval-routing | 8085 | (own) | Canonical approvals (single-writer) |
-| document-generation | 8086 | separate DB default `cpq_document` (see §16) | Kafka document job consumer + REST |
-| contract-asset-management | 8087 | (own) | Subscriptions — DTO-only, `activate` → `ErpAdapter.syncToErp` |
-| configuration-engine | 8088 | (own) | Configuration sessions; `POST /internal/v1/configurations/evaluate`; `ProductRuleEvaluationCore` |
+| approval-routing | 8085 | approval | Canonical approvals and complete quote history |
+| document-generation | 8086 | document | Kafka document job consumer + REST |
+| contract-asset-management | 8087 | contract | Subscriptions — DTO-only, `activate` → `ErpAdapter.syncToErp` |
+| configuration-engine | 8088 | configuration | Configuration sessions; `POST /internal/v1/configurations/evaluate`; `ProductRuleEvaluationCore` |
 | pricebook-service | 8089 | pricing | Price books + entries (published = immutable) |
-| ai-service | 8086 ⚠ | ai | AgentRouter — runtime Azure OpenAI `gpt-4o`; agents disabled by default (`OPENCRM_AI_AGENTS_ENABLED:false`) |
+| ai-service | 8090 | ai | Azure baseline; Jev/OpenRouter selection and execution opt-in; agents disabled by default |
 
 Per-service package convention: `com.opencrm.{service}/{config,controller,service,repository,entity,dto,mapper,event,exception,validator}`. Services run with **virtual threads enabled** (`spring.threads.virtual.enabled: true` — gateway, quote, ai verified).
 
@@ -137,7 +137,7 @@ Per-service package convention: `com.opencrm.{service}/{config,controller,servic
 
 ## 6. Data architecture
 
-- **One PostgreSQL database `opencrm`, schema per service** (`init-db.sql`: `crm, cpq, pricing, product, quote, communication, ai`); `pricing` and `pricebook` services share the `pricing` schema name in compose. Connection pattern: `jdbc:postgresql://…/opencrm?currentSchema={schema}` + `spring.flyway.schemas`.
+- **One PostgreSQL database `opencrm`, isolated schemas** (`crm, cpq, pricing, product, quote, communication, ai, configuration, approval, document, contract`). Pricing-service owns all migrations for the shared pricing/pricebook schema; pricebook's Flyway remains disabled. Existing standalone databases require explicit compatibility overrides; see [database alignment](database-schema-alignment.md).
 - Extensions: `uuid-ossp`, `pg_trgm`; **pgvector commented out** until needed.
 - App role `opencrm_app` with schema-scoped grants (bootstrap only).
 - Quote soft-delete is enforced with domain guards: `QUOTE_ACCEPTED_NO_DELETE` on accepted quotes (`QuoteService.java:119`), `softDelete()` on lines.
@@ -283,10 +283,10 @@ Copy this table into planning. **Do not present the Target column as current.**
 
 Observations from code that plans should account for (none authorize change by themselves):
 
-1. **Port collision `:8086`** — `ai-service/application.yml` sets `server.port: 8086`, the same port gateway routes expect for **document-generation** (`DOCUMENT_GENERATION_URI:http://localhost:8086`). The gateway's ai-service route defaults to `lb://ai-service` (no local URI), so running both services locally on defaults collides. Treat ai-service's local port as unresolved until a wave plan fixes it.
-2. **document-generation database default** — its yml defaults to `DB_NAME:cpq_document` (own database), not the shared `opencrm` + schema model used elsewhere; `init-db.sql` creates no document schema. Compose does not build this service, so the drift only bites when running it locally.
-3. **Compose coverage gap** — 5 of 11 reactor services are not in `docker-compose.yml` (configuration-engine, approval-routing, document-generation, contract-asset, ai-service); local dev relies on `mvnw` + Azure autoconfig excludes.
-4. **communication-service & ai-service routes are `lb://`** — with no registry in the tree they fall through to CircuitBreaker fallbacks; the ERP path is an explicit stub (`forward:/fallback/erp/unavailable`).
+1. **AI port collision resolved** — AI uses `8090`; document generation retains `8086`. Gateway default/dev AI routes have explicit HTTP targets. AI is an opt-in Compose profile.
+2. **Database defaults aligned** — configuration, approval, document and contract services use isolated schemas in `opencrm`. Existing standalone databases need explicit legacy overrides until a separately reviewed migration; [runbook](database-schema-alignment.md).
+3. **Compose coverage gap** — configuration-engine, approval-routing, document-generation and contract-asset still use separate local launch procedures; Azure autoconfig exclusions remain necessary.
+4. **communication-service route remains `lb://`** — with no registry it falls through to the CircuitBreaker fallback; ERP remains an explicit stub (`forward:/fallback/erp/unavailable`).
 5. **Azure-on-Boot-4 shims are load-bearing** — root Surefire system properties + per-service `spring.autoconfigure.exclude` (token credential, compatibility verifier, AAD B2C, Event Hubs Kafka OAuth2). Removing them breaks Boot 4 startup; keep them until spring-cloud-azure 7.x.
 6. **Existing ADR statuses re-verified against code** — see [adr/README.md](adr/README.md) verification column (ADR-001…006 + backlog ADR all match their stated status).
 
