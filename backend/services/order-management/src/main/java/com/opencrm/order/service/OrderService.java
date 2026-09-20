@@ -119,9 +119,23 @@ public class OrderService {
   if(c.quantity()<1) throw OrderProblem.invalid("Positive cancellation quantity required");
   var lines=db.queryForList("SELECT * FROM order_lines WHERE id=? AND order_id=?",c.lineId(),id);if(lines.isEmpty()) throw OrderProblem.missing();var line=lines.getFirst();
   if(c.quantity()>num(line,"ordered")-num(line,"cancelled")-Math.max(num(line,"fulfilled"),num(line,"shipped"))) throw OrderProblem.invalid("Cancellation exceeds remaining quantity");
-  if(num(line,"allocated")>0 || db.queryForObject("SELECT COUNT(*) FROM order_tasks WHERE order_id=? AND line_id=? AND dispatched_at IS NOT NULL",Integer.class,id,c.lineId())>0) throw OrderProblem.conflict("Dispatched or allocated work requires release reconciliation");
+  if(c.quantity()>num(line,"ordered")-num(line,"cancelled")-num(line,"fulfilled")-num(line,"allocated")) throw OrderProblem.conflict("Allocated quantity requires explicit release before cancellation");
+  int uncertain=db.queryForObject("SELECT COUNT(*) FROM order_tasks t LEFT JOIN task_operations op ON op.task_id=t.id WHERE t.order_id=? AND t.line_id=? AND (t.status='UNKNOWN' OR op.status='UNKNOWN' OR (op.status='CLAIMED' AND op.lease_until>clock_timestamp()) OR (op.status='WAITING_EXTERNAL' AND op.evidence_reference IS NULL) OR (t.dispatched_at IS NOT NULL AND op.operation_key IS NULL))",Integer.class,id,c.lineId());
+  uncertain+=db.queryForObject("SELECT COUNT(*) FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON s.evidence_id=e.id WHERE e.order_id=? AND e.line_id=? AND s.status IN ('PENDING','CONFLICT')",Integer.class,id,c.lineId());
+  if(uncertain>0) throw OrderProblem.conflict("Unreconciled or active work prevents cancellation");
   db.update("UPDATE order_lines SET cancelled=cancelled+?,status=CASE WHEN cancelled+?=ordered THEN 'CANCELLED' ELSE status END WHERE id=?",c.quantity(),c.quantity(),c.lineId());
-  if(num(line,"cancelled")+c.quantity()==num(line,"ordered")) db.update("UPDATE order_tasks SET status='CANCELLED' WHERE line_id=?",c.lineId());
+  if(num(line,"cancelled")+c.quantity()==num(line,"ordered")) {
+   db.update("UPDATE order_tasks SET status='CANCELLED' WHERE line_id=?",c.lineId());
+   db.update("UPDATE task_operations SET status='CANCELLED',lease_token=NULL,lease_until=NULL WHERE task_id IN (SELECT id FROM order_tasks WHERE line_id=?)",c.lineId());
+  } else {
+   int target=num(line,"ordered")-num(line,"cancelled")-c.quantity();
+   var proofs=db.queryForList("SELECT t.id,t.kind FROM order_tasks t JOIN task_operations op ON op.task_id=t.id WHERE t.line_id=? AND t.status='WAITING_EXTERNAL' AND op.evidence_reference IS NOT NULL AND op.status<>'UNKNOWN'",c.lineId());
+   for(var proof:proofs) {
+    boolean met=switch(str(proof,"kind")) {case "ALLOCATION" -> num(line,"allocated")+num(line,"shipped")>=target;case "SHIPMENT" -> num(line,"shipped")>=target;case "DELIVERY" -> num(line,"delivered")>=target;case "SERVICE","PROVISION" -> num(line,"fulfilled")>=target;default -> false;};
+    if(met) {db.update("UPDATE order_tasks SET status='SUCCESS' WHERE id=?",str(proof,"id"));db.update("UPDATE task_operations SET status='SUCCESS',lease_token=NULL,lease_until=NULL WHERE task_id=?",str(proof,"id"));}
+   }
+   db.update("UPDATE order_tasks SET status='READY' WHERE line_id=? AND status='BLOCKED' AND NOT EXISTS (SELECT 1 FROM order_task_dependencies d JOIN order_tasks p ON p.id=d.predecessor_id WHERE d.task_id=order_tasks.id AND p.status NOT IN ('SUCCESS','CANCELLED'))",c.lineId());
+  }
   if(db.queryForObject("SELECT COUNT(*) FROM order_lines WHERE order_id=? AND cancelled<>ordered",Integer.class,id)==0) db.update("UPDATE orders SET status='CANCELLED' WHERE id=?",id);
  });}
  private View mutate(String id,String action,String permission,Command c,Runnable change) {
