@@ -1,0 +1,350 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OMS pilot",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/orders": {
+      "get": {
+        "summary": "GET /orders",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        }
+      }
+    },
+    "/orders/from-quote": {
+      "post": {
+        "summary": "POST /orders/from-quote",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "summary": "GET /orders/{id}",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/fulfillment-plan": {
+      "get": {
+        "summary": "GET /orders/{id}/fulfillment-plan",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/timeline": {
+      "get": {
+        "summary": "GET /orders/{id}/timeline",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/submit": {
+      "post": {
+        "summary": "POST /orders/{id}/submit",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/holds": {
+      "post": {
+        "summary": "POST /orders/{id}/holds",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/cancellation-requests": {
+      "post": {
+        "summary": "POST /orders/{id}/cancellation-requests",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/evidence": {
+      "post": {
+        "summary": "POST /orders/{id}/evidence",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}/reconcile": {
+      "post": {
+        "summary": "POST /orders/{id}/reconcile",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/order-exceptions": {
+      "get": {
+        "summary": "GET /order-exceptions",
+        "responses": {
+          "200": {
+            "description": "ApiResponse DTO; see oms-pilot-v1.md"
+          },
+          "403": {
+            "description": "Permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope"
+          },
+          "409": {
+            "description": "Version or operation identity conflict"
+          },
+          "422": {
+            "description": "Semantic validation failed"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
