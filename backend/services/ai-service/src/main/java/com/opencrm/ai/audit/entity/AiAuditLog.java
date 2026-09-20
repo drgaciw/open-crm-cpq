@@ -62,7 +62,7 @@ public class AiAuditLog {
             createdAt = Instant.now();
         }
         if (model == null) {
-            model = "glm-5";
+            model = "unknown";
         }
     }
 

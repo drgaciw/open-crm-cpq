@@ -25,7 +25,11 @@ spring:
       hibernate:
         default_schema: ai
 
-  # Azure OpenAI Configuration
+  # Keep AI migrations and their history in the service's own schema.
+  flyway:
+    schemas: ai
+    default-schema: ai
+
   ai:
     azure:
       openai:
@@ -41,7 +45,10 @@ server:
 opencrm:
   gateway:
     base-url: ${OPENCRM_GATEWAY_BASE_URL:http://localhost:8080}
+  # Azure remains the default provider until the opt-in rollout is configured.
   ai:
+    selection:
+      execution-enabled: ${OPENCRM_AI_SELECTION_EXECUTION_ENABLED:false}
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 
