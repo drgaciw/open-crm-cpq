@@ -58,6 +58,10 @@ class QuoteRevisionIntegrationTest {
         when(pricing.executePricing(anyMap())).thenReturn(com.opencrm.common.dto.ApiResponse.success(repriced));
         service.calculate(q.getId());
         var validation=new ConfigurationValidationResult();validation.setValid(true);when(products.validateConfiguration(anyList())).thenReturn(validation);
+        service.submitForReview(q.getId());service.reject(q.getId(),"Tax evidence needs correction");
+        var rejected=quotes.findById(q.getId()).orElseThrow();
+        terms.capture(q.getId(),new SourceTermsRequest(rejected.getVersion(),"address","corrected-tax-ref","config-ref",List.of(new SourceTermsRequest.LineTerms(lineId,"DIGITAL","ONE_TIME","0.00",null,null))),auth);
+        assertThat(quotes.findById(q.getId()).orElseThrow().getStatus()).isEqualTo(QuoteStatus.DRAFT);
         service.submitForReview(q.getId());service.approve(q.getId());service.send(q.getId());service.accept(q.getId());
         var revised=quotes.findById(q.getId()).orElseThrow();assertThat(revised.getAcceptedRevision()).isEqualTo(2);assertThat(revised.getUuid()).isEqualTo(q.getUuid());
         assertThat(revised.getTotalAmount()).isEqualByComparingTo("60.00");
