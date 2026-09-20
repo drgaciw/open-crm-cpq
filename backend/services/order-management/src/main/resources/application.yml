@@ -1,0 +1,32 @@
+server:
+  port: 8090
+spring:
+  application:
+    name: order-management
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:opencrm}?currentSchema=oms
+    username: ${OMS_DB_USERNAME:oms_app}
+    password: ${OMS_DB_PASSWORD:}
+  flyway:
+    default-schema: oms
+    schemas: oms
+    create-schemas: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-management
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+oms:
+  intake-enabled: ${OMS_INTAKE_ENABLED:false}
+  snapshot-consumer-enabled: ${OMS_SNAPSHOT_CONSUMER_ENABLED:false}
+  trusted-source-scopes: ${OMS_TRUSTED_SOURCE_SCOPES:}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
