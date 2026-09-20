@@ -13,6 +13,11 @@ spring:
     create-schemas: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    properties:
+      security.protocol: ${OMS_KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
     consumer:
       group-id: order-management
       enable-auto-commit: false
@@ -22,6 +27,15 @@ spring:
     listener:
       ack-mode: record
 oms:
+  execution:
+    enabled: ${OMS_EXECUTION_ENABLED:false}
+    callback-enabled: ${OMS_ACTIVATION_CALLBACK_ENABLED:false}
+    allowed-scopes: ${OMS_EXECUTION_ALLOWED_SCOPES:}
+  outbox-relay:
+    enabled: ${OMS_OUTBOX_RELAY_ENABLED:false}
+  messaging:
+    producer-acl-verified: ${OMS_PRODUCER_ACL_VERIFIED:false}
+    trusted-producer-principals: ${OMS_TRUSTED_PRODUCER_PRINCIPALS:}
   scope-id: ${OMS_SCOPE_ID:}
   intake-enabled: ${OMS_INTAKE_ENABLED:false}
   snapshot-consumer-enabled: ${OMS_SNAPSHOT_CONSUMER_ENABLED:false}
