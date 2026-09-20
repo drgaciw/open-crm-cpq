@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../../.cache/orders-browser",
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "browser/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/test-setup.ts"]
+}
