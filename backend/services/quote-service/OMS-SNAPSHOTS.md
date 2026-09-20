@@ -37,3 +37,24 @@ Approved classification is server configuration: `oms.quote.product-fulfillment-
 product ID to PHYSICAL/DIGITAL/SERVICE; `oms.quote.classification-mapping-version` is mandatory.
 Missing or mismatched requested classification becomes null in the snapshot plus a hold.
 The configured version is captured in configurationReference alongside source evidence.
+
+## Preexecution commercial correction
+
+`oms.quote-revision-requested.v1` is consumed only when `oms.quote.revision-consumer-enabled=true`.
+The disabled default cannot reopen a quote. Startup additionally requires
+`oms.quote.revision-trusted-producer-configured=true`,
+`spring.kafka.properties.security.protocol=SASL_SSL`, an explicit
+`oms.quote.revision-producer-principal` naming the OMS producer, and the deployment `oms.quote.scope-id`.
+This is an operational attestation gate: the broker must actually restrict topic WRITE to that OMS
+principal and configure authenticated consumer/group READ. The application cannot remotely prove ACLs.
+
+Only the exact canonical OMS-owned accepted revision with matching deployment/customer may reopen.
+OMS must first prove no external work and cancel the old obligations; quote service trusts only that
+producer contract, not an HTTP caller. Event ID and operation key bind the normalized command hash in
+immutable durable receipt tables. Replays after later acceptance never reopen the source again.
+
+Reopening preserves quote UUID, source line IDs and acceptedRevision, resets approval state/tier/reference,
+and records a correction permit. Source terms may then be captured in corrected DRAFT state, and ordinary
+CPQ editing/pricing and fresh review/approval/send/accept produce revision N+1. Capture consumes the permit.
+Previous snapshots are immutable. No in-flight amendment, source payload patch, or browser-supplied economics
+are introduced. V1_7 owns the correction receipt schema; V1_6 is reserved for the shared outbox relay upgrade.

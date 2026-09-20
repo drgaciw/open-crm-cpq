@@ -29,7 +29,8 @@ public class SourceTermsService {
             .orElseThrow(() -> new ResourceNotFoundException("Quote"));
         if (!Objects.equals(quote.getVersion(), request.expectedVersion()))
             throw new BusinessException("Quote version changed", HttpStatus.CONFLICT, "VERSION_CONFLICT");
-        if (!Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED).contains(quote.getStatus()) || "OMS".equals(quote.getFulfillmentOwner()))
+        if (!Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED).contains(quote.getStatus()) || ("OMS".equals(quote.getFulfillmentOwner())
+                && (quote.getStatus()!=QuoteStatus.DRAFT || quote.getOmsCorrectionOperationKey()==null || quote.getAcceptedRevision()<1)))
             throw new BusinessException("Source terms require an editable unaccepted quote", HttpStatus.CONFLICT, "QUOTE_NOT_EDITABLE");
         if (request.lines() == null) throw new BusinessException("Source lines required", "INVALID_SOURCE_TERMS");
         var sourceLines = lines.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
