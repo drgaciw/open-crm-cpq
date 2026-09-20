@@ -103,6 +103,16 @@ class OpenRouterCatalogClientTest {
     }
 
     @Test
+    void unselectedTildeModelDoesNotAbortCompleteDiscovery() throws Exception {
+        models = "{\"data\":[{\"id\":\"vendor/model\"},{\"id\":\"~deepseek/deepseek-pro-latest\"}]}";
+        CatalogSnapshot snapshot = client().fetch(null, Set.of("vendor/model"));
+        assertThat(snapshot.endpoints()).hasSize(1);
+        var evidence = json.readTree(Files.readString(snapshots.resolve(snapshot.version() + ".evidence.json")));
+        assertThat(evidence.path("discoveredModelCount").asInt()).isEqualTo(2);
+        assertThat(evidence.path("excluded").get(0).path("model").asText()).isEqualTo("~deepseek/deepseek-pro-latest");
+    }
+
+    @Test
     void missingNegativeExtraPricesAndUnknownCapabilitiesAreExcluded() throws Exception {
         ObjectNode endpoint = endpoint();
         ObjectNode prices = (ObjectNode) endpoint.path("pricing");
@@ -132,6 +142,10 @@ class OpenRouterCatalogClientTest {
         assertThatThrownBy(() -> client().fetch(null)).isInstanceOf(IOException.class).hasMessageContaining("pagination");
         models = "{\"data\":[{\"id\":\"vendor/model\"}],\"total\":2}";
         assertThatThrownBy(() -> client().fetch(null)).isInstanceOf(IOException.class).hasMessageContaining("count");
+        models = "{\"data\":[{\"id\":\"vendor/model\"}],\"links\":{\"next\":\"?cursor=next\"}}";
+        assertThatThrownBy(() -> client().fetch(null)).isInstanceOf(IOException.class).hasMessageContaining("pagination");
+        models = "{\"data\":[{\"id\":\"vendor/model\"}],\"meta\":{\"pagination\":{\"has_more\":true}}}";
+        assertThatThrownBy(() -> client().fetch(null)).isInstanceOf(IOException.class).hasMessageContaining("pagination");
         models = "{\"data\":[{\"id\":\"vendor/model\"},{\"id\":\"vendor/model\"}]}";
         assertThatThrownBy(() -> client().fetch(null)).isInstanceOf(IOException.class).hasMessageContaining("duplicate");
         models = "{\"data\":[{\"id\":\"vendor/model\"}]}";
