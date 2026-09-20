@@ -69,7 +69,7 @@ public class OrderService {
   var holds=validator.validate(s);String id=UUID.randomUUID().toString();Instant now=Instant.now();String actor=access.actor();
   db.update("INSERT INTO orders(id,order_number,scope_id,customer_id,quote_id,quote_number,accepted_revision,snapshot_id,snapshot_json,snapshot_hash,status,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,"ORD-"+id,s.scopeId(),s.customerId(),s.quoteId(),s.quoteNumber(),s.acceptedRevision(),s.snapshotId(),source.get("payload"),source.get("payload_hash"),"DRAFT",Timestamp.from(now),Timestamp.from(now),actor,actor);
   for(var line:s.lines()) {
-   String lineId=UUID.randomUUID().toString();db.update("INSERT INTO order_lines(id,order_id,source_line_id,description,ordered) VALUES(?,?,?,?,?)",lineId,id,line.sourceLineId(),line.description(),line.quantity());
+   String lineId=UUID.randomUUID().toString();db.update("INSERT INTO order_lines(id,order_id,source_line_id,description,ordered) VALUES(?,?,?,?,?)",lineId,id,line.sourceLineId(),line.description()==null?"[Missing source description]":line.description(),line.quantity());
    if(holds.contains("MAPPING:"+line.sourceLineId())) continue;
    List<String> kinds=new ArrayList<>(switch(line.fulfillmentType()) { case "PHYSICAL" -> List.of("ALLOCATION","SHIPMENT","DELIVERY");case "DIGITAL" -> List.of("PROVISION");case "SERVICE" -> List.of("SERVICE");default -> throw OrderProblem.invalid("Unsupported fulfillment mapping"); });
    if("RECURRING".equals(line.chargeType())) kinds.add("ACTIVATION");kinds.add("FINANCE_ACK");
@@ -126,12 +126,12 @@ public class OrderService {
  });}
  private View mutate(String id,String action,String permission,Command c,Runnable change) {
   checkText(c.operationKey(),"operationKey",200);checkText(c.reason(),"reason",2000);
-  return tx.execute(t->{var r=row(id,true);String scope=str(r,"scope_id");access.require(permission,scope,str(r,"customer_id"));
+  try { return tx.execute(t->{var r=row(id,true);String scope=str(r,"scope_id");access.require(permission,scope,str(r,"customer_id"));
    String body=hash(json.writeValueAsString(List.of(id,action,c)));String replay=idempotency(scope,c.operationKey(),body);if(replay!=null) return view(replay);
    long version=((Number)r.get("version")).longValue();if(version!=c.expectedVersion()) throw OrderProblem.conflict("Order version changed");
    change.run();db.update("UPDATE orders SET version=version+1,updated_at=?,updated_by=? WHERE id=?",Timestamp.from(Instant.now()),access.actor(),id);
    remember(scope,c.operationKey(),body,id);audit(id,action.split(":")[0],c.reason(),version+1,null);return view(id);
-  });
+  }); } catch(org.springframework.dao.DuplicateKeyException e) { throw OrderProblem.conflict("Operation key already used by a concurrent command"); }
  }
  private Map<String,Object> row(String id,boolean lock) {var rows=db.queryForList("SELECT * FROM orders WHERE id=? AND is_deleted=false"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty()) throw OrderProblem.missing();return rows.getFirst();}
  private View view(String id) {var r=row(id,false);List<Line> lines=db.query("SELECT * FROM order_lines WHERE order_id=? ORDER BY source_line_id",(l,n)->new Line(l.getString("id"),l.getString("description"),l.getInt("ordered"),l.getInt("cancelled"),l.getInt("shipped"),l.getInt("delivered"),l.getInt("ordered")-l.getInt("cancelled")-l.getInt("fulfilled"),l.getInt("allocated"),l.getString("status")),id);List<String> holds=new ArrayList<>(db.queryForList("SELECT code FROM order_holds WHERE order_id=? ORDER BY code",String.class,id));if(Boolean.TRUE.equals(r.get("manual_hold"))) holds.add("MANUAL");return new View(id,str(r,"order_number"),str(r,"quote_id"),str(r,"quote_number"),str(r,"customer_id"),str(r,"scope_id"),str(r,"status"),((Number)r.get("version")).longValue(),decode(str(r,"snapshot_json")),lines,List.copyOf(holds),str(r,"finance_status"));}
