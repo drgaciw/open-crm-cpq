@@ -9,7 +9,8 @@ import org.testcontainers.junit.jupiter.*;
 import java.util.Set;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
-@Testcontainers(disabledWithoutDocker=true)
+@Testcontainers
+@org.junit.jupiter.api.Tag("integration")
 class OrderPostgresIntegrationTest extends OrderServiceTest {
  @Container static PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("oms");
  @BeforeAll static void migrate() {Flyway.configure().dataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword()).schemas("order_management").defaultSchema("order_management").load().migrate();}

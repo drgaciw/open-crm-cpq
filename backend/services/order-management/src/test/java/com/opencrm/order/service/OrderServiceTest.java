@@ -75,4 +75,10 @@ class OrderServiceTest {
   }
   assertEquals(1,db.queryForObject("SELECT SUM(version) FROM orders",Integer.class));assertEquals(3,db.queryForObject("SELECT COUNT(*) FROM order_audit",Integer.class));
  }
+ @Test void commandLookupBindsReceiptToCurrentDatabaseVersion() {
+  var initial=convert();service.submit(initial.id(),new Command(0,"go","submit"));
+  var staleAuthorizationRead=mock(OrderService.class);when(staleAuthorizationRead.get(initial.id())).thenReturn(initial);
+  var controller=new com.opencrm.order.controller.OrderOperationController(staleAuthorizationRead,db);
+  var result=controller.get(initial.id(),"submit").getData();assertEquals("SUCCEEDED",result.status());assertEquals(1,result.orderVersion());
+ }
 }

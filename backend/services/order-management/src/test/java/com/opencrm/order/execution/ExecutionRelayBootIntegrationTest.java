@@ -13,7 +13,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.*;
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties={"oms.scope-id=pilot","oms.security.issuer-uri=https://issuer.test","oms.security.jwk-set-uri=https://issuer.test/jwks","oms.outbox-relay.enabled=true","oms.execution.enabled=false","spring.jpa.hibernate.ddl-auto=validate"})
-@Testcontainers(disabledWithoutDocker=true)
+@Testcontainers
+@org.junit.jupiter.api.Tag("integration")
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class ExecutionRelayBootIntegrationTest {
  @Container static PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:16-alpine");

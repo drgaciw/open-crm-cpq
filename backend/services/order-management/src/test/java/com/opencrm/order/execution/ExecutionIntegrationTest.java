@@ -16,7 +16,8 @@ import java.time.*;
 import java.util.*;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
-@Testcontainers(disabledWithoutDocker=true)
+@Testcontainers
+@org.junit.jupiter.api.Tag("integration")
 class ExecutionIntegrationTest {
  @Container static PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("oms");
  JdbcTemplate db;DataSourceTransactionManager manager;OrderAccess access;OrderService orders;ExecutionService execution;JsonMapper json=JsonMapper.builder().build();

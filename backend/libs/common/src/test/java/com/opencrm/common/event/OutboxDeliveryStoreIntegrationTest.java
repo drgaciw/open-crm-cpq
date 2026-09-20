@@ -23,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
+@org.junit.jupiter.api.Tag("integration")
 class OutboxDeliveryStoreIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
     JdbcTemplate jdbc;
@@ -127,5 +128,17 @@ class OutboxDeliveryStoreIntegrationTest {
         assertTrue(claim(1).isEmpty());
         transaction.executeWithoutResult(status -> { assertTrue(store.acknowledged(delivery)); status.setRollbackOnly(); });
         assertTrue(jdbc.queryForObject("SELECT published FROM outbox_events",Boolean.class));
+    }
+    @Test void leaseExpiryUsesWallClockInsideLongTransaction() {
+        insert(1);var delivery=one();
+        transaction.executeWithoutResult(status->{
+            jdbc.queryForObject("SELECT now()",java.sql.Timestamp.class);
+            jdbc.update("UPDATE outbox_events SET lease_until=clock_timestamp()+interval '100 milliseconds'");
+            jdbc.execute("SELECT pg_sleep(0.2)");
+            var sameTransactionStore=new OutboxDeliveryStore(jdbc);
+            assertFalse(sameTransactionStore.acknowledged(delivery));
+            assertFalse(sameTransactionStore.failed(delivery,5,"late failure"));
+        });
+        assertFalse(jdbc.queryForObject("SELECT published FROM outbox_events",Boolean.class));
     }
 }

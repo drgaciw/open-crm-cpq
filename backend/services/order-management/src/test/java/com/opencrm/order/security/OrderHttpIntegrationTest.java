@@ -72,6 +72,9 @@ class OrderHttpIntegrationTest {
         assertEquals(200,send("/orders/"+id+"/fulfillment-plan","GET","",reader).statusCode());
         var submit=send("/orders/"+id+"/submit","POST","{\"expectedVersion\":0,\"reason\":\"approved pilot\",\"operationKey\":\"submit-http\"}",actor);
         assertEquals(200,submit.statusCode(),submit.body());
+        var operation=send("/orders/"+id+"/operations/submit-http","GET","",reader);assertEquals(200,operation.statusCode(),operation.body());assertEquals("SUCCEEDED",json.readTree(operation.body()).path("data").path("status").asText());
+        var missing=send("/orders/"+id+"/operations/never-received","GET","",reader);assertEquals("NOT_FOUND",json.readTree(missing.body()).path("data").path("status").asText());
+        assertEquals(404,send("/orders/"+id+"/operations/submit-http","GET","",token("other",List.of("oms:read"))).statusCode());
         assertEquals(409,send("/orders/"+id+"/submit","POST","{\"expectedVersion\":0,\"reason\":\"stale\",\"operationKey\":\"stale-http\"}",actor).statusCode());
     }
 }

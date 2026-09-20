@@ -50,7 +50,7 @@ public class OutboxDeliveryStore {
         return jdbc.update("""
             UPDATE outbox_events SET published=true,published_at=now(),lease_token=NULL,lease_until=NULL,
                 next_attempt_at=NULL,error_message=NULL,updated_at=now(),version=version+1
-            WHERE id=? AND lease_token=? AND lease_until>now() AND published=false AND is_deleted=false
+            WHERE id=? AND lease_token=? AND lease_until>clock_timestamp() AND published=false AND is_deleted=false
             """,delivery.id(),delivery.token()) == 1;
     }
 
@@ -62,7 +62,7 @@ public class OutboxDeliveryStore {
                 exhausted_at=CASE WHEN retry_count>=? THEN now() ELSE NULL END,
                 next_attempt_at=now()+(LEAST(300,power(2,LEAST(retry_count-1,6))*5) * interval '1 second'),
                 updated_at=now(),version=version+1
-            WHERE id=? AND lease_token=? AND lease_until>now() AND published=false AND is_deleted=false
+            WHERE id=? AND lease_token=? AND lease_until>clock_timestamp() AND published=false AND is_deleted=false
             """,safeError,maxAttempts,delivery.id(),delivery.token()) == 1;
     }
 
