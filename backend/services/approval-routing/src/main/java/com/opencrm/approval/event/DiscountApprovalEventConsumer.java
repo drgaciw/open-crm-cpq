@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
+import com.opencrm.approval.event.shadow.DiscountTierShadowService;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
@@ -25,6 +26,7 @@ public class DiscountApprovalEventConsumer {
     
     private final ApprovalRequestRepository approvalRequestRepository;
     private final ObjectMapper objectMapper;
+    private final DiscountTierShadowService discountTierShadow;
     
     @KafkaListener(topics = KafkaTopics.DISCOUNT_APPROVAL_REQUIRED, groupId = "approval-routing")
     @Transactional
@@ -34,6 +36,8 @@ public class DiscountApprovalEventConsumer {
             
             log.info("Received discount approval required event for quote: {}", event.getQuoteId());
             
+            String ruleTier = determineApprovalTier(event.getMarginDelta());
+
             // Create approval request
             ApprovalRequest request = ApprovalRequest.builder()
                     .quoteId(event.getQuoteId())
@@ -45,11 +49,15 @@ public class DiscountApprovalEventConsumer {
                     .currencyCode(event.getCurrencyCode())
                     .requesterId("system") // In production, extract from context
                     .submittedAt(Instant.now())
-                    .approvalTier(determineApprovalTier(event.getMarginDelta()))
+                    .approvalTier(ruleTier)
                     .reason("Discount exceeds standard threshold")
                     .build();
             
-            approvalRequestRepository.save(request);
+            ApprovalRequest saved = approvalRequestRepository.save(request);
+
+            // Advisory shadow only (ADR-015): the rule above stays authoritative. Never throws, and runs
+            // after this transaction commits, so it cannot cause a redelivery.
+            discountTierShadow.recordAfterCommit(saved.getId(), event, ruleTier);
             
             log.info("Created approval request for quote: {}", event.getQuoteId());
             
