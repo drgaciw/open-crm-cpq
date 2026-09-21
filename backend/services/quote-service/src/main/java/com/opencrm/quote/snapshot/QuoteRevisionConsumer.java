@@ -18,6 +18,7 @@ public class QuoteRevisionConsumer {
         this.mapper=mapper;this.service=service;
     }
     @KafkaListener(topics="oms.quote-revision-requested.v1",groupId="quote-oms-revision-v1",
+        containerFactory=com.opencrm.common.event.OmsKafkaListenerFactories.NAME,
         properties={"enable.auto.commit=false"})
     public void accept(String payload) throws Exception {service.reopen(mapper.readValue(payload,QuoteRevisionRequest.class));}
 }

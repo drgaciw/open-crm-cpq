@@ -26,7 +26,7 @@ public class OmsActivationConsumer {
         this.jdbc=jdbc;this.mapper=mapper;this.sources=sources;this.trust=trust;
     }
     @Transactional
-    @KafkaListener(topics="oms.activation-requested.v1",groupId="contract-oms-activation-v1")
+    @KafkaListener(topics="oms.activation-requested.v1",groupId="contract-oms-activation-v1",containerFactory=com.opencrm.common.event.OmsKafkaListenerFactories.NAME)
     public void accept(String payload) throws Exception {
         ActivationRequest r=mapper.readValue(payload,ActivationRequest.class);
         trust.requireScope(r.scopeId());
