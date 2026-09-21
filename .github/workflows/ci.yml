@@ -73,8 +73,42 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-integration-test-reports
-          path: backend/**/target/surefire-reports/*.xml
+          path: |
+            backend/**/target/surefire-reports/*.xml
+            **/target/restore-drill-report.json
           if-no-files-found: ignore
+          retention-days: 7
+
+  oms-browser:
+    name: OMS Browser Acceptance (Chromium + PostgreSQL)
+    runs-on: ubuntu-latest
+    needs: [shared-libraries, backend-unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.3'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Required browser fixtures and live order acceptance
+        run: bash scripts/ci/run-core.sh oms-browser
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oms-browser-evidence
+          path: |
+            backend/services/order-management/target/surefire-reports/*OrderLiveBrowserUat*.xml
+            **/target/restore-drill-report.json
+            **/target/oms-browser-*.json
+            **/target/oms-browser-*.png
+            **/target/oms-browser-*.log
+          if-no-files-found: warn
           retention-days: 7
 
   cpq-beta-python:
