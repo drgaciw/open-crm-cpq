@@ -2,6 +2,7 @@ package com.opencrm.order.recovery;
 /** One predicate for daily findings and operator resolution; amounts remain exact integer cents. */
 final class RecoveryFacts {
  private RecoveryFacts() {}
+ static final String UNADJUDICATED_CONFLICTS = "SELECT COUNT(*) FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON s.evidence_id=e.id WHERE e.order_id=? AND s.status='CONFLICT' AND NOT EXISTS(SELECT 1 FROM recovery_evidence_adjudications a WHERE a.evidence_id=e.id AND a.order_id=e.order_id)";
  static final String FINANCE_MISMATCH = """
    SELECT COUNT(*) FROM finance_requests r
    CROSS JOIN LATERAL (

@@ -23,6 +23,8 @@ public class DailyReconciliation {
  }
  private int scanScope(String scope,int limit){
   db.update("INSERT INTO recovery_daily_runs(scope_id,run_date,upper_bound) VALUES(?,(clock_timestamp() AT TIME ZONE 'UTC')::date,clock_timestamp()) ON CONFLICT DO NOTHING",scope);
+  // Extend only the current day's completed window. Its immutable checkpoint remains unchanged.
+  db.update("UPDATE recovery_daily_runs r SET upper_bound=clock_timestamp(),completed_at=NULL WHERE r.scope_id=? AND r.run_date=(clock_timestamp() AT TIME ZONE 'UTC')::date AND r.completed_at IS NOT NULL AND EXISTS(SELECT 1 FROM orders o WHERE o.scope_id=r.scope_id AND o.is_deleted=false AND (o.created_at,o.id)>(r.cursor_created_at,r.cursor_id))",scope);
   // The row lock is the worker fence. Cursor, findings and audits commit together; crashes release it.
   var runs=db.queryForList("SELECT * FROM recovery_daily_runs WHERE scope_id=? AND completed_at IS NULL ORDER BY run_date LIMIT 1 FOR UPDATE SKIP LOCKED",scope);
   if(runs.isEmpty())return 0;var run=runs.getFirst();Object day=run.get("run_date");
@@ -33,8 +35,17 @@ public class DailyReconciliation {
    for(var finding:findings.entrySet())record(scope,day,order,finding.getKey(),finding.getValue());
    db.update("UPDATE recovery_daily_runs SET cursor_created_at=?,cursor_id=?,scanned=scanned+1 WHERE scope_id=? AND run_date=?",candidate.get("created_at"),id,scope,day);
   }
-  if(orders.size()<limit)db.update("UPDATE recovery_daily_runs SET completed_at=clock_timestamp() WHERE scope_id=? AND run_date=?",scope,day);
+  if(orders.size()<limit){
+   db.update("UPDATE recovery_daily_runs SET completed_at=clock_timestamp() WHERE scope_id=? AND run_date=?",scope,day);
+   db.update("INSERT INTO recovery_daily_checkpoints(scope_id,run_date,upper_bound,cursor_created_at,cursor_id,scanned,completed_at) SELECT scope_id,run_date,upper_bound,cursor_created_at,cursor_id,scanned,completed_at FROM recovery_daily_runs WHERE scope_id=? AND run_date=? ON CONFLICT DO NOTHING",scope,day);
+  }
   return orders.size();
+ }
+ public record ScanHealth(long incompleteRuns,double oldestRunAgeSeconds,double secondsSinceCompletion) {}
+ public ScanHealth health(){
+  long incomplete=0;double oldest=0,since=0;
+  for(String scope:scopes){var row=db.queryForMap("SELECT COUNT(*) FILTER(WHERE completed_at IS NULL) AS incomplete,COALESCE(MAX(EXTRACT(EPOCH FROM clock_timestamp()-upper_bound)) FILTER(WHERE completed_at IS NULL),0) AS age,COALESCE(EXTRACT(EPOCH FROM clock_timestamp()-MAX(completed_at)),0) AS since FROM recovery_daily_runs WHERE scope_id=?",scope);incomplete+=((Number)row.get("incomplete")).longValue();oldest=Math.max(oldest,((Number)row.get("age")).doubleValue());since=Math.max(since,((Number)row.get("since")).doubleValue());}
+  return new ScanHealth(incomplete,oldest,since);
  }
  private Map<String,String> inspect(String id){
   var result=new LinkedHashMap<String,String>();
@@ -43,7 +54,7 @@ public class DailyReconciliation {
   check(result,id,"ATTEMPTS_EXHAUSTED","SELECT COUNT(*) FROM task_operations WHERE order_id=? AND attempt>=3 AND (status='RETRYABLE' OR (status='CLAIMED' AND lease_until<clock_timestamp()))","Operation attempts exhausted");
   check(result,id,"ALLOCATION_EXPIRED","SELECT COUNT(*) FROM allocation_lots WHERE order_id=? AND quantity>consumed+released AND expires_at<=clock_timestamp()","Expired allocation requires explicit release or reconciled shipment proof");
   check(result,id,"PENDING_DELIVERY","SELECT COUNT(*) FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON e.id=s.evidence_id WHERE e.order_id=? AND s.status='PENDING'","Delivery awaits referenced shipment evidence");
-  check(result,id,"CONTRADICTORY_EVIDENCE","SELECT COUNT(*) FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON e.id=s.evidence_id WHERE e.order_id=? AND s.status='CONFLICT'","Conflicting fulfillment evidence remains preserved");
+  check(result,id,"CONTRADICTORY_EVIDENCE",RecoveryFacts.UNADJUDICATED_CONFLICTS,"Conflicting fulfillment evidence remains preserved");
   check(result,id,"OUTBOX_EXHAUSTED","SELECT COUNT(*) FROM outbox_events WHERE aggregate_type='Order' AND aggregate_id=? AND exhausted_at IS NOT NULL AND NOT published AND NOT is_deleted","Event delivery exhausted; reconcile broker state before requeue");
   check(result,id,"FINANCE_DISCREPANCY",RecoveryFacts.FINANCE_MISMATCH,"Finance handoff lacks an exact cumulative authoritative acknowledgment");
   check(result,id,"FINANCE_CONTRADICTORY","SELECT COUNT(*) FROM order_exceptions WHERE order_id=? AND category='FINANCE_CONTRADICTORY' AND status='OPEN'","Late contradictory finance outcome requires authoritative review");
