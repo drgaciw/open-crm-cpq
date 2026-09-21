@@ -145,7 +145,9 @@ public class RecoveryService {
    mutation.accept(order);
    db.update("INSERT INTO order_idempotency(scope_id,operation_key,body_hash,order_id) VALUES(?,?,?,?)",scope,command.operationKey(),hash,orderId);
    db.update("INSERT INTO recovery_receipts(scope_id,operation_key,order_id,exception_id,action,result,actor,reason) VALUES(?,?,?,?,?,?,?,?)",scope,command.operationKey(),orderId,exceptionId,action,"ABANDON".equals(action)?"ABANDONED":"SUCCEEDED",access.actor(),command.reason());
-   audit(order,"RECOVERY_"+action,command.reason(),access.actor());return result(orderId,action,detail,command);
+   audit(order,"RECOVERY_"+action,command.reason(),access.actor());
+   com.opencrm.order.audit.CommandAudit.record(db,orderId,command.operationKey(),access.actor(),command.reason(),num(order,"version"));
+   return result(orderId,action,detail,command);
   });}catch(DataIntegrityViolationException race){throw OrderProblem.conflict("Concurrent recovery operation conflict");}
  }
  private Operation result(String id,String action,Object detail,RecoveryCommand command){return new Operation("ABANDON".equals(action)?(String)detail:command.operationKey(),id,"ABANDON".equals(action)?"ABANDONED":"SUCCEEDED",currentVersion(id));}

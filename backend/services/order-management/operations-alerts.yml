@@ -1,6 +1,16 @@
 groups:
   - name: oms-pilot
     rules:
+      - alert: OmsReconciliationStale
+        expr: oms_reconciliation_since_completion_seconds > 86400 or oms_reconciliation_oldest_run_age_seconds > 86400 or oms_reconciliation_sample_age_seconds > 120 or changes(oms_reconciliation_refresh_failures[5m]) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "OMS reconciliation is overdue or its health sample is stale; inspect scanner and database"}
+      - alert: OmsScrapeUnavailable
+        expr: up{job="oms-pilot"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "OMS authenticated monitoring endpoint is unavailable"}
       - alert: OmsOutboxDeliveryStuck
         expr: oms_outbox_oldest_pending_seconds > 300
         for: 5m

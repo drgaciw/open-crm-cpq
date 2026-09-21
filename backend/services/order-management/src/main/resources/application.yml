@@ -34,6 +34,13 @@ spring:
     listener:
       ack-mode: record
 oms:
+  recovery:
+    enabled: ${OMS_RECOVERY_ENABLED:false}
+    scopes: ${OMS_RECOVERY_SCOPES:}
+    batch-size: ${OMS_RECOVERY_BATCH_SIZE:100}
+    scan-delay-ms: ${OMS_RECOVERY_SCAN_DELAY_MS:5000}
+    metrics-poll-ms: ${OMS_RECOVERY_METRICS_POLL_MS:30000}
+    metrics-query-timeout-seconds: ${OMS_RECOVERY_METRICS_QUERY_TIMEOUT_SECONDS:5}
   execution:
     enabled: ${OMS_EXECUTION_ENABLED:false}
     callback-enabled: ${OMS_ACTIVATION_CALLBACK_ENABLED:false}

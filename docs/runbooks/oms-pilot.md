@@ -2,6 +2,34 @@
 
 Status: implementation in progress; this runbook is not production acceptance evidence.
 
+## Build and database roles
+
+Build the OMS reactor with `./mvnw -pl services/order-management -am package` from the
+backend directory (Windows: `mvnw.cmd`). Build the service Dockerfile with the service directory
+as context; the container runs as a nonroot user on port 8090. Run additive migrations in the
+deployment's separate migration job as the schema owner, then apply
+`backend/services/order-management/db/runtime-grants.sql` as that owner with `ON_ERROR_STOP`.
+See `backend/services/order-management/db-role.md` for required role attributes and tested permissions. Configure the deployed
+service with `SPRING_FLYWAY_ENABLED=false` and only `OMS_DB_USERNAME`/`OMS_DB_PASSWORD` runtime
+credentials. Do not give the service process migration credentials. Reapply grants after migrations.
+
+## Recovery and monitoring configuration
+
+Keep `OMS_RECOVERY_ENABLED=false` until schema, scope and operator readiness are verified. Enable
+with explicit `OMS_RECOVERY_SCOPES`; default batch size is 100 and scan delay is 5000 ms. Capacity
+must be measured in the pilot environment. Scrapes use cached bounded database samples; an
+uninitialized or stale sample must alert rather than appear healthy. Import `operations-alerts.yml`
+and adapt `prometheus-scrape.example.yml` to the deployment's TLS endpoint and rotated service
+credential with only `oms:monitor` in the correct scope. Exercise a failed scrape and stale-sample
+alert and record receipt by the named on-call owner before intake. These files are configuration
+artifacts, not evidence that monitoring has been installed.
+
+OMS Kafka listeners retain failed records at their offsets, including malformed records. Repair
+the producer/cause and use an approved, attributable quarantine/replay procedure if necessary;
+never advance offsets merely to make lag disappear. Monitor consumer lag and broker retention
+headroom externally. The local broker tests prove retained offsets and replay identity, not
+production ACLs, replicated broker durability or the required retention horizon.
+
 ## Deployment prerequisites
 
 Use a dedicated migration identity and a separate OMS application role. The application must not
