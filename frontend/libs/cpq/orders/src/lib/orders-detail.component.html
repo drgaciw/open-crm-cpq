@@ -278,7 +278,87 @@
       </table>
     </div>
   </section>
+  <section aria-label="Evidence dispositions">
+    <h2>Evidence dispositions</h2>
+    <p>
+      Append-only disavowals appear here. The original observation remains in
+      the ledger with its original status. Disavowal does not prove fulfillment
+      or change quantities.
+    </p>
+    @if (!adjudications().length) {
+      <p>No evidence dispositions recorded.</p>
+    }
+    <ul>
+      @for (disposition of adjudications(); track disposition.id) {
+        <li>
+          Disavowed observation {{ disposition.evidenceId }} · Authority:
+          {{ disposition.authorityReference }} ·
+          {{ disposition.occurredAt | date: 'medium' }}<br />
+          {{ disposition.reason }} · Recorded by {{ disposition.actor }} at
+          {{ disposition.recordedAt | date: 'medium' }}
+        </li>
+      }
+    </ul>
+  </section>
   <fieldset [disabled]="pending() || loading() || stale() || unresolved() > 0">
+    <section>
+      <h2>Disavow conflicting evidence</h2>
+      <p>
+        Requires both oms:recover and oms:evidence. Select an unapplied
+        conflicting observation and provide independent authority showing it was
+        incorrect. Record any correct fulfillment evidence separately.
+      </p>
+      <form (ngSubmit)="adjudicateEvidence()">
+        <label
+          >Conflicting observation<select
+            name="adjudicationEvidence"
+            [(ngModel)]="adjudicationEvidence"
+            required
+          >
+            <option value="">Choose an unadjudicated conflict</option>
+            @for (entry of adjudicableEvidence(); track entry.id) {
+              <option [value]="entry.id">
+                {{ entry.kind }} · {{ entry.externalReference }} ·
+                {{ entry.id }}
+              </option>
+            }
+          </select></label
+        >
+        <label
+          >Adjudication authority reference<input
+            name="adjudicationReference"
+            [(ngModel)]="adjudicationReference"
+            maxlength="500"
+            required
+        /></label>
+        <label
+          >Authority occurred at (local time)<input
+            type="datetime-local"
+            name="adjudicationAt"
+            [(ngModel)]="adjudicationAt"
+            required
+        /></label>
+        <label
+          >Adjudication reason<textarea
+            name="adjudicationReason"
+            [(ngModel)]="adjudicationReason"
+            required
+          ></textarea>
+        </label>
+        <label class="check"
+          ><input
+            type="checkbox"
+            name="adjudicationConfirmed"
+            [(ngModel)]="adjudicationConfirmed"
+          />
+          I confirm the selected original observation is disavowed by this
+          authority. This does not record fulfillment.</label
+        >
+        <button type="submit" class="danger">
+          Disavow conflicting observation
+        </button>
+      </form>
+    </section>
     <section>
       <h2>Order commands</h2>
       <p>

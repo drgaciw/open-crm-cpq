@@ -81,6 +81,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     fixture.detectChanges();
     return fixture;
   }
@@ -244,6 +245,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     http
       .expectOne(`/api/v1/orders/o/operations/${key}`)
       .flush(
@@ -339,6 +341,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('pending');
     expect(c.order()?.lines[0].delivered).toBe(0);
@@ -378,6 +381,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     const lookup = http.expectOne(`/api/v1/orders/o/operations/${key}`);
     lookup.flush(
       envelope({
@@ -403,6 +407,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     http.expectOne(`/api/v1/orders/o/operations/${key}`).flush(
       envelope({
         operationKey: key,
@@ -434,6 +439,7 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/evidence-adjudications').flush(envelope([]));
     expect(c.order()?.status).toBe('SUBMITTED');
     c.holdActive = true;
     c.commandReason = 'Review shipping instructions';

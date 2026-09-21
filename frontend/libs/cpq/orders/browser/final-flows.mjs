@@ -57,6 +57,7 @@ try {
     },
   };
   const calls = [];
+  const adjudications = [];
   const outcomes = new Map();
   let loseNext = false;
   const wrap = (data) => ({
@@ -79,6 +80,16 @@ try {
       const target = path.match(/\/operations\/([^/]+)\/abandon$/)?.[1];
       if (target) outcomes.set(target, 'ABANDONED');
       outcomes.set(body.operationKey, 'SUCCEEDED');
+      if (path.endsWith('/adjudications'))
+        adjudications.push({
+          id: 'disposition',
+          evidenceId: 'conflict',
+          authorityReference: body.authorityReference,
+          occurredAt: body.occurredAt,
+          actor: 'reviewer',
+          reason: body.reason,
+          recordedAt: '2026-09-20T15:00:00Z',
+        });
       data = { status: 'SUCCEEDED' };
     } else if (path.endsWith('/plan'))
       data = [
@@ -92,6 +103,7 @@ try {
         },
       ];
     else if (path.endsWith('/timeline')) data = [];
+    else if (path.endsWith('/evidence-adjudications')) data = adjudications;
     else if (path.endsWith('/allocations'))
       data = [
         {
@@ -121,6 +133,21 @@ try {
           reason: 'Carrier pickup',
           status: 'APPLIED',
           detail: null,
+        },
+        {
+          id: 'conflict',
+          lineId: 'line',
+          kind: 'SHIPMENT',
+          quantity: 2,
+          externalReference: 'incorrect-shipment',
+          allocationReference: 'allocation-1',
+          shipmentReference: null,
+          occurredAt: '2026-09-20T12:00:00Z',
+          expiresAt: null,
+          actor: 'operator',
+          reason: 'Disputed observation',
+          status: 'CONFLICT',
+          detail: 'Reference conflict',
         },
       ];
     else if (path.endsWith('/finance-requests'))
@@ -301,11 +328,81 @@ try {
       .isDisabled(),
     false,
   );
+  await page.getByLabel('Conflicting observation').selectOption('conflict');
+  await page
+    .getByLabel('Adjudication authority reference')
+    .fill('carrier-audit-proof');
+  await page
+    .getByLabel('Authority occurred at (local time)')
+    .fill('2026-09-20T14:00');
+  await page
+    .getByLabel('Adjudication reason')
+    .fill('Carrier audit disproves duplicate observation');
+  const beforeDisavowal = calls.length;
+  await page
+    .getByRole('button', {
+      name: 'Disavow conflicting observation',
+      exact: true,
+    })
+    .click();
+  assert.equal(calls.length, beforeDisavowal);
+  await page
+    .getByLabel(
+      'I confirm the selected original observation is disavowed by this authority. This does not record fulfillment.',
+    )
+    .check();
+  await commit('Disavow conflicting observation');
+  assert.equal(
+    calls.at(-1).path,
+    '/api/v1/orders/order/evidence/conflict/adjudications',
+  );
+  assert.deepEqual(Object.keys(calls.at(-1).body).sort(), [
+    'authorityReference',
+    'expectedVersion',
+    'occurredAt',
+    'operationKey',
+    'reason',
+  ]);
+  assert.equal(calls.at(-1).body.authorityReference, 'carrier-audit-proof');
+  assert.match(
+    await page
+      .getByRole('region', { name: 'Evidence dispositions' })
+      .innerText(),
+    /carrier-audit-proof/,
+  );
+  assert.match(
+    await page
+      .getByRole('region', { name: 'Fulfillment evidence ledger' })
+      .innerText(),
+    /CONFLICT/,
+  );
+  assert.equal(
+    await page
+      .getByLabel('Conflicting observation')
+      .locator('option[value="conflict"]')
+      .count(),
+    0,
+  );
+  assert.equal(line.shipped, 0);
+  assert.equal(order.status, 'DRAFT');
+  const fulfillment = page
+    .getByRole('heading', { name: 'Fulfillment lines', exact: true })
+    .locator('..');
+  assert.equal(
+    await fulfillment
+      .locator('tbody tr')
+      .first()
+      .locator('td')
+      .nth(3)
+      .innerText(),
+    '0',
+  );
+  assert.equal(await page.locator('.badge').innerText(), 'DRAFT');
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify(
       {
-        scenarios: 8,
+        scenarios: 9,
         commands: calls.length,
         backend: 'intercepted HTTP fixtures only',
         pageErrors: errors,
