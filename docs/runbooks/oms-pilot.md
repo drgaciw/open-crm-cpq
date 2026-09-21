@@ -1,6 +1,6 @@
 # OMS manual pilot operations
 
-Status: implementation in progress; this runbook is not production acceptance evidence.
+Status: integrated pilot; operational acceptance pending. This runbook is not production acceptance evidence.
 
 ## Build and database roles
 
@@ -133,3 +133,8 @@ all targets at gateway :8080; local browser login still needs a registered redir
 the secure session cookie. POST /oms/logout requires the CSRF header. Verify real provider login,
 expired access-token renewal, logout and denied account claims before enabling the pilot. The local
 PKCE/token-relay tests do not replace this deployment check.
+
+For direct bearer-token requests through the gateway, separately configure its resource-server
+`AZURE_AD_B2C_ISSUER_URI` and `AZURE_AD_B2C_JWK_SET_URI` for the intended trusted issuer.
+`OMS_OIDC_ISSUER_URI` configures the browser OAuth client; it does not override that bearer
+decoder. Validate the intended browser-session and direct-bearer paths independently.

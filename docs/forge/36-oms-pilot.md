@@ -22,8 +22,10 @@ reactor/gateway/shell/CI and migration allocation; agents must request cross-bou
 
 Q owns quote-service (migration next unused version); R owns common/event existing relay and tests;
 K owns contract-asset (migration next unused version); O/E/F/B/X own distinct packages in
-order-management, migrations V1 order, V2 execution, V3 operations; S owns OMS security/config;
-U owns frontend/libs/cpq/orders exclusively, including recovery/evidence UI.
+order-management; S owns OMS security/config; U owns frontend/libs/cpq/orders exclusively,
+including recovery/evidence UI. Integrated OMS migrations are V1 orders, V2 execution,
+V3 fulfillment, V4 finance, V5 recovery, V6 replacement, V7 command audit and V8 operational
+lookup indexes. The coordinator owns cross-package integration and migration allocation.
 
 Before edits: worktree-bound GitNexus upstream impact. UNKNOWN requires source checks; HIGH/CRITICAL
 requires warning. Before commits: complete detect-changes. TDD behavioral red/green and separate
@@ -46,3 +48,28 @@ Required: 100-way conversion, aliases, snapshot immutability, version/body confl
 lease/crash/ack failure, unknown outcomes, cancellation races, legacy overlap, scope denial,
 partial finance acknowledgments, restore and disable-intake drain. Performance and recovery
 budgets are targets requiring measured evidence, not claims about this implementation.
+
+## Integrated engineering evidence and remaining gates
+
+The integration branch now includes scoped OMS APIs and workspace, quote snapshots, durable
+execution/manual fulfillment/finance, contract ownership fencing, recovery/adjudication,
+least-privilege database grants, gateway outbox recovery routing, and required CI/browser stages.
+This records integrated engineering scope, not completion of every requirement or launch approval.
+See the [requirement-to-test matrix](../oms/requirement-test-matrix.md) and
+[evidence record](../oms/pilot-evidence.md) for exact tests, revisions and remaining scenario gaps.
+
+Composed PostgreSQL tests exercise 100 simultaneous conversions mixing canonical and legacy
+aliases, a physical/service/monthly/annual order through real OMS services with partial then full
+finance acknowledgments, and competing shipment/cancellation at one version. These use synthetic
+manual authority evidence and trusted test acknowledgments, not live quote/contract processes or
+external providers. Local browser HTTP/JWT/PostgreSQL, broker acknowledgment/consumer retention,
+runtime database-role and actual local dump/restore tests provide additional bounded evidence.
+The CI contract explicitly includes cpq-orders and a required fixture plus live-browser stage;
+published final-SHA CI evidence remains a separate release artifact.
+
+Production intake remains closed until named owners approve identity and broker ACL verification,
+fence-before-intake cutover, retention/poison-record lag response, alerts and recovery procedures.
+The representative 100000-order/200-line/25-user/10-intake-per-second/30-minute load run, manual
+screen-reader and critical-task keyboard checks, real IdP/gateway callback and SASL_SSL ACL tests,
+infrastructure-loss RPO/RTO and availability acceptance remain unproven. Local restore and
+scheduler-capacity arithmetic do not establish those budgets. P1/P2 and all unrelated holds remain.

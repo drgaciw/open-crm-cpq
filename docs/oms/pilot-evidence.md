@@ -1,10 +1,11 @@
 # OMS pilot evidence and release gates
 
-Evidence baseline: integration commit `ad896d5`, documentation branch
-`feat/oms-evidence-docs`, 20 September 2026. Original authorized implementation base:
-`8db288016c6da39bea8c29322613718f15faa459`. This is an evidence inventory, **not production
-acceptance or a claim that all engineering work is complete**. Later integration changes need their
-own results. No tests were rerun for this documentation-only change.
+Engineering baseline: integration commit `e96d3fa`, branch `feat/oms-integration`,
+20 September 2026. Original authorized implementation base:
+`8db288016c6da39bea8c29322613718f15faa459`. Final documentation follows this code baseline.
+This inventory records locally verified engineering evidence; **production acceptance remains
+closed** until the operational gates below pass. Independent specification and code-quality
+reviews passed for the integrated pilot work and final deployment artifacts.
 
 The [source requirements](../requirements/order-management-requirements.md) retain their proposed
 research status. The [authorized wave](../forge/36-oms-pilot.md) and
@@ -26,28 +27,71 @@ into broader operational claims.
 | Angular `orders.components.spec.ts`, `orders.service.spec.ts`, `pending-operations.spec.ts`, `orders-adjudication.spec.ts` | Command bodies, version/permission UI, uncertain-command journal, errors, immutable dispositions | HttpClient mocks and component fixtures; not live backend acceptance. |
 | `PublishedLanguageCompatibilityTest` | Additive fields accepted by supported Jackson 2/3 readers, including nested line records | Tested reader versions only; no universal schema-compatibility claim. |
 
-Reviewed local reports from the workstream checkouts include 39 passing recovery tests (34
-PostgreSQL, one real JWT/HTTP, four unit), two real-broker tests plus two retention-policy unit
-tests, and a passing local restore drill. These are scoped workstream results, not a consolidated
-release-candidate CI result. Test names in the matrix establish traceability; an entry alone does
-not assert a fresh passing run at this exact baseline.
+## Final local verification
 
-Archive immutable CI links, commit SHA, environment, command, test counts/failures/skips and
-Surefire/Vitest reports for the release candidate. Relevant artifacts are service
-`target/surefire-reports/`, `target/restore-drill-report.json`, and browser JSON/screenshots/logs.
-Local ignored artifacts and agent reports are insufficient as the final release record.
+The final changed-service Maven `verify -Pintegration-tests` run passed: common 99,
+security 13, OMS 189, quote 60, contract-asset 38 and gateway 58 tests (457 total), with zero
+failures/errors/skips. The separately invoked `OrderLiveBrowserUat` then passed one test in
+29.962 seconds against the final code: 458 tests across these scopes including live browser.
+An earlier full backend reactor verification passed all 12 service suites. CRM and pricing
+were separately rerun with JaCoCo enabled: 85.99% and 84.41% line coverage respectively,
+passing both 80% gates. These are local runs, not a published remote CI result.
 
-At this baseline the separately reviewed DB runtime-role hardening and live-browser/CI follow-ups
-are **not included**. A post-baseline, not-yet-committed `OrderLiveBrowserUat` run was inspected:
-one test passed, zero failures/errors/skips, 36.61 seconds. Its `oms-browser-live.json` records 11
-POST responses plus a separately faulted real committed hold response, recovered after reload;
-zero page errors; zero axe violations on the final screen (WCAG 2 A/AA and 2.1 AA tags); and one
-Tab-navigation probe. Actual OMS HTTP/JWT/PostgreSQL uses synthetic manual authority evidence.
-The coordinator also reports intermediate partial-delivery/finance checks and final database
-assertions for ten delivered, ten acknowledged, all evidence applied and command-audit coverage.
-Archive these artifacts with the final commit before treating this as release-candidate evidence.
-Fixture browser runs remain separate. The runtime-role follow-up must run against the complete
-migration set, including recovery tables.
+Additional verified evidence:
+
+- `PilotScenarioIntegrationTest`: 100 concurrent UUID/number-alias conversions produce one
+  order/plan; mixed physical/service/monthly/annual lines complete only after their own
+  evidence and full exact finance acknowledgments; shipment/cancellation race has one version
+  winner and conserves quantities. Actual OMS/PostgreSQL, synthetic authority acknowledgments;
+  not a complete deployed quote-to-contract journey.
+- `ContractOmsBrokerRetentionIntegrationTest`: actual named OMS listener factory and source
+  consumer retain a fatal record beyond ten failures and through consumer restart, even when
+  the shared consumer factory enables auto-commit. Registry and trust are mocked; no SASL/ACL
+  deployment claim. Quote and contract OMS factories remain isolated from legacy listeners.
+- `DbRoleIntegrationTest`: actual PostgreSQL runtime-role allow/deny checks include recovery
+  tables and operations, immutable records and published-outbox cleanup. `RecoveryWiringIntegrationTest`
+  covers shared command auditing, abandoned operation lookup and adjudicated cancellation.
+- Angular: 28 Vitest tests; production CRM build and orders feature lint passed. Nine fixture
+  browser scenarios issued ten commands with zero page errors. Fixture responses are mocked.
+- Final live browser: real OMS HTTP, signed local JWT/JWKS and PostgreSQL; eleven successful
+  POST responses plus a deliberately lost real committed hold response, recovered after reload.
+  Partial delivery and partial finance acknowledgment cannot complete the order. Final database
+  assertions verify ten delivered, ten acknowledged, applied evidence and command-audit coverage.
+  Zero page errors, zero axe violations on the final screen (WCAG 2 A/AA and 2.1 AA tags), and
+  one Tab-navigation probe. Manual accessibility and production gateway login remain unverified.
+- Actual local `pg_dump`/`pg_restore`: separate restored database, one snapshot, three receipts,
+  six audit rows and five pending outbox rows retained; UNKNOWN redispatch blocked. Backup age
+  at restore 157 ms and restore duration 295 ms are small functional-drill measurements, **not
+  infrastructure-loss RPO/RTO evidence**.
+- OMS Docker image built; non-root UID 100 and Java 25 runtime checked. Disabled pilot Compose
+  overlay validates; four Promtool alert fixtures pass. No deployment or alert delivery claimed.
+- CI contract drift check passes. Jenkins/manual GitHub Actions include explicit OMS/quote/contract,
+  orders UI and mandatory fixture/live browser checks with fresh no-skip test-report assertions.
+- Complete GitNexus branch comparison: 231 changed files, 1,485 changed symbols, 117 affected
+  execution flows, CRITICAL aggregate risk; no partial/truncated results. This broad cross-service impact
+  is why staged cutover and deployment gates remain mandatory. The final four artifact changes
+  separately report LOW risk. FTS search extension was unavailable; graph analysis completed.
+
+Reproduction commands (from `backend`, Java 25 and Docker available):
+
+```powershell
+$env:MAVEN_OPTS='-Xmx512m'
+$env:JDK_JAVA_OPTIONS='-Xmx512m'
+.\mvnw.cmd -pl services/order-management,services/quote-service,services/contract-asset-management,services/gateway-service -am verify -Pintegration-tests
+.\mvnw.cmd -pl services/order-management -am test -Pintegration-tests '-Dtest=OrderLiveBrowserUat' '-Dsurefire.failIfNoSpecifiedTests=false'
+```
+
+The browser check additionally requires the pinned frontend dependencies and Playwright Chromium;
+`scripts/ci/oms-browser.sh` installs these on the CI agent and requires Docker. The local frontend
+uses an existing shared dependency junction; no dependency installation into that junction was done.
+
+Relevant local artifacts: `backend/oms-final-integrated-verify.log`,
+`backend/oms-final-live-browser.log`, `backend/oms-all-backend-verify.log`,
+`backend/oms-coverage-verify.log`, service `target/surefire-reports/`,
+`backend/services/order-management/target/restore-drill-report.json`, and that service's
+`target/oms-browser-live.json`, PNG and accessibility JSON. These ignored artifacts remain local;
+archive immutable CI links, SHA, environment and reports for the release candidate. Local results
+and agent reports do not substitute for the final operational release record.
 
 ## Cutover and retention gates
 
@@ -89,7 +133,7 @@ existing accepted work may continue to add outbox records.
 | Infrastructure-loss RPO <=15 minutes, RTO <=4 hours; encrypted backup/PITR and authoritative downstream reconciliation | **NOT RUN**. Local functional restore only. |
 | 99.5% monthly availability, daily reconciliation at production volume, exception visibility <=60 seconds, alert delivery/escalation and poison-lag recovery within retention | **NOT DEMONSTRATED** on an agreed deployment. |
 | Named pilot/fulfillment/finance/security/SRE owners, policy approval, training and real external evidence procedures | **APPROVAL REQUIRED** before launch; test identities are not assigned operational owners. |
-| Consolidated final CI, live browser acceptance and runtime least-privilege verification on the final SHA | **PENDING** release record. Post-baseline live browser passed locally; final commit/CI association still pending. Preserve Docker-required tests without silent skipping and include the new Nx project explicitly. |
+| Published release-candidate CI record | **PENDING** remote run and immutable archive. Final local service, live browser and runtime-role checks passed; required CI wiring is committed. Preserve Docker-required tests without silent skipping. |
 
 P1/P2 remain roadmap work: non-quote intake, bundle designer, general cross-line orchestration,
 in-flight amendments, distributed sourcing/procurement, payment controls, returns/refunds,
