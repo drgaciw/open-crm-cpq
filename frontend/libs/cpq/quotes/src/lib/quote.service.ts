@@ -1,3 +1,4 @@
+import { JevSuggestionEnvelope } from '@frontend/shared-models';
 import { Service, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, finalize } from 'rxjs';
@@ -132,6 +133,14 @@ export class QuoteService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.basePath}/${id}`);
+  }
+
+  /**
+   * Advisory approval-tier suggestion (ADR-015). Never a decision, never required: the endpoint always
+   * answers 200 with a status, and callers must treat any failure as "no suggestion".
+   */
+  getTierSuggestion(id: number): Observable<JevSuggestionEnvelope> {
+    return this.http.get<JevSuggestionEnvelope>(`${this.basePath}/${id}/approvals/tier-suggestion`);
   }
 
   submit(id: number): Observable<QuoteDto> {

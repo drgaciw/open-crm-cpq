@@ -59,6 +59,8 @@ Any further use case requires an amendment to this table.
 - `opencrm.jev.api-key: ${JEV_API_KEY:}` has an empty default, unlike other secrets, so that a flag-off service boots without the variable. An empty key forces the no-op transport.
 - `leads.score_probabilities` is `TEXT` holding JSON, not `JSONB`. `crm-service` boots with `ddl-auto=validate`, the value is only read back whole, and a JSON type mapping could not be boot-tested without Docker when it landed. Revisit if it ever needs querying.
 - Lead scoring has no event/listener layer: `JevAdvisoryRunner` already defers to after-commit, so `LeadService` gains one collaborator and one call per save.
+- The quote-tier suggestion is **on demand**. The UI has no tier picker (Submit posts no tier), so there is nothing to show it beside; a "Suggest approval tier (advisory)" button on DRAFT quotes fetches it. An ordinary page load therefore makes no extra request, and the suggestion never preselects or submits anything.
+- The first request for a quote's feature state returns `PENDING` and starts one evaluation; later requests read the stored decision by feature hash. A state already evaluated without a usable answer is not retried, so polling cannot spend the call budget. The user's eventual tier is attached to the logged decision by a scheduled, read-only reconciler; `quote.approvalTier` values outside the `ApprovalTier` vocabulary (it is also written from pricing data) are ignored.
 
 ## Rollout and gates
 
