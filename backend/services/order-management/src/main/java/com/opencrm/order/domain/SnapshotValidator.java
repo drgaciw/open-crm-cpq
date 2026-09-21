@@ -7,7 +7,7 @@ public class SnapshotValidator {
   if(s==null || s.schemaVersion()!=1 || !"USD".equals(s.currency()) || s.acceptedRevision()<1 || s.acceptedAt()==null) throw OrderProblem.invalid("Unsupported accepted snapshot");
   required(s.snapshotId()); required(s.scopeId()); required(s.customerId()); required(s.quoteNumber());
   try { if(!UUID.fromString(s.quoteId()).toString().equals(s.quoteId())) throw new IllegalArgumentException(); } catch(Exception e) { throw OrderProblem.invalid("Canonical quote UUID required"); }
-  if(s.lines()==null || s.lines().isEmpty()) throw OrderProblem.invalid("Order requires lines");
+  if(s.lines()==null || s.lines().isEmpty() || s.lines().size()>200) throw OrderProblem.invalid("Order requires between 1 and 200 lines");
   Set<String> ids=new HashSet<>(); var holds=new ArrayList<String>();
   BigDecimal subtotal=BigDecimal.ZERO,discount=BigDecimal.ZERO,tax=BigDecimal.ZERO,total=BigDecimal.ZERO;
   for(var l:s.lines()) {

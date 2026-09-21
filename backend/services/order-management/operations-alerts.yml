@@ -1,0 +1,23 @@
+groups:
+  - name: oms-pilot
+    rules:
+      - alert: OmsOutboxDeliveryStuck
+        expr: oms_outbox_oldest_pending_seconds > 300
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "OMS pending delivery is over five minutes old; inspect relay and broker"}
+      - alert: OmsOutboxExhausted
+        expr: oms_outbox_exhausted > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "OMS exhausted delivery requires attributable recovery"}
+      - alert: OmsTaskOutcomeNeedsReconciliation
+        expr: oms_tasks_unknown > 0 or oms_tasks_overdue > 0 or oms_finance_exceptions_open > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "OMS external work needs operator reconciliation"}
+      - alert: OmsMetricsStale
+        expr: oms_operations_sample_age_seconds > 120 or changes(oms_operations_refresh_failures[5m]) > 0 or oms_operations_configured == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "OMS operational metrics are stale, failing or unconfigured"}
