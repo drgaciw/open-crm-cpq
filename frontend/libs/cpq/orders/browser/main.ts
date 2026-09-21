@@ -8,7 +8,7 @@ import { apiResponseInterceptor } from '@frontend/shared-data-access';
 import { ORDERS_ROUTES } from '../src/lib/orders.routes';
 
 @Component({
-  selector: 'orders-browser-harness',
+  selector: 'cpq-orders-browser-harness',
   imports: [RouterOutlet],
   template: '<router-outlet />',
 })
