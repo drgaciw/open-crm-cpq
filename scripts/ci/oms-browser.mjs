@@ -23,7 +23,7 @@ for (const name of ['oms-browser-live.json','oms-browser-live.png','oms-browser-
 try {
 server = await createServer({
   configFile: resolve(frontend, 'libs/cpq/orders/browser.vite.config.mts'),
-  server: { port: Number(process.env.OMS_BROWSER_PORT || 4317), strictPort: true,
+  server: { port: Number(process.env.OMS_BROWSER_PORT || 0), strictPort: true,
     ...(target ? { proxy: { '/api': { target, changeOrigin: true } } } : {}) },
 });
   await server.listen();

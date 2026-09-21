@@ -1,0 +1,49 @@
+# Explicit pilot overlay; use with docker-compose.yml and --profile oms.
+# Migrate/grant separately before startup. No migration credentials enter this service.
+# Gateway browser cookies require HTTPS at the deployment ingress.
+services:
+  order-management:
+    profiles: [oms]
+    build:
+      context: ./services/order-management
+    ports:
+      - "127.0.0.1:${OMS_HTTP_PORT:-8090}:8090"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: opencrm
+      OMS_DB_USERNAME: ${OMS_DB_USERNAME:-oms_app}
+      OMS_DB_PASSWORD: ${OMS_DB_PASSWORD:?Provide the separate OMS runtime credential}
+      SPRING_FLYWAY_ENABLED: "false"
+      OMS_SCOPE_ID: ${OMS_SCOPE_ID:?Provide the pilot deployment scope}
+      OMS_SECURITY_ISSUER_URI: ${OMS_OIDC_ISSUER_URI:?Provide the trusted issuer}
+      OMS_SECURITY_JWK_SET_URI: ${OMS_JWK_SET_URI:?Provide the issuer JWKS endpoint}
+      OMS_SECURITY_AUDIENCE: order-management
+      OMS_INTAKE_ENABLED: ${OMS_INTAKE_ENABLED:-false}
+      OMS_TRUSTED_SOURCE_SCOPES: ${OMS_TRUSTED_SOURCE_SCOPES:-}
+      OMS_SNAPSHOT_CONSUMER_ENABLED: ${OMS_SNAPSHOT_CONSUMER_ENABLED:-false}
+      OMS_EXECUTION_ENABLED: ${OMS_EXECUTION_ENABLED:-false}
+      OMS_ACTIVATION_CALLBACK_ENABLED: ${OMS_ACTIVATION_CALLBACK_ENABLED:-false}
+      OMS_EXECUTION_ALLOWED_SCOPES: ${OMS_EXECUTION_ALLOWED_SCOPES:-}
+      OMS_OUTBOX_RELAY_ENABLED: ${OMS_OUTBOX_RELAY_ENABLED:-false}
+      OMS_RECOVERY_ENABLED: ${OMS_RECOVERY_ENABLED:-false}
+      OMS_RECOVERY_SCOPES: ${OMS_RECOVERY_SCOPES:-}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}
+      OMS_KAFKA_SECURITY_PROTOCOL: SASL_SSL
+      OMS_PRODUCER_ACL_VERIFIED: ${OMS_PRODUCER_ACL_VERIFIED:-false}
+      OMS_TRUSTED_PRODUCER_PRINCIPALS: ${OMS_TRUSTED_PRODUCER_PRINCIPALS:-}
+      # Supply mounted broker credentials/trust via a deployment-owned Spring config tree.
+      SPRING_CONFIG_IMPORT: ${OMS_SPRING_CONFIG_IMPORT:-optional:configtree:/run/secrets/}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  gateway-service:
+    environment:
+      ORDER_MANAGEMENT_URI: http://order-management:8090
+      SPRING_PROFILES_ACTIVE: oms-browser
+      OMS_OIDC_ISSUER_URI: ${OMS_OIDC_ISSUER_URI:?Provide the trusted issuer}
+      OMS_OIDC_CLIENT_ID: ${OMS_OIDC_CLIENT_ID:?Provide the registered browser client}
+      OMS_OIDC_CLIENT_SECRET: ${OMS_OIDC_CLIENT_SECRET:?Provide the registered browser client credential}
+      OMS_OIDC_REDIRECT_URI: ${OMS_OIDC_REDIRECT_URI:?Provide the registered HTTPS callback}
+      OMS_OIDC_SCOPES: ${OMS_OIDC_SCOPES:-openid,profile}

@@ -13,6 +13,14 @@ See `backend/services/order-management/db-role.md` for required role attributes 
 service with `SPRING_FLYWAY_ENABLED=false` and only `OMS_DB_USERNAME`/`OMS_DB_PASSWORD` runtime
 credentials. Do not give the service process migration credentials. Reapply grants after migrations.
 
+An explicit Compose pilot overlay is available in `backend/docker-compose.oms.yml`. Validate it
+with `docker compose -f docker-compose.yml -f docker-compose.oms.yml --profile oms config --quiet`
+from `backend`, with deployment credentials supplied externally. It registers the OMS container and
+gateway destination and enables the gateway's browser-login profile. Migrations/grants, registered
+HTTPS callback, TLS ingress, broker credential mounts and topic ACLs must exist first. All OMS
+intake, source consumers, executor, relay and recovery switches remain off by default. The overlay
+has not been launched against production or a real IdP. Keep secrets out of rendered config logs.
+
 ## Recovery and monitoring configuration
 
 Keep `OMS_RECOVERY_ENABLED=false` until schema, scope and operator readiness are verified. Enable
