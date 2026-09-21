@@ -2,6 +2,7 @@ package com.opencrm.order.recovery;
 
 import com.opencrm.order.domain.OrderProblem;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -14,7 +15,14 @@ public class DailyReconciliation {
  private final JdbcTemplate db;
  private final TransactionTemplate tx;
  private final SortedSet<String> scopes=new TreeSet<>();
- public DailyReconciliation(JdbcTemplate db,PlatformTransactionManager manager,@Value("${oms.recovery.scopes:}") String configuredScopes){this.db=db;this.tx=new TransactionTemplate(manager);for(String scope:configuredScopes.split(","))if(!scope.isBlank())scopes.add(scope.trim());}
+ private final int healthQueryTimeoutSeconds;
+ public DailyReconciliation(JdbcTemplate db,PlatformTransactionManager manager,String scopes){this(db,manager,scopes,5);}
+ @Autowired
+ public DailyReconciliation(JdbcTemplate db,PlatformTransactionManager manager,@Value("${oms.recovery.scopes:}") String configuredScopes,@Value("${oms.recovery.metrics-query-timeout-seconds:5}") int timeoutSeconds){
+  if(timeoutSeconds<1||timeoutSeconds>30)throw new IllegalArgumentException("Reconciliation health timeout must be 1..30 seconds");
+  this.db=db;this.tx=new TransactionTemplate(manager);this.healthQueryTimeoutSeconds=timeoutSeconds;
+  for(String scope:configuredScopes.split(","))if(!scope.isBlank())scopes.add(scope.trim());
+ }
  public int scan(int limit){
   if(limit<1||limit>100)throw OrderProblem.invalid("Batch size must be 1..100");
   int scanned=0;
@@ -43,8 +51,14 @@ public class DailyReconciliation {
  }
  public record ScanHealth(long incompleteRuns,double oldestRunAgeSeconds,double secondsSinceCompletion) {}
  public ScanHealth health(){
-  long incomplete=0;double oldest=0,since=0;
-  for(String scope:scopes){var row=db.queryForMap("SELECT COUNT(*) FILTER(WHERE completed_at IS NULL) AS incomplete,COALESCE(MAX(EXTRACT(EPOCH FROM clock_timestamp()-upper_bound)) FILTER(WHERE completed_at IS NULL),0) AS age,COALESCE(EXTRACT(EPOCH FROM clock_timestamp()-MAX(completed_at)),0) AS since FROM recovery_daily_runs WHERE scope_id=?",scope);incomplete+=((Number)row.get("incomplete")).longValue();oldest=Math.max(oldest,((Number)row.get("age")).doubleValue());since=Math.max(since,((Number)row.get("since")).doubleValue());}
+  long incomplete=0;double oldest=0,since=scopes.isEmpty()?Double.POSITIVE_INFINITY:0;
+  for(String scope:scopes){
+   ScanHealth current=db.query(connection->{
+    var statement=connection.prepareStatement("SELECT COUNT(*) FILTER(WHERE completed_at IS NULL) AS incomplete,COALESCE(MAX(EXTRACT(EPOCH FROM clock_timestamp()-upper_bound)) FILTER(WHERE completed_at IS NULL),0) AS age,EXTRACT(EPOCH FROM clock_timestamp()-MAX(completed_at)) AS since FROM recovery_daily_runs WHERE scope_id=?");
+    statement.setString(1,scope);statement.setQueryTimeout(healthQueryTimeoutSeconds);return statement;
+   },result->{result.next();return new ScanHealth(result.getLong("incomplete"),result.getDouble("age"),result.getObject("since")==null?Double.POSITIVE_INFINITY:result.getDouble("since"));});
+   incomplete+=current.incompleteRuns();oldest=Math.max(oldest,current.oldestRunAgeSeconds());since=Math.max(since,current.secondsSinceCompletion());
+  }
   return new ScanHealth(incomplete,oldest,since);
  }
  private Map<String,String> inspect(String id){
