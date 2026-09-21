@@ -27,6 +27,9 @@ public class RecoveryService {
  private final OrderAccess access;
  private final ExecutionService execution;
  private final Set<String> scopes;
+ private com.opencrm.order.advisory.OrderAdvisoryTrigger advisory = com.opencrm.order.advisory.OrderAdvisoryTrigger.NONE;
+ @org.springframework.beans.factory.annotation.Autowired(required=false)
+ public void setAdvisory(com.opencrm.order.advisory.OrderAdvisoryTrigger advisory){this.advisory=advisory;}
  public RecoveryService(JdbcTemplate db,PlatformTransactionManager manager,ObjectMapper json,OrderAccess access,ExecutionService execution,@Value("${oms.recovery.scopes:}") String scopes) {
   this.db=db;this.tx=new TransactionTemplate(manager);this.json=json;this.access=access;this.execution=execution;
   this.scopes=new HashSet<>();for(String scope:scopes.split(","))if(!scope.isBlank())this.scopes.add(scope.trim());
@@ -147,6 +150,7 @@ public class RecoveryService {
    db.update("INSERT INTO recovery_receipts(scope_id,operation_key,order_id,exception_id,action,result,actor,reason) VALUES(?,?,?,?,?,?,?,?)",scope,command.operationKey(),orderId,exceptionId,action,"ABANDON".equals(action)?"ABANDONED":"SUCCEEDED",access.actor(),command.reason());
    audit(order,"RECOVERY_"+action,command.reason(),access.actor());
    com.opencrm.order.audit.CommandAudit.record(db,orderId,command.operationKey(),access.actor(),command.reason(),num(order,"version"));
+   com.opencrm.order.advisory.OrderAdvisoryTrigger.notifySafely(advisory,orderId);
    return result(orderId,action,detail,command);
   });}catch(DataIntegrityViolationException race){throw OrderProblem.conflict("Concurrent recovery operation conflict");}
  }

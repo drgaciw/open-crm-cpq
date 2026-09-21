@@ -16,6 +16,9 @@ public class DailyReconciliation {
  private final TransactionTemplate tx;
  private final SortedSet<String> scopes=new TreeSet<>();
  private final int healthQueryTimeoutSeconds;
+ private com.opencrm.order.advisory.OrderAdvisoryTrigger advisory = com.opencrm.order.advisory.OrderAdvisoryTrigger.NONE;
+ @Autowired(required=false)
+ public void setAdvisory(com.opencrm.order.advisory.OrderAdvisoryTrigger advisory){this.advisory=advisory;}
  public DailyReconciliation(JdbcTemplate db,PlatformTransactionManager manager,String scopes){this(db,manager,scopes,5);}
  @Autowired
  public DailyReconciliation(JdbcTemplate db,PlatformTransactionManager manager,@Value("${oms.recovery.scopes:}") String configuredScopes,@Value("${oms.recovery.metrics-query-timeout-seconds:5}") int timeoutSeconds){
@@ -37,11 +40,13 @@ public class DailyReconciliation {
   var runs=db.queryForList("SELECT * FROM recovery_daily_runs WHERE scope_id=? AND completed_at IS NULL ORDER BY run_date LIMIT 1 FOR UPDATE SKIP LOCKED",scope);
   if(runs.isEmpty())return 0;var run=runs.getFirst();Object day=run.get("run_date");
   var orders=db.queryForList("SELECT id,created_at FROM orders WHERE scope_id=? AND is_deleted=false AND created_at<=? AND (created_at,id)>(?,?) ORDER BY created_at,id LIMIT ?",scope,run.get("upper_bound"),run.get("cursor_created_at"),run.get("cursor_id"),limit);
+  int advisorySubmissions=0;
   for(var candidate:orders){
    var order=db.queryForMap("SELECT * FROM orders WHERE id=? AND scope_id=? FOR UPDATE",candidate.get("id"),scope);String id=(String)order.get("id");
    var findings=inspect(id);
    for(var finding:findings.entrySet())record(scope,day,order,finding.getKey(),finding.getValue());
    db.update("UPDATE recovery_daily_runs SET cursor_created_at=?,cursor_id=?,scanned=scanned+1 WHERE scope_id=? AND run_date=?",candidate.get("created_at"),id,scope,day);
+   if(!findings.isEmpty() && advisorySubmissions++<5)com.opencrm.order.advisory.OrderAdvisoryTrigger.notifySafely(advisory,id);
   }
   if(orders.size()<limit){
    db.update("UPDATE recovery_daily_runs SET completed_at=clock_timestamp() WHERE scope_id=? AND run_date=?",scope,day);

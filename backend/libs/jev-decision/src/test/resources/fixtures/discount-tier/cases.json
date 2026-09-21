@@ -1,0 +1,641 @@
+{
+  "synthetic": true,
+  "note": "SYNTHETIC fixture (ADR-015 offline stage). Answers are hand-made to exercise the pipeline; they are not recordings of the real model and carry no evidence about its quality.",
+  "useCase": "discount-tier-shadow",
+  "schema": {
+    "name": "discount-tier",
+    "version": 1
+  },
+  "cases": [
+    {
+      "name": "margin-5.0",
+      "features": {
+        "margin_delta": 5.0,
+        "requested_discount": 4.0,
+        "currency_code": "USD"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.97,
+          "probabilities": {
+            "MANAGER": 0.97,
+            "DIRECTOR": 0.015,
+            "VP_SALES": 0.015
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-8.5",
+      "features": {
+        "margin_delta": 8.5,
+        "requested_discount": 6.8,
+        "currency_code": "USD"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.91,
+          "probabilities": {
+            "MANAGER": 0.91,
+            "DIRECTOR": 0.045,
+            "VP_SALES": 0.045
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-12.0",
+      "features": {
+        "margin_delta": 12.0,
+        "requested_discount": 9.6,
+        "currency_code": "USD"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.87,
+          "probabilities": {
+            "MANAGER": 0.87,
+            "DIRECTOR": 0.065,
+            "VP_SALES": 0.065
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-15.0",
+      "features": {
+        "margin_delta": 15.0,
+        "requested_discount": 12.0,
+        "currency_code": "GBP"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.85,
+          "probabilities": {
+            "MANAGER": 0.85,
+            "DIRECTOR": 0.075,
+            "VP_SALES": 0.075
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-18.0",
+      "features": {
+        "margin_delta": 18.0,
+        "requested_discount": 14.4,
+        "currency_code": "GBP"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.87,
+          "probabilities": {
+            "MANAGER": 0.87,
+            "DIRECTOR": 0.065,
+            "VP_SALES": 0.065
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-19.5",
+      "features": {
+        "margin_delta": 19.5,
+        "requested_discount": 15.6,
+        "currency_code": "USD"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.62,
+          "probabilities": {
+            "MANAGER": 0.62,
+            "DIRECTOR": 0.19,
+            "VP_SALES": 0.19
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-19.99",
+      "features": {
+        "margin_delta": 19.99,
+        "requested_discount": 15.99,
+        "currency_code": "EUR"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.51,
+          "probabilities": {
+            "MANAGER": 0.245,
+            "DIRECTOR": 0.51,
+            "VP_SALES": 0.245
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-20.0",
+      "features": {
+        "margin_delta": 20.0,
+        "requested_discount": 16.0,
+        "currency_code": "EUR"
+      },
+      "authoritative": "MANAGER",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.58,
+          "probabilities": {
+            "MANAGER": 0.58,
+            "DIRECTOR": 0.21,
+            "VP_SALES": 0.21
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-20.01",
+      "features": {
+        "margin_delta": 20.01,
+        "requested_discount": 16.01,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "MANAGER",
+          "confidence": 0.55,
+          "probabilities": {
+            "MANAGER": 0.55,
+            "DIRECTOR": 0.225,
+            "VP_SALES": 0.225
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-20.5",
+      "features": {
+        "margin_delta": 20.5,
+        "requested_discount": 16.4,
+        "currency_code": "USD"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.53,
+          "probabilities": {
+            "MANAGER": 0.235,
+            "DIRECTOR": 0.53,
+            "VP_SALES": 0.235
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-22.0",
+      "features": {
+        "margin_delta": 22.0,
+        "requested_discount": 17.6,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.95,
+          "probabilities": {
+            "MANAGER": 0.025,
+            "DIRECTOR": 0.95,
+            "VP_SALES": 0.025
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-24.0",
+      "features": {
+        "margin_delta": 24.0,
+        "requested_discount": 19.2,
+        "currency_code": "GBP"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.88,
+          "probabilities": {
+            "MANAGER": 0.06,
+            "DIRECTOR": 0.88,
+            "VP_SALES": 0.06
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-25.0",
+      "features": {
+        "margin_delta": 25.0,
+        "requested_discount": 20.0,
+        "currency_code": "USD"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.91,
+          "probabilities": {
+            "MANAGER": 0.045,
+            "DIRECTOR": 0.91,
+            "VP_SALES": 0.045
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-26.5",
+      "features": {
+        "margin_delta": 26.5,
+        "requested_discount": 21.2,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.92,
+          "probabilities": {
+            "MANAGER": 0.04,
+            "DIRECTOR": 0.92,
+            "VP_SALES": 0.04
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-28.0",
+      "features": {
+        "margin_delta": 28.0,
+        "requested_discount": 22.4,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.91,
+          "probabilities": {
+            "MANAGER": 0.045,
+            "DIRECTOR": 0.91,
+            "VP_SALES": 0.045
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-29.5",
+      "features": {
+        "margin_delta": 29.5,
+        "requested_discount": 23.6,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.57,
+          "probabilities": {
+            "MANAGER": 0.215,
+            "DIRECTOR": 0.57,
+            "VP_SALES": 0.215
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-29.99",
+      "features": {
+        "margin_delta": 29.99,
+        "requested_discount": 23.99,
+        "currency_code": "EUR"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.55,
+          "probabilities": {
+            "MANAGER": 0.225,
+            "DIRECTOR": 0.225,
+            "VP_SALES": 0.55
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-30.0",
+      "features": {
+        "margin_delta": 30.0,
+        "requested_discount": 24.0,
+        "currency_code": "GBP"
+      },
+      "authoritative": "DIRECTOR",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.61,
+          "probabilities": {
+            "MANAGER": 0.195,
+            "DIRECTOR": 0.61,
+            "VP_SALES": 0.195
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-30.01",
+      "features": {
+        "margin_delta": 30.01,
+        "requested_discount": 24.01,
+        "currency_code": "USD"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "DIRECTOR",
+          "confidence": 0.55,
+          "probabilities": {
+            "MANAGER": 0.225,
+            "DIRECTOR": 0.55,
+            "VP_SALES": 0.225
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-30.5",
+      "features": {
+        "margin_delta": 30.5,
+        "requested_discount": 24.4,
+        "currency_code": "USD"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.56,
+          "probabilities": {
+            "MANAGER": 0.22,
+            "DIRECTOR": 0.22,
+            "VP_SALES": 0.56
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-32.0",
+      "features": {
+        "margin_delta": 32.0,
+        "requested_discount": 25.6,
+        "currency_code": "GBP"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.87,
+          "probabilities": {
+            "MANAGER": 0.065,
+            "DIRECTOR": 0.065,
+            "VP_SALES": 0.87
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-34.0",
+      "features": {
+        "margin_delta": 34.0,
+        "requested_discount": 27.2,
+        "currency_code": "GBP"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.87,
+          "probabilities": {
+            "MANAGER": 0.065,
+            "DIRECTOR": 0.065,
+            "VP_SALES": 0.87
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-35.0",
+      "features": {
+        "margin_delta": 35.0,
+        "requested_discount": 28.0,
+        "currency_code": "USD"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.95,
+          "probabilities": {
+            "MANAGER": 0.025,
+            "DIRECTOR": 0.025,
+            "VP_SALES": 0.95
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-37.5",
+      "features": {
+        "margin_delta": 37.5,
+        "requested_discount": 30.0,
+        "currency_code": "EUR"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.88,
+          "probabilities": {
+            "MANAGER": 0.06,
+            "DIRECTOR": 0.06,
+            "VP_SALES": 0.88
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-40.0",
+      "features": {
+        "margin_delta": 40.0,
+        "requested_discount": 32.0,
+        "currency_code": "USD"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.87,
+          "probabilities": {
+            "MANAGER": 0.065,
+            "DIRECTOR": 0.065,
+            "VP_SALES": 0.87
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-42.0",
+      "features": {
+        "margin_delta": 42.0,
+        "requested_discount": 33.6,
+        "currency_code": "EUR"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.96,
+          "probabilities": {
+            "MANAGER": 0.02,
+            "DIRECTOR": 0.02,
+            "VP_SALES": 0.96
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-45.0",
+      "features": {
+        "margin_delta": 45.0,
+        "requested_discount": 36.0,
+        "currency_code": "EUR"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.86,
+          "probabilities": {
+            "MANAGER": 0.07,
+            "DIRECTOR": 0.07,
+            "VP_SALES": 0.86
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-50.0",
+      "features": {
+        "margin_delta": 50.0,
+        "requested_discount": 40.0,
+        "currency_code": "GBP"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.94,
+          "probabilities": {
+            "MANAGER": 0.03,
+            "DIRECTOR": 0.03,
+            "VP_SALES": 0.94
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-60.0",
+      "features": {
+        "margin_delta": 60.0,
+        "requested_discount": 48.0,
+        "currency_code": "GBP"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.89,
+          "probabilities": {
+            "MANAGER": 0.055,
+            "DIRECTOR": 0.055,
+            "VP_SALES": 0.89
+          }
+        }
+      }
+    },
+    {
+      "name": "margin-75.0",
+      "features": {
+        "margin_delta": 75.0,
+        "requested_discount": 60.0,
+        "currency_code": "GBP"
+      },
+      "authoritative": "VP_SALES",
+      "answers": {
+        "tier": {
+          "type": "choice",
+          "choice": "VP_SALES",
+          "confidence": 0.88,
+          "probabilities": {
+            "MANAGER": 0.06,
+            "DIRECTOR": 0.06,
+            "VP_SALES": 0.88
+          }
+        }
+      }
+    }
+  ]
+}

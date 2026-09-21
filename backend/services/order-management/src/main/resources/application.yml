@@ -34,6 +34,8 @@ spring:
     listener:
       ack-mode: record
 oms:
+  advisory:
+    ttl: PT15M
   recovery:
     enabled: ${OMS_RECOVERY_ENABLED:false}
     scopes: ${OMS_RECOVERY_SCOPES:}
@@ -63,3 +65,23 @@ logging:
   level:
     org.springframework.web: INFO
     org.springframework.jdbc.core: INFO
+
+# ADR-015 OMS extension: shadow only. No UI or business decision depends on these switches.
+opencrm:
+  jev:
+    enabled: ${JEV_ENABLED:false}
+    transport: ${JEV_TRANSPORT:noop}
+    api-key: ${JEV_API_KEY:}
+    base-url: ${JEV_BASE_URL:}
+    model: ${JEV_MODEL:}
+    wire-format: ${JEV_WIRE_FORMAT:NATIVE}
+    daily-call-budget: ${JEV_DAILY_CALL_BUDGET:100}
+    max-concurrent: 1
+    max-retries: 0
+    connect-timeout: 2s
+    read-timeout: 5s
+    max-body-bytes: 8192
+    oms-exception-triage:
+      enabled: ${JEV_OMS_EXCEPTION_TRIAGE_ENABLED:false}
+      rubric-version: oms-exception-triage-v1
+      min-confidence: 0.9

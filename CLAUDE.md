@@ -43,3 +43,57 @@ This project is indexed by GitNexus as **open-crm-cpq** (13865 symbols, 32495 re
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Project steering (not generated)
+
+The GitNexus block above is **code-intelligence only**. Steering lives in [AGENTS.md](AGENTS.md) —
+read its "Project steering", "Learned User Preferences" and "Learned Workspace Facts" sections, which
+are authoritative and kept current. Do not duplicate them here.
+
+- [AGENT.md](AGENT.md) — landed vs target state, and the explicit **holds** (Activities API, NgRx,
+  dual-read flip, …). Treat `MODERNIZATION_PLAN.md` as target-state, never as this week's work.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/adr/README.md](docs/adr/README.md)
+
+## Commands
+
+Backend — Maven, **Java 25 / Spring Boot 4.0.6**, 14 modules under `backend/`:
+
+```bash
+cd backend
+mvn -B verify                                    # full reactor
+mvn -pl services/crm-service -am verify          # one service + its lib deps
+mvn -Dtest=LeadServiceTest -pl services/crm-service test           # single class
+mvn -Dtest=LeadServiceTest#methodName -pl services/crm-service test # single method
+```
+
+`*IntegrationTest` classes extend `BaseIntegrationTest` and start a **PostgreSQL Testcontainer** —
+they need Docker. CI splits these into separate `backend-unit` and `backend-integration` jobs.
+
+Frontend — Nx + Angular 22, Vitest:
+
+```bash
+cd frontend
+npm ci --legacy-peer-deps      # the flag is mandatory; npm + package-lock.json only
+npm run test:crm               # crm-* + shared libs
+npm run test:cpq               # cpq-* libs
+npx nx serve crm               # :4200, proxies /api -> gateway :8080
+npx nx test crm-leads -- -t "name"   # single spec
+```
+
+Never add a `pnpm-lock.yaml` or `yarn.lock` under `frontend/` — it breaks the Nx project graph.
+`nx.json` has **no `plugins` array**, so no targets are inferred; declare every target explicitly in
+`project.json`.
+
+Browser UAT / chaos (`frontend/e2e/`, plain `.mjs`, driven by Playwright):
+
+```bash
+node e2e/uat-crm-smoke.mjs     # deterministic smoke
+node e2e/uat-jev-local.mjs     # LLM-driven (Jev) browser agent; needs OPENROUTER_API_KEY
+node e2e/chaos-crm.mjs         # network/fault injection
+```
+
+These need the full stack running and are **not** wired into CI.
+
+CI: **Jenkins is primary** (`Jenkinsfile`); `.github/workflows/ci.yml` is the `workflow_dispatch`
+fallback — see ADR-003. The GHA frontend job selects projects through a grep allowlist, so a new Nx
+project is silently skipped unless that list is updated.
