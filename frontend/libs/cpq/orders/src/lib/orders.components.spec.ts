@@ -78,9 +78,185 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o').flush(envelope(order));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
     fixture.detectChanges();
     return fixture;
   }
+  it('requires allocation expiry before dispatching real allocation evidence', () => {
+    const c = loadDetail().componentInstance;
+    c.evidenceLine = 'l';
+    c.evidenceKind = 'ALLOCATION';
+    c.evidenceReference = 'warehouse-1';
+    c.evidenceAt = '2026-09-20T12:30';
+    c.evidenceReason = 'Observed reservation';
+    c.recordEvidence();
+    http.expectNone((r) => r.method === 'POST');
+    expect(c.error()).toContain('expiry');
+  });
+  it('sends allocation expiry and the exact causal shipment or release reference', () => {
+    const c = loadDetail().componentInstance;
+    c.evidenceLine = 'l';
+    c.evidenceKind = 'ALLOCATION';
+    c.evidenceReference = 'lot-1';
+    c.evidenceAt = '2026-09-20T12:30';
+    c.evidenceExpiresAt = '2026-09-21T12:30';
+    c.evidenceReason = 'Reserved';
+    c.recordEvidence();
+    const request = http.expectOne('/api/v1/orders/o/evidence');
+    expect(request.request.body.expiresAt).toBe(
+      new Date(c.evidenceExpiresAt).toISOString(),
+    );
+    request.flush({}, { status: 422, statusText: 'Rejected' });
+    c.stale.set(false);
+    c.unresolved.set(0);
+    c.evidenceKind = 'RELEASE';
+    c.recordEvidence();
+    http.expectNone((r) => r.method === 'POST');
+    c.allocationReference = 'lot-1';
+    c.evidenceReference = 'release-1';
+    c.recordEvidence();
+    const release = http.expectOne('/api/v1/orders/o/evidence');
+    expect(release.request.body.allocationReference).toBe('lot-1');
+    expect(release.request.body.expiresAt).toBeUndefined();
+    release.flush({}, { status: 403, statusText: 'Forbidden' });
+  });
+  it('requires a recorded request and sends actual finance outcomes without optimistic completion', () => {
+    const c = loadDetail().componentInstance;
+    c.financeRequestKey = 'request-1';
+    c.financeReference = 'provider-lookup';
+    c.financeAt = '2026-09-20T12:30';
+    c.financeReason = 'Verified response';
+    c.financeOutcome = 'UNKNOWN';
+    c.recordFinance();
+    http.expectNone((r) => r.method === 'POST');
+    c.finance.set([
+      {
+        requestKey: 'request-1',
+        lineId: 'l',
+        quantity: 5,
+        acknowledgedQuantity: 0,
+        status: 'PENDING',
+        payload: '{}',
+      },
+    ]);
+    c.recordFinance();
+    const req = http.expectOne('/api/v1/orders/o/finance-acknowledgments');
+    expect(req.request.body).toEqual(
+      expect.objectContaining({
+        requestKey: 'request-1',
+        lineId: 'l',
+        outcome: 'UNKNOWN',
+        externalReference: 'provider-lookup',
+        expectedVersion: 4,
+      }),
+    );
+    expect(c.order()?.financeStatus).toBe('PENDING');
+    req.error(new ProgressEvent('error'));
+    c.recordFinance();
+    http.expectNone((r) => r.method === 'POST');
+    expect(sessionStorage.getItem('oms:pending:order:o')).not.toContain(
+      'provider-lookup',
+    );
+  });
+  it('prepares a selected finance line with a versioned reason', () => {
+    const c = loadDetail().componentInstance;
+    c.financeLine = 'l';
+    c.financeReason = 'All obligations fulfilled';
+    c.prepareFinance();
+    const req = http.expectOne('/api/v1/orders/o/finance-requests');
+    expect(req.request.body).toEqual(
+      expect.objectContaining({
+        lineId: 'l',
+        reason: 'All obligations fulfilled',
+        expectedVersion: 4,
+      }),
+    );
+    req.flush({}, { status: 409, statusText: 'Not fulfilled' });
+    expect(c.order()?.financeStatus).toBe('PENDING');
+  });
+  it('requires whole-order replacement confirmation and forbids known in-flight replacement', () => {
+    const c = loadDetail().componentInstance;
+    c.replacementReason = 'Correct source price';
+    c.replace();
+    http.expectNone((r) => r.method === 'POST');
+    c.replacementConfirmed = true;
+    c.replace();
+    const req = http.expectOne('/api/v1/orders/o/replacement-requests');
+    expect(req.request.body.reason).toBe('Correct source price');
+    expect(req.request.body.expectedVersion).toBe(4);
+    req.flush({}, { status: 409, statusText: 'Execution found' });
+    expect(c.order()?.status).toBe('DRAFT');
+    c.stale.set(false);
+    c.order.update((value) => value && { ...value, status: 'IN_PROGRESS' });
+    c.replace();
+    http.expectNone((r) => r.method === 'POST');
+  });
+  it('requires authoritative no-effect confirmation and never submits a retry with it', () => {
+    const c = loadDetail().componentInstance;
+    c.tasks.set([
+      {
+        id: 'task/1',
+        lineId: 'l',
+        kind: 'ACTIVATION',
+        status: 'UNKNOWN',
+        templateVersion: 1,
+        dispatchedAt: '2026-09-19T12:00:00Z',
+      },
+    ]);
+    c.noEffectTask = 'task/1';
+    c.noEffectReference = 'provider-proof';
+    c.noEffectAt = '2026-09-20T12:30';
+    c.noEffectReason = 'Authoritative lookup';
+    c.recordNoEffect();
+    http.expectNone((r) => r.method === 'POST');
+    c.noEffectConfirmed = true;
+    c.recordNoEffect();
+    const req = http.expectOne('/api/v1/orders/o/tasks/task%2F1/no-effect');
+    expect(req.request.body.evidenceReference).toBe('provider-proof');
+    http.expectNone((r) => r.url.endsWith('/retry'));
+    req.flush({}, { status: 403, statusText: 'Forbidden' });
+  });
+  it('keeps the original uncertain key until authoritative ABANDONED and fresh version are observed', () => {
+    const c = loadDetail().componentInstance;
+    c.commandReason = 'Submit';
+    c.submit();
+    const original = http.expectOne('/api/v1/orders/o/submit');
+    const key = original.request.body.operationKey;
+    original.error(new ProgressEvent('error'));
+    c.stale.set(false);
+    c.abandonKey = key;
+    c.abandonReason = 'Never received';
+    c.abandonConfirmed = true;
+    c.abandon();
+    const recovery = http.expectOne(
+      `/api/v1/orders/o/operations/${key}/abandon`,
+    );
+    expect(recovery.request.body.operationKey).not.toBe(key);
+    recovery.flush(envelope({ status: 'ABANDONED' }));
+    expect(sessionStorage.getItem('oms:pending:order:o')).toContain(key);
+    http
+      .expectOne('/api/v1/orders/o')
+      .flush(envelope({ ...order, version: 5 }));
+    http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http
+      .expectOne(`/api/v1/orders/o/operations/${key}`)
+      .flush(
+        envelope({
+          operationKey: key,
+          orderId: 'o',
+          status: 'ABANDONED',
+          orderVersion: 5,
+        }),
+      );
+    expect(c.unresolved()).toBe(0);
+    expect(sessionStorage.getItem('oms:pending:order:o')).toBeNull();
+  });
   it('shows initial loading and never disguises a forbidden list as empty', () => {
     const fixture = TestBed.createComponent(OrdersListComponent);
     fixture.detectChanges();
@@ -130,6 +306,7 @@ describe('Orders workspace', () => {
     const c = fixture.componentInstance;
     c.evidenceLine = 'l';
     c.evidenceKind = 'DELIVERY';
+    c.shipmentReference = 'shipment-123';
     c.evidenceQuantity = 1;
     c.evidenceReason = 'Carrier proof';
     c.recordEvidence();
@@ -159,6 +336,9 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o').flush(envelope(order));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('pending');
     expect(c.order()?.lines[0].delivered).toBe(0);
@@ -180,6 +360,7 @@ describe('Orders workspace', () => {
     const c = fixture.componentInstance;
     c.evidenceLine = 'l';
     c.evidenceKind = 'DELIVERY';
+    c.shipmentReference = 'shipment-123';
     c.evidenceQuantity = 1;
     c.evidenceReference = 'POD-private';
     c.evidenceAt = '2026-09-20T12:30';
@@ -194,6 +375,9 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o').flush(envelope(order));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
     const lookup = http.expectOne(`/api/v1/orders/o/operations/${key}`);
     lookup.flush(
       envelope({
@@ -216,16 +400,17 @@ describe('Orders workspace', () => {
     http.expectOne('/api/v1/orders/o').flush(envelope(order));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
-    http
-      .expectOne(`/api/v1/orders/o/operations/${key}`)
-      .flush(
-        envelope({
-          operationKey: key,
-          orderId: 'o',
-          status: 'SUCCEEDED',
-          orderVersion: 4,
-        }),
-      );
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
+    http.expectOne(`/api/v1/orders/o/operations/${key}`).flush(
+      envelope({
+        operationKey: key,
+        orderId: 'o',
+        status: 'SUCCEEDED',
+        orderVersion: 4,
+      }),
+    );
     expect(restored.componentInstance.unresolved()).toBe(0);
     expect(sessionStorage.getItem('oms:pending:order:o')).toBeNull();
     restored.destroy();
@@ -246,6 +431,9 @@ describe('Orders workspace', () => {
       .flush(envelope({ ...order, status: 'SUBMITTED', version: 5 }));
     http.expectOne('/api/v1/orders/o/plan').flush(envelope([]));
     http.expectOne('/api/v1/orders/o/timeline').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/fulfillment-evidence').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/allocations').flush(envelope([]));
+    http.expectOne('/api/v1/orders/o/finance-requests').flush(envelope([]));
     expect(c.order()?.status).toBe('SUBMITTED');
     c.holdActive = true;
     c.commandReason = 'Review shipping instructions';
@@ -380,16 +568,14 @@ describe('Orders workspace', () => {
     const restored = TestBed.createComponent(OrdersExceptionsComponent);
     restored.detectChanges();
     http.expectOne((r) => r.url === '/api/v1/order-exceptions').flush(page);
-    http
-      .expectOne(`/api/v1/order-exceptions/e/operations/${key}`)
-      .flush(
-        envelope({
-          operationKey: key,
-          orderId: 'o',
-          status: 'UNKNOWN',
-          orderVersion: 4,
-        }),
-      );
+    http.expectOne(`/api/v1/order-exceptions/e/operations/${key}`).flush(
+      envelope({
+        operationKey: key,
+        orderId: 'o',
+        status: 'UNKNOWN',
+        orderVersion: 4,
+      }),
+    );
     const next = restored.componentInstance;
     next.select(next.rows()[0]);
     next.owner = 'other';

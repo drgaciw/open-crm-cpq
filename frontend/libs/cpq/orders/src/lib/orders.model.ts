@@ -114,9 +114,43 @@ export type EvidenceKind =
 export interface OperationStatus {
   operationKey: string;
   orderId: string;
-  status: 'SUCCEEDED' | 'NOT_FOUND' | 'UNKNOWN' | 'PENDING';
+  status: 'SUCCEEDED' | 'ABANDONED' | 'NOT_FOUND' | 'UNKNOWN' | 'PENDING';
   orderVersion: number;
 }
+export interface FulfillmentEvidence {
+  id: string;
+  lineId: string;
+  kind: string;
+  quantity: number;
+  externalReference: string;
+  allocationReference: string | null;
+  shipmentReference: string | null;
+  occurredAt: string;
+  expiresAt: string | null;
+  actor: string;
+  reason: string;
+  status: string;
+  detail: string | null;
+}
+export interface Allocation {
+  id: string;
+  lineId: string;
+  reference: string;
+  quantity: number;
+  consumed: number;
+  released: number;
+  available: number;
+  expiresAt: string | null;
+}
+export interface FinanceRequest {
+  requestKey: string;
+  lineId: string;
+  quantity: number;
+  acknowledgedQuantity: number;
+  status: string;
+  payload: string;
+}
+export type FinanceOutcome = 'ACKNOWLEDGED' | 'REJECTED' | 'UNKNOWN';
 export const ORDER_STATUSES = [
   'DRAFT',
   'SUBMITTED',
