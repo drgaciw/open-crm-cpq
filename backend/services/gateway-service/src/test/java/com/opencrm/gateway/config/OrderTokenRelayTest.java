@@ -24,11 +24,12 @@ class OrderTokenRelayTest {
   var beans=new StaticListableBeanFactory(Map.of("manager",manager));
   var filter=new OrderTokenRelay(new TokenRelayGatewayFilterFactory(beans.getBeanProvider(ReactiveOAuth2AuthorizedClientManager.class)));
   var principal=new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(),Map.of("sub","operator"),"sub"),List.of(),"oms");
-  for(String path:List.of("/api/v1/orders/123","/api/v1/order-exceptions","/api/v1/accounts","/api/v1/orders-evil")) {
+  var protectedPaths=Set.of("/api/v1/orders/123","/api/v1/order-exceptions","/api/v1/order-outbox","/api/v1/order-outbox/123/recover");
+  for(String path:List.of("/api/v1/orders/123","/api/v1/order-exceptions","/api/v1/order-outbox","/api/v1/order-outbox/123/recover","/api/v1/accounts","/api/v1/orders-evil","/api/v1/order-outbox-evil","/api/v1/order-outboxes/123")) {
    var exchange=MockServerWebExchange.from(MockServerHttpRequest.get(path)).mutate().principal(Mono.just(principal)).build();
    var forwarded=new AtomicReference<String>();filter.filter(exchange,e->{forwarded.set(e.getRequest().getHeaders().getFirst("Authorization"));return Mono.empty();}).block();
-   assertEquals(path.equals("/api/v1/accounts")||path.equals("/api/v1/orders-evil")?null:"Bearer server-kept-token",forwarded.get());
+   assertEquals(protectedPaths.contains(path)?"Bearer server-kept-token":null,forwarded.get(),path);
   }
-  verify(manager,times(2)).authorize(any());
+  verify(manager,times(4)).authorize(any());
  }
 }

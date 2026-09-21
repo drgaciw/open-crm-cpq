@@ -15,6 +15,6 @@ public class OrderTokenRelay implements GlobalFilter,Ordered {
  public int getOrder(){return -100;}
  public Mono<Void> filter(ServerWebExchange exchange,GatewayFilterChain chain) {
   String path=exchange.getRequest().getPath().value();
-  return path.equals("/api/v1/orders")||path.startsWith("/api/v1/orders/")||path.equals("/api/v1/order-exceptions")||path.startsWith("/api/v1/order-exceptions/")?relay.filter(exchange,chain):chain.filter(exchange);
+  return path.equals("/api/v1/orders")||path.startsWith("/api/v1/orders/")||path.equals("/api/v1/order-exceptions")||path.startsWith("/api/v1/order-exceptions/")||path.equals("/api/v1/order-outbox")||path.startsWith("/api/v1/order-outbox/")?relay.filter(exchange,chain):chain.filter(exchange);
  }
 }
