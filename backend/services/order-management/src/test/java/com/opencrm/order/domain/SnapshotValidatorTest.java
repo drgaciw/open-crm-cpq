@@ -16,4 +16,11 @@ class SnapshotValidatorTest {
  @Test void rejectsUsdPrecisionBeyondCents() {var l=new Line("line-1","product","Widget","PHYSICAL","ONE_TIME",3,"EA","10.0001","0","0","30.0003","ONE_TIME",null,null);var o=snapshot("30.0003",List.of(l));var precise=new AcceptedOrderSnapshot(1,o.snapshotId(),o.quoteId(),o.quoteNumber(),1,o.scopeId(),o.customerId(),o.acceptedAt(),"USD","30.0003","0","0","30.0003",o.address(),o.approvalReference(),o.taxEvidence(),o.configurationReference(),o.lines());assertThrows(RuntimeException.class,()->new SnapshotValidator().validate(precise));}
  @Test void equalRecurringDatesAreInvalid() {var l=new Line("line-1","product","Widget","DIGITAL","RECURRING",3,"EA","10","0","0","30","MONTHLY",LocalDate.of(2026,1,1),LocalDate.of(2026,1,1));assertThrows(RuntimeException.class,()->new SnapshotValidator().validate(snapshot("30",List.of(l))));}
  @Test void missingMappingCreatesExplicitHold() {var l=new Line("line-1","product","Widget",null,"ONE_TIME",3,"EA","10","0","0","30","ONE_TIME",null,null);assertTrue(new SnapshotValidator().validate(snapshot("30",List.of(l))).contains("MAPPING:line-1"));}
+ @Test void rejects201LinesButAccepts200() {
+  var lines=new ArrayList<Line>();for(int i=0;i<201;i++)lines.add(new Line("line-"+i,"p","Item","DIGITAL","ONE_TIME",1,"EA","0","0","0","0","ONE_TIME",null,null));
+  var s=new AcceptedOrderSnapshot(1,"snap","00000000-0000-0000-0000-000000000001","Q",1,"pilot","customer",Instant.now(),"USD","0","0","0","0","address","approved","tax","config",lines);
+  assertEquals(422,assertThrows(OrderProblem.class,()->new SnapshotValidator().validate(s)).status());
+  var allowed=new AcceptedOrderSnapshot(1,s.snapshotId(),s.quoteId(),s.quoteNumber(),1,s.scopeId(),s.customerId(),s.acceptedAt(),"USD","0","0","0","0",s.address(),s.approvalReference(),s.taxEvidence(),s.configurationReference(),lines.subList(0,200));
+  assertTrue(new SnapshotValidator().validate(allowed).isEmpty());
+ }
 }
