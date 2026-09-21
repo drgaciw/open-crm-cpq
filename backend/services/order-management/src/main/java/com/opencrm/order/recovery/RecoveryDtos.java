@@ -7,6 +7,8 @@ public final class RecoveryDtos {
  public record Assignment(long expectedVersion,String operationKey,String reason,String owner) {}
  public record Resolution(long expectedVersion,String operationKey,String reason,String action) {}
  public record NoEffect(long expectedVersion,String operationKey,String reason,String evidenceReference,Instant occurredAt) {}
+ public record Adjudication(long expectedVersion,String operationKey,String reason,String authorityReference,Instant occurredAt) {}
+ public record AdjudicationView(String id,String evidenceId,String authorityReference,Instant occurredAt,String actor,String reason,Instant recordedAt) {}
  public record Operation(String operationKey,String orderId,String status,long orderVersion) {}
  public record ExceptionView(String id,String orderId,String orderNumber,String customerId,String taskId,String category,String severity,String status,String owner,String nextAction,String reason,Instant firstOccurredAt,Instant lastOccurredAt,long version) {}
  public record Page<T>(List<T> content,int page,int size,long totalElements,int totalPages) {}
