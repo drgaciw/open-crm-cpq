@@ -31,6 +31,22 @@ public class RecoveryService {
   this.db=db;this.tx=new TransactionTemplate(manager);this.json=json;this.access=access;this.execution=execution;
   this.scopes=new HashSet<>();for(String scope:scopes.split(","))if(!scope.isBlank())this.scopes.add(scope.trim());
  }
+ public Operation adjudicate(String orderId,String evidenceId,Adjudication request){
+  text(request.authorityReference(),500,"authority reference");
+  if(request.occurredAt()==null||request.occurredAt().isAfter(Instant.now().plusSeconds(300)))throw OrderProblem.invalid("Valid authority evidence timestamp required");
+  var command=new RecoveryCommand(request.expectedVersion(),request.operationKey(),request.reason());
+  return mutate(orderId,"EVIDENCE_ADJUDICATION",List.of(evidenceId,request.authorityReference(),request.occurredAt()),command,null,order->{
+   var evidence=one("SELECT e.*,s.status FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON s.evidence_id=e.id WHERE e.id=? AND e.order_id=?",evidenceId,orderId);
+   if(!"CONFLICT".equals(str(evidence,"status")))throw OrderProblem.conflict("Only unapplied conflicting evidence can be adjudicated");
+   if(request.occurredAt().isBefore(instant(evidence,"occurred_at")))throw OrderProblem.invalid("Adjudication authority predates the observation");
+   db.update("INSERT INTO recovery_evidence_adjudications(id,order_id,evidence_id,authority_reference,occurred_at,actor,reason,operation_key) VALUES(?,?,?,?,?,?,?,?)",UUID.randomUUID().toString(),orderId,evidenceId,request.authorityReference(),Timestamp.from(request.occurredAt()),access.actor(),request.reason(),request.operationKey());
+   if(count(RecoveryFacts.UNADJUDICATED_CONFLICTS,orderId)==0)db.update("UPDATE order_exceptions SET status='RESOLVED',version=version+1 WHERE order_id=? AND category='CONTRADICTORY_EVIDENCE' AND status='OPEN'",orderId);
+  });
+ }
+ public List<AdjudicationView> adjudications(String orderId){
+  authorized(orderId,"oms:read",false);
+  return db.queryForList("SELECT * FROM recovery_evidence_adjudications WHERE order_id=? ORDER BY recorded_at,id",orderId).stream().map(r->new AdjudicationView(str(r,"id"),str(r,"evidence_id"),str(r,"authority_reference"),instant(r,"occurred_at"),str(r,"actor"),str(r,"reason"),instant(r,"recorded_at"))).toList();
+ }
  public Operation abandon(String id,String originalKey,RecoveryCommand command) {
   text(originalKey,200,"original operation key");
   if(originalKey.equals(command.operationKey()))throw OrderProblem.invalid("Recovery requires a separate operation key");
@@ -118,6 +134,7 @@ public class RecoveryService {
   validate(command);
   try{return tx.execute(t->{
    var order=authorized(orderId,"ASSIGN".equals(action)?"oms:assign":"oms:recover",true);String scope=str(order,"scope_id");
+   if("EVIDENCE_ADJUDICATION".equals(action))access.require("oms:evidence",scope,str(order,"customer_id"));
    String hash=OrderService.hash(json.writeValueAsString(Arrays.asList("RECOVERY",orderId,action,detail,command)));
    var prior=db.queryForList("SELECT body_hash,order_id FROM order_idempotency WHERE scope_id=? AND operation_key=?",scope,command.operationKey());
    if(!prior.isEmpty()) {
@@ -147,6 +164,7 @@ public class RecoveryService {
    case "ALLOCATION_EXPIRED" -> count("SELECT COUNT(*) FROM allocation_lots WHERE order_id=? AND quantity>consumed+released AND expires_at<=clock_timestamp()",id)>0;
    case "PENDING_DELIVERY" -> count("SELECT COUNT(*) FROM fulfillment_evidence e JOIN fulfillment_evidence_state s ON s.evidence_id=e.id WHERE e.order_id=? AND s.status='PENDING'",id)>0;
    case "OUTBOX_EXHAUSTED" -> count("SELECT COUNT(*) FROM outbox_events WHERE aggregate_type='Order' AND aggregate_id=? AND exhausted_at IS NOT NULL AND NOT published AND NOT is_deleted",id)>0;
+   case "CONTRADICTORY_EVIDENCE" -> count(RecoveryFacts.UNADJUDICATED_CONFLICTS,id)>0;
    case "FINANCE_DISCREPANCY" -> count(RecoveryFacts.FINANCE_MISMATCH,id)>0;
    default -> true; // Contradictory facts and source/terminal holds need their own authoritative correction workflow.
   };

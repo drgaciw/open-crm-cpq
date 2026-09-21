@@ -10,6 +10,10 @@ import java.util.List;
 public class RecoveryController {
  private final RecoveryService recovery;
  public RecoveryController(RecoveryService recovery){this.recovery=recovery;}
+ @PostMapping("/orders/{id}/evidence/{evidenceId}/adjudications")
+ public ResponseEntity<ApiResponse<Operation>> adjudicate(@PathVariable String id,@PathVariable String evidenceId,@RequestBody Adjudication command){return accepted(recovery.adjudicate(id,evidenceId,command));}
+ @GetMapping("/orders/{id}/evidence-adjudications")
+ public ApiResponse<List<AdjudicationView>> adjudications(@PathVariable String id){return ApiResponse.success(recovery.adjudications(id));}
  @GetMapping("/order-exceptions")
  public ApiResponse<List<ExceptionView>> list(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size,@RequestParam(required=false) String status,@RequestParam(required=false) String category,@RequestParam(required=false) String owner){return page(recovery.exceptions(page,size,status,category,owner));}
  @PostMapping("/order-exceptions/{id}/assign")

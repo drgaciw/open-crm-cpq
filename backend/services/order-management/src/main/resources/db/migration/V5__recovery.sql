@@ -25,3 +25,21 @@ CREATE INDEX recovery_exception_order_status ON order_exceptions(order_id,status
 CREATE TRIGGER recovery_tombstones_immutable BEFORE UPDATE OR DELETE ON recovery_command_tombstones FOR EACH ROW EXECUTE FUNCTION reject_immutable_mutation();
 CREATE TRIGGER recovery_receipts_immutable BEFORE UPDATE OR DELETE ON recovery_receipts FOR EACH ROW EXECUTE FUNCTION reject_immutable_mutation();
 CREATE TRIGGER recovery_findings_immutable BEFORE UPDATE OR DELETE ON recovery_findings FOR EACH ROW EXECUTE FUNCTION reject_immutable_mutation();
+
+CREATE TABLE recovery_evidence_adjudications (
+ id varchar(36) PRIMARY KEY, order_id varchar(36) NOT NULL REFERENCES orders(id),
+ evidence_id varchar(36) NOT NULL UNIQUE REFERENCES fulfillment_evidence(id),
+ authority_reference varchar(500) NOT NULL, occurred_at timestamptz NOT NULL,
+ actor varchar(200) NOT NULL, reason text NOT NULL, operation_key varchar(200) NOT NULL,
+ recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX recovery_adjudication_order ON recovery_evidence_adjudications(order_id);
+CREATE TABLE recovery_daily_checkpoints (
+ scope_id varchar(200) NOT NULL, run_date date NOT NULL, upper_bound timestamptz NOT NULL,
+ cursor_created_at timestamptz NOT NULL, cursor_id varchar(36) NOT NULL, scanned bigint NOT NULL,
+ completed_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(scope_id,run_date,upper_bound), FOREIGN KEY(scope_id,run_date) REFERENCES recovery_daily_runs(scope_id,run_date)
+);
+CREATE INDEX orders_reconciliation_cursor ON orders(scope_id,created_at,id) WHERE is_deleted=false;
+CREATE TRIGGER recovery_adjudications_immutable BEFORE UPDATE OR DELETE ON recovery_evidence_adjudications FOR EACH ROW EXECUTE FUNCTION reject_immutable_mutation();
+CREATE TRIGGER recovery_checkpoints_immutable BEFORE UPDATE OR DELETE ON recovery_daily_checkpoints FOR EACH ROW EXECUTE FUNCTION reject_immutable_mutation();
