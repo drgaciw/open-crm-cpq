@@ -36,7 +36,7 @@ oms.tasks.unknown; oms.tasks.overdue (expired claims/waiting acknowledgments);
 oms.finance.exceptions.open; oms.operations.configured; oms.operations.sample.age.seconds;
 oms.operations.refresh.failures; oms.operations.scan.limit. All values are replaced as one cached
 sample. Scraping never executes SQL. Failed polls retain the last sample and advance the failure
-counter; sample age exposes staleness (NaN until the first successful sample).
+counter; sample age exposes staleness (+Infinity until the first successful sample, so startup failure stays alertable).
 
 The rule sample in operations-alerts.yml is a deployment artifact to copy into the approved
 Prometheus rules location, not an installed alarm. Alert ownership/routing and evidence of firing

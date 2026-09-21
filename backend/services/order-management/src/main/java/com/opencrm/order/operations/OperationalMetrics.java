@@ -39,7 +39,7 @@ public class OperationalMetrics {
         gauge(meters,"oms.tasks.overdue",Snapshot::overdue);
         gauge(meters,"oms.finance.exceptions.open",Snapshot::financeExceptions);
         Gauge.builder("oms.operations.configured",this,m->m.configured()?1:0).register(meters);
-        Gauge.builder("oms.operations.sample.age.seconds",this,m->{var at=m.snapshot.get().sampledAt();return at==null?Double.NaN:Math.max(0,Instant.now().getEpochSecond()-at.getEpochSecond());}).register(meters);
+        Gauge.builder("oms.operations.sample.age.seconds",this,m->{var at=m.snapshot.get().sampledAt();return at==null?Double.POSITIVE_INFINITY:Math.max(0,Instant.now().getEpochSecond()-at.getEpochSecond());}).register(meters);
         Gauge.builder("oms.operations.refresh.failures",failures,AtomicLong::doubleValue).register(meters);
         Gauge.builder("oms.operations.scan.limit",this,m->m.scanLimit).register(meters);
     }
