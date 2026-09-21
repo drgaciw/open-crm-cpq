@@ -1,5 +1,6 @@
 package com.opencrm.order.execution;
 
+import com.opencrm.order.audit.CommandAudit;
 import com.opencrm.common.order.*;
 import com.opencrm.order.domain.OrderProblem;
 import com.opencrm.order.dto.OrderDtos.Command;
@@ -406,6 +407,7 @@ public class ExecutionService {
                 mutation.accept(order);
                 db.update("INSERT INTO order_idempotency(scope_id,operation_key,body_hash,order_id) VALUES(?,?,?,?)", scope, command.operationKey(), body, orderId);
                 changed(order, action.split(":")[0], command.reason(), null, access.actor());
+                CommandAudit.record(db,orderId,command.operationKey(),access.actor(),command.reason(),command.expectedVersion());
             });
         } catch (DataIntegrityViolationException conflict) { throw OrderProblem.conflict("Concurrent operation key conflict"); }
     }

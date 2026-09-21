@@ -1,5 +1,6 @@
 package com.opencrm.order.service;
 
+import com.opencrm.order.audit.CommandAudit;
 import com.opencrm.common.order.AcceptedOrderSnapshot;
 import com.opencrm.order.domain.*;
 import com.opencrm.order.dto.OrderDtos.*;
@@ -64,7 +65,7 @@ public class OrderService {
   String body=hash("CONVERT|"+s.snapshotId()+"|"+s.quoteId()+"|"+s.acceptedRevision());
   var replay=idempotency(s.scopeId(),key,body);if(replay!=null) return view(replay);
   var existing=db.queryForList("SELECT id FROM orders WHERE scope_id=? AND quote_id=? AND accepted_revision=?",s.scopeId(),s.quoteId(),s.acceptedRevision());
-  if(!existing.isEmpty()) { String id=(String)existing.getFirst().get("id");remember(s.scopeId(),key,body,id);return view(id); }
+  if(!existing.isEmpty()) { String id=(String)existing.getFirst().get("id");long before=((Number)row(id,true).get("version")).longValue();remember(s.scopeId(),key,body,id);CommandAudit.record(db,id,key,access.actor(),"Existing accepted order referenced",before);return view(id); }
   if(!intakeEnabled) throw new OrderProblem(422,"New order intake is disabled");
   var replacement=s.acceptedRevision()>1 ? com.opencrm.order.replacement.ReplacementLineage.requirePermit(db,s) : null;
   var holds=validator.validate(s);String id=UUID.randomUUID().toString();Instant now=Instant.now();String actor=access.actor();
@@ -84,11 +85,14 @@ public class OrderService {
   }
   for(String hold:holds) db.update("INSERT INTO order_holds(order_id,code) VALUES(?,?)",id,hold);
   if(replacement!=null) com.opencrm.order.replacement.ReplacementLineage.link(db,replacement,id);
-  remember(s.scopeId(),key,body,id);audit(id,"CREATED","Accepted snapshot captured",0,null);return view(id);
+  remember(s.scopeId(),key,body,id);audit(id,"CREATED","Accepted snapshot captured",0,null);CommandAudit.record(db,id,key,actor,"Accepted snapshot captured",0);return view(id);
  }
  public View get(String id) { return tx.execute(t -> {var row=row(id,false);access.require("oms:read",str(row,"scope_id"),str(row,"customer_id"));return view(id);}); }
  public record Search(List<View> orders,long total) {}
  public Search list(int page,int size,String query,String status,String customerId) {
+  return list(page,size,query,status,customerId,null,null);
+ }
+ public Search list(int page,int size,String query,String status,String customerId,String externalReference,Boolean hasExceptions) {
   if(page<0 || size<1 || size>100 || page>100000) throw OrderProblem.invalid("Invalid pagination");
   String scope=access.scopeId();Set<String> accounts=access.customerIds();
   if(accounts.isEmpty()) throw new OrderProblem(403,"Account claims required");
@@ -99,6 +103,12 @@ public class OrderService {
   if(customerId!=null) {sql+=" AND customer_id=?";parameters.add(customerId);}
   if(status!=null && !status.isBlank()) {sql+=" AND status=?";parameters.add(status);}
   if(query!=null && !query.isBlank()) {sql+=" AND (LOWER(order_number) LIKE ? OR LOWER(quote_number) LIKE ?)";String q="%"+query.toLowerCase(Locale.ROOT)+"%";parameters.add(q);parameters.add(q);}
+  if(externalReference!=null && !externalReference.isBlank()) {
+   checkText(externalReference,"external reference",500);
+   sql+=" AND (EXISTS (SELECT 1 FROM fulfillment_evidence e WHERE e.order_id=orders.id AND (e.external_reference=? OR e.allocation_reference=? OR e.shipment_reference=?)) OR EXISTS (SELECT 1 FROM finance_acknowledgments f JOIN finance_requests r ON r.request_key=f.request_key WHERE r.order_id=orders.id AND f.external_reference=?) OR EXISTS (SELECT 1 FROM order_audit a WHERE a.order_id=orders.id AND a.evidence_reference=?))";
+   for(int i=0;i<5;i++)parameters.add(externalReference);
+  }
+  if(hasExceptions!=null)sql+=" AND "+(hasExceptions?"":"NOT ")+"EXISTS (SELECT 1 FROM order_exceptions x WHERE x.order_id=orders.id AND x.status='OPEN')";
   long total=db.queryForObject(sql.replace("SELECT id FROM orders","SELECT COUNT(*) FROM orders"),Long.class,parameters.toArray());
   sql+=" ORDER BY created_at DESC,id LIMIT ? OFFSET ?";parameters.add(size);parameters.add((long)page*size);
   return new Search(db.queryForList(sql,parameters.toArray()).stream().map(r->view(str(r,"id"))).toList(),total);
@@ -146,7 +156,7 @@ public class OrderService {
    String body=hash(json.writeValueAsString(List.of(id,action,c)));String replay=idempotency(scope,c.operationKey(),body);if(replay!=null) return view(replay);
    long version=((Number)r.get("version")).longValue();if(version!=c.expectedVersion()) throw OrderProblem.conflict("Order version changed");
    change.run();db.update("UPDATE orders SET version=version+1,updated_at=?,updated_by=? WHERE id=?",Timestamp.from(Instant.now()),access.actor(),id);
-   remember(scope,c.operationKey(),body,id);audit(id,action.split(":")[0],c.reason(),version+1,null);return view(id);
+   remember(scope,c.operationKey(),body,id);audit(id,action.split(":")[0],c.reason(),version+1,null);CommandAudit.record(db,id,c.operationKey(),access.actor(),c.reason(),version);return view(id);
   }); } catch(org.springframework.dao.DuplicateKeyException e) { throw OrderProblem.conflict("Operation key already used by a concurrent command"); }
  }
  private Map<String,Object> row(String id,boolean lock) {var rows=db.queryForList("SELECT * FROM orders WHERE id=? AND is_deleted=false"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty()) throw OrderProblem.missing();return rows.getFirst();}

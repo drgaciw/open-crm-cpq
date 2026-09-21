@@ -1,5 +1,6 @@
 package com.opencrm.order.fulfillment;
 
+import com.opencrm.order.audit.CommandAudit;
 import com.opencrm.common.order.AcceptedOrderSnapshot;
 import com.opencrm.order.domain.OrderProblem;
 import com.opencrm.order.execution.ExecutionService;
@@ -63,7 +64,7 @@ public class EvidenceService {
         String semantic=semantic(orderId,c);
         var identity=db.queryForList("SELECT e.id,e.semantic_hash,e.order_id FROM fulfillment_evidence_identity i JOIN fulfillment_evidence e ON e.id=i.evidence_id WHERE i.scope_id=? AND i.kind=? AND i.external_reference=?",scope,c.kind(),c.externalReference());
         if(!identity.isEmpty() && semantic.equals(identity.getFirst().get("semantic_hash"))) {
-            String evidenceId=str(identity.getFirst(),"id");remember(scope,c.operationKey(),body,orderId,evidenceId);return receipt(orderId,evidenceId);
+            String evidenceId=str(identity.getFirst(),"id");remember(scope,c.operationKey(),body,orderId,evidenceId);CommandAudit.record(db,orderId,c.operationKey(),actor,c.reason(),c.expectedVersion());return receipt(orderId,evidenceId);
         }
         if("ALLOCATION".equals(c.kind()) && !c.expiresAt().isAfter(Instant.now())) throw OrderProblem.invalid("Allocation expiry must be in the future");
         if(!Set.of("SUBMITTED","IN_PROGRESS").contains(str(order,"status"))) throw OrderProblem.conflict("Evidence requires an active submitted order");
@@ -76,11 +77,13 @@ public class EvidenceService {
         remember(scope,c.operationKey(),body,orderId,id);
         if(!identity.isEmpty()) {
             conflict(order,id,c.lineId(),c.kind(),"External reference contradicts previously recorded evidence");
+            CommandAudit.record(db,orderId,c.operationKey(),actor,c.reason(),c.expectedVersion());
             return receipt(orderId,id);
         }
         db.update("INSERT INTO fulfillment_evidence_identity(scope_id,kind,external_reference,evidence_id) VALUES(?,?,?,?)",scope,c.kind(),c.externalReference(),id);
         apply(order,evidence(id));
         if("SHIPMENT".equals(c.kind())) reconcilePendingLocked(order,c.externalReference());
+        CommandAudit.record(db,orderId,c.operationKey(),actor,c.reason(),c.expectedVersion());
         return receipt(orderId,id);
     }
 

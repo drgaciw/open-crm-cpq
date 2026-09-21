@@ -1,5 +1,6 @@
 package com.opencrm.order.finance;
 
+import com.opencrm.order.audit.CommandAudit;
 import com.opencrm.common.order.AcceptedOrderSnapshot;
 import com.opencrm.order.dto.OrderDtos.*;
 import com.opencrm.order.domain.OrderProblem;
@@ -89,6 +90,7 @@ public class FinanceService {
    db.update("UPDATE orders SET version=?,updated_at=CURRENT_TIMESTAMP,updated_by=? WHERE id=?",version,access.actor(),id);
    db.update("INSERT INTO order_audit(id,order_id,actor,occurred_at,action,reason,version) VALUES(?,?,?,CURRENT_TIMESTAMP,?,?,?)",UUID.randomUUID().toString(),id,access.actor(),action,c.reason(),version);
    String event=UUID.randomUUID().toString();outbox(event,id,"oms.order-updated.v1",json.writeValueAsString(Map.of("eventId",event,"orderId",id,"scopeId",scope,"customerId",str(order,"customer_id"),"version",version,"action",action)));
+   CommandAudit.record(db,id,c.operationKey(),access.actor(),c.reason(),c.expectedVersion());
    return orders.get(id);
   });}catch(DataIntegrityViolationException e){throw OrderProblem.conflict("Concurrent finance identity conflict");}
  }

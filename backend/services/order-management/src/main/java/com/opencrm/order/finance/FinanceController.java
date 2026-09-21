@@ -14,5 +14,5 @@ public class FinanceController {
  @GetMapping("/{id}/finance-requests") public ApiResponse<List<RequestView>> list(@PathVariable String id){return ApiResponse.success(finance.list(id));}
  @PostMapping("/{id}/finance-requests") public ApiResponse<View> prepare(@PathVariable String id,@RequestBody Prepare request){return ApiResponse.success(finance.prepare(id,request.lineId(),request.command()));}
  @PostMapping("/{id}/finance-acknowledgments") public ApiResponse<View> acknowledge(@PathVariable String id,@RequestBody Acknowledgment request){return ApiResponse.success(finance.acknowledge(id,request));}
- @ExceptionHandler(OrderProblem.class) public ResponseEntity<ApiResponse<Void>> problem(OrderProblem e){return ResponseEntity.status(e.status()).body(ApiResponse.error(e.getMessage()));}
+ @ExceptionHandler(OrderProblem.class) public ResponseEntity<ApiResponse<Void>> problem(OrderProblem e){return ResponseEntity.status(e.status()).body(ApiResponse.error(e.getMessage(),"OMS_"+e.status(),null));}
 }

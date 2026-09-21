@@ -1,5 +1,6 @@
 package com.opencrm.order.replacement;
 
+import com.opencrm.order.audit.CommandAudit;
 import com.opencrm.order.domain.OrderProblem;
 import com.opencrm.order.dto.OrderDtos.Command;
 import com.opencrm.order.security.OrderAccess;
@@ -62,6 +63,7 @@ public class ReplacementService {
   db.update("INSERT INTO order_audit(id,order_id,actor,occurred_at,action,reason,version,evidence_reference) VALUES(?,?,?,CURRENT_TIMESTAMP,'REPLACEMENT_REQUESTED',?,?,?)",UUID.randomUUID().toString(),id,actor,c.reason(),version+1,eventId);
   String payload=json.writeValueAsString(Map.of("schemaVersion",1,"eventId",eventId,"operationKey",c.operationKey(),"orderId",id,"quoteId",order.get("quote_id"),"acceptedRevision",order.get("accepted_revision"),"scopeId",scope,"customerId",customer,"reason",c.reason()));
   db.update("INSERT INTO outbox_events(uuid,aggregate_type,aggregate_id,event_type,payload,created_at) VALUES(?,'Order',?,'oms.quote-revision-requested.v1',?,CURRENT_TIMESTAMP)",eventId,id,payload);
+  CommandAudit.record(db,id,c.operationKey(),actor,c.reason(),version);
   return new Receipt(c.operationKey(),id,eventId,version+1,"SUCCEEDED");
  }
  private Receipt receipt(String id,String key) {
