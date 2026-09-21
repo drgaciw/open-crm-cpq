@@ -19,7 +19,7 @@ public class OrderBrowserSecurity {
  SecurityWebFilterChain orderBrowserChain(ServerHttpSecurity http,ReactiveClientRegistrationRepository registrations) {
   var resolver=new DefaultServerOAuth2AuthorizationRequestResolver(registrations);
   resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
-  return http.securityMatcher(ServerWebExchangeMatchers.pathMatchers("/api/v1/orders","/api/v1/orders/**","/api/v1/order-exceptions","/api/v1/order-exceptions/**","/oauth2/authorization/oms","/login/oauth2/code/oms","/oms/logout"))
+  return http.securityMatcher(ServerWebExchangeMatchers.pathMatchers("/api/v1/orders","/api/v1/orders/**","/api/v1/order-exceptions","/api/v1/order-exceptions/**","/api/v1/order-outbox","/api/v1/order-outbox/**","/oauth2/authorization/oms","/login/oauth2/code/oms","/oms/logout"))
    .csrf(c->c.csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse()).csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler()))
    .authorizeExchange(a->a.pathMatchers("/oauth2/authorization/oms","/login/oauth2/code/oms").permitAll().anyExchange().authenticated())
    .exceptionHandling(e->e.authenticationEntryPoint(new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED)))

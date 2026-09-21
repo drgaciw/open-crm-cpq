@@ -41,7 +41,7 @@ spring:
             - id: order-management
               uri: ${ORDER_MANAGEMENT_URI:http://localhost:8090}
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/order-exceptions/**
+                - Path=/api/v1/orders/**,/api/v1/order-exceptions/**,/api/v1/order-outbox,/api/v1/order-outbox/**
 
             # CRM Service routes (use direct URI for MVP, lb:// for production with service discovery)
             - id: crm-service
@@ -339,7 +339,7 @@ spring:
             - id: order-management
               uri: ${ORDER_MANAGEMENT_URI:http://localhost:8090}
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/order-exceptions/**
+                - Path=/api/v1/orders/**,/api/v1/order-exceptions/**,/api/v1/order-outbox,/api/v1/order-outbox/**
 
             - id: crm-service
               uri: http://localhost:8081
