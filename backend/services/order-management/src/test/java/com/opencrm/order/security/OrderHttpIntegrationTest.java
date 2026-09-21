@@ -77,4 +77,18 @@ class OrderHttpIntegrationTest {
         assertEquals(404,send("/orders/"+id+"/operations/submit-http","GET","",token("other",List.of("oms:read"))).statusCode());
         assertEquals(409,send("/orders/"+id+"/submit","POST","{\"expectedVersion\":0,\"reason\":\"stale\",\"operationKey\":\"stale-http\"}",actor).statusCode());
     }
+    @Test void monitoringRequiresExplicitScopedServicePermission() throws Exception {
+        var endpoint=URI.create("http://localhost:"+port+"/actuator/prometheus");
+        var reader=HttpRequest.newBuilder(endpoint).header("Authorization","Bearer "+token("fixture-account",List.of("oms:read"))).GET().build();
+        assertEquals(403,client.send(reader,HttpResponse.BodyHandlers.ofString()).statusCode());
+        var monitor=HttpRequest.newBuilder(endpoint).header("Authorization","Bearer "+token("fixture-account",List.of("oms:monitor"))).GET().build();
+        var response=client.send(monitor,HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode(),response.body());
+        assertTrue(response.body().contains("oms_outbox_pending"));
+        var wrongScope=new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("pilot-test").build(),
+            new JWTClaimsSet.Builder(SignedJWT.parse(token("fixture-account",List.of("oms:monitor"))).getJWTClaimsSet()).claim("scope_id","other-scope").build());
+        wrongScope.sign(new RSASSASigner(key));
+        assertEquals(403,client.send(HttpRequest.newBuilder(endpoint).header("Authorization","Bearer "+wrongScope.serialize()).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(401,client.send(HttpRequest.newBuilder(endpoint).GET().build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
 }

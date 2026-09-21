@@ -23,6 +23,11 @@ spring:
     consumer:
       group-id: order-management
       enable-auto-commit: false
+      max-poll-records: 50
+      fetch-max-wait: 500ms
+      properties:
+        max.partition.fetch.bytes: 1048576
+        fetch.max.bytes: 5242880
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -46,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 logging:
   level:
     org.springframework.web: INFO

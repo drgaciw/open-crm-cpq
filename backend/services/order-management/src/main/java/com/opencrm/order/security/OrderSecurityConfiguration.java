@@ -17,11 +17,22 @@ import org.springframework.security.web.SecurityFilterChain;
 public class OrderSecurityConfiguration {
     @Bean
     SecurityFilterChain orderSecurity(HttpSecurity http,
-            @Value("${oms.security.bypass:false}") boolean bypass) throws Exception {
+            @Value("${oms.security.bypass:false}") boolean bypass,
+            @Value("${oms.scope-id}") String scope) throws Exception {
         if (bypass) throw new IllegalStateException("OMS authentication bypass is forbidden");
         return http.csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.requestMatchers("/actuator/health").permitAll().anyRequest().authenticated())
+            .authorizeHttpRequests(a -> a.requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actuator/prometheus").access((authentication,context)-> {
+                    var authenticated=authentication.get();
+                    boolean allowed=false;
+                    if(authenticated instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken token && token.isAuthenticated()) {
+                        Object permissions=token.getToken().getClaim("permissions");
+                        allowed=scope.equals(token.getToken().getClaim("scope_id"))
+                            && permissions instanceof java.util.Collection<?> values && values.contains("oms:monitor");
+                    }
+                    return new org.springframework.security.authorization.AuthorizationDecision(allowed);
+                }).anyRequest().authenticated())
             .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults())).build();
     }
     @Bean

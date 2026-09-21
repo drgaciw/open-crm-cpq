@@ -42,6 +42,6 @@ class OrderJwtDecoderTest {
         for(String bad:new String[]{wrongSignature,wrongIssuer,wrongAudience,expired}) assertThrows(JwtException.class,()->decoder.decode(bad));
     }
     @Test void bypassConfigurationIsRejected() {
-        assertThrows(IllegalStateException.class,()->new OrderSecurityConfiguration().orderSecurity(null,true));
+        assertThrows(IllegalStateException.class,()->new OrderSecurityConfiguration().orderSecurity(null,true,"pilot"));
     }
 }

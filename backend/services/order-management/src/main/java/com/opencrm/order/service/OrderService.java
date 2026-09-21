@@ -26,21 +26,39 @@ public class OrderService {
  private final OrderAccess access;
  private final boolean intakeEnabled;
  private final Set<String> trustedScopes;
+ private final com.opencrm.order.operations.IntakeAdmission admission;
  private final SnapshotValidator validator=new SnapshotValidator();
  public OrderService(JdbcTemplate db,PlatformTransactionManager manager,ObjectMapper json,OrderAccess access,
+   boolean intakeEnabled,String trustedScopes) {
+  this(db,manager,json,access,new com.opencrm.order.operations.IntakeAdmission(db,trustedScopes.split(",")[0],1048576,10000),intakeEnabled,trustedScopes);
+ }
+ @org.springframework.beans.factory.annotation.Autowired
+ public OrderService(JdbcTemplate db,PlatformTransactionManager manager,ObjectMapper json,OrderAccess access,
+   com.opencrm.order.operations.IntakeAdmission admission,
    @Value("${oms.intake-enabled:false}") boolean intakeEnabled,@Value("${oms.trusted-source-scopes:}") String trustedScopes) {
   this.db=db;this.tx=new TransactionTemplate(manager);this.json=json;this.access=access;this.intakeEnabled=intakeEnabled;
+  this.admission=admission;
   this.trustedScopes=new HashSet<>(Arrays.asList(trustedScopes.split(",")));
  }
  /** Called only by the configured, authenticated Kafka consumer; never exposed as an HTTP operation. */
  public void acceptTrustedSnapshot(String payload,String expectedHash) {
+  if(payload==null) throw OrderProblem.invalid("Accepted snapshot required");
   if(!hash(payload).equals(expectedHash)) throw OrderProblem.invalid("Snapshot hash mismatch");
+  // A tightened admission policy must not turn an already acknowledged receipt into a poison replay.
+  var accepted=db.queryForList("SELECT scope_id,payload FROM snapshot_inbox WHERE payload_hash=?",expectedHash);
+  if(!accepted.isEmpty()) {
+   if(!trustedScopes.contains(str(accepted.getFirst(),"scope_id"))) throw new OrderProblem(403,"Source scope denied");
+   if(!payload.equals(str(accepted.getFirst(),"payload"))) throw OrderProblem.conflict("Snapshot hash collision");
+   return;
+  }
+  admission.checkPayload(payload);
   var s=decode(payload); validator.validate(s);
   if(!trustedScopes.contains(s.scopeId()) || s.scopeId().isBlank()) throw new OrderProblem(403,"Source scope denied");
   try {
    tx.executeWithoutResult(t -> {
     var rows=db.queryForList("SELECT payload_hash FROM snapshot_inbox WHERE snapshot_id=?",s.snapshotId());
     if(!rows.isEmpty()) { if(!expectedHash.equals(rows.getFirst().get("payload_hash"))) throw OrderProblem.conflict("Snapshot identity reused");return; }
+    admission.checkNewIntake();
     db.update("INSERT INTO snapshot_inbox(snapshot_id,scope_id,customer_id,quote_id,accepted_revision,payload,payload_hash,received_at) VALUES(?,?,?,?,?,?,?,?)",s.snapshotId(),s.scopeId(),s.customerId(),s.quoteId(),s.acceptedRevision(),payload,expectedHash,Timestamp.from(Instant.now()));
    });
   } catch(DataIntegrityViolationException e) {
@@ -67,6 +85,7 @@ public class OrderService {
   var existing=db.queryForList("SELECT id FROM orders WHERE scope_id=? AND quote_id=? AND accepted_revision=?",s.scopeId(),s.quoteId(),s.acceptedRevision());
   if(!existing.isEmpty()) { String id=(String)existing.getFirst().get("id");long before=((Number)row(id,true).get("version")).longValue();remember(s.scopeId(),key,body,id);CommandAudit.record(db,id,key,access.actor(),"Existing accepted order referenced",before);return view(id); }
   if(!intakeEnabled) throw new OrderProblem(422,"New order intake is disabled");
+  admission.checkNewIntake();
   var replacement=s.acceptedRevision()>1 ? com.opencrm.order.replacement.ReplacementLineage.requirePermit(db,s) : null;
   var holds=validator.validate(s);String id=UUID.randomUUID().toString();Instant now=Instant.now();String actor=access.actor();
   db.update("INSERT INTO orders(id,order_number,scope_id,customer_id,quote_id,quote_number,accepted_revision,snapshot_id,snapshot_json,snapshot_hash,status,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,"ORD-"+id,s.scopeId(),s.customerId(),s.quoteId(),s.quoteNumber(),s.acceptedRevision(),s.snapshotId(),source.get("payload"),source.get("payload_hash"),"DRAFT",Timestamp.from(now),Timestamp.from(now),actor,actor);
