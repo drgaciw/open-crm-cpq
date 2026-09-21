@@ -12,6 +12,7 @@ import {
   FulfillmentEvidence,
   Allocation,
   FinanceRequest,
+  EvidenceAdjudication,
 } from './orders.model';
 
 /** Uses the shell's ApiResponse interceptor, including its Spring-page pagination projection. */
@@ -56,6 +57,11 @@ export class OrdersService {
   evidence(id: string) {
     return this.http.get<FulfillmentEvidence[]>(
       `${this.base}/${encodeURIComponent(id)}/fulfillment-evidence`,
+    );
+  }
+  adjudications(id: string) {
+    return this.http.get<EvidenceAdjudication[]>(
+      `${this.base}/${encodeURIComponent(id)}/evidence-adjudications`,
     );
   }
   allocations(id: string) {

@@ -142,6 +142,15 @@ export interface Allocation {
   available: number;
   expiresAt: string | null;
 }
+export interface EvidenceAdjudication {
+  id: string;
+  evidenceId: string;
+  authorityReference: string;
+  occurredAt: string;
+  actor: string;
+  reason: string;
+  recordedAt: string;
+}
 export interface FinanceRequest {
   requestKey: string;
   lineId: string;

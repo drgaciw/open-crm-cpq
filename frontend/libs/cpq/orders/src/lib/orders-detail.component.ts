@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   inject,
   OnInit,
@@ -26,6 +27,7 @@ import {
   FulfillmentEvidence,
   FinanceRequest,
   FinanceOutcome,
+  EvidenceAdjudication,
 } from './orders.model';
 
 @Component({
@@ -48,6 +50,17 @@ export class OrdersDetailComponent implements OnInit {
   readonly timeline = signal<OrderTimeline[]>([]);
   readonly allocations = signal<Allocation[]>([]);
   readonly evidence = signal<FulfillmentEvidence[]>([]);
+  readonly adjudications = signal<EvidenceAdjudication[]>([]);
+  readonly adjudicableEvidence = computed(() =>
+    this.evidence().filter(
+      (entry) =>
+        entry.status === 'CONFLICT' &&
+        this.order()?.lines.some((line) => line.id === entry.lineId) &&
+        !this.adjudications().some(
+          (disposition) => disposition.evidenceId === entry.id,
+        ),
+    ),
+  );
   readonly finance = signal<FinanceRequest[]>([]);
   readonly pendingOperations = signal<PendingOperation[]>([]);
   readonly loading = signal(false);
@@ -97,6 +110,11 @@ export class OrdersDetailComponent implements OnInit {
   abandonKey = '';
   abandonReason = '';
   abandonConfirmed = false;
+  adjudicationEvidence = '';
+  adjudicationReference = '';
+  adjudicationAt = '';
+  adjudicationReason = '';
+  adjudicationConfirmed = false;
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroy))
@@ -130,6 +148,7 @@ export class OrdersDetailComponent implements OnInit {
       tasks: this.api.plan(this.id),
       timeline: this.api.timeline(this.id),
       evidence: this.api.evidence(this.id),
+      adjudications: this.api.adjudications(this.id),
       allocations: this.api.allocations(this.id),
       finance: this.api.finance(this.id),
       operations: operations.length
@@ -171,6 +190,7 @@ export class OrdersDetailComponent implements OnInit {
           this.tasks.set(data.tasks);
           this.timeline.set(data.timeline);
           this.evidence.set(data.evidence);
+          this.adjudications.set(data.adjudications);
           this.allocations.set(data.allocations);
           this.finance.set(data.finance);
           this.loading.set(false);
@@ -179,6 +199,7 @@ export class OrdersDetailComponent implements OnInit {
           this.replacementConfirmed = false;
           this.noEffectConfirmed = false;
           this.abandonConfirmed = false;
+          this.adjudicationConfirmed = false;
         },
         error: (error) => {
           this.signInRequired.set(error?.status === 401);
@@ -188,6 +209,7 @@ export class OrdersDetailComponent implements OnInit {
           this.tasks.set([]);
           this.timeline.set([]);
           this.evidence.set([]);
+          this.adjudications.set([]);
           this.allocations.set([]);
           this.finance.set([]);
         },
@@ -304,6 +326,32 @@ export class OrdersDetailComponent implements OnInit {
       'finance-requests',
       { lineId: this.financeLine },
       this.financeReason,
+    );
+  }
+  adjudicateEvidence() {
+    const observation = this.adjudicableEvidence().find(
+      (entry) => entry.id === this.adjudicationEvidence,
+    );
+    if (
+      !observation ||
+      !this.adjudicationConfirmed ||
+      !this.adjudicationReference.trim() ||
+      !this.validTime(this.adjudicationAt) ||
+      new Date(this.adjudicationAt) < new Date(observation.occurredAt) ||
+      new Date(this.adjudicationAt).getTime() > Date.now() + 300000
+    ) {
+      this.error.set(
+        'Choose an unadjudicated conflict and confirm its disavowal with an actual authority reference and time at or after the observation.',
+      );
+      return;
+    }
+    this.run(
+      `evidence/${encodeURIComponent(observation.id)}/adjudications`,
+      {
+        authorityReference: this.adjudicationReference.trim(),
+        occurredAt: new Date(this.adjudicationAt).toISOString(),
+      },
+      this.adjudicationReason,
     );
   }
   recordFinance() {
