@@ -41,6 +41,14 @@ class DbRoleIntegrationTest {
         // A prior broad global default must not leak UPDATE onto future append-only tables.
         admin.execute("ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO oms_app");
         String grants=Files.readString(Path.of("db/runtime-grants.sql"));
+        admin.execute("GRANT UPDATE(body_hash) ON order_idempotency TO PUBLIC");
+        assertThrows(org.springframework.dao.DataAccessException.class,()->admin.execute(grants),
+            "PUBLIC column grants must fail closed before the runtime policy is installed");
+        admin.execute("REVOKE UPDATE(body_hash) ON order_idempotency FROM PUBLIC");
+        admin.execute("GRANT UPDATE(snapshot_id) ON snapshot_inbox TO PUBLIC");
+        assertThrows(org.springframework.dao.DataAccessException.class,()->admin.execute(grants),
+            "The identity-lock exception applies only to oms_app, never PUBLIC");
+        admin.execute("REVOKE UPDATE(snapshot_id) ON snapshot_inbox FROM PUBLIC");
         admin.execute(grants);
         admin.execute(grants); // Reapplying after migrations must be safe.
         var access=mock(OrderAccess.class);
@@ -55,6 +63,12 @@ class DbRoleIntegrationTest {
         var submitted=service.submit(order.id(),new Command(order.version(),"role drill submit","role-submit"));
         assertEquals("SUBMITTED",submitted.status());
         assertEquals(submitted.version(),service.get(order.id()).version());
+        // Verify PostgreSQL's existing table-level REVOKE also removes PUBLIC column ACLs.
+        // The policy's earlier PUBLIC preflight is defense in depth, not an exploit correction.
+        admin.execute("GRANT UPDATE(body_hash) ON order_idempotency TO PUBLIC");
+        assertTrue(admin.queryForObject("SELECT has_column_privilege('oms_app','order_idempotency','body_hash','UPDATE')",Boolean.class));
+        admin.execute("REVOKE ALL ON order_idempotency FROM PUBLIC");
+        assertDenied(runtime,"UPDATE order_idempotency SET body_hash='rewritten'");
         assertTrue(db.queryForObject("SELECT count(*) FROM order_audit",Integer.class)>0);
         assertTrue(db.queryForObject("SELECT count(*) FROM outbox_events",Integer.class)>0);
         Long cleanupId=db.queryForObject("SELECT min(id) FROM outbox_events",Long.class);
@@ -63,7 +77,8 @@ class DbRoleIntegrationTest {
         for(String table:List.of("snapshot_inbox","order_audit","order_command_audit","order_idempotency",
                 "execution_inbox","operation_reconciliations","fulfillment_evidence","fulfillment_evidence_identity",
                 "fulfillment_evidence_receipts","finance_requests","finance_acknowledgments",
-                "order_replacement_requests","order_replacement_lineage")) {
+                "order_replacement_requests","order_replacement_lineage","recovery_command_tombstones",
+                "recovery_receipts","recovery_findings","recovery_evidence_adjudications","recovery_daily_checkpoints")) {
             assertFalse(admin.queryForObject("SELECT has_table_privilege('oms_app',?,'UPDATE')",Boolean.class,"order_management."+table));
             assertDenied(runtime,"DELETE FROM "+table);
             assertDenied(runtime,"TRUNCATE "+table);
@@ -91,10 +106,24 @@ class DbRoleIntegrationTest {
         assertEquals(1,db.queryForObject("SELECT count(*) FROM future_ledger",Integer.class));
         assertDenied(runtime,"UPDATE future_ledger SET id=2");
         assertDenied(runtime,"DELETE FROM future_ledger");
-        admin.execute("CREATE TABLE order_management.recovery_daily_runs(id int)");
-        admin.execute(grants);
-        db.update("INSERT INTO recovery_daily_runs VALUES(1)");
-        assertEquals(1,db.update("UPDATE recovery_daily_runs SET id=2"));
+        var manager=new DataSourceTransactionManager(runtime);
+        var execution=new com.opencrm.order.execution.ExecutionService(db,manager,json,access,true,"pilot");
+        var recovery=new com.opencrm.order.recovery.RecoveryService(db,manager,json,access,execution,"pilot");
+        String task=db.queryForObject("SELECT id FROM order_tasks WHERE order_id=? AND kind='ALLOCATION'",String.class,order.id());
+        var lease=execution.claim(task,"role-drill-worker",java.time.Duration.ofSeconds(30)).orElseThrow();
+        execution.dispatch(lease);
+        execution.recordUnknown(lease,"Fictional local drill timeout; no external completion claimed");
+        var exception=db.queryForMap("SELECT id,version FROM order_exceptions WHERE task_id=? AND category='UNKNOWN_OUTCOME'",task);
+        recovery.assign((String)exception.get("id"),new com.opencrm.order.recovery.RecoveryDtos.Assignment(
+            ((Number)exception.get("version")).longValue(),"role-assign","Role drill triage","drill-owner"));
+        assertEquals("drill-owner",db.queryForObject("SELECT owner FROM order_exceptions WHERE id=?",String.class,exception.get("id")));
+        var daily=new com.opencrm.order.recovery.DailyReconciliation(db,manager,"pilot");
+        assertEquals(1,daily.scan(10));
+        assertEquals(1,db.queryForObject("SELECT scanned FROM recovery_daily_runs WHERE scope_id='pilot'",Integer.class));
+        assertNotNull(db.queryForObject("SELECT completed_at FROM recovery_daily_runs WHERE scope_id='pilot'",Object.class));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM recovery_daily_checkpoints",Integer.class));
+        assertTrue(db.queryForObject("SELECT count(*) FROM recovery_findings",Integer.class)>0);
+        assertEquals("UNKNOWN",db.queryForObject("SELECT status FROM task_operations WHERE task_id=?",String.class,task));
     }
 
     private static void assertDenied(DriverManagerDataSource source,String sql) throws Exception {

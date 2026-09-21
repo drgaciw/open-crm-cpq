@@ -22,10 +22,10 @@ BEGIN
  END IF;
  IF EXISTS (SELECT 1 FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
    JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(a.attacl) x
-   WHERE n.nspname='order_management' AND x.grantee=runtime_oid
-     AND NOT (c.relname='snapshot_inbox' AND a.attname='snapshot_id'
+   WHERE n.nspname='order_management' AND x.grantee IN (runtime_oid,0)
+     AND NOT (x.grantee=runtime_oid AND c.relname='snapshot_inbox' AND a.attname='snapshot_id'
        AND x.privilege_type='UPDATE' AND NOT x.is_grantable)) THEN
-   RAISE EXCEPTION 'Remove preexisting runtime column grants before applying this policy';
+   RAISE EXCEPTION 'Remove preexisting runtime/PUBLIC column grants before applying this policy';
  END IF;
 END $$;
 

@@ -18,7 +18,10 @@ No password belongs in this script, repository, shell history or image. Configur
 externally. Give this identity database CONNECT if the database's PUBLIC CONNECT privilege was
 removed. Give it no role memberships, schema ownership, public schema CREATE, or privileges in
 other service schemas. The script rejects elevated attributes, role memberships, object ownership
-and unexpected preexisting column grants; DBAs remain responsible for the wider database policy.
+and unexpected preexisting runtime or PUBLIC column grants; DBAs remain responsible for the wider
+database policy. PUBLIC has no identity-lock exception: any PUBLIC column ACL is rejected before
+grants are changed. This preflight is defense in depth: PostgreSQL's table-level REVOKE also removes
+column privileges, which the integration test verifies with a seeded PUBLIC receipt-column grant.
 
 After **every** migration, connect as the actual schema/migration owner and run:
 
@@ -49,5 +52,6 @@ remain available to the running application when a separate migration job is use
 `DbRoleIntegrationTest` uses a fresh PostgreSQL container and SET ROLE on every runtime connection,
 then exercises actual snapshot intake, order conversion, submit and read. It verifies denied audit,
 snapshot, receipt and finance mutation, denied trigger bypass/DDL, future append-only defaults, and
-conditional recovery permissions. Run with Docker using `./mvnw.cmd -pl services/order-management
+actual V5 recovery assignment and daily reconciliation under the runtime role, plus rejection of
+PUBLIC receipt and snapshot-identity column grants. Run with Docker using `./mvnw.cmd -pl services/order-management
 -am test -Dtest=DbRoleIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false` from `backend`.
