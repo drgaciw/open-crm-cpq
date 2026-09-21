@@ -21,3 +21,8 @@ groups:
         for: 1m
         labels: {severity: warning}
         annotations: {summary: "OMS operational metrics are stale, failing or unconfigured"}
+      - alert: OmsOperationalCountCapped
+        expr: oms_outbox_pending >= oms_operations_scan_limit or oms_outbox_exhausted >= oms_operations_scan_limit or oms_tasks_unknown >= oms_operations_scan_limit or oms_tasks_overdue >= oms_operations_scan_limit or oms_finance_exceptions_open >= oms_operations_scan_limit
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "OMS operational count reached its scan cap; reported counts are lower bounds"}
