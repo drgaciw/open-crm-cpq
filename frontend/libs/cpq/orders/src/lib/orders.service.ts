@@ -9,6 +9,9 @@ import {
   SourceReference,
   Command,
   OperationStatus,
+  FulfillmentEvidence,
+  Allocation,
+  FinanceRequest,
 } from './orders.model';
 
 /** Uses the shell's ApiResponse interceptor, including its Spring-page pagination projection. */
@@ -48,6 +51,21 @@ export class OrdersService {
   timeline(id: string) {
     return this.http.get<OrderTimeline[]>(
       `${this.base}/${encodeURIComponent(id)}/timeline`,
+    );
+  }
+  evidence(id: string) {
+    return this.http.get<FulfillmentEvidence[]>(
+      `${this.base}/${encodeURIComponent(id)}/fulfillment-evidence`,
+    );
+  }
+  allocations(id: string) {
+    return this.http.get<Allocation[]>(
+      `${this.base}/${encodeURIComponent(id)}/allocations`,
+    );
+  }
+  finance(id: string) {
+    return this.http.get<FinanceRequest[]>(
+      `${this.base}/${encodeURIComponent(id)}/finance-requests`,
     );
   }
   convert(source: SourceReference, key: string) {

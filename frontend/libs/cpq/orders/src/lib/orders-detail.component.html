@@ -39,6 +39,31 @@
   >
     Reconcile uncertain outcome
   </button>
+  <fieldset [disabled]="pending() || loading() || stale()">
+    <legend>Recover a never-received command</legend>
+    <p>
+      The server must confirm that the original key is safely abandoned. This
+      does not undo committed work. NOT_FOUND alone never clears the command.
+    </p>
+    <label
+      >Unresolved operation<select [(ngModel)]="abandonKey">
+        <option value="">Choose an operation</option>
+        @for (entry of pendingOperations(); track entry.operationKey) {
+          <option [value]="entry.operationKey">
+            {{ entry.action }} · {{ entry.operationKey }}
+          </option>
+        }
+      </select></label
+    >
+    <label
+      >Abandonment reason<textarea [(ngModel)]="abandonReason"></textarea>
+    </label>
+    <label class="check"
+      ><input type="checkbox" [(ngModel)]="abandonConfirmed" /> I request that
+      this operation key be prevented from executing in the future.</label
+    >
+    <button type="button" (click)="abandon()">Request safe abandonment</button>
+  </fieldset>
 }
 @if (notice()) {
   <p class="notice" role="status">{{ notice() }}</p>
@@ -184,6 +209,75 @@
       </table>
     </div>
   </section>
+  <section aria-label="Fulfillment evidence ledger">
+    <h2>Allocation references</h2>
+    @if (!allocations().length) {
+      <p>No allocation lots recorded.</p>
+    }
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference / line</th>
+            <th>Reserved</th>
+            <th>Consumed</th>
+            <th>Released</th>
+            <th>Available</th>
+            <th>Expires</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (lot of allocations(); track lot.id) {
+            <tr>
+              <td>{{ lot.reference }}<br />{{ lot.lineId }}</td>
+              <td>{{ lot.quantity }}</td>
+              <td>{{ lot.consumed }}</td>
+              <td>{{ lot.released }}</td>
+              <td>{{ lot.available }}</td>
+              <td>{{ lot.expiresAt | date: 'medium' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <h2>Recorded fulfillment evidence</h2>
+    @if (!evidence().length) {
+      <p>No fulfillment evidence recorded.</p>
+    }
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Kind / line</th>
+            <th>Quantity</th>
+            <th>External reference</th>
+            <th>Causal references</th>
+            <th>Occurred / actor</th>
+            <th>Status / reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of evidence(); track entry.id) {
+            <tr>
+              <td>{{ entry.kind }}<br />{{ entry.lineId }}</td>
+              <td>{{ entry.quantity }}</td>
+              <td>{{ entry.externalReference }}</td>
+              <td>
+                Allocation: {{ entry.allocationReference || '—'
+                }}<br />Shipment: {{ entry.shipmentReference || '—' }}
+              </td>
+              <td>
+                {{ entry.occurredAt | date: 'medium' }}<br />{{ entry.actor }}
+              </td>
+              <td>
+                {{ entry.status }} · {{ entry.detail }}<br />{{ entry.reason }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
   <fieldset [disabled]="pending() || loading() || stale() || unresolved() > 0">
     <section>
       <h2>Order commands</h2>
@@ -211,6 +305,31 @@
         ><button type="button" (click)="hold()">Apply hold change</button
         ><button type="button" (click)="reconcile()">Reconcile order</button>
       </div>
+    </section>
+    <section>
+      <h2>Request commercial correction</h2>
+      <p>
+        This cancels every obligation on an eligible unexecuted order and
+        requests that the quote reopen for correction and fresh approval. The
+        original snapshot remains immutable. The server rejects any execution,
+        allocation or unresolved work.
+      </p>
+      <label
+        >Replacement reason<textarea [(ngModel)]="replacementReason"></textarea>
+      </label>
+      <label class="check"
+        ><input type="checkbox" [(ngModel)]="replacementConfirmed" /> I confirm
+        cancellation of this entire order to request a newly approved commercial
+        revision.</label
+      >
+      <button
+        type="button"
+        class="danger"
+        [disabled]="o.status !== 'DRAFT' && o.status !== 'SUBMITTED'"
+        (click)="replace()"
+      >
+        Cancel order and request correction
+      </button>
     </section>
     <section>
       <h2>Cancel remaining quantity</h2>
@@ -265,8 +384,8 @@
       <p>
         Record an actual external event. Manual allocation does not guarantee
         stock availability. Delivery received before shipment remains pending
-        reconciliation. Finance acknowledgments require
-        <strong>oms:finance</strong>.
+        reconciliation. Record finance outcomes in the separate finance section
+        below.
       </p>
       <form (ngSubmit)="recordEvidence()">
         <div class="grid">
@@ -314,6 +433,53 @@
               [(ngModel)]="evidenceAt"
               required
           /></label>
+          @if (evidenceKind === 'ALLOCATION') {
+            <label
+              >Allocation expiry (local time)<input
+                name="evidenceExpiresAt"
+                type="datetime-local"
+                [(ngModel)]="evidenceExpiresAt"
+                required
+            /></label>
+          }
+          @if (evidenceKind === 'SHIPMENT' || evidenceKind === 'RELEASE') {
+            <label
+              >Original allocation reference<input
+                name="allocationReference"
+                [(ngModel)]="allocationReference"
+                list="allocation-references"
+                required
+            /></label>
+            <datalist id="allocation-references">
+              @for (lot of allocations(); track lot.id) {
+                @if (lot.lineId === evidenceLine) {
+                  <option [value]="lot.reference">
+                    {{ lot.available }} available
+                  </option>
+                }
+              }
+            </datalist>
+          }
+          @if (evidenceKind === 'DELIVERY') {
+            <label
+              >Causal shipment reference<input
+                name="shipmentReference"
+                [(ngModel)]="shipmentReference"
+                list="shipment-references"
+                required
+            /></label>
+            <datalist id="shipment-references">
+              @for (entry of evidence(); track entry.id) {
+                @if (
+                  entry.lineId === evidenceLine && entry.kind === 'SHIPMENT'
+                ) {
+                  <option [value]="entry.externalReference">
+                    {{ entry.status }}
+                  </option>
+                }
+              }
+            </datalist>
+          }
         </div>
         <label
           >Evidence reason<textarea
@@ -324,7 +490,99 @@
         ><button type="submit">Record evidence</button>
       </form>
     </section>
+    <section>
+      <h2>Finance requests and actual outcomes</h2>
+      <p>
+        Requires oms:finance. Request preparation freezes the fulfilled line
+        obligation; it does not prove an invoice exists. Only actual
+        acknowledged quantities count toward completion. Unknown or rejected
+        outcomes require reconciliation.
+      </p>
+      <label
+        >Finance line<select [(ngModel)]="financeLine">
+          <option value="">Choose a fulfilled line</option>
+          @for (line of o.lines; track line.id) {
+            <option [value]="line.id">{{ line.description }}</option>
+          }
+        </select></label
+      >
+      <label
+        >Finance reason<textarea [(ngModel)]="financeReason"></textarea>
+      </label>
+      <button type="button" (click)="prepareFinance()">
+        Prepare finance request
+      </button>
+      <form (ngSubmit)="recordFinance()">
+        <div class="grid">
+          <label
+            >Recorded finance request<select
+              name="financeRequestKey"
+              [(ngModel)]="financeRequestKey"
+              required
+            >
+              <option value="">Choose a request</option>
+              @for (request of finance(); track request.requestKey) {
+                <option [value]="request.requestKey">
+                  {{ request.lineId }} · {{ request.status }} ·
+                  {{ request.requestKey }}
+                </option>
+              }
+            </select></label
+          >
+          <label
+            >Actual finance outcome<select
+              name="financeOutcome"
+              [(ngModel)]="financeOutcome"
+            >
+              <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="UNKNOWN">Unknown</option>
+            </select></label
+          >
+          <label
+            >Finance quantity<input
+              name="financeQuantity"
+              type="number"
+              min="1"
+              step="1"
+              [(ngModel)]="financeQuantity"
+              required
+          /></label>
+          <label
+            >Finance external reference<input
+              name="financeReference"
+              [(ngModel)]="financeReference"
+              required
+          /></label>
+          <label
+            >Finance occurred at (local time)<input
+              name="financeAt"
+              type="datetime-local"
+              [(ngModel)]="financeAt"
+              required
+          /></label>
+        </div>
+        <button type="submit">Record actual finance outcome</button>
+      </form>
+    </section>
   </fieldset>
+  <section aria-label="Finance ledger">
+    <h2>Frozen finance obligations</h2>
+    @if (!finance().length) {
+      <p>No finance requests recorded.</p>
+    }
+    @for (request of finance(); track request.requestKey) {
+      <details>
+        <summary>
+          {{ request.lineId }} · {{ request.status }} ·
+          {{ request.acknowledgedQuantity }} of
+          {{ request.quantity }} acknowledged
+        </summary>
+        <p>Request key: {{ request.requestKey }}</p>
+        <pre>{{ request.payload }}</pre>
+      </details>
+    }
+  </section>
   <section>
     <h2>Execution plan</h2>
     <p class="muted">
@@ -362,7 +620,7 @@
                     loading() ||
                     stale() ||
                     unresolved() > 0 ||
-                    (task.status !== 'FAILED' && task.status !== 'EXHAUSTED')
+                    task.status !== 'RETRYABLE'
                   "
                   (click)="retry(task)"
                 >
@@ -375,6 +633,44 @@
       </table>
     </div>
     <p>Retry uses the command reason above and requires recovery permission.</p>
+    <fieldset
+      [disabled]="pending() || loading() || stale() || unresolved() > 0"
+    >
+      <legend>Record authoritative no-effect evidence</legend>
+      <p>
+        A provider's verified no-effect result may permit recovery. A timeout,
+        missing response or NOT_FOUND command lookup is not no-effect evidence.
+        This form does not retry the task.
+      </p>
+      <label
+        >No-effect task<select [(ngModel)]="noEffectTask">
+          <option value="">Choose an unresolved task</option>
+          @for (task of tasks(); track task.id) {
+            <option [value]="task.id">
+              {{ task.kind }} · {{ task.status }} · {{ task.id }}
+            </option>
+          }
+        </select></label
+      >
+      <label
+        >No-effect evidence reference<input [(ngModel)]="noEffectReference"
+      /></label>
+      <label
+        >No-effect occurred at (local time)<input
+          type="datetime-local"
+          [(ngModel)]="noEffectAt"
+      /></label>
+      <label
+        >No-effect reason<textarea [(ngModel)]="noEffectReason"></textarea>
+      </label>
+      <label class="check"
+        ><input type="checkbox" [(ngModel)]="noEffectConfirmed" /> I have
+        authoritative evidence that this dispatch had no external effect.</label
+      >
+      <button type="button" (click)="recordNoEffect()">
+        Record no-effect evidence
+      </button>
+    </fieldset>
   </section>
   <section>
     <h2>Order timeline</h2>

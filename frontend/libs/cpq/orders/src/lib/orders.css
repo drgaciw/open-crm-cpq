@@ -156,6 +156,10 @@ summary {
   cursor: pointer;
   font-weight: 600;
 }
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .check {
   flex-direction: row;
   align-items: center;
