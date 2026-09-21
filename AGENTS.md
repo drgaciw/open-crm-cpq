@@ -52,6 +52,29 @@ GitNexus block above is **code-intelligence only**. For what to build vs hold, r
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — index
 - [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 **Accepted**; dual-read ADR-005 still **Proposed**)
 
+## AutoJev decision skills (optional, advisory)
+
+Six third-party skills from <https://autojev.ai/jev-skills> are vendored by
+`scripts/sync-autojev-skills.sh` into `.agents/skills/` (source of truth) and mirrored to
+`.claude/skills/`. They call the AutoJev MCP server (`.mcp.json` → `https://autojev.ai/mcp`), which
+needs `AUTOJEV_API_KEY` in the environment that launches the agent host — never in a project file.
+Without the key the `autojev_*` tools are absent; carry on without them, do not invent results.
+
+| Skill | Use at this decision boundary |
+| --- | --- |
+| `autojev` | Umbrella router; `autojev_decide` only when no preset tool fits |
+| `autojev-task-router` | Ambiguous or risky next step: proceed / deep review / split / block |
+| `autojev-model-router` | Real quality/cost/latency tradeoff between models you can actually invoke |
+| `autojev-tool-guard` | Immediately before a consequential, hard-to-reverse tool call |
+| `autojev-research-guard` | Whether gathered evidence supports one precise claim |
+| `autojev-completion-review` | Before reporting a multi-step task complete |
+
+- Verdicts are **decision support, not authorization**. They never replace the GitNexus impact /
+  `detect_changes` requirements above, user confirmations, or the holds in [AGENT.md](AGENT.md).
+- Every call sends a task summary to an external service: no secrets, credentials, or customer/CRM
+  data in the payload — compact task state only.
+- This is separate from the Jev *model* used by `jev-worker/` and `frontend/e2e/uat-jev-local.mjs`.
+
 ## Learned User Preferences
 
 - Prefer browser automation (Playwright, Cursor browser; Chrome DevTools when Google Chrome is available) for UAT and chaos testing across pages, fields, and workflows with mock data; fix failures with a TDD loop.
