@@ -73,7 +73,33 @@ Without the key the `autojev_*` tools are absent; carry on without them, do not 
   `detect_changes` requirements above, user confirmations, or the holds in [AGENT.md](AGENT.md).
 - Every call sends a task summary to an external service: no secrets, credentials, or customer/CRM
   data in the payload — compact task state only.
-- This is separate from the Jev *model* used by `jev-worker/` and `frontend/e2e/uat-jev-local.mjs`.
+- This is separate from the Jev *model* used by `jev-worker/`, `frontend/e2e/uat-jev-local.mjs`, and the
+  advisory decision support in domain services
+  ([ADR-015](docs/adr/ADR-015-jev-advisory-decision-support.md)).
+
+When the `autojev_*` tools are connected, these project-specific moments are **mandatory**, not optional.
+
+`autojev-tool-guard` — call before:
+
+- Anything aimed at the dev server on `:4200` or at the GitNexus **MCP**: both point at the *other*
+  checkout (`C:\Users\dgorn\cpq-crm\open-crm-cpq`), not this tree. State which checkout the action hits.
+- Starting, restarting, or killing any backend service, dev server, Docker container or browser. Services
+  reaped for memory are **never** restarted unprompted; check free RAM first.
+- Editing `frontend/proxy.conf.json` (it must keep targeting the gateway on `:8080`).
+- Touching anything under a hold in [AGENT.md](AGENT.md) / `docs/ARCHITECTURE.md` §17 — including
+  `approvals.legacy-local-read-enabled` and turning on any `opencrm.jev.*.enabled` flag.
+- `mvn` builds of a service whose jar is currently running from `target/` (Windows locks the jar).
+
+`autojev-completion-review` — always list these under known gaps when they apply, never omit them:
+
+- `*IntegrationTest` classes need Docker; a Docker-less run did not execute them.
+- `scripts/ci/frontend.sh` tests only an allowlist (`crm-*`, `shared-models`, `shared-data-access`);
+  `cpq-*`, `shared-ui` and any new Nx project are silently skipped. `scripts/ci/backend-unit.sh` builds
+  only `crm-service` + `gateway-service`; other services' tests run only in the Docker integration job.
+- CPQ services are often down during CRM UAT — empty lists or 503 fallbacks are expected then, and prove
+  nothing about the feature.
+- A GitNexus result with `partial: true`, `truncated: true` or `risk: UNKNOWN` is not a clean check.
+- Browser UAT / chaos scripts are not wired into CI; "tests pass" does not include them.
 
 ## Learned User Preferences
 
