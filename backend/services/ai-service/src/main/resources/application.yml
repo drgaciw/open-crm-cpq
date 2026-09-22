@@ -1,6 +1,14 @@
 spring:
   application:
     name: ai-service
+  # The API-key Spring AI client does not use Azure 5.8's Boot 3 credential bootstrap.
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
   threads:
     virtual:
       enabled: true
@@ -25,7 +33,11 @@ spring:
       hibernate:
         default_schema: ai
 
-  # Azure OpenAI Configuration
+  # Keep AI migrations and their history in the service's own schema.
+  flyway:
+    schemas: ai
+    default-schema: ai
+
   ai:
     azure:
       openai:
@@ -36,12 +48,15 @@ spring:
             deployment-name: gpt-4o
 
 server:
-  port: 8086
+  port: 8090
 
 opencrm:
   gateway:
     base-url: ${OPENCRM_GATEWAY_BASE_URL:http://localhost:8080}
+  # Azure remains the default provider until the opt-in rollout is configured.
   ai:
+    selection:
+      execution-enabled: ${OPENCRM_AI_SELECTION_EXECUTION_ENABLED:false}
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 

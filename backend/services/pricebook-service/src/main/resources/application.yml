@@ -18,6 +18,8 @@ spring:
     properties:
       hibernate:
         default_schema: pricing
+  # pricing-service exclusively owns pricing schema migrations, including price-book tables.
+  # Start pricing-service migrations before this service validates its entities.
   flyway:
     enabled: false
 

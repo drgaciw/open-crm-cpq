@@ -172,6 +172,8 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 
 ---
 
+> **Executed 2026-09-22** on branch `merge/codex-adr-gap-integration`, which merges `codex/adr-gap-integration` into `main` in one pass. It contains every patch from the other eight `codex/*` branches. ADR conflicts were resolved as planned: codex text for 008/013/014/VERIFICATION/REQ/AGENT/ARCHITECTURE, and main's rows for ADR-015–018. There were no Flyway version collisions.
+
 ## 6. Prioritised roadmap
 
 | Horizon | Item | Type |

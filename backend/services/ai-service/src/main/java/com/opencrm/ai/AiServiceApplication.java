@@ -5,7 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
 @SpringBootApplication
-@ComponentScan(basePackages = {"com.opencrm.ai", "com.opencrm.common", "com.opencrm.security"})
+// Shared DTOs need no component scan; common outbox components belong to domain services.
+@ComponentScan(basePackages = {"com.opencrm.ai", "com.opencrm.security"})
 public class AiServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(AiServiceApplication.class, args);
