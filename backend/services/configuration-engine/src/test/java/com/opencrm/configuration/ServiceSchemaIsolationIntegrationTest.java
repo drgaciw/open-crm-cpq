@@ -32,11 +32,11 @@ class ServiceSchemaIsolationIntegrationTest {
             .withDatabaseName("opencrm");
 
     private static final List<Service> SERVICES = List.of(
-            new Service("configuration-engine", "configuration", "configuration_sessions", 1),
+            new Service("configuration-engine", "configuration", "configuration_sessions", 2),
             // 3 = V1_1 + V1_2 + V1_3__create_jev_decision_log (ADR-015, merged after this test was written)
-            new Service("approval-routing", "approval", "approval_requests", 3),
-            new Service("document-generation", "document", "document_generation_jobs", 1),
-            new Service("contract-asset-management", "contract", "subscriptions", 1));
+            new Service("approval-routing", "approval", "approval_requests", 4),
+            new Service("document-generation", "document", "document_generation_jobs", 2),
+            new Service("contract-asset-management", "contract", "subscriptions", 2));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {
