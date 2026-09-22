@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.kafka.autoconfigure.DefaultKafkaProducerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -56,14 +57,16 @@ public class OutboxRelayAutoConfiguration {
             KafkaTemplate<String, String> kafkaTemplate,
             PlatformTransactionManager transactionManager,
             OutboxProperties properties,
-            ObjectProvider<OutboxRelayObserver> observer) {
+            ObjectProvider<OutboxRelayObserver> observer,
+            Environment environment) {
         return new OutboxRelayPublisher(
                 outboxEventRepository,
                 kafkaTemplate,
                 new TransactionTemplate(transactionManager),
                 properties.getRelay(),
                 observer.getIfUnique(() -> OutboxRelayObserver.NOOP),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                environment.getProperty("spring.application.name"));
     }
 
     /**

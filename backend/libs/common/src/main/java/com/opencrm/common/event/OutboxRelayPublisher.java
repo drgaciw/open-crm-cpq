@@ -1,11 +1,13 @@
 package com.opencrm.common.event;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +49,7 @@ public class OutboxRelayPublisher {
     private final OutboxProperties.Relay properties;
     private final OutboxRelayObserver observer;
     private final Clock clock;
+    private final String producerName;
 
     public OutboxRelayPublisher(
             OutboxEventRepository repository,
@@ -54,13 +57,15 @@ public class OutboxRelayPublisher {
             TransactionTemplate transactionTemplate,
             OutboxProperties.Relay properties,
             OutboxRelayObserver observer,
-            Clock clock) {
+            Clock clock,
+            String producerName) {
         this.repository = repository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
         this.properties = properties;
         this.observer = observer;
         this.clock = clock;
+        this.producerName = producerName;
     }
 
     /** One relay tick. Never runs inside a caller's transaction: each lease commits on its own. */
@@ -98,8 +103,7 @@ public class OutboxRelayPublisher {
         List<InFlight> inFlight = new ArrayList<>(lease.size());
         for (OutboxEvent event : lease) {
             try {
-                inFlight.add(new InFlight(event,
-                        kafkaTemplate.send(event.getEventType(), event.getAggregateId(), event.getPayload())));
+                inFlight.add(new InFlight(event, kafkaTemplate.send(toRecord(event))));
             } catch (RuntimeException e) {
                 // A synchronous failure (no metadata within max.block.ms, serializer error) usually means the broker
                 // is unreachable. Stop sending: the rest of the lease is left untouched and not counted as attempts.
@@ -167,6 +171,27 @@ public class OutboxRelayPublisher {
         int exponent = Math.min(Math.max(attempt - 1, 0), 20);
         Duration delay = initial.multipliedBy(1L << exponent);
         return delay.compareTo(max) > 0 ? max : delay;
+    }
+
+    /**
+     * The Kafka record for an outbox row: topic from {@code event_type} (which holds the topic, ADR-018 Context 5), key
+     * {@code aggregate_id} (per-aggregate partition order), JSON payload unchanged, and the envelope headers written so
+     * far (D4): {@code eventId} = the row UUID, which is identical on every re-send and is what consumers deduplicate
+     * on (D6), plus {@code occurredAt} and {@code producer}.
+     */
+    ProducerRecord<String, String> toRecord(OutboxEvent event) {
+        ProducerRecord<String, String> record =
+                new ProducerRecord<>(event.getEventType(), event.getAggregateId(), event.getPayload());
+        header(record, EventHeaders.EVENT_ID, event.getUuid());
+        header(record, EventHeaders.OCCURRED_AT, event.getCreatedAt() == null ? null : event.getCreatedAt().toString());
+        header(record, EventHeaders.PRODUCER, producerName);
+        return record;
+    }
+
+    private static void header(ProducerRecord<String, String> record, String name, String value) {
+        if (value != null && !value.isBlank()) {
+            record.headers().add(name, value.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private static String describe(Throwable error) {
