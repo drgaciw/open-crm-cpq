@@ -13,7 +13,7 @@ Usage: bash scripts/ci/run-core.sh <stage>
 Stages:
   toolchain            Verify java, mvn, node, docker, python + CI contract drift
   shared-libraries     Maven verify for backend/libs/*
-  backend-unit         Fast Maven unit profile (crm-service + gateway-service)
+  backend-unit         Fast Docker-free Maven unit profile (all backend modules)
   backend-integration  Full Maven verify (Testcontainers)
   cpq-beta-python      cpq_beta pytest (best-effort)
   frontend             Nx build, lint, targeted tests

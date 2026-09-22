@@ -94,8 +94,8 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 
 - `*IntegrationTest` classes need Docker; a Docker-less run did not execute them.
 - `scripts/ci/frontend.sh` tests only an allowlist (`crm-*`, `shared-models`, `shared-data-access`);
-  `cpq-*`, `shared-ui` and any new Nx project are silently skipped. `scripts/ci/backend-unit.sh` builds
-  only `crm-service` + `gateway-service`; other services' tests run only in the Docker integration job.
+  `cpq-*`, `shared-ui` and any new Nx project are silently skipped. `scripts/ci/backend-unit.sh` runs
+  every backend module's unit tests and fails if one starts a Testcontainer; tag Docker tests `integration`.
 - CPQ services are often down during CRM UAT — empty lists or 503 fallbacks are expected then, and prove
   nothing about the feature.
 - A GitNexus result with `partial: true`, `truncated: true` or `risk: UNKNOWN` is not a clean check.
