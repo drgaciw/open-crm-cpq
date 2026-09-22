@@ -3,7 +3,6 @@ package com.opencrm.common.event.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.opencrm.common.event.EventContractRegistry;
-import com.opencrm.common.event.dto.v1.QuoteAcceptedEventV1;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -94,16 +93,6 @@ public class QuoteAcceptedEvent {
             event.setCurrencyCode(pricing.getCurrencyCode());
         }
         return event;
-    }
-
-    public QuoteAcceptedEventV1 toPublishedLanguageV1() {
-        return QuoteAcceptedEventV1.builder()
-                .quoteId(getQuoteId())
-                .acceptedAt(getAcceptedAt())
-                .customerId(getCustomerId())
-                .totalAmount(getTotalAmount())
-                .currencyCode(getCurrencyCode())
-                .build();
     }
 
     @Data

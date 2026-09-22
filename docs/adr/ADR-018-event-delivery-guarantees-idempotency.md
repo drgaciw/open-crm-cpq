@@ -103,6 +103,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - The `dto/v1` subset classes are **deprecated and removed** once contract tests pin the live payload classes.
 - Consumers must tolerate unknown properties, and a test proves it.
 - A breaking change means a new `eventVersion` with a dual-publish window. Adding fields is non-breaking.
+- *Refined during implementation (2026-09-22):* the registry is also enforced at the publishing API. `OutboxEventPublisher.publish` takes an `EventContract`, not a topic string, so an unregistered topic does not compile. The publisher refuses a `RESERVED` contract or a payload of the wrong class.
 
 **D6 — Idempotent consumers (inbox).**
 - Every `@KafkaListener` deduplicates on header `eventId`, using a per-schema `processed_events(consumer_group, event_id, processed_at)` row written **in the same transaction** as the side effect.
@@ -124,6 +125,10 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - *Refined during implementation (2026-09-22):* the shared dedupe key is the **quote UUID**, not `eventId`. The Redis message carries no `eventId`, so an `eventId` key cannot dedupe across the two channels during the dual run. A quote is accepted once, so its UUID identifies the acceptance on both. The claim lives in crm's `processed_events`, written in the deal transaction (D6), and replaces the Redis `SETNX` key.
 
 **D9 — One emitter per event type.** Remove the unwired `QuoteService.acceptQuote` publish path. A GitNexus or ArchUnit check enforces one publishing method per topic per service.
+- *Refined during implementation (2026-09-22):* the check is a source-scanning unit test, `EventContractFitnessTest`, not GitNexus or ArchUnit.
+  - ArchUnit works on bytecode. It sees that a method calls `publish`, but not which contract is passed to a given call, and topic strings are inlined as compile-time constants.
+  - GitNexus is not in the build, and its index proved unreliable (review doc 39, §7).
+  - The rule is also stricter: **one publish call site per contract, in the service that owns it.** A single call site implies a single publishing method.
 
 **D10 — Operability.** Micrometer metrics per service:
 - outbox backlog count and age
@@ -195,6 +200,7 @@ Each step can be undone by redeploying the previous version. Schema changes are 
 - **GitNexus Cypher:**
   - Zero callers of `KafkaTemplate.send` or `RedisTemplate.convertAndSend` for domain events outside the relay.
   - Exactly one publishing method per (service, topic).
+  - *Implemented 2026-09-22* as `EventContractFitnessTest`, a unit-gate source scan, not a GitNexus query. See the D9 refinement.
 - **Health:** the `outbox` indicator is **DOWN** in a test with an aged unpublished row.
 
 ## Evidence (HEAD `4a29d31`)
@@ -386,6 +392,45 @@ Branch `feat/adr018-d8-crm-quote-accepted-kafka`, 2026-09-22. This covers D8 tra
   - D8 step 3: remove `QuoteEventPublisher`, `QuoteAcceptedEventListener` and `RedisSubscriberConfig` once each environment has proven the dual run.
   - The D9 fitness check.
   - The rest of D4, D5, DLT and lag metrics, and the per-environment backlog decision.
+
+### The registry as the contract: D5 and the D9 check (Rollout step 5)
+
+Branch `feat/adr018-d5-registry-contract-d9-fitness`, 2026-09-22. The ADR stays **Proposed**. The wire format does not change.
+
+- **Registry (D5).** `EventContract` gains `payloadClass` and `status` (`PUBLISHED` or `RESERVED`). New lookups: `all()` and `forTopic()`.
+  - The three published topics with no entry (Context 6) are now registered:
+    - `ProductUpdated` and `BundleStructureChanged`: product-service, payload `ProductCatalogLifecycleEvent`.
+    - `QuoteApprovalRejected`: approval-routing, payload `ApprovalRejectedEvent`.
+  - The four entries with no producer are now `RESERVED`: `PriceCalculated`, `ContractExecuted`, `ApprovalStepDecided` and `ApprovalOutcomeCompleted`. The last two have no payload class yet.
+  - That gives 8 `PUBLISHED` and 4 `RESERVED` contracts.
+- **Publishing goes through the registry.** See the D5 refinement.
+  - `OutboxEventPublisher.publish(aggregateType, aggregateId, EventContract, payload)` replaces the overload that took a topic string. The old overload is removed.
+  - All 8 call sites pass their registry constant.
+  - Storage is unchanged: `outbox_events.event_type` still holds the topic until D4 adds a `topic` column.
+- **Fitness functions (D5, D9).** `EventContractFitnessTest` in `libs/common` runs in the unit gate and scans `services/*/src/main/java`. It checks that:
+  - every `PUBLISHED` contract has exactly one publish call site, in its owning service;
+  - a `RESERVED` contract has none;
+  - each call names exactly one registry constant directly, with no static import and no variable;
+  - no service references `KafkaTemplate`;
+  - Redis `convertAndSend` appears only in `QuoteEventPublisher`, allowlisted for the D8 dual run. The test fails once the allowlisted file is gone, so D8 step 3 has to remove the entry.
+
+  The test was red first: against the old call sites it reported all 8 as naming no contract. For publishing, it replaces the GitNexus Cypher items under "Acceptance and fitness functions" (see the D9 refinement).
+- **Consumers tolerate unknown properties (D5).**
+  - Every registered payload class, and every published-language type reachable through its fields, is `@JsonIgnoreProperties(ignoreUnknown = true)`. That is 20 types.
+  - `PublishedPayloadToleranceTest` reads a JSON object with an unknown field into each type under a strict mapper. All 20 failed before the annotation was added.
+- **`dto/v1` removed (D5).**
+  - Deleted: the five `*EventV1` subset classes, the `toPublishedLanguageV1()` helpers and their test. Nothing produced or consumed them.
+  - `PriceCalculatedEvent`'s line type moves to `PriceCalculatedEvent.PriceCalculatedLine`, with the same JSON shape.
+- **Tests.**
+  - `EventContractRegistryTest` (7). It checks that `all()` covers every constant, that there is one contract per topic, that type plus version is unique, and that every topic is a `KafkaTopics` constant. It also pins each contract's topic, type, owner and status.
+  - `OutboxEventPublisherTest` (+3): a `RESERVED` contract, a payload of the wrong class, and a null payload are all refused.
+  - The fitness test (5) and the tolerance test (40).
+  - Six service tests now verify the contract instead of the topic string.
+  - `OutboxRelayKafkaIntegrationTest` (quote) and `PriceBookOutboxWiringTest` now publish real contracts with real payloads, not ad-hoc maps.
+- **Not done:**
+  - The rest of D4. The `eventType`, `eventVersion`, `correlationId`, `causationId` and `actor` headers and the `topic` column still need the additive outbox migrations. The publisher already has the contract, so `eventType` and `eventVersion` need only those columns.
+  - `KafkaTopics` still has 15 constants with no producer and no registry entry, such as `cpq.quote.created` and the AMCP mesh topics. They are names, not contracts; pruning them is housekeeping outside D5.
+  - DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
 
 ## Sources
 

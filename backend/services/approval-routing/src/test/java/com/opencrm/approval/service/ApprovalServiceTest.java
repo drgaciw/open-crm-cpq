@@ -1,5 +1,6 @@
 package com.opencrm.approval.service;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
@@ -103,7 +104,7 @@ class ApprovalServiceTest {
         verify(outboxEventPublisher).publish(
                 eq("ApprovalRequest"),
                 eq("Q-001"),
-                eq("cpq.quote.approval.rejected"),
+                eq(EventContractRegistry.QUOTE_APPROVAL_REJECTED_V1),
                 any()
         );
     }

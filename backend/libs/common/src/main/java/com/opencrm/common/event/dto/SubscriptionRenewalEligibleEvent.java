@@ -1,6 +1,6 @@
 package com.opencrm.common.event.dto;
 
-import com.opencrm.common.event.dto.v1.SubscriptionRenewalEligibleEventV1;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,18 +16,10 @@ import java.time.LocalDate;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SubscriptionRenewalEligibleEvent {
     private String subscriptionId;
     private LocalDate renewalDate;
     private String currentPlan;
     private String usageBand;
-
-    public SubscriptionRenewalEligibleEventV1 toPublishedLanguageV1() {
-        return SubscriptionRenewalEligibleEventV1.builder()
-                .subscriptionId(subscriptionId)
-                .renewalDate(renewalDate)
-                .currentPlan(currentPlan)
-                .usageBand(usageBand)
-                .build();
-    }
 }

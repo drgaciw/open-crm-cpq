@@ -1,6 +1,6 @@
 package com.opencrm.product.catalog;
 
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,7 +62,7 @@ class ProductLifecycleEventTest {
         verify(outboxEventPublisher).publish(
                 eq("Product"),
                 eq("1"),
-                eq(KafkaTopics.PRODUCT_UPDATED),
+                eq(EventContractRegistry.PRODUCT_UPDATED_V1),
                 any()
         );
     }
@@ -79,7 +79,7 @@ class ProductLifecycleEventTest {
         verify(outboxEventPublisher).publish(
                 eq("Product"),
                 eq("1"),
-                eq(KafkaTopics.PRODUCT_UPDATED),
+                eq(EventContractRegistry.PRODUCT_UPDATED_V1),
                 any()
         );
     }

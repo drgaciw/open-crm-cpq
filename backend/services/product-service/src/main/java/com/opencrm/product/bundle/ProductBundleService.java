@@ -1,6 +1,6 @@
 package com.opencrm.product.bundle;
 
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.exception.BusinessException;
@@ -123,7 +123,7 @@ public class ProductBundleService {
         outboxEventPublisher.publish(
                 "ProductBundle",
                 bundle.getId().toString(),
-                KafkaTopics.BUNDLE_STRUCTURE_CHANGED,
+                EventContractRegistry.BUNDLE_STRUCTURE_CHANGED_V1,
                 new ProductCatalogLifecycleEvent(
                         String.valueOf(bundle.getProductId()),
                         changeType,
