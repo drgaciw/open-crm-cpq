@@ -211,6 +211,13 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - The ERP call has moved out of the listener transaction into `ErpSyncJob`.
 >   - Document generation now starts after commit, which fixes a race that could leave jobs PENDING.
 >   - Poison records go to `<topic>.DLT` instead of being silently dropped.
+> - **ADR-018 CRM onto Kafka (Rollout step 4, D8 steps 1–2 and D9).**
+>   - quote-service publishes to Redis `quote:accepted` only after commit, and a Redis failure no longer rolls back the acceptance.
+>   - crm-service has a Kafka listener on `cpq.quote.status.accepted`. It is off by default and is enabled together with the relay.
+>   - Both channels claim the quote UUID in crm's `processed_events`, inside the deal transaction, so the deal is marked WON once whichever channel arrives first. This replaces the Redis `SETNX` keys.
+>   - `QuoteAcceptedEvent` gained `deal` and ARR/TCV/ACV. Unknown properties are now tolerated, and a test proves it.
+>   - The unwired `acceptQuote` emitter is gone, leaving one publisher per topic.
+>   - Removing Redis (D8 step 3) waits until the dual run is proven. The backlog decision now has to cover crm too: see ADR-018, "Backlog caveat".
 
 ---
 
@@ -221,6 +228,7 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 - **Process leak.** 14 long-lived `gitnexus mcp` node processes (some from 2026-09-19) were running on the workstation.
 - **Resolved later on 2026-09-22.** In `~/.gitnexus/registry.json` (backup `registry.json.bak-2026-09-22T18-44-52-714Z`), the main checkout is now `open-crm-cpq`, which matches CLAUDE.md/AGENTS.md. Each worktree or clone has a unique alias, `open-crm-cpq-wt-<leaf>` or `open-crm-cpq-clone-cpq-crm`, and `open-crm-cpq-evaluation` is unchanged. These aliases differ from each folder name, so GitNexus keeps them when the folder is re-analysed; this was checked by re-analysing `oms-evidence-docs`. 11 leftover `gitnexus mcp` servers started on 09-19/20 by the Codex app-server were stopped, and today's 3 were left running. The `cmano-clone` x3 name collision is still open.
 - **Resolution gaps.** Field-injected method calls sometimes lack `CALLS` edges (`ApprovalRoutingClient` showed 0 callers versus 6 in `rg`), and one row had a corrupted `filePath` in a CALLS query. Keep the `rg` confirmation step. Consider `analyze --force` if corruption recurs.
+  - *It recurred later on 2026-09-22.* After incremental `analyze --index-only` runs, `impact` reported CRITICAL for `publishQuoteAccepted`, `applyWinFromQuote` and `acceptQuote`, with callers in Twilio Python, Vue and `JevException`. `rg` showed one real caller, two real callers and none respectively. `analyze --index-only --force` (73 s, about 20k nodes) restored correct LOW results. Treat any cross-language caller in a Java impact result as a sign the index is corrupt, and re-index with `--force` before trusting it.
 
 ---
 

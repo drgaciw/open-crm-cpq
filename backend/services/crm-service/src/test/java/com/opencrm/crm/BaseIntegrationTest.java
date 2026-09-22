@@ -63,7 +63,9 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.cloud.azure.compatibility-verifier.enabled", () -> "false");
         registry.add("spring.autoconfigure.exclude", () ->
                 "com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,"
-                        + "com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration");
+                        + "com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration,"
+                        // crm-service has Kafka since ADR-018 D8; azure-spring 5.x's Event Hubs Kafka config cannot load on Boot 4.
+                        + "com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration");
     }
 
     @BeforeEach

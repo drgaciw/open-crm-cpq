@@ -25,13 +25,7 @@ class QuoteAcceptedIdempotencyTest {
     }
 
     @Test
-    void redisKey_hasStablePrefix() {
-        assertThat(QuoteAcceptedIdempotency.redisKey("abc"))
-                .isEqualTo(QuoteAcceptedIdempotency.KEY_PREFIX + "abc");
-    }
-
-    @Test
-    void ttl_isThirtyDays() {
-        assertThat(QuoteAcceptedIdempotency.TTL.toDays()).isEqualTo(30);
+    void claimNamespace_isSharedByBothChannels() {
+        assertThat(QuoteAcceptedIdempotency.CLAIM_NAMESPACE).isEqualTo("crm-quote-accepted");
     }
 }

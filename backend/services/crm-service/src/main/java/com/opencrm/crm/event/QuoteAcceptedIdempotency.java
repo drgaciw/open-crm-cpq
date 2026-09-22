@@ -3,27 +3,24 @@ package com.opencrm.crm.event;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import lombok.experimental.UtilityClass;
 
-import java.time.Duration;
-
 /**
- * Builds Redis keys for at-most-once processing of quote acceptance messages.
- * <p>
- * <b>Semantics (claim-then-apply, no poisoned keys):</b>
- * <ol>
- *   <li>Listener claims with {@code SET NX} + {@link #TTL} before calling the processor.</li>
- *   <li>Retain the key only after a successful deal update (deal found and marked WON).</li>
- *   <li>If the deal is missing (processor no-op) or apply throws, <b>delete</b> the key so a later
- *       republish can retry — do not leave a 30-day “processed” key for a skipped update.</li>
- *   <li>Duplicate delivery while the key exists skips re-application (true at-most-once after success).</li>
- * </ol>
+ * Dedupe key for quote acceptance (ADR-018 D6/D8).
+ *
+ * <p>Quote acceptance reaches crm-service on two channels during the D8 dual run: Redis {@code quote:accepted} and
+ * Kafka {@code cpq.quote.status.accepted}. Both are mapped to a {@link QuoteAcceptedCrmMessage}, and
+ * {@link QuoteAcceptedDealProcessor} claims {@link #dedupeKey} under {@link #CLAIM_NAMESPACE} in
+ * {@code processed_events}, in the same transaction as the deal update. The first channel to arrive marks the deal WON;
+ * the other finds the claim and skips.
+ *
+ * <p>The key is the quote UUID, not the Kafka {@code eventId}: the Redis message has no {@code eventId}, and a quote is
+ * accepted once, so its UUID is the natural key on both channels. This replaced the Redis {@code SET NX} keys
+ * {@code crm:quote-accepted:processed:*}, which lived outside the deal transaction and were lost with Redis.
  */
 @UtilityClass
 public class QuoteAcceptedIdempotency {
 
-    public static final String KEY_PREFIX = "crm:quote-accepted:processed:";
-
-    /** TTL for retained processed keys after a successful deal update. */
-    public static final Duration TTL = Duration.ofDays(30);
+    /** {@code processed_events.consumer_group} value shared by the Redis and Kafka quote-accepted listeners. */
+    public static final String CLAIM_NAMESPACE = "crm-quote-accepted";
 
     /**
      * Prefer quote UUID; otherwise fall back to deal id + quote number for deduplication.
@@ -36,9 +33,5 @@ public class QuoteAcceptedIdempotency {
                 ? event.getQuoteNumber()
                 : "unknown-quote";
         return dealExternalId + ":" + quotePart;
-    }
-
-    public static String redisKey(String dedupeKey) {
-        return KEY_PREFIX + dedupeKey;
     }
 }

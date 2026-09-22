@@ -121,6 +121,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - crm-service consumes `cpq.quote.status.accepted` from Kafka. Its dedupe key is `eventId`, which replaces today's key built from quote and deal IDs.
 - The CRM fields missing from `QuoteAcceptedEvent`, such as `dealExternalId` and ARR/ACV/TCV, are added **additively**.
 - Transition: first move the Redis publish to after-commit, and make it log without failing on error. Then run Redis and Kafka side by side with a shared dedupe key. Then remove the Redis publisher and listener.
+- *Refined during implementation (2026-09-22):* the shared dedupe key is the **quote UUID**, not `eventId`. The Redis message carries no `eventId`, so an `eventId` key cannot dedupe across the two channels during the dual run. A quote is accepted once, so its UUID identifies the acceptance on both. The claim lives in crm's `processed_events`, written in the deal transaction (D6), and replaces the Redis `SETNX` key.
 
 **D9 — One emitter per event type.** Remove the unwired `QuoteService.acceptQuote` publish path. A GitNexus or ArchUnit check enforces one publishing method per topic per service.
 
@@ -337,6 +338,54 @@ Branch `feat/adr018-d6-d7-idempotent-consumers-dlt`, 2026-09-22. The ADR stays *
   - DLT topics need retention and a replay runbook, and their depth needs an alert. DLT depth and consumer lag metrics are still open.
   - The ERP side must upsert by subscription number, because a sync repeated after a crash is possible.
 - **Not done:** the rest of D4, D5, D8 (CRM onto Kafka), D9, DLT and lag metrics, and the per-environment backlog decision.
+
+### CRM onto Kafka: D8 dual run and D9 single emitter (Rollout step 4)
+
+Branch `feat/adr018-d8-crm-quote-accepted-kafka`, 2026-09-22. This covers D8 transition steps 1 and 2 and all of D9's code change. The ADR stays **Proposed**.
+
+- **Redis publish after commit (D8 step 1).**
+  - `QuoteEventPublisher.publishQuoteAccepted` registers a `TransactionSynchronization` and publishes in `afterCommit`. With no transaction active it publishes at once.
+  - A serialization or Redis failure is logged, never thrown. Quote acceptance no longer depends on Redis, and a rolled-back acceptance never reaches CRM.
+  - The outbox write in `QuoteService.accept` is unchanged. It is the reliable channel.
+- **Contract additions (additive, D5).**
+  - `QuoteAcceptedEvent` gains `deal { dealExternalId, dealType }` and `pricing.arr`, `pricing.tcv`, `pricing.acv`. `QuoteAcceptedKafkaEventFactory` fills them.
+  - The event and its seven snapshot types are now `@JsonIgnoreProperties(ignoreUnknown = true)`. A consumer built against an older copy of the DTO therefore reads a newer payload even with a strict mapper. `QuoteAcceptedEventToleranceTest` proves it, and failed with `UnrecognizedPropertyException` before the annotation.
+- **CRM Kafka listener (D8 step 2).**
+  - crm-service gets `spring-boot-starter-kafka` and the Event Hubs auto-configuration exclude.
+  - `QuoteAcceptedKafkaListener` consumes `cpq.quote.status.accepted` as group `crm-service`. It maps the event onto `QuoteAcceptedCrmMessage` and hands it to the same `QuoteAcceptedDealProcessor` the Redis listener uses.
+  - It is **off by default**: `opencrm.crm.quote-accepted.kafka.enabled`, or `CRM_QUOTE_ACCEPTED_KAFKA_ENABLED` in compose. Turn it on with quote-service's relay; without the relay the topic stays empty.
+  - An unreadable payload, or one without `quoteId`, throws `NonRetryableEventException` and goes to `cpq.quote.status.accepted.DLT` (D7). A quote with no deal is skipped.
+- **Shared dedupe (D6 applied to D8; see the D8 refinement).**
+  - `QuoteAcceptedDealProcessor` claims `processed_events('crm-quote-accepted', <quote UUID>)` through the new `KafkaInbox.claimKey(namespace, key)`, inside the deal transaction. `claim(group, record)` now delegates to it. If there is no UUID, the key falls back to `<deal>:<quoteNumber>`.
+  - The namespace is `crm-quote-accepted`, not the Kafka group, because both channels share it.
+  - A claim is written only when the deal exists. A missing deal leaves nothing claimed, so a redelivery can still apply it.
+  - The Redis `SET NX` keys (`crm:quote-accepted:processed:*`) are gone. They lived outside the deal transaction and were lost with Redis.
+  - crm migration `V5` creates `processed_events`. `opencrm.kafka.inbox.enabled` is on in crm, so the daily purge also runs there.
+- **One emitter (D9).**
+  - `QuoteService.acceptQuote(Long)` is removed. It had no callers: `rg` found none, and GitNexus `impact` agreed once the index had been rebuilt with `--force`.
+  - `QuoteService.accept` is the only publisher of `cpq.quote.status.accepted`.
+  - Not done: the GitNexus or ArchUnit fitness check (one publishing method per service and topic).
+- **Tests.**
+  - Unit:
+    - `QuoteEventPublisherTest` (2): publishes after commit and never on rollback; a Redis failure is swallowed.
+    - `QuoteAcceptedKafkaEventFactoryTest` (+1): deal and ARR/TCV/ACV.
+    - `QuoteAcceptedEventToleranceTest` (1).
+    - crm: `QuoteAcceptedKafkaListenerTest` (3), `QuoteAcceptedDealProcessorTest` (3), `QuoteAcceptedEventListenerTest` (3) and `QuoteAcceptedIdempotencyTest` (3), all rewritten for the inbox.
+  - Testcontainers:
+    - `QuoteAcceptedRedisIntegrationTest` now asserts `processed_events` rows instead of Redis keys.
+    - The new `QuoteAcceptedDualRunIntegrationTest` runs PostgreSQL, Redis and `apache/kafka:4.3.1`. A Kafka-only acceptance marks the deal WON. The same acceptance sent on Redis and then Kafka is applied once, with one claim.
+- **Operations.**
+  - Enable per environment in order: quote-service's relay first (after the backlog decision), then `CRM_QUOTE_ACCEPTED_KAFKA_ENABLED=true`.
+  - The CRM group starts at `earliest`, so it reads every acceptance the topic retains. An acceptance applied through Redis *after* this change is a no-op on Kafka, because of the shared claim. One whose Redis message was dropped marks its deal WON, which is the intended catch-up.
+  - **Backlog caveat.** Acceptances applied through Redis *before* this change have no claim; their keys were in Redis. The relay's first run publishes the whole outbox backlog, so each historic acceptance would set WON, `wonAt`, amount and currency on its deal again, overwriting any later manual edit. Each environment's backlog decision therefore has to cover crm. There are three options:
+    - Set the `crm-service` group's offsets to the end of the topic (`kafka-consumer-groups --reset-offsets --to-latest`) once the backlog has drained, and before enabling crm's listener. Redis covers the gap during the dual run, and the other consumers' replay stays a separate choice.
+    - Mark the historic rows published, which also withholds them from document-generation and contract-asset.
+    - Accept the re-application.
+  - document-generation, contract-asset and crm all consume this topic and share its `.DLT`. A replay must filter on `kafka_dlt-original-consumer-group`, and the runbook has to say so.
+- **Not done:**
+  - D8 step 3: remove `QuoteEventPublisher`, `QuoteAcceptedEventListener` and `RedisSubscriberConfig` once each environment has proven the dual run.
+  - The D9 fitness check.
+  - The rest of D4, D5, DLT and lag metrics, and the per-environment backlog decision.
 
 ## Sources
 
