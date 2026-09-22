@@ -1,5 +1,6 @@
 package com.opencrm.security;
 
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,10 +23,15 @@ public final class SecurityUtils {
 
     /**
      * Get the current authenticated user context.
+     * <p>
+     * Anonymous callers are not users: Spring Security marks an
+     * {@link AnonymousAuthenticationToken} as authenticated, so without this check a
+     * permitAll chain would report the principal {@code anonymousUser} as the actor
+     * (ADR-016 phase 0).
      */
     public static Optional<UserContext> getCurrentUser() {
         return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
-                .filter(Authentication::isAuthenticated)
+                .filter(SecurityUtils::isRealUser)
                 .map(SecurityUtils::extractUserContext);
     }
 
@@ -55,11 +61,16 @@ public final class SecurityUtils {
     }
 
     /**
-     * Check if current user is authenticated.
+     * Check if current user is authenticated. Anonymous callers do not count.
      */
     public static boolean isAuthenticated() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && authentication.isAuthenticated();
+        return isRealUser(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    private static boolean isRealUser(Authentication authentication) {
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
     private static UserContext extractUserContext(Authentication authentication) {
