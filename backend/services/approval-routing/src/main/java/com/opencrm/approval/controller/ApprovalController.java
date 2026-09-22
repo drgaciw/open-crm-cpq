@@ -40,6 +40,12 @@ public class ApprovalController {
         return ApiResponse.success(approvalService.getById(id));
     }
 
+    @GetMapping("/quote/{quoteId}")
+    @Operation(summary = "List non-deleted approval history for a quote, newest submitted first")
+    public ApiResponse<List<ApprovalRequestDto>> getByQuoteId(@PathVariable String quoteId) {
+        return ApiResponse.success(approvalService.getByQuoteId(quoteId));
+    }
+
     @GetMapping("/pending")
     @Operation(summary = "List all pending approval requests")
     public ApiResponse<List<ApprovalRequestDto>> getPendingApprovals() {

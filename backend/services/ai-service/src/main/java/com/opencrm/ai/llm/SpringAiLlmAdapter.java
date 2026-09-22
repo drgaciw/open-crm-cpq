@@ -7,12 +7,14 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "opencrm.ai.selection.execution-enabled", havingValue = "false", matchIfMissing = true)
 public class SpringAiLlmAdapter implements LlmAdapter {
 
     private final ChatClient chatClient;

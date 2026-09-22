@@ -68,9 +68,6 @@
         <!-- Azure -->
         <spring-cloud-azure.version>5.8.0</spring-cloud-azure.version>
 
-        <!-- Kafka -->
-        <kafka.version>3.6.1</kafka.version>
-
         <!-- gRPC -->
         <grpc.version>1.60.1</grpc.version>
         <protobuf.version>3.25.1</protobuf.version>

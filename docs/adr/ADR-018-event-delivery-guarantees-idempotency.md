@@ -219,10 +219,14 @@ Branch `fix/adr018-kafka-starter-outbox-relay`, 2026-09-22. It implements part o
   - `OutboxRelayRegistrationContextTest` (quote-service) checks four things: auto-configuration discovery, a single relay when enabled, off by default, and a safe skip without Kafka.
   - `KafkaListenerInfrastructureContextTest` (approval-routing, configuration-engine, contract-asset-management, document-generation) checks that the listener container factory exists and that each consumer is subscribed to its topic.
   - All pass. Unit suites for `libs/*` and the 7 services show no regressions against the pre-change baseline.
+- **End-to-end proof (2026-09-22, branch `feat/compose-kafka-cpq-services`, Docker/Testcontainers):**
+  - `OutboxRelayKafkaIntegrationTest` (quote-service): a committed outbox row reaches `cpq.quote.status.accepted` on a real `apache/kafka:4.3.1` broker, and the relay marks it published.
+  - `QuoteAcceptedKafkaIntegrationTest` (document-generation): the real listener creates exactly one document job, and a redelivery of the same event is ignored.
+  - The consumer IT surfaced a **third layer of the D1 defect**. `backend/pom.xml` pinned `kafka.version=3.6.1` against spring-kafka 4.0.5, and every listener container died with `VerifyError` in `KafkaMessageListenerContainer$ListenerConsumer.run()`. The pin is removed, so Boot now manages kafka-clients 4.1.2.
+  - Local compose gains Kafka and the four consumers under `--profile events`.
 - **Not done:**
   - the rest of D1 (the `outbox` health indicator) and D2–D10
-  - booting the services against real PostgreSQL and Kafka (Docker was not running)
-  - `*IntegrationTest` classes, which need Docker
+  - running the full compose stack together; the end-to-end proof above uses Testcontainers, one service at a time
 
 ## Sources
 

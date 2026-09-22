@@ -76,6 +76,12 @@ public class ApprovalService {
     }
 
     @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> getByQuoteId(String quoteId) {
+        return approvalRequestMapper.toDtoList(
+                approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(quoteId));
+    }
+
+    @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovals() {
         return approvalRequestMapper.toDtoList(
                 approvalRequestRepository.findByStatus(ApprovalStatus.PENDING));

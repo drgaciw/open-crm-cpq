@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -27,6 +29,7 @@ public class AiAuditLog {
     private String eventType;
 
     @Column(name = "input_context", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String inputContext;
 
     @Column(name = "llm_output", columnDefinition = "TEXT")
@@ -47,7 +50,8 @@ public class AiAuditLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "snapshot_references", columnDefinition = "TEXT")
+    @Column(name = "snapshot_references", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String snapshotReferences;
 
     public AiAuditLog() {
@@ -62,7 +66,7 @@ public class AiAuditLog {
             createdAt = Instant.now();
         }
         if (model == null) {
-            model = "glm-5";
+            model = "unknown";
         }
     }
 
