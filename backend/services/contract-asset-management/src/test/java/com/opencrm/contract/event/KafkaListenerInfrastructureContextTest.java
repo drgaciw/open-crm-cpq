@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.contract.acl.ErpAdapter;
 import com.opencrm.contract.repository.SubscriptionRepository;
@@ -52,6 +53,7 @@ class KafkaListenerInfrastructureContextTest {
                 .withUserConfiguration(ServiceStyleKafkaWiring.class)
                 .withBean(SubscriptionRepository.class, () -> mock(SubscriptionRepository.class))
                 .withBean(ErpAdapter.class, () -> mock(ErpAdapter.class))
+                .withBean(KafkaInbox.class, () -> mock(KafkaInbox.class))
                 .withBean(QuoteAcceptedEventConsumer.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class))

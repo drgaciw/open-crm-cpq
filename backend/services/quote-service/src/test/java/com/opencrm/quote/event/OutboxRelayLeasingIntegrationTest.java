@@ -1,8 +1,8 @@
 package com.opencrm.quote.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -124,7 +125,7 @@ class OutboxRelayLeasingIntegrationTest {
         OutboxProperties.Relay settings = new OutboxProperties().getRelay();
         settings.setAckTimeout(Duration.ofSeconds(2));
         return new OutboxRelayPublisher(repository, kafka, tx, settings, OutboxRelayObserver.NOOP,
-                Clock.fixed(now, ZoneOffset.UTC));
+                Clock.fixed(now, ZoneOffset.UTC), "quote-service");
     }
 
     @Test
@@ -201,13 +202,18 @@ class OutboxRelayLeasingIntegrationTest {
         assertThat(lease(retryAt.plusSeconds(1), 10)).containsExactly(x1);
     }
 
+    /** Matches the q-order record on TOPIC with {@code value}, i.e. one specific outbox row. */
+    private static ProducerRecord<String, String> payload(String value) {
+        return argThat(r -> r != null && TOPIC.equals(r.topic()) && "q-order".equals(r.key()) && value.equals(r.value()));
+    }
+
     @Test
     @DisplayName("D2: a failing send future leaves the row unpublished in the database")
     @SuppressWarnings("unchecked")
     void failingSendLeavesRowUnpublished() {
         long id = insert("q-fail", "{}");
         KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
-        when(kafka.send(anyString(), anyString(), anyString()))
+        when(kafka.send(any(ProducerRecord.class)))
                 .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker rejected")));
         Instant now = Instant.now().plusSeconds(1);
 
@@ -230,23 +236,23 @@ class OutboxRelayLeasingIntegrationTest {
         long second = insert("q-order", "{\"n\":2}");
         KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
         CompletableFuture<SendResult<String, String>> acked = CompletableFuture.completedFuture(null);
-        when(kafka.send(TOPIC, "q-order", "{\"n\":1}"))
+        when(kafka.send(payload("{\"n\":1}")))
                 .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("transient")))
                 .thenReturn(acked);
-        when(kafka.send(TOPIC, "q-order", "{\"n\":2}")).thenReturn(acked);
+        when(kafka.send(payload("{\"n\":2}"))).thenReturn(acked);
         Instant now = Instant.now().plusSeconds(1);
 
         relay(kafka, now).publishPendingEvents();
 
-        verify(kafka, never()).send(TOPIC, "q-order", "{\"n\":2}");
+        verify(kafka, never()).send(payload("{\"n\":2}"));
         assertThat(reload(second).getStatus()).isEqualTo(OutboxStatus.PENDING);
 
         // After the backoff, one tick publishes both, first then second.
         relay(kafka, now.plus(1, ChronoUnit.HOURS)).publishPendingEvents();
 
         InOrder order = inOrder(kafka);
-        order.verify(kafka, times(2)).send(eq(TOPIC), eq("q-order"), eq("{\"n\":1}"));
-        order.verify(kafka).send(eq(TOPIC), eq("q-order"), eq("{\"n\":2}"));
+        order.verify(kafka, times(2)).send(payload("{\"n\":1}"));
+        order.verify(kafka).send(payload("{\"n\":2}"));
         assertThat(reload(first).getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
         assertThat(reload(second).getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
         assertThat(reload(first).getPublishedAt()).isNotNull();

@@ -57,6 +57,10 @@ management:
 # transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so
 # the service boots without it; a blank key forces the no-op transport.
 opencrm:
+  kafka:
+    inbox:
+      # ADR-018 D6: consumers deduplicate on the eventId header via processed_events (V1_5).
+      enabled: true
   jev:
     enabled: ${JEV_ENABLED:false}
     transport: ${JEV_TRANSPORT:noop}
