@@ -79,6 +79,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_FLYWAY_SCHEMAS: crm
+      # ADR-018 D8 dual run: also consume quote acceptance from Kafka. Needs `--profile events` (Kafka) and the
+      # quote-service relay (OPENCRM_OUTBOX_RELAY_ENABLED=true); off by default.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CRM_QUOTE_ACCEPTED_KAFKA_ENABLED: ${CRM_QUOTE_ACCEPTED_KAFKA_ENABLED:-false}
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: opencrm

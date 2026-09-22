@@ -6,22 +6,30 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Legacy channel: quote acceptance over Redis Pub/Sub {@code quote:accepted}.
+ *
+ * <p>ADR-018 D8 dual run: {@link QuoteAcceptedKafkaListener} consumes the same acceptances from Kafka, and both hand
+ * them to {@link QuoteAcceptedDealProcessor}, which deduplicates in the deal transaction. Pub/Sub keeps nothing, so a
+ * message sent while crm-service is down is lost; Kafka is the channel that survives that. This listener and the
+ * quote-service publisher are removed once the dual run shows Kafka alone is enough.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class QuoteAcceptedEventListener implements MessageListener {
 
     private final ObjectMapper objectMapper;
-    private final StringRedisTemplate stringRedisTemplate;
     private final QuoteAcceptedDealProcessor quoteAcceptedDealProcessor;
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            String body = new String(message.getBody());
+            String body = new String(message.getBody(), StandardCharsets.UTF_8);
             QuoteAcceptedCrmMessage event = objectMapper.readValue(body, QuoteAcceptedCrmMessage.class);
 
             String dealExternalId = event.getDealExternalId();
@@ -29,28 +37,10 @@ public class QuoteAcceptedEventListener implements MessageListener {
                 log.warn("QuoteAcceptedCrmMessage received without dealExternalId, skipping CRM update");
                 return;
             }
-
-            String dedupeKey = QuoteAcceptedIdempotency.dedupeKey(event, dealExternalId);
-            String redisKey = QuoteAcceptedIdempotency.redisKey(dedupeKey);
-            Boolean first =
-                    stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "1", QuoteAcceptedIdempotency.TTL);
-            if (Boolean.FALSE.equals(first)) {
-                log.info("Duplicate quote acceptance for key {}, skipping", dedupeKey);
-                return;
-            }
-
-            try {
-                boolean applied = quoteAcceptedDealProcessor.applyWinFromQuote(event, dealExternalId);
-                if (!applied) {
-                    // Deal missing: release claim so a later republish can retry (no poisoned key).
-                    stringRedisTemplate.delete(redisKey);
-                }
-            } catch (Exception e) {
-                stringRedisTemplate.delete(redisKey);
-                throw e;
-            }
+            quoteAcceptedDealProcessor.applyWinFromQuote(event, dealExternalId);
         } catch (Exception e) {
-            log.error("Failed to process QuoteAcceptedCrmMessage", e);
+            // Pub/Sub cannot redeliver; the Kafka channel is the retrying one during the dual run.
+            log.error("Failed to process QuoteAcceptedCrmMessage from Redis", e);
         }
     }
 }

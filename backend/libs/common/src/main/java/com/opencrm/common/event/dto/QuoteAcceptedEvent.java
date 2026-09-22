@@ -1,5 +1,6 @@
 package com.opencrm.common.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.dto.v1.QuoteAcceptedEventV1;
@@ -17,10 +18,15 @@ import java.util.Map;
  * Event published when a quote is accepted.
  * Topic: cpq.quote.status.accepted
  * Publisher: Quote Management
- * Subscribers: Document Generation, Contract/Asset Management
+ * Subscribers: Document Generation, Contract/Asset Management, CRM (ADR-018 D8)
+ *
+ * <p>ADR-018 D8 added {@link DealSnapshot} and the ARR/TCV/ACV totals on {@link PricingSnapshot} so crm-service can
+ * move off the Redis {@code quote:accepted} channel. Additive and {@code NON_NULL}: consumers that do not know them
+ * ignore them.
  */
 @Data
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @EqualsAndHashCode(of = {"quoteId", "acceptedAt", "customerId", "totalAmount", "currencyCode"})
 public class QuoteAcceptedEvent {
@@ -43,6 +49,7 @@ public class QuoteAcceptedEvent {
     private ConfigurationSnapshot configuration;
     private TermSnapshot terms;
     private CorrelationSnapshot correlation;
+    private DealSnapshot deal;
 
     public QuoteAcceptedEvent(
             String quoteId,
@@ -101,6 +108,7 @@ public class QuoteAcceptedEvent {
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class QuoteSnapshot {
@@ -111,6 +119,7 @@ public class QuoteAcceptedEvent {
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CustomerSnapshot {
@@ -120,15 +129,31 @@ public class QuoteAcceptedEvent {
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PricingSnapshot {
         private BigDecimal totalAmount;
         private String currencyCode;
+        private BigDecimal arr;
+        private BigDecimal tcv;
+        private BigDecimal acv;
+    }
+
+    /** The CRM deal the quote belongs to (ADR-018 D8); {@code dealExternalId} is the CRM {@code Deal.uuid}. */
+    @Data
+    @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DealSnapshot {
+        private String dealExternalId;
+        private String dealType;
     }
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ConfigurationSnapshot {
@@ -139,6 +164,7 @@ public class QuoteAcceptedEvent {
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class TermSnapshot {
@@ -149,6 +175,7 @@ public class QuoteAcceptedEvent {
 
     @Data
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CorrelationSnapshot {

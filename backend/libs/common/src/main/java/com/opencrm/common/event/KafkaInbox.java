@@ -40,13 +40,25 @@ public class KafkaInbox {
      * @throws IllegalStateException if no transaction is active (the claim would not be atomic with the side effect)
      */
     public boolean claim(String consumerGroup, ConsumerRecord<?, ?> record) {
+        return claimKey(consumerGroup, eventIdOf(record));
+    }
+
+    /**
+     * Records {@code key} as processed in {@code namespace}, for callers whose dedupe key is not a Kafka record's, e.g.
+     * a business key shared by two delivery channels during a migration (crm-service's quote acceptance arrives over
+     * Redis and Kafka during the ADR-018 D8 dual run, and both claim the quote UUID).
+     *
+     * @return {@code true} the first time, {@code false} if {@code key} was already claimed in {@code namespace}
+     * @throws IllegalStateException if no transaction is active (the claim would not be atomic with the side effect)
+     */
+    public boolean claimKey(String namespace, String key) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("KafkaInbox.claim must run inside the listener's transaction");
+            throw new IllegalStateException("KafkaInbox claims must run inside the consumer's transaction");
         }
         int inserted = jdbc.update(
                 "INSERT INTO processed_events (consumer_group, event_id, processed_at) VALUES (?, ?, now()) "
                         + "ON CONFLICT (consumer_group, event_id) DO NOTHING",
-                consumerGroup, eventIdOf(record));
+                namespace, key);
         return inserted == 1;
     }
 

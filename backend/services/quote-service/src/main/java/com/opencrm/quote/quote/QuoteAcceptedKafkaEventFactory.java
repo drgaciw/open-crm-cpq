@@ -27,7 +27,7 @@ final class QuoteAcceptedKafkaEventFactory {
                 "lineCount", String.valueOf(lineItems.size())
         );
 
-        return QuoteAcceptedEvent.v1(
+        QuoteAcceptedEvent event = QuoteAcceptedEvent.v1(
                 QuoteAcceptedEvent.QuoteSnapshot.builder()
                         .quoteId(quoteId)
                         .quoteNumber(quote.getQuoteNumber())
@@ -39,6 +39,9 @@ final class QuoteAcceptedKafkaEventFactory {
                 QuoteAcceptedEvent.PricingSnapshot.builder()
                         .totalAmount(quote.getTotalAmount())
                         .currencyCode(quote.getCurrency())
+                        .arr(quote.getArr())
+                        .tcv(quote.getTcv())
+                        .acv(quote.getAcv())
                         .build(),
                 QuoteAcceptedEvent.ConfigurationSnapshot.builder()
                         .configurationId(extractConfigurationId(quote.getMetadata()))
@@ -56,6 +59,14 @@ final class QuoteAcceptedKafkaEventFactory {
                         .sourceService(SOURCE_SERVICE)
                         .build()
         );
+        // ADR-018 D8: the fields crm-service needs to mark the deal WON without the Redis quote:accepted message.
+        if (quote.getDealExternalId() != null || quote.getDealType() != null) {
+            event.setDeal(QuoteAcceptedEvent.DealSnapshot.builder()
+                    .dealExternalId(quote.getDealExternalId())
+                    .dealType(quote.getDealType() != null ? quote.getDealType().name() : null)
+                    .build());
+        }
+        return event;
     }
 
     private static String extractConfigurationId(String metadata) {

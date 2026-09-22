@@ -50,4 +50,27 @@ class QuoteAcceptedKafkaEventFactoryTest {
         assertThat(event.getCorrelation().getSourceService()).isEqualTo("quote-service");
         assertThat(event.toPublishedLanguageV1().getSchemaVersion()).isEqualTo(1);
     }
+
+    @Test
+    void carriesTheDealAndCommercialTotalsCrmNeeds() {
+        Quote quote = Quote.builder()
+                .uuid("quote-uuid-2")
+                .quoteNumber("Q-201")
+                .dealExternalId("deal-uuid-7")
+                .dealType(DealType.RENEWAL)
+                .currency("EUR")
+                .totalAmount(new BigDecimal("1200.00"))
+                .arr(new BigDecimal("1200.00"))
+                .tcv(new BigDecimal("3600.00"))
+                .acv(new BigDecimal("1200.00"))
+                .build();
+
+        QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(quote, List.of());
+
+        assertThat(event.getDeal().getDealExternalId()).isEqualTo("deal-uuid-7");
+        assertThat(event.getDeal().getDealType()).isEqualTo("RENEWAL");
+        assertThat(event.getPricing().getArr()).isEqualByComparingTo("1200.00");
+        assertThat(event.getPricing().getTcv()).isEqualByComparingTo("3600.00");
+        assertThat(event.getPricing().getAcv()).isEqualByComparingTo("1200.00");
+    }
 }
