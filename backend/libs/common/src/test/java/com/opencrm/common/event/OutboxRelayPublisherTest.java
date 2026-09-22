@@ -6,11 +6,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,8 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -56,7 +58,7 @@ class OutboxRelayPublisherTest {
         properties.setAckTimeout(Duration.ofMillis(200));
         relay = new OutboxRelayPublisher(repository, kafkaTemplate,
                 new TransactionTemplate(mock(PlatformTransactionManager.class)), properties, observer,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), "quote-service");
     }
 
     private static OutboxEvent row(long id, String aggregateId) {
@@ -78,6 +80,37 @@ class OutboxRelayPublisherTest {
         return CompletableFuture.failedFuture(new IllegalStateException(message));
     }
 
+    @SuppressWarnings("unchecked")
+    private static ProducerRecord<String, String> anyRecord() {
+        return any(ProducerRecord.class);
+    }
+
+    private static ProducerRecord<String, String> keyed(String key) {
+        return argThat(record -> record != null && key.equals(record.key()));
+    }
+
+    private static String header(ProducerRecord<String, String> record, String name) {
+        Header header = record.headers().lastHeader(name);
+        return header == null ? null : new String(header.value(), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    @DisplayName("D4 headers: the record carries eventId (the row UUID), occurredAt and producer; topic, key and payload are unchanged")
+    void recordCarriesEnvelopeHeaders() {
+        OutboxEvent event = row(1, "q-1");
+        event.setUuid("5f0c9d7e-0000-4000-8000-000000000001");
+        event.setCreatedAt(Instant.parse("2026-09-22T11:59:00Z"));
+
+        ProducerRecord<String, String> record = relay.toRecord(event);
+
+        assertThat(record.topic()).isEqualTo("cpq.quote.status.accepted");
+        assertThat(record.key()).isEqualTo("q-1");
+        assertThat(record.value()).isEqualTo("{\"id\":1}");
+        assertThat(header(record, EventHeaders.EVENT_ID)).isEqualTo("5f0c9d7e-0000-4000-8000-000000000001");
+        assertThat(header(record, EventHeaders.OCCURRED_AT)).isEqualTo("2026-09-22T11:59:00Z");
+        assertThat(header(record, EventHeaders.PRODUCER)).isEqualTo("quote-service");
+    }
+
     @Test
     @DisplayName("an empty lease sends nothing")
     void emptyLeaseSendsNothing() {
@@ -85,7 +118,7 @@ class OutboxRelayPublisherTest {
 
         relay.publishPendingEvents();
 
-        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+        verify(kafkaTemplate, never()).send(anyRecord());
         verify(repository, never()).saveAll(any());
     }
 
@@ -94,7 +127,7 @@ class OutboxRelayPublisherTest {
     void acknowledgedRowIsPublished() {
         OutboxEvent event = row(1, "q-1");
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(event)).thenReturn(List.of());
-        when(kafkaTemplate.send("cpq.quote.status.accepted", "q-1", "{\"id\":1}")).thenReturn(acked());
+        when(kafkaTemplate.send(keyed("q-1"))).thenReturn(acked());
 
         relay.publishPendingEvents();
 
@@ -110,7 +143,7 @@ class OutboxRelayPublisherTest {
     void failedSendFutureLeavesRowUnpublished() {
         OutboxEvent event = row(1, "q-1");
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(event));
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(rejected("NOT_ENOUGH_REPLICAS"));
+        when(kafkaTemplate.send(anyRecord())).thenReturn(rejected("NOT_ENOUGH_REPLICAS"));
 
         relay.publishPendingEvents();
 
@@ -129,7 +162,7 @@ class OutboxRelayPublisherTest {
     void missingAckTimesOut() {
         OutboxEvent event = row(1, "q-1");
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(event));
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(new CompletableFuture<>());
+        when(kafkaTemplate.send(anyRecord())).thenReturn(new CompletableFuture<>());
 
         relay.publishPendingEvents();
 
@@ -144,12 +177,12 @@ class OutboxRelayPublisherTest {
         OutboxEvent first = row(1, "q-1");
         OutboxEvent second = row(2, "q-2");
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(first, second));
-        when(kafkaTemplate.send(anyString(), eq("q-1"), anyString()))
+        when(kafkaTemplate.send(keyed("q-1")))
                 .thenThrow(new IllegalStateException("Topic not present in metadata after 10000 ms"));
 
         relay.publishPendingEvents();
 
-        verify(kafkaTemplate, never()).send(anyString(), eq("q-2"), anyString());
+        verify(kafkaTemplate, never()).send(keyed("q-2"));
         assertThat(first.getRetryCount()).isEqualTo(1);
         assertThat(first.getErrorMessage()).contains("Topic not present in metadata");
         assertThat(second.getRetryCount()).isZero();
@@ -163,8 +196,8 @@ class OutboxRelayPublisherTest {
         OutboxEvent ok = row(1, "q-1");
         OutboxEvent bad = row(2, "q-2");
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(ok, bad)).thenReturn(List.of());
-        when(kafkaTemplate.send(anyString(), eq("q-1"), anyString())).thenReturn(acked());
-        when(kafkaTemplate.send(anyString(), eq("q-2"), anyString())).thenReturn(rejected("RecordTooLarge"));
+        when(kafkaTemplate.send(keyed("q-1"))).thenReturn(acked());
+        when(kafkaTemplate.send(keyed("q-2"))).thenReturn(rejected("RecordTooLarge"));
 
         relay.publishPendingEvents();
 
@@ -179,7 +212,7 @@ class OutboxRelayPublisherTest {
         OutboxEvent event = row(1, "q-1");
         event.setRetryCount(properties.getMaxAttempts() - 1);
         when(repository.leaseDueBatch(NOW, 100)).thenReturn(List.of(event));
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(rejected("still down"));
+        when(kafkaTemplate.send(anyRecord())).thenReturn(rejected("still down"));
 
         relay.publishPendingEvents();
 
@@ -199,7 +232,7 @@ class OutboxRelayPublisherTest {
                 .thenReturn(List.of(first))
                 .thenReturn(List.of(second))
                 .thenReturn(List.of());
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(acked());
+        when(kafkaTemplate.send(anyRecord())).thenReturn(acked());
 
         relay.publishPendingEvents();
 
@@ -213,7 +246,7 @@ class OutboxRelayPublisherTest {
     void drainIsBounded() {
         properties.setMaxDrainIterations(2);
         when(repository.leaseDueBatch(NOW, 100)).thenAnswer(inv -> List.of(row(System.nanoTime(), "q-" + System.nanoTime())));
-        when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(acked());
+        when(kafkaTemplate.send(anyRecord())).thenReturn(acked());
 
         relay.publishPendingEvents();
 

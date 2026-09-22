@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Invalidates compiled configuration models when catalog or bundle structure changes.
+ *
+ * <p>Idempotent by nature (ADR-018 D6): invalidating a cache entry twice is the same as once.
+ * {@code ConfigurationEngineConsumerRedeliveryTest} proves it. Failures go to {@code <topic>.DLT} after retries (D7).
  */
 @Component
 @RequiredArgsConstructor

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.approval.event.shadow.DiscountTierShadowService;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
@@ -52,6 +53,7 @@ class KafkaListenerInfrastructureContextTest {
                 .withUserConfiguration(ServiceStyleKafkaWiring.class)
                 .withBean(ApprovalRequestRepository.class, () -> mock(ApprovalRequestRepository.class))
                 .withBean(DiscountTierShadowService.class, () -> mock(DiscountTierShadowService.class))
+                .withBean(KafkaInbox.class, () -> mock(KafkaInbox.class))
                 .withBean(DiscountApprovalEventConsumer.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class))

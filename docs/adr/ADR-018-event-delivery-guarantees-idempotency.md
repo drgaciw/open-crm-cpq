@@ -294,6 +294,50 @@ Branch `feat/adr018-d2-d3-outbox-ack-lease`, 2026-09-22. All of it lives in `lib
   - Each environment still has to decide on its backlog before enabling the relay.
 - **Not done:** D4–D9, consumer lag and DLT metrics (D7), and a per-environment backlog decision.
 
+### Consumers: D6 idempotency, D7 dead letters, first D4 headers (Rollout steps 2–3)
+
+Branch `feat/adr018-d6-d7-idempotent-consumers-dlt`, 2026-09-22. The ADR stays **Proposed**.
+
+- **Envelope headers (D4, partial).**
+  - The relay now sends each record with three headers, `eventId`, `occurredAt` and `producer` (`EventHeaders`). `eventId` is the outbox row UUID, so it is identical on every re-send.
+  - Topic, key and payload are unchanged.
+  - Not yet sent: `eventType`, `eventVersion`, `correlationId`, `causationId` and `actor`. They need registry and outbox columns.
+- **Inbox (D6).**
+  - `KafkaInbox` in `libs/common` adds the dedupe claim: `INSERT … ON CONFLICT DO NOTHING` into the schema's `processed_events(consumer_group, event_id)`.
+    - The claim is written in the listener's transaction, so it commits or rolls back with the side effect. It refuses to run without a transaction.
+    - The key is the `eventId` header, or `topic-partition@offset` for records without one.
+  - It is plain JDBC rather than a JPA entity. Every service scans `com.opencrm.common` with `ddl-auto: validate`, and only consuming schemas have the table.
+  - It is opt-in with `opencrm.kafka.inbox.enabled`, and a daily job purges claims older than 30 days.
+  - Migrations: approval `V1_5` and contract `V1_3`.
+- **Consumers.**
+
+  | Consumer | Before | Now |
+  |----------|--------|-----|
+  | approval-routing `DiscountApprovalEventConsumer` | new PENDING approval on every delivery | Inbox check, plus a natural-key backstop: an identical PENDING DISCOUNT request for the same quote line makes the event a duplicate. Different figures still create a request; whether they should supersede the open one is a business decision, not made here. |
+  | contract-asset `QuoteAcceptedEventConsumer` | `UNIQUE(subscription_number)` violation on redelivery; ERP call inside the listener transaction | Inbox check, plus an `existsBySubscriptionNumber` backstop. The subscription is created with `erp_sync_status = QUEUED`, and the new `ErpSyncJob` handles the ERP step (see the next row). |
+  | contract-asset `ErpSyncJob` (new) | n/a | Claims each `QUEUED` row with a compare-and-set to `IN_PROGRESS`, calls the ERP with no transaction open, then records the outcome: success → `SYNCED` and activated; rate limit → back to `QUEUED`; any other failure → `FAILED`. A stale `IN_PROGRESS` claim is requeued after 10 minutes. API-created subscriptions (`PENDING`) are untouched. |
+  | document-generation `QuoteAcceptedEventConsumer` | idempotent by key; generation kicked off *inside* the transaction on an `@Async` thread, which could run before the commit and leave the job PENDING | Still idempotent by `idempotency_key`. Generation now starts after the commit. |
+  | configuration-engine consumers (×3) | idempotent by nature, undocumented | Idempotence is now documented and proven by a redelivery test. |
+
+- **Dead letters (D7).**
+  - `KafkaConsumerErrorHandlingAutoConfiguration` provides a `DefaultErrorHandler` that Boot's listener container factory picks up:
+    - it retries with exponential backoff (4 retries, 1 s doubling to 10 s; `opencrm.kafka.consumer.retry.*`);
+    - then `DeadLetterPublishingRecoverer` publishes to `<topic>.DLT`, on the partition the key hashes to.
+  - `NonRetryableEventException` and Jackson parse errors go to the DLT at once. All five listeners now throw `NonRetryableEventException` for unreadable or incomplete payloads.
+  - It is on by default; `opencrm.kafka.consumer.dead-letter.enabled=false` turns it off.
+  - There is no `ErrorHandlingDeserializer`, because listeners receive raw strings and parse them themselves.
+- **Tests.**
+  - Unit: inbox and error-handler wiring (6), the relay headers test, approval consumer (14), contract consumer (4), `ErpSyncJob` (5), document consumer (3), CE redelivery (2).
+  - Testcontainers, real broker and PostgreSQL:
+    - `DiscountApprovalKafkaIntegrationTest`: a second delivery with the same `eventId` gives one approval and one inbox row. An identical event without `eventId` is caught by the backstop.
+    - `QuoteAcceptedSubscriptionKafkaIntegrationTest`: three deliveries give one subscription, which `ErpSyncJob` marks `SYNCED` and `ACTIVE`.
+    - `QuoteAcceptedKafkaIntegrationTest`: the job now reaches `COMPLETED`. A poison record lands on `cpq.quote.status.accepted.DLT` with its origin and exception headers, and the next record on the same partition is still processed.
+    - `OutboxRelayKafkaIntegrationTest`: the record's `eventId` equals the outbox row UUID.
+- **Operations.**
+  - DLT topics need retention and a replay runbook, and their depth needs an alert. DLT depth and consumer lag metrics are still open.
+  - The ERP side must upsert by subscription number, because a sync repeated after a crash is possible.
+- **Not done:** the rest of D4, D5, D8 (CRM onto Kafka), D9, DLT and lag metrics, and the per-environment backlog decision.
+
 ## Sources
 
 - Spring Boot 4.0.3 reference, [*Developing Auto-configuration → Condition Annotations → Bean Conditions*](https://github.com/spring-projects/spring-boot/blob/v4.0.3/documentation/spring-boot-docs/src/docs/antora/modules/reference/pages/features/developing-auto-configuration.adoc). Bean conditions "are evaluated based on what has been processed so far". It is recommended to use them only on auto-configuration classes, "since these are guaranteed to load after any user-defined bean definitions have been added." Checked 2026-09-22.
