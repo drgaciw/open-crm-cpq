@@ -1,4 +1,18 @@
 spring:
+  # Same Azure auto-configuration excludes as the running producer services (quote/product/pricing):
+  # spring-cloud-azure's B2C, token-credential, compatibility-verifier and Event Hubs Kafka OAuth2
+  # auto-configurations block local boot on Spring Boot 4 (ADR-018 D1 / ADR-010).
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
   application:
     name: approval-routing
   datasource:
@@ -13,7 +27,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: approval-routing
       auto-offset-reset: earliest
