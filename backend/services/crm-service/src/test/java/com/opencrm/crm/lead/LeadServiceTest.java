@@ -51,6 +51,9 @@ class LeadServiceTest {
     @Mock
     private LeadMapper leadMapper;
 
+    @Mock
+    private com.opencrm.crm.lead.scoring.LeadScoreAdvisor leadScoreAdvisor;
+
     @InjectMocks
     private LeadService leadService;
 
@@ -124,6 +127,7 @@ class LeadServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getTitle()).isEqualTo("New Lead");
             verify(leadRepository).save(lead);
+            verify(leadScoreAdvisor).requestScore(lead);
         }
 
         @Test
@@ -270,6 +274,7 @@ class LeadServiceTest {
 
             assertThat(result).isNotNull();
             verify(leadMapper).updateEntity(updateRequest, lead);
+            verify(leadScoreAdvisor).requestScore(lead);
         }
 
         @Test

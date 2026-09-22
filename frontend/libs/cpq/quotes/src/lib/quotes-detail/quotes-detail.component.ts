@@ -23,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
+  AdvisorySuggestionComponent,
   ConfirmDialogComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
@@ -30,6 +31,8 @@ import {
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
 import {
+  APPROVAL_TIER_LABELS,
+  JevSuggestionEnvelope,
   LineItemCreateRequest,
   QuoteLineItemDto,
 } from '@frontend/shared-models';
@@ -56,6 +59,7 @@ function httpErrorMessage(err: unknown): string {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    AdvisorySuggestionComponent,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -247,6 +251,33 @@ function httpErrorMessage(err: unknown): string {
           </mat-menu>
         </div>
       </app-page-header>
+
+      @if (canSubmit()) {
+        <section class="tier-suggestion" aria-label="Advisory approval tier suggestion">
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="onSuggestTier()"
+            [disabled]="tierSuggestionLoading()"
+            title="Ask for an advisory suggestion. It never selects or submits a tier."
+          >
+            <mat-icon>tips_and_updates</mat-icon>
+            Suggest approval tier (advisory)
+          </button>
+          @if (tierSuggestion(); as envelope) {
+            @if (envelope.status === 'READY') {
+              <app-advisory-suggestion
+                [suggestion]="envelope.suggestion"
+                heading="Suggested approval tier"
+                [labels]="tierLabels" />
+            } @else if (envelope.status === 'PENDING') {
+              <p class="tier-suggestion-note" role="status">Evaluating — ask again in a moment.</p>
+            } @else {
+              <p class="tier-suggestion-note" role="status">No suggestion available.</p>
+            }
+          }
+        </section>
+      }
 
       @if (actionError(); as actionErr) {
         <div class="error-banner" role="alert">
@@ -525,6 +556,21 @@ function httpErrorMessage(err: unknown): string {
         align-items: center;
       }
 
+      .tier-suggestion {
+        display: grid;
+        gap: 12px;
+        max-width: 520px;
+        margin-bottom: 16px;
+        justify-items: start;
+      }
+      .tier-suggestion app-advisory-suggestion {
+        justify-self: stretch;
+      }
+      .tier-suggestion-note {
+        margin: 0;
+        color: #616161;
+        font-size: 13px;
+      }
       .error-banner {
         display: flex;
         align-items: center;
@@ -688,12 +734,20 @@ export class QuotesDetailComponent {
 
   readonly actionBusy = signal(false);
   readonly actionError = signal<string | null>(null);
+
+  /** Advisory only (ADR-015). Fetched on demand so an ordinary page load makes no extra request. */
+  readonly tierSuggestion = signal<JevSuggestionEnvelope | null>(null);
+  readonly tierSuggestionLoading = signal(false);
+  readonly tierLabels: Record<string, string> = APPROVAL_TIER_LABELS;
   readonly editingLineId = signal<number | null>(null);
 
   /** Reload when route `:id` changes (e.g. after clone navigation). */
   private readonly loadOnIdChange = effect(() => {
     const _id = this.id();
-    untracked(() => this.load());
+    untracked(() => {
+      this.tierSuggestion.set(null);
+      this.load();
+    });
   });
 
   /** Submit only from DRAFT (matches quote-service). */
@@ -772,6 +826,25 @@ export class QuotesDetailComponent {
       () => this.canCalculate(),
       (id) => this.quoteService.calculate(id),
     );
+  }
+
+  onSuggestTier(): void {
+    const id = this.quote()?.id;
+    if (id == null || this.tierSuggestionLoading()) {
+      return;
+    }
+    this.tierSuggestionLoading.set(true);
+    this.quoteService.getTierSuggestion(id).subscribe({
+      next: (envelope) => {
+        this.tierSuggestion.set(envelope);
+        this.tierSuggestionLoading.set(false);
+      },
+      // Advisory: a failure is "no suggestion", never an error banner.
+      error: () => {
+        this.tierSuggestion.set({ status: 'UNAVAILABLE', suggestion: null });
+        this.tierSuggestionLoading.set(false);
+      },
+    });
   }
 
   onSubmit(): void {

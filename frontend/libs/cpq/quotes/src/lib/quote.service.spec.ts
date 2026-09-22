@@ -97,6 +97,17 @@ describe('QuoteService', () => {
     expect(service.selectedQuote()).toBeNull();
   });
 
+  it('getTierSuggestion GETs the advisory endpoint and returns the envelope', () => {
+    let received: unknown;
+    service.getTierSuggestion(42).subscribe((envelope) => (received = envelope));
+
+    const req = httpMock.expectOne('/api/v1/quotes/42/approvals/tier-suggestion');
+    expect(req.request.method).toBe('GET');
+    req.flush({ status: 'PENDING', suggestion: null });
+
+    expect(received).toEqual({ status: 'PENDING', suggestion: null });
+  });
+
   it('delete DELETEs /api/v1/quotes/:id (soft-delete)', async () => {
     const del = firstValueFrom(service.delete(42));
     const req = httpMock.expectOne('/api/v1/quotes/42');

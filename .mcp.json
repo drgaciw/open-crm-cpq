@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "autojev": {
+      "type": "http",
+      "url": "https://autojev.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${AUTOJEV_API_KEY}"
+      }
+    }
+  }
+}

@@ -128,6 +128,11 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
             </td>
           </ng-container>
 
+          <ng-container matColumnDef="score">
+            <th mat-header-cell *matHeaderCellDef title="Advisory estimate, not a decision">Score (advisory)</th>
+            <td mat-cell *matCellDef="let lead">{{ lead.scoreSuggestion?.value ?? '—' }}</td>
+          </ng-container>
+
           <ng-container matColumnDef="contact">
             <th mat-header-cell *matHeaderCellDef>Contact</th>
             <td mat-cell *matCellDef="let lead">
@@ -235,7 +240,7 @@ export class LeadListComponent implements OnInit {
   readonly actionLoading = signal(false);
   readonly currentPriority = signal<LeadPriority | undefined>(undefined);
 
-  displayedColumns = ['title', 'status', 'priority', 'source', 'estimatedValue', 'contact', 'organization', 'actions'];
+  displayedColumns = ['title', 'status', 'priority', 'source', 'estimatedValue', 'score', 'contact', 'organization', 'actions'];
   selectedTabIndex = 0;
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;

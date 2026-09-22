@@ -1,9 +1,11 @@
 # ADR-002: Primary LLM — GLM-5 via Zhipu AI (supersedes ADR-001)
 
-**Status:** Accepted *(architecture decision — implementation **not** landed)*
+**Status:** Superseded by [ADR-014](ADR-014-jev-openrouter-model-selection.md) on 2026-09-19; GLM-5 implementation never landed
 **Date:** 2026-03-15
 **Supersedes:** ADR-001 (Claude Sonnet 4.6)
 **Deciders:** DRGAMTD (Enterprise Architect / Platform Owner)
+
+> Historical decision retained for provenance. The fixed GLM-5 choice, dependency instructions, price comparisons, and unchecked action items below are obsolete and must not be implemented from this record. Current direction: Jev selects qualifying OpenRouter models at the lowest total cost under ADR-014. See the [implementation requirements](../backlog/REQ-jev-openrouter-model-selection.md). Azure OpenAI `gpt-4o` remains the checked-in runtime pending implementation.
 
 ### Runtime vs decision (verified 2026-08-31)
 

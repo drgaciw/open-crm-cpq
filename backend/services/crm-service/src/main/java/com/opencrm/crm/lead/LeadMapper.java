@@ -19,6 +19,12 @@ public interface LeadMapper {
     @Mapping(target = "organization", ignore = true)
     @Mapping(target = "status", constant = "NEW")
     @Mapping(target = "score", constant = "0")
+    @Mapping(target = "scoreSource", ignore = true)
+    @Mapping(target = "scoreConfidence", ignore = true)
+    @Mapping(target = "scoreProbabilities", ignore = true)
+    @Mapping(target = "scoreRubricVersion", ignore = true)
+    @Mapping(target = "scoreModel", ignore = true)
+    @Mapping(target = "scoredAt", ignore = true)
     @Mapping(target = "assignedAt", ignore = true)
     @Mapping(target = "firstContactedAt", ignore = true)
     @Mapping(target = "lastContactedAt", ignore = true)
@@ -44,6 +50,8 @@ public interface LeadMapper {
     @Mapping(target = "contactName", expression = "java(lead.getContact() != null ? lead.getContact().getFullName() : null)")
     @Mapping(target = "organizationId", source = "organization.id")
     @Mapping(target = "organizationName", source = "organization.name")
+    @Mapping(target = "scoreSuggestion",
+            expression = "java(com.opencrm.crm.lead.scoring.LeadScoreSuggestionDto.from(lead))")
     LeadDto toDto(Lead lead);
 
     /**
@@ -55,6 +63,12 @@ public interface LeadMapper {
     @Mapping(target = "organization", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "score", ignore = true)
+    @Mapping(target = "scoreSource", ignore = true)
+    @Mapping(target = "scoreConfidence", ignore = true)
+    @Mapping(target = "scoreProbabilities", ignore = true)
+    @Mapping(target = "scoreRubricVersion", ignore = true)
+    @Mapping(target = "scoreModel", ignore = true)
+    @Mapping(target = "scoredAt", ignore = true)
     @Mapping(target = "assignedAt", ignore = true)
     @Mapping(target = "firstContactedAt", ignore = true)
     @Mapping(target = "lastContactedAt", ignore = true)

@@ -87,3 +87,21 @@ services:
 # Dual-read legacy local approval_requests when routing has no row (pre-cutover IDs).
 approvals:
   legacy-local-read-enabled: ${APPROVALS_LEGACY_LOCAL_READ:true}
+
+# Jev advisory decision support (ADR-015). Inert by default: every flag is false and the
+# transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so
+# the service boots without it; a blank key forces the no-op transport.
+opencrm:
+  jev:
+    enabled: ${JEV_ENABLED:false}
+    transport: ${JEV_TRANSPORT:noop}
+    api-key: ${JEV_API_KEY:}
+    base-url: ${JEV_BASE_URL:}
+    # Pinned evaluator model; a *latest alias is rejected. Ignored by wire-format FACADE.
+    model: ${JEV_MODEL:}
+    wire-format: ${JEV_WIRE_FORMAT:NATIVE}
+    daily-call-budget: ${JEV_DAILY_CALL_BUDGET:500}
+    quote-tier-suggestion:
+      enabled: ${JEV_QUOTE_TIER_SUGGESTION_ENABLED:false}
+      rubric-version: quote-tier-v1
+      min-confidence: 0.6
