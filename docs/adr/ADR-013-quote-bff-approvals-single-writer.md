@@ -20,7 +20,11 @@ Verified on the tree (2026-09-19):
 
 ## Decision
 
-**quote-service is the Backend-for-Frontend for approvals. It is the only service the Angular approval inbox talks to. All approval state changes are written single-writer to approval-routing; quote-service keeps a local, flag-gated read of its legacy `quote.approval_requests` rows solely to surface pre-cutover records. `/api/v1/approvals/**` is canonical but FE-forbidden.**
+**quote-service is the Backend-for-Frontend for approvals. It is the only service the Angular approval inbox talks to. New submissions and canonical decisions are written to approval-routing. During the flag-gated compatibility window, a canonical 404 on approve/reject permits updating an existing legacy local row. `/api/v1/approvals/**` is canonical but FE-forbidden.**
+
+The compatibility exception is deliberate: `approveLegacyLocal` and `rejectLegacyLocal` save existing local approvals when legacy mode is enabled. This is not permission to create new local submissions or remove the ADR-005 cutover gate.
+
+Canonical quote history uses `GET /api/v1/approvals/quote/{quoteId}` and includes non-deleted records across all states, ordered by submission time and ID descending. The BFF uses this endpoint instead of filtering the pending queue, so approved/rejected records remain visible. Its existing legacy merge and status mapping remain intact.
 
 1. FE contract: `/api/v1/quotes/approvals/**` only (list, pending, history, approve/reject through the BFF).
 2. Canonical writes: quote-service → approval-routing REST client; no other service writes approvals; approval-routing never writes quote state.

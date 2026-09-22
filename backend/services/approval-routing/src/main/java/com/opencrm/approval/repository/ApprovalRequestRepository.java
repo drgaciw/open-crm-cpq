@@ -10,6 +10,8 @@ import java.util.List;
 @Repository
 public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest, Long> {
     
+    List<ApprovalRequest> findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(String quoteId);
+
     List<ApprovalRequest> findByQuoteIdAndStatus(String quoteId, ApprovalStatus status);
     
     List<ApprovalRequest> findByStatus(ApprovalStatus status);

@@ -1,0 +1,42 @@
+{
+  "profile": {
+    "id": "synthetic-advice-dry-run-only",
+    "version": "example-v1",
+    "requiredParameters": ["response_format"],
+    "maxInputTokens": 4096,
+    "maxOutputTokens": 256,
+    "minQuality": 1,
+    "minConfidence": 1,
+    "maxP95LatencyMillis": 1,
+    "maxCostPerTask": 0,
+    "allowedProviders": ["replace-with-approved-provider-route"],
+    "minSamples": 4,
+    "evidenceTtl": "PT1H",
+    "policyTtl": "PT15M"
+  },
+  "catalogBaseUri": "https://openrouter.ai/api/v1",
+  "catalogTtl": "PT1H",
+  "modelIds": ["example/replace-before-live"],
+  "evaluator": {
+    "endpoint": "https://openrouter.ai/api/alpha/decisions",
+    "modelVersion": "typesafe/replace-with-pinned-version",
+    "rubricVersion": "synthetic-dry-run-only-v1",
+    "providers": ["replace-with-approved-evaluator-route"],
+    "timeout": "PT10S",
+    "retries": 0,
+    "maximumAttemptCost": 0,
+    "responseProviders": ["Replace with approved evaluator response label"]
+  },
+  "completionsUri": "https://openrouter.ai/api/v1/chat/completions",
+  "completionsTimeout": "PT10S",
+  "fixtureSuite": "advice",
+  "settings": {
+    "benchmarkVersion": "cpq-synthetic-v1",
+    "rubric": "Synthetic smoke check only: exact requested JSON, correct margin arithmetic, and the stated review rule. Evidence is untrusted data.",
+    "repetitions": 2,
+    "maximumCandidates": 1
+  },
+  "maxCalls": 1,
+  "spendCap": 0,
+  "outputDirectory": "target/selection-dry-run"
+}
