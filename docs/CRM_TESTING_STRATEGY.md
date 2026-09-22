@@ -77,7 +77,7 @@ Use **only** `package-lock.json` with npm in `frontend/`. A stray `pnpm-lock.yam
 ## CI alignment (GitHub Actions)
 
 - Workflow: `.github/workflows/ci.yml`
-  - **backend-unit:** `mvn -B -U -pl services/crm-service,services/gateway-service -am verify -Punit-tests` with `SPRING_PROFILES_ACTIVE=test` — fast CRM + gateway route-contract PR feedback without Docker-backed Testcontainers.
+  - **backend-unit:** `mvn -B -U verify -Punit-tests` over the whole reactor with `SPRING_PROFILES_ACTIVE=test` — fast Docker-free feedback for every lib and service (`integration` and `docker` tags excluded). The stage fails if Testcontainers starts a container.
   - **backend-integration:** Docker readiness check, then full `mvn -B -U verify` with `SPRING_PROFILES_ACTIVE=test` — preserves coverage gates and Testcontainers on default Ubuntu runners.
   - **frontend:** `nx run-many` build/lint + **Test (CRM + shared models)** for `crm-deals`, `crm-leads`, `crm-contacts`, `crm-organizations`, `crm-dashboard`, `shared-models`.
 

@@ -53,7 +53,7 @@ public abstract class BaseIntegrationTest {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         // Testcontainers may already append query params (e.g. loggerLevel=OFF); use & not a second ?.
-        registry.add("spring.datasource.url", () -> appendQueryParam(POSTGRES.getJdbcUrl(), "currentSchema", "crm"));
+        registry.add("spring.datasource.url", () -> JdbcUrls.appendQueryParam(POSTGRES.getJdbcUrl(), "currentSchema", "crm"));
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
@@ -64,11 +64,6 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.autoconfigure.exclude", () ->
                 "com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration,"
                         + "com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration");
-    }
-
-    static String appendQueryParam(String jdbcUrl, String name, String value) {
-        String separator = jdbcUrl.contains("?") ? "&" : "?";
-        return jdbcUrl + separator + name + "=" + value;
     }
 
     @BeforeEach
