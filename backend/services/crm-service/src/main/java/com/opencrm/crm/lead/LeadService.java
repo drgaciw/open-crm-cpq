@@ -35,6 +35,7 @@ public class LeadService {
     private final OrganizationRepository organizationRepository;
     private final DealRepository dealRepository;
     private final LeadMapper leadMapper;
+    private final com.opencrm.crm.lead.scoring.LeadScoreAdvisor leadScoreAdvisor;
 
     /**
      * Create a new lead.
@@ -65,6 +66,7 @@ public class LeadService {
 
         Lead saved = leadRepository.save(lead);
         log.info("Created lead with ID: {}", saved.getId());
+        leadScoreAdvisor.requestScore(saved);
 
         return leadMapper.toDto(saved);
     }
@@ -134,6 +136,7 @@ public class LeadService {
 
         Lead updated = leadRepository.save(lead);
         log.info("Updated lead ID: {}", updated.getId());
+        leadScoreAdvisor.requestScore(updated);
 
         return leadMapper.toDto(updated);
     }
