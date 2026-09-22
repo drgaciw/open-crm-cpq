@@ -42,10 +42,13 @@ class ApprovalServiceSingleWriterTest {
 
     @BeforeEach
     void setUp() {
+        // No SecurityContext here, so these single-writer tests run with the dev-only
+        // unverified-actor fallback on; actor resolution itself is in ApprovalServiceActorTest.
         approvalService = new ApprovalService(
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
+                true,
                 true
         );
     }
@@ -189,6 +192,7 @@ class ApprovalServiceSingleWriterTest {
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
+                false,
                 false
         );
         when(approvalRoutingClient.getPending()).thenReturn(List.of(
@@ -211,7 +215,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyRetainsDecisionsAndIsolatesQuoteWithLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false, false);
         when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(
                 historyRow(1L, "42", "PENDING"),
                 historyRow(2L, "42", "APPROVED"),
@@ -263,7 +267,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyPropagatesRoutingFailureWhenLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false, false);
         BusinessException failure = new BusinessException("unavailable", "APPROVAL_ROUTING_UNAVAILABLE");
         when(approvalRoutingClient.getByQuoteId(42L)).thenThrow(failure);
 

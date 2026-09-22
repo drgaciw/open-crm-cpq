@@ -121,6 +121,27 @@ Because no production authentication path works today, this is effectively a **g
    - The prod-marker guard is verified.
    - A rollback exercise is recorded. Rollback means redeploying the previous version; `mode=dev` is never allowed in prod.
 
+### Pre-acceptance hardening (2026-09-22)
+
+Branch `fix/adr016-phase0-service-trust`. These changes tighten behaviour without making any new trust decision, so they did not wait for Acceptance:
+
+- **Actor integrity (part of step 0 and step 4).**
+  - `ApprovalService.resolveActor` takes the actor from the authenticated principal.
+  - A body `approver` or `requestedBy` naming anyone else is refused with 403 `ACTOR_MISMATCH`.
+  - With no principal, the call is refused with 401 `AUTHENTICATION_REQUIRED`, unless `approvals.allow-unverified-actor` is set. Only the `dev` profile sets it.
+  - `SecurityUtils` no longer treats an `AnonymousAuthenticationToken` as a user, so a permitAll chain cannot yield the actor `anonymousUser`.
+  - Unit tests: `ApprovalServiceActorTest` and `SecurityUtilsTest`.
+- **Dev chains.**
+  - approval-routing, configuration-engine, contract-asset-management and document-generation now have the `@Profile("dev")` permitAll chain that the other six services already had.
+  - Their `!dev` chains are unchanged line for line, and each is guarded by a `SecurityConfigNonDevProfileTest`.
+  - This closes the local-dev 403s. It does not close F1.
+
+Still open (steps 1–5):
+
+- No service except the gateway is a resource server, so every `!dev` `/api/v1/**` call is still refused.
+- `/internal/**` is still `permitAll()` in pricebook and CE.
+- approval-routing still trusts the `approverId` request parameter from its caller, and there is no tier↔role check.
+
 ## Consequences
 
 - **Positive:**
