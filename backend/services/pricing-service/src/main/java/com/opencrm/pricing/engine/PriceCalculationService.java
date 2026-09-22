@@ -1,6 +1,6 @@
 package com.opencrm.pricing.engine;
 
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.valueobject.Money;
@@ -90,7 +90,7 @@ public class PriceCalculationService {
         outboxEventPublisher.publish(
                 "PriceCalculation",
                 quoteId,
-                KafkaTopics.DISCOUNT_APPROVAL_REQUIRED,
+                EventContractRegistry.DISCOUNT_APPROVAL_REQUIRED_V1,
                 event
         );
         

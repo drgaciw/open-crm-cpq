@@ -48,7 +48,7 @@ class QuoteAcceptedKafkaEventFactoryTest {
         assertThat(event.getConfiguration().getConfigurationId()).isEqualTo("cfg-42");
         assertThat(event.getTerms().getTermMonths()).isEqualTo(12);
         assertThat(event.getCorrelation().getSourceService()).isEqualTo("quote-service");
-        assertThat(event.toPublishedLanguageV1().getSchemaVersion()).isEqualTo(1);
+        assertThat(event.getEventVersion()).isEqualTo(1);
     }
 
     @Test

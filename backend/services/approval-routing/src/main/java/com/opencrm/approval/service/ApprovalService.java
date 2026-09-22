@@ -6,7 +6,7 @@ import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.ApprovalSubmitRequest;
 import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.exception.BusinessException;
@@ -124,7 +124,7 @@ public class ApprovalService {
         outboxEventPublisher.publish(
                 "ApprovalRequest",
                 request.getQuoteId(),
-                KafkaTopics.QUOTE_APPROVAL_REJECTED,
+                EventContractRegistry.QUOTE_APPROVAL_REJECTED_V1,
                 event
         );
 

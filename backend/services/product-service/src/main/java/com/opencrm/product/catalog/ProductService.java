@@ -1,6 +1,6 @@
 package com.opencrm.product.catalog;
 
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
@@ -158,7 +158,7 @@ public class ProductService {
         outboxEventPublisher.publish(
                 "Product",
                 updated.getId().toString(),
-                KafkaTopics.PRODUCT_STATUS_RETIRED,
+                EventContractRegistry.PRODUCT_RETIRED_V1,
                 event
         );
         
@@ -170,7 +170,7 @@ public class ProductService {
         outboxEventPublisher.publish(
                 "Product",
                 product.getId().toString(),
-                KafkaTopics.PRODUCT_UPDATED,
+                EventContractRegistry.PRODUCT_UPDATED_V1,
                 new ProductCatalogLifecycleEvent(
                         product.getId().toString(),
                         changeType,

@@ -1,6 +1,6 @@
 package com.opencrm.contract.scheduler;
 
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.contract.domain.Subscription;
@@ -50,7 +50,7 @@ public class RenewalScheduler {
                 outboxEventPublisher.publish(
                         "Subscription",
                         subscription.getId().toString(),
-                        KafkaTopics.SUBSCRIPTION_RENEWAL_ELIGIBLE,
+                        EventContractRegistry.SUBSCRIPTION_RENEWAL_ELIGIBLE_V1,
                         event
                 );
                 

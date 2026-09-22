@@ -1,5 +1,6 @@
 package com.opencrm.product.bundle;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.product.catalog.Product;
 import com.opencrm.product.catalog.ProductCategory;
@@ -26,7 +27,6 @@ import static org.mockito.Mockito.when;
 @DisplayName("Product Bundle Lifecycle Events")
 class ProductBundleLifecycleEventTest {
 
-    private static final String BUNDLE_STRUCTURE_CHANGED_TOPIC = "cpq.product.bundle.structure.changed";
 
     @Mock
     private ProductBundleRepository bundleRepository;
@@ -87,7 +87,7 @@ class ProductBundleLifecycleEventTest {
         verify(outboxEventPublisher).publish(
                 eq("ProductBundle"),
                 eq("10"),
-                eq(BUNDLE_STRUCTURE_CHANGED_TOPIC),
+                eq(EventContractRegistry.BUNDLE_STRUCTURE_CHANGED_V1),
                 any()
         );
     }
@@ -111,7 +111,7 @@ class ProductBundleLifecycleEventTest {
         verify(outboxEventPublisher).publish(
                 eq("ProductBundle"),
                 eq("10"),
-                eq(BUNDLE_STRUCTURE_CHANGED_TOPIC),
+                eq(EventContractRegistry.BUNDLE_STRUCTURE_CHANGED_V1),
                 any()
         );
     }

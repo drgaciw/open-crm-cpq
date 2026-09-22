@@ -1,8 +1,8 @@
 package com.opencrm.configuration.session;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
-import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
@@ -165,7 +165,7 @@ class ConfigurationSessionServiceTest {
         verify(outboxEventPublisher).publish(
                 eq("ConfigurationSession"),
                 eq("1"),
-                eq(KafkaTopics.CONFIGURATION_COMMITTED),
+                eq(EventContractRegistry.CONFIGURATION_COMMITTED_V1),
                 any()
         );
     }
