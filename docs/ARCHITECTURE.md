@@ -236,7 +236,7 @@ Do not "fix" CI by inventing runners (#238 **HOLD**).
 
 | Layer | Tooling |
 |-------|---------|
-| Java unit | Maven Surefire, `unit-tests` profile (`excludedGroups=integration`, JaCoCo skipped) — Docker-free |
+| Java unit | Maven Surefire, `unit-tests` profile (`excludedGroups=integration,docker`, JaCoCo skipped), whole reactor — Docker-free, enforced by `scripts/ci/backend-unit.sh` |
 | Java integration | `integration-tests` profile, Testcontainers Postgres/Redis; Docker Engine API `api.version=1.44` pinned for Docker 29+ |
 | Frontend unit | Vitest 4 + `@analogjs/vitest-angular`, `TestBed` + `vi.fn()` (not Jasmine spies), jsdom |
 | E2E / UAT | Playwright scripts (`e2e/uat-crm-smoke.mjs`, `e2e/uat-jev-local.mjs`, `e2e/chaos-crm.mjs`); browser automation preferred for UAT |

@@ -215,7 +215,8 @@
         <profile>
             <id>unit-tests</id>
             <properties>
-                <excludedGroups>integration</excludedGroups>
+                <!-- Docker-free: scripts/ci/backend-unit.sh fails the stage if Testcontainers starts a container. -->
+                <excludedGroups>integration,docker</excludedGroups>
                 <jacoco.skip>true</jacoco.skip>
             </properties>
         </profile>

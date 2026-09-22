@@ -4,7 +4,7 @@
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-09-15"
+last_reviewed: "2026-09-22"
 
 # JDK2 toolchain pins (GHA + Jenkins Maven/Node). Jenkins WAR stays on lts-jdk21.
 toolchain:
@@ -48,7 +48,7 @@ scripts_ci:
       jenkins_stage: Backend Unit
       jenkins_parallel_group: Parallel — Fast checks
       blocking: true
-      notes: "Maven -pl services/crm-service,services/gateway-service -am verify -Punit-tests (Docker-free; excludes integration-tagged tests)"
+      notes: "Maven verify -Punit-tests over the whole backend reactor (excludes integration- and docker-tagged tests); fails if Testcontainers starts a container, so the stage stays Docker-free"
     - id: cpq-beta-python
       script: scripts/ci/cpq-beta-python.sh
       run_core_arg: cpq-beta-python
