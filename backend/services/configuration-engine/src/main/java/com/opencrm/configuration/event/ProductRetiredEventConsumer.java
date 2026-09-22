@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Consumes product retired events and invalidates related configuration sessions.
+ *
+ * <p>Idempotent by nature (ADR-018 D6): it cancels only {@code IN_PROGRESS} sessions and invalidates a cache entry, so
+ * a redelivery finds nothing left to cancel. {@code ConfigurationEngineConsumerRedeliveryTest} proves it. A failure is
+ * retried and then sent to {@code cpq.product.status.retired.DLT} by the shared error handler (D7).
  */
 @Component
 @RequiredArgsConstructor

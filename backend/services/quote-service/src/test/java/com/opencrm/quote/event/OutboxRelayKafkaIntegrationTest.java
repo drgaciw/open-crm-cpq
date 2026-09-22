@@ -2,6 +2,7 @@ package com.opencrm.quote.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.opencrm.common.event.EventHeaders;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.OutboxEventRepository;
@@ -85,6 +86,15 @@ class OutboxRelayKafkaIntegrationTest {
         ConsumerRecord<String, String> record = awaitRecord(topic, aggregateId, Duration.ofSeconds(60));
         assertThat(record.value()).contains(aggregateId).contains("USD");
 
+        // ADR-018 D4: the envelope headers the relay writes. eventId is the outbox row UUID, the consumer dedupe key (D6).
+        String eventId = header(record, EventHeaders.EVENT_ID);
+        assertThat(repository.findAll()).anySatisfy(row -> {
+            assertThat(row.getAggregateId()).isEqualTo(aggregateId);
+            assertThat(row.getUuid()).isEqualTo(eventId);
+        });
+        assertThat(header(record, EventHeaders.PRODUCER)).isEqualTo("quote-service");
+        assertThat(header(record, EventHeaders.OCCURRED_AT)).isNotBlank();
+
         Instant deadline = Instant.now().plusSeconds(30);
         while (Instant.now().isBefore(deadline)
                 && repository.findUnpublishedEvents().stream().anyMatch(e -> aggregateId.equals(e.getAggregateId()))) {
@@ -114,6 +124,11 @@ class OutboxRelayKafkaIntegrationTest {
             }
         }
         throw new AssertionError("no record with key " + key + " on " + topic + " within " + timeout);
+    }
+
+    private static String header(ConsumerRecord<String, String> record, String name) {
+        var header = record.headers().lastHeader(name);
+        return header == null ? null : new String(header.value(), java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private static void sleep(long millis) {

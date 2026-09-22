@@ -61,3 +61,15 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+# ADR-018 D6: inbox dedupe for the quote-accepted consumer (processed_events, V1_3), and the ERP sync that
+# the consumer queues instead of calling the ERP inside its Kafka transaction.
+opencrm:
+  kafka:
+    inbox:
+      enabled: true
+  erp-sync:
+    enabled: ${ERP_SYNC_ENABLED:true}
+    poll-interval: PT30S
+    batch-size: 20
+    stale-after: PT10M

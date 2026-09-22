@@ -205,6 +205,12 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - An `outbox` health indicator and `opencrm.outbox.*` metrics were added.
 >   - Additive migrations cover all seven owning schemas.
 >   - The relay stays opt-in: each environment still has to decide what to do with its backlog before enabling it.
+> - **ADR-018 consumers (Rollout steps 2–3).**
+>   - The relay now sends an `eventId` header, the outbox row UUID.
+>   - The inbox (`processed_events`) makes approval-routing and contract-asset idempotent: no more duplicate PENDING approvals and no more `UNIQUE` violations on redelivery.
+>   - The ERP call has moved out of the listener transaction into `ErpSyncJob`.
+>   - Document generation now starts after commit, which fixes a race that could leave jobs PENDING.
+>   - Poison records go to `<topic>.DLT` instead of being silently dropped.
 
 ---
 

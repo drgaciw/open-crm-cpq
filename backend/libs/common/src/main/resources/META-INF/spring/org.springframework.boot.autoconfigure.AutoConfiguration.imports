@@ -2,3 +2,5 @@ com.opencrm.common.event.OutboxRelayAutoConfiguration
 com.opencrm.common.event.OutboxObservabilityAutoConfiguration
 com.opencrm.common.event.OutboxHealthAutoConfiguration
 com.opencrm.common.event.OutboxMetricsAutoConfiguration
+com.opencrm.common.event.KafkaInboxAutoConfiguration
+com.opencrm.common.event.KafkaConsumerErrorHandlingAutoConfiguration
