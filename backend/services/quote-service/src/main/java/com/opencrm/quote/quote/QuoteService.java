@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
-import com.opencrm.common.event.KafkaTopics;
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
@@ -284,7 +284,7 @@ public class QuoteService {
         outboxEventPublisher.publish(
                 "Quote",
                 saved.getQuoteNumber(),
-                KafkaTopics.QUOTE_STATUS_ACCEPTED,
+                EventContractRegistry.QUOTE_ACCEPTED_V1,
                 kafkaEvent
         );
 

@@ -1,5 +1,6 @@
 package com.opencrm.pricing.engine;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.valueobject.Money;
 import org.junit.jupiter.api.DisplayName;
@@ -89,7 +90,7 @@ class PriceCalculationServiceTest {
         verify(outboxEventPublisher).publish(
                 eq("PriceCalculation"),
                 eq("Q-001"),
-                eq("cpq.discount.approval.required"),
+                eq(EventContractRegistry.DISCOUNT_APPROVAL_REQUIRED_V1),
                 any()
         );
     }

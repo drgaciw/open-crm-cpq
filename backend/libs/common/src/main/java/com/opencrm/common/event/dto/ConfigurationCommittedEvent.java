@@ -1,5 +1,6 @@
 package com.opencrm.common.event.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opencrm.common.event.EventContractRegistry;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +17,7 @@ import java.util.Map;
  */
 @Data
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ConfigurationCommittedEvent {
 
     public static final String EVENT_TYPE = EventContractRegistry.CONFIGURATION_COMMITTED_V1.eventType();
@@ -55,6 +57,7 @@ public class ConfigurationCommittedEvent {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class CorrelationSnapshot {
         private String correlationId;
         private String causationId;

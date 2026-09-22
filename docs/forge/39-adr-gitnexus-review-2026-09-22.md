@@ -218,6 +218,12 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - `QuoteAcceptedEvent` gained `deal` and ARR/TCV/ACV. Unknown properties are now tolerated, and a test proves it.
 >   - The unwired `acceptQuote` emitter is gone, leaving one publisher per topic.
 >   - Removing Redis (D8 step 3) waits until the dual run is proven. The backlog decision now has to cover crm too: see ADR-018, "Backlog caveat".
+> - **ADR-018 registry as the contract (Rollout step 5, D5 and the D9 check).**
+>   - `OutboxEventPublisher.publish` now takes a registry `EventContract` instead of a topic string, so an unregistered topic does not compile. The publisher refuses a `RESERVED` contract or a payload of the wrong class.
+>   - The registry now holds 8 `PUBLISHED` and 4 `RESERVED` contracts, which closes Context 6: 3 topics were missing and 4 entries had no producer.
+>   - `EventContractFitnessTest`, part of the unit gate, enforces one publish call site per contract, in the owning service. It also allows no `KafkaTemplate` in services and Redis sends only where allowlisted. This replaces the GitNexus Cypher fitness function, which is unreliable given §7.
+>   - All 20 payload types tolerate unknown properties, and a test proves it.
+>   - The unused `dto/v1` subset classes are deleted.
 
 ---
 
