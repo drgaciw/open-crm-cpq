@@ -21,6 +21,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * ADR-018 D1 regression guard: the transactional-outbox relay must be registered in quote-service.
@@ -45,6 +46,8 @@ class OutboxRelayRegistrationContextTest {
     private final ApplicationContextRunner serviceStyleContext = new ApplicationContextRunner()
             .withUserConfiguration(ServiceStyleComponentScan.class)
             .withBean(OutboxEventRepository.class, () -> mock(OutboxEventRepository.class))
+            // The relay runs each lease in its own transaction (ADR-018 D3), as the JPA service context provides.
+            .withBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class))
             .withBean(ObjectMapper.class, ObjectMapper::new)
             .withPropertyValues("spring.kafka.bootstrap-servers=localhost:9092");
 

@@ -1,98 +1,184 @@
 package com.opencrm.common.event;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Outbox Relay: polls the outbox_events table for unpublished events
- * and forwards them to Kafka. Runs on a fixed schedule.
+ * Outbox relay: leases due {@code outbox_events} rows and forwards them to Kafka (ADR-010, ADR-018 D1–D3).
  *
- * Ensures at-least-once delivery semantics for the Transactional Outbox pattern.
+ * <p>Delivery is at-least-once, and it is now actually true:
+ * <ul>
+ *   <li><b>D2, acknowledge before marking.</b> A row is marked published only after the broker acknowledged its
+ *       record within {@code ack-timeout}. A failed or unacknowledged send leaves the row unpublished, records the
+ *       error, and backs off exponentially. After {@code max-attempts} the row becomes {@link OutboxStatus#FAILED},
+ *       which the {@code outbox} health indicator reports.</li>
+ *   <li><b>D3, leasing.</b> Each lease is one transaction around {@link OutboxEventRepository#leaseDueBatch}
+ *       ({@code FOR UPDATE SKIP LOCKED}), so replicas never publish the same row. Only the oldest unpublished row of
+ *       each aggregate is leased, so per-aggregate order holds even when a send fails.</li>
+ * </ul>
+ * Records within one lease belong to different aggregates, so they are sent together and awaited against one
+ * shared deadline; a lease holds its row locks for at most {@code ack-timeout}. A tick keeps leasing while leases
+ * make progress, up to {@code max-drain-iterations}, which drains bursts for a single aggregate.
  *
- * <p>Registered by {@link OutboxRelayAutoConfiguration}, not by component scanning (ADR-018 D1). As a scanned
- * {@code @Component} guarded by {@code @ConditionalOnBean(KafkaTemplate.class)}, its condition was evaluated before
- * the auto-configured {@code KafkaTemplate} existed, so the relay was never registered.
+ * <p>A record whose acknowledgement timed out may still reach the broker later and then be sent again: consumers
+ * must deduplicate (ADR-018 D6).
+ *
+ * <p>Registered by {@link OutboxRelayAutoConfiguration}, not by component scanning (D1).
  */
-@RequiredArgsConstructor
 @Slf4j
 public class OutboxRelayPublisher {
 
-    private final OutboxEventRepository outboxEventRepository;
+    private final OutboxEventRepository repository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final TransactionTemplate transactionTemplate;
+    private final OutboxProperties.Relay properties;
+    private final OutboxRelayObserver observer;
+    private final Clock clock;
 
-    private static final int MAX_RETRIES = 5;
-    private static final int BATCH_SIZE = 100;
+    public OutboxRelayPublisher(
+            OutboxEventRepository repository,
+            KafkaTemplate<String, String> kafkaTemplate,
+            TransactionTemplate transactionTemplate,
+            OutboxProperties.Relay properties,
+            OutboxRelayObserver observer,
+            Clock clock) {
+        this.repository = repository;
+        this.kafkaTemplate = kafkaTemplate;
+        this.transactionTemplate = transactionTemplate;
+        this.properties = properties;
+        this.observer = observer;
+        this.clock = clock;
+    }
 
-    /**
-     * Poll for unpublished outbox events every 5 seconds and publish to Kafka.
-     */
-    @Scheduled(fixedDelay = 5000)
-    @Transactional
+    /** One relay tick. Never runs inside a caller's transaction: each lease commits on its own. */
+    @Scheduled(fixedDelayString = "${opencrm.outbox.relay.poll-interval:PT5S}")
     public void publishPendingEvents() {
-        List<OutboxEvent> events = outboxEventRepository.findUnpublishedEventsWithRetryLimit(MAX_RETRIES);
-
-        if (events.isEmpty()) {
-            return;
-        }
-
-        int processed = 0;
-        List<OutboxEvent> eventsToSave = new ArrayList<>();
-
-        for (OutboxEvent event : events) {
-            if (processed >= BATCH_SIZE) {
+        int published = 0;
+        int iterations = Math.max(1, properties.getMaxDrainIterations());
+        for (int i = 0; i < iterations; i++) {
+            LeaseResult result = transactionTemplate.execute(status -> relayLease());
+            if (result == null) {
                 break;
             }
-
-            try {
-                kafkaTemplate.send(event.getEventType(), event.getAggregateId(), event.getPayload())
-                        .whenComplete((result, ex) -> {
-                            if (ex != null) {
-                                log.error("Failed to publish outbox event {} to Kafka topic {}",
-                                        event.getId(), event.getEventType(), ex);
-                            }
-                        });
-
-                event.markAsPublished();
-                eventsToSave.add(event);
-                processed++;
-
-                log.debug("Published outbox event {} to topic {}", event.getId(), event.getEventType());
-
-            } catch (Exception e) {
-                log.error("Error publishing outbox event {}", event.getId(), e);
-                event.incrementRetryCount(e.getMessage());
-                eventsToSave.add(event);
+            published += result.published();
+            if (result.published() == 0) {
+                break;
             }
         }
-
-        if (!eventsToSave.isEmpty()) {
-            outboxEventRepository.saveAll(eventsToSave);
-        }
-
-        if (processed > 0) {
-            log.info("Outbox relay published {} events", processed);
+        if (published > 0) {
+            log.info("Outbox relay published {} events", published);
         }
     }
 
     /**
-     * Cleanup old published events (older than 7 days). Runs daily at 3 AM.
+     * Leases one batch, sends it, and records each outcome. Must run inside a transaction; the leased rows stay
+     * locked until it commits.
      */
-    @Scheduled(cron = "0 0 3 * * *")
-    @Transactional
-    public void cleanupOldEvents() {
-        Instant cutoff = Instant.now().minusSeconds(7 * 24 * 3600);
-        List<OutboxEvent> oldEvents = outboxEventRepository.findPublishedEventsBefore(cutoff);
-
-        if (!oldEvents.isEmpty()) {
-            outboxEventRepository.deleteAll(oldEvents);
-            log.info("Cleaned up {} old outbox events", oldEvents.size());
+    LeaseResult relayLease() {
+        Instant now = clock.instant();
+        List<OutboxEvent> lease = repository.leaseDueBatch(now, properties.getBatchSize());
+        if (lease.isEmpty()) {
+            return LeaseResult.EMPTY;
         }
+
+        int failed = 0;
+        List<InFlight> inFlight = new ArrayList<>(lease.size());
+        for (OutboxEvent event : lease) {
+            try {
+                inFlight.add(new InFlight(event,
+                        kafkaTemplate.send(event.getEventType(), event.getAggregateId(), event.getPayload())));
+            } catch (RuntimeException e) {
+                // A synchronous failure (no metadata within max.block.ms, serializer error) usually means the broker
+                // is unreachable. Stop sending: the rest of the lease is left untouched and not counted as attempts.
+                recordFailure(event, describe(e), now);
+                failed++;
+                break;
+            }
+        }
+
+        int published = 0;
+        long deadline = System.nanoTime() + properties.getAckTimeout().toNanos();
+        for (InFlight sent : inFlight) {
+            try {
+                sent.ack().get(Math.max(0L, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+                sent.event().markAsPublished(clock.instant());
+                observer.published(sent.event());
+                published++;
+            } catch (TimeoutException e) {
+                recordFailure(sent.event(), "No broker acknowledgement within " + properties.getAckTimeout(), now);
+                failed++;
+            } catch (ExecutionException e) {
+                recordFailure(sent.event(), describe(e.getCause() != null ? e.getCause() : e), now);
+                failed++;
+            } catch (InterruptedException e) {
+                // Unconfirmed rows stay PENDING without an attempt counted, and are sent again later.
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        repository.saveAll(lease);
+        if (failed > 0) {
+            log.warn("Outbox relay lease: {} leased, {} published, {} failed", lease.size(), published, failed);
+        }
+        return new LeaseResult(lease.size(), published, failed);
+    }
+
+    /** Deletes published rows older than {@code retention} with one idempotent statement (D3). */
+    @Scheduled(cron = "${opencrm.outbox.relay.cleanup-cron:0 0 3 * * *}")
+    public void cleanupOldEvents() {
+        Instant cutoff = clock.instant().minus(properties.getRetention());
+        Integer deleted = transactionTemplate.execute(status -> repository.deletePublishedBefore(cutoff));
+        if (deleted != null && deleted > 0) {
+            log.info("Cleaned up {} published outbox events older than {}", deleted, cutoff);
+        }
+    }
+
+    private void recordFailure(OutboxEvent event, String error, Instant now) {
+        int attempt = event.getRetryCount() + 1;
+        Duration delay = backoff(attempt, properties.getInitialBackoff(), properties.getMaxBackoff());
+        boolean exhausted = event.recordFailedAttempt(error, now, properties.getMaxAttempts(), delay);
+        observer.attemptFailed(event, exhausted);
+        if (exhausted) {
+            log.error("Outbox event {} ({} -> {}, aggregate {}) is FAILED after {} attempts: {}",
+                    event.getId(), event.getAggregateType(), event.getEventType(), event.getAggregateId(),
+                    attempt, error);
+        } else {
+            log.warn("Outbox event {} ({}) attempt {} failed, retry in {}: {}",
+                    event.getId(), event.getEventType(), attempt, delay, error);
+        }
+    }
+
+    /** {@code initial * 2^(attempt-1)}, capped at {@code max}. */
+    static Duration backoff(int attempt, Duration initial, Duration max) {
+        int exponent = Math.min(Math.max(attempt - 1, 0), 20);
+        Duration delay = initial.multipliedBy(1L << exponent);
+        return delay.compareTo(max) > 0 ? max : delay;
+    }
+
+    private static String describe(Throwable error) {
+        String message = error.getMessage();
+        return error.getClass().getSimpleName() + (message == null ? "" : ": " + message);
+    }
+
+    private record InFlight(OutboxEvent event, CompletableFuture<SendResult<String, String>> ack) {
+    }
+
+    /** Outcome of one lease. */
+    record LeaseResult(int leased, int published, int failed) {
+        static final LeaseResult EMPTY = new LeaseResult(0, 0, 0);
     }
 }

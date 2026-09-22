@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -54,6 +55,9 @@ import org.testcontainers.kafka.KafkaContainer;
                     + "com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration"
         })
 @DisplayName("ADR-018 D1: quote-service outbox → Kafka (Testcontainers)")
+// Close the context after this class: its scheduled relay would otherwise keep leasing rows in the shared test
+// database (and retrying a stopped broker) while later integration tests run.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OutboxRelayKafkaIntegrationTest {
 
     @Container

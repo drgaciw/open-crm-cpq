@@ -198,6 +198,13 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - `SecurityUtils` no longer treats anonymous callers as users.
 >   - The four services that lacked one now have the `dev` permitAll chain.
 >   - F1 itself stays open until ADR-016 steps 1–5 are done. See ADR-016, "Pre-acceptance hardening".
+> - **ADR-018 relay hardening (Rollout step 1).**
+>   - Rows are marked published only after the broker acknowledges them (D2).
+>   - Leasing uses `FOR UPDATE SKIP LOCKED` and takes only the oldest unpublished row of each aggregate (D3). The oldest-row rule was added during implementation because `SKIP LOCKED` alone lets replicas reorder an aggregate's events.
+>   - Failed attempts back off, and rows that reach the retry limit are marked `FAILED`.
+>   - An `outbox` health indicator and `opencrm.outbox.*` metrics were added.
+>   - Additive migrations cover all seven owning schemas.
+>   - The relay stays opt-in: each environment still has to decide what to do with its backlog before enabling it.
 
 ---
 
