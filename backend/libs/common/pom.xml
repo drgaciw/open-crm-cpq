@@ -65,6 +65,26 @@
             <artifactId>spring-kafka</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Optional: OutboxRelayAutoConfiguration pins producer delivery settings through
+             Boot's DefaultKafkaProducerFactoryCustomizer (ADR-018 D2). Services bring it with
+             spring-boot-starter-kafka. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Optional: outbox health indicator and metrics (ADR-018 D1/D10). Services bring
+             both with spring-boot-starter-actuator; nothing registers without them. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-health</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- Apache Commons -->
         <dependency>

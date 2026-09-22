@@ -69,6 +69,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - Move the relay out of component scanning into an auto-configuration in `libs/common`: `OutboxAutoConfiguration`, `@AutoConfiguration(after = KafkaAutoConfiguration.class)`, registered in `META-INF/spring/…AutoConfiguration.imports`.
 - The relay is **opt-in** through `opencrm.outbox.relay.enabled` (default `false`). It has never run, so every producer schema holds a backlog of unpublished rows. Enabling it replays that backlog to consumers (document jobs, subscriptions, ERP sync), so each environment decides first whether to replay, mark or age out the backlog.
 - Add an `outbox` health indicator. It reports **DOWN** when unpublished rows older than a threshold exist, or when outbox rows exist but no relay bean does.
+  - *Amended 2026-09-22:* while the relay is disabled the indicator reports **UNKNOWN**, with the backlog in its details, not DOWN. The relay is off everywhere until each environment has triaged its backlog, and every compose healthcheck reads `/actuator/health`, so DOWN would mark every producer container unhealthy. UNKNOWN never lowers the aggregate status. With the relay running, DOWN applies as written, plus any `FAILED` row. Revisit when the relay is on by default.
 - Exclude the outbox packages from `scanBasePackages` so the bean cannot be registered twice.
 
 **D2 — Acknowledge before marking.**
@@ -79,6 +80,11 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 **D3 — Lease rows in PostgreSQL.**
 - Fetch with `SELECT … FROM outbox_events WHERE published = false AND status <> 'FAILED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT :batch` inside a short transaction, so replicas are safe without a new dependency.
 - Cleanup is a single idempotent `DELETE … WHERE published AND published_at < now() - interval '7 days'`.
+- *Refined during implementation (2026-09-22):*
+  - `SKIP LOCKED` alone prevents double sends but not reordering. With two replicas, one can lease row 2 of an aggregate while the other still holds row 1.
+  - The lease therefore takes only the **oldest unpublished row of each aggregate**: `NOT EXISTS` an older row of the same `(aggregate_type, aggregate_id)` whose status is not `PUBLISHED`.
+  - Per-aggregate order then holds across failures, ticks and replicas, and a `FAILED` row blocks its aggregate until it is requeued.
+  - This replaces D2's "skip later rows for the same aggregate in that tick". A tick keeps leasing while leases make progress, so a burst for one aggregate still drains in one tick.
 
 **D4 — Standard envelope in Kafka headers.** Every record carries:
 - `eventId` (the outbox row UUID)
@@ -224,9 +230,69 @@ Branch `fix/adr018-kafka-starter-outbox-relay`, 2026-09-22. It implements part o
   - `QuoteAcceptedKafkaIntegrationTest` (document-generation): the real listener creates exactly one document job, and a redelivery of the same event is ignored.
   - The consumer IT surfaced a **third layer of the D1 defect**. `backend/pom.xml` pinned `kafka.version=3.6.1` against spring-kafka 4.0.5, and every listener container died with `VerifyError` in `KafkaMessageListenerContainer$ListenerConsumer.run()`. The pin is removed, so Boot now manages kafka-clients 4.1.2.
   - Local compose gains Kafka and the four consumers under `--profile events`.
-- **Not done:**
-  - the rest of D1 (the `outbox` health indicator) and D2–D10
+- **Not done at that point:**
+  - the rest of D1 (the `outbox` health indicator) and D2–D10 (D2, D3, the health indicator and part of D10 followed, see below)
   - running the full compose stack together; the end-to-end proof above uses Testcontainers, one service at a time
+
+### Relay hardening: D2, D3, D1 health, D10 metrics (Rollout step 1)
+
+Branch `feat/adr018-d2-d3-outbox-ack-lease`, 2026-09-22. All of it lives in `libs/common`, plus additive migrations; the wire format does not change. The ADR stays **Proposed**.
+
+- **Ack before mark (D2).**
+  - A lease's records are sent together and awaited against one deadline (`ack-timeout`, default 10 s).
+  - A row is marked `PUBLISHED` only when its future completed. A failed future, a timeout or a synchronous send error leaves it unpublished, records the error, and schedules a retry at `next_attempt_at`, backing off 5 s → 5 min.
+  - After `max-attempts` (10) the row becomes `FAILED`.
+  - A synchronous send failure stops the lease, so the untouched rows are not charged an attempt.
+  - When the relay is enabled, the producer is pinned through Boot's `DefaultKafkaProducerFactoryCustomizer`: `acks=all`, `enable.idempotence=true`, and `max.block.ms` = `ack-timeout`.
+- **Leasing (D3).**
+  - `OutboxEventRepository.leaseDueBatch` is a native `FOR UPDATE OF e SKIP LOCKED` query and leases only the oldest unpublished row per aggregate (see the D3 refinement).
+  - Each lease is its own transaction and holds row locks for at most `ack-timeout`.
+  - A tick keeps leasing while leases make progress, up to `max-drain-iterations` (10).
+  - Cleanup is one `DELETE`.
+- **Schema.**
+  - One migration per owning schema: product `V1_5`, quote `V1_6`, pricing `V4` (also covers pricebook, which shares the `pricing` schema), configuration `V1_2`, approval `V1_4`, contract `V1_2`, document `V1_2`.
+  - Each adds `status` (`PENDING|PUBLISHED|FAILED`, check constraint, backfilled from `published`), `next_attempt_at`, and two partial indexes.
+  - `published` is kept in step for existing readers.
+- **Health (D1).**
+  - The `outbox` indicator states are set out in the D1 amendment.
+  - Snapshots are cached for `snapshot-ttl` (10 s).
+  - `management.health.outbox.enabled=false` switches it off.
+- **Metrics (D10).**
+  - Gauges: `opencrm.outbox.pending`, `opencrm.outbox.failed` and `opencrm.outbox.oldest.pending.age` (seconds).
+  - Counter: `opencrm.outbox.relay.attempts{result=published|failed|exhausted}`.
+  - Consumer lag and DLT depth wait for D7.
+- **Auto-configuration.** There are four top-level auto-configurations:
+  - `OutboxRelayAutoConfiguration`
+  - `OutboxObservabilityAutoConfiguration` (the backlog probe)
+  - `OutboxHealthAutoConfiguration`
+  - `OutboxMetricsAutoConfiguration`
+
+  They are separate, rather than nested `@Configuration` classes, because services component-scan `com.opencrm.common`. The scan would register a nested configuration without its enclosing class's conditions. `OutboxRelayRegistrationContextTest` caught exactly that.
+- **Settings.**
+  - `opencrm.outbox.relay.*`: `enabled`, `poll-interval` (ISO-8601), `batch-size`, `ack-timeout`, `max-attempts`, `initial-backoff`, `max-backoff`, `max-drain-iterations`, `retention`, `cleanup-cron`.
+  - `opencrm.outbox.health.*`: `max-pending-age`, `snapshot-ttl`.
+- **Tests (red first).**
+  - The old unit test pinned the bug: it asserted that a failed send was still marked published. Flipping that assertion failed on the old relay with `expected: <false> but was: <true>`.
+  - New unit tests:
+    - 11 relay tests (`OutboxRelayPublisherTest`)
+    - 4 new entity tests in `OutboxEventTest`
+    - 4 health tests
+    - 1 metrics test
+    - 4 auto-configuration tests (pinned producer settings, observability without the relay, observer wiring, indicator switch)
+  - `OutboxRelayLeasingIntegrationTest` (quote-service, Testcontainers PostgreSQL, real Flyway migrations) covers the ADR acceptance items:
+    - two concurrent leases are disjoint and do not wait on each other;
+    - only the head of each aggregate is leased;
+    - a `FAILED` row blocks its aggregate only;
+    - backoff is honoured;
+    - a failing send future leaves the row unpublished in the database;
+    - an aggregate's rows are published in order after a failed first attempt;
+    - the indicator is DOWN with an aged pending row and UNKNOWN in the service, where the relay is disabled.
+  - `OutboxRelayKafkaIntegrationTest` still passes against a real broker with the new relay. It now closes its context after the class, so its scheduled relay cannot touch later tests' rows.
+- **Operations.**
+  - To requeue after fixing the cause: `UPDATE outbox_events SET status = 'PENDING', retry_count = 0, next_attempt_at = NULL WHERE status = 'FAILED' AND …`.
+  - A record whose acknowledgement timed out can still reach the broker and later be sent again, so duplicates remain possible. D6 (inbox) is what makes them harmless.
+  - Each environment still has to decide on its backlog before enabling the relay.
+- **Not done:** D4–D9, consumer lag and DLT metrics (D7), and a per-environment backlog decision.
 
 ## Sources
 
