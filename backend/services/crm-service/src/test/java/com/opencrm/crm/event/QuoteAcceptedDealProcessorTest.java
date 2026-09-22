@@ -1,10 +1,12 @@
 package com.opencrm.crm.event;
 
+import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealStage;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -18,6 +20,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,6 +30,9 @@ class QuoteAcceptedDealProcessorTest {
 
     @Mock
     private DealRepository dealRepository;
+
+    @Mock
+    private KafkaInbox inbox;
 
     @InjectMocks
     private QuoteAcceptedDealProcessor processor;
@@ -42,20 +48,24 @@ class QuoteAcceptedDealProcessorTest {
                 .build();
     }
 
-    @Test
-    void applyWinFromQuote_marksWonAndSetsAmountAndCurrency() {
-        when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
-
-        Instant acceptedAt = Instant.parse("2025-05-02T12:00:00Z");
-        QuoteAcceptedCrmMessage msg = QuoteAcceptedCrmMessage.builder()
+    private QuoteAcceptedCrmMessage message(Instant acceptedAt) {
+        return QuoteAcceptedCrmMessage.builder()
                 .dealExternalId(deal.getUuid())
                 .totalAmount(new BigDecimal("15000.00"))
                 .currency("EUR")
                 .acceptedAt(acceptedAt)
                 .quoteNumber("Q-1")
+                .quoteUuid("quote-uuid-1")
                 .build();
+    }
 
-        boolean applied = processor.applyWinFromQuote(msg, deal.getUuid());
+    @Test
+    void applyWinFromQuote_marksWonAndSetsAmountAndCurrency() {
+        when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
+        when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(true);
+        Instant acceptedAt = Instant.parse("2025-05-02T12:00:00Z");
+
+        boolean applied = processor.applyWinFromQuote(message(acceptedAt), deal.getUuid());
 
         assertThat(applied).isTrue();
         ArgumentCaptor<Deal> captor = ArgumentCaptor.forClass(Deal.class);
@@ -68,6 +78,20 @@ class QuoteAcceptedDealProcessorTest {
     }
 
     @Test
+    @DisplayName("ADR-018 D8: a second arrival of the same acceptance, on either channel, does not re-apply")
+    void applyWinFromQuote_skipsAlreadyClaimedQuote() {
+        when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
+        when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(false);
+
+        boolean applied = processor.applyWinFromQuote(message(Instant.now()), deal.getUuid());
+
+        assertThat(applied).isFalse();
+        verify(dealRepository, never()).save(any());
+        assertThat(deal.getStage()).isEqualTo(DealStage.PROPOSAL);
+    }
+
+    @Test
+    @DisplayName("a missing deal claims nothing, so a later redelivery can still apply")
     void applyWinFromQuote_returnsFalseWhenDealMissing() {
         when(dealRepository.findByUuid("missing")).thenReturn(Optional.empty());
 
@@ -75,7 +99,7 @@ class QuoteAcceptedDealProcessorTest {
                 QuoteAcceptedCrmMessage.builder().quoteNumber("Q-9").build(), "missing");
 
         assertThat(applied).isFalse();
-        verify(dealRepository).findByUuid("missing");
         verify(dealRepository, never()).save(any());
+        verify(inbox, never()).claimKey(anyString(), anyString());
     }
 }

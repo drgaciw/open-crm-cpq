@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -51,12 +52,12 @@ class QuoteAcceptedRedisIntegrationTest extends BaseIntegrationTest {
     private Deal seededDeal;
     private Instant acceptedAt;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
-    void seedDealAndFlushRedis() {
-        var keys = stringRedisTemplate.keys(QuoteAcceptedIdempotency.KEY_PREFIX + "*");
-        if (keys != null && !keys.isEmpty()) {
-            stringRedisTemplate.delete(keys);
-        }
+    void seedDealAndClearClaims() {
+        jdbcTemplate.update("DELETE FROM processed_events");
 
         acceptedAt = Instant.parse("2025-06-15T14:30:00Z");
         seededDeal = dealRepository.saveAndFlush(Deal.builder()
@@ -84,13 +85,11 @@ class QuoteAcceptedRedisIntegrationTest extends BaseIntegrationTest {
         assertThat(won.getCurrency()).isEqualTo("EUR");
         assertThat(won.getWonAt()).isEqualTo(acceptedAt);
 
-        String redisKey = QuoteAcceptedIdempotency.redisKey(
-                QuoteAcceptedIdempotency.dedupeKey(message, seededDeal.getUuid()));
-        assertThat(Boolean.TRUE.equals(stringRedisTemplate.hasKey(redisKey))).isTrue();
+        assertThat(claims("quote-uuid-it-1")).as("ADR-018 D8: the quote UUID is claimed in processed_events").isEqualTo(1);
     }
 
     @Test
-    @DisplayName("Duplicate identical message does not re-apply; idempotency key remains")
+    @DisplayName("Duplicate identical message does not re-apply; one processed_events claim remains")
     void publish_duplicate_isIdempotent() throws Exception {
         QuoteAcceptedCrmMessage message = sampleMessage(seededDeal.getUuid(), "quote-uuid-it-2", "Q-IT-2");
         String payload = objectMapper.writeValueAsString(message);
@@ -123,10 +122,14 @@ class QuoteAcceptedRedisIntegrationTest extends BaseIntegrationTest {
                     assertThat(afterDup.getUpdatedAt()).isAfterOrEqualTo(updatedAfterFirst);
                 });
 
-        String redisKey = QuoteAcceptedIdempotency.redisKey(
-                QuoteAcceptedIdempotency.dedupeKey(message, seededDeal.getUuid()));
-        assertThat(Boolean.TRUE.equals(stringRedisTemplate.hasKey(redisKey))).isTrue();
-        assertThat(stringRedisTemplate.opsForValue().get(redisKey)).isEqualTo("1");
+        assertThat(claims("quote-uuid-it-2")).isEqualTo(1);
+    }
+
+    private int claims(String quoteUuid) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM processed_events WHERE consumer_group = ? AND event_id = ?",
+                Integer.class, QuoteAcceptedIdempotency.CLAIM_NAMESPACE, quoteUuid);
+        return count == null ? 0 : count;
     }
 
     private QuoteAcceptedCrmMessage sampleMessage(String dealUuid, String quoteUuid, String quoteNumber) {

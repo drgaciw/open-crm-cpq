@@ -276,6 +276,8 @@ public class QuoteService {
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        // ADR-018 D8 dual run: best-effort Redis publish after commit; the outbox row below is the reliable channel.
+        // D9: this is the only emitter of cpq.quote.status.accepted (the unwired acceptQuote path was removed).
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
         QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
@@ -577,44 +579,5 @@ public class QuoteService {
 
     private BigDecimal decimalOrFallback(BigDecimal value, BigDecimal fallback) {
         return value != null ? value : fallback;
-    }
-    
-    /**
-     * Accept a quote and publish event via Transactional Outbox.
-     * Ensures synchronized totals before acceptance.
-     */
-    public QuoteDto acceptQuote(Long id) {
-        log.debug("Accepting quote ID: {}", id);
-        
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
-        
-        // Recalculate totals to ensure synchronization
-        quote.recalculateTotals();
-        
-        // Use state machine method
-        quote.accept();
-        
-        Quote saved = quoteRepository.save(quote);
-        
-        // Publish event via Transactional Outbox
-        com.opencrm.common.event.dto.QuoteAcceptedEvent event = 
-                new com.opencrm.common.event.dto.QuoteAcceptedEvent(
-                        saved.getQuoteNumber(),
-                        saved.getAcceptedAt(),
-                        saved.getCustomerExternalId(),
-                        saved.getTotalAmount(),
-                        saved.getCurrency()
-                );
-        
-        outboxEventPublisher.publish(
-                "Quote",
-                saved.getQuoteNumber(),
-                KafkaTopics.QUOTE_STATUS_ACCEPTED,
-                event
-        );
-        
-        log.info("Accepted quote: {}", saved.getQuoteNumber());
-        return quoteMapper.toDto(saved);
     }
 }
