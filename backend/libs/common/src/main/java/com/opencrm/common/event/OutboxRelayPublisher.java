@@ -2,10 +2,8 @@ package com.opencrm.common.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -17,9 +15,11 @@ import java.util.List;
  * and forwards them to Kafka. Runs on a fixed schedule.
  *
  * Ensures at-least-once delivery semantics for the Transactional Outbox pattern.
+ *
+ * <p>Registered by {@link OutboxRelayAutoConfiguration}, not by component scanning (ADR-018 D1). As a scanned
+ * {@code @Component} guarded by {@code @ConditionalOnBean(KafkaTemplate.class)}, its condition was evaluated before
+ * the auto-configured {@code KafkaTemplate} existed, so the relay was never registered.
  */
-@Component
-@ConditionalOnBean(KafkaTemplate.class)
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxRelayPublisher {
