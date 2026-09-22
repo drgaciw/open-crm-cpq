@@ -18,7 +18,7 @@ Reverse-engineered from the working tree on **2026-09-19** (all claims verified 
 - **PostgreSQL 16** (single database `opencrm`, schema-per-service) + **Redis 7** (cache, rate limiting).
 - **Kafka** for async integration (document jobs, catalog lifecycle, quote-accepted) with a **transactional outbox** in `libs/common`.
 - **Rules**: Drools 10.2 DRL on pricing-service; shared `ProductRuleEvaluationCore` on configuration-engine; OpenL Tablets present **behind a port** but not required for forge.
-- **AI**: `ai-service` AgentRouter; runtime is **Azure OpenAI `gpt-4o`**. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) accepts Jev-driven OpenRouter model selection as the next direction; implementation is in backlog and ADR-002 is superseded.
+- **AI**: `ai-service` AgentRouter; runtime is **Azure OpenAI `gpt-4o`**. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) accepts Jev-driven OpenRouter model selection as the next direction; implementation is behind a disabled flag; live rollout is pending and ADR-002 is superseded.
 
 Agents using this repo must:
 
@@ -108,12 +108,12 @@ PostgreSQL 16 :5432 (opencrm, schema-per-service)      Redis 7 :6379      Kafka 
 | pricing-service | 8082 | pricing | Execute/simulate pricing, rule-sets, rules (DRL), pricing-customers |
 | product-service | 8083 | product | Catalog, options, attributes, bundles, configuration **rules CRUD** + retained inline validate |
 | quote-service | 8084 | quote | Quotes, lines, documents API, **approvals BFF** (single-writer → approval-routing; dual-read legacy local reads) |
-| approval-routing | 8085 | (own) | Canonical approvals (single-writer) |
-| document-generation | 8086 | separate DB default `cpq_document` (see §16) | Kafka document job consumer + REST |
-| contract-asset-management | 8087 | (own) | Subscriptions — DTO-only, `activate` → `ErpAdapter.syncToErp` |
-| configuration-engine | 8088 | (own) | Configuration sessions; `POST /internal/v1/configurations/evaluate`; `ProductRuleEvaluationCore` |
+| approval-routing | 8085 | approval | Canonical approvals and complete quote history |
+| document-generation | 8086 | document | Kafka document job consumer + REST |
+| contract-asset-management | 8087 | contract | Subscriptions — DTO-only, `activate` → `ErpAdapter.syncToErp` |
+| configuration-engine | 8088 | configuration | Configuration sessions; `POST /internal/v1/configurations/evaluate`; `ProductRuleEvaluationCore` |
 | pricebook-service | 8089 | pricing | Price books + entries (published = immutable) |
-| ai-service | 8086 ⚠ | ai | AgentRouter — runtime Azure OpenAI `gpt-4o`; agents disabled by default (`OPENCRM_AI_AGENTS_ENABLED:false`) |
+| ai-service | 8090 | ai | Azure baseline; Jev/OpenRouter selection and execution opt-in; agents disabled by default |
 
 Per-service package convention: `com.opencrm.{service}/{config,controller,service,repository,entity,dto,mapper,event,exception,validator}`. Services run with **virtual threads enabled** (`spring.threads.virtual.enabled: true` — gateway, quote, ai verified).
 
@@ -137,7 +137,7 @@ Per-service package convention: `com.opencrm.{service}/{config,controller,servic
 
 ## 6. Data architecture
 
-- **One PostgreSQL database `opencrm`, schema per service** (`init-db.sql`: `crm, cpq, pricing, product, quote, communication, ai`); `pricing` and `pricebook` services share the `pricing` schema name in compose. Connection pattern: `jdbc:postgresql://…/opencrm?currentSchema={schema}` + `spring.flyway.schemas`.
+- **One PostgreSQL database `opencrm`, isolated schemas** (`crm, cpq, pricing, product, quote, communication, ai, configuration, approval, document, contract`). Pricing-service owns all migrations for the shared pricing/pricebook schema; pricebook's Flyway remains disabled. Existing standalone databases require explicit compatibility overrides; see [database alignment](database-schema-alignment.md).
 - Extensions: `uuid-ossp`, `pg_trgm`; **pgvector commented out** until needed.
 - App role `opencrm_app` with schema-scoped grants (bootstrap only).
 - Quote soft-delete is enforced with domain guards: `QUOTE_ACCEPTED_NO_DELETE` on accepted quotes (`QuoteService.java:119`), `softDelete()` on lines.
@@ -170,7 +170,7 @@ Per-service package convention: `com.opencrm.{service}/{config,controller,servic
 ## 9. AI
 
 - `ai-service` = **AgentRouter** (`/api/v1/ai/**`, `/api/v1/copilot/**` through the gateway). Agents disabled by default (`OPENCRM_AI_AGENTS_ENABLED:false`); Redis state store; Postgres `ai` schema audit logging.
-- **Runtime: Azure OpenAI `gpt-4o`** (`spring.ai.azure.openai`, `AZURE_OPENAI_*`, `deployment-name: gpt-4o`). Fixed-model ADR-001 and ADR-002 are historical. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) defines Jev-driven selection using OpenRouter models/prices; [implementation requirements](backlog/REQ-jev-openrouter-model-selection.md) are in backlog.
+- **Runtime: Azure OpenAI `gpt-4o`** (`spring.ai.azure.openai`, `AZURE_OPENAI_*`, `deployment-name: gpt-4o`). Fixed-model ADR-001 and ADR-002 are historical. [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) defines Jev-driven selection using OpenRouter models/prices; [requirements](backlog/REQ-jev-openrouter-model-selection.md) retain live rollout gates.
 - CI LLM path is separate ([ADR-003](adr/ADR-003-ci-llm-integration.md)): `LLM_ENDPOINT`-driven advisory stages in Jenkins only — **never** point `ai-assist` at `ai-service:8086`.
 - `agents/` holds the CPQ agent PRD fleet (66 files — 28 numbered `cpq-agent-*` PRDs plus supporting docs; the ADR-001/002 fleet target is 37 agents); AI parse of validate results (H2) and quote preflight via `ProductServiceClient` are landed consumers.
 
@@ -267,7 +267,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | Frontend | Angular **22** Nx `apps/crm` + libs. **Signals + HttpClient** ([ADR-007](adr/ADR-007-frontend-signals-no-state-library.md)) | NgRx 19+ **held**; customer-portal / admin-console **not** in tree |
 | Database | PostgreSQL 16 + Redis 7 (compose); **one DB `opencrm`, schemas per service** ([ADR-008](adr/ADR-008-postgres-schema-per-service.md)) | Same + production Azure. pgvector commented until needed |
 | Infrastructure | Docker Compose local; **Jenkins primary CI**; GHA manual fallback — [ADR-003](adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
-| AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) Jev selects qualifying OpenRouter models at lowest total cost; **implementation backlog** |
+| AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending** |
 | Rules | Drools DRL on pricing; CE `ProductRuleEvaluationCore`; port abstraction ([ADR-012](adr/ADR-012-rules-engine-port-abstraction.md)); OpenL **not** required | OpenL Tablets + full Drools / full SpEL **held** |
 | Events | Kafka + outbox + `v1` published language ([ADR-010](adr/ADR-010-kafka-outbox-events.md)); document-generation consumer | Kafka S2B-9 rule invalidation, agent Kafka #241 **held** |
 | Identity | Gateway JWT config present; Azure AD B2C **`enabled: false` by default** | Full OAuth2/OIDC identity service |
@@ -283,10 +283,10 @@ Copy this table into planning. **Do not present the Target column as current.**
 
 Observations from code that plans should account for (none authorize change by themselves):
 
-1. **Port collision `:8086`** — `ai-service/application.yml` sets `server.port: 8086`, the same port gateway routes expect for **document-generation** (`DOCUMENT_GENERATION_URI:http://localhost:8086`). The gateway's ai-service route defaults to `lb://ai-service` (no local URI), so running both services locally on defaults collides. Treat ai-service's local port as unresolved until a wave plan fixes it.
-2. **document-generation database default** — its yml defaults to `DB_NAME:cpq_document` (own database), not the shared `opencrm` + schema model used elsewhere; `init-db.sql` creates no document schema. Compose does not build this service, so the drift only bites when running it locally.
-3. **Compose coverage gap** — 5 of 11 reactor services are not in `docker-compose.yml` (configuration-engine, approval-routing, document-generation, contract-asset, ai-service); local dev relies on `mvnw` + Azure autoconfig excludes.
-4. **communication-service & ai-service routes are `lb://`** — with no registry in the tree they fall through to CircuitBreaker fallbacks; the ERP path is an explicit stub (`forward:/fallback/erp/unavailable`).
+1. **AI port collision resolved** — AI uses `8090`; document generation retains `8086`. Gateway default/dev AI routes have explicit HTTP targets. AI is an opt-in Compose profile.
+2. **Database defaults aligned** — configuration, approval, document and contract services use isolated schemas in `opencrm`. Existing standalone databases need explicit legacy overrides until a separately reviewed migration; [runbook](database-schema-alignment.md).
+3. **Compose coverage gap** — configuration-engine, approval-routing, document-generation and contract-asset still use separate local launch procedures; Azure autoconfig exclusions remain necessary.
+4. **communication-service route remains `lb://`** — with no registry it falls through to the CircuitBreaker fallback; ERP remains an explicit stub (`forward:/fallback/erp/unavailable`).
 5. **Azure-on-Boot-4 shims are load-bearing** — root Surefire system properties + per-service `spring.autoconfigure.exclude` (token credential, compatibility verifier, AAD B2C, Event Hubs Kafka OAuth2). Removing them breaks Boot 4 startup; keep them until spring-cloud-azure 7.x.
 6. **Existing ADR statuses re-verified against code** — see [adr/README.md](adr/README.md) verification column (ADR-001…006 + backlog ADR all match their stated status).
 
@@ -309,7 +309,7 @@ Observations from code that plans should account for (none authorize change by t
 | WhatsApp #430 undo | On `main` |
 | **R2** price-book list-row delete | N stretch; still held |
 | Named Wave T / T1 / T2 | Skipped |
-| Jev/OpenRouter model **selection** as runtime | ADR-014 Accepted; implementation in backlog. ADR-002 GLM-5 direction superseded. **Still held** |
+| Jev/OpenRouter selection as runtime | ADR-014 Accepted; implementation behind a disabled flag; live rollout pending. ADR-002 GLM-5 direction superseded |
 | Enabling any Jev advisory flag outside local/offline | [ADR-015](adr/ADR-015-jev-advisory-decision-support.md) un-holds advisory + shadow **code** only (`enabled:false`, no-op transport). Turning a flag on beyond local/offline needs the ADR-015 shadow → canary gates; `names` duplicate mode needs data-processing sign-off |
 | Accept ADR-005 | Flip not authorized |
 
@@ -356,7 +356,7 @@ Plans: [23](forge/23-wave-n-architecture.md)–[35](forge/35-wave-w-architecture
 |-----|--------|------|
 | ADR-001 LLM Claude Sonnet 4.6 | **Superseded** by ADR-002 | [adr/ADR-001-primary-llm-claude-sonnet-4-6.md](adr/ADR-001-primary-llm-claude-sonnet-4-6.md) |
 | ADR-002 GLM-5 | **Superseded** by ADR-014; never implemented | [adr/ADR-002-primary-llm-glm-5.md](adr/ADR-002-primary-llm-glm-5.md) |
-| ADR-014 Jev/OpenRouter selection | **Accepted** decision; implementation backlog (runtime Azure gpt-4o) | [adr/ADR-014-jev-openrouter-model-selection.md](adr/ADR-014-jev-openrouter-model-selection.md) |
+| ADR-014 Jev/OpenRouter selection | **Accepted** decision; implementation behind a disabled flag (default Azure gpt-4o) | [adr/ADR-014-jev-openrouter-model-selection.md](adr/ADR-014-jev-openrouter-model-selection.md) |
 | ADR-015 Jev advisory decision support | **Accepted** decision; advisory + shadow in domain services, flag-off + no-op transport — not runtime behavior | [adr/ADR-015-jev-advisory-decision-support.md](adr/ADR-015-jev-advisory-decision-support.md) |
 | ADR-003 CI / Jenkins | Accepted | [adr/ADR-003-ci-llm-integration.md](adr/ADR-003-ci-llm-integration.md) |
 | ADR-004 CSRF edge | Accepted | [adr/ADR-004-csrf-edge-boundary.md](adr/ADR-004-csrf-edge-boundary.md) |
