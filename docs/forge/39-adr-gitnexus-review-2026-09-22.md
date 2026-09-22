@@ -187,6 +187,18 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 | Next | Amend ADR-011 (4 libs, starter policy, test doubles out of `src/main`, lib compatibility) | Amend |
 | Later | **ADR-019** governance + CI fitness runner; **ADR-020** observability; **ADR-021** AI topology; **ADR-022** runtime topology | New ADRs |
 
+> **Progress 2026-09-22 (after the review).**
+> - **CI gate (PR #542).**
+>   - `backend-unit` now runs the unit profile over the whole reactor: 15 modules, 1,125 tests.
+>   - Before this, it built only crm, gateway and the three libraries they depend on.
+>   - The stage also fails if any unit test starts a Testcontainer. That check matters because a crm helper test had been quietly starting PostgreSQL and Redis.
+>   - Still missing: nothing posts `jenkins/opencrm-cpq-ci`. There is no Jenkins instance and no webhook, and `main` has no commit statuses. Getting a PR check needs a reachable Jenkins or an ADR-003 amendment.
+> - **ADR-016 pre-acceptance hardening.**
+>   - The approval actor now comes only from the principal. A spoofed `approver` or `requestedBy` gets 403, and a request with no principal gets 401 outside `dev`.
+>   - `SecurityUtils` no longer treats anonymous callers as users.
+>   - The four services that lacked one now have the `dev` permitAll chain.
+>   - F1 itself stays open until ADR-016 steps 1–5 are done. See ADR-016, "Pre-acceptance hardening".
+
 ---
 
 ## 7. GitNexus hygiene observed

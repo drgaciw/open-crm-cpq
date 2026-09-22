@@ -12,6 +12,7 @@ import com.opencrm.quote.quote.QuoteStatus;
 import com.opencrm.security.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,16 +40,19 @@ public class ApprovalService {
     private final QuoteRepository quoteRepository;
     private final ApprovalRoutingClient approvalRoutingClient;
     private final boolean legacyLocalReadEnabled;
+    private final boolean allowUnverifiedActor;
 
     public ApprovalService(
             ApprovalRequestRepository approvalRepository,
             QuoteRepository quoteRepository,
             ApprovalRoutingClient approvalRoutingClient,
-            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled) {
+            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled,
+            @Value("${approvals.allow-unverified-actor:false}") boolean allowUnverifiedActor) {
         this.approvalRepository = approvalRepository;
         this.quoteRepository = quoteRepository;
         this.approvalRoutingClient = approvalRoutingClient;
         this.legacyLocalReadEnabled = legacyLocalReadEnabled;
+        this.allowUnverifiedActor = allowUnverifiedActor;
     }
 
     public ApprovalRequestDto submitForApproval(Long quoteId, ApprovalSubmitRequest request) {
@@ -64,7 +68,7 @@ public class ApprovalService {
             );
         }
 
-        String requester = request.getRequestedBy() != null ? request.getRequestedBy() : "system";
+        String requester = resolveActor(request.getRequestedBy());
         RoutingApprovalDto remote = approvalRoutingClient.submit(RoutingApprovalSubmitRequest.builder()
                 .quoteId(String.valueOf(quoteId))
                 .tier(request.getTier().name())
@@ -272,15 +276,44 @@ public class ApprovalService {
         }
     }
 
-    private static String resolveActor(String requested) {
-        if (requested != null && !requested.isBlank()) {
-            return requested;
+    /**
+     * ADR-016 phase 0: the acting user comes from the authenticated principal, never from
+     * the request body.
+     * <ul>
+     *   <li>With an authenticated principal, the principal is the actor. A body value naming
+     *       anyone else is refused with 403 rather than silently replaced, so a spoofing
+     *       attempt is visible to the caller and in the log.</li>
+     *   <li>With no authenticated principal the decision cannot be attributed. That is only
+     *       reachable where the filter chain admits anonymous callers (the local {@code dev}
+     *       chain). It is refused with 401 unless {@code approvals.allow-unverified-actor} is
+     *       set, which only the {@code dev} profile does; the body value is then recorded as an
+     *       unverified label, or {@code system} when absent.</li>
+     * </ul>
+     */
+    String resolveActor(String asserted) {
+        String claimed = asserted == null || asserted.isBlank() ? null : asserted.trim();
+        Optional<String> principal = SecurityUtils.getCurrentUser().map(user -> user.getUserId());
+        if (principal.isPresent()) {
+            if (claimed != null && !claimed.equals(principal.get())) {
+                log.warn("Refused approval actor '{}': authenticated principal is '{}'", claimed, principal.get());
+                throw new BusinessException(
+                        "Actor in the request does not match the authenticated user",
+                        HttpStatus.FORBIDDEN,
+                        "ACTOR_MISMATCH"
+                );
+            }
+            return principal.get();
         }
-        try {
-            return SecurityUtils.getCurrentUserId();
-        } catch (SecurityException ex) {
-            return "system";
+        if (!allowUnverifiedActor) {
+            throw new BusinessException(
+                    "An authenticated user is required to act on approvals",
+                    HttpStatus.UNAUTHORIZED,
+                    "AUTHENTICATION_REQUIRED"
+            );
         }
+        String actor = claimed != null ? claimed : "system";
+        log.warn("Recording unverified approval actor '{}' (approvals.allow-unverified-actor=true)", actor);
+        return actor;
     }
 
     private ApprovalRequestDto toDtoFromRouting(RoutingApprovalDto remote) {
