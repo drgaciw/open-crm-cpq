@@ -1,5 +1,6 @@
 package com.opencrm.crm.event;
 
+import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealRepository;
@@ -8,8 +9,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Applies quote-accepted side effects to CRM deals inside a transaction.
+ *
+ * <p>Called by both quote-accepted listeners during the ADR-018 D8 dual run (Redis and Kafka). Deduplication happens
+ * here, in the deal transaction: the quote's key is claimed in {@code processed_events} only when the deal exists,
+ * and the claim commits or rolls back with the deal update. A missing deal leaves no claim, so a later redelivery
+ * can still apply; a second arrival of the same acceptance, on either channel, is skipped.
  */
 @Slf4j
 @Service
@@ -17,23 +25,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class QuoteAcceptedDealProcessor {
 
     private final DealRepository dealRepository;
+    private final KafkaInbox inbox;
 
     /**
-     * Marks the deal WON from quote acceptance fields.
+     * Marks the deal WON from quote acceptance fields, once per quote.
      *
-     * @return {@code true} if the deal was found and updated; {@code false} if missing (no-op).
-     *         Callers must not retain the Redis idempotency key when this returns {@code false}.
+     * @return {@code true} if this call updated the deal; {@code false} if the deal is missing (nothing claimed) or
+     *         this acceptance was already applied
      */
     @Transactional
     public boolean applyWinFromQuote(QuoteAcceptedCrmMessage event, String dealExternalId) {
-        return dealRepository.findByUuid(dealExternalId).map(deal -> {
-            applyToDeal(deal, event);
-            return true;
-        }).orElseGet(() -> {
-            log.warn("Deal with UUID {} not found for QuoteAcceptedCrmMessage; not retaining idempotency key",
-                    dealExternalId);
+        Optional<Deal> deal = dealRepository.findByUuid(dealExternalId);
+        if (deal.isEmpty()) {
+            log.warn("Deal with UUID {} not found for quote {}; nothing claimed, a redelivery can still apply it",
+                    dealExternalId, safeQuoteLabel(event));
             return false;
-        });
+        }
+        String key = QuoteAcceptedIdempotency.dedupeKey(event, dealExternalId);
+        if (!inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, key)) {
+            log.info("Quote acceptance {} already applied to deal {}; skipping", key, dealExternalId);
+            return false;
+        }
+        applyToDeal(deal.get(), event);
+        return true;
     }
 
     private void applyToDeal(Deal deal, QuoteAcceptedCrmMessage event) {

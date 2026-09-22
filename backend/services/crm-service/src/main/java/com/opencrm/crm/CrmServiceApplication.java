@@ -3,6 +3,7 @@ package com.opencrm.crm;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * CRM Service - Core CRM functionality.
@@ -17,6 +18,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  */
 @SpringBootApplication
 @EnableJpaAuditing
+// Runs the daily processed_events purge registered by libs/common's KafkaInboxAutoConfiguration (ADR-018 D8).
+@EnableScheduling
 public class CrmServiceApplication {
 
     public static void main(String[] args) {

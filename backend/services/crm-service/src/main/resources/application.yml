@@ -48,10 +48,23 @@ spring:
       - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
       - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
       - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+      # Boot 4 moved KafkaProperties; azure-spring 5.x's Event Hubs Kafka OAuth2 config cannot load with the starter.
+      - com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration
   cloud:
     azure:
       compatibility-verifier:
         enabled: false
+  # ADR-018 D8: quote acceptance arrives on cpq.quote.status.accepted (see opencrm.crm.quote-accepted below).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: crm-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 springdoc:
   api-docs:
@@ -113,6 +126,16 @@ opencrm:
     # Local pg_trgm candidate lookup only; no data leaves the service.
     duplicate-hints:
       enabled: ${CRM_DUPLICATE_HINTS_ENABLED:false}
+    # ADR-018 D8 dual run: also take quote acceptance from Kafka. Turn on together with quote-service's outbox
+    # relay (OPENCRM_OUTBOX_RELAY_ENABLED), which is what puts the events on the topic. Both channels claim the
+    # quote UUID in processed_events, so a deal is marked WON once whichever arrives first.
+    quote-accepted:
+      kafka:
+        enabled: ${CRM_QUOTE_ACCEPTED_KAFKA_ENABLED:false}
+  kafka:
+    inbox:
+      # processed_events (V5): dedupe store for quote acceptance, shared by the Redis and Kafka listeners.
+      enabled: true
 
 ---
 # Development profile
