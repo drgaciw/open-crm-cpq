@@ -2,16 +2,17 @@ package com.opencrm.quote.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.EventHeaders;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.OutboxEventRepository;
 import com.opencrm.common.event.OutboxRelayPublisher;
+import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.quote.QuoteServiceApplication;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -81,7 +82,7 @@ class OutboxRelayKafkaIntegrationTest {
         String topic = KafkaTopics.QUOTE_STATUS_ACCEPTED;
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                publisher.publish("Quote", aggregateId, topic, Map.of("quoteId", aggregateId, "currencyCode", "USD")));
+                publisher.publish("Quote", aggregateId, EventContractRegistry.QUOTE_ACCEPTED_V1, acceptedEvent(aggregateId)));
 
         ConsumerRecord<String, String> record = awaitRecord(topic, aggregateId, Duration.ofSeconds(60));
         assertThat(record.value()).contains(aggregateId).contains("USD");
@@ -138,5 +139,12 @@ class OutboxRelayKafkaIntegrationTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }
+    }
+
+    private static QuoteAcceptedEvent acceptedEvent(String quoteId) {
+        QuoteAcceptedEvent event = new QuoteAcceptedEvent();
+        event.setQuoteId(quoteId);
+        event.setCurrencyCode("USD");
+        return event;
     }
 }

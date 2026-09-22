@@ -1,5 +1,6 @@
 package com.opencrm.product.catalog;
 
+import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.OutboxEventRepository;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -70,7 +71,7 @@ class ProductRetireTest {
         verify(outboxEventPublisher).publish(
                 eq("Product"),
                 eq("1"),
-                eq("cpq.product.status.retired"),
+                eq(EventContractRegistry.PRODUCT_RETIRED_V1),
                 any()
         );
     }

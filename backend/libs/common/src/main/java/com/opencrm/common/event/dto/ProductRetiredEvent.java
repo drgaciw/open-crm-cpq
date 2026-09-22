@@ -1,6 +1,6 @@
 package com.opencrm.common.event.dto;
 
-import com.opencrm.common.event.dto.v1.ProductRetiredEventV1;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,16 +16,9 @@ import java.time.Instant;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ProductRetiredEvent {
     private String productId;
     private Instant retiredAt;
     private String reasonCode;
-
-    public ProductRetiredEventV1 toPublishedLanguageV1() {
-        return ProductRetiredEventV1.builder()
-                .productId(productId)
-                .retiredAt(retiredAt)
-                .reasonCode(reasonCode)
-                .build();
-    }
 }
