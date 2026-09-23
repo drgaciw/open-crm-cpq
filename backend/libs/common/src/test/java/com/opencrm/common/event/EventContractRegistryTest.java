@@ -58,6 +58,19 @@ class EventContractRegistryTest {
     }
 
     @Test
+    @DisplayName("every KafkaTopics constant has a contract: no topic names without one")
+    void everyKafkaTopicHasAContract() {
+        Set<String> registered = EventContractRegistry.all().stream()
+                .map(EventContract::topic)
+                .collect(Collectors.toSet());
+
+        assertThat(Arrays.stream(KafkaTopics.class.getFields())
+                .filter(field -> Modifier.isStatic(field.getModifiers()) && field.getType() == String.class)
+                .map(EventContractRegistryTest::valueOf))
+                .as("add a topic together with its EventContractRegistry entry (PUBLISHED or RESERVED)")
+                .allSatisfy(topic -> assertThat(registered).contains(topic));
+    }
+    @Test
     @DisplayName("the wire: topic, owner and status of every contract are pinned")
     void wireIsPinned() {
         Map<String, String> expected = new LinkedHashMap<>();
@@ -96,7 +109,7 @@ class EventContractRegistryTest {
     void forTopicLooksUpByTopic() {
         assertThat(EventContractRegistry.forTopic(KafkaTopics.QUOTE_STATUS_ACCEPTED))
                 .contains(EventContractRegistry.QUOTE_ACCEPTED_V1);
-        assertThat(EventContractRegistry.forTopic(KafkaTopics.QUOTE_CREATED)).isEmpty();
+        assertThat(EventContractRegistry.forTopic("cpq.quote.created")).isEmpty();
     }
 
     @Test

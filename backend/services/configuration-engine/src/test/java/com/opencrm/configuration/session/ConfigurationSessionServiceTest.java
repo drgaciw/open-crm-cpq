@@ -1,9 +1,11 @@
 package com.opencrm.configuration.session;
 
 import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.EventCorrelation;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -168,6 +171,33 @@ class ConfigurationSessionServiceTest {
                 eq(EventContractRegistry.CONFIGURATION_COMMITTED_V1),
                 any()
         );
+    }
+
+    @Test
+    @DisplayName("ADR-018 D4: the committed event is published under the correlation its payload carries")
+    void completePublishesUnderThePayloadCorrelation() {
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any())).thenReturn(session);
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
+        AtomicReference<EventCorrelation.Context> seen =
+                new AtomicReference<>();
+        AtomicReference<Object> payload = new AtomicReference<>();
+        doAnswer(invocation -> {
+            seen.set(EventCorrelation.current().orElse(null));
+            payload.set(invocation.getArgument(3));
+            return null;
+        }).when(outboxEventPublisher).publish(any(), any(), any(), any());
+
+        sessionService.complete(1L);
+
+        ConfigurationCommittedEvent.CorrelationSnapshot snapshot =
+                ((ConfigurationCommittedEvent) payload.get()).getCorrelation();
+        assertNotNull(seen.get());
+        assertEquals(snapshot.getCorrelationId(), seen.get().correlationId());
+        assertEquals(snapshot.getCausationId(), seen.get().causationId());
+        assertTrue(EventCorrelation.current().isEmpty(), "the scope is closed after publishing");
     }
 
     @Test

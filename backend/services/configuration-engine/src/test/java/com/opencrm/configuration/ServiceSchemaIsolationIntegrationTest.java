@@ -31,12 +31,14 @@ class ServiceSchemaIsolationIntegrationTest {
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("opencrm");
 
+    // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
+    // D2/D3 relay status, D6 inbox (approval, contract) and D4 envelope columns.
     private static final List<Service> SERVICES = List.of(
-            new Service("configuration-engine", "configuration", "configuration_sessions", 2),
-            // 3 = V1_1 + V1_2 + V1_3__create_jev_decision_log (ADR-015, merged after this test was written)
-            new Service("approval-routing", "approval", "approval_requests", 5),
-            new Service("document-generation", "document", "document_generation_jobs", 2),
-            new Service("contract-asset-management", "contract", "subscriptions", 3));
+            new Service("configuration-engine", "configuration", "configuration_sessions", 3),
+            // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope
+            new Service("approval-routing", "approval", "approval_requests", 6),
+            new Service("document-generation", "document", "document_generation_jobs", 3),
+            new Service("contract-asset-management", "contract", "subscriptions", 4));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {
