@@ -481,6 +481,66 @@ Branch `feat/adr018-d4-envelope-headers-topic-column`, 2026-09-22. The ADR stays
   - Consumers can now log and trace by `correlationId`. Putting it into MDC and tracing is ADR-020.
 - **Not done:** the D4 contract step, the service-principal `actor` (ADR-016), DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
 
+### Close-out: D10 metrics, D7 dead-letter triage, backlog triage, dual-run evidence
+
+Branch `feat/adr018-close-out-metrics-dlt-replay-runbooks`, 2026-09-23. The operating procedure is [`docs/runbooks/event-operations.md`](../runbooks/event-operations.md).
+
+- **Consumer lag (D10).** Nothing to build. Spring Boot's `KafkaMetricsAutoConfiguration` already attaches Micrometer listeners to every consumer factory, so `kafka.consumer.fetch.manager.records.lag.max` exists in every consumer. `DeadLetterTriageIntegrationTest` asserts that the meter is present.
+- **Dead letters (D10).** `DeadLetterCountingRecoverer` wraps the D7 `DeadLetterPublishingRecoverer`. It counts `opencrm.kafka.consumer.dead.letters{topic,group,exception}`, using the listener's own exception, only after the DLT publish succeeded. If the publish throws, nothing is counted and the error handler retries.
+- **DLT depth (D7, D10).** The consumer group `opencrm-dlt-triage` holds one triage cursor per DLT.
+  - `opencrm.kafka.dlt.depth{topic}` is the end offset minus that cursor (or minus the start offset where there is no cursor). It is registered for each topic the service's listener containers subscribe to, once the application is ready.
+  - Reads are cached (`opencrm.kafka.consumer.dead-letter.depth.cache-ttl`, 30 s) and bounded by a 5 s broker timeout.
+  - Depth drops to zero after replay or skip, so "depth > 0 for 24 h" is the alert. The runbook defines it.
+- **Replay (D7).**
+  - `DeadLetterTriage` uses only `kafka-clients` and implements `depth`, `peek`, `replay` and `skip`. `DeadLetterTool` is a command-line wrapper that runs as an admin process inside any consumer image, through Boot's `PropertiesLauncher`. It adds no HTTP endpoint, which matters while ADR-016 is open.
+  - Replay re-publishes to the original topic with the original key, value and envelope headers, minus `kafka_dlt-*`, and moves the cursor only after the broker acknowledges.
+  - *Refinement:* replay does **not** filter on `kafka_dlt-original-consumer-group`, although the D6/D7 section said a replay "must". Every consumer is idempotent (D6), so a group that already processed the event ignores the replayed copy, and only the group that failed acts on it. The shared DLT needs no per-group handling.
+- **Backlog triage (Rollout, D2).**
+  - `OutboxStatus.SKIPPED` is a terminal state that an operator sets with the runbook SQL. It never goes to Kafka, no longer blocks its aggregate, and ages out with the published rows. Its `error_message` records why.
+  - `FAILED` rows can now be given up, not only requeued.
+  - Migrations widen `ck_outbox_events_status` in all seven schemas: product `V1_7`, quote `V1_8`, pricing `V6`, configuration `V1_4`, approval `V1_7`, contract `V1_5`, document `V1_4`. Each adds the constraint `NOT VALID` and then validates it, so no long exclusive lock is held.
+  - The lease query now also treats `SKIPPED` as done. Two `<>` conditions keep the existing partial index usable.
+- **Dual-run evidence (D8).**
+  - `opencrm.crm.quote.accepted{channel=redis|kafka, outcome=applied|duplicate|deal-not-found|no-deal|failed}` is recorded by both CRM listeners after the deal transaction commits. `QuoteAcceptedDealProcessor` now returns a `QuoteAcceptedOutcome` instead of a boolean.
+  - The runbook's proposed exit criterion for D8 step 3: over 7 consecutive days, Kafka's count equals Redis's and no crm dead letters appear.
+- **Tests.**
+  - `DeadLetterSupportTest` (6): the counter, including no count on a failed publish; header names equal to Spring Kafka's; replay headers; the origin fallback; the command line.
+  - `KafkaConsumerSupportTest` (+1): the metrics bean follows the error handler's switch.
+  - `DeadLetterTriageIntegrationTest` (document-generation, real broker):
+    - a poison record is counted and gives depth 1;
+    - `peek` names the group and exception, and `skip` takes depth to 0;
+    - a fixed failure is dry-run, replayed and processed by the real listener, keeping its `eventId` and dropping `kafka_dlt-*`.
+  - `OutboxRelayLeasingIntegrationTest` (+1): the runbook's `SKIPPED` statement, verbatim, unblocks a `FAILED` aggregate, is never leased, and ages out.
+  - `QuoteAcceptedDualRunIntegrationTest`: the same acceptance on Redis then Kafka counts `redis/applied` once and `kafka/duplicate` once.
+  - The CRM listener tests assert the outcome counters.
+- **Not done:** live enablement in a shared environment. It follows the runbook's §2 and needs the owner decisions below. A full local compose run was not attempted: the workstation had about 0.5 GB of free memory, and every hop is already proven against a real broker by the ITs above.
+
+## Acceptance checklist (2026-09-23)
+
+Every decision is implemented. Accepting the ADR is the owner's call. The items below are what remains.
+
+| Decision | State | Evidence |
+|----------|-------|----------|
+| D1 Kafka wiring, relay registration, health | Done | Context tests in all consumers; `OutboxRelayKafkaIntegrationTest`; `outbox` indicator (UNKNOWN while the relay is disabled) |
+| D2 Ack before mark, bounded retry, `FAILED` | Done, plus `SKIPPED` | `OutboxRelayPublisherTest`, `OutboxRelayLeasingIntegrationTest` |
+| D3 `SKIP LOCKED` leasing, per-aggregate order | Done (refined: oldest row per aggregate) | `OutboxRelayLeasingIntegrationTest` |
+| D4 Envelope headers | Expand step done (all 8 headers). The contract step (`event_type` holds the registry type) waits for all environments | `OutboxRelayKafkaIntegrationTest`, `EventCorrelationTest` |
+| D5 Registry is the contract | Done | `EventContractRegistryTest`, `EventContractFitnessTest`, `PublishedPayloadToleranceTest` |
+| D6 Idempotent consumers | Done | Redelivery ITs for approval, contract, document and crm; CE redelivery test |
+| D7 DLT, runbook | Done | `DeadLetterTriageIntegrationTest`, runbook §5 |
+| D8 Retire Redis | Steps 1–2 done; step 3 waits for the dual-run exit criterion | `QuoteAcceptedDualRunIntegrationTest`, runbook §6 |
+| D9 One emitter | Done | `EventContractFitnessTest` |
+| D10 Metrics | Done | Runbook §1 |
+
+**Owner decisions still open.** Each is listed in runbook §7:
+
+- DLT retention and alert routing;
+- the per-environment backlog decision;
+- the dual-run window and exit criterion;
+- the discount supersede rule;
+- ERP upsert by subscription number;
+- accepting this ADR.
+
 ## Sources
 
 - Spring Boot 4.0.3 reference, [*Developing Auto-configuration → Condition Annotations → Bean Conditions*](https://github.com/spring-projects/spring-boot/blob/v4.0.3/documentation/spring-boot-docs/src/docs/antora/modules/reference/pages/features/developing-auto-configuration.adoc). Bean conditions "are evaluated based on what has been processed so far". It is recommended to use them only on auto-configuration classes, "since these are guaranteed to load after any user-defined bean definitions have been added." Checked 2026-09-22.

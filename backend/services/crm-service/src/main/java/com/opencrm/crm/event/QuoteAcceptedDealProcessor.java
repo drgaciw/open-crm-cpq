@@ -30,24 +30,25 @@ public class QuoteAcceptedDealProcessor {
     /**
      * Marks the deal WON from quote acceptance fields, once per quote.
      *
-     * @return {@code true} if this call updated the deal; {@code false} if the deal is missing (nothing claimed) or
-     *         this acceptance was already applied
+     * @return {@link QuoteAcceptedOutcome#APPLIED} if this call updated the deal, {@link QuoteAcceptedOutcome#DUPLICATE}
+     *         if the acceptance was already applied, {@link QuoteAcceptedOutcome#DEAL_NOT_FOUND} if the deal is missing
+     *         (nothing claimed)
      */
     @Transactional
-    public boolean applyWinFromQuote(QuoteAcceptedCrmMessage event, String dealExternalId) {
+    public QuoteAcceptedOutcome applyWinFromQuote(QuoteAcceptedCrmMessage event, String dealExternalId) {
         Optional<Deal> deal = dealRepository.findByUuid(dealExternalId);
         if (deal.isEmpty()) {
             log.warn("Deal with UUID {} not found for quote {}; nothing claimed, a redelivery can still apply it",
                     dealExternalId, safeQuoteLabel(event));
-            return false;
+            return QuoteAcceptedOutcome.DEAL_NOT_FOUND;
         }
         String key = QuoteAcceptedIdempotency.dedupeKey(event, dealExternalId);
         if (!inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, key)) {
             log.info("Quote acceptance {} already applied to deal {}; skipping", key, dealExternalId);
-            return false;
+            return QuoteAcceptedOutcome.DUPLICATE;
         }
         applyToDeal(deal.get(), event);
-        return true;
+        return QuoteAcceptedOutcome.APPLIED;
     }
 
     private void applyToDeal(Deal deal, QuoteAcceptedCrmMessage event) {
