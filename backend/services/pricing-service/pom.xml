@@ -33,6 +33,12 @@
         </dependency>
         <dependency>
             <groupId>com.opencrm</groupId>
+            <artifactId>security</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.opencrm</groupId>
             <artifactId>rules-engine</artifactId>
         </dependency>
         <dependency>

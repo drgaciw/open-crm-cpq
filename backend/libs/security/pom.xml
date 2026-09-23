@@ -13,7 +13,7 @@
 
     <artifactId>security</artifactId>
     <name>Security Library</name>
-    <description>Shared security utilities, JWT handling, and Azure AD B2C integration</description>
+    <description>Security starter: the baseline resource-server chain, JWT validation and role mapping (ADR-016)</description>
 
     <packaging>jar</packaging>
 
@@ -24,7 +24,7 @@
             <artifactId>common</artifactId>
         </dependency>
 
-        <!-- Spring Security with OAuth2 -->
+        <!-- Spring Security resource server (Nimbus JWT decoder); oauth2-client lives in the gateway only -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -33,35 +33,22 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-client</artifactId>
-        </dependency>
 
-        <!-- JWT -->
+        <!-- Test: MockMvc against the baseline chain, with real signed JWTs -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>${jjwt.version}</version>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>${jjwt.version}</version>
-            <scope>runtime</scope>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>${jjwt.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- Azure AD B2C -->
-        <dependency>
-            <groupId>com.azure.spring</groupId>
-            <artifactId>spring-cloud-azure-starter-active-directory-b2c</artifactId>
-            <version>${spring-cloud-azure.version}</version>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -73,6 +60,24 @@
                 <configuration>
                     <skip>true</skip>
                 </configuration>
+            </plugin>
+            <!-- ADR-016 step 0: TestTokens and AbstractSecurityBaselineTest for every service's slice test -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>security-test-support</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>com/opencrm/security/test/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

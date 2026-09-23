@@ -239,6 +239,20 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - `opencrm.crm.quote.accepted{channel,outcome}` is the evidence for ending the Redis dual run.
 >   - `docs/runbooks/event-operations.md` covers enablement, alerts, triage, rollback and the D8 step 3 exit criterion.
 >   - Open for the owner: DLT retention, the per-environment backlog decision, the dual-run window, the discount supersede rule, ERP upsert, and accepting the ADR.
+> - **ADR-016 accepted; rollout steps 0–1 (2026-09-23).**
+>   - The owner accepted ADR-016, and it is being implemented in rollout order, one PR per step.
+>   - `libs/security` now auto-configures the one servlet chain. In `jwt` mode (every profile except `dev`) each service is a resource server:
+>     - tenant-specific issuer only;
+>     - audience `api://opencrm-api`, with 60 s clock skew;
+>     - Entra app roles mapped to `ROLE_<UPPER_SNAKE>`;
+>     - `/internal/**` needs `Internal.Invoke`.
+>   - `dev` mode permits everything, logs a WARN, and refuses `OPENCRM_ENV=prod`.
+>   - The nine per-service `SecurityConfig` chains and their 16 profile tests are gone. ai-service now has the baseline too.
+>   - The B2C starter, jjwt and `oauth2-client` are out of `libs/security`, which partly addresses F10.
+>   - Every servlet service has a prod-profile slice test that uses its own `application.yml` and real RS256 tokens: anonymous 401, user token 200, `/internal/**` with a user token 403.
+>   - `SecurityBaselineFitnessTest` runs in the unit gate in place of the ArchUnit rules. It checks that no service declares its own chain, that nothing calls `permitAll` on `/internal`, that no committed config sets `mode: dev`, and that every service uses the baseline.
+>   - Transitional: pricebook and CE keep `/internal/**` open through `opencrm.security.legacy-open-internal` until step 2 gives their callers service tokens. The flag is refused under the production marker, and the fitness test pins it to those two services.
+>   - F1 stays open until steps 2–5.
 
 ---
 
