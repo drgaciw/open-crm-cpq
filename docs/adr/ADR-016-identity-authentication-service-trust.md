@@ -1,8 +1,8 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Proposed. This is documentation only; it changes no code, YAML or runtime behavior.
-**Date:** 2026-09-22
-**Deciders:** Pending (project owner). Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 and 1 are done; see [Implementation log](#implementation-log).
+**Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
+**Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
 - [ADR-004](ADR-004-csrf-edge-boundary.md) (edge CSRF; this ADR covers the auth model it left out of scope)
 - [ADR-009](ADR-009-gateway-edge-only.md)
@@ -11,15 +11,9 @@
 - [ADR-015](ADR-015-jev-advisory-decision-support.md)
 - [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (actor on events)
 
-**Does not authorize:**
-- changing any `SecurityConfig`
-- enabling JWT validation on domain services
-- removing `dev` permit-all chains
-- creating IdP tenants or app registrations
-- FE login work
-- changing ADR-004's CSRF posture
-
-Accepting this ADR makes the target model the contract. Implementation still needs a wave plan.
+**What acceptance authorizes.** While this ADR was Proposed, it authorized no change to `SecurityConfig`, JWT validation, the `dev` chains or FE login. Acceptance makes the target model the contract, and the [Rollout](#rollout) is the wave plan, one PR per step. Two things stay outside the code PRs:
+- creating the Entra tenant objects (app registrations, app roles, workload identities), which is step 5 and an operations task;
+- ADR-004's CSRF posture, which this ADR does not change.
 
 ---
 
@@ -45,7 +39,7 @@ ADR-004 settled *browser CSRF* at the edge and put "full Azure AD B2C resource-s
 
 Because no production authentication path works today, this is effectively a **greenfield decision**: there are no users, sessions or tokens to migrate.
 
-## Decision (Proposed)
+## Decision
 
 1. **Identity provider.** Internal users (sales, deal desk, approvers, admins) authenticate against the organization's **workforce Microsoft Entra ID tenant**. Azure AD B2C is not adopted for new work. External (partner or customer) access is out of scope and would need its own ADR, most likely with Entra External ID. The issuer must be **tenant-specific** (never `common`), and the audience must be validated.
 
@@ -103,7 +97,9 @@ Because no production authentication path works today, this is effectively a **g
 - Network policy and mesh belong to ADR-022 (reserved). Timeouts, retries and circuit breakers belong to ADR-017 (reserved).
 - Existing holds (Activities, NgRx, Kafka S2B-9/#241, subscriptions FE) are unchanged.
 
-## Rollout (after Acceptance and a wave plan)
+## Rollout
+
+One PR per step, in order. Progress is recorded in the [Implementation log](#implementation-log).
 
 0. **Tests first.** Add prod-profile slice tests per service:
    - anonymous → 401
@@ -136,11 +132,81 @@ Branch `fix/adr016-phase0-service-trust`. These changes tighten behaviour withou
   - Their `!dev` chains are unchanged line for line, and each is guarded by a `SecurityConfigNonDevProfileTest`.
   - This closes the local-dev 403s. It does not close F1.
 
-Still open (steps 1–5):
+Still open on 2026-09-22 (steps 1–5):
 
 - No service except the gateway is a resource server, so every `!dev` `/api/v1/**` call is still refused.
 - `/internal/**` is still `permitAll()` in pricebook and CE.
 - approval-routing still trusts the `approverId` request parameter from its caller, and there is no tier↔role check.
+
+## Implementation log
+
+### Steps 0 and 1: the baseline chain (2026-09-23)
+
+**One chain, in `libs/security`.** `OpenCrmSecurityAutoConfiguration` is auto-configured ahead of Boot's security auto-configuration and is the only servlet `SecurityFilterChain` (decisions 4 and 8).
+- `opencrm.security.mode`: when unset, the mode is `dev` under the `dev` profile and `jwt` otherwise.
+- `dev` mode permits everything and logs a WARN. It refuses to start when `opencrm.env` (`OPENCRM_ENV`) is `prod` or `production`.
+- `jwt` mode, in rule order:
+  1. `/actuator/health/**` and `/actuator/info` are public.
+  2. `/internal/**` needs `ROLE_INTERNAL_INVOKE`.
+  3. Service rules come next.
+  4. `/api/v1/**` and everything else need an authenticated token.
+- The chain is stateless with CSRF off (ADR-004).
+- A service adds rules with an `OpenCrmSecurityCustomizer` bean. Because customizer rules come after the `/internal/**` rule, a customizer cannot open `/internal/**`, and a test proves it.
+
+**Token validation (decision 1).** `OpenCrmJwtDecoders` builds a lazy Nimbus decoder: the identity provider is contacted on the first token, not at startup.
+- The issuer must be tenant-specific. `common`, `organizations` and `consumers` are refused at startup.
+- `aud` must contain one of `opencrm.security.jwt.audiences` (default `api://opencrm-api`). An empty list is refused at startup.
+- `exp` and `nbf` are checked with a 60 s clock skew.
+- Configuration uses relaxed binding: `OPENCRM_SECURITY_JWT_ISSUERURI`, and optionally `OPENCRM_SECURITY_JWT_JWKSETURI` and `OPENCRM_SECURITY_JWT_AUDIENCES`.
+- With no issuer, the service still starts. It logs an ERROR and answers every token with 401, which matches the pre-step-1 state where every `!dev` `/api/v1/**` call was refused. With the production marker set, a missing issuer stops startup instead.
+
+**Roles (decision 7).** `EntraRoleAuthorities` maps each value in the `roles` claim to `ROLE_<UPPER_SNAKE>`:
+
+| App role | Authority |
+|----------|-----------|
+| `CPQ.User` | `ROLE_CPQ_USER` |
+| `DealDesk` | `ROLE_DEAL_DESK` |
+| `SalesVP` | `ROLE_SALES_VP` |
+| `Internal.Invoke` | `ROLE_INTERNAL_INVOKE` |
+
+Scopes keep Spring's `SCOPE_` mapping, and the principal name is `sub`. Spring Security 7 also grants a `FACTOR_BEARER` authority; role checks ignore it.
+
+**Removed or changed.**
+- The nine domain `SecurityConfig` classes are deleted, along with their 16 `SecurityConfig*ProfileTest`s. The gateway's reactive chain stays until step 3.
+- ai-service now runs the baseline (decision 9). Before this it had no chain of its own and fell back to Boot's default chain (form login and HTTP Basic against a generated password). Its `@ComponentScan` of `com.opencrm.security` is gone, because the library arrives as auto-configuration.
+- `libs/security` no longer carries the Azure AD B2C starter, jjwt or `oauth2-client` (decision 8). Only the gateway still declares `oauth2-client` and B2C, and step 3 removes B2C there.
+
+**Decisions made during implementation.**
+- **`/internal/**` stays open in pricebook-service and configuration-engine until step 2.** Their callers have no service token yet: pricing-service calls pricebook for price-book lookups, and quote-service reaches CE through the gateway rewrite. Step 2 is where this ADR protects `/internal/**`. Until then, those two services set `opencrm.security.legacy-open-internal: true`. The flag:
+  - logs a WARN;
+  - is refused under the production marker;
+  - is pinned to exactly those two services by `SecurityBaselineFitnessTest`, so step 2 has to delete it.
+- **API docs are private in `jwt` mode.** The old `!dev` chains made `/api-docs/**` and Swagger UI public. The baseline does not, unless a service sets `opencrm.security.permit-api-docs: true`. The docs stay reachable in `dev` mode.
+- **Unauthenticated requests get 401**, with a `WWW-Authenticate: Bearer` challenge. The old chains returned 403 because they had no authentication mechanism.
+
+**Evidence.** Everything below runs in the Docker-free unit gate.
+- `libs/security` tests:
+  - `OpenCrmSecurityJwksTest` runs the production decoder against a local JWKS endpoint. It checks that the principal is `sub` with the mapped roles, that forged and wrong-audience tokens get 401, that a customizer can add an Admin-only rule but cannot open `/internal/**`, and that no session is created.
+  - `OpenCrmJwtDecodersTest`, `OpenCrmSecurityModeTest`, `EntraRoleAuthoritiesTest` and `OpenCrmSecurityDevAndUnconfiguredTest`.
+  - `SecurityBaselineFitnessTest` stands in for the ArchUnit rules, as a source scan like ADR-018's `EventContractFitnessTest`. It checks four things:
+    - no service declares its own servlet chain or `@EnableWebSecurity`;
+    - no `permitAll()` on `/internal`;
+    - no committed `opencrm.security.mode: dev`;
+    - every servlet service depends on `libs/security`.
+- **Step 0: one `SecurityBaselineTest` per servlet service (10).** They extend `AbstractSecurityBaselineTest` from the `libs/security` test-jar. Each test loads the service's own `application.yml` outside `dev` and signs real RS256 tokens with `TestTokens`. It checks:
+  - health is public;
+  - an anonymous request gets 401;
+  - a user token gets 200;
+  - expired, forged, wrong-audience and wrong-issuer tokens get 401;
+  - `/internal/**` gives 403 to a user token and 200 to an `Internal.Invoke` service token. In pricebook and CE it stays open until step 2.
+- The actor-spoof test from step 0 is `ApprovalServiceActorTest` (pre-acceptance hardening).
+
+**Still open after step 1.**
+- **Step 2:** `RestClient` relay and client-credentials interceptors; removal of the quote→gateway hairpin; service tokens for the `/internal/**` callers; deletion of `legacy-open-internal`.
+- **Step 3:** the gateway BFF. It also replaces the gateway's multi-tenant `common` issuer default and drops B2C.
+- **Step 4:** tier↔role checks in approval-routing, `service:<client-id>` actors, and request DTOs without identity fields.
+- **Step 5:** the go-live gate.
+- Until step 3 there is no login in any environment, so every non-dev `/api/v1/**` call is still refused, exactly as before step 1.
 
 ## Consequences
 
@@ -173,7 +239,20 @@ This ADR is implemented only when all of the following pass in CI. A successful 
   - Every service that records an actor calls `SecurityUtils.getCurrentUserId`.
 - **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token `sub`.
 
-## Evidence (HEAD `4a29d31`)
+Status on 2026-09-23, after step 1:
+
+| Check | State |
+|-------|-------|
+| Slice tests: anonymous 401 and service-role 403 | **Done** for all 10 servlet services (`SecurityBaselineTest`). In pricebook and CE, `/internal/**` returns 403 only after step 2 |
+| Slice test: actor-spoof rejection | Done for quote-service (`ApprovalServiceActorTest`). approval-routing follows in step 4 |
+| First two "ArchUnit" rules (chain origin, no `/internal` `permitAll`) | **Done** as the source-scan `SecurityBaselineFitnessTest`, which the unit gate runs |
+| DTO identity-field rule | Step 4 |
+| GitNexus Cypher checks | Steps 2 and 4. They will be source scans too, because the index is unreliable (review §7) |
+| quote→approval-routing integration test with a test issuer | Step 4 |
+
+## Evidence at drafting (HEAD `4a29d31`)
+
+This is the state the ADR was written against. Step 1 changed much of it; see the [Implementation log](#implementation-log).
 
 - `backend/services/*/src/main/java/com/opencrm/*/config/SecurityConfig.java`: 10 chains. Only `gateway-service` calls `oauth2ResourceServer`. `@Profile("dev")` is absent in approval-routing, configuration-engine, contract-asset-management and document-generation.
 - `backend/services/gateway-service/src/main/resources/application.yml`: `spring.security.oauth2.resourceserver.jwt.issuer-uri` defaults to `…/common/v2.0`; `azure.activedirectory.b2c.enabled: false`.
@@ -184,7 +263,7 @@ This ADR is implemented only when all of the following pass in CI. A successful 
 
 ## Sources
 
-Checked 2026-09-22; recheck when the ADR is Accepted.
+Checked 2026-09-22 and rechecked on acceptance, 2026-09-23. Nothing had changed: B2C end of sale on 1 May 2025, support until at least May 2030, and RFC 10017 published 21 Aug 2026 as BCP 212.
 
 - [Azure AD B2C FAQ: end of sale 1 May 2025, support until at least May 2030](https://learn.microsoft.com/en-us/azure/active-directory-b2c/faq)
 - [Migrate from Azure AD B2C to Microsoft Entra External ID](https://learn.microsoft.com/en-us/entra/external-id/customers/migrate-from-b2c-to-external-id)

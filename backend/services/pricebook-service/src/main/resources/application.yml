@@ -57,3 +57,10 @@ management:
 logging:
   level:
     com.opencrm: INFO
+
+opencrm:
+  security:
+    # ADR-016 rollout step 1: /internal/** stays open to anonymous mesh callers (pricing-service price-book lookups)
+    # until rollout step 2 gives them a service token. Refused when OPENCRM_ENV=prod; pinned by
+    # libs/security SecurityBaselineFitnessTest. Step 2 deletes this block.
+    legacy-open-internal: true
