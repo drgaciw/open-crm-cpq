@@ -224,6 +224,13 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - `EventContractFitnessTest`, part of the unit gate, enforces one publish call site per contract, in the owning service. It also allows no `KafkaTemplate` in services and Redis sends only where allowlisted. This replaces the GitNexus Cypher fitness function, which is unreliable given §7.
 >   - All 20 payload types tolerate unknown properties, and a test proves it.
 >   - The unused `dto/v1` subset classes are deleted.
+> - **ADR-018 full envelope (D4 expand step).**
+>   - Every record now carries all eight D4 headers: `eventId`, `occurredAt`, `producer`, `eventType`, `eventVersion`, `correlationId`, `causationId` and `actor`.
+>   - Additive, nullable columns hold the envelope in all seven outbox schemas.
+>   - Kafka listeners continue the correlation chain of the record they handle.
+>   - The actor is `user:<sub>` from the security context, or the service.
+>   - `event_type` keeps holding the topic until a later contract step, so any release can still be rolled back.
+>   - `KafkaTopics` is cut to the 12 registered topics, and a test keeps it matched to the registry.
 
 ---
 

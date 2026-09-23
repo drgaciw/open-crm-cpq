@@ -95,7 +95,7 @@ class OutboxRelayPublisherTest {
     }
 
     @Test
-    @DisplayName("D4 headers: the record carries eventId (the row UUID), occurredAt and producer; topic, key and payload are unchanged")
+    @DisplayName("D4, row from before D4: topic from event_type, type and version from the registry, correlated by its own id")
     void recordCarriesEnvelopeHeaders() {
         OutboxEvent event = row(1, "q-1");
         event.setUuid("5f0c9d7e-0000-4000-8000-000000000001");
@@ -109,6 +109,49 @@ class OutboxRelayPublisherTest {
         assertThat(header(record, EventHeaders.EVENT_ID)).isEqualTo("5f0c9d7e-0000-4000-8000-000000000001");
         assertThat(header(record, EventHeaders.OCCURRED_AT)).isEqualTo("2026-09-22T11:59:00Z");
         assertThat(header(record, EventHeaders.PRODUCER)).isEqualTo("quote-service");
+        assertThat(header(record, EventHeaders.EVENT_TYPE)).isEqualTo("QuoteAccepted");
+        assertThat(header(record, EventHeaders.EVENT_VERSION)).isEqualTo("1");
+        assertThat(header(record, EventHeaders.CORRELATION_ID)).isEqualTo("5f0c9d7e-0000-4000-8000-000000000001");
+        assertThat(record.headers().lastHeader(EventHeaders.CAUSATION_ID)).isNull();
+        assertThat(record.headers().lastHeader(EventHeaders.ACTOR)).isNull();
+    }
+
+    @Test
+    @DisplayName("D4 row: the topic column routes the record, and correlation, causation and actor come from the row")
+    void d4RowCarriesItsEnvelope() {
+        OutboxEvent event = row(2, "q-2");
+        event.setUuid("5f0c9d7e-0000-4000-8000-000000000002");
+        // The shape after the D4 contract step: event_type holds the registry type, topic the topic.
+        event.setEventType("QuoteAccepted");
+        event.setTopic("cpq.quote.status.accepted");
+        event.setEventVersion(1);
+        event.setCorrelationId("quote-uuid-7");
+        event.setCausationId("upstream-event-9");
+        event.setActor("user:auth0|42");
+
+        ProducerRecord<String, String> record = relay.toRecord(event);
+
+        assertThat(record.topic()).isEqualTo("cpq.quote.status.accepted");
+        assertThat(header(record, EventHeaders.EVENT_TYPE)).isEqualTo("QuoteAccepted");
+        assertThat(header(record, EventHeaders.EVENT_VERSION)).isEqualTo("1");
+        assertThat(header(record, EventHeaders.CORRELATION_ID)).isEqualTo("quote-uuid-7");
+        assertThat(header(record, EventHeaders.CAUSATION_ID)).isEqualTo("upstream-event-9");
+        assertThat(header(record, EventHeaders.ACTOR)).isEqualTo("user:auth0|42");
+    }
+
+    @Test
+    @DisplayName("D4: a topic with no registry entry is still sent, without eventType or eventVersion")
+    void unregisteredTopicHasNoTypeHeaders() {
+        OutboxEvent event = row(3, "q-3");
+        event.setUuid("5f0c9d7e-0000-4000-8000-000000000003");
+        event.setEventType("cpq.some.legacy.topic");
+
+        ProducerRecord<String, String> record = relay.toRecord(event);
+
+        assertThat(record.topic()).isEqualTo("cpq.some.legacy.topic");
+        assertThat(record.headers().lastHeader(EventHeaders.EVENT_TYPE)).isNull();
+        assertThat(record.headers().lastHeader(EventHeaders.EVENT_VERSION)).isNull();
+        assertThat(header(record, EventHeaders.CORRELATION_ID)).isEqualTo("5f0c9d7e-0000-4000-8000-000000000003");
     }
 
     @Test

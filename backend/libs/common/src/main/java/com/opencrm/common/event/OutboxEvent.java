@@ -33,6 +33,10 @@ public class OutboxEvent extends BaseEntity {
     @Column(name = "aggregate_id", nullable = false, length = 100)
     private String aggregateId;
 
+    /**
+     * Holds the topic (ADR-018 Context 5), as it did before D4, so a relay from before D4 still routes correctly. The
+     * D4 contract step switches it to the registry event type once every environment reads {@link #topic}.
+     */
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
@@ -62,6 +66,36 @@ public class OutboxEvent extends BaseEntity {
     /** Earliest time the relay may retry this row; {@code null} means it is due now. */
     @Column(name = "next_attempt_at")
     private Instant nextAttemptAt;
+
+    // --- ADR-018 D4 envelope (expand step). All nullable: rows written before D4 have none of them. ---------------
+
+    /**
+     * The Kafka topic the relay sends to. {@code null} on rows written before D4, whose topic is in
+     * {@link #eventType}; use {@link #resolveTopic()}.
+     */
+    @Column(name = "topic", length = 255)
+    private String topic;
+
+    /** Registry contract version ({@link EventContractRegistry}). */
+    @Column(name = "event_version")
+    private Integer eventVersion;
+
+    /** The chain this event belongs to; its own {@code uuid} when it starts one. */
+    @Column(name = "correlation_id", length = 100)
+    private String correlationId;
+
+    /** The id of the event that caused this one, when a consumer published it. */
+    @Column(name = "causation_id", length = 100)
+    private String causationId;
+
+    /** Who caused the event: {@code user:<sub>} or {@code service:<name>} (ADR-016). */
+    @Column(name = "actor", length = 255)
+    private String actor;
+
+    /** The topic to publish to: {@link #topic}, or {@link #eventType} for a row written before ADR-018 D4. */
+    public String resolveTopic() {
+        return topic != null ? topic : eventType;
+    }
 
     public void markAsPublished() {
         markAsPublished(Instant.now());
