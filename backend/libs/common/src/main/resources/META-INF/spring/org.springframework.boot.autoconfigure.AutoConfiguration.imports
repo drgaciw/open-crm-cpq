@@ -6,3 +6,4 @@ com.opencrm.common.event.KafkaInboxAutoConfiguration
 com.opencrm.common.event.KafkaConsumerErrorHandlingAutoConfiguration
 com.opencrm.common.event.EventActorAutoConfiguration
 com.opencrm.common.event.EventCorrelationKafkaAutoConfiguration
+com.opencrm.common.event.DeadLetterMetricsAutoConfiguration

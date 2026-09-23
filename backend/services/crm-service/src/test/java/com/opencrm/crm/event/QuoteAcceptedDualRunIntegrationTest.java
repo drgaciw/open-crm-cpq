@@ -1,5 +1,10 @@
 package com.opencrm.crm.event;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import com.opencrm.common.event.EventHeaders;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
@@ -41,7 +46,17 @@ import static org.awaitility.Awaitility.await;
  * channel arrives first. Both claim the quote UUID in {@code processed_events} inside the deal transaction.
  */
 @DisplayName("ADR-018 D8: quote acceptance over Kafka and Redis marks the deal WON once")
+@Import(QuoteAcceptedDualRunIntegrationTest.Metrics.class)
 class QuoteAcceptedDualRunIntegrationTest extends BaseIntegrationTest {
+
+    /** A real registry, so the channel counters can be asserted. */
+    @TestConfiguration
+    static class Metrics {
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
+    }
 
     static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:4.3.1");
 
@@ -60,6 +75,7 @@ class QuoteAcceptedDualRunIntegrationTest extends BaseIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired EntityManager entityManager;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired MeterRegistry meterRegistry;
 
     private final Instant acceptedAt = Instant.parse("2026-09-22T12:00:00Z");
     private Deal deal;
@@ -96,6 +112,8 @@ class QuoteAcceptedDualRunIntegrationTest extends BaseIntegrationTest {
         QuoteAcceptedCrmMessage redisMessage = QuoteAcceptedCrmMessage.builder()
                 .quoteUuid(quoteUuid).quoteNumber("Q-D8-2").dealExternalId(deal.getUuid())
                 .totalAmount(new BigDecimal("2500.00")).currency("EUR").acceptedAt(acceptedAt).build();
+        double redisApplied = count("redis", "applied");
+        double kafkaDuplicates = count("kafka", "duplicate");
 
         stringRedisTemplate.convertAndSend(RedisSubscriberConfig.QUOTE_ACCEPTED_CHANNEL,
                 objectMapper.writeValueAsString(redisMessage));
@@ -111,6 +129,9 @@ class QuoteAcceptedDualRunIntegrationTest extends BaseIntegrationTest {
             entityManager.clear();
             Deal after = dealRepository.findByUuid(deal.getUuid()).orElseThrow();
             assertThat(after.getAmount()).as("the Kafka copy must not re-apply").isEqualByComparingTo("999.99");
+            // The dual-run evidence (runbook): each acceptance is applied once and seen as a duplicate once.
+            assertThat(count("redis", "applied") - redisApplied).isEqualTo(1.0);
+            assertThat(count("kafka", "duplicate") - kafkaDuplicates).isEqualTo(1.0);
         });
         assertThat(claims(quoteUuid)).isEqualTo(1);
     }
@@ -147,6 +168,12 @@ class QuoteAcceptedDualRunIntegrationTest extends BaseIntegrationTest {
         });
         entityManager.clear();
         return dealRepository.findByUuid(deal.getUuid()).orElseThrow();
+    }
+
+    private double count(String channel, String outcome) {
+        var counter = meterRegistry.find(QuoteAcceptedChannelMetrics.METER)
+                .tags("channel", channel, "outcome", outcome).counter();
+        return counter == null ? 0 : counter.count();
     }
 
     private int claims(String quoteUuid) {

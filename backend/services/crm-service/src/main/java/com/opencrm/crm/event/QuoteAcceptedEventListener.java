@@ -25,6 +25,7 @@ public class QuoteAcceptedEventListener implements MessageListener {
 
     private final ObjectMapper objectMapper;
     private final QuoteAcceptedDealProcessor quoteAcceptedDealProcessor;
+    private final QuoteAcceptedChannelMetrics metrics;
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
@@ -35,10 +36,13 @@ public class QuoteAcceptedEventListener implements MessageListener {
             String dealExternalId = event.getDealExternalId();
             if (dealExternalId == null || dealExternalId.isBlank()) {
                 log.warn("QuoteAcceptedCrmMessage received without dealExternalId, skipping CRM update");
+                metrics.record(QuoteAcceptedChannelMetrics.REDIS, QuoteAcceptedOutcome.NO_DEAL);
                 return;
             }
-            quoteAcceptedDealProcessor.applyWinFromQuote(event, dealExternalId);
+            metrics.record(QuoteAcceptedChannelMetrics.REDIS,
+                    quoteAcceptedDealProcessor.applyWinFromQuote(event, dealExternalId));
         } catch (Exception e) {
+            metrics.record(QuoteAcceptedChannelMetrics.REDIS, QuoteAcceptedOutcome.FAILED);
             // Pub/Sub cannot redeliver; the Kafka channel is the retrying one during the dual run.
             log.error("Failed to process QuoteAcceptedCrmMessage from Redis", e);
         }
