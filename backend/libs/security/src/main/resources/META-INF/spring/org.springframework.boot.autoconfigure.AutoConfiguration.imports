@@ -1,1 +1,2 @@
 com.opencrm.security.event.SecurityEventActorAutoConfiguration
+com.opencrm.security.web.OpenCrmSecurityAutoConfiguration

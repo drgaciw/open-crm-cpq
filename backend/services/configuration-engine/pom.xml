@@ -36,6 +36,12 @@
             <groupId>com.opencrm</groupId>
             <artifactId>security</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.opencrm</groupId>
+            <artifactId>security</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Spring Web -->
         <dependency>

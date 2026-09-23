@@ -110,6 +110,14 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
+                <!-- ADR-016 step 0: shared prod-profile slice test support -->
+                <groupId>com.opencrm</groupId>
+                <artifactId>security</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
                 <groupId>com.opencrm</groupId>
                 <artifactId>rules-engine</artifactId>
                 <version>${project.version}</version>
