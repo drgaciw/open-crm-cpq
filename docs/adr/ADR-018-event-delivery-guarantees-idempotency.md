@@ -96,6 +96,13 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - `actor` (`user:<sub>` or `service:<client-id>`, per ADR-016)
 
 `OutboxEvent` gains a separate `topic` column (`event_type` then means the registry type), plus `status` and header columns. The Flyway migration is additive in each owning schema (ADR-008). Payloads stay JSON DTOs.
+- *Refined during implementation (2026-09-22):*
+  - **The `event_type` switch is split into expand and contract steps.** Changing what an existing column means in one release breaks this ADR's rule that every step can be undone by redeploying the previous version: a relay from before D4 would send new rows to a topic called `QuoteAccepted`.
+    - The expand step adds `topic` and the header columns. It keeps writing the topic into `event_type`, and the relay reads `topic`.
+    - The contract step switches `event_type` to the registry type once every environment runs the expand step.
+  - **The `eventType` header comes from the registry**, looked up by topic. D5 makes topic-to-contract one-to-one and pins it by test.
+  - **`correlationId` is always present.** An event that nothing correlated starts its own chain, correlated by its own `eventId`. A Kafka listener continues the chain of the record it is handling, and that record's `eventId` becomes the causation. A producer that already has a business correlation, such as a quote's UUID, opens a correlation scope around its publish.
+  - **`actor` is `user:<sub>` for an authenticated principal and `service:<spring.application.name>` otherwise.** `service:<client-id>` for service principals waits for ADR-016.
 
 **D5 — The registry is the contract.**
 - `EventContractRegistry` maps each topic to (eventType, version, owner, **payload class actually published**).
@@ -431,6 +438,48 @@ Branch `feat/adr018-d5-registry-contract-d9-fitness`, 2026-09-22. The ADR stays 
   - The rest of D4. The `eventType`, `eventVersion`, `correlationId`, `causationId` and `actor` headers and the `topic` column still need the additive outbox migrations. The publisher already has the contract, so `eventType` and `eventVersion` need only those columns.
   - `KafkaTopics` still has 15 constants with no producer and no registry entry, such as `cpq.quote.created` and the AMCP mesh topics. They are names, not contracts; pruning them is housekeeping outside D5.
   - DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
+
+### The full envelope: D4 expand step, plus `KafkaTopics` clean-up
+
+Branch `feat/adr018-d4-envelope-headers-topic-column`, 2026-09-22. The ADR stays **Proposed**. Payloads, topics and keys do not change; records gain headers.
+
+- **Schema.** One migration per owning schema: product `V1_6`, quote `V1_7`, pricing `V5`, configuration `V1_3`, approval `V1_6`, contract `V1_4`, document `V1_3`.
+  - Each adds `topic`, `event_version`, `correlation_id`, `causation_id` and `actor` to `outbox_events`.
+  - The columns are nullable with no default, so PostgreSQL adds them without rewriting the table, and code from before D4 keeps inserting.
+  - There is no backfill. The relay handles older rows.
+- **Publisher.**
+  - Each row now records the topic, the contract version, the correlation and causation, and the actor.
+  - `event_type` still holds the topic; see the D4 refinement.
+  - The event id is assigned before the save, so an event outside any correlation scope is correlated by its own id.
+- **Relay.**
+  - It sends to `topic`, falling back to `event_type` for an older row.
+  - It adds five headers: `eventType` and `eventVersion` (from the registry by topic, the row's version first), `correlationId` (the row's, or its `eventId`), `causationId` and `actor`.
+  - A header with no value is left out. A topic with no registry entry is still sent, without type headers.
+- **Correlation.**
+  - `EventCorrelation` is a thread-bound scope that nests and restores the previous scope when closed.
+  - `EventCorrelationRecordInterceptor` opens one around every Kafka listener call: `correlationId` is the record's correlation (or its `eventId`), and `causationId` is its `eventId`. It closes after the record, whether the listener succeeded or failed.
+  - Boot's listener container factory applies the interceptor. `EventEnvelopeAutoConfigurationTest` proves that on the factory Boot builds.
+  - A service that defines its own `RecordInterceptor` replaces it.
+  - quote-service (`QuoteAccepted`, correlated by the quote UUID) and configuration-engine (`ConfigurationCommitted`) publish inside a scope taken from their payload's correlation snapshot, so the headers match the payload.
+- **Actor.**
+  - `EventActorResolver` lives in `libs/common`. Its fallback, `EventActorAutoConfiguration`, answers `service:<spring.application.name>`.
+  - `libs/security` adds `SecurityEventActorAutoConfiguration` (its first auto-configuration), ordered before the fallback. Its resolver answers `user:<sub>` from `SecurityUtils.getCurrentUser()`, which already ignores anonymous callers, and the service otherwise.
+- **`KafkaTopics` clean-up.**
+  - The 15 constants with no producer, no consumer, no reference and no contract are removed. Examples are `cpq.quote.created`, `cpq.approval.approved` and the six AMCP event mesh topics.
+  - `KafkaTopics` now matches the registry one-to-one (12 topics). `EventContractRegistryTest` enforces this in both directions, so a topic name cannot come back without a `PUBLISHED` or `RESERVED` contract.
+  - `product-config-mgmt.xml` still names planned topics such as `cpq.product.created` in prose. They become `RESERVED` contracts when their wave is planned; held work such as agent Kafka #241 is unaffected.
+- **Tests.**
+  - `EventCorrelationTest` (6): nesting, blank ids, the interceptor continuing a chain, an older record correlated by its `eventId`, no envelope, and a stale scope replaced rather than stacked.
+  - `EventEnvelopeAutoConfigurationTest` (4) and `SecurityContextEventActorResolverTest` (4): JWT user, other principal, anonymous or no caller, and resolver precedence.
+  - `OutboxEventPublisherTest` (+2) and `OutboxRelayPublisherTest` (+2, and the older-row case extended).
+  - `ConfigurationSessionServiceTest` (+1): the scope matches the payload snapshot and is closed afterwards.
+  - `OutboxRelayKafkaIntegrationTest` now asserts all eight headers on a real broker, and the row's `topic` and `event_version` after the real Flyway migration.
+  - `ServiceSchemaIsolationIntegrationTest` pins one more migration each for configuration, approval, document and contract. It also proves that a raw insert without the new columns, which is what code from before D4 does, still works.
+  - The approval, document and contract consumer ITs pass with the correlation interceptor active on real listener containers.
+- **Operations.**
+  - **Contract step (later).** Once every environment runs this release, switch `event_type` to the registry type: new rows get `contract.eventType()`, and `UPDATE outbox_events SET event_type = <type for topic> WHERE topic IS NOT NULL` fixes the rest. After that, rolling back past this release needs the reverse update, `SET event_type = topic`, before a relay is enabled.
+  - Consumers can now log and trace by `correlationId`. Putting it into MDC and tracing is ADR-020.
+- **Not done:** the D4 contract step, the service-principal `actor` (ADR-016), DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
 
 ## Sources
 

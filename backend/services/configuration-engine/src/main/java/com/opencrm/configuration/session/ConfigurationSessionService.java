@@ -3,6 +3,7 @@ package com.opencrm.configuration.session;
 import com.opencrm.common.configuration.ConfigurationValidityAuthority;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.EventCorrelation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -138,12 +139,17 @@ public class ConfigurationSessionService {
                         .sourceService(ConfigurationValidityAuthority.OWNER_SERVICE)
                         .build()
         );
-        outboxEventPublisher.publish(
-                "ConfigurationSession",
-                String.valueOf(session.getId()),
-                EventContractRegistry.CONFIGURATION_COMMITTED_V1,
-                event
-        );
+        // ADR-018 D4: the envelope headers carry the same correlation as the payload's snapshot.
+        ConfigurationCommittedEvent.CorrelationSnapshot correlation = event.getCorrelation();
+        try (EventCorrelation.Scope ignored =
+                     EventCorrelation.begin(correlation.getCorrelationId(), correlation.getCausationId())) {
+            outboxEventPublisher.publish(
+                    "ConfigurationSession",
+                    String.valueOf(session.getId()),
+                    EventContractRegistry.CONFIGURATION_COMMITTED_V1,
+                    event
+            );
+        }
     }
 
     public ConfigurationSessionDto cancel(Long sessionId) {

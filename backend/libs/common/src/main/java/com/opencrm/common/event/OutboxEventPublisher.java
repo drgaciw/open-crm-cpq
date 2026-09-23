@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.EventContractRegistry.EventContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Service for publishing domain events via Transactional Outbox pattern.
@@ -18,6 +20,10 @@ import java.util.Objects;
  * <p>ADR-018 D5: the topic comes from an {@link EventContractRegistry} entry, never from a string. Only a PUBLISHED
  * contract is accepted, and only with a payload of its registered class, so what is written here is what the registry
  * says is on the wire.
+ *
+ * <p>ADR-018 D4: each row also records the envelope the relay sends as headers: topic, contract version, correlation
+ * and causation (from the active {@link EventCorrelation} scope; an event outside any scope starts its own chain,
+ * correlated by its own id) and the actor ({@link EventActorResolver}).
  */
 @Component
 @RequiredArgsConstructor
@@ -26,6 +32,7 @@ public class OutboxEventPublisher {
 
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<EventActorResolver> actorResolver;
 
     /**
      * Publish an event to the outbox table.
@@ -51,12 +58,24 @@ public class OutboxEventPublisher {
         }
         try {
             String payload = objectMapper.writeValueAsString(eventPayload);
+            String eventId = UUID.randomUUID().toString();
+            EventCorrelation.Context correlation = EventCorrelation.current().orElse(null);
+            String correlationId = correlation != null && correlation.correlationId() != null
+                    ? correlation.correlationId()
+                    : eventId;
 
-            // Until ADR-018 D4 adds a topic column, outbox_events.event_type holds the topic the relay sends to.
             OutboxEvent outboxEvent = Objects.requireNonNull(OutboxEvent.builder()
+                    .uuid(eventId)
                     .aggregateType(aggregateType)
                     .aggregateId(aggregateId)
+                    // D4 expand step: event_type keeps holding the topic so a relay from before D4 still routes
+                    // correctly; the D4 contract step switches it to contract.eventType().
                     .eventType(contract.topic())
+                    .topic(contract.topic())
+                    .eventVersion(contract.eventVersion())
+                    .correlationId(correlationId)
+                    .causationId(correlation != null ? correlation.causationId() : null)
+                    .actor(currentActor())
                     .payload(payload)
                     .published(false)
                     .retryCount(0)
@@ -64,11 +83,16 @@ public class OutboxEventPublisher {
 
             outboxEventRepository.save(outboxEvent);
 
-            log.debug("Published event to outbox: type={} v{}, topic={}, aggregateId={}",
-                    contract.eventType(), contract.eventVersion(), contract.topic(), aggregateId);
+            log.debug("Published event to outbox: type={} v{}, topic={}, aggregateId={}, correlationId={}",
+                    contract.eventType(), contract.eventVersion(), contract.topic(), aggregateId, correlationId);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event payload", e);
             throw new RuntimeException("Failed to publish event", e);
         }
+    }
+
+    private String currentActor() {
+        EventActorResolver resolver = actorResolver.getIfAvailable();
+        return resolver == null ? null : resolver.currentActor();
     }
 }
