@@ -1,0 +1,144 @@
+package com.opencrm.security.web;
+
+import com.opencrm.security.web.OpenCrmSecurityProperties.SecurityMode;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Locale;
+import java.util.Set;
+
+/**
+ * The one {@link SecurityFilterChain} of every servlet service (ADR-016 decisions 4 and 9). Services do not declare
+ * their own chain; they add rules with an {@link OpenCrmSecurityCustomizer} bean. {@code EventContractFitnessTest}'s
+ * sibling, {@code SecurityBaselineFitnessTest}, keeps it that way.
+ *
+ * <p><strong>{@code jwt} mode</strong> (every profile except {@code dev}): an OAuth 2.0 resource server.
+ * <ul>
+ *   <li>{@code /actuator/health/**} and {@code /actuator/info} are public;</li>
+ *   <li>{@code /internal/**} needs a token with the internal app role ({@code Internal.Invoke}), except in the two
+ *       services that set the transitional {@code opencrm.security.legacy-open-internal} until rollout step 2;</li>
+ *   <li>{@code /api/v1/**} and everything else need an authenticated token;</li>
+ *   <li>tokens are validated by {@link OpenCrmJwtDecoders}; app roles map through {@link EntraRoleAuthorities}.</li>
+ * </ul>
+ * Stateless, CSRF off: services receive bearer tokens, never cookies (ADR-004 keeps CSRF at the edge).
+ *
+ * <p><strong>{@code dev} mode</strong>: permits everything, logs a WARN, and refuses to start when the production
+ * marker {@code opencrm.env} ({@code OPENCRM_ENV}) is {@code prod} or {@code production}.
+ */
+@Slf4j
+@AutoConfiguration(beforeName = {
+        "org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration",
+        "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration",
+        "org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration"
+})
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnClass({HttpSecurity.class, JwtDecoder.class})
+@EnableConfigurationProperties(OpenCrmSecurityProperties.class)
+@EnableWebSecurity
+@EnableMethodSecurity
+public class OpenCrmSecurityAutoConfiguration {
+
+    /** Values of {@code opencrm.env} that mark a production deployment. */
+    static final Set<String> PRODUCTION_MARKERS = Set.of("prod", "production");
+
+    @Bean
+    public SecurityFilterChain openCrmSecurityFilterChain(HttpSecurity http, OpenCrmSecurityProperties properties,
+                                                         Environment environment, JwtDecoder jwtDecoder,
+                                                         ObjectProvider<OpenCrmSecurityCustomizer> customizers)
+            throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        if (mode(properties, environment) == SecurityMode.DEV) {
+            log.warn("opencrm.security.mode=dev: every request is permitted without authentication. "
+                    + "Local development only (ADR-016).");
+            return http.authorizeHttpRequests(rules -> rules.anyRequest().permitAll()).build();
+        }
+        JwtAuthenticationConverter authentication = new JwtAuthenticationConverter();
+        authentication.setJwtGrantedAuthoritiesConverter(
+                new EntraRoleAuthorities(properties.getJwt().getRolesClaim()));
+        String internalAuthority = EntraRoleAuthorities.authorityFor(properties.getInternalRole());
+        boolean legacyOpenInternal = legacyOpenInternal(properties, environment);
+        return http
+                .authorizeHttpRequests(rules -> {
+                    rules.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
+                    if (properties.isPermitApiDocs()) {
+                        rules.requestMatchers("/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**",
+                                "/swagger-ui.html").permitAll();
+                    }
+                    if (legacyOpenInternal) {
+                        rules.requestMatchers("/internal/**").permitAll();
+                    } else {
+                        rules.requestMatchers("/internal/**").hasAuthority(internalAuthority);
+                    }
+                    customizers.orderedStream().forEach(customizer -> customizer.customize(rules));
+                    rules.requestMatchers("/api/v1/**").authenticated();
+                    rules.anyRequest().authenticated();
+                })
+                .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt
+                        .decoder(jwtDecoder)
+                        .jwtAuthenticationConverter(authentication)))
+                .build();
+    }
+
+    /** The token decoder of {@code jwt} mode. In {@code dev} mode it exists but is never used. */
+    @Bean
+    @ConditionalOnMissingBean
+    public JwtDecoder openCrmJwtDecoder(OpenCrmSecurityProperties properties, Environment environment) {
+        if (mode(properties, environment) == SecurityMode.DEV) {
+            return token -> {
+                throw new org.springframework.security.oauth2.jwt.BadJwtException("opencrm.security.mode=dev");
+            };
+        }
+        return OpenCrmJwtDecoders.create(properties.getJwt(), isProduction(environment));
+    }
+
+    /** {@code opencrm.security.mode}, else {@code dev} under the {@code dev} profile and {@code jwt} otherwise. */
+    static SecurityMode mode(OpenCrmSecurityProperties properties, Environment environment) {
+        SecurityMode mode = properties.getMode() != null
+                ? properties.getMode()
+                : environment.acceptsProfiles(Profiles.of("dev")) ? SecurityMode.DEV : SecurityMode.JWT;
+        if (mode == SecurityMode.DEV && isProduction(environment)) {
+            throw new IllegalStateException("opencrm.security.mode=dev is not allowed when opencrm.env="
+                    + environment.getProperty("opencrm.env") + " (ADR-016 decision 4)");
+        }
+        return mode;
+    }
+
+    /** {@code opencrm.security.legacy-open-internal}, refused under the production marker (ADR-016 step 2 removes it). */
+    static boolean legacyOpenInternal(OpenCrmSecurityProperties properties, Environment environment) {
+        if (!properties.isLegacyOpenInternal()) {
+            return false;
+        }
+        if (isProduction(environment)) {
+            throw new IllegalStateException("opencrm.security.legacy-open-internal is not allowed when opencrm.env="
+                    + environment.getProperty("opencrm.env") + ": /internal/** is never permitAll in production "
+                    + "(ADR-016 decision 4)");
+        }
+        log.warn("opencrm.security.legacy-open-internal=true: /internal/** accepts anonymous callers until ADR-016 "
+                + "rollout step 2 gives them a service token.");
+        return true;
+    }
+
+    static boolean isProduction(Environment environment) {
+        String marker = environment.getProperty("opencrm.env");
+        return marker != null && PRODUCTION_MARKERS.contains(marker.trim().toLowerCase(Locale.ROOT));
+    }
+}
