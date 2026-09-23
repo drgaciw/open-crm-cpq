@@ -1,5 +1,9 @@
 package com.opencrm.crm.event;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import java.util.Map;
 import com.opencrm.common.event.NonRetryableEventException;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,10 +38,13 @@ class QuoteAcceptedKafkaListenerTest {
     private QuoteAcceptedDealProcessor processor;
 
     private QuoteAcceptedKafkaListener listener;
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
-        listener = new QuoteAcceptedKafkaListener(objectMapper, processor);
+        listener = new QuoteAcceptedKafkaListener(objectMapper, processor,
+                new QuoteAcceptedChannelMetrics(new StaticListableBeanFactory(Map.of("registry", registry))
+                        .getBeanProvider(MeterRegistry.class)));
     }
 
     static QuoteAcceptedEvent event(String dealExternalId) {
@@ -62,6 +70,7 @@ class QuoteAcceptedKafkaListenerTest {
     @Test
     @DisplayName("maps the Kafka contract onto the deal update, keyed by the quote UUID like the Redis message")
     void mapsEventToDealUpdate() throws Exception {
+        when(processor.applyWinFromQuote(any(), anyString())).thenReturn(QuoteAcceptedOutcome.DUPLICATE);
         listener.onQuoteAccepted(objectMapper.writeValueAsString(event("deal-5")));
 
         ArgumentCaptor<com.opencrm.common.event.dto.QuoteAcceptedCrmMessage> sent =
@@ -76,6 +85,7 @@ class QuoteAcceptedKafkaListenerTest {
         assertThat(message.getTcv()).isEqualByComparingTo("3600.00");
         assertThat(message.getDurationInMonths()).isEqualTo(36);
         assertThat(QuoteAcceptedIdempotency.dedupeKey(message, "deal-5")).isEqualTo("quote-uuid-5");
+        assertThat(count("duplicate")).isEqualTo(1.0);
     }
 
     @Test
@@ -84,6 +94,7 @@ class QuoteAcceptedKafkaListenerTest {
         listener.onQuoteAccepted(objectMapper.writeValueAsString(event(null)));
 
         verify(processor, never()).applyWinFromQuote(any(), anyString());
+        assertThat(count("no-deal")).isEqualTo(1.0);
     }
 
     @Test
@@ -93,5 +104,12 @@ class QuoteAcceptedKafkaListenerTest {
         assertThatThrownBy(() -> listener.onQuoteAccepted("{\"customerId\":\"c\"}"))
                 .isInstanceOf(NonRetryableEventException.class);
         verify(processor, never()).applyWinFromQuote(any(), anyString());
+        assertThat(count("failed")).as("counted per attempt").isEqualTo(2.0);
+    }
+
+    private double count(String outcome) {
+        var counter = registry.find(QuoteAcceptedChannelMetrics.METER)
+                .tags("channel", QuoteAcceptedChannelMetrics.KAFKA, "outcome", outcome).counter();
+        return counter == null ? 0 : counter.count();
     }
 }

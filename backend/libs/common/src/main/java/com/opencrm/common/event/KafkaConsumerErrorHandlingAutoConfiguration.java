@@ -1,9 +1,11 @@
 package com.opencrm.common.event;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.TopicPartition;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -51,7 +53,8 @@ public class KafkaConsumerErrorHandlingAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(CommonErrorHandler.class)
-    public DefaultErrorHandler kafkaDeadLetterErrorHandler(KafkaOperations<?, ?> kafkaOperations, RetryProperties retry) {
+    public DefaultErrorHandler kafkaDeadLetterErrorHandler(KafkaOperations<?, ?> kafkaOperations, RetryProperties retry,
+                                                           ObjectProvider<MeterRegistry> meterRegistry) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaOperations,
                 (record, exception) -> {
                     log.error("Kafka record {}-{}@{} (key {}) failed after retries; publishing to {}{}",
@@ -63,7 +66,9 @@ public class KafkaConsumerErrorHandlingAutoConfiguration {
         backOff.setInitialInterval(retry.getInitialInterval().toMillis());
         backOff.setMultiplier(retry.getMultiplier());
         backOff.setMaxInterval(retry.getMaxInterval().toMillis());
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
+        // ADR-018 D10: count each record once it is on the DLT (opencrm.kafka.consumer.dead.letters).
+        DefaultErrorHandler handler = new DefaultErrorHandler(
+                new DeadLetterCountingRecoverer(recoverer, meterRegistry), backOff);
         handler.addNotRetryableExceptions(NonRetryableEventException.class,
                 com.fasterxml.jackson.core.JsonProcessingException.class);
         return handler;

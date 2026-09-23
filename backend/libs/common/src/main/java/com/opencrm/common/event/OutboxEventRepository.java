@@ -19,8 +19,10 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
      *   <li>{@code FOR UPDATE SKIP LOCKED}: concurrent relays (replicas, or pricing and pricebook sharing the
      *       {@code pricing} schema) never lease the same row, and never wait on each other.</li>
      *   <li>Only the <em>oldest</em> unpublished row of each aggregate is eligible. A later row of the same aggregate
-     *       waits until every earlier one is {@code PUBLISHED}, so per-aggregate order holds across failures and
-     *       across replicas. A {@code FAILED} row therefore blocks its aggregate until it is requeued.</li>
+     *       waits until every earlier one is {@code PUBLISHED} or {@code SKIPPED}, so per-aggregate order holds across
+     *       failures and across replicas. A {@code FAILED} row therefore blocks its aggregate until it is requeued or
+     *       skipped. The two {@code <>} conditions (not {@code NOT IN}) keep the partial index on
+     *       {@code status <> 'PUBLISHED'} usable.</li>
      *   <li>Rows backing off ({@code next_attempt_at} in the future) are not due.</li>
      * </ul>
      * Order within an aggregate follows {@code id}; writes to one aggregate are serialised by its own row lock, so
@@ -35,6 +37,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                   WHERE older.aggregate_type = e.aggregate_type
                     AND older.aggregate_id = e.aggregate_id
                     AND older.status <> 'PUBLISHED'
+                    AND older.status <> 'SKIPPED'
                     AND older.id < e.id)
             ORDER BY e.id
             LIMIT :limit

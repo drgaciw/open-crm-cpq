@@ -231,6 +231,14 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - The actor is `user:<sub>` from the security context, or the service.
 >   - `event_type` keeps holding the topic until a later contract step, so any release can still be rolled back.
 >   - `KafkaTopics` is cut to the 12 registered topics, and a test keeps it matched to the registry.
+> - **ADR-018 close-out (2026-09-23).**
+>   - Every decision is implemented. ADR-018 now has an acceptance checklist, and accepting it is the owner's call.
+>   - New metrics: consumer lag (Boot's Kafka client metrics), `opencrm.kafka.consumer.dead.letters` and `opencrm.kafka.dlt.depth`.
+>   - `DeadLetterTool` is a one-off admin process for DLT triage: `depth`, `peek`, `replay` and `skip`. Replay relies on D6 idempotency instead of a per-group filter.
+>   - The terminal `SKIPPED` outbox status is for backlog triage.
+>   - `opencrm.crm.quote.accepted{channel,outcome}` is the evidence for ending the Redis dual run.
+>   - `docs/runbooks/event-operations.md` covers enablement, alerts, triage, rollback and the D8 step 3 exit criterion.
+>   - Open for the owner: DLT retention, the per-environment backlog decision, the dual-run window, the discount supersede rule, ERP upsert, and accepting the ADR.
 
 ---
 

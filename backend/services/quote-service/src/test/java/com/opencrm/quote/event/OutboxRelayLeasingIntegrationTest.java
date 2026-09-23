@@ -191,6 +191,38 @@ class OutboxRelayLeasingIntegrationTest {
         assertThat(lease(Instant.now().plusSeconds(1), 10)).containsExactly(y1);
     }
 
+    /** The backlog-triage statement from docs/runbooks/event-operations.md, with its two values bound. */
+    private static final String RUNBOOK_SKIP = """
+            UPDATE outbox_events
+               SET status = 'SKIPPED', published = TRUE, published_at = now(), next_attempt_at = NULL,
+                   error_message = LEFT('skipped: ' || ?, 500)
+             WHERE status IN ('PENDING', 'FAILED')
+               AND created_at < ?
+            """;
+
+    @Test
+    @DisplayName("backlog triage: the runbook SKIP statement unblocks an aggregate, is never leased, and ages out")
+    void runbookSkipUnblocksAndAgesOut() {
+        long x1 = insert("X", "{}");
+        long x2 = insert("X", "{}");
+        jdbc.update("UPDATE outbox_events SET status = 'FAILED', retry_count = 10, "
+                + "created_at = now() - interval '2 days' WHERE id = ?", x1);
+        Instant now = Instant.now().plusSeconds(1);
+        assertThat(lease(now, 10)).as("the FAILED head blocks its aggregate").isEmpty();
+
+        int skipped = jdbc.update(RUNBOOK_SKIP, "historic backlog, owner decision",
+                java.sql.Timestamp.from(Instant.now().minus(Duration.ofDays(1))));
+
+        assertThat(skipped).as("only rows older than the cutoff").isEqualTo(1);
+        OutboxEvent row = reload(x1);
+        assertThat(row.getStatus()).isEqualTo(OutboxStatus.SKIPPED);
+        assertThat(row.getErrorMessage()).startsWith("skipped: historic backlog");
+        assertThat(lease(now, 10)).as("SKIPPED no longer blocks, and is never leased itself").containsExactly(x2);
+        Integer deleted = tx.execute(status -> repository.deletePublishedBefore(Instant.now().plusSeconds(60)));
+        assertThat(deleted).as("SKIPPED ages out with the published rows").isEqualTo(1);
+        assertThat(repository.findById(x1)).isEmpty();
+    }
+
     @Test
     @DisplayName("D2: a row backing off is not due until next_attempt_at")
     void backingOffRowIsNotDue() {
