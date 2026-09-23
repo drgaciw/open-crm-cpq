@@ -32,13 +32,13 @@ class ServiceSchemaIsolationIntegrationTest {
             .withDatabaseName("opencrm");
 
     // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
-    // D2/D3 relay status, D6 inbox (approval, contract) and D4 envelope columns.
+    // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
     private static final List<Service> SERVICES = List.of(
-            new Service("configuration-engine", "configuration", "configuration_sessions", 3),
-            // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope
-            new Service("approval-routing", "approval", "approval_requests", 6),
-            new Service("document-generation", "document", "document_generation_jobs", 3),
-            new Service("contract-asset-management", "contract", "subscriptions", 4));
+            new Service("configuration-engine", "configuration", "configuration_sessions", 4),
+            // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope, V1_7 SKIPPED
+            new Service("approval-routing", "approval", "approval_requests", 7),
+            new Service("document-generation", "document", "document_generation_jobs", 4),
+            new Service("contract-asset-management", "contract", "subscriptions", 5));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {

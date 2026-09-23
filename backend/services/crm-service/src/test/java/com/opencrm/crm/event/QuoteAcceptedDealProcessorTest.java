@@ -65,9 +65,9 @@ class QuoteAcceptedDealProcessorTest {
         when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(true);
         Instant acceptedAt = Instant.parse("2025-05-02T12:00:00Z");
 
-        boolean applied = processor.applyWinFromQuote(message(acceptedAt), deal.getUuid());
+        QuoteAcceptedOutcome outcome = processor.applyWinFromQuote(message(acceptedAt), deal.getUuid());
 
-        assertThat(applied).isTrue();
+        assertThat(outcome).isEqualTo(QuoteAcceptedOutcome.APPLIED);
         ArgumentCaptor<Deal> captor = ArgumentCaptor.forClass(Deal.class);
         verify(dealRepository).save(captor.capture());
         Deal saved = captor.getValue();
@@ -83,9 +83,9 @@ class QuoteAcceptedDealProcessorTest {
         when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
         when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(false);
 
-        boolean applied = processor.applyWinFromQuote(message(Instant.now()), deal.getUuid());
+        QuoteAcceptedOutcome outcome = processor.applyWinFromQuote(message(Instant.now()), deal.getUuid());
 
-        assertThat(applied).isFalse();
+        assertThat(outcome).isEqualTo(QuoteAcceptedOutcome.DUPLICATE);
         verify(dealRepository, never()).save(any());
         assertThat(deal.getStage()).isEqualTo(DealStage.PROPOSAL);
     }
@@ -95,10 +95,10 @@ class QuoteAcceptedDealProcessorTest {
     void applyWinFromQuote_returnsFalseWhenDealMissing() {
         when(dealRepository.findByUuid("missing")).thenReturn(Optional.empty());
 
-        boolean applied = processor.applyWinFromQuote(
+        QuoteAcceptedOutcome outcome = processor.applyWinFromQuote(
                 QuoteAcceptedCrmMessage.builder().quoteNumber("Q-9").build(), "missing");
 
-        assertThat(applied).isFalse();
+        assertThat(outcome).isEqualTo(QuoteAcceptedOutcome.DEAL_NOT_FOUND);
         verify(dealRepository, never()).save(any());
         verify(inbox, never()).claimKey(anyString(), anyString());
     }

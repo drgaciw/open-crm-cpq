@@ -28,7 +28,7 @@ class KafkaConsumerSupportTest {
     private final ApplicationContextRunner kafkaContext = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(
                     KafkaAutoConfiguration.class, KafkaConsumerErrorHandlingAutoConfiguration.class,
-                    KafkaInboxAutoConfiguration.class))
+                    KafkaInboxAutoConfiguration.class, DeadLetterMetricsAutoConfiguration.class))
             .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
             .withPropertyValues("spring.kafka.bootstrap-servers=localhost:9092");
 
@@ -58,6 +58,13 @@ class KafkaConsumerSupportTest {
         });
     }
 
+    @Test
+    @DisplayName("D10: dead-letter metrics are registered with the error handler, and switched off with it")
+    void deadLetterMetricsFollowTheErrorHandler() {
+        kafkaContext.run(context -> assertThat(context).hasSingleBean(DeadLetterMetrics.class));
+        kafkaContext.withPropertyValues("opencrm.kafka.consumer.dead-letter.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean(DeadLetterMetrics.class));
+    }
     @Test
     @DisplayName("D7: opencrm.kafka.consumer.dead-letter.enabled=false leaves Spring Kafka's default handling")
     void deadLetterHandlingCanBeSwitchedOff() {

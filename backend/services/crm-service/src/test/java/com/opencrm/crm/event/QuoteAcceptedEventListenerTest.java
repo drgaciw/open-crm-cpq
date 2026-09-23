@@ -1,5 +1,9 @@
 package com.opencrm.crm.event;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import java.util.Map;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
@@ -15,6 +19,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -35,10 +40,13 @@ class QuoteAcceptedEventListenerTest {
     private QuoteAcceptedDealProcessor quoteAcceptedDealProcessor;
 
     private QuoteAcceptedEventListener listener;
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
-        listener = new QuoteAcceptedEventListener(objectMapper, quoteAcceptedDealProcessor);
+        listener = new QuoteAcceptedEventListener(objectMapper, quoteAcceptedDealProcessor,
+                new QuoteAcceptedChannelMetrics(new StaticListableBeanFactory(Map.of("registry", registry))
+                        .getBeanProvider(MeterRegistry.class)));
     }
 
     private Message message(String dealExternalId) throws Exception {
@@ -58,7 +66,9 @@ class QuoteAcceptedEventListenerTest {
     @Test
     @DisplayName("hands the acceptance to the processor with the deal id")
     void onMessage_delegatesToProcessor() throws Exception {
+        when(quoteAcceptedDealProcessor.applyWinFromQuote(any(), anyString())).thenReturn(QuoteAcceptedOutcome.APPLIED);
         listener.onMessage(message("deal-7"), null);
+        assertThat(count("applied")).isEqualTo(1.0);
 
         verify(quoteAcceptedDealProcessor).applyWinFromQuote(
                 argThat(m -> "quote-uuid-7".equals(m.getQuoteUuid())), eq("deal-7"));
@@ -70,6 +80,7 @@ class QuoteAcceptedEventListenerTest {
         listener.onMessage(message(" "), null);
 
         verify(quoteAcceptedDealProcessor, never()).applyWinFromQuote(any(), anyString());
+        assertThat(count("no-deal")).isEqualTo(1.0);
     }
 
     @Test
@@ -79,5 +90,12 @@ class QuoteAcceptedEventListenerTest {
         when(quoteAcceptedDealProcessor.applyWinFromQuote(any(), anyString())).thenThrow(new IllegalStateException("db"));
 
         assertThatCode(() -> listener.onMessage(message, null)).doesNotThrowAnyException();
+        assertThat(count("failed")).isEqualTo(1.0);
+    }
+
+    private double count(String outcome) {
+        var counter = registry.find(QuoteAcceptedChannelMetrics.METER)
+                .tags("channel", QuoteAcceptedChannelMetrics.REDIS, "outcome", outcome).counter();
+        return counter == null ? 0 : counter.count();
     }
 }

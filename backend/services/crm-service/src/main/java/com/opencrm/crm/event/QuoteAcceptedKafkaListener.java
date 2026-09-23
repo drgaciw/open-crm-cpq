@@ -42,16 +42,25 @@ public class QuoteAcceptedKafkaListener {
 
     private final ObjectMapper objectMapper;
     private final QuoteAcceptedDealProcessor quoteAcceptedDealProcessor;
+    private final QuoteAcceptedChannelMetrics metrics;
 
     @KafkaListener(topics = KafkaTopics.QUOTE_STATUS_ACCEPTED, groupId = CONSUMER_GROUP)
     public void onQuoteAccepted(String payload) {
-        QuoteAcceptedCrmMessage message = toCrmMessage(parse(payload));
-        String dealExternalId = message.getDealExternalId();
-        if (dealExternalId == null || dealExternalId.isBlank()) {
-            log.debug("Quote {} accepted without a CRM deal; nothing to update", message.getQuoteNumber());
-            return;
+        try {
+            QuoteAcceptedCrmMessage message = toCrmMessage(parse(payload));
+            String dealExternalId = message.getDealExternalId();
+            if (dealExternalId == null || dealExternalId.isBlank()) {
+                log.debug("Quote {} accepted without a CRM deal; nothing to update", message.getQuoteNumber());
+                metrics.record(QuoteAcceptedChannelMetrics.KAFKA, QuoteAcceptedOutcome.NO_DEAL);
+                return;
+            }
+            metrics.record(QuoteAcceptedChannelMetrics.KAFKA,
+                    quoteAcceptedDealProcessor.applyWinFromQuote(message, dealExternalId));
+        } catch (RuntimeException e) {
+            // Counted per attempt; the shared error handler retries it or sends it to the DLT (D7).
+            metrics.record(QuoteAcceptedChannelMetrics.KAFKA, QuoteAcceptedOutcome.FAILED);
+            throw e;
         }
-        quoteAcceptedDealProcessor.applyWinFromQuote(message, dealExternalId);
     }
 
     private QuoteAcceptedEvent parse(String payload) {
