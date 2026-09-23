@@ -4,3 +4,5 @@ com.opencrm.common.event.OutboxHealthAutoConfiguration
 com.opencrm.common.event.OutboxMetricsAutoConfiguration
 com.opencrm.common.event.KafkaInboxAutoConfiguration
 com.opencrm.common.event.KafkaConsumerErrorHandlingAutoConfiguration
+com.opencrm.common.event.EventActorAutoConfiguration
+com.opencrm.common.event.EventCorrelationKafkaAutoConfiguration

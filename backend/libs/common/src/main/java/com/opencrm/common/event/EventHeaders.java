@@ -6,9 +6,9 @@ import org.apache.kafka.common.header.Header;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Kafka record headers of the event envelope (ADR-018 D4). The outbox relay sets the first three from the outbox row;
- * the rest of the D4 envelope ({@code eventType}, {@code eventVersion}, {@code correlationId}, {@code causationId},
- * {@code actor}) needs registry and outbox columns and is not written yet. Values are UTF-8 strings.
+ * Kafka record headers of the event envelope (ADR-018 D4). The outbox relay writes all of them from the outbox row and
+ * {@link EventContractRegistry}; a header whose value is unknown is left out. Values are UTF-8 strings. Payloads are
+ * unchanged, so a consumer that ignores headers is unaffected.
  */
 public final class EventHeaders {
 
@@ -20,6 +20,21 @@ public final class EventHeaders {
 
     /** {@code spring.application.name} of the producing service. */
     public static final String PRODUCER = "producer";
+
+    /** Registry event type, e.g. {@code QuoteAccepted}. */
+    public static final String EVENT_TYPE = "eventType";
+
+    /** Registry contract version, e.g. {@code 1}. */
+    public static final String EVENT_VERSION = "eventVersion";
+
+    /** The chain the event belongs to; the event's own {@code eventId} when it starts one. Always present. */
+    public static final String CORRELATION_ID = "correlationId";
+
+    /** The {@code eventId} of the event that caused this one; absent when the event was not caused by another. */
+    public static final String CAUSATION_ID = "causationId";
+
+    /** Who caused the event: {@code user:<sub>} or {@code service:<name>} (ADR-016). */
+    public static final String ACTOR = "actor";
 
     private EventHeaders() {
     }

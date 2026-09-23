@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -158,11 +159,11 @@ public class OutboxRelayPublisher {
         observer.attemptFailed(event, exhausted);
         if (exhausted) {
             log.error("Outbox event {} ({} -> {}, aggregate {}) is FAILED after {} attempts: {}",
-                    event.getId(), event.getAggregateType(), event.getEventType(), event.getAggregateId(),
+                    event.getId(), event.getAggregateType(), event.resolveTopic(), event.getAggregateId(),
                     attempt, error);
         } else {
             log.warn("Outbox event {} ({}) attempt {} failed, retry in {}: {}",
-                    event.getId(), event.getEventType(), attempt, delay, error);
+                    event.getId(), event.resolveTopic(), attempt, delay, error);
         }
     }
 
@@ -174,17 +175,33 @@ public class OutboxRelayPublisher {
     }
 
     /**
-     * The Kafka record for an outbox row: topic from {@code event_type} (which holds the topic, ADR-018 Context 5), key
-     * {@code aggregate_id} (per-aggregate partition order), JSON payload unchanged, and the envelope headers written so
-     * far (D4): {@code eventId} = the row UUID, which is identical on every re-send and is what consumers deduplicate
-     * on (D6), plus {@code occurredAt} and {@code producer}.
+     * The Kafka record for an outbox row (ADR-018 D4):
+     * <ul>
+     *   <li>topic: the {@code topic} column, or {@code event_type} on a row written before D4;</li>
+     *   <li>key: {@code aggregate_id}, for per-aggregate partition order; payload: the JSON, unchanged;</li>
+     *   <li>headers: {@code eventId} (the row UUID, identical on every re-send, the D6 dedupe key), {@code occurredAt},
+     *       {@code producer}, {@code eventType} and {@code eventVersion} (from {@link EventContractRegistry}, which
+     *       maps each topic to one contract), {@code correlationId} (the row's, or its {@code eventId} when it starts
+     *       a chain), {@code causationId} and {@code actor}.</li>
+     * </ul>
      */
     ProducerRecord<String, String> toRecord(OutboxEvent event) {
-        ProducerRecord<String, String> record =
-                new ProducerRecord<>(event.getEventType(), event.getAggregateId(), event.getPayload());
+        String topic = event.resolveTopic();
+        Optional<EventContractRegistry.EventContract> contract = EventContractRegistry.forTopic(topic);
+        Integer version = event.getEventVersion() != null
+                ? event.getEventVersion()
+                : contract.map(EventContractRegistry.EventContract::eventVersion).orElse(null);
+
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, event.getAggregateId(), event.getPayload());
         header(record, EventHeaders.EVENT_ID, event.getUuid());
         header(record, EventHeaders.OCCURRED_AT, event.getCreatedAt() == null ? null : event.getCreatedAt().toString());
         header(record, EventHeaders.PRODUCER, producerName);
+        header(record, EventHeaders.EVENT_TYPE, contract.map(EventContractRegistry.EventContract::eventType).orElse(null));
+        header(record, EventHeaders.EVENT_VERSION, version == null ? null : version.toString());
+        header(record, EventHeaders.CORRELATION_ID,
+                event.getCorrelationId() != null ? event.getCorrelationId() : event.getUuid());
+        header(record, EventHeaders.CAUSATION_ID, event.getCausationId());
+        header(record, EventHeaders.ACTOR, event.getActor());
         return record;
     }
 

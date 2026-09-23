@@ -7,6 +7,7 @@ import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.EventCorrelation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
@@ -281,12 +282,17 @@ public class QuoteService {
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
         QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
-        outboxEventPublisher.publish(
-                "Quote",
-                saved.getQuoteNumber(),
-                EventContractRegistry.QUOTE_ACCEPTED_V1,
-                kafkaEvent
-        );
+        // ADR-018 D4: the envelope headers carry the same correlation as the payload's snapshot (the quote UUID).
+        QuoteAcceptedEvent.CorrelationSnapshot correlation = kafkaEvent.getCorrelation();
+        try (EventCorrelation.Scope ignored =
+                     EventCorrelation.begin(correlation.getCorrelationId(), correlation.getCausationId())) {
+            outboxEventPublisher.publish(
+                    "Quote",
+                    saved.getQuoteNumber(),
+                    EventContractRegistry.QUOTE_ACCEPTED_V1,
+                    kafkaEvent
+            );
+        }
 
         return quoteMapper.toDto(saved);
     }

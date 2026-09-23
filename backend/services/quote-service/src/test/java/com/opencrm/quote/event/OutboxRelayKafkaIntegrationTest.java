@@ -95,6 +95,18 @@ class OutboxRelayKafkaIntegrationTest {
         });
         assertThat(header(record, EventHeaders.PRODUCER)).isEqualTo("quote-service");
         assertThat(header(record, EventHeaders.OCCURRED_AT)).isNotBlank();
+        // ADR-018 D4: the rest of the envelope. No correlation scope and no security context here, so the event starts
+        // its own chain and is attributed to the service.
+        assertThat(header(record, EventHeaders.EVENT_TYPE)).isEqualTo("QuoteAccepted");
+        assertThat(header(record, EventHeaders.EVENT_VERSION)).isEqualTo("1");
+        assertThat(header(record, EventHeaders.CORRELATION_ID)).isEqualTo(eventId);
+        assertThat(header(record, EventHeaders.CAUSATION_ID)).isNull();
+        assertThat(header(record, EventHeaders.ACTOR)).isEqualTo("service:quote-service");
+        assertThat(repository.findAll()).anySatisfy(row -> {
+            assertThat(row.getAggregateId()).isEqualTo(aggregateId);
+            assertThat(row.getTopic()).isEqualTo(topic);
+            assertThat(row.getEventVersion()).isEqualTo(1);
+        });
 
         Instant deadline = Instant.now().plusSeconds(30);
         while (Instant.now().isBefore(deadline)

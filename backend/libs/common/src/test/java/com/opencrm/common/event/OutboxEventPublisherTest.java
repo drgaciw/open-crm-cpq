@@ -11,6 +11,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,6 +26,9 @@ public class OutboxEventPublisherTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private ObjectProvider<EventActorResolver> actorResolver;
 
     @InjectMocks
     private OutboxEventPublisher outboxEventPublisher;
@@ -52,7 +56,7 @@ public class OutboxEventPublisherTest {
         assertEquals(aggregateType, capturedEvent.getAggregateType());
         assertEquals(aggregateId, capturedEvent.getAggregateId());
         assertEquals(KafkaTopics.QUOTE_STATUS_ACCEPTED, capturedEvent.getEventType(),
-                "outbox_events.event_type holds the topic the relay sends to, until ADR-018 D4");
+                "event_type keeps holding the topic until the ADR-018 D4 contract step");
         assertEquals(jsonPayload, capturedEvent.getPayload());
         assertFalse(capturedEvent.getPublished());
         assertEquals(0, capturedEvent.getRetryCount());
@@ -106,5 +110,38 @@ public class OutboxEventPublisherTest {
                 .hasMessageContaining("not null");
 
         verifyNoInteractions(objectMapper, outboxEventRepository);
+    }
+
+    @Test
+    void publish_RecordsTheD4Envelope() throws JsonProcessingException {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(actorResolver.getIfAvailable()).thenReturn(() -> "user:auth0|42");
+
+        outboxEventPublisher.publish("Quote", "Q-1", EventContractRegistry.QUOTE_ACCEPTED_V1, new QuoteAcceptedEvent());
+
+        verify(outboxEventRepository).save(outboxEventCaptor.capture());
+        OutboxEvent row = outboxEventCaptor.getValue();
+        assertEquals(KafkaTopics.QUOTE_STATUS_ACCEPTED, row.getTopic());
+        assertEquals(1, row.getEventVersion());
+        assertNotNull(row.getUuid(), "the event id is assigned before save so it can seed the correlation");
+        assertEquals(row.getUuid(), row.getCorrelationId(), "outside any scope an event starts its own chain");
+        assertNull(row.getCausationId());
+        assertEquals("user:auth0|42", row.getActor());
+    }
+
+    @Test
+    void publish_TakesCorrelationAndCausationFromTheActiveScope() throws JsonProcessingException {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        try (EventCorrelation.Scope ignored = EventCorrelation.begin("quote-uuid-7", "upstream-event-9")) {
+            outboxEventPublisher.publish("Quote", "Q-1", EventContractRegistry.QUOTE_ACCEPTED_V1, new QuoteAcceptedEvent());
+        }
+
+        verify(outboxEventRepository).save(outboxEventCaptor.capture());
+        OutboxEvent row = outboxEventCaptor.getValue();
+        assertEquals("quote-uuid-7", row.getCorrelationId());
+        assertEquals("upstream-event-9", row.getCausationId());
+        assertNull(row.getActor(), "no EventActorResolver bean: no actor");
+        assertTrue(EventCorrelation.current().isEmpty(), "closing the scope restores the empty context");
     }
 }
