@@ -13,10 +13,15 @@ import org.springframework.boot.test.context.runner.ReactiveWebApplicationContex
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.cloud.gateway.filter.factory.SpringCloudCircuitBreakerResilience4JFilterFactory;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.session.ReactiveMapSessionRepository;
 import org.springframework.session.ReactiveSessionRepository;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.server.session.CookieWebSessionIdResolver;
 import org.springframework.web.server.session.DefaultWebSessionManager;
+import org.springframework.web.util.UriComponentsBuilder;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -72,5 +77,37 @@ class GatewayApplicationStartupTest {
                             .expectHeader().valueEquals(GatewayAuthenticationEntryPoint.LOGIN_HINT_HEADER,
                                     "/oauth2/authorization/entra");
                 });
+    }
+
+    /**
+     * ADR-016 step 5: behind the TLS-terminating ingress, {@code SERVER_FORWARD_HEADERS_STRATEGY=framework} makes the
+     * login's redirect URI the public https origin. Without it, forwarded headers are not trusted.
+     */
+    @Test
+    void behindTheIngressTheRedirectUriIsThePublicOrigin() {
+        // The login stores its authorization request in the session; an in-memory store replaces Redis here.
+        var login = gateway("default").withPropertyValues(
+                        "opencrm.security.jwt.issuer-uri=https://login.microsoftonline.com/00000000-0000-4000-8000-00000000c0de/v2.0",
+                        "opencrm.gateway.login.client-id=gateway-client",
+                        "opencrm.gateway.login.client-secret=local-test-secret")
+                .withBean(ReactiveSessionRepository.class,
+                        () -> new ReactiveMapSessionRepository(new java.util.concurrent.ConcurrentHashMap<>()));
+        login.withPropertyValues("server.forward-headers-strategy=framework").run(context -> {
+            assertThat(context).hasNotFailed().hasBean("forwardedHeaderTransformer");
+            assertThat(redirectUri(context)).isEqualTo("https://crm.example.com/login/oauth2/code/entra");
+        });
+        login.run(context -> assertThat(redirectUri(context)).doesNotContain("crm.example.com"));
+    }
+
+    private static String redirectUri(org.springframework.context.ApplicationContext context) {
+        URI location = WebTestClient.bindToApplicationContext(context).build().get().uri("/oauth2/authorization/entra")
+                .header("X-Forwarded-Proto", "https")
+                .header("X-Forwarded-Host", "crm.example.com")
+                .header("X-Forwarded-Port", "443")
+                .exchange().expectStatus().isFound()
+                .returnResult(Void.class).getResponseHeaders().getLocation();
+        assertThat(location).isNotNull();
+        String encoded = UriComponentsBuilder.fromUri(location).build().getQueryParams().getFirst("redirect_uri");
+        return URLDecoder.decode(encoded, StandardCharsets.UTF_8);
     }
 }

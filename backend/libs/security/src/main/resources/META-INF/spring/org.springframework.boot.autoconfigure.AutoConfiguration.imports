@@ -2,3 +2,4 @@ com.opencrm.security.event.SecurityEventActorAutoConfiguration
 com.opencrm.security.web.OpenCrmSecurityAutoConfiguration
 com.opencrm.security.client.OpenCrmOutboundAuthAutoConfiguration
 com.opencrm.security.OpenCrmActorAutoConfiguration
+com.opencrm.security.OpenCrmPreflightAutoConfiguration

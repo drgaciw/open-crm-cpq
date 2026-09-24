@@ -1,0 +1,159 @@
+# Runbook: identity go-live (ADR-016 step 5)
+
+This runbook takes an environment from "the code is ready" to "OpenCRM authenticates with Microsoft Entra ID in production". It is the go-live gate of [ADR-016](../adr/ADR-016-identity-authentication-service-trust.md): the Entra configuration, the environment of every service, the checks that prove it works, and the rollback exercise that must be recorded before go-live.
+
+The Entra configuration is also a file, [`infra/entra/opencrm-identity.json`](../../infra/entra/opencrm-identity.json). It is the source of truth; this runbook explains how to apply it. `SecurityBaselineFitnessTest` fails the build when that file and the code disagree, for example when the code checks an app role the file does not declare.
+
+**Who does what.** An Entra administrator (Application Administrator, plus Privileged Role Administrator for admin consent and app role assignments) does sections 1 to 3. The platform team does sections 4 to 6. The service owner signs off section 7 and the rollback record in section 8.
+
+## 0. Before you start
+
+- A workforce Entra tenant. Note its tenant id: the issuer is `https://login.microsoftonline.com/<tenant-id>/v2.0`.
+- An AKS cluster with the OIDC issuer and workload identity enabled. Note the OIDC issuer URL (`az aks show -g <rg> -n <cluster> --query oidcIssuerProfile.issuerUrl -o tsv`).
+- The Kubernetes namespace OpenCRM runs in, and one service account per service, named after the service (`gateway-service`, `quote-service`, and so on).
+- The public host of the SPA and gateway, for example `crm.example.com`, with TLS at the ingress.
+- Redis for the gateway's sessions (section 5).
+
+## 1. The API app registration: `opencrm-api`
+
+One registration represents the whole API. Every service accepts its tokens (ADR-016 decision 5).
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| Application ID URI | `api://opencrm-api` | Scopes are requested as `api://opencrm-api/...` |
+| `requestedAccessTokenVersion` (manifest, `api` section) | `2` | The services accept the v2.0 issuer only. v2.0 tokens carry the API's **client id** as `aud` |
+| Exposed delegated scope | `access_as_user` | User tokens need a delegated scope (`scp`). The services tell users from services by it |
+| Optional claim, access token | `idtyp` | Marks app-only tokens as `idtyp=app`, so service tokens are recognised explicitly |
+| App roles | `CPQ.User`, `DealDesk`, `SalesVP`, `CFO`, `Admin` for users; `Internal.Invoke` for applications | See the manifest for the descriptions. The code maps `DealDesk` to `ROLE_DEAL_DESK` and so on |
+| Enterprise application: assignment required | Yes | Only assigned users and workloads get tokens for the API |
+
+Record the API's **Application (client) ID**. Every service needs it in `OPENCRM_SECURITY_JWT_AUDIENCES` (section 4). The services refuse to start in production without it, because without it they would refuse every token.
+
+## 2. The gateway app registration: `opencrm-gateway`
+
+The gateway signs users in (ADR-016 decision 2). It is a confidential web client with no secret.
+
+- **Platform**: Web. Redirect URI `https://<crm-host>/login/oauth2/code/entra`, one per environment. For a developer's local run against a test tenant, `http://localhost:4200/login/oauth2/code/entra`, never in the production registration.
+- **API permissions**: `opencrm-api` / `access_as_user` (delegated). **Grant admin consent** for the tenant. The gateway requests `api://opencrm-api/.default`; without consent each user would see a consent prompt, or be blocked where user consent is disabled.
+- **Credential**: a federated identity credential for the gateway's service account. No client secret, no certificate:
+  ```bash
+  az ad app federated-credential create --id <gateway-app-client-id> --parameters '{
+    "name": "aks-gateway-service",
+    "issuer": "<aks-oidc-issuer-url>",
+    "subject": "system:serviceaccount:<namespace>:gateway-service",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+  ```
+- Annotate the `gateway-service` service account with `azure.workload.identity/client-id: <gateway-app-client-id>`, and label the gateway pods `azure.workload.identity/use: "true"`.
+
+## 3. Workload identities and role assignments
+
+Each service that calls another service has its own identity. The manifest's `workloads` lists them, with what each one calls. Today they are quote-service, pricing-service, configuration-engine and ai-service.
+
+For each of them:
+
+1. Create a user-assigned managed identity, then a federated credential for the service's Kubernetes service account:
+   ```bash
+   az identity create -g <rg> -n opencrm-<service>
+   az identity federated-credential create -g <rg> --identity-name opencrm-<service> \
+     --name aks-<service> --issuer <aks-oidc-issuer-url> \
+     --subject system:serviceaccount:<namespace>:<service> --audience api://AzureADTokenExchange
+   ```
+2. Annotate the service account with `azure.workload.identity/client-id: <identity client id>`, and label the pods `azure.workload.identity/use: "true"`. The webhook then injects `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_AUTHORITY_HOST` and `AZURE_FEDERATED_TOKEN_FILE`. The services need no other identity configuration.
+3. **quote-service and pricing-service only**: assign the `Internal.Invoke` app role of `opencrm-api` to the identity's service principal. They are the only callers of `/internal/**`:
+   ```powershell
+   New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId <opencrm-api-sp-object-id> `
+     -PrincipalId <identity-principal-id> -ResourceId <opencrm-api-sp-object-id> -AppRoleId <Internal.Invoke-role-id>
+   ```
+   Managed identity tokens are cached, so a new role assignment can take hours to appear in tokens. Assign roles well before the rollout.
+
+**People.** Assign the app roles to groups, not individuals:
+
+| App role | Assign to | Decides |
+|----------|-----------|---------|
+| `CPQ.User` | everyone who uses OpenCRM | no approvals |
+| `DealDesk` | the deal desk | `DEAL_DESK` and `MANAGER` approvals |
+| `SalesVP` | sales vice presidents | `SALES_VP`, `DIRECTOR` and `VP_SALES`, and every Deal Desk tier |
+| `CFO` | finance leadership | every tier |
+| `Admin` | system administrators | no approvals (segregation of duties) |
+
+The services check that a caller is authenticated, not that it holds `CPQ.User`. With assignment required, though, a user with no role gets no token. Assign `CPQ.User` to every user, and the approver roles on top of it; a user in several groups gets every role in the `roles` claim.
+
+## 4. The environment of every service
+
+| Variable | Services | Value |
+|----------|----------|-------|
+| `OPENCRM_ENV` | all | `prod`: the production marker. It refuses `dev` mode, an incomplete identity configuration and client secrets |
+| `OPENCRM_SECURITY_JWT_ISSUERURI` | all | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
+| `OPENCRM_SECURITY_JWT_AUDIENCES` | all | `<opencrm-api client id>,api://opencrm-api` |
+| `OPENCRM_GATEWAY_LOGIN_CLIENTID` | gateway-service | the gateway app's client id |
+| `SERVER_FORWARD_HEADERS_STRATEGY` | gateway-service | `framework` (section 5) |
+| `DB_PASSWORD` (`DB_PASS` in ai-service) | every service with a database | from the secret store, for example Key Vault through the CSI driver. The committed configuration has no default outside the `dev` and `test` profiles, so a missing value stops the service at startup |
+| `REDIS_HOST`, `REDIS_PORT` | gateway-service | the session store |
+
+Never set `OPENCRM_SECURITY_CLIENT_CLIENTSECRET`, `OPENCRM_GATEWAY_LOGIN_CLIENTSECRET` or `opencrm.security.mode`. Under `OPENCRM_ENV=prod` the first two stop the service, and `mode=dev` is refused.
+
+## 5. Ingress, sessions and metrics
+
+- **Ingress.** It terminates TLS and must **set** `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`, overwriting whatever the client sent. The gateway trusts them only with `SERVER_FORWARD_HEADERS_STRATEGY=framework`, and builds the login's redirect URI from them (`https://<crm-host>/login/oauth2/code/entra`). Set it on the gateway only; the domain services are not behind the ingress.
+- **Redis** holds the gateway's sessions (Spring Session, cookie `OPENCRM_SESSION`, 30 minutes idle). If Redis is lost, users sign in again; nothing else is lost. Use a highly available tier, TLS, and an eviction policy that does not evict sessions under normal load.
+- **Metrics.** `/actuator/prometheus` needs a token, as does everything except health and info. **Open decision for the owner** before go-live: a management port reachable only from the monitoring namespace (with the ADR-022 network policy), or a scraper workload identity with a token. Until then, metrics are not scraped.
+
+## 6. Deploy
+
+1. Apply sections 1 to 5 in the target environment.
+2. Deploy all services. Each one logs a single line at startup; check that every pod says the same:
+   ```
+   ADR-016 identity: mode=jwt, production=true, issuer=https://login.microsoftonline.com/<tenant-id>/v2.0,
+   audiences=[<api client id>, api://opencrm-api], service identity=<client id> (workload identity)
+   ```
+   A service with an incomplete configuration does not start; its log names every problem at once (`ADR-016 go-live gate (opencrm.env=prod): ...`).
+
+## 7. Verify (go-live checklist)
+
+Tick every line in the environment, and keep the evidence (screenshots, log lines, request ids) with the change record.
+
+- [ ] Every pod logs the identity line in section 6, with `production=true` and a workload identity where the manifest lists one.
+- [ ] An anonymous `GET /api/v1/quotes` gets `401`, `WWW-Authenticate: Bearer` and `X-OpenCRM-Login: /oauth2/authorization/entra`.
+- [ ] Opening the SPA redirects to Entra and back; the browser holds `OPENCRM_SESSION` (`HttpOnly`, `Secure`) and `XSRF-TOKEN`, and never a token.
+- [ ] The access token in the gateway's session, inspected in a test tenant: `ver` `2.0`, `aud` the API's client id, `scp` `access_as_user`, the user's `roles`, and `oid`.
+- [ ] Creating a quote (a POST from the SPA) succeeds: the SPA sends `X-XSRF-TOKEN`.
+- [ ] Approvals: a `DealDesk` user decides a `DEAL_DESK` approval; the same user gets `403 APPROVER_ROLE_REQUIRED` on a `SALES_VP` approval; a requester gets `403 SELF_APPROVAL` on their own request. The recorded approver is the user's `oid`.
+- [ ] Service calls: a quote's configuration check (quote-service to configuration-engine `/internal`) and price-book lookups (pricing-service to pricebook-service `/internal`) succeed; the same `/internal` path with a user token gets `403`.
+- [ ] Sign-out (toolbar) ends the session at the gateway and at Entra, and returns to the app.
+- [ ] In staging, with the production configuration, a service started with `SPRING_PROFILES_ACTIVE=dev` refuses to start, and so does one without `OPENCRM_SECURITY_JWT_AUDIENCES`.
+
+## 8. Rollback exercise (record before go-live)
+
+Rollback means redeploying the previous version of the services, with its configuration. It never means `opencrm.security.mode=dev`: the production marker refuses dev mode, and dev mode would permit every request.
+
+The configuration is compatible in both directions for the steps of ADR-016: older versions ignore the new variables, and this version's variables are a superset. The one exception is a version from before step 5, which still has the `postgres` database password default; it starts either way because `DB_PASSWORD` is set.
+
+Run it in staging, with the production configuration:
+
+1. Deploy version N (this release). Pass section 7.
+2. Redeploy version N-1 (the image tags from the previous release, same configuration). Record the time from the command to all pods ready.
+3. Check: health is `UP`; a signed-in user can read quotes; existing sessions either survive or send the user to sign in again, with no error page.
+4. Redeploy version N. Pass section 7 again.
+
+Record:
+
+| Field | Value |
+|-------|-------|
+| Date, environment | |
+| Version N / N-1 (image tags) | |
+| Time to roll back / to roll forward | |
+| Sessions after rollback (kept or re-login) | |
+| Problems seen, and follow-ups | |
+| Performed by / signed off by | |
+
+## 9. Decisions still open for the owner
+
+- How Prometheus scrapes `/actuator/prometheus` (section 5).
+- Who may pass a quote's review (`IN_REVIEW` to `APPROVED` has no tier; today any signed-in user can). See ADR-016 step 4.
+- The discount-tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule. See ADR-016 step 4.
+
+## References
+
+- [ADR-016](../adr/ADR-016-identity-authentication-service-trust.md), [ADR-004](../adr/ADR-004-csrf-edge-boundary.md), [gateway environment](../CRM_GATEWAY_ENV.md).
+- [Workload identity on AKS](https://learn.microsoft.com/azure/aks/workload-identity-deploy-cluster), [federated credentials on an app registration](https://learn.microsoft.com/entra/workload-id/workload-identity-federation-create-trust), [assigning an app role to a managed identity](https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/assign-app-role-managed-identity-powershell).
