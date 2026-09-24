@@ -48,7 +48,6 @@ class ApprovalServiceSingleWriterTest {
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
-                true,
                 true
         );
     }
@@ -78,7 +77,7 @@ class ApprovalServiceSingleWriterTest {
 
         ApprovalRequestDto dto = approvalService.submitForApproval(
                 42L,
-                ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).requestedBy("agent-011").build()
+                ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).build()
         );
 
         ArgumentCaptor<RoutingApprovalSubmitRequest> submitCaptor =
@@ -86,7 +85,6 @@ class ApprovalServiceSingleWriterTest {
         verify(approvalRoutingClient).submit(submitCaptor.capture());
         assertThat(submitCaptor.getValue().getQuoteId()).isEqualTo("42");
         assertThat(submitCaptor.getValue().getTier()).isEqualTo("DEAL_DESK");
-        assertThat(submitCaptor.getValue().getRequesterId()).isEqualTo("agent-011");
 
         verify(approvalRepository, never()).save(any());
         verify(approvalRepository, never()).findByIdAndDeletedFalse(any());
@@ -153,7 +151,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     @DisplayName("approveRequest updates Quote via routing and does not save local ApprovalRequest")
     void approveViaRoutingDoesNotWriteLocal() {
-        when(approvalRoutingClient.approve(9001L, "mgr-1"))
+        when(approvalRoutingClient.approve(9001L))
                 .thenReturn(RoutingApprovalDto.builder()
                         .id(9001L)
                         .quoteId("42")
@@ -174,10 +172,10 @@ class ApprovalServiceSingleWriterTest {
 
         ApprovalRequestDto dto = approvalService.approveRequest(
                 9001L,
-                ApprovalResponseRequest.builder().approver("mgr-1").comments("ok").build()
+                ApprovalResponseRequest.builder().comments("ok").build()
         );
 
-        verify(approvalRoutingClient).approve(9001L, "mgr-1");
+        verify(approvalRoutingClient).approve(9001L);
         verify(approvalRepository, never()).save(any());
         assertThat(quote.getStatus()).isEqualTo(QuoteStatus.APPROVED);
         assertThat(quote.getApprovalState()).isEqualTo(ApprovalState.APPROVED);
@@ -192,7 +190,6 @@ class ApprovalServiceSingleWriterTest {
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
-                false,
                 false
         );
         when(approvalRoutingClient.getPending()).thenReturn(List.of(
@@ -215,7 +212,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyRetainsDecisionsAndIsolatesQuoteWithLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false);
         when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(
                 historyRow(1L, "42", "PENDING"),
                 historyRow(2L, "42", "APPROVED"),
@@ -267,7 +264,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyPropagatesRoutingFailureWhenLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false);
         BusinessException failure = new BusinessException("unavailable", "APPROVAL_ROUTING_UNAVAILABLE");
         when(approvalRoutingClient.getByQuoteId(42L)).thenThrow(failure);
 

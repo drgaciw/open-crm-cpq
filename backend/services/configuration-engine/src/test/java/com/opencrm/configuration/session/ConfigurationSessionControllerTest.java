@@ -5,12 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.security.CurrentActor;
+import com.opencrm.security.test.TestCallers;
+import com.opencrm.security.test.TestTokens;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -48,6 +53,9 @@ class ConfigurationSessionControllerTest {
     @Mock
     private ConfigurationSessionService sessionService;
 
+    @Spy
+    private CurrentActor currentActor = new CurrentActor("service:configuration-engine", false);
+
     @InjectMocks
     private ConfigurationSessionController sessionController;
 
@@ -81,6 +89,11 @@ class ConfigurationSessionControllerTest {
                 .build();
     }
 
+    @AfterEach
+    void signOut() {
+        TestCallers.clear();
+    }
+
     @Test
     @DisplayName("controller method signatures never expose ConfigurationSession entity")
     void controllerSignaturesUseDtoOnly() {
@@ -99,13 +112,14 @@ class ConfigurationSessionControllerTest {
     }
 
     @Test
-    @DisplayName("POST / creates DTO without deleted")
+    @DisplayName("POST / creates a session for the authenticated caller; a userId parameter is ignored (ADR-016)")
     void createReturnsDtoOnly() throws Exception {
-        when(sessionService.create("PROD-001", "user-1")).thenReturn(sampleDto);
+        String caller = TestCallers.signInUser("user-1", "CPQ.User");
+        when(sessionService.create("PROD-001", caller)).thenReturn(sampleDto);
 
         MvcResult result = mockMvc.perform(post("/api/v1/configurations")
                         .param("productId", "PROD-001")
-                        .param("userId", "user-1")
+                        .param("userId", "mallory")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
@@ -136,13 +150,14 @@ class ConfigurationSessionControllerTest {
     }
 
     @Test
-    @DisplayName("GET / listByUser returns DTO array without deleted")
+    @DisplayName("GET / lists the authenticated caller's sessions, never another user's (ADR-016)")
     void listByUserReturnsDtos() throws Exception {
-        when(sessionService.getByUserAndStatus("user-1", ConfigurationStatus.IN_PROGRESS))
+        when(sessionService.getByUserAndStatus(TestTokens.oidOf("user-1"), ConfigurationStatus.IN_PROGRESS))
                 .thenReturn(List.of(sampleDto));
+        TestCallers.signInUser("user-1", "CPQ.User");
 
         MvcResult result = mockMvc.perform(get("/api/v1/configurations")
-                        .param("userId", "user-1")
+                        .param("userId", "someone-else")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].userId").value("user-1"))

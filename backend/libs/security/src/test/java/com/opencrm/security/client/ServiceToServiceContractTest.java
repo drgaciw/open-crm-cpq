@@ -64,7 +64,9 @@ class ServiceToServiceContractTest {
     static class Probe {
         @GetMapping("/api/v1/whoami")
         String whoami() {
-            return SecurityContextHolder.getContext().getAuthentication().getName();
+            // The actor the called service would record (ADR-016 decision 6).
+            return com.opencrm.security.SecurityUtils.getCurrentCaller()
+                    .map(com.opencrm.security.Caller::actorId).orElse("anonymous");
         }
 
         @RequestMapping("/**")
@@ -130,7 +132,7 @@ class ServiceToServiceContractTest {
     void relayReachesApiAsUser() {
         userRequest();
 
-        assertThat(call(outboundAuth.relayUserToken(), "/api/v1/whoami")).isEqualTo(new Result(200, "alice"));
+        assertThat(call(outboundAuth.relayUserToken(), "/api/v1/whoami")).isEqualTo(new Result(200, TestTokens.oidOf("alice")));
     }
 
     @Test
@@ -145,6 +147,6 @@ class ServiceToServiceContractTest {
     @Test
     @DisplayName("without a user (consumer, scheduler), relayUserToken() calls as the service")
     void machineContextCallsAsService() {
-        assertThat(call(outboundAuth.relayUserToken(), "/api/v1/whoami")).isEqualTo(new Result(200, "quote-service"));
+        assertThat(call(outboundAuth.relayUserToken(), "/api/v1/whoami")).isEqualTo(new Result(200, "service:quote-service"));
     }
 }

@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       {@code dev} profile only;</li>
  *   <li>decision 5: every HTTP client a service builds takes an {@code OutboundAuth} interceptor, unless it calls an
  *       external API (allowlisted); services do not call the gateway (allowlisted: the ai-service agent tools);</li>
+ *   <li>decision 6: actors come from the verified token. No request parameter, header or request body carries an
+ *       identity, and no code records a hard-coded actor such as {@code "system"};</li>
  *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline.</li>
  * </ul>
  * It reads source text, like {@code EventContractFitnessTest}: the rules are about what is written, not about beans.
@@ -72,6 +74,25 @@ class SecurityBaselineFitnessTest {
     private static final Pattern GATEWAY_URL_KEY = Pattern.compile("services\\.gateway|opencrm\\.gateway|GATEWAY_SERVICE_URL");
     private static final Pattern ROUTE_ONTO_INTERNAL = Pattern.compile("(?m)^[^#\\n]*(RewritePath|Path)=[^\\n]*/internal");
     private static final Pattern GRPC_PORT_OFF_BY_DEFAULT = Pattern.compile("^\\$\\{[A-Za-z0-9_.]+:-1}$");
+    /** Names that say who acted. Decision 6: they come from the token, never from the request. */
+    private static final Set<String> IDENTITY_NAMES = Set.of("approver", "approverid", "approvedby", "requester",
+            "requesterid", "requestedby", "actor", "actorid", "decidedby", "acceptedby", "rejectedby", "userid",
+            "createdby", "updatedby", "generatedby", "changedby", "submittedby", "performedby");
+    private static final Pattern REQUEST_INPUT = Pattern.compile(
+            "@Request(?:Param|Header)\\b(\\s*\\(([^)]*)\\))?\\s+(?:final\\s+)?[\\w.<>?]+\\s+(\\w+)\\s*[,)]");
+    private static final Pattern QUOTED = Pattern.compile("\"([^\"]*)\"");
+    private static final Pattern FIELD = Pattern.compile(
+            "(?m)^\\s*(?:private|protected|public)?\\s*(?:final\\s+)?[\\w.<>?, ]+\\s+(\\w+)\\s*(?:=[^;]*)?;");
+    private static final Pattern RECORD_COMPONENTS = Pattern.compile("\\brecord\\s+\\w+\\s*\\(([^)]*)\\)");
+    private static final Pattern LITERAL_ACTOR = Pattern.compile("\\.(?:set)?(?i:requesterId|approverId|approver"
+            + "|requestedBy|generatedBy|changedBy|createdBy|updatedBy|decidedBy|acceptedBy|userId|actor)\\(\\s*\"");
+    private static final Pattern SYSTEM_LITERAL = Pattern.compile("\"system\"");
+
+    /** Files where {@code "system"} is not an actor, with the reason. */
+    private static final Map<String, String> SYSTEM_LITERAL_ALLOWLIST = Map.of(
+            "ai-service/src/main/java/com/opencrm/ai/selection/execution/OpenRouterExecutionClient.java",
+            "the chat message role of a system prompt");
+
     private static final Pattern IDENTITY_HEADER_FILTER = Pattern.compile(
             "(?mi)^[^#\\n]*(AddRequestHeader|SetRequestHeader|MapRequestHeader)=\\s*(X-User|X-Actor|X-Auth|Authorization)[^\\n]*");
 
@@ -221,6 +242,89 @@ class SecurityBaselineFitnessTest {
         assertThat(filters).isEmpty();
         assertThat(gateway.javaFiles().keySet())
                 .contains("gateway-service/src/main/java/com/opencrm/gateway/security/IdentityRelayFilter.java");
+    }
+
+    @Test
+    @DisplayName("no request parameter or header names who acted; the actor comes from the token (D6)")
+    void noIdentityFromRequestParameters() {
+        List<String> violations = new ArrayList<>();
+        for (ServiceSources service : services) {
+            service.javaFiles().forEach((path, text) -> {
+                Matcher matcher = REQUEST_INPUT.matcher(text);
+                while (matcher.find()) {
+                    List<String> names = new ArrayList<>(List.of(matcher.group(3)));
+                    if (matcher.group(2) != null) {
+                        Matcher quoted = QUOTED.matcher(matcher.group(2));
+                        while (quoted.find()) {
+                            names.add(quoted.group(1));
+                        }
+                    }
+                    names.stream().filter(SecurityBaselineFitnessTest::isIdentityName)
+                            .forEach(name -> violations.add(path + ": " + name));
+                }
+            });
+        }
+        assertThat(violations).as("record CurrentActor.id() (libs/security) instead of a request input").isEmpty();
+    }
+
+    @Test
+    @DisplayName("no request DTO carries an identity field such as approver, requesterId, actor or decidedBy (D6)")
+    void noIdentityInRequestBodies() {
+        List<String> violations = new ArrayList<>();
+        int requestTypes = 0;
+        for (ServiceSources service : services) {
+            for (Map.Entry<String, String> file : service.javaFiles().entrySet()) {
+                // Request types by naming convention; an @Entity named *Request (ApprovalRequest) is a record of the
+                // request, where the service writes the actor, not something a caller sends.
+                if (!file.getKey().endsWith("Request.java") || file.getValue().contains("@Entity")) {
+                    continue;
+                }
+                requestTypes++;
+                List<String> names = new ArrayList<>();
+                Matcher field = FIELD.matcher(file.getValue());
+                while (field.find()) {
+                    names.add(field.group(1));
+                }
+                Matcher record = RECORD_COMPONENTS.matcher(file.getValue());
+                while (record.find()) {
+                    for (String component : record.group(1).split(",")) {
+                        String[] words = component.trim().split("\\s+");
+                        names.add(words[words.length - 1]);
+                    }
+                }
+                names.stream().filter(SecurityBaselineFitnessTest::isIdentityName)
+                        .forEach(name -> violations.add(file.getKey() + ": " + name));
+            }
+        }
+        assertThat(requestTypes).as("the scan finds request types").isGreaterThan(20);
+        assertThat(violations).as("the service records the actor itself (CurrentActor)").isEmpty();
+    }
+
+    @Test
+    @DisplayName("no code records a hard-coded actor such as \"system\" (D6)")
+    void noHardCodedActors() {
+        List<String> violations = new ArrayList<>();
+        Set<String> systemLiterals = new TreeSet<>();
+        for (ServiceSources service : services) {
+            service.javaFiles().forEach((path, text) -> {
+                Matcher literal = LITERAL_ACTOR.matcher(text);
+                while (literal.find()) {
+                    violations.add(path + ": " + literal.group());
+                }
+                if (SYSTEM_LITERAL.matcher(text).find()) {
+                    systemLiterals.add(path);
+                }
+            });
+        }
+        assertThat(violations).as("record CurrentActor.id(), or CurrentActor.self() for background work").isEmpty();
+        assertThat(systemLiterals).as("\"system\" is not an actor; use CurrentActor.self()")
+                .isEqualTo(new TreeSet<>(SYSTEM_LITERAL_ALLOWLIST.keySet()));
+    }
+
+    private static boolean isIdentityName(String name) {
+        return IDENTITY_NAMES.contains(name.toLowerCase(java.util.Locale.ROOT).replace("-", "").replace("_", ""))
+                || name.toLowerCase(java.util.Locale.ROOT).startsWith("x-user")
+                || name.toLowerCase(java.util.Locale.ROOT).startsWith("x-actor");
     }
 
     @Test

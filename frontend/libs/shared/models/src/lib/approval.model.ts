@@ -76,9 +76,9 @@ export interface ApprovalRequestDto {
 
 /**
  * Mirrors: com.opencrm.quote.approval.ApprovalResponseRequest
- * Body for POST .../approvals/{id}/approve|reject
+ * Body for POST .../approvals/{id}/approve|reject. There is no approver field: the
+ * gateway session's user is the approver (ADR-016 decision 6).
  */
 export interface ApprovalResponseRequest {
-  approver?: string;
   comments?: string;
 }

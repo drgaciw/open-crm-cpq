@@ -128,7 +128,7 @@ class ApprovalControllerTest {
         MvcResult result = mockMvc.perform(post("/api/v1/approvals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"quoteId":"42","tier":"DEAL_DESK","requesterId":"agent","reason":"Quote approval submitted via BFF"}
+                                {"quoteId":"42","tier":"DEAL_DESK","reason":"Quote approval submitted via BFF"}
                                 """)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isCreated())
@@ -204,10 +204,9 @@ class ApprovalControllerTest {
                 .approverId("mgr-1")
                 .approvedAt(Instant.parse("2026-09-01T11:00:00Z"))
                 .build();
-        when(approvalService.approve(eq(9001L), eq("mgr-1"))).thenReturn(approved);
+        when(approvalService.approve(eq(9001L))).thenReturn(approved);
 
         MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/approve")
-                        .param("approverId", "mgr-1")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Approval request approved"))
@@ -229,10 +228,9 @@ class ApprovalControllerTest {
                 .rejectionReason("Too steep")
                 .rejectedAt(Instant.parse("2026-09-01T11:30:00Z"))
                 .build();
-        when(approvalService.reject(eq(9001L), eq("mgr-1"), eq("Too steep"))).thenReturn(rejected);
+        when(approvalService.reject(eq(9001L), eq("Too steep"))).thenReturn(rejected);
 
         MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/reject")
-                        .param("approverId", "mgr-1")
                         .param("reason", "Too steep")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

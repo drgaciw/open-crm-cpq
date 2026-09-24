@@ -13,7 +13,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Utility class for security operations.
+ * Who is calling, from the security context (ADR-016 decision 6). Actor fields take their value from here, never from
+ * the request.
+ *
+ * <ul>
+ *   <li>{@link #getCurrentCaller()}: the verified caller, a person or a service. Anonymous requests have none.</li>
+ *   <li>{@link #getCurrentUser()}: the caller only when it is a person. A service token is not a user.</li>
+ * </ul>
+ * A user's id is the Entra object id ({@code oid}), falling back to {@code sub}; see {@link Caller.User}.
  */
 public final class SecurityUtils {
 
@@ -22,17 +29,33 @@ public final class SecurityUtils {
     }
 
     /**
-     * Get the current authenticated user context.
+     * The verified caller of the current request, or empty when it is anonymous or there is no request.
      * <p>
-     * Anonymous callers are not users: Spring Security marks an
-     * {@link AnonymousAuthenticationToken} as authenticated, so without this check a
-     * permitAll chain would report the principal {@code anonymousUser} as the actor
+     * Anonymous callers are not callers: Spring Security marks an {@link AnonymousAuthenticationToken} as
+     * authenticated, so without this check a permitAll chain would report {@code anonymousUser} as the actor
      * (ADR-016 phase 0).
      */
+    public static Optional<Caller> getCurrentCaller() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!isRealCaller(authentication)) {
+            return Optional.empty();
+        }
+        Set<String> authorities = authorities(authentication);
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            Jwt jwt = jwtAuth.getToken();
+            return Optional.of(isAppOnly(jwt)
+                    ? new Caller.Service(clientIdOf(jwt), authorities)
+                    : new Caller.User(userIdOf(jwt), authorities));
+        }
+        return Optional.of(new Caller.User(authentication.getName(), authorities));
+    }
+
+    /** The current user, when the caller is a person. */
     public static Optional<UserContext> getCurrentUser() {
-        return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
-                .filter(SecurityUtils::isRealUser)
-                .map(SecurityUtils::extractUserContext);
+        return getCurrentCaller()
+                .filter(Caller.User.class::isInstance)
+                .map(caller -> extractUserContext(SecurityContextHolder.getContext().getAuthentication(),
+                        caller.actorId(), caller.authorities()));
     }
 
     /**
@@ -61,27 +84,57 @@ public final class SecurityUtils {
     }
 
     /**
-     * Check if current user is authenticated. Anonymous callers do not count.
+     * Check if the current request has a verified caller, user or service. Anonymous callers do not count.
      */
     public static boolean isAuthenticated() {
-        return isRealUser(SecurityContextHolder.getContext().getAuthentication());
+        return isRealCaller(SecurityContextHolder.getContext().getAuthentication());
     }
 
-    private static boolean isRealUser(Authentication authentication) {
+    /**
+     * Whether an Entra access token was issued to an application acting as itself (client credentials). Entra marks
+     * those with the optional claim {@code idtyp=app}; without it, a token that names a client ({@code azp}, or
+     * {@code appid} in v1.0) but carries no delegated scope ({@code scp}, present only in user tokens) is one too.
+     */
+    public static boolean isAppOnly(Jwt jwt) {
+        if ("app".equalsIgnoreCase(jwt.getClaimAsString("idtyp"))) {
+            return true;
+        }
+        return !jwt.hasClaim("scp") && (hasText(jwt.getClaimAsString("azp")) || hasText(jwt.getClaimAsString("appid")));
+    }
+
+    /** A person's id: {@code oid}, the same in every application of the tenant, else {@code sub}. */
+    static String userIdOf(Jwt jwt) {
+        String oid = jwt.getClaimAsString("oid");
+        return hasText(oid) ? oid : jwt.getSubject();
+    }
+
+    /** The calling application's client id: {@code azp} (v2.0), {@code appid} (v1.0), else {@code sub}. */
+    static String clientIdOf(Jwt jwt) {
+        String azp = jwt.getClaimAsString("azp");
+        if (hasText(azp)) {
+            return azp;
+        }
+        String appid = jwt.getClaimAsString("appid");
+        return hasText(appid) ? appid : jwt.getSubject();
+    }
+
+    private static boolean isRealCaller(Authentication authentication) {
         return authentication != null
                 && authentication.isAuthenticated()
                 && !(authentication instanceof AnonymousAuthenticationToken);
     }
 
-    private static UserContext extractUserContext(Authentication authentication) {
-        Set<String> roles = authentication.getAuthorities().stream()
+    private static Set<String> authorities(Authentication authentication) {
+        return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toSet());
+    }
 
+    private static UserContext extractUserContext(Authentication authentication, String userId, Set<String> roles) {
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             Jwt jwt = jwtAuth.getToken();
             return UserContext.builder()
-                    .userId(jwt.getSubject())
+                    .userId(userId)
                     .email(jwt.getClaimAsString("email"))
                     .displayName(jwt.getClaimAsString("name"))
                     .tenantId(jwt.getClaimAsString("tid"))
@@ -89,11 +142,14 @@ public final class SecurityUtils {
                     .permissions(Collections.emptySet())
                     .build();
         }
-
         return UserContext.builder()
-                .userId(authentication.getName())
+                .userId(userId)
                 .roles(roles)
                 .permissions(Collections.emptySet())
                 .build();
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

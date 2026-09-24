@@ -3,7 +3,7 @@ package com.opencrm.common.event;
 /**
  * Who is causing the events published on this thread, for the {@code actor} envelope header (ADR-018 D4, ADR-016).
  *
- * <p>Values are {@code user:<sub>} for an authenticated user and {@code service:<name>} otherwise. The default, from
+ * <p>Values are {@code user:<oid>} for a person and {@code service:<client-id or name>} otherwise. The default, from
  * {@link EventActorAutoConfiguration}, always answers {@code service:<spring.application.name>}. {@code libs/security}
  * replaces it with one that reads the security context.
  */

@@ -176,7 +176,7 @@ function httpErrorMessage(err: unknown): string {
               [title]="
                 canApproveReject()
                   ? 'Approve this quote'
-                  : 'Approve is available for IN_REVIEW or PENDING_APPROVAL'
+                  : 'Approve is available in review; pending approvals are decided in Approvals'
               "
             >
               <mat-icon>check_circle</mat-icon>
@@ -190,7 +190,7 @@ function httpErrorMessage(err: unknown): string {
               [title]="
                 canApproveReject()
                   ? 'Reject this quote (optional reason)'
-                  : 'Reject is available for IN_REVIEW or PENDING_APPROVAL'
+                  : 'Reject is available in review; pending approvals are decided in Approvals'
               "
             >
               <mat-icon>cancel</mat-icon>
@@ -761,11 +761,11 @@ export class QuotesDetailComponent {
 
   readonly canCalculate = computed(() => this.canEditLines());
 
-  /** Approve / Reject from review states. */
-  readonly canApproveReject = computed(() => {
-    const status = this.quote()?.status;
-    return status === 'IN_REVIEW' || status === 'PENDING_APPROVAL';
-  });
+  /**
+   * Approve / Reject a review. A PENDING_APPROVAL quote is decided in the approvals inbox,
+   * where approval-routing checks the approver's role (ADR-016 step 4); the quote API refuses it.
+   */
+  readonly canApproveReject = computed(() => this.quote()?.status === 'IN_REVIEW');
 
   readonly canSend = computed(() => this.quote()?.status === 'APPROVED');
 
