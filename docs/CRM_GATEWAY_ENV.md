@@ -40,6 +40,23 @@ export CORS_ALLOWED_ORIGINS=https://crm-portal.azurewebsites.net,https://admin.e
 
 Browser Cookie CSRF is **gateway-only**. Domain services use `csrf.disable()` + `SessionCreationPolicy.STATELESS` (Bearer / mesh); do **not** enable Cookie CSRF on downstream services. See [ADR-004: CSRF edge-only boundary](./adr/ADR-004-csrf-edge-boundary.md) (stub at [docs/ADR-004-csrf-edge-boundary.md](./ADR-004-csrf-edge-boundary.md)).
 
+## Identity ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md))
+
+The gateway has no identity defaults. With no issuer set, every non-`dev` API call is refused.
+
+| Variable | Role | Default |
+|----------|------|---------|
+| `OPENCRM_SECURITY_JWT_ISSUERURI` | Tenant issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`. It validates bearer-lane tokens and builds the login registration. `common`, `organizations` and `consumers` are refused | unset |
+| `OPENCRM_SECURITY_JWT_AUDIENCES` | Accepted `aud` values. v2.0 tokens carry the API's client ID, so list it next to `api://opencrm-api` | `api://opencrm-api` |
+| `OPENCRM_GATEWAY_LOGIN_CLIENTID` | The gateway's own Entra app registration. Set: browser login (BFF). Unset: bearer lane only, and `OPENCRM_ENV=prod` refuses to start | unset |
+| `AZURE_FEDERATED_TOKEN_FILE` | Injected by AKS workload identity. The gateway's client assertion, re-read for every token request | injected |
+| `OPENCRM_GATEWAY_LOGIN_CLIENTSECRET` | Local runs against a real tenant only. Refused under `OPENCRM_ENV=prod` | unset |
+| `OPENCRM_GATEWAY_SESSION_COOKIESECURE` | Set `false` only for a plain-http local run | `true` |
+| `OPENCRM_ENV` | `prod` is the production marker: it refuses `dev` mode, a missing login and client secrets | unset |
+| `REDIS_HOST` / `REDIS_PORT` | BFF sessions (Spring Session, cookie `OPENCRM_SESSION`) and rate limiting | `localhost` / `6379` |
+
+Local login through `nx serve`: `frontend/proxy.conf.json` forwards `/oauth2`, `/login/oauth2` and `/logout` to `:8080` without changing the origin, so the redirect URI to register is `http://localhost:4200/login/oauth2/code/entra`.
+
 ## `CRM_SERVICE_URI`
 
 | Location | Value / pattern |

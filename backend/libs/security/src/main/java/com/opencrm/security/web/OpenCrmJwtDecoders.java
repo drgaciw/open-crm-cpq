@@ -80,7 +80,8 @@ public final class OpenCrmJwtDecoders {
         return new DelegatingOAuth2TokenValidator<>(validators);
     }
 
-    static void requireSingleTenant(String issuer) {
+    /** Refuses {@code common}, {@code organizations} and {@code consumers}; null (no issuer) passes. */
+    public static void requireSingleTenant(String issuer) {
         if (issuer == null) {
             return;
         }
@@ -93,7 +94,8 @@ public final class OpenCrmJwtDecoders {
         }
     }
 
-    static void requireAudience(List<String> audiences) {
+    /** Refuses a missing or blank audience list. */
+    public static void requireAudience(List<String> audiences) {
         if (audiences == null || audiences.stream().allMatch(a -> a == null || a.isBlank())) {
             throw new IllegalStateException("opencrm.security.jwt.audiences must name the API audience, "
                     + "for example api://opencrm-api (ADR-016 decision 1)");
