@@ -16,7 +16,8 @@ import static org.mockito.Mockito.*;
 class AgentAuditPrivacyTest {
     @Test void routineLogsExcludePayloadWhileDurableAuditRetainsIt() {
         var repository = mock(AiAuditLogRepository.class);
-        var service = new AgentAuditLogger(repository, new ObjectMapper());
+        var service = new AgentAuditLogger(repository, new ObjectMapper(),
+                new com.opencrm.security.CurrentActor("service:ai-service", false));
         Logger logger = (Logger) LoggerFactory.getLogger(AgentAuditLogger.class);
         var messages = new ListAppender<ILoggingEvent>();
         messages.start(); logger.addAppender(messages);

@@ -18,6 +18,7 @@ import org.springframework.boot.context.annotation.ImportCandidates;
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import com.opencrm.security.CurrentActor;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 
@@ -54,6 +55,7 @@ class KafkaListenerInfrastructureContextTest {
                 .withBean(ApprovalRequestRepository.class, () -> mock(ApprovalRequestRepository.class))
                 .withBean(DiscountTierShadowService.class, () -> mock(DiscountTierShadowService.class))
                 .withBean(KafkaInbox.class, () -> mock(KafkaInbox.class))
+                .withBean(CurrentActor.class, () -> new CurrentActor("service:approval-routing", false))
                 .withBean(DiscountApprovalEventConsumer.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class))

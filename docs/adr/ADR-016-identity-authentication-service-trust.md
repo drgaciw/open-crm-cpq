@@ -1,6 +1,6 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 3 are done; see [Implementation log](#implementation-log).
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 4 are done; see [Implementation log](#implementation-log).
 **Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
 **Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
@@ -345,6 +345,81 @@ External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
   - how Prometheus scrapes `/actuator/prometheus`, which now needs a token here as at every service (a management port or a scraper identity).
 - **FE sign-out.** The SPA has no sign-out control yet. `POST /logout` needs the XSRF token, as a header or a `_csrf` form field.
 
+### Step 4: actors and roles (2026-09-23)
+
+**Who the actor is (decision 6).** `libs/security` now answers "who is calling" in one place.
+- `SecurityUtils.getCurrentCaller()` returns a `Caller`, a person or a service:
+  - **A person is identified by the Entra object id `oid`, not by `sub`.** Entra makes `sub` pairwise: each client application gets a different value for the same person. The same approver signed in through the gateway and through an agent client would otherwise be two people. `oid` is the same in every application of the tenant. `sub` stays as the fallback for a token without `oid`.
+  - **A service is an app-only token**: `idtyp=app`, or, without that optional claim, a token that names a client (`azp`, or `appid` in v1.0) but carries no delegated scope. Entra puts `scp` only in user tokens. Its actor is `service:<client-id>`.
+  - `getCurrentUser()` now returns people only. A service token is not a user.
+- **`CurrentActor`** (auto-configured) is the value to record: the caller, or, when there is no caller, this service itself. That is `service:<client-id>` of its workload identity, or `service:<application-name>` locally. It covers Kafka consumers, schedulers and async work, and replaces the literal `"system"`.
+- **JPA auditing now records someone.** Every service had `@EnableJpaAuditing` but no `AuditorAware`, so `created_by` and `updated_by` were always empty. `libs/security` now provides the auditor, backed by `CurrentActor`.
+- **The event actor (ADR-018 D4)** is now `user:<oid>`, `service:<client-id>` for a calling service, or this service.
+
+**Identity no longer comes from the request.**
+
+| Where | Before | After |
+|-------|--------|-------|
+| approval-routing approve and reject | `approverId` query parameter | the token's user |
+| approval-routing submit | `requesterId` in the body, else `"system"` | the caller, user or `service:<client-id>` |
+| approval-routing discount consumer | `requesterId("system")` | this service |
+| quote BFF submit, approve and reject | body `requestedBy`/`approver`, checked against the principal (phase 0) | fields removed; the BFF relays the token and sends no identity |
+| configuration-engine sessions | `userId` query parameter on create and list | the caller; the list shows the caller's own sessions |
+| quote documents | `generatedBy("system")` | the actor |
+| AI audit log (ai-service) | `created_by` never set | the actor |
+| `approvals.allow-unverified-actor` | a dev-profile flag, which `APPROVALS_ALLOW_UNVERIFIED_ACTOR` could turn on anywhere | removed: only `opencrm.security.mode=dev` allows unverified actors, and the production marker refuses dev mode |
+
+**Who may decide (decision 7).** approval-routing checks every approve and reject (`ApprovalAuthority`):
+
+| Tier | May decide |
+|------|-----------|
+| `DEAL_DESK`, `MANAGER` | DealDesk, SalesVP, CFO |
+| `SALES_VP`, `DIRECTOR`, `VP_SALES` | SalesVP, CFO |
+| `CFO` | CFO |
+| any other tier | no one (fails closed) |
+
+- A higher role satisfies a lower tier.
+- Refusals: 401 `AUTHENTICATION_REQUIRED` without a caller; 403 `APPROVER_MUST_BE_A_USER` for a service token; 403 `APPROVER_ROLE_REQUIRED`; 403 `SELF_APPROVAL` for the requester.
+- The quote BFF passes approval-routing's 401, 403 and 409 through with its code and message. Before, every error from approval-routing became a 502.
+- In `dev` mode, a decision without a caller goes through, is recorded as this service, and logs a WARN.
+
+**Two bypasses closed.**
+- **The quote-level decision.** `POST /api/v1/quotes/{id}/approve|reject` could decide a `PENDING_APPROVAL` quote directly. That skipped approval-routing and its role check, and left its approval open. It now answers 409 `APPROVAL_PENDING`. The SPA offers Approve and Reject on the quote only in review; pending approvals are decided in the approvals inbox. Passing a review (`IN_REVIEW`) is unchanged.
+- **Legacy local approvals.** An approval that approval-routing does not know could be decided in quote-service, with no role check. It is now history only: 409 `LEGACY_APPROVAL_READ_ONLY`. Reads (ADR-005 dual-read) are unchanged.
+
+**Decisions made during implementation.**
+- **`oid`, not `sub`, identifies a person.** The acceptance criterion "the persisted approver equals the token `sub`" is amended to `oid`.
+- **Admin and CPQ.User decide nothing.** Administering the system is not approving deals.
+- **`DIRECTOR` maps to SalesVP.** The discount path's `DIRECTOR` tier has no role of its own, so it maps to the next role up rather than down.
+- **The requester cannot decide their own approval.** Decision 7 does not say this, but the requester is now reliable, so four-eyes can be enforced. Recorded here for the owner to confirm.
+- **The policy is code, not configuration.** Changing who may approve is a reviewed change.
+- **Background work is attributed to the service** (open since step 2). The security context is not propagated to other threads, consumers or schedulers. A user is recorded where they act, on the request thread; document-generation's async job, for example, records its completion as the service.
+- **Identity fields are removed, not rejected.** Decision 6 allows either. A client that still sends one is ignored, since unknown JSON properties are, so a spoofing attempt no longer earns a 403 as in phase 0. It simply has no effect.
+
+**Evidence.** Everything below runs in the Docker-free unit gate.
+- `ApprovalDecisionSecurityTest` (approval-routing, 4 tests) uses the real chain, real RS256 tokens and the real controller, service and mapper:
+  - the persisted approver is the token's `oid`, and an `approverId` parameter is ignored;
+  - a role below the tier gets 403, as do the requester and a service token;
+  - the requester of a submit is the token's user, and a `requesterId` in the body is ignored.
+- `ApprovalServiceTest` (approval-routing): the tier-by-role matrix (15 cases), self-approval, service tokens, 401, `dev` mode, and service requesters. `DiscountApprovalEventConsumerTest`: the consumer requests as the service.
+- `libs/security`: `SecurityUtilsTest` (8), `OpenCrmActorAutoConfigurationTest` (3), `SecurityContextEventActorResolverTest` (5). `ServiceToServiceContractTest` now checks that the called service sees the user's `oid` and `service:quote-service`.
+- quote-service: `ApprovalServiceActorTest` (5): the BFF sends no identity, shows the approver approval-routing recorded, passes refusals through, and refuses legacy decisions. `ApprovalRoutingClientTest` (+2) and `QuoteServiceReviewDecisionTest` (3).
+- configuration-engine `ConfigurationSessionControllerTest`: sessions belong to the caller, and `userId` parameters are ignored. ai-service `AgentAuditLoggerTest`: every audit row records the actor.
+- FE: the quote detail spec (Approve and Reject only in review); the quotes and approvals libraries pass.
+- `SecurityBaselineFitnessTest` gains three checks: no request parameter or header names an actor; no request type has an identity field; no code records a hard-coded actor (`"system"`, or a string literal passed to an actor field).
+- Test helpers: `TestTokens` now mints Entra-shaped tokens (users with `oid`, `scp` and `azp`; services with `azp`, `idtyp=app` and `oid`), and `TestCallers` puts such a caller into the security context.
+
+**Still open after step 4.**
+- **Step 5**, the go-live gate. It now also covers:
+  - the `idtyp` optional claim on the API's access tokens, which makes service detection explicit;
+  - assigning the DealDesk, SalesVP and CFO app roles to the right groups, since they now decide approvals;
+  - existing rows keep their old actors (`"system"`, body values, or nothing); there is no backfill.
+- **For the owner:**
+  - who may pass a review: `IN_REVIEW` → `APPROVED` has no tier, and any authenticated user can do it, as before;
+  - the discount tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule above;
+  - nothing yet decides whether a quote needs a tiered approval at all. That is a pricing rule, outside this ADR.
+- **Record-level authorization** stays deferred (decision 7): who may see or change whose quotes and configuration sessions.
+
 ## Consequences
 
 - **Positive:**
@@ -374,19 +449,20 @@ This ADR is implemented only when all of the following pass in CI. A successful 
 - **GitNexus Cypher:**
   - Every service with a `RestClient` bean imports the `libs/security` interceptor.
   - Every service that records an actor calls `SecurityUtils.getCurrentUserId`.
-- **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token `sub`.
+- **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token's user (`oid`, amended in step 4 from `sub`, which Entra makes pairwise per client).
 
-Status on 2026-09-23, after step 3:
+Status on 2026-09-23, after step 4:
 
 | Check | State |
 |-------|-------|
 | Slice tests: anonymous 401 and service-role 403 | **Done** for all 10 servlet services (`SecurityBaselineTest`), pricebook and CE included since step 2 |
-| Slice test: actor-spoof rejection | Done for quote-service (`ApprovalServiceActorTest`). approval-routing follows in step 4 |
+| Slice test: actor-spoof rejection | **Done** in step 4: approval-routing ignores an `approverId` parameter or `requesterId` field and records the token's user (`ApprovalDecisionSecurityTest`); the quote BFF sends no identity (`ApprovalServiceActorTest`) |
 | First two "ArchUnit" rules (chain origin, no `/internal` `permitAll`) | **Done** as the source-scan `SecurityBaselineFitnessTest`, which the unit gate runs |
-| DTO identity-field rule | Step 4 |
+| DTO identity-field rule | **Done** in step 4 as source scans in `SecurityBaselineFitnessTest`: no request parameter, header or request type carries an identity |
 | "Every service with a `RestClient` bean imports the `libs/security` interceptor" | **Done** in step 2, as a source scan in `SecurityBaselineFitnessTest` rather than GitNexus Cypher, because the index is unreliable (review §7). It covers every HTTP client a service builds, with external APIs allowlisted |
-| "Every service that records an actor calls `SecurityUtils.getCurrentUserId`" | Step 4, also as a source scan |
-| quote→approval-routing integration test with a test issuer | Step 4 |
+| "Every service that records an actor calls `SecurityUtils.getCurrentUserId`" | **Done** in step 4: actors come from `CurrentActor` (which reads `SecurityUtils`) and the JPA auditor; the fitness test refuses hard-coded actors |
+| quote→approval-routing integration test with a test issuer | **Done** in step 4, in two halves: approval-routing persists the token's `oid` as approver through the real chain (`ApprovalDecisionSecurityTest`), and quote-service relays the user's token to it (`RestClientConfigAuthTest`) |
+| Tier↔role check on approve and reject (decision 7) | **Done** in step 4: `ApprovalAuthority`, with the requester unable to decide their own approval |
 | Gateway: login, one relayed token, no forged identity headers | **Done** in step 3: GatewaySecurityChainTest, IdentityRelayFilterTest, and IdentityRelayRoutingTest through real routing. SecurityBaselineFitnessTest checks one tenant, no B2C and no identity-adding route filters |
 
 ## Evidence at drafting (HEAD `4a29d31`)

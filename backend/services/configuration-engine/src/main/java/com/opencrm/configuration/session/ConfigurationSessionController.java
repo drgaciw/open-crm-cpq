@@ -2,6 +2,7 @@ package com.opencrm.configuration.session;
 
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.security.CurrentActor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,8 @@ import java.util.List;
  * REST controller for configuration session management.
  * Constraint solving, configuration validation, and session-safe configuration states.
  * API boundary exposes {@link ConfigurationSessionDto} only — never the JPA entity.
+ * <p>
+ * A session belongs to the authenticated caller; no endpoint takes a user id (ADR-016 decision 6).
  */
 @RestController
 @RequestMapping("/api/v1/configurations")
@@ -22,14 +25,13 @@ import java.util.List;
 public class ConfigurationSessionController {
 
     private final ConfigurationSessionService sessionService;
+    private final CurrentActor currentActor;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a new configuration session")
-    public ApiResponse<ConfigurationSessionDto> create(
-            @RequestParam String productId,
-            @RequestParam String userId) {
-        ConfigurationSessionDto session = sessionService.create(productId, userId);
+    @Operation(summary = "Create a configuration session for the authenticated caller")
+    public ApiResponse<ConfigurationSessionDto> create(@RequestParam String productId) {
+        ConfigurationSessionDto session = sessionService.create(productId, currentActor.id());
         return ApiResponse.success(session, "Configuration session created");
     }
 
@@ -40,11 +42,10 @@ public class ConfigurationSessionController {
     }
 
     @GetMapping
-    @Operation(summary = "List configuration sessions by user and status")
-    public ApiResponse<List<ConfigurationSessionDto>> listByUser(
-            @RequestParam String userId,
+    @Operation(summary = "List the authenticated caller's configuration sessions by status")
+    public ApiResponse<List<ConfigurationSessionDto>> listMine(
             @RequestParam(defaultValue = "IN_PROGRESS") ConfigurationStatus status) {
-        return ApiResponse.success(sessionService.getByUserAndStatus(userId, status));
+        return ApiResponse.success(sessionService.getByUserAndStatus(currentActor.id(), status));
     }
 
     @PostMapping("/{id}/selections")

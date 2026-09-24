@@ -215,12 +215,17 @@ public class QuoteService {
         return List.copyOf(ids);
     }
 
+    /**
+     * Pass a quote's review. A quote waiting on a tiered approval ({@code PENDING_APPROVAL}) is decided through that
+     * approval in approval-routing, which checks the approver's role (ADR-016 decision 7), never here.
+     */
     public QuoteDto approve(Long id) {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
-        if (quote.getStatus() != QuoteStatus.PENDING_APPROVAL && quote.getStatus() != QuoteStatus.IN_REVIEW) {
-            throw new BusinessException("Quote must be in review or pending approval to approve", "INVALID_STATUS_TRANSITION");
+        refuseWhileRouted(quote);
+        if (quote.getStatus() != QuoteStatus.IN_REVIEW) {
+            throw new BusinessException("Quote must be in review to approve", "INVALID_STATUS_TRANSITION");
         }
 
         quote.setStatus(QuoteStatus.APPROVED);
@@ -230,12 +235,14 @@ public class QuoteService {
         return quoteMapper.toDto(saved);
     }
 
+    /** Fail a quote's review. Like {@link #approve}, a quote waiting on a tiered approval is decided there. */
     public QuoteDto reject(Long id, String reason) {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
-        if (quote.getStatus() != QuoteStatus.PENDING_APPROVAL && quote.getStatus() != QuoteStatus.IN_REVIEW) {
-            throw new BusinessException("Quote must be in review or pending approval to reject", "INVALID_STATUS_TRANSITION");
+        refuseWhileRouted(quote);
+        if (quote.getStatus() != QuoteStatus.IN_REVIEW) {
+            throw new BusinessException("Quote must be in review to reject", "INVALID_STATUS_TRANSITION");
         }
 
         quote.setStatus(QuoteStatus.REJECTED);
@@ -246,6 +253,20 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} rejected", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
+    }
+
+    /**
+     * Deciding a {@code PENDING_APPROVAL} quote here would skip approval-routing's role check and leave its approval
+     * open (ADR-016 decision 7, ADR-013 single writer).
+     */
+    private static void refuseWhileRouted(Quote quote) {
+        if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
+            throw new BusinessException(
+                    "Quote " + quote.getQuoteNumber() + " is waiting on a tiered approval; decide that approval instead",
+                    HttpStatus.CONFLICT,
+                    "APPROVAL_PENDING"
+            );
+        }
     }
 
     public QuoteDto send(Long id) {

@@ -299,7 +299,7 @@ describe('QuotesDetailComponent', () => {
     expect(submitSpy).not.toHaveBeenCalled();
   });
 
-  it('enables Approve/Reject for IN_REVIEW and PENDING_APPROVAL', () => {
+  it('enables Approve/Reject for IN_REVIEW only; PENDING_APPROVAL is decided in the approvals inbox', () => {
     selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW
     fixture.detectChanges();
     expect(component.canApproveReject()).toBe(true);
@@ -311,7 +311,7 @@ describe('QuotesDetailComponent', () => {
 
     selectedQuote.set(toQuoteDto(MOCK_QUOTES[2])); // PENDING_APPROVAL
     fixture.detectChanges();
-    expect(component.canApproveReject()).toBe(true);
+    expect(component.canApproveReject()).toBe(false);
   });
 
   it('rejects with optional reason from prompt', () => {
