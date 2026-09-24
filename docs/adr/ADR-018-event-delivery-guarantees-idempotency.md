@@ -103,6 +103,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
   - **The `eventType` header comes from the registry**, looked up by topic. D5 makes topic-to-contract one-to-one and pins it by test.
   - **`correlationId` is always present.** An event that nothing correlated starts its own chain, correlated by its own `eventId`. A Kafka listener continues the chain of the record it is handling, and that record's `eventId` becomes the causation. A producer that already has a business correlation, such as a quote's UUID, opens a correlation scope around its publish.
   - **`actor` is `user:<sub>` for an authenticated principal and `service:<spring.application.name>` otherwise.** `service:<client-id>` for service principals waits for ADR-016.
+    - *Updated by ADR-016 step 4 (2026-09-23):* a person is now `user:<oid>`, because Entra makes `sub` pairwise per client; a calling service with a service token is `service:<client-id>`; and without a caller the service is `service:<client-id>` of its workload identity, or `service:<spring.application.name>` locally.
 
 **D5 — The registry is the contract.**
 - `EventContractRegistry` maps each topic to (eventType, version, owner, **payload class actually published**).

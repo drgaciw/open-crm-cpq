@@ -272,6 +272,13 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - B2C and the gateway's `common` issuer default are gone; the production marker now also requires the login. The gateway actuator is down to health and info.
 >   - `SecurityBaselineFitnessTest` now also checks that the gateway trusts one tenant and that no route adds identity headers.
 >   - Step 5 gains: the gateway's app registration (redirect URIs, federated credential, admin consent), forwarded headers at the ingress, Redis for sessions, and Prometheus scraping.
+> - **ADR-016 rollout step 4: actors and roles (2026-09-23).**
+>   - Actors come from the verified token only. A person is their Entra `oid` (not the per-client `sub`), a calling service is `service:<client-id>`, and background work is the service itself. `CurrentActor` in `libs/security` gives that value, and a JPA auditor now fills `created_by`/`updated_by`, which were empty in every service.
+>   - Identity inputs are gone: approval-routing's `approverId` parameter and `requesterId` field, the quote BFF's `approver`/`requestedBy`, configuration-engine's `userId` parameters, and the `"system"` literals. The dev-only unverified-actor flag, which an environment variable could enable anywhere, is replaced by `dev` mode.
+>   - approval-routing enforces tier↔role on every decision (DealDesk < SalesVP < CFO; Admin decides nothing; unknown tiers fail closed), refuses service tokens and self-approval, and the quote BFF passes those refusals through instead of a 502.
+>   - Two bypasses closed: the quote-level approve/reject of a `PENDING_APPROVAL` quote (409; decided in the approvals inbox) and decisions on legacy local approvals (409, read-only history).
+>   - `SecurityBaselineFitnessTest` now also refuses identity in request parameters, headers and request types, and hard-coded actors. The quote→approval-routing acceptance test is done, with `oid` in place of `sub`.
+>   - For the owner: who may pass an `IN_REVIEW` review, the discount-tier mapping, and the four-eyes rule. Step 5 adds the `idtyp` optional claim and the approver role assignments.
 
 ---
 

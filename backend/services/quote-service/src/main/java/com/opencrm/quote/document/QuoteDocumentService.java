@@ -5,6 +5,7 @@ import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class QuoteDocumentService {
     private final QuoteRepository quoteRepository;
     private final QuoteLineItemRepository lineItemRepository;
     private final TemplateEngine templateEngine;
+    private final CurrentActor currentActor;
 
     public QuoteDocumentDto generateDocument(Long quoteId, DocumentType documentType) {
         log.debug("Generating {} document for quote {}", documentType, quoteId);
@@ -63,7 +65,7 @@ public class QuoteDocumentService {
                 .fileName(fileName)
                 .content(pdfBytes)
                 .fileSize((long) pdfBytes.length)
-                .generatedBy("system")
+                .generatedBy(currentActor.id())
                 .build();
 
         QuoteDocument saved = documentRepository.save(doc);

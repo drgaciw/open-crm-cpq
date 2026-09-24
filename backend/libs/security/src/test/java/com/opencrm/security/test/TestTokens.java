@@ -18,8 +18,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Real RS256-signed JWTs shaped like Entra ID access tokens, for ADR-016 tests. Nothing here is mocked: the tokens go
@@ -39,6 +41,12 @@ public final class TestTokens {
     /** The API audience of ADR-016 decision 1. */
     public static final String AUDIENCE = "api://opencrm-api";
 
+    /** The client a user token was issued to ({@code azp}): the gateway's login. */
+    public static final String USER_CLIENT_ID = "opencrm-gateway-test";
+
+    /** The delegated scope user tokens carry ({@code scp}). */
+    public static final String USER_SCOPE = "access_as_user";
+
     private static final String KEY_ID = "opencrm-test-key";
     private static final RSAKey KEY = rsaKey();
     private static final RSAKey FOREIGN_KEY = rsaKey();
@@ -46,14 +54,25 @@ public final class TestTokens {
     private TestTokens() {
     }
 
-    /** A user token: {@code sub} is the user, {@code roles} the Entra app roles. */
+    /**
+     * A user token shaped like Entra's: {@code sub} is the given name (pairwise in Entra), {@code oid} is
+     * {@link #oidOf(String)}, {@code scp} is {@link #USER_SCOPE}, {@code azp} the gateway, {@code roles} the app roles.
+     */
     public static Builder user(String subject, String... roles) {
-        return new Builder(subject, List.of(roles));
+        return new Builder(subject, List.of(roles), false);
     }
 
-    /** A client-credentials token of a calling service: {@code sub} is its client id. */
+    /**
+     * A client-credentials token of a calling service: {@code azp} is its client id, {@code idtyp=app}, no {@code scp},
+     * and {@code sub}/{@code oid} its service principal, {@link #oidOf(String)} of {@code service:<clientId>}.
+     */
     public static Builder service(String clientId, String... roles) {
-        return new Builder(clientId, List.of(roles));
+        return new Builder(clientId, List.of(roles), true);
+    }
+
+    /** The {@code oid} of a test principal: a stable UUID derived from the name. */
+    public static String oidOf(String name) {
+        return UUID.nameUUIDFromBytes(("oid:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /** The public key that {@link #user} and {@link #service} tokens verify against. */
@@ -74,15 +93,17 @@ public final class TestTokens {
     public static final class Builder {
         private final String subject;
         private final List<String> roles;
+        private final boolean appOnly;
         private String issuer = ISSUER;
         private String audience = AUDIENCE;
         private Instant issuedAt = Instant.now().minusSeconds(5);
         private Instant expiresAt = issuedAt.plus(Duration.ofMinutes(10));
         private RSAKey signingKey = KEY;
 
-        private Builder(String subject, List<String> roles) {
+        private Builder(String subject, List<String> roles, boolean appOnly) {
             this.subject = subject;
             this.roles = roles;
+            this.appOnly = appOnly;
         }
 
         public Builder issuer(String issuer) {
@@ -110,14 +131,21 @@ public final class TestTokens {
 
         /** The compact serialized JWT. */
         public String mint() {
+            String servicePrincipal = oidOf("service:" + subject);
             JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                     .issuer(issuer)
-                    .subject(subject)
+                    .subject(appOnly ? servicePrincipal : subject)
                     .audience(List.of(audience))
                     .issuedAt(issuedAt)
                     .notBefore(issuedAt)
                     .expiresAt(expiresAt)
-                    .claim("tid", "00000000-0000-4000-8000-00000000c0de");
+                    .claim("tid", "00000000-0000-4000-8000-00000000c0de")
+                    .claim("ver", "2.0");
+            if (appOnly) {
+                claims.claim("oid", servicePrincipal).claim("azp", subject).claim("idtyp", "app");
+            } else {
+                claims.claim("oid", oidOf(subject)).claim("azp", USER_CLIENT_ID).claim("scp", USER_SCOPE);
+            }
             if (!roles.isEmpty()) {
                 claims.claim("roles", roles);
             }

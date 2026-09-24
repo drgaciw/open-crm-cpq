@@ -7,6 +7,7 @@ import com.opencrm.approval.domain.ApprovalType;
 import com.opencrm.approval.event.shadow.DiscountTierShadowService;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.KafkaInbox;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.NonRetryableEventException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -54,7 +55,7 @@ class DiscountApprovalEventConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new DiscountApprovalEventConsumer(approvalRequestRepository, new ObjectMapper(), discountTierShadow,
-                inbox);
+                inbox, new CurrentActor("service:approval-routing", false));
         when(inbox.claim(eq(DiscountApprovalEventConsumer.CONSUMER_GROUP), any())).thenReturn(true);
         when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING)).thenReturn(List.of());
         when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(call -> call.getArgument(0));
@@ -80,7 +81,7 @@ class DiscountApprovalEventConsumerTest {
         return ApprovalRequest.builder()
                 .quoteId("Q-1").lineId(lineId).approvalType(ApprovalType.DISCOUNT).status(ApprovalStatus.PENDING)
                 .requestedDiscount(new BigDecimal(discount)).marginDelta(new BigDecimal(marginDelta))
-                .currencyCode("USD").requesterId("system").build();
+                .currencyCode("USD").requesterId("service:approval-routing").build();
     }
 
     @ParameterizedTest(name = "margin delta {0} routes to {1}")
@@ -113,6 +114,8 @@ class DiscountApprovalEventConsumerTest {
         assertThat(request.getMarginDelta()).isEqualByComparingTo("25");
         assertThat(request.getCurrencyCode()).isEqualTo("USD");
         assertThat(request.getSubmittedAt()).isNotNull();
+        assertThat(request.getRequesterId()).as("the consumer acts as this service (ADR-016 decision 6)")
+                .isEqualTo("service:approval-routing");
     }
 
     @Test

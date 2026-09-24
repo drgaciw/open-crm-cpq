@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.ai.audit.entity.AiAuditLog;
 import com.opencrm.ai.audit.repository.AiAuditLogRepository;
+import com.opencrm.security.CurrentActor;
+import com.opencrm.security.test.TestCallers;
+import com.opencrm.security.test.TestTokens;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +39,26 @@ class AgentAuditLoggerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        agentAuditLogger = new AgentAuditLogger(auditLogRepository, objectMapper);
+        agentAuditLogger = new AgentAuditLogger(auditLogRepository, objectMapper,
+                new CurrentActor("service:ai-service", false));
+    }
+
+    @AfterEach
+    void signOut() {
+        TestCallers.clear();
+    }
+
+    @Test
+    @DisplayName("ADR-016 step 4: every entry records who caused it, the user or else ai-service itself")
+    void entriesRecordTheActor() {
+        TestCallers.signInUser("rep-1", "CPQ.User");
+        agentAuditLogger.logInvocation("agent-001", "session-abc", Map.of());
+        TestCallers.clear();
+        agentAuditLogger.logFailure("agent-001", "session-abc", "timeout");
+
+        verify(auditLogRepository, times(2)).save(auditLogCaptor.capture());
+        assertEquals(TestTokens.oidOf("rep-1"), auditLogCaptor.getAllValues().get(0).getCreatedBy());
+        assertEquals("service:ai-service", auditLogCaptor.getAllValues().get(1).getCreatedBy());
     }
 
     @Test

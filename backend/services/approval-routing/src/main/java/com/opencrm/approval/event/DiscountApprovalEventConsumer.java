@@ -11,6 +11,7 @@ import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.NonRetryableEventException;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
+import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,6 +37,8 @@ import java.util.Objects;
  * as before; whether it should supersede the open request is a business rule this class does not decide.
  *
  * <p>An unreadable payload is not retryable and goes straight to {@code cpq.discount.approval.required.DLT} (D7).
+ *
+ * <p>The requester is this service, {@code service:<client-id>} (ADR-016 decision 6), not a user named in the event.
  */
 @Component
 @RequiredArgsConstructor
@@ -49,6 +52,7 @@ public class DiscountApprovalEventConsumer {
     private final ObjectMapper objectMapper;
     private final DiscountTierShadowService discountTierShadow;
     private final KafkaInbox inbox;
+    private final CurrentActor currentActor;
 
     @KafkaListener(topics = KafkaTopics.DISCOUNT_APPROVAL_REQUIRED, groupId = CONSUMER_GROUP)
     @Transactional
@@ -75,7 +79,8 @@ public class DiscountApprovalEventConsumer {
                 .requestedDiscount(event.getRequestedDiscount())
                 .marginDelta(event.getMarginDelta())
                 .currencyCode(event.getCurrencyCode())
-                .requesterId("system") // In production, extract from context
+                // The consumer acts as this service (ADR-016 decision 6); the event carries no verified user.
+                .requesterId(currentActor.self())
                 .submittedAt(Instant.now())
                 .approvalTier(ruleTier)
                 .reason("Discount exceeds standard threshold")

@@ -17,6 +17,8 @@ import java.util.List;
  * REST controller for approval routing.
  * Risk evaluation and approval state machine for exceptions (margin/terms).
  * API boundary exposes {@link ApprovalRequestDto} only — never the JPA entity.
+ * <p>
+ * No endpoint takes an identity: the requester and the approver are the authenticated caller (ADR-016 decision 6).
  */
 @RestController
 @RequestMapping("/api/v1/approvals")
@@ -59,21 +61,18 @@ public class ApprovalController {
     }
 
     @PostMapping("/{id}/approve")
-    @Operation(summary = "Approve a pending request")
-    public ApiResponse<ApprovalRequestDto> approve(
-            @PathVariable Long id,
-            @RequestParam String approverId) {
-        ApprovalRequestDto request = approvalService.approve(id, approverId);
+    @Operation(summary = "Approve a pending request as the authenticated user (role must satisfy the tier)")
+    public ApiResponse<ApprovalRequestDto> approve(@PathVariable Long id) {
+        ApprovalRequestDto request = approvalService.approve(id);
         return ApiResponse.success(request, "Approval request approved");
     }
 
     @PostMapping("/{id}/reject")
-    @Operation(summary = "Reject a pending request")
+    @Operation(summary = "Reject a pending request as the authenticated user (role must satisfy the tier)")
     public ApiResponse<ApprovalRequestDto> reject(
             @PathVariable Long id,
-            @RequestParam String approverId,
             @RequestParam String reason) {
-        ApprovalRequestDto request = approvalService.reject(id, approverId, reason);
+        ApprovalRequestDto request = approvalService.reject(id, reason);
         return ApiResponse.success(request, "Approval request rejected");
     }
 }
