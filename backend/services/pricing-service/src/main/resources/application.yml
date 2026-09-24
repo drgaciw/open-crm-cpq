@@ -60,10 +60,11 @@ spring:
       compatibility-verifier:
         enabled: false
 
-# gRPC server configuration
+# gRPC server. Off by default (ADR-016 step 2): the listener is outside the servlet security chain, so it would be
+# an unauthenticated side door, and no service calls it. Set PRICING_GRPC_PORT only once it authenticates callers.
 grpc:
   server:
-    port: 9090
+    port: ${PRICING_GRPC_PORT:-1}
 
 springdoc:
   api-docs:

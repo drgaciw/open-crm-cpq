@@ -79,20 +79,6 @@ class OpenCrmSecurityModeTest {
     }
 
     @Test
-    @DisplayName("legacy-open-internal is off by default, allowed outside production, refused in production")
-    void legacyOpenInternalGuard() {
-        assertThat(OpenCrmSecurityAutoConfiguration.legacyOpenInternal(properties, environment)).isFalse();
-
-        properties.setLegacyOpenInternal(true);
-        assertThat(OpenCrmSecurityAutoConfiguration.legacyOpenInternal(properties, environment)).isTrue();
-
-        environment.setProperty("opencrm.env", "production");
-        assertThatThrownBy(() -> OpenCrmSecurityAutoConfiguration.legacyOpenInternal(properties, environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("never permitAll");
-    }
-
-    @Test
     @DisplayName("defaults: audience api://opencrm-api, roles claim, 60 s skew, Internal.Invoke, API docs private")
     void defaults() {
         assertThat(properties.getJwt().getAudiences()).containsExactly("api://opencrm-api");

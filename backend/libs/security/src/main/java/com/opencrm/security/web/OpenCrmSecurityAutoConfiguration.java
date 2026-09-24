@@ -31,8 +31,8 @@ import java.util.Set;
  * <p><strong>{@code jwt} mode</strong> (every profile except {@code dev}): an OAuth 2.0 resource server.
  * <ul>
  *   <li>{@code /actuator/health/**} and {@code /actuator/info} are public;</li>
- *   <li>{@code /internal/**} needs a token with the internal app role ({@code Internal.Invoke}), except in the two
- *       services that set the transitional {@code opencrm.security.legacy-open-internal} until rollout step 2;</li>
+ *   <li>{@code /internal/**} needs a service token with the internal app role ({@code Internal.Invoke}); callers
+ *       attach it with {@code OutboundAuth.serviceToken()};</li>
  *   <li>{@code /api/v1/**} and everything else need an authenticated token;</li>
  *   <li>tokens are validated by {@link OpenCrmJwtDecoders}; app roles map through {@link EntraRoleAuthorities}.</li>
  * </ul>
@@ -75,7 +75,6 @@ public class OpenCrmSecurityAutoConfiguration {
         authentication.setJwtGrantedAuthoritiesConverter(
                 new EntraRoleAuthorities(properties.getJwt().getRolesClaim()));
         String internalAuthority = EntraRoleAuthorities.authorityFor(properties.getInternalRole());
-        boolean legacyOpenInternal = legacyOpenInternal(properties, environment);
         return http
                 .authorizeHttpRequests(rules -> {
                     rules.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
@@ -83,11 +82,7 @@ public class OpenCrmSecurityAutoConfiguration {
                         rules.requestMatchers("/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll();
                     }
-                    if (legacyOpenInternal) {
-                        rules.requestMatchers("/internal/**").permitAll();
-                    } else {
-                        rules.requestMatchers("/internal/**").hasAuthority(internalAuthority);
-                    }
+                    rules.requestMatchers("/internal/**").hasAuthority(internalAuthority);
                     customizers.orderedStream().forEach(customizer -> customizer.customize(rules));
                     rules.requestMatchers("/api/v1/**").authenticated();
                     rules.anyRequest().authenticated();
@@ -110,8 +105,12 @@ public class OpenCrmSecurityAutoConfiguration {
         return OpenCrmJwtDecoders.create(properties.getJwt(), isProduction(environment));
     }
 
-    /** {@code opencrm.security.mode}, else {@code dev} under the {@code dev} profile and {@code jwt} otherwise. */
-    static SecurityMode mode(OpenCrmSecurityProperties properties, Environment environment) {
+    /**
+     * {@code opencrm.security.mode}, else {@code dev} under the {@code dev} profile and {@code jwt} otherwise.
+     *
+     * @throws IllegalStateException for {@code dev} mode when the production marker is set
+     */
+    public static SecurityMode mode(OpenCrmSecurityProperties properties, Environment environment) {
         SecurityMode mode = properties.getMode() != null
                 ? properties.getMode()
                 : environment.acceptsProfiles(Profiles.of("dev")) ? SecurityMode.DEV : SecurityMode.JWT;
@@ -122,22 +121,8 @@ public class OpenCrmSecurityAutoConfiguration {
         return mode;
     }
 
-    /** {@code opencrm.security.legacy-open-internal}, refused under the production marker (ADR-016 step 2 removes it). */
-    static boolean legacyOpenInternal(OpenCrmSecurityProperties properties, Environment environment) {
-        if (!properties.isLegacyOpenInternal()) {
-            return false;
-        }
-        if (isProduction(environment)) {
-            throw new IllegalStateException("opencrm.security.legacy-open-internal is not allowed when opencrm.env="
-                    + environment.getProperty("opencrm.env") + ": /internal/** is never permitAll in production "
-                    + "(ADR-016 decision 4)");
-        }
-        log.warn("opencrm.security.legacy-open-internal=true: /internal/** accepts anonymous callers until ADR-016 "
-                + "rollout step 2 gives them a service token.");
-        return true;
-    }
-
-    static boolean isProduction(Environment environment) {
+    /** Whether the production marker {@code opencrm.env} ({@code OPENCRM_ENV}) is {@code prod} or {@code production}. */
+    public static boolean isProduction(Environment environment) {
         String marker = environment.getProperty("opencrm.env");
         return marker != null && PRODUCTION_MARKERS.contains(marker.trim().toLowerCase(Locale.ROOT));
     }

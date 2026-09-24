@@ -254,7 +254,7 @@ Before marking any task as complete, verify:
 | `backend/services/pricing-service/` | Execute/simulate, rule-sets, rules, pricing-customers |
 | `backend/services/pricebook-service/` | Price books + entries |
 | `backend/services/quote-service/` | Quotes, lines, documents, BFF approvals |
-| `backend/services/configuration-engine/` | Sessions + `/internal/.../evaluate` |
+| `backend/services/configuration-engine/` | Sessions + evaluate (`/api/v1/configurations/evaluate` for users via the gateway, `/internal/v1/configurations/evaluate` for services) |
 | `backend/services/approval-routing/` | Canonical approvals |
 | `backend/services/document-generation/` | Kafka document jobs |
 | `backend/services/contract-asset-management/` | Subscriptions (`SubscriptionDto` + paginated list; **no FE**) |

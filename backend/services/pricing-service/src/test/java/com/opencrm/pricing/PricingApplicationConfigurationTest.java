@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PricingApplicationConfigurationTest {
 
     @Test
-    void bindsAzureCompatibilitySettingsInSpringNamespaceAndPreservesGrpcPort() throws Exception {
+    void bindsAzureCompatibilitySettingsInSpringNamespaceAndKeepsGrpcOffByDefault() throws Exception {
         var sources = new YamlPropertySourceLoader()
                 .load("pricing-application", new FileSystemResource("src/main/resources/application.yml"));
         var environment = new MockEnvironment();
@@ -25,6 +25,9 @@ class PricingApplicationConfigurationTest {
                         "com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration");
         assertThat(binder.bind("spring.cloud.azure.compatibility-verifier.enabled", Boolean.class)
                 .orElse(true)).isFalse();
-        assertThat(binder.bind("grpc.server.port", Integer.class).orElse(0)).isEqualTo(9090);
+        // ADR-016 step 2: the unauthenticated gRPC listener is off (-1) unless PRICING_GRPC_PORT opts in.
+        assertThat(binder.bind("grpc.server.port", Integer.class).orElse(0)).isEqualTo(-1);
+        environment.setProperty("PRICING_GRPC_PORT", "9090");
+        assertThat(Binder.get(environment).bind("grpc.server.port", Integer.class).orElse(0)).isEqualTo(9090);
     }
 }
