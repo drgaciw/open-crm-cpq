@@ -21,29 +21,29 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-@DisplayName("ProductServiceClient S2D-3a gateway validate")
+@DisplayName("ProductServiceClient S2D-3a configuration-engine evaluate (direct, ADR-016 step 2)")
 class ProductServiceClientTest {
 
-    private MockRestServiceServer gatewayServer;
+    private MockRestServiceServer ceServer;
     private ProductServiceClient client;
 
     @BeforeEach
     void setUp() {
-        RestClient.Builder gatewayBuilder = RestClient.builder().baseUrl("http://gateway.test");
-        gatewayServer = MockRestServiceServer.bindTo(gatewayBuilder).build();
+        RestClient.Builder ceBuilder = RestClient.builder().baseUrl("http://configuration-engine.test");
+        ceServer = MockRestServiceServer.bindTo(ceBuilder).build();
 
-        client = new ProductServiceClient(gatewayBuilder.build());
+        client = new ProductServiceClient(ceBuilder.build());
     }
 
     @AfterEach
     void verifyServer() {
-        gatewayServer.verify();
+        ceServer.verify();
     }
 
     @Test
-    @DisplayName("validateConfiguration POSTs to gateway and parses valid=true")
+    @DisplayName("validateConfiguration POSTs to CE evaluate and parses valid=true")
     void validateConfigurationParsesValidResult() {
-        gatewayServer.expect(requestTo("http://gateway.test/api/v1/configuration/validate"))
+        ceServer.expect(requestTo("http://configuration-engine.test/internal/v1/configurations/evaluate"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("[10,20]"))
                 .andRespond(withSuccess("""
@@ -63,7 +63,7 @@ class ProductServiceClientTest {
     @Test
     @DisplayName("validateConfiguration parses valid=false with violations")
     void validateConfigurationParsesInvalidResult() {
-        gatewayServer.expect(requestTo("http://gateway.test/api/v1/configuration/validate"))
+        ceServer.expect(requestTo("http://configuration-engine.test/internal/v1/configurations/evaluate"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("""
                         {
@@ -92,9 +92,9 @@ class ProductServiceClientTest {
     }
 
     @Test
-    @DisplayName("validateConfiguration maps gateway transport failure to BusinessException")
+    @DisplayName("validateConfiguration maps a CE transport failure to BusinessException")
     void validateConfigurationMapsTransportFailure() {
-        gatewayServer.expect(requestTo("http://gateway.test/api/v1/configuration/validate"))
+        ceServer.expect(requestTo("http://configuration-engine.test/internal/v1/configurations/evaluate"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withServerError());
 

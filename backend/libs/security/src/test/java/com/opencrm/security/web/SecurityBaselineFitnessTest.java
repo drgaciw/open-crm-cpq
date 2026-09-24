@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -25,10 +26,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>decision 4: the servlet chain comes from {@code libs/security}; services add rules through
  *       {@link OpenCrmSecurityCustomizer} and declare no {@code SecurityFilterChain} or {@code @EnableWebSecurity};</li>
- *   <li>decision 4: no {@code permitAll()} on {@code /internal/**}, and the transitional
- *       {@code opencrm.security.legacy-open-internal} only where allowlisted;</li>
+ *   <li>decision 4: no {@code permitAll()} on {@code /internal/**}; the step-1 {@code legacy-open-internal} flag is
+ *       gone; the gateway never routes onto {@code /internal/**}; no gRPC listener is on by default, because it would
+ *       bypass the chain;</li>
  *   <li>decision 4: no committed configuration selects {@code opencrm.security.mode: dev}; dev mode comes from the
  *       {@code dev} profile only;</li>
+ *   <li>decision 5: every HTTP client a service builds takes an {@code OutboundAuth} interceptor, unless it calls an
+ *       external API (allowlisted); services do not call the gateway (allowlisted: the ai-service agent tools);</li>
  *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline.</li>
  * </ul>
  * It reads source text, like {@code EventContractFitnessTest}: the rules are about what is written, not about beans.
@@ -41,17 +45,33 @@ class SecurityBaselineFitnessTest {
             "gateway-service", "reactive edge (WebFlux); becomes the BFF in ADR-016 rollout step 3");
 
     /**
-     * Services that keep {@code /internal/**} open until their callers send service tokens. ADR-016 rollout step 2
-     * empties this map; the test fails while an entry no longer sets the flag, so the map cannot go stale.
+     * Source files that build an HTTP client for an API outside the OpenCRM trust domain, which authenticates with its
+     * own credentials. The test fails while an entry no longer builds a client, so the map cannot go stale.
      */
-    private static final Map<String, String> LEGACY_OPEN_INTERNAL_ALLOWLIST = Map.of(
-            "pricebook-service", "pricing-service price-book lookups (/internal/v1/price-books)",
-            "configuration-engine", "quote-service validation through the gateway rewrite (/internal/v1/configurations)");
+    private static final Map<String, String> EXTERNAL_CLIENT_ALLOWLIST = Map.of(
+            "ai-service/src/main/java/com/opencrm/ai/selection/execution/OpenRouterExecutionClient.java",
+            "OpenRouter inference, authenticated with its own API key",
+            "ai-service/src/main/java/com/opencrm/ai/selection/evaluation/SelectionEvaluationCli.java",
+            "offline model-selection evaluation CLI against external APIs");
+
+    /**
+     * Services that call the gateway, with the reason. Decision 5: domain services never call the gateway. The
+     * ai-service agent tools use the gateway's agent contract, like external agents do (F3); rollout step 3 decides
+     * whether that stays, since the BFF gateway must then keep a bearer-token lane.
+     */
+    private static final Map<String, String> GATEWAY_CALLER_ALLOWLIST = Map.of(
+            "ai-service", "agent tools on the gateway agent contract (F3), user token relayed; revisit in step 3");
 
     private static final Pattern OWN_CHAIN = Pattern.compile(
             "\\bSecurityFilterChain\\b|@EnableWebSecurity\\b|WebSecurityConfigurerAdapter|\\.oauth2ResourceServer\\s*\\(");
     private static final Pattern INTERNAL_PERMIT_ALL = Pattern.compile(
             "\"/internal[^\"]*\"\\s*\\)\\s*\\.permitAll\\s*\\(");
+    private static final Pattern CLIENT_CONSTRUCTION = Pattern.compile(
+            "RestClient\\.builder\\s*\\(|RestClient\\.create\\s*\\(|WebClient\\.builder\\s*\\(|WebClient\\.create\\s*\\("
+                    + "|new\\s+RestTemplate\\s*\\(|HttpClient\\.new(Builder|HttpClient)\\s*\\(|RestClient\\.Builder\\s+\\w+");
+    private static final Pattern GATEWAY_URL_KEY = Pattern.compile("services\\.gateway|opencrm\\.gateway|GATEWAY_SERVICE_URL");
+    private static final Pattern ROUTE_ONTO_INTERNAL = Pattern.compile("(?m)^[^#\\n]*(RewritePath|Path)=[^\\n]*/internal");
+    private static final Pattern GRPC_PORT_OFF_BY_DEFAULT = Pattern.compile("^\\$\\{[A-Za-z0-9_.]+:-1}$");
 
     private static Path servicesDir;
     private static List<ServiceSources> services;
@@ -105,17 +125,93 @@ class SecurityBaselineFitnessTest {
     }
 
     @Test
-    @DisplayName("legacy-open-internal is set exactly by the allowlisted services, until step 2")
-    void legacyOpenInternalOnlyWhereAllowlisted() {
+    @DisplayName("no service sets the step-1 legacy-open-internal flag, which step 2 removed")
+    void noLegacyOpenInternal() {
         Set<String> setting = new TreeSet<>();
         for (ServiceSources service : services) {
             for (Map<String, Object> document : service.configDocuments()) {
-                if (Boolean.TRUE.equals(securityProperty(document, "legacy-open-internal"))) {
+                if (securityProperty(document, "legacy-open-internal") != null) {
                     setting.add(service.name());
                 }
             }
         }
-        assertThat(setting).isEqualTo(new TreeSet<>(LEGACY_OPEN_INTERNAL_ALLOWLIST.keySet()));
+        assertThat(setting).as("/internal/** needs a service token; the flag no longer exists").isEmpty();
+    }
+
+    @Test
+    @DisplayName("every HTTP client a service builds takes an OutboundAuth interceptor, unless external (D5)")
+    void everyClientAuthenticates() {
+        List<String> unauthenticated = new ArrayList<>();
+        Set<String> buildingClients = new TreeSet<>();
+        for (ServiceSources service : services) {
+            service.javaFiles().forEach((path, text) -> {
+                if (!CLIENT_CONSTRUCTION.matcher(text).find()) {
+                    return;
+                }
+                buildingClients.add(path);
+                if (!EXTERNAL_CLIENT_ALLOWLIST.containsKey(path) && !text.contains("OutboundAuth")) {
+                    unauthenticated.add(path);
+                }
+            });
+        }
+        assertThat(unauthenticated)
+                .as("add outboundAuth.relayUserToken() for /api/v1 calls or outboundAuth.serviceToken() for /internal")
+                .isEmpty();
+        assertThat(buildingClients).as("stale EXTERNAL_CLIENT_ALLOWLIST entries")
+                .containsAll(EXTERNAL_CLIENT_ALLOWLIST.keySet());
+        assertThat(buildingClients).as("the scan finds the known service clients")
+                .contains("quote-service/src/main/java/com/opencrm/quote/config/RestClientConfig.java",
+                        "pricing-service/src/main/java/com/opencrm/pricing/config/PriceBookClientConfig.java");
+    }
+
+    @Test
+    @DisplayName("services do not call the gateway, except the allowlisted agent tools (D5)")
+    void servicesDoNotCallTheGateway() {
+        Set<String> callers = new TreeSet<>();
+        for (ServiceSources service : services) {
+            if (service.name().equals("gateway-service")) {
+                continue;
+            }
+            boolean inConfig = GATEWAY_URL_KEY.matcher(service.configText()).find();
+            boolean inCode = service.javaFiles().values().stream().anyMatch(t -> GATEWAY_URL_KEY.matcher(t).find());
+            if (inConfig || inCode) {
+                callers.add(service.name());
+            }
+        }
+        assertThat(callers).isEqualTo(new TreeSet<>(GATEWAY_CALLER_ALLOWLIST.keySet()));
+    }
+
+    @Test
+    @DisplayName("the gateway never routes browser traffic onto /internal/** (D3, D4)")
+    void gatewayNeverRoutesOntoInternal() {
+        ServiceSources gateway = services.stream().filter(s -> s.name().equals("gateway-service")).findFirst()
+                .orElseThrow();
+        assertThat(gateway.configText()).as("gateway route config").isNotBlank();
+        Matcher matcher = ROUTE_ONTO_INTERNAL.matcher(gateway.configText());
+        List<String> routes = new ArrayList<>();
+        while (matcher.find()) {
+            routes.add(matcher.group().trim());
+        }
+        assertThat(routes).as("route to the service's public /api/v1 path instead").isEmpty();
+    }
+
+    @Test
+    @DisplayName("no gRPC listener is on by default: it would bypass the servlet chain (D4)")
+    void grpcServersOffByDefault() {
+        List<String> violations = new ArrayList<>();
+        for (ServiceSources service : services) {
+            for (Map<String, Object> document : service.configDocuments()) {
+                Object port = nested(document, "grpc", "server", "port");
+                if (port == null) {
+                    continue;
+                }
+                String value = port.toString().trim();
+                if (!value.equals("-1") && !GRPC_PORT_OFF_BY_DEFAULT.matcher(value).matches()) {
+                    violations.add(service.name() + ": grpc.server.port=" + value);
+                }
+            }
+        }
+        assertThat(violations).as("use grpc.server.port: ${<ENV>:-1} until the listener authenticates").isEmpty();
     }
 
     @Test
@@ -161,6 +257,22 @@ class SecurityBaselineFitnessTest {
         return opencrmMap.get("security." + key);
     }
 
+    /** {@code a.b.c} from nested maps, or the flat key {@code "a.b.c"}; null when absent. */
+    private static Object nested(Map<String, Object> document, String... keys) {
+        Object flat = document.get(String.join(".", keys));
+        if (flat != null) {
+            return flat;
+        }
+        Object current = document;
+        for (String key : keys) {
+            if (!(current instanceof Map<?, ?> map)) {
+                return null;
+            }
+            current = map.get(key);
+        }
+        return current;
+    }
+
     private static Path locateServicesDir() {
         Path dir = Path.of("").toAbsolutePath();
         while (dir != null) {
@@ -193,13 +305,17 @@ class SecurityBaselineFitnessTest {
                     }
                 }
                 List<Map<String, Object>> documents = new ArrayList<>();
+                StringBuilder configText = new StringBuilder();
                 Path resources = serviceDir.resolve("src/main/resources");
                 if (Files.isDirectory(resources)) {
                     try (Stream<Path> files = Files.list(resources)) {
                         for (Path file : files.filter(p -> p.getFileName().toString().matches("application.*\\.ya?ml"))
                                 .filter(p -> !p.getFileName().toString().startsWith("application-dev."))
+                                .sorted()
                                 .toList()) {
-                            for (Object document : new Yaml().loadAll(Files.readString(file, StandardCharsets.UTF_8))) {
+                            String text = Files.readString(file, StandardCharsets.UTF_8);
+                            configText.append(text).append('\n');
+                            for (Object document : new Yaml().loadAll(text)) {
                                 if (document instanceof Map<?, ?> map) {
                                     documents.add((Map<String, Object>) map);
                                 }
@@ -208,7 +324,7 @@ class SecurityBaselineFitnessTest {
                     }
                 }
                 result.add(new ServiceSources(serviceDir.getFileName().toString(),
-                        Files.readString(pom, StandardCharsets.UTF_8), javaFiles, documents));
+                        Files.readString(pom, StandardCharsets.UTF_8), javaFiles, documents, configText.toString()));
             }
             return result;
         } catch (IOException e) {
@@ -217,6 +333,6 @@ class SecurityBaselineFitnessTest {
     }
 
     private record ServiceSources(String name, String pom, Map<String, String> javaFiles,
-                                  List<Map<String, Object>> configDocuments) {
+                                  List<Map<String, Object>> configDocuments, String configText) {
     }
 }

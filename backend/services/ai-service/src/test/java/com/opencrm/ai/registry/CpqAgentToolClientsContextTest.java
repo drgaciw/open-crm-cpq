@@ -1,5 +1,6 @@
 package com.opencrm.ai.registry;
 
+import com.opencrm.security.client.OutboundAuth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ class CpqAgentToolClientsContextTest {
     @Test void springSelectsTheProductionConstructorAmongTestOverloads() {
         new ApplicationContextRunner().withUserConfiguration(CpqAgentToolClients.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
+                .withBean(OutboundAuth.class, OutboundAuth::withoutServiceIdentity)
                 .withPropertyValues("opencrm.gateway.base-url=http://127.0.0.1:1")
                 .run(context -> assertThat(context).hasNotFailed().hasSingleBean(CpqAgentToolClients.class));
     }

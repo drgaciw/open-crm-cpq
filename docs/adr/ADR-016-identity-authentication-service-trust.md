@@ -1,6 +1,6 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 and 1 are done; see [Implementation log](#implementation-log).
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0, 1 and 2 are done; see [Implementation log](#implementation-log).
 **Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
 **Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
@@ -208,6 +208,76 @@ Scopes keep Spring's `SCOPE_` mapping, and the principal name is `sub`. Spring S
 - **Step 5:** the go-live gate.
 - Until step 3 there is no login in any environment, so every non-dev `/api/v1/**` call is still refused, exactly as before step 1.
 
+### Step 2: service-to-service calls (2026-09-23)
+
+**Outbound authentication in `libs/security`** (`com.opencrm.security.client`, auto-configured). Every `RestClient` that calls another OpenCRM service takes one of two `OutboundAuth` interceptors:
+
+| Interceptor | Use for | Token sent |
+|-------------|---------|------------|
+| `relayUserToken()` | user-initiated calls to another service's `/api/v1/**` | the caller's bearer token, so the downstream service sees the real actor. With no user token (a Kafka consumer, a scheduler, another thread) it sends the service's own token |
+| `serviceToken()` | calls to `/internal/**` | always the service's own token, because only service identities hold `Internal.Invoke` |
+
+- An `Authorization` header the caller set is left alone.
+- With no token available, the call goes out without one and a WARN is logged once. That is the `dev` case, where every service permits all.
+- With the production marker set in `jwt` mode, a missing token raises `ServiceTokenException`. It is a `RestClientException`, so each client's existing error handling applies.
+
+**Service tokens** come from `ClientCredentialsServiceTokenProvider`, which runs the client-credentials grant against the Entra token endpoint without `oauth2-client` (decision 8).
+- **Credential.** AKS workload identity federation: the projected service-account token named by `AZURE_FEDERATED_TOKEN_FILE` is the `jwt-bearer` client assertion. It is re-read for every token request because kubelet rotates it.
+- **No configuration in AKS.** Client id, tenant, authority and token file default from `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_AUTHORITY_HOST` and `AZURE_FEDERATED_TOKEN_FILE`, which the workload identity webhook injects. The scope defaults to `api://opencrm-api/.default`. Everything can be overridden under `opencrm.security.client.*`.
+- **Caching.** Tokens are cached and refreshed 5 minutes before expiry. If a refresh fails, the cached token is used until it expires.
+- **Secrets.** A client secret is accepted only for local tests against a real tenant, and refused at startup under the production marker.
+- **Hardening.** The token endpoint must use https. Errors report the OAuth `error` code, never the description, the secret or the assertion.
+
+**Service-to-service calls after step 2:**
+
+| Caller → called | Path | Token |
+|-----------------|------|-------|
+| quote → pricing | `/api/v1/pricing/execute`, `/api/v1/pricing/simulate` | user (relay) |
+| quote → approval-routing | `/api/v1/approvals/**` | user (relay) |
+| quote → configuration-engine | `/internal/v1/configurations/evaluate` | service. Before step 2 this went through the gateway |
+| pricing → pricebook | `/internal/v1/price-books/resolve-batch` | service |
+| configuration-engine → product | `/api/v1/configuration/rules/**` | user (relay) |
+| ai-service → gateway (agent tools) | `/api/v1/pricing/execute`, `/api/v1/quotes/*/line-items`, `/api/v1/configuration/validate` | user (relay) |
+| gateway → configuration-engine | `/api/v1/configuration/validate` rewritten to `/api/v1/configurations/evaluate`. Before step 2 it was rewritten to the internal path | the browser's |
+
+External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
+
+**Removed or changed.**
+- **The quote→gateway hairpin is gone.** quote-service calls configuration-engine directly, configured by `services.configuration-engine.url` (`CONFIGURATION_ENGINE_URL`). `services.gateway.url` (`GATEWAY_SERVICE_URL`) is removed.
+- **`/internal/**` is protected in every service.** The step-1 `legacy-open-internal` flag is deleted, along with the pricebook and configuration-engine settings that used it.
+- **configuration-engine also serves evaluate on a public path.** `POST /api/v1/configurations/evaluate` joins the internal path. The gateway's `/api/v1/configuration/validate` and `/api/v1/cpq/configuration/validate` shims now rewrite to the public path, because the internal path would refuse the user's token.
+- **pricing-service's gRPC listener is off by default** (`grpc.server.port: ${PRICING_GRPC_PORT:-1}`).
+
+**Decisions made during implementation.**
+- **`/internal/**` always gets a service token, even for user-initiated calls.** Decision 5 says user-initiated calls relay the user's token, but decision 4 reserves `/internal/**` for `Internal.Invoke`, which user tokens never carry. So pricing→pricebook and quote→configuration-engine send the service token, and the called service sees the calling service, not the user. Both calls are reads that record no actor. A call that must carry the actor goes to `/api/v1/**`.
+- **The gRPC listener was an unauthenticated side door.** pricing-service ran a gRPC server on port 9090, outside the servlet chain. Nothing in the repo calls it: configuration-engine declares a client but never uses it. This ADR had not listed it. It is now off by default, and turning it on requires authenticated gRPC first.
+- **ai-service still calls the gateway.** Its agent tools use the gateway's agent contract, the same one external agents use (F3), and those calls now relay the user's token. This is an allowlisted exception to "domain services never call the gateway". Step 3 decides between two options: the BFF gateway keeps a bearer-token lane for agents, or ai-service calls the services directly.
+- **Correction to decision 1: in v2.0 access tokens, `aud` is the API's client ID.** Entra sets `aud` to the application (client) ID GUID in v2.0 tokens, and to the App ID URI (`api://opencrm-api`) in v1.0 tokens. The tenant issuer `…/v2.0` means v2.0 tokens. Production must therefore set `OPENCRM_SECURITY_JWT_AUDIENCES` to include the API's client ID; keeping `api://opencrm-api` in the list does no harm. Service tokens are still requested with the scope `api://opencrm-api/.default`. Step 5's go-live gate checks this.
+- **The security context does not cross threads.** A user-initiated call made on another thread (`@Async` or an executor) sends the service token. Step 4 decides whether any call that records an actor needs the context propagated.
+
+**Evidence.** Everything below runs in the Docker-free unit gate.
+- `ServiceToServiceContractTest` (libs/security) sends a calling `RestClient` against a called service that runs the baseline chain in-process, with real RS256 tokens. It shows:
+  - `serviceToken()` reaches `/internal/**`;
+  - `relayUserToken()` reaches `/api/v1/**` as the user, and gets 403 on `/internal/**`;
+  - without a user, `relayUserToken()` calls as the service.
+- `ClientCredentialsServiceTokenProviderTest` runs against a local token endpoint. It checks the exact form fields of the workload-identity request, caching, refresh with a re-read assertion, the stale-token fallback, error handling that leaks no secrets, and the https-only rule.
+- `OutboundAuthTest` and `ServiceTokenProvidersTest`.
+- Per service:
+  - `RestClientConfigAuthTest` (quote-service): the user's token goes to pricing and approval-routing, and the service token goes to configuration-engine.
+  - `PricingConfigBeansTest` (pricing-service): the service token goes to pricebook.
+  - Every `SecurityBaselineTest`, pricebook's and configuration-engine's included, now expects `/internal/**` to refuse anonymous callers and user tokens.
+- `SecurityBaselineFitnessTest` gains four checks:
+  - every HTTP client a service builds takes an `OutboundAuth` interceptor, unless it calls an allowlisted external API;
+  - only allowlisted services reference the gateway;
+  - the gateway never routes onto `/internal/**`;
+  - no gRPC listener is on by default.
+
+**Still open after step 2.**
+- **Step 3:** the gateway BFF, including the ai-service→gateway decision.
+- **Step 4:** actor integrity and tier↔role checks. Consumers and schedulers already call out with their service identity through the relay fallback; recording `service:<client-id>` as their actor is step 4.
+- **Step 5:** the go-live gate. It now also covers a workload identity for every calling service, with the `Internal.Invoke` app role assigned, and `OPENCRM_SECURITY_JWT_AUDIENCES` including the API's client ID.
+- Until step 3 there is still no login outside `dev`.
+
 ## Consequences
 
 - **Positive:**
@@ -239,20 +309,21 @@ This ADR is implemented only when all of the following pass in CI. A successful 
   - Every service that records an actor calls `SecurityUtils.getCurrentUserId`.
 - **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token `sub`.
 
-Status on 2026-09-23, after step 1:
+Status on 2026-09-23, after step 2:
 
 | Check | State |
 |-------|-------|
-| Slice tests: anonymous 401 and service-role 403 | **Done** for all 10 servlet services (`SecurityBaselineTest`). In pricebook and CE, `/internal/**` returns 403 only after step 2 |
+| Slice tests: anonymous 401 and service-role 403 | **Done** for all 10 servlet services (`SecurityBaselineTest`), pricebook and CE included since step 2 |
 | Slice test: actor-spoof rejection | Done for quote-service (`ApprovalServiceActorTest`). approval-routing follows in step 4 |
 | First two "ArchUnit" rules (chain origin, no `/internal` `permitAll`) | **Done** as the source-scan `SecurityBaselineFitnessTest`, which the unit gate runs |
 | DTO identity-field rule | Step 4 |
-| GitNexus Cypher checks | Steps 2 and 4. They will be source scans too, because the index is unreliable (review §7) |
+| "Every service with a `RestClient` bean imports the `libs/security` interceptor" | **Done** in step 2, as a source scan in `SecurityBaselineFitnessTest` rather than GitNexus Cypher, because the index is unreliable (review §7). It covers every HTTP client a service builds, with external APIs allowlisted |
+| "Every service that records an actor calls `SecurityUtils.getCurrentUserId`" | Step 4, also as a source scan |
 | quote→approval-routing integration test with a test issuer | Step 4 |
 
 ## Evidence at drafting (HEAD `4a29d31`)
 
-This is the state the ADR was written against. Step 1 changed much of it; see the [Implementation log](#implementation-log).
+This is the state the ADR was written against. Steps 1 and 2 changed much of it; see the [Implementation log](#implementation-log).
 
 - `backend/services/*/src/main/java/com/opencrm/*/config/SecurityConfig.java`: 10 chains. Only `gateway-service` calls `oauth2ResourceServer`. `@Profile("dev")` is absent in approval-routing, configuration-engine, contract-asset-management and document-generation.
 - `backend/services/gateway-service/src/main/resources/application.yml`: `spring.security.oauth2.resourceserver.jwt.issuer-uri` defaults to `…/common/v2.0`; `azure.activedirectory.b2c.enabled: false`.
@@ -268,3 +339,5 @@ Checked 2026-09-22 and rechecked on acceptance, 2026-09-23. Nothing had changed:
 - [Azure AD B2C FAQ: end of sale 1 May 2025, support until at least May 2030](https://learn.microsoft.com/en-us/azure/active-directory-b2c/faq)
 - [Migrate from Azure AD B2C to Microsoft Entra External ID](https://learn.microsoft.com/en-us/entra/external-id/customers/migrate-from-b2c-to-external-id)
 - [RFC 10017: OAuth 2.0 for Browser-Based Applications (BCP 212, Aug 2026)](https://www.rfc-editor.org/info/rfc10017/)
+- [Access token claims reference: `aud` is the API's client ID in v2.0 tokens](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) (step 2 correction to decision 1, checked 2026-09-23)
+- [Use Microsoft Entra Workload ID with AKS: the injected environment, and re-reading `AZURE_FEDERATED_TOKEN_FILE` for every exchange](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) (step 2, checked 2026-09-23)
