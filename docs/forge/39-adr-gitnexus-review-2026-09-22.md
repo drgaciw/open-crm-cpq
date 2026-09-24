@@ -279,6 +279,15 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - Two bypasses closed: the quote-level approve/reject of a `PENDING_APPROVAL` quote (409; decided in the approvals inbox) and decisions on legacy local approvals (409, read-only history).
 >   - `SecurityBaselineFitnessTest` now also refuses identity in request parameters, headers and request types, and hard-coded actors. The quote→approval-routing acceptance test is done, with `oid` in place of `sub`.
 >   - For the owner: who may pass an `IN_REVIEW` review, the discount-tier mapping, and the four-eyes rule. Step 5 adds the `idtyp` optional claim and the approver role assignments.
+> - **ADR-016 rollout step 5: the go-live gate (2026-09-24).**
+>   - A go-live blocker was found and fixed. The gateway never issued the `XSRF-TOKEN` cookie, because WebFlux defers the token until something subscribes to it, so every SPA state change and every logout got 403, in dev too. A filter after CSRF now subscribes; `GatewayCsrfCookieTest` proves the cookie, the header round trip and a form logout.
+>   - The SPA has a sign-out button: a form POST to `/logout` with `_csrf`, which now returns to `/` instead of `/login?logout`.
+>   - Behind the ingress, `SERVER_FORWARD_HEADERS_STRATEGY=framework` makes the Entra `redirect_uri` the public origin. A startup test proves it with and without the setting.
+>   - No secrets in YAML. The `${DB_PASSWORD:postgres}` default is gone from the default profile of all ten services and kept for `dev | test` only, and `SecurityBaselineFitnessTest` refuses secret defaults outside local profiles.
+>   - `infra/entra/opencrm-identity.json` records the app registrations, app roles, the `idtyp` claim, the redirect path, federated credentials and workload identities. The fitness test checks it against the code: every role the code uses, the redirect path, and every service that calls another.
+>   - A startup preflight logs the identity summary. Under the production marker it refuses to start on a non-jwt mode, a missing or multi-tenant issuer, audiences without the API's client ID, or a client secret. Every service's baseline test proves the guard.
+>   - The runbook `docs/runbooks/identity-go-live.md` has the `az`/Graph commands, the environment, the verification checklist and the rollback exercise. The rollback record, and with it F1, stays open until the runbook runs in staging.
+>   - Still for the owner: Prometheus scraping, who may pass an `IN_REVIEW` review, the discount-tier mapping and the four-eyes rule.
 
 ---
 

@@ -35,7 +35,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       external API (allowlisted); services do not call the gateway (allowlisted: the ai-service agent tools);</li>
  *   <li>decision 6: actors come from the verified token. No request parameter, header or request body carries an
  *       identity, and no code records a hard-coded actor such as {@code "system"};</li>
- *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline.</li>
+ *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline;</li>
+ *   <li>step 5 go-live gate: no secret in committed configuration. A secret-named key outside the local profiles is a
+ *       placeholder with no default, or an empty one;</li>
+ *   <li>step 5 go-live gate: {@code infra/entra/opencrm-identity.json}, the Entra configuration to apply, agrees with
+ *       the code: the app roles the code checks, v2.0 tokens, the {@code idtyp} claim, the gateway's redirect path and
+ *       a workload identity for every service that calls another.</li>
  * </ul>
  * It reads source text, like {@code EventContractFitnessTest}: the rules are about what is written, not about beans.
  */
@@ -92,6 +97,14 @@ class SecurityBaselineFitnessTest {
     private static final Map<String, String> SYSTEM_LITERAL_ALLOWLIST = Map.of(
             "ai-service/src/main/java/com/opencrm/ai/selection/execution/OpenRouterExecutionClient.java",
             "the chat message role of a system prompt");
+
+    /** Last key segments that hold secrets (lower case, without dashes and underscores). */
+    private static final Set<String> SECRET_KEYS = Set.of("password", "secret", "clientsecret", "apikey", "accesskey",
+            "accountkey", "privatekey", "connectionstring", "sastoken", "token", "credentials");
+    /** Profiles that only ever run on a laptop or in CI, where a well-known default is allowed. */
+    private static final Set<String> LOCAL_PROFILES = Set.of("dev", "test", "local");
+    /** {@code ${NAME}} or {@code ${NAME:}}: resolved from the environment, no secret default. */
+    private static final Pattern PLACEHOLDER_WITHOUT_DEFAULT = Pattern.compile("^\\$\\{[A-Za-z0-9_.\\-]+:?}$");
 
     private static final Pattern IDENTITY_HEADER_FILTER = Pattern.compile(
             "(?mi)^[^#\\n]*(AddRequestHeader|SetRequestHeader|MapRequestHeader)=\\s*(X-User|X-Actor|X-Auth|Authorization)[^\\n]*");
@@ -325,6 +338,139 @@ class SecurityBaselineFitnessTest {
         return IDENTITY_NAMES.contains(name.toLowerCase(java.util.Locale.ROOT).replace("-", "").replace("_", ""))
                 || name.toLowerCase(java.util.Locale.ROOT).startsWith("x-user")
                 || name.toLowerCase(java.util.Locale.ROOT).startsWith("x-actor");
+    }
+
+    @Test
+    @DisplayName("no secret in committed configuration outside the local profiles (step 5 go-live gate)")
+    @SuppressWarnings("unchecked")
+    void noSecretsInConfiguration() throws IOException {
+        List<String> violations = new ArrayList<>();
+        int checked = 0;
+        for (ServiceSources service : services) {
+            Path resources = servicesDir.resolve(service.name()).resolve("src/main/resources");
+            if (!Files.isDirectory(resources)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(resources)) {
+                for (Path file : files.filter(p -> p.getFileName().toString().matches("application.*\\.ya?ml")).toList()) {
+                    String name = file.getFileName().toString();
+                    Matcher profileFile = Pattern.compile("application-([a-z0-9]+)\\.ya?ml").matcher(name);
+                    if (profileFile.matches() && LOCAL_PROFILES.contains(profileFile.group(1))) {
+                        continue;
+                    }
+                    for (Object document : new Yaml().loadAll(Files.readString(file, StandardCharsets.UTF_8))) {
+                        if (!(document instanceof Map<?, ?> map) || onlyLocalProfiles((Map<String, Object>) map)) {
+                            continue;
+                        }
+                        checked++;
+                        collectSecrets(service.name() + "/" + name, "", map, violations);
+                    }
+                }
+            }
+        }
+        assertThat(checked).as("configuration documents checked").isGreaterThan(10);
+        assertThat(violations)
+                .as("use ${ENV_VAR} with no default; put local defaults in a dev | test profile document")
+                .isEmpty();
+    }
+
+    /** Whether the document is active only in local profiles ({@code spring.config.activate.on-profile}). */
+    private static boolean onlyLocalProfiles(Map<String, Object> document) {
+        Object onProfile = nested(document, "spring", "config", "activate", "on-profile");
+        if (onProfile == null || onProfile.toString().contains("!")) {
+            return false;
+        }
+        return java.util.Arrays.stream(onProfile.toString().split("[|&,()\\s]+"))
+                .filter(profile -> !profile.isBlank())
+                .allMatch(LOCAL_PROFILES::contains);
+    }
+
+    private static void collectSecrets(String file, String prefix, Map<?, ?> map, List<String> violations) {
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            String path = prefix.isEmpty() ? key : prefix + "." + key;
+            if (entry.getValue() instanceof Map<?, ?> child) {
+                collectSecrets(file, path, child, violations);
+                continue;
+            }
+            String last = path.substring(path.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT)
+                    .replace("-", "").replace("_", "");
+            if (!SECRET_KEYS.contains(last) || entry.getValue() == null) {
+                continue;
+            }
+            String value = String.valueOf(entry.getValue()).trim();
+            if (!value.isEmpty() && !PLACEHOLDER_WITHOUT_DEFAULT.matcher(value).matches()) {
+                violations.add(file + ": " + path + "=" + value);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("the Entra manifest agrees with the code: roles, token version, idtyp, redirect, workloads (step 5)")
+    void entraManifestMatchesTheCode() throws IOException {
+        Path manifestFile = servicesDir.getParent().getParent().resolve("infra/entra/opencrm-identity.json");
+        assertThat(manifestFile).as("the Entra manifest").isRegularFile();
+        String manifestText = Files.readString(manifestFile, StandardCharsets.UTF_8);
+        com.fasterxml.jackson.databind.JsonNode manifest = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(manifestText);
+        com.fasterxml.jackson.databind.JsonNode api = manifest.path("api");
+
+        Map<String, String> declaredRoles = new java.util.TreeMap<>();
+        api.path("appRoles").forEach(role -> declaredRoles.put(role.path("value").asText(),
+                role.path("allowedMemberTypes").toString()));
+        Set<String> rolesInCode = new TreeSet<>(Set.of(new OpenCrmSecurityProperties().getInternalRole(), "CPQ.User",
+                "Admin"));
+        Pattern roleReference = Pattern.compile("authorityFor\\(\\s*\"([^\"]+)\"\\s*\\)");
+        for (ServiceSources service : services) {
+            service.javaFiles().values().forEach(text -> {
+                Matcher matcher = roleReference.matcher(text);
+                while (matcher.find()) {
+                    rolesInCode.add(matcher.group(1));
+                }
+            });
+        }
+        assertThat(rolesInCode).as("roles the code checks").contains("DealDesk", "SalesVP", "CFO");
+        assertThat(declaredRoles.keySet()).as("every role the code checks is an app role").containsAll(rolesInCode);
+        assertThat(declaredRoles.get("Internal.Invoke")).as("Internal.Invoke is for applications only")
+                .isEqualTo("[\"Application\"]");
+        rolesInCode.stream().filter(role -> !role.equals("Internal.Invoke")).forEach(role ->
+                assertThat(declaredRoles.get(role)).as(role + " is for users only").isEqualTo("[\"User\"]"));
+
+        assertThat(api.path("requestedAccessTokenVersion").asInt())
+                .as("v2.0 tokens: the issuer is the v2.0 endpoint and aud is the client id").isEqualTo(2);
+        assertThat(api.path("optionalClaims").path("accessToken").toString())
+                .as("idtyp marks service tokens explicitly").contains("\"idtyp\"");
+        assertThat(api.path("delegatedScopes").size()).as("user tokens need a delegated scope (scp)").isPositive();
+
+        ServiceSources gateway = services.stream().filter(s -> s.name().equals("gateway-service")).findFirst()
+                .orElseThrow();
+        Matcher registrationId = Pattern.compile("registrationId\\s*=\\s*\"([^\"]+)\"").matcher(gateway.javaFiles()
+                .get("gateway-service/src/main/java/com/opencrm/gateway/security/GatewayBffProperties.java"));
+        assertThat(registrationId.find()).isTrue();
+        assertThat(manifest.path("gateway").path("redirectPath").asText())
+                .isEqualTo("/login/oauth2/code/" + registrationId.group(1));
+        manifest.path("gateway").path("redirectUris").forEach(uri -> assertThat(uri.asText())
+                .as("redirect URIs are https").startsWith("https://")
+                .endsWith("/login/oauth2/code/" + registrationId.group(1)));
+
+        Map<String, String> workloads = new java.util.TreeMap<>();
+        manifest.path("workloads").forEach(workload -> workloads.put(workload.path("service").asText(),
+                workload.path("appRoles").toString()));
+        for (ServiceSources service : services) {
+            boolean callsInternal = service.javaFiles().values().stream().anyMatch(t -> t.contains("serviceToken()"));
+            boolean callsServices = callsInternal
+                    || service.javaFiles().values().stream().anyMatch(t -> t.contains("relayUserToken()"));
+            if (callsServices) {
+                assertThat(workloads).as(service.name() + " calls other services, so it needs a workload identity")
+                        .containsKey(service.name());
+            }
+            if (callsInternal) {
+                assertThat(workloads.get(service.name())).as(service.name() + " calls /internal/**")
+                        .contains("Internal.Invoke");
+            }
+        }
+        assertThat(manifestText.toLowerCase(java.util.Locale.ROOT))
+                .as("the manifest holds no credential").doesNotContain("clientsecret").doesNotContain("\"password\"");
     }
 
     @Test

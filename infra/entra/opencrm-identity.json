@@ -1,0 +1,114 @@
+{
+  "$comment": [
+    "ADR-016 step 5: the Microsoft Entra configuration OpenCRM expects, one file for every environment.",
+    "Values in {braces} are per environment. There are no secrets here, and there must never be: every credential is a",
+    "federated workload identity. SecurityBaselineFitnessTest (libs/security) fails when this file and the code disagree.",
+    "Apply and verify it with docs/runbooks/identity-go-live.md."
+  ],
+  "tenantIssuer": "https://login.microsoftonline.com/{tenant-id}/v2.0",
+  "api": {
+    "displayName": "opencrm-api",
+    "identifierUri": "api://opencrm-api",
+    "requestedAccessTokenVersion": 2,
+    "appRoleAssignmentRequired": true,
+    "delegatedScopes": [
+      {
+        "value": "access_as_user",
+        "adminConsentDisplayName": "Use OpenCRM as the signed-in user"
+      }
+    ],
+    "optionalClaims": {
+      "accessToken": ["idtyp"]
+    },
+    "appRoles": [
+      {
+        "value": "CPQ.User",
+        "allowedMemberTypes": ["User"],
+        "description": "Uses OpenCRM/CPQ. Decides no approvals."
+      },
+      {
+        "value": "DealDesk",
+        "allowedMemberTypes": ["User"],
+        "description": "Decides DEAL_DESK and MANAGER approvals."
+      },
+      {
+        "value": "SalesVP",
+        "allowedMemberTypes": ["User"],
+        "description": "Decides SALES_VP, DIRECTOR and VP_SALES approvals, and every Deal Desk tier."
+      },
+      {
+        "value": "CFO",
+        "allowedMemberTypes": ["User"],
+        "description": "Decides CFO approvals, and every lower tier."
+      },
+      {
+        "value": "Admin",
+        "allowedMemberTypes": ["User"],
+        "description": "Administers OpenCRM. Decides no approvals."
+      },
+      {
+        "value": "Internal.Invoke",
+        "allowedMemberTypes": ["Application"],
+        "description": "Calls another service's /internal/** API with a service token."
+      }
+    ]
+  },
+  "gateway": {
+    "displayName": "opencrm-gateway",
+    "platform": "web",
+    "registrationId": "entra",
+    "redirectPath": "/login/oauth2/code/entra",
+    "redirectUris": [
+      "https://{crm-host}/login/oauth2/code/entra"
+    ],
+    "postLogoutRedirectPath": "/",
+    "clientCredential": "federated",
+    "serviceAccount": "gateway-service",
+    "apiPermissions": [
+      {
+        "resource": "opencrm-api",
+        "scope": "access_as_user",
+        "adminConsent": true
+      }
+    ],
+    "environment": {
+      "OPENCRM_GATEWAY_LOGIN_CLIENTID": "{gateway client id}",
+      "SERVER_FORWARD_HEADERS_STRATEGY": "framework"
+    }
+  },
+  "workloads": [
+    {
+      "service": "quote-service",
+      "serviceAccount": "quote-service",
+      "appRoles": ["Internal.Invoke"],
+      "calls": "configuration-engine /internal (service token); pricing-service and approval-routing /api/v1 (user token, else service token)"
+    },
+    {
+      "service": "pricing-service",
+      "serviceAccount": "pricing-service",
+      "appRoles": ["Internal.Invoke"],
+      "calls": "pricebook-service /internal (service token)"
+    },
+    {
+      "service": "configuration-engine",
+      "serviceAccount": "configuration-engine",
+      "appRoles": [],
+      "calls": "product-service /api/v1 (user token, else service token)"
+    },
+    {
+      "service": "ai-service",
+      "serviceAccount": "ai-service",
+      "appRoles": [],
+      "calls": "gateway bearer lane (user token, else service token)"
+    }
+  ],
+  "everyService": {
+    "environment": {
+      "OPENCRM_ENV": "prod",
+      "OPENCRM_SECURITY_JWT_ISSUERURI": "{tenantIssuer}",
+      "OPENCRM_SECURITY_JWT_AUDIENCES": "{api client id},api://opencrm-api",
+      "DB_PASSWORD": "{from the secret store, never committed; DB_PASS in ai-service}"
+    },
+    "injectedByWorkloadIdentity": ["AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_AUTHORITY_HOST", "AZURE_FEDERATED_TOKEN_FILE"]
+  }
+}

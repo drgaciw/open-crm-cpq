@@ -10,7 +10,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:opencrm}?currentSchema=crm
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
@@ -167,3 +167,13 @@ logging:
   level:
     com.opencrm: INFO
     org.hibernate.SQL: WARN
+
+---
+# Local and CI only: the well-known development database password. The default profile has no secret
+# defaults, so a deployment without DB_PASSWORD fails at startup instead of trying "postgres" (ADR-016 step 5).
+spring:
+  config:
+    activate:
+      on-profile: dev | test
+  datasource:
+    password: ${DB_PASSWORD:postgres}
