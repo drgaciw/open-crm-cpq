@@ -54,6 +54,9 @@ The gateway has no identity defaults. With no issuer set, every non-`dev` API ca
 | `OPENCRM_GATEWAY_SESSION_COOKIESECURE` | Set `false` only for a plain-http local run | `true` |
 | `OPENCRM_ENV` | `prod` is the production marker: it refuses `dev` mode, a missing login and client secrets | unset |
 | `REDIS_HOST` / `REDIS_PORT` | BFF sessions (Spring Session, cookie `OPENCRM_SESSION`) and rate limiting | `localhost` / `6379` |
+| `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` behind the TLS-terminating ingress, so the login's redirect URI is the public https origin. The ingress must overwrite `X-Forwarded-*` | unset (headers not trusted) |
+
+Production values, the Entra registrations behind them and the go-live checks are in the [identity go-live runbook](runbooks/identity-go-live.md).
 
 Local login through `nx serve`: `frontend/proxy.conf.json` forwards `/oauth2`, `/login/oauth2` and `/logout` to `:8080` without changing the origin, so the redirect URI to register is `http://localhost:4200/login/oauth2/code/entra`.
 
