@@ -41,6 +41,12 @@ public final class TestTokens {
     /** The API audience of ADR-016 decision 1. */
     public static final String AUDIENCE = "api://opencrm-api";
 
+    /**
+     * A made-up client id of the API app registration. Real v2.0 tokens carry it as {@code aud}; production must list it
+     * in {@code opencrm.security.jwt.audiences} (ADR-016 step 5 go-live gate).
+     */
+    public static final String API_CLIENT_ID = "6f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f";
+
     /** The client a user token was issued to ({@code azp}): the gateway's login. */
     public static final String USER_CLIENT_ID = "opencrm-gateway-test";
 

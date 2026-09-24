@@ -1,6 +1,6 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 4 are done; see [Implementation log](#implementation-log).
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 5 are done in the code; see [Implementation log](#implementation-log). Going live still needs the environment work of the [identity go-live runbook](../runbooks/identity-go-live.md), including the recorded rollback exercise.
 **Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
 **Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
@@ -420,6 +420,60 @@ External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
   - nothing yet decides whether a quote needs a tiered approval at all. That is a pricing rule, outside this ADR.
 - **Record-level authorization** stays deferred (decision 7): who may see or change whose quotes and configuration sessions.
 
+### Step 5: the go-live gate (2026-09-24)
+
+The gate had four items: the Entra app registrations, roles and workload identities documented; no secrets in YAML; the production-marker guard verified; a rollback exercise recorded. Steps 2 to 4 added their own. Everything the repository can do is done and checked by the build. What needs a tenant and a cluster is in the [identity go-live runbook](../runbooks/identity-go-live.md), with a checklist and a record to fill in.
+
+**The Entra configuration is a file the build checks.** [`infra/entra/opencrm-identity.json`](../../infra/entra/opencrm-identity.json) describes:
+- the API registration: `api://opencrm-api`, v2.0 tokens, the `access_as_user` scope, the `idtyp` optional claim, and six app roles with their member types (`Internal.Invoke` for applications, the rest for users), with assignment required;
+- the gateway registration: its web redirect path, the admin-consented API permission, and a federated credential for its service account;
+- the four workloads that call other services, with `Internal.Invoke` for quote-service and pricing-service, and the environment of every service.
+
+`SecurityBaselineFitnessTest` fails when the file and the code disagree:
+- every role the code checks is declared, with the right member type;
+- the token version is 2, `idtyp` is requested, and a delegated scope exists;
+- the redirect path matches the gateway's registration id;
+- every service that calls another has a workload identity, and every `/internal` caller has `Internal.Invoke`;
+- the file holds no credential.
+
+**A startup gate in every service (`OpenCrmIdentityPreflight`)**, the gateway included.
+- Each service logs one line: mode, production marker, issuer, audiences and service identity.
+- Under the production marker a service refuses to start, listing every problem at once, when:
+  - the mode is not `jwt`;
+  - the issuer is missing or multi-tenant;
+  - the audiences lack the API's client id, a GUID;
+  - a client secret is configured.
+- **Why the client id.** Step 2 found that v2.0 tokens carry the API's client id as `aud`. A deployment that lists only `api://opencrm-api` would refuse every token: an outage made of configuration. It now fails at startup instead.
+- Every servlet service proves this with its own `application.yml` (`AbstractSecurityBaselineTest.productionMarkerGuards`): the `dev` profile is refused, a missing client id is refused, and the complete configuration starts.
+
+**No secrets in YAML.**
+- Every service defaulted its database password to `postgres` (`${DB_PASSWORD:postgres}`; `${DB_PASS:postgres}` in ai-service). A deployment that missed the variable would have tried a well-known password without a word.
+- The default now lives in a `dev | test` profile document. The default profile requires the variable, so a missing one stops the service at startup.
+- `SecurityBaselineFitnessTest` checks every service's configuration: outside the `dev`, `test` and `local` profiles, no key named like a secret (password, secret, api-key, token and so on) has a literal value or a non-empty default.
+
+**A go-live blocker found and fixed: the SPA never received the `XSRF-TOKEN` cookie.**
+- WebFlux defers the CSRF token and writes the cookie only when something subscribes to it, and nothing in the gateway did.
+- So once the BFF went live, every cookie-authenticated state change from the SPA would have been refused with 403: every POST, and sign-out. `dev` mode had the same fault.
+- The gateway now subscribes to the token on every request, in a filter after the CSRF filter. `GatewayCsrfCookieTest` failed before the fix and passes after it. ADR-004 has a note.
+
+**Behind the ingress.** With `SERVER_FORWARD_HEADERS_STRATEGY=framework` on the gateway, the login's redirect URI is the public https origin. Without it, forwarded headers are not trusted. Both are tested on the packaged gateway (`GatewayApplicationStartupTest`). The ingress must overwrite the `X-Forwarded-*` headers, not append to what the client sent.
+
+**Sign-out (open since step 3).**
+- The toolbar has Sign out. `SessionService` posts a form to `/logout` with the CSRF token in the `_csrf` field. As a page navigation, the browser follows the gateway's redirect to Entra's end-session endpoint.
+- When no Entra session is left, the gateway returns to `/`, instead of Spring's default `/login?logout`, which the SPA does not have.
+
+**Rollback.** The runbook (section 8) has the procedure and the record to fill in. Rollback means redeploying version N-1 with the same configuration, never `mode=dev`, which the production marker refuses. The exercise itself needs staging, so it is not done here; it remains a go-live item.
+
+**Evidence.**
+- libs/security: `OpenCrmIdentityPreflightTest` (5); `productionMarkerGuards` in every service's `SecurityBaselineTest`; `SecurityBaselineFitnessTest` gains two checks: no secrets in configuration, and the Entra manifest matches the code.
+- gateway: `GatewayCsrfCookieTest` (2: the cookie is issued and accepted; sign-out with it lands on `/`); `GatewayApplicationStartupTest` (+1: forwarded headers behind the ingress).
+- FE: `session.service.spec.ts` (3) and the toolbar spec (+1).
+
+**Still open: needs an environment, or the owner.**
+- **In each environment:** apply sections 1 to 5 of the runbook, pass the section 7 checklist, and record the section 8 rollback exercise. These are the only gate items not done.
+- **For the owner:** how Prometheus scrapes metrics; who may pass an `IN_REVIEW` review; the discount-tier mapping and the four-eyes rule.
+- **Record-level authorization** stays deferred (decision 7).
+
 ## Consequences
 
 - **Positive:**
@@ -451,7 +505,7 @@ This ADR is implemented only when all of the following pass in CI. A successful 
   - Every service that records an actor calls `SecurityUtils.getCurrentUserId`.
 - **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token's user (`oid`, amended in step 4 from `sub`, which Entra makes pairwise per client).
 
-Status on 2026-09-23, after step 4:
+Status on 2026-09-24, after step 5:
 
 | Check | State |
 |-------|-------|
@@ -463,6 +517,10 @@ Status on 2026-09-23, after step 4:
 | "Every service that records an actor calls `SecurityUtils.getCurrentUserId`" | **Done** in step 4: actors come from `CurrentActor` (which reads `SecurityUtils`) and the JPA auditor; the fitness test refuses hard-coded actors |
 | quote→approval-routing integration test with a test issuer | **Done** in step 4, in two halves: approval-routing persists the token's `oid` as approver through the real chain (`ApprovalDecisionSecurityTest`), and quote-service relays the user's token to it (`RestClientConfigAuthTest`) |
 | Tier↔role check on approve and reject (decision 7) | **Done** in step 4: `ApprovalAuthority`, with the requester unable to decide their own approval |
+| Go-live: app registrations, app roles and workload identities documented | **Done** in step 5: `infra/entra/opencrm-identity.json` and the runbook; `SecurityBaselineFitnessTest` keeps the file in step with the code |
+| Go-live: no secrets in YAML | **Done** in step 5: database password defaults moved to `dev \| test`; `SecurityBaselineFitnessTest` refuses secret values and defaults elsewhere |
+| Go-live: the production-marker guard verified | **Done** in step 5: `OpenCrmIdentityPreflight` at startup, and `productionMarkerGuards` in every service's `SecurityBaselineTest` |
+| Go-live: rollback exercise recorded | **Open**: needs staging; procedure and record in runbook section 8 |
 | Gateway: login, one relayed token, no forged identity headers | **Done** in step 3: GatewaySecurityChainTest, IdentityRelayFilterTest, and IdentityRelayRoutingTest through real routing. SecurityBaselineFitnessTest checks one tenant, no B2C and no identity-adding route filters |
 
 ## Evidence at drafting (HEAD `4a29d31`)
@@ -488,3 +546,6 @@ Checked 2026-09-22 and rechecked on acceptance, 2026-09-23. Nothing had changed:
 - [Authorization code flow: PKCE `code_verifier`, and `client_assertion` for confidential web apps](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow) (step 3, checked 2026-09-23)
 - [Scopes and permissions: when `.default` prompts for consent](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc#the-default-scope) (step 3, checked 2026-09-23)
 - [Microsoft.Identity.Web credentials: `SignedAssertionFilePath`, the Kubernetes workload-identity assertion, as a web app's client credential](https://learn.microsoft.com/en-us/entra/msidweb/authentication/credentials-overview) (step 3, checked 2026-09-23)
+- [Workload identity on AKS: the managed identity, its federated credential and the service account annotation](https://learn.microsoft.com/en-us/azure/aks/workload-identity-deploy-cluster) (step 5, checked 2026-09-24)
+- [A federated identity credential on an app registration, for the gateway's login](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust) (step 5, checked 2026-09-24)
+- [Assigning an app role (`Internal.Invoke`) to a managed identity, and the token caching delay](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/assign-app-role-managed-identity-powershell) (step 5, checked 2026-09-24)

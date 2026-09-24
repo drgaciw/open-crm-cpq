@@ -1,5 +1,6 @@
 package com.opencrm.security.test;
 
+import com.opencrm.security.OpenCrmPreflightAutoConfiguration;
 import com.opencrm.security.web.OpenCrmSecurityAutoConfiguration;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,8 +8,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +29,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,7 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>health is public; anonymous, expired, forged and wrong-audience requests get 401 with a Bearer challenge;</li>
  *   <li>a user token reaches the user API;</li>
  *   <li>{@code /internal/**} needs the {@code Internal.Invoke} service role: anonymous gets 401, a user token 403,
- *       and a service token 200.</li>
+ *       and a service token 200;</li>
+ *   <li>under the production marker (step 5 go-live gate), {@code dev} mode and an incomplete identity configuration
+ *       refuse to start, and the complete one starts.</li>
  * </ul>
  */
 @ExtendWith(SpringExtension.class)
@@ -136,6 +142,25 @@ public abstract class AbstractSecurityBaselineTest {
         mvc.perform(get(internalPath())
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.service("quote-service", "Internal.Invoke").bearer()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("production marker: dev mode and an incomplete identity refuse to start; the complete one starts")
+    void productionMarkerGuards() {
+        WebApplicationContextRunner production = new WebApplicationContextRunner()
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .withUserConfiguration(BaselineProbeApp.class)
+                .withConfiguration(AutoConfigurations.of(OpenCrmPreflightAutoConfiguration.class))
+                .withPropertyValues("opencrm.env=prod", "opencrm.security.jwt.issuer-uri=" + TestTokens.ISSUER);
+
+        production.withPropertyValues("spring.profiles.active=dev")
+                .run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+                        .hasMessageContaining("dev is not allowed"));
+        production.run(context -> assertThat(context).hasFailed().getFailure().rootCause()
+                .hasMessageContaining("must include the API's client id"));
+        production.withPropertyValues(
+                        "opencrm.security.jwt.audiences=" + TestTokens.API_CLIENT_ID + ",api://opencrm-api")
+                .run(context -> assertThat(context).hasNotFailed());
     }
 
     @Test

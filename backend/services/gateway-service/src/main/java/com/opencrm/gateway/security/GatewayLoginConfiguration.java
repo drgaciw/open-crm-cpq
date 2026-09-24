@@ -84,6 +84,9 @@ public class GatewayLoginConfiguration {
         OidcClientInitiatedServerLogoutSuccessHandler logout =
                 new OidcClientInitiatedServerLogoutSuccessHandler(registrations);
         logout.setPostLogoutRedirectUri(login.getPostLogoutRedirectUri());
+        // Without an Entra session (it already expired) there is no end-session call; land on the app, not on
+        // Spring's default /login?logout, which the SPA does not have.
+        logout.setLogoutSuccessUrl(java.net.URI.create(login.getSuccessUrl()));
 
         log.info("Browser login: Entra registration '{}' for client {} ({})", registration.getRegistrationId(),
                 registration.getClientId(),

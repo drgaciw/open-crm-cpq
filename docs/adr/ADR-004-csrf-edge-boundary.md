@@ -53,6 +53,7 @@ Auth model is unchanged this ADR: gateway JWT/prod auth; services `.authenticate
 > - The gateway checks the CSRF token on every state-changing request that does **not** carry `Authorization: Bearer`. A bearer request (agents, ai-service's agent tools) is authenticated by its token, not by a cookie, so it is exempt. A cross-site page cannot add that header without a CORS preflight, which the allow-list refuses.
 > - `CsrfProtectionFilter` (the Origin/Referer allow-list) is unchanged. `POST /logout` needs the XSRF token too.
 > - The auth-model sentence above is superseded by ADR-016: every service is a resource server, and Azure AD B2C is not used.
+> - *ADR-016 step 5 (2026-09-24):* the gateway never handed out the `XSRF-TOKEN` cookie. WebFlux defers the CSRF token and writes the cookie only when something subscribes to it; nothing did, so the SPA had no token to echo and its state-changing requests got 403. A filter after the CSRF filter now subscribes on every request (`GatewayCsrfCookieTest`). Sign-out posts the token as the `_csrf` form field.
 
 ---
 

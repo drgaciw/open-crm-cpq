@@ -15,6 +15,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -23,8 +24,11 @@ import org.springframework.security.web.server.authentication.logout.DelegatingS
 import org.springframework.security.web.server.authentication.logout.SecurityContextServerLogoutHandler;
 import org.springframework.security.web.server.authentication.logout.WebSessionServerLogoutHandler;
 import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
+import org.springframework.web.server.WebFilter;
+import reactor.core.publisher.Mono;
 
 import java.util.Set;
 
@@ -64,7 +68,8 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf
                 .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
-                .requireCsrfProtectionMatcher(cookieAuthenticatedStateChange()));
+                .requireCsrfProtectionMatcher(cookieAuthenticatedStateChange()))
+                .addFilterAfter(issueCsrfCookie(), SecurityWebFiltersOrder.CSRF);
         if (OpenCrmSecurityAutoConfiguration.mode(security, environment) == SecurityMode.DEV) {
             log.warn("opencrm.security.mode=dev: the gateway permits every request without authentication. "
                     + "Local development only (ADR-016).");
@@ -104,6 +109,18 @@ public class SecurityConfig {
                             .logoutSuccessHandler(login.logoutSuccessHandler()));
         }
         return http.build();
+    }
+
+    /**
+     * WebFlux defers the CSRF token: the {@code XSRF-TOKEN} cookie is only written when something subscribes to the
+     * token. Without this filter the SPA never receives the cookie, so it cannot send {@code X-XSRF-TOKEN}, and every
+     * cookie-authenticated state change, {@code POST /logout} included, is refused (ADR-016 step 5).
+     */
+    static WebFilter issueCsrfCookie() {
+        return (exchange, chain) -> {
+            Mono<CsrfToken> token = exchange.getAttribute(CsrfToken.class.getName());
+            return (token != null ? token : Mono.<CsrfToken>empty()).then(chain.filter(exchange));
+        };
     }
 
     /**
