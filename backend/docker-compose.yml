@@ -386,7 +386,6 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      AZURE_AD_B2C_ENABLED: "false"
     depends_on:
       crm-service:
         condition: service_healthy
