@@ -253,11 +253,13 @@ class CpqGatewayRoutesTest {
                 "Validate shim must match POST /api/v1/configuration/validate");
         assertTrue(yaml.contains("Path=/api/v1/cpq/configuration/validate"),
                 "CPQ validate alias must match POST /api/v1/cpq/configuration/validate");
-        assertTrue(yaml.contains("RewritePath=/api/v1/configuration/validate, /internal/v1/configurations/evaluate"),
-                "Validate must rewrite to CE POST /internal/v1/configurations/evaluate");
+        // ADR-016 step 2: CE's public evaluate, never /internal/** (which refuses user tokens).
+        assertTrue(yaml.contains("RewritePath=/api/v1/configuration/validate, /api/v1/configurations/evaluate"),
+                "Validate must rewrite to CE POST /api/v1/configurations/evaluate");
         assertTrue(yaml.contains(
-                        "RewritePath=/api/v1/cpq/configuration/validate, /internal/v1/configurations/evaluate"),
+                        "RewritePath=/api/v1/cpq/configuration/validate, /api/v1/configurations/evaluate"),
                 "CPQ validate alias must rewrite to CE evaluate");
+        assertFalse(yaml.contains("/internal/"), "The gateway must not route onto /internal/** (ADR-016)");
         assertTrue(yaml.contains("CONFIGURATION_ENGINE_URI") || yaml.contains("http://localhost:8088"),
                 "Validate shim must target configuration-engine URI");
 

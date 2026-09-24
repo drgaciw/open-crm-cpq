@@ -40,9 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <ul>
  *   <li>health is public; anonymous, expired, forged and wrong-audience requests get 401 with a Bearer challenge;</li>
  *   <li>a user token reaches the user API;</li>
- *   <li>{@code /internal/**} needs the {@code Internal.Invoke} service role: a user token gets 403. A service that
- *       still sets the transitional {@code opencrm.security.legacy-open-internal} overrides
- *       {@link #internalAccess()}; ADR-016 step 2 removes that override.</li>
+ *   <li>{@code /internal/**} needs the {@code Internal.Invoke} service role: anonymous gets 401, a user token 403,
+ *       and a service token 200.</li>
  * </ul>
  */
 @ExtendWith(SpringExtension.class)
@@ -51,14 +50,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         initializers = ConfigDataApplicationContextInitializer.class)
 @TestPropertySource(properties = "opencrm.security.jwt.issuer-uri=" + TestTokens.ISSUER)
 public abstract class AbstractSecurityBaselineTest {
-
-    /** How {@code /internal/**} is expected to behave in the service under test. */
-    protected enum InternalAccess {
-        /** The target of ADR-016 decision 4: service token with {@code Internal.Invoke}. */
-        SERVICE_ROLE,
-        /** Anonymous callers still allowed, until ADR-016 rollout step 2 (pricebook and configuration-engine). */
-        LEGACY_OPEN_UNTIL_STEP_2
-    }
 
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
@@ -86,10 +77,6 @@ public abstract class AbstractSecurityBaselineTest {
     /** A path under {@code /internal/**}; the service need not have one yet. */
     protected String internalPath() {
         return "/internal/v1/probe";
-    }
-
-    protected InternalAccess internalAccess() {
-        return InternalAccess.SERVICE_ROLE;
     }
 
     @BeforeEach
@@ -139,10 +126,8 @@ public abstract class AbstractSecurityBaselineTest {
     @Test
     @DisplayName("/internal/** with a user token (no Internal.Invoke) is 403")
     void internalWithUserTokenIsForbidden() throws Exception {
-        ResultMatcher expected = internalAccess() == InternalAccess.SERVICE_ROLE
-                ? status().isForbidden() : status().isOk();
         mvc.perform(get(internalPath()).header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", "CPQ.User").bearer()))
-                .andExpect(expected);
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -154,13 +139,9 @@ public abstract class AbstractSecurityBaselineTest {
     }
 
     @Test
-    @DisplayName("anonymous /internal/** is 401 (legacy services: still open until step 2)")
+    @DisplayName("anonymous /internal/** is 401")
     void anonymousInternal() throws Exception {
-        if (internalAccess() == InternalAccess.SERVICE_ROLE) {
-            mvc.perform(get(internalPath())).andExpect(bearerChallenge());
-        } else {
-            mvc.perform(get(internalPath())).andExpect(status().isOk());
-        }
+        mvc.perform(get(internalPath())).andExpect(bearerChallenge());
     }
 
     private static ResultMatcher bearerChallenge() {

@@ -1,5 +1,6 @@
 package com.opencrm.quote.config;
 
+import com.opencrm.security.client.OutboundAuth;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,41 +9,47 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
+/**
+ * quote-service's clients of other services, each authenticated per ADR-016 decision 5. User-initiated calls to
+ * another service's {@code /api/v1/**} relay the caller's token; calls to {@code /internal/**} carry this service's own
+ * token. quote-service never calls the gateway.
+ */
 @Configuration
 public class RestClientConfig {
 
-    @Value("${services.pricing.url}")
-    private String pricingServiceUrl;
-
-    @Value("${services.gateway.url}")
-    private String gatewayServiceUrl;
-
-    @Value("${services.approval-routing.url}")
-    private String approvalRoutingServiceUrl;
-
+    /** pricing {@code /api/v1/pricing/**}: user-initiated, so the caller's token is relayed. */
     @Bean("pricingRestClient")
-    public RestClient pricingRestClient() {
+    public RestClient pricingRestClient(@Value("${services.pricing.url}") String pricingServiceUrl,
+                                        OutboundAuth outboundAuth) {
         return RestClient.builder()
                 .baseUrl(pricingServiceUrl)
                 .requestFactory(createRequestFactory())
+                .requestInterceptor(outboundAuth.relayUserToken())
                 .build();
     }
 
-    /** Gateway RestClient for S2D-3a validate (structured ConfigurationValidationResult). */
-    @Bean("gatewayRestClient")
-    public RestClient gatewayRestClient() {
+    /**
+     * configuration-engine {@code /internal/v1/configurations/evaluate} for the S2D-3a preflight. Direct, not through
+     * the gateway, and with the service token that {@code /internal/**} requires (ADR-016 step 2).
+     */
+    @Bean("configurationEngineRestClient")
+    public RestClient configurationEngineRestClient(
+            @Value("${services.configuration-engine.url}") String configurationEngineUrl, OutboundAuth outboundAuth) {
         return RestClient.builder()
-                .baseUrl(gatewayServiceUrl)
+                .baseUrl(configurationEngineUrl)
                 .requestFactory(createRequestFactory())
+                .requestInterceptor(outboundAuth.serviceToken())
                 .build();
     }
 
-    /** approval-routing RestClient for S2C-12 single-writer approval records (G4). */
+    /** approval-routing {@code /api/v1/approvals/**} for S2C-12 single-writer approvals (G4): the caller's token. */
     @Bean("approvalRoutingRestClient")
-    public RestClient approvalRoutingRestClient() {
+    public RestClient approvalRoutingRestClient(
+            @Value("${services.approval-routing.url}") String approvalRoutingServiceUrl, OutboundAuth outboundAuth) {
         return RestClient.builder()
                 .baseUrl(approvalRoutingServiceUrl)
                 .requestFactory(createRequestFactory())
+                .requestInterceptor(outboundAuth.relayUserToken())
                 .build();
     }
 

@@ -31,13 +31,8 @@ public class OpenCrmSecurityProperties {
     /** Whether {@code /api-docs/**} and Swagger UI are public in {@code jwt} mode. Off unless a service opts in. */
     private boolean permitApiDocs = false;
 
-    /**
-     * Transitional, removed by ADR-016 rollout step 2: keeps {@code /internal/**} open to anonymous mesh callers, as
-     * the pricebook and configuration-engine chains did before step 1, until those callers send a service token.
-     * Logs a WARN at startup and is refused when the production marker is set. {@code SecurityBaselineFitnessTest}
-     * pins which services may set it.
-     */
-    private boolean legacyOpenInternal = false;
+    /** This service's own identity for machine calls and {@code /internal/**} calls (ADR-016 decision 5). */
+    private final Client client = new Client();
 
     /** Local development versus a real identity provider. */
     public enum SecurityMode {
@@ -67,5 +62,41 @@ public class OpenCrmSecurityProperties {
 
         /** Tolerated clock difference for {@code exp} and {@code nbf}. */
         private Duration clockSkew = Duration.ofSeconds(60);
+    }
+
+    /**
+     * {@code opencrm.security.client.*}: the OAuth 2.0 client-credentials identity of this service. In AKS every value
+     * defaults from the workload identity webhook's environment ({@code AZURE_CLIENT_ID}, {@code AZURE_TENANT_ID},
+     * {@code AZURE_AUTHORITY_HOST}, {@code AZURE_FEDERATED_TOKEN_FILE}), so no configuration and no secret is needed.
+     */
+    @Getter
+    @Setter
+    public static class Client {
+        /** Application (client) id. Defaults to {@code AZURE_CLIENT_ID}. Unset means no service identity. */
+        private String clientId;
+
+        /**
+         * Token endpoint. Defaults to {@code <AZURE_AUTHORITY_HOST><AZURE_TENANT_ID>/oauth2/v2.0/token}, else to the
+         * endpoint of the tenant in {@code opencrm.security.jwt.issuer-uri}.
+         */
+        private String tokenUri;
+
+        /** Requested scope. Defaults to the first accepted audience plus {@code /.default}. */
+        private String scope;
+
+        /**
+         * Projected Kubernetes service-account token sent as the client assertion (workload identity federation).
+         * Defaults to {@code AZURE_FEDERATED_TOKEN_FILE}. Re-read on every token request, because kubelet rotates it.
+         */
+        private String federatedTokenFile;
+
+        /** Client secret, for local tests against a real tenant only. Refused when the production marker is set. */
+        private String clientSecret;
+
+        /** How long before expiry a cached token is replaced. */
+        private Duration refreshBeforeExpiry = Duration.ofMinutes(5);
+
+        /** Connect and read timeout of token requests. */
+        private Duration timeout = Duration.ofSeconds(10);
     }
 }

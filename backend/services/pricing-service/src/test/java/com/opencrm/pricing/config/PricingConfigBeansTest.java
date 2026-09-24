@@ -1,13 +1,20 @@
 package com.opencrm.pricing.config;
 
 import com.opencrm.pricing.execution.PricingAuditLog;
+import com.opencrm.security.client.OutboundAuth;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @DisplayName("Pricing config beans and audit log")
 class PricingConfigBeansTest {
@@ -18,9 +25,19 @@ class PricingConfigBeansTest {
     }
 
     @Test
-    void priceBookRestClient_usesBaseUrl() {
-        RestClient client = new PriceBookClientConfig().priceBookRestClient("http://pricebook.local");
-        assertThat(client).isNotNull();
+    @DisplayName("the price-book client sends pricing-service's own token to /internal (ADR-016 step 2)")
+    void priceBookRestClient_sendsTheServiceToken() {
+        RestClient client = new PriceBookClientConfig().priceBookRestClient("http://pricebook.local",
+                new OutboundAuth(() -> Optional.of("pricing-service-token"), false));
+        RestClient.Builder builder = client.mutate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://pricebook.local/internal/v1/price-books/resolve-batch"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer pricing-service-token"))
+                .andRespond(withSuccess());
+
+        builder.build().post().uri("/internal/v1/price-books/resolve-batch").retrieve().toBodilessEntity();
+
+        server.verify();
     }
 
     @Test

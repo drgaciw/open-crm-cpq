@@ -79,8 +79,9 @@ services:
     url: ${PRICING_SERVICE_URL:http://localhost:8082}
   product:
     url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
-  gateway:
-    url: ${GATEWAY_SERVICE_URL:http://localhost:8080}
+  # ADR-016 step 2: direct, with a service token; quote-service never calls the gateway.
+  configuration-engine:
+    url: ${CONFIGURATION_ENGINE_URL:http://localhost:8088}
   approval-routing:
     url: ${APPROVAL_ROUTING_SERVICE_URL:http://localhost:8085}
 

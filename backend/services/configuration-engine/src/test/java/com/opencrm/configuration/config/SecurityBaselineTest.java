@@ -20,10 +20,4 @@ class SecurityBaselineTest extends AbstractSecurityBaselineTest {
     protected String internalPath() {
         return "/internal/v1/configurations/evaluate";
     }
-
-    /** {@code opencrm.security.legacy-open-internal: true} in application.yml until ADR-016 rollout step 2. */
-    @Override
-    protected InternalAccess internalAccess() {
-        return InternalAccess.LEGACY_OPEN_UNTIL_STEP_2;
-    }
 }

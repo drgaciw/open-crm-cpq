@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
+import com.opencrm.security.client.OutboundAuth;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,10 @@ import java.util.Map;
 
 /**
  * HTTP client for agent-contract CPQ routes via the API gateway.
+ *
+ * <p>ADR-016 step 2: every call relays the bearer token of the user who invoked the agent, so the CPQ services see the
+ * real actor; with no user (a background run) ai-service's own token is sent. Calling the gateway is an allowlisted
+ * exception to decision 5, pinned by {@code SecurityBaselineFitnessTest}; step 3 decides it.
  */
 @Slf4j
 @Component
@@ -36,8 +41,8 @@ public class CpqAgentToolClients {
     @Autowired
     public CpqAgentToolClients(
             @Value("${opencrm.gateway.base-url:http://localhost:8080}") String gatewayBaseUrl,
-            ObjectMapper objectMapper) {
-        this.restClient = buildRestClient(gatewayBaseUrl);
+            ObjectMapper objectMapper, OutboundAuth outboundAuth) {
+        this.restClient = buildRestClient(gatewayBaseUrl, outboundAuth);
         this.objectMapper = objectMapper;
     }
 
@@ -171,13 +176,14 @@ public class CpqAgentToolClients {
         }
     }
 
-    private static RestClient buildRestClient(String gatewayBaseUrl) {
+    private static RestClient buildRestClient(String gatewayBaseUrl, OutboundAuth outboundAuth) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofSeconds(30));
         return RestClient.builder()
                 .baseUrl(gatewayBaseUrl)
                 .requestFactory(factory)
+                .requestInterceptor(outboundAuth.relayUserToken())
                 .build();
     }
 }
