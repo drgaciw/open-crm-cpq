@@ -253,6 +253,17 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - `SecurityBaselineFitnessTest` runs in the unit gate in place of the ArchUnit rules. It checks that no service declares its own chain, that nothing calls `permitAll` on `/internal`, that no committed config sets `mode: dev`, and that every service uses the baseline.
 >   - Transitional: pricebook and CE keep `/internal/**` open through `opencrm.security.legacy-open-internal` until step 2 gives their callers service tokens. The flag is refused under the production marker, and the fitness test pins it to those two services.
 >   - F1 stays open until steps 2–5.
+> - **ADR-016 rollout step 2: service-to-service calls (2026-09-23).**
+>   - `libs/security` now gives every client of another OpenCRM service one of two interceptors:
+>     - `relayUserToken()` for `/api/v1/**`: the caller's token, or the service's own token when there is no user;
+>     - `serviceToken()` for `/internal/**`: always the service's own token.
+>   - Service tokens come from a client-credentials grant with AKS workload identity federation. It needs no configuration in AKS and no secret; a secret is refused under the production marker.
+>   - The quote→gateway hairpin is gone (F11): quote-service calls configuration-engine's internal evaluate directly, with its service token.
+>   - The gateway's validate shim now rewrites to configuration-engine's new public `/api/v1/configurations/evaluate`, never to `/internal/**`.
+>   - `/internal/**` is protected in every service, and the step-1 transitional flag is deleted.
+>   - pricing-service's unauthenticated gRPC listener, which nothing calls, is off by default. The ADR had not listed it.
+>   - `SecurityBaselineFitnessTest` now also checks that every service HTTP client authenticates (external APIs are allowlisted), that services do not call the gateway (ai-service's agent tools are the one allowlisted exception, to be decided in step 3), that the gateway never routes onto `/internal/**`, and that no gRPC listener is on by default.
+>   - Correction to ADR-016 decision 1: v2.0 access tokens carry the API's client ID as `aud`, so production must list it in `OPENCRM_SECURITY_JWT_AUDIENCES`.
 
 ---
 

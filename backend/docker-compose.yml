@@ -232,7 +232,7 @@ services:
       # ADR-018 D1: relay is opt-in; enabling replays any unpublished outbox backlog
       OPENCRM_OUTBOX_RELAY_ENABLED: ${OPENCRM_OUTBOX_RELAY_ENABLED:-false}
       APPROVAL_ROUTING_SERVICE_URL: http://approval-routing:8085
-      GATEWAY_SERVICE_URL: http://gateway-service:8080
+      CONFIGURATION_ENGINE_URL: http://configuration-engine:8088
     depends_on:
       postgres:
         condition: service_healthy
