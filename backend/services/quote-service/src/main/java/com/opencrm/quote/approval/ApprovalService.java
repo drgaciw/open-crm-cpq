@@ -9,7 +9,6 @@ import com.opencrm.quote.quote.ApprovalState;
 import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
-import com.opencrm.security.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -30,6 +29,11 @@ import java.util.Set;
  * Single-writer: approval <em>records</em> are created/updated in approval-routing.
  * This service only projects {@link Quote} status / approvalState / approvalTier.
  * Dual-read GETs may fall back to legacy local {@code approval_requests} rows.
+ * <p>
+ * Identity and authority (ADR-016 decisions 6 and 7): the quote BFF sends no requester or approver. It relays the
+ * user's token, and approval-routing records that user and checks that their role may decide the tier. A legacy local
+ * approval, one approval-routing does not know, is history only: deciding it is refused, because it would bypass that
+ * check.
  */
 @Slf4j
 @Service
@@ -40,19 +44,16 @@ public class ApprovalService {
     private final QuoteRepository quoteRepository;
     private final ApprovalRoutingClient approvalRoutingClient;
     private final boolean legacyLocalReadEnabled;
-    private final boolean allowUnverifiedActor;
 
     public ApprovalService(
             ApprovalRequestRepository approvalRepository,
             QuoteRepository quoteRepository,
             ApprovalRoutingClient approvalRoutingClient,
-            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled,
-            @Value("${approvals.allow-unverified-actor:false}") boolean allowUnverifiedActor) {
+            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled) {
         this.approvalRepository = approvalRepository;
         this.quoteRepository = quoteRepository;
         this.approvalRoutingClient = approvalRoutingClient;
         this.legacyLocalReadEnabled = legacyLocalReadEnabled;
-        this.allowUnverifiedActor = allowUnverifiedActor;
     }
 
     public ApprovalRequestDto submitForApproval(Long quoteId, ApprovalSubmitRequest request) {
@@ -68,11 +69,9 @@ public class ApprovalService {
             );
         }
 
-        String requester = resolveActor(request.getRequestedBy());
         RoutingApprovalDto remote = approvalRoutingClient.submit(RoutingApprovalSubmitRequest.builder()
                 .quoteId(String.valueOf(quoteId))
                 .tier(request.getTier().name())
-                .requesterId(requester)
                 .reason("Quote approval submitted via BFF")
                 .build());
 
@@ -88,34 +87,45 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {
-        String approver = resolveActor(request != null ? request.getApprover() : null);
         try {
-            RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId, approver);
+            RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.APPROVED, ApprovalState.APPROVED);
-            log.info("Approval {} approved via routing for quote {}", approvalId, remote.getQuoteId());
+            log.info("Approval {} approved via routing for quote {} by {}",
+                    approvalId, remote.getQuoteId(), remote.getApproverId());
             return toDtoFromRouting(remote);
         } catch (ResourceNotFoundException ex) {
-            if (!legacyLocalReadEnabled) {
-                throw ex;
-            }
-            return approveLegacyLocal(approvalId, request, approver);
+            throw notInRouting(approvalId, ex);
         }
     }
 
     public ApprovalRequestDto rejectRequest(Long approvalId, ApprovalResponseRequest request) {
-        String approver = resolveActor(request != null ? request.getApprover() : null);
         String comments = request != null ? request.getComments() : null;
         try {
-            RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, approver, comments);
+            RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.REJECTED, ApprovalState.REJECTED);
-            log.info("Approval {} rejected via routing for quote {}", approvalId, remote.getQuoteId());
+            log.info("Approval {} rejected via routing for quote {} by {}",
+                    approvalId, remote.getQuoteId(), remote.getApproverId());
             return toDtoFromRouting(remote);
         } catch (ResourceNotFoundException ex) {
-            if (!legacyLocalReadEnabled) {
-                throw ex;
-            }
-            return rejectLegacyLocal(approvalId, request, approver);
+            throw notInRouting(approvalId, ex);
         }
+    }
+
+    /**
+     * An approval approval-routing does not know. A legacy local row is readable history but cannot be decided here:
+     * that would skip approval-routing's role check (ADR-016 decision 7) and write a second store (ADR-013).
+     */
+    private RuntimeException notInRouting(Long approvalId, ResourceNotFoundException notFound) {
+        if (legacyLocalReadEnabled && approvalRepository.findByIdAndDeletedFalse(approvalId).isPresent()) {
+            log.warn("Refused a decision on legacy local approval {}: it predates approval-routing", approvalId);
+            return new BusinessException(
+                    "Approval " + approvalId + " predates approval-routing and can no longer be decided; "
+                            + "submit the quote for approval again",
+                    HttpStatus.CONFLICT,
+                    "LEGACY_APPROVAL_READ_ONLY"
+            );
+        }
+        return notFound;
     }
 
     @Transactional(readOnly = true)
@@ -199,60 +209,6 @@ public class ApprovalService {
         return result;
     }
 
-    private ApprovalRequestDto approveLegacyLocal(
-            Long approvalId, ApprovalResponseRequest request, String approver) {
-        ApprovalRequest approval = approvalRepository.findByIdAndDeletedFalse(approvalId)
-                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", approvalId));
-
-        if (approval.getStatus() != ApprovalStatus.PENDING) {
-            throw new BusinessException("Approval request is not pending", "APPROVAL_NOT_PENDING");
-        }
-
-        approval.setStatus(ApprovalStatus.APPROVED);
-        approval.setApprover(approver);
-        if (request != null) {
-            approval.setComments(request.getComments());
-        }
-        approval.setRespondedAt(Instant.now());
-        ApprovalRequest saved = approvalRepository.save(approval);
-
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(approval.getQuoteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", approval.getQuoteId()));
-        quote.setStatus(QuoteStatus.APPROVED);
-        quote.setApprovalState(ApprovalState.APPROVED);
-        quoteRepository.save(quote);
-
-        log.info("Legacy local approval {} approved for quote {}", approvalId, quote.getQuoteNumber());
-        return toDto(saved);
-    }
-
-    private ApprovalRequestDto rejectLegacyLocal(
-            Long approvalId, ApprovalResponseRequest request, String approver) {
-        ApprovalRequest approval = approvalRepository.findByIdAndDeletedFalse(approvalId)
-                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", approvalId));
-
-        if (approval.getStatus() != ApprovalStatus.PENDING) {
-            throw new BusinessException("Approval request is not pending", "APPROVAL_NOT_PENDING");
-        }
-
-        approval.setStatus(ApprovalStatus.REJECTED);
-        approval.setApprover(approver);
-        if (request != null) {
-            approval.setComments(request.getComments());
-        }
-        approval.setRespondedAt(Instant.now());
-        ApprovalRequest saved = approvalRepository.save(approval);
-
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(approval.getQuoteId())
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", approval.getQuoteId()));
-        quote.setStatus(QuoteStatus.REJECTED);
-        quote.setApprovalState(ApprovalState.REJECTED);
-        quoteRepository.save(quote);
-
-        log.info("Legacy local approval {} rejected for quote {}", approvalId, quote.getQuoteNumber());
-        return toDto(saved);
-    }
-
     private void applyQuoteDecision(String quoteIdRaw, QuoteStatus status, ApprovalState state) {
         Long quoteId = parseQuoteId(quoteIdRaw);
         Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
@@ -274,46 +230,6 @@ public class ApprovalService {
                     "INVALID_ROUTING_QUOTE_ID"
             );
         }
-    }
-
-    /**
-     * ADR-016 phase 0: the acting user comes from the authenticated principal, never from
-     * the request body.
-     * <ul>
-     *   <li>With an authenticated principal, the principal is the actor. A body value naming
-     *       anyone else is refused with 403 rather than silently replaced, so a spoofing
-     *       attempt is visible to the caller and in the log.</li>
-     *   <li>With no authenticated principal the decision cannot be attributed. That is only
-     *       reachable where the filter chain admits anonymous callers (the local {@code dev}
-     *       chain). It is refused with 401 unless {@code approvals.allow-unverified-actor} is
-     *       set, which only the {@code dev} profile does; the body value is then recorded as an
-     *       unverified label, or {@code system} when absent.</li>
-     * </ul>
-     */
-    String resolveActor(String asserted) {
-        String claimed = asserted == null || asserted.isBlank() ? null : asserted.trim();
-        Optional<String> principal = SecurityUtils.getCurrentUser().map(user -> user.getUserId());
-        if (principal.isPresent()) {
-            if (claimed != null && !claimed.equals(principal.get())) {
-                log.warn("Refused approval actor '{}': authenticated principal is '{}'", claimed, principal.get());
-                throw new BusinessException(
-                        "Actor in the request does not match the authenticated user",
-                        HttpStatus.FORBIDDEN,
-                        "ACTOR_MISMATCH"
-                );
-            }
-            return principal.get();
-        }
-        if (!allowUnverifiedActor) {
-            throw new BusinessException(
-                    "An authenticated user is required to act on approvals",
-                    HttpStatus.UNAUTHORIZED,
-                    "AUTHENTICATION_REQUIRED"
-            );
-        }
-        String actor = claimed != null ? claimed : "system";
-        log.warn("Recording unverified approval actor '{}' (approvals.allow-unverified-actor=true)", actor);
-        return actor;
     }
 
     private ApprovalRequestDto toDtoFromRouting(RoutingApprovalDto remote) {

@@ -1,5 +1,7 @@
 package com.opencrm.quote.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -8,15 +10,21 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
 /**
  * HTTP client for approval-routing (canonical approval writer for S2C-12).
+ * <p>
+ * It sends no identity: approval-routing records the caller of the relayed user token as requester or approver, and
+ * decides whether their role may decide the tier (ADR-016 decisions 6 and 7). Its refusals (401, 403, 409) reach the
+ * caller with approval-routing's status, code and message instead of turning into a 502.
  */
 @Slf4j
 @Component
@@ -26,6 +34,7 @@ public class ApprovalRoutingClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<List<RoutingApprovalDto>>> LIST =
             new ParameterizedTypeReference<>() {};
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RestClient approvalRoutingRestClient;
 
@@ -41,6 +50,9 @@ public class ApprovalRoutingClient {
                     .uri("/api/v1/approvals")
                     .body(request)
                     .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_SUBMIT_FAILED");
+                    })
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw new BusinessException(
                                 "approval-routing submit failed with HTTP " + res.getStatusCode().value(),
@@ -154,17 +166,19 @@ public class ApprovalRoutingClient {
         }
     }
 
-    public RoutingApprovalDto approve(Long approvalId, String approverId) {
-        log.debug("Approving routing approval {} by {}", approvalId, approverId);
+    public RoutingApprovalDto approve(Long approvalId) {
+        log.debug("Approving routing approval {}", approvalId);
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/approvals/{id}/approve")
-                            .queryParam("approverId", approverId)
                             .build(approvalId))
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
                         throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+                    })
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_APPROVE_FAILED");
                     })
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw new BusinessException(
@@ -186,19 +200,21 @@ public class ApprovalRoutingClient {
         }
     }
 
-    public RoutingApprovalDto reject(Long approvalId, String approverId, String reason) {
-        log.debug("Rejecting routing approval {} by {}", approvalId, approverId);
+    public RoutingApprovalDto reject(Long approvalId, String reason) {
+        log.debug("Rejecting routing approval {}", approvalId);
         String safeReason = (reason == null || reason.isBlank()) ? "Rejected via quote BFF" : reason;
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/approvals/{id}/reject")
-                            .queryParam("approverId", approverId)
                             .queryParam("reason", safeReason)
                             .build(approvalId))
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
                         throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+                    })
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_REJECT_FAILED");
                     })
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
                         throw new BusinessException(
@@ -228,5 +244,30 @@ public class ApprovalRoutingClient {
             throw new BusinessException(message, HttpStatus.BAD_GATEWAY, errorCode);
         }
         return response.getData();
+    }
+
+    /** 401, 403 and 409 are approval-routing's decisions about the caller or the request, not a gateway failure. */
+    private static boolean isRefusal(HttpStatusCode status) {
+        int code = status.value();
+        return code == 401 || code == 403 || code == 409;
+    }
+
+    /** approval-routing's refusal with its status, error code and message, e.g. 403 {@code APPROVER_ROLE_REQUIRED}. */
+    private static BusinessException refusal(ClientHttpResponse response, String fallbackCode) throws IOException {
+        HttpStatus status = HttpStatus.valueOf(response.getStatusCode().value());
+        String message = "approval-routing refused the request (HTTP " + status.value() + ")";
+        String code = fallbackCode;
+        try {
+            JsonNode body = JSON.readTree(response.getBody());
+            if (body != null && body.hasNonNull("message")) {
+                message = body.get("message").asText();
+            }
+            if (body != null && body.hasNonNull("errorCode")) {
+                code = body.get("errorCode").asText();
+            }
+        } catch (IOException unreadable) {
+            log.debug("approval-routing refusal without a readable body", unreadable);
+        }
+        return new BusinessException(message, status, code);
     }
 }

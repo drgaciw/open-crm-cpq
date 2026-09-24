@@ -88,10 +88,8 @@ services:
 # Dual-read legacy local approval_requests when routing has no row (pre-cutover IDs).
 approvals:
   legacy-local-read-enabled: ${APPROVALS_LEGACY_LOCAL_READ:true}
-  # ADR-016 phase 0: approve/reject/submit take the actor from the authenticated principal.
-  # With no principal they are refused (401) unless this is true; only the dev profile below
-  # turns it on, because only the dev filter chain admits anonymous callers.
-  allow-unverified-actor: ${APPROVALS_ALLOW_UNVERIFIED_ACTOR:false}
+  # Requester and approver come from the token, recorded by approval-routing (ADR-016 step 4).
+  # There is no switch for unverified actors: only opencrm.security.mode=dev allows them.
 
 # Jev advisory decision support (ADR-015). Inert by default: every flag is false and the
 # transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so
@@ -110,14 +108,3 @@ opencrm:
       enabled: ${JEV_QUOTE_TIER_SUGGESTION_ENABLED:false}
       rubric-version: quote-tier-v1
       min-confidence: 0.6
-
----
-# Local dev: the dev SecurityFilterChain is permitAll, so there is no principal to take the
-# approval actor from. Record the body value (or "system") as an unverified label instead of
-# refusing every decision. Never enable this outside dev.
-spring:
-  config:
-    activate:
-      on-profile: dev
-approvals:
-  allow-unverified-actor: true

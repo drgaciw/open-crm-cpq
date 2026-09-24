@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 /**
  * Create/submit payload for quote BFF → approval-routing (S2C-12 / Wave G3).
  * Internal to agents; agent-facing URLs remain under {@code /api/v1/quotes/{id}/approvals}.
+ * The requester is the authenticated caller, never a field (ADR-016 decision 6).
  */
 @Data
 @Builder
@@ -25,9 +26,6 @@ public class ApprovalSubmitRequest {
 
     @NotNull(message = "tier is required")
     private QuoteApprovalTier tier;
-
-    /** Defaults to {@code system} when omitted. */
-    private String requesterId;
 
     private String lineId;
 
