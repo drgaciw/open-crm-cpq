@@ -49,6 +49,11 @@ Jules PRs **#402** / **#404** proposed enabling Cookie CSRF across microservices
 
 Auth model is unchanged this ADR: gateway JWT/prod auth; services `.authenticated()` on `/api/v1/**`; health/docs public. Full Azure AD B2C resource-server rollout is out of scope.
 
+> **Update 2026-09-23 ([ADR-016](ADR-016-identity-authentication-service-trust.md) step 3).** The gateway is now a backend-for-frontend: the browser holds only a session cookie, so this ADR's cookie CSRF is load-bearing, as ADR-016 decision 2 said it would be.
+> - The gateway checks the CSRF token on every state-changing request that does **not** carry `Authorization: Bearer`. A bearer request (agents, ai-service's agent tools) is authenticated by its token, not by a cookie, so it is exempt. A cross-site page cannot add that header without a CORS preflight, which the allow-list refuses.
+> - `CsrfProtectionFilter` (the Origin/Referer allow-list) is unchanged. `POST /logout` needs the XSRF token too.
+> - The auth-model sentence above is superseded by ADR-016: every service is a resource server, and Azure AD B2C is not used.
+
 ---
 
 ## Options considered

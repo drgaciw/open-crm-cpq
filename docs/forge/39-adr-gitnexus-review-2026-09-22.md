@@ -264,6 +264,14 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - pricing-service's unauthenticated gRPC listener, which nothing calls, is off by default. The ADR had not listed it.
 >   - `SecurityBaselineFitnessTest` now also checks that every service HTTP client authenticates (external APIs are allowlisted), that services do not call the gateway (ai-service's agent tools are the one allowlisted exception, to be decided in step 3), that the gateway never routes onto `/internal/**`, and that no gRPC listener is on by default.
 >   - Correction to ADR-016 decision 1: v2.0 access tokens carry the API's client ID as `aud`, so production must list it in `OPENCRM_SECURITY_JWT_AUDIENCES`.
+> - **ADR-016 rollout step 3: the gateway BFF (2026-09-23).**
+>   - The gateway is a confidential Entra client when `OPENCRM_GATEWAY_LOGIN_CLIENTID` is set: authorization code with PKCE, tokens in a Spring Session on Redis, and only an `HttpOnly` session cookie in the browser. It authenticates to Entra with the AKS workload-identity assertion; a secret is for local runs only.
+>   - A bearer lane stays for agents and ai-service's agent tools, which settles the step-2 question. Bearer requests are exempt from cookie CSRF; cookie requests are not (ADR-004 note added).
+>   - `IdentityRelayFilter` strips every inbound identity header and relays exactly one validated token upstream, instead of SCG `TokenRelay`. A routing test proves forged `X-User-Id`/`X-Actor` never reach a service.
+>   - API calls get 401 with an `X-OpenCRM-Login` hint; the SPA's only change is an interceptor that follows it, once per 30 seconds.
+>   - B2C and the gateway's `common` issuer default are gone; the production marker now also requires the login. The gateway actuator is down to health and info.
+>   - `SecurityBaselineFitnessTest` now also checks that the gateway trusts one tenant and that no route adds identity headers.
+>   - Step 5 gains: the gateway's app registration (redirect URIs, federated credential, admin consent), forwarded headers at the ingress, Redis for sessions, and Prometheus scraping.
 
 ---
 
