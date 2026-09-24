@@ -56,11 +56,11 @@ class SecurityBaselineFitnessTest {
 
     /**
      * Services that call the gateway, with the reason. Decision 5: domain services never call the gateway. The
-     * ai-service agent tools use the gateway's agent contract, like external agents do (F3); rollout step 3 decides
-     * whether that stays, since the BFF gateway must then keep a bearer-token lane.
+     * ai-service agent tools use the gateway's agent contract, like external agents do (F3). Rollout step 3 kept that:
+     * the gateway's bearer lane validates the relayed token and forwards it unchanged.
      */
     private static final Map<String, String> GATEWAY_CALLER_ALLOWLIST = Map.of(
-            "ai-service", "agent tools on the gateway agent contract (F3), user token relayed; revisit in step 3");
+            "ai-service", "agent tools on the gateway's bearer lane (F3 agent contract), user token relayed (step 3)");
 
     private static final Pattern OWN_CHAIN = Pattern.compile(
             "\\bSecurityFilterChain\\b|@EnableWebSecurity\\b|WebSecurityConfigurerAdapter|\\.oauth2ResourceServer\\s*\\(");
@@ -72,6 +72,8 @@ class SecurityBaselineFitnessTest {
     private static final Pattern GATEWAY_URL_KEY = Pattern.compile("services\\.gateway|opencrm\\.gateway|GATEWAY_SERVICE_URL");
     private static final Pattern ROUTE_ONTO_INTERNAL = Pattern.compile("(?m)^[^#\\n]*(RewritePath|Path)=[^\\n]*/internal");
     private static final Pattern GRPC_PORT_OFF_BY_DEFAULT = Pattern.compile("^\\$\\{[A-Za-z0-9_.]+:-1}$");
+    private static final Pattern IDENTITY_HEADER_FILTER = Pattern.compile(
+            "(?mi)^[^#\\n]*(AddRequestHeader|SetRequestHeader|MapRequestHeader)=\\s*(X-User|X-Actor|X-Auth|Authorization)[^\\n]*");
 
     private static Path servicesDir;
     private static List<ServiceSources> services;
@@ -193,6 +195,32 @@ class SecurityBaselineFitnessTest {
             routes.add(matcher.group().trim());
         }
         assertThat(routes).as("route to the service's public /api/v1 path instead").isEmpty();
+    }
+
+    @Test
+    @DisplayName("the gateway trusts one tenant: no multi-tenant issuer, no Azure AD B2C (D1, D8)")
+    void gatewayTrustsOneTenant() {
+        ServiceSources gateway = services.stream().filter(s -> s.name().equals("gateway-service")).findFirst()
+                .orElseThrow();
+        String config = gateway.configText().toLowerCase(java.util.Locale.ROOT);
+        assertThat(config).doesNotContainPattern("://[a-z0-9.-]+/(common|organizations|consumers)\\b")
+                .doesNotContain("b2c");
+        assertThat(gateway.pom()).doesNotContain("active-directory-b2c");
+    }
+
+    @Test
+    @DisplayName("gateway routes add no identity headers; identity is relayed only as a validated token (D3)")
+    void gatewayRoutesAddNoIdentityHeaders() {
+        ServiceSources gateway = services.stream().filter(s -> s.name().equals("gateway-service")).findFirst()
+                .orElseThrow();
+        Matcher matcher = IDENTITY_HEADER_FILTER.matcher(gateway.configText());
+        List<String> filters = new ArrayList<>();
+        while (matcher.find()) {
+            filters.add(matcher.group().trim());
+        }
+        assertThat(filters).isEmpty();
+        assertThat(gateway.javaFiles().keySet())
+                .contains("gateway-service/src/main/java/com/opencrm/gateway/security/IdentityRelayFilter.java");
     }
 
     @Test

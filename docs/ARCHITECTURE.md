@@ -182,10 +182,10 @@ Per-service package convention: `com.opencrm.{service}/{config,controller,servic
 
 | Layer | Landed (verified 2026-09-19) |
 |-------|--------|
-| Gateway | `CookieServerCsrfTokenRepository.withHttpOnlyFalse` + `ServerCsrfTokenRequestAttributeHandler` (`SecurityConfig.java`, dev + prod chains) + `CsrfProtectionFilter` Origin/Referer allow-list; `security.csrf.allowed-origins` = `CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` (default `http://localhost:4200`). **No** `*`/`*.azurewebsites.net` |
-| Gateway auth | dev profile: `permitAll` (CSRF still on); default profile: JWT `oauth2ResourceServer`, `/actuator|api-docs|swagger-ui` public, rest `authenticated()` |
+| Gateway | `CookieServerCsrfTokenRepository.withHttpOnlyFalse` + `ServerCsrfTokenRequestAttributeHandler` (`SecurityConfig.java`; since ADR-016 step 3 a state-changing request with `Authorization: Bearer` is exempt, a cookie-session one is not) + `CsrfProtectionFilter` Origin/Referer allow-list; `security.csrf.allowed-origins` = `CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` (default `http://localhost:4200`). **No** `*`/`*.azurewebsites.net` |
+| Gateway auth | [ADR-016](adr/ADR-016-identity-authentication-service-trust.md) step 3: a BFF login (Entra authorization code + PKCE, confidential client, tokens in a Spring Session on Redis) when `OPENCRM_GATEWAY_LOGIN_CLIENTID` is set, and a bearer lane for agents. The gateway strips inbound identity headers and relays one validated token. `/actuator/health|info` public, API docs only when permitted, the rest `authenticated()`. `dev` mode: `permitAll` (CSRF still on) |
 | Domain services | `csrf.disable()` + `STATELESS` (Bearer/mesh) — verified in crm-service; **do not** merge Jules #402/#404 Cookie CSRF on microservices |
-| Identity | Azure AD B2C config present, **`enabled: false` by default** (`AZURE_AD_B2C_ENABLED:false` in compose); AAD-B2C autoconfig excluded on Boot 4 |
+| Identity | Workforce Entra ID, one tenant ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md)). Azure AD B2C is removed from the gateway (step 3); some services still exclude the spring-cloud-azure AAD-B2C autoconfig on Boot 4 |
 | `SECURITY_OPEN` | Must not be a production-reachable bypass |
 | GitNexus | `CsrfProtectionFilter` / `SecurityConfig` often **UNKNOWN** — confirm with `rg` before edits |
 
@@ -270,7 +270,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | AI | `ai-service` AgentRouter; **runtime Azure OpenAI `gpt-4o`** | [ADR-014](adr/ADR-014-jev-openrouter-model-selection.md) Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending** |
 | Rules | Drools DRL on pricing; CE `ProductRuleEvaluationCore`; port abstraction ([ADR-012](adr/ADR-012-rules-engine-port-abstraction.md)); OpenL **not** required | OpenL Tablets + full Drools / full SpEL **held** |
 | Events | Kafka + outbox + `v1` published language ([ADR-010](adr/ADR-010-kafka-outbox-events.md)); document-generation consumer | Kafka S2B-9 rule invalidation, agent Kafka #241 **held** |
-| Identity | Gateway JWT config present; Azure AD B2C **`enabled: false` by default** | Full OAuth2/OIDC identity service |
+| Identity | Entra ID login at the gateway BFF; every service a resource server ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md) steps 0–3) | Actor integrity and role checks (step 4); go-live gate: app registrations, workload identities, consent (step 5) |
 | Search | CRM/quote list + `PageInfo` over gateway | Elasticsearch 8 **not in tree** |
 | Comms | Gateway stubs `/api/v1/emails/**` etc. → `communication-service` (**not** in Maven reactor) | Twilio / SendGrid / WhatsApp hub. **#430 on `main` — do not undo** |
 | Activities | **No** schema, controller, or FE | Do **not** invent `/api/v1/activities/**` |

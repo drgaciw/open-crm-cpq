@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * Responsibilities:
  * - Route requests to appropriate microservices
- * - Authentication via Azure AD B2C
+ * - Authentication: backend-for-frontend login against Microsoft Entra ID, plus a bearer lane for agents (ADR-016)
  * - Rate limiting
  * - Request/Response logging
  * - Circuit breaker patterns

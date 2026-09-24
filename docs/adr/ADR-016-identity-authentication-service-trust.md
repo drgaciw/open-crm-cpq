@@ -1,6 +1,6 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0, 1 and 2 are done; see [Implementation log](#implementation-log).
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 3 are done; see [Implementation log](#implementation-log).
 **Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
 **Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
@@ -278,6 +278,73 @@ External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
 - **Step 5:** the go-live gate. It now also covers a workload identity for every calling service, with the `Internal.Invoke` app role assigned, and `OPENCRM_SECURITY_JWT_AUDIENCES` including the API's client ID.
 - Until step 3 there is still no login outside `dev`.
 
+### Step 3: the gateway BFF (2026-09-23)
+
+**Two ways in, one chain.** The gateway runs one reactive chain with two lanes:
+
+| Lane | Caller | Credential | CSRF (ADR-004) |
+|------|--------|------------|----------------|
+| Browser (BFF) | the Angular SPA | the session cookie `OPENCRM_SESSION` (`HttpOnly`, `Secure`, `SameSite=Lax`). Tokens stay in the server-side session | required on every state-changing request |
+| Bearer | agents (F3) and ai-service's agent tools | `Authorization: Bearer`, validated like every service validates it (tenant issuer, audience, clock skew) | exempt |
+
+**Login (decision 2).**
+- The login is on when `OPENCRM_GATEWAY_LOGIN_CLIENTID` names the gateway's Entra app registration. It is the authorization-code flow with PKCE (S256); Spring Security adds `state` and `nonce`.
+- **Registration.** It is built from the tenant issuer, without discovery: the authorize, token and JWKS endpoints, and `end_session_endpoint` for logout. It declares no userinfo endpoint. So the gateway reads identity from the validated ID token, never sends the API access token to Microsoft Graph, and does not call Entra at startup.
+- **Issuer.** It must be a tenant-specific v2.0 issuer. `common`, `organizations` and `consumers` are refused (decision 1).
+- **Scopes.** `openid profile offline_access api://opencrm-api/.default`. The access token is for the OpenCRM API, and the refresh token lets the gateway renew it without the user.
+- **Confidential client without a secret.** The gateway authenticates to the token endpoint, for code redemption and for refresh, with the workload-identity assertion from `AZURE_FEDERATED_TOKEN_FILE`. It is re-read for every request, as for step 2's service tokens. A client secret works only for local runs against a real tenant, and is refused under the production marker.
+- **After login** the browser returns to the page it was navigating to (Spring Security's saved request), or to `/` when the login started from an API call. Spring Security changes the session ID when it stores the login, which prevents session fixation.
+- **Logout.** `POST /logout` (with the CSRF token) ends the session and redirects to Entra's end-session endpoint (RP-initiated logout), which returns the browser to `/`.
+
+**Sessions.** Spring Session keeps the WebSession in the existing Redis. The session holds the security context and the authorized client (access and refresh tokens). The idle timeout is the default 30 minutes.
+
+**How the SPA learns to log in.**
+- A page navigation is redirected to the login. That is a GET that accepts HTML, is not under `/api/` and is not an XHR.
+- Every other unauthenticated request gets 401 with `WWW-Authenticate: Bearer` and the header `X-OpenCRM-Login: /oauth2/authorization/entra`. CORS exposes the header.
+- The SPA's `authRedirectInterceptor` (`libs/shared/data-access`) sends the browser to that path when a 401 carries the header. It follows only a same-origin path, and redirects at most once every 30 seconds, so a broken login cannot loop.
+- That is the only FE change, as step 3 intended. For local runs, `nx serve` proxies `/oauth2`, `/login/oauth2` and `/logout` to the gateway without changing the origin.
+
+**Token relay and header strip (decision 3).** `IdentityRelayFilter` is a global filter that runs before routing:
+- it removes `Authorization` and every `X-User-*`, `X-Actor*`, `X-Auth-*`, `X-Forwarded-User`, `X-Remote-User` and `X-MS-Client-Principal*` header the caller sent;
+- it then sets exactly one `Authorization: Bearer`: the validated bearer-lane token, or the session's access token;
+- the session's token is renewed with the refresh token when it nears expiry. If renewal fails, the call gets 401 with the login hint, and the SPA logs in again;
+- anonymous and `dev` requests go upstream with no identity at all.
+
+**Other changes.**
+- **Actuator.** Only `/actuator/health/**` and `/actuator/info` are public now, as in every service since step 1. Before, all of `/actuator/**` was public at the gateway. API docs are public only when `opencrm.security.permit-api-docs` is set.
+- **Production marker.** It now also refuses a gateway without the login. In `jwt` mode without the login, the gateway logs a WARN and offers the bearer lane only.
+- **B2C is gone** (decision 1): the starter, its exclusions and settings, the `common` issuer default, and the compose variable. The gateway has no identity defaults at all.
+- `org.springframework.security` logs at INFO. DEBUG would log session and token handling.
+
+**The ai-service decision (open since step 2): keep the bearer lane.** ai-service's agent tools keep calling the gateway's agent contract with the relayed user token, the same contract external agents use (F3). Calling the services directly would copy the gateway's CPQ alias rewrites into ai-service and give agents two contracts. The fitness allowlist entry stays, with this reason.
+
+**Decisions made during implementation.**
+- **One filter instead of Spring Cloud Gateway's `TokenRelay`.** `TokenRelay` only adds the session's token. Stripping forged headers would need a second filter whose order matters, and the bearer lane would need a third. One ordered filter does all three. It is global rather than per route, so a new route cannot forget it.
+- **Bearer requests are exempt from CSRF.** ADR-004 protects cookie-authenticated browsers. A request that carries `Authorization: Bearer` is authenticated by that token, not by a cookie, so the CSRF check adds nothing and would break agents. A cross-site page cannot add that header without a CORS preflight, which the origin allow-list refuses.
+- **Consent for `api://opencrm-api/.default`.** With `.default`, Entra asks for consent to the API permissions listed on the gateway's registration. For an internal application a tenant admin grants that consent once (step 5). Otherwise each user sees a consent prompt, or is blocked where user consent is disabled.
+- **Behind the ingress.** The redirect URI is `{baseUrl}/login/oauth2/code/entra`. Behind a TLS-terminating ingress, `{baseUrl}` is only right if the gateway trusts the forwarded headers. Step 5 sets that together with the ingress.
+
+**Evidence.** Everything below runs in the Docker-free unit gate.
+- `GatewaySecurityChainTest` (11 tests):
+  - with the login: an anonymous API call gets 401 and the hint; a page navigation is redirected to the login; the login is an authorization-code request with PKCE, `nonce` and the API scope; bearer GET and POST pass without CSRF; forged, expired and wrong-audience tokens get 401; a cookie POST without the CSRF token gets 403; health is public;
+  - without the login: 401 without a hint; the production marker refuses a gateway without the login, and a client secret;
+  - `dev`: everything is permitted, and CSRF still applies.
+- `IdentityRelayFilterTest` (6): with no authentication, every inbound identity header is removed; the bearer token is relayed and nothing else; the session token is relayed through the authorized-client manager; a session that cannot be renewed gets 401 and the hint, and nothing is forwarded, while an OAuth2 error from further down the chain is not mistaken for one; the filter runs before any route filter.
+- `IdentityRelayRoutingTest` (2), through real Spring Cloud Gateway routing to an upstream HTTP server: a request with a bearer token and forged `X-User-Id` and `X-Actor` reaches the upstream with only the bearer token; in `dev` it reaches it with no identity.
+- `GatewayLoginConfigurationTest` (6): the registration's endpoints, PKCE, no userinfo and the end-session metadata; multi-tenant, missing and v1.0 issuers are refused; the credential is the workload identity, and a secret only outside production; a local secret uses `client_secret_post`; a refresh authenticates with the re-read assertion against a local token endpoint; the session cookie's attributes.
+- `GatewayApplicationStartupTest` (3): the packaged configuration starts in the default and `dev` profiles with the relay filter; with the login it starts with Redis-backed sessions and the `OPENCRM_SESSION` cookie.
+- `auth-redirect.interceptor.spec.ts` (6): the SPA follows the hint and still reports the error; it ignores a 401 without the hint, other errors and off-site hints; it redirects at most once every 30 seconds.
+- `SecurityBaselineFitnessTest` gains two checks: the gateway trusts one tenant (no multi-tenant issuer, no B2C in its configuration or POM), and gateway routes add no identity headers while the relay filter exists.
+
+**Still open after step 3.**
+- **Step 4:** actor integrity and tier↔role checks in approval-routing, and `service:<client-id>` actors.
+- **Step 5:** the go-live gate. It now also covers:
+  - the gateway's app registration: a Web redirect URI per environment, a federated identity credential for the gateway's service account, and the API's delegated permission with admin consent;
+  - forwarded-header trust at the ingress, so `{baseUrl}` is the public https origin;
+  - Redis availability and persistence for sessions, since Redis now affects login;
+  - how Prometheus scrapes `/actuator/prometheus`, which now needs a token here as at every service (a management port or a scraper identity).
+- **FE sign-out.** The SPA has no sign-out control yet. `POST /logout` needs the XSRF token, as a header or a `_csrf` form field.
+
 ## Consequences
 
 - **Positive:**
@@ -309,7 +376,7 @@ This ADR is implemented only when all of the following pass in CI. A successful 
   - Every service that records an actor calls `SecurityUtils.getCurrentUserId`.
 - **Integration test:** quote→approval-routing approve under the prod profile with a test issuer, where the persisted approver equals the token `sub`.
 
-Status on 2026-09-23, after step 2:
+Status on 2026-09-23, after step 3:
 
 | Check | State |
 |-------|-------|
@@ -320,6 +387,7 @@ Status on 2026-09-23, after step 2:
 | "Every service with a `RestClient` bean imports the `libs/security` interceptor" | **Done** in step 2, as a source scan in `SecurityBaselineFitnessTest` rather than GitNexus Cypher, because the index is unreliable (review §7). It covers every HTTP client a service builds, with external APIs allowlisted |
 | "Every service that records an actor calls `SecurityUtils.getCurrentUserId`" | Step 4, also as a source scan |
 | quote→approval-routing integration test with a test issuer | Step 4 |
+| Gateway: login, one relayed token, no forged identity headers | **Done** in step 3: GatewaySecurityChainTest, IdentityRelayFilterTest, and IdentityRelayRoutingTest through real routing. SecurityBaselineFitnessTest checks one tenant, no B2C and no identity-adding route filters |
 
 ## Evidence at drafting (HEAD `4a29d31`)
 
@@ -341,3 +409,6 @@ Checked 2026-09-22 and rechecked on acceptance, 2026-09-23. Nothing had changed:
 - [RFC 10017: OAuth 2.0 for Browser-Based Applications (BCP 212, Aug 2026)](https://www.rfc-editor.org/info/rfc10017/)
 - [Access token claims reference: `aud` is the API's client ID in v2.0 tokens](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference) (step 2 correction to decision 1, checked 2026-09-23)
 - [Use Microsoft Entra Workload ID with AKS: the injected environment, and re-reading `AZURE_FEDERATED_TOKEN_FILE` for every exchange](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) (step 2, checked 2026-09-23)
+- [Authorization code flow: PKCE `code_verifier`, and `client_assertion` for confidential web apps](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow) (step 3, checked 2026-09-23)
+- [Scopes and permissions: when `.default` prompts for consent](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc#the-default-scope) (step 3, checked 2026-09-23)
+- [Microsoft.Identity.Web credentials: `SignedAssertionFilePath`, the Kubernetes workload-identity assertion, as a web app's client credential](https://learn.microsoft.com/en-us/entra/msidweb/authentication/credentials-overview) (step 3, checked 2026-09-23)

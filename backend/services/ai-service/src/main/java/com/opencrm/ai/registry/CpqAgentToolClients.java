@@ -26,7 +26,8 @@ import java.util.Map;
  *
  * <p>ADR-016 step 2: every call relays the bearer token of the user who invoked the agent, so the CPQ services see the
  * real actor; with no user (a background run) ai-service's own token is sent. Calling the gateway is an allowlisted
- * exception to decision 5, pinned by {@code SecurityBaselineFitnessTest}; step 3 decides it.
+ * exception to decision 5, pinned by {@code SecurityBaselineFitnessTest}: since step 3 the gateway's bearer lane
+ * validates the token and forwards it unchanged, the same lane external agents use.
  */
 @Slf4j
 @Component
