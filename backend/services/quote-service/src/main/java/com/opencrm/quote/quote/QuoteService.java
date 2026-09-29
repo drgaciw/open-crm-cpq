@@ -20,6 +20,8 @@ import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import com.opencrm.security.Caller;
+import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,6 +42,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -58,6 +61,7 @@ public class QuoteService {
     private final ProductServiceClient productServiceClient;
     private final ObjectMapper objectMapper;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final CurrentActor currentActor;
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -218,11 +222,15 @@ public class QuoteService {
     /**
      * Pass a quote's review. A quote waiting on a tiered approval ({@code PENDING_APPROVAL}) is decided through that
      * approval in approval-routing, which checks the approver's role (ADR-016 decision 7), never here.
+     *
+     * <p>Passing a review releases the quote to be sent, so it is a controlled step: {@link ReviewAuthority} says who
+     * may do it, and the quote's creator may not pass their own quote (ADR-016, owner decision 1).
      */
     public QuoteDto approve(Long id) {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
+        authorizeReview(quote, true);
         refuseWhileRouted(quote);
         if (quote.getStatus() != QuoteStatus.IN_REVIEW) {
             throw new BusinessException("Quote must be in review to approve", "INVALID_STATUS_TRANSITION");
@@ -235,11 +243,15 @@ public class QuoteService {
         return quoteMapper.toDto(saved);
     }
 
-    /** Fail a quote's review. Like {@link #approve}, a quote waiting on a tiered approval is decided there. */
+    /**
+     * Fail a quote's review. Like {@link #approve}, it needs a reviewer role and a quote waiting on a tiered approval is
+     * decided there. Failing your own quote is allowed: it only holds the quote back.
+     */
     public QuoteDto reject(Long id, String reason) {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
+        authorizeReview(quote, false);
         refuseWhileRouted(quote);
         if (quote.getStatus() != QuoteStatus.IN_REVIEW) {
             throw new BusinessException("Quote must be in review to reject", "INVALID_STATUS_TRANSITION");
@@ -253,6 +265,38 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} rejected", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
+    }
+
+    /**
+     * Who may pass or fail a review (ADR-016, owner decision 1). Refusals are 401 without a verified caller, and 403 for
+     * a service, a person without a reviewer role, or the creator passing their own quote. A quote with no recorded
+     * creator, made before actors were recorded (ADR-016 step 4), has no four-eyes check but still needs the role.
+     */
+    private void authorizeReview(Quote quote, boolean passing) {
+        Optional<Caller> caller = currentActor.caller();
+        if (caller.isEmpty()) {
+            if (!currentActor.unverifiedCallersAllowed()) {
+                throw new BusinessException("An authenticated user is required to review quotes",
+                        HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED");
+            }
+            log.warn("dev mode: quote {} reviewed without a verified user", quote.getQuoteNumber());
+            return;
+        }
+        if (!(caller.get() instanceof Caller.User user)) {
+            throw new BusinessException("Quote reviews are decided by people, not by services",
+                    HttpStatus.FORBIDDEN, "REVIEWER_MUST_BE_A_USER");
+        }
+        if (!ReviewAuthority.mayReview(user.authorities())) {
+            log.warn("Refused review of quote {} by {}: none of {}", quote.getQuoteNumber(), user.actorId(),
+                    ReviewAuthority.REVIEWERS);
+            throw new BusinessException("Reviewing a quote needs the Deal Desk, Sales VP or CFO role",
+                    HttpStatus.FORBIDDEN, "REVIEWER_ROLE_REQUIRED");
+        }
+        if (passing && user.actorId().equals(quote.getCreatedBy())) {
+            log.warn("Refused self-review of quote {} by its creator {}", quote.getQuoteNumber(), user.actorId());
+            throw new BusinessException("The creator of a quote cannot pass its review",
+                    HttpStatus.FORBIDDEN, "SELF_REVIEW");
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.opencrm.quote.quote;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.PricingExecuteView;
 import com.opencrm.quote.client.PricingFinancialMetricsView;
@@ -67,7 +68,8 @@ class QuoteServiceCalculateTest {
                 pricingServiceClient,
                 productServiceClient,
                 objectMapper,
-                outboxEventPublisher
+                outboxEventPublisher,
+                new CurrentActor("service:quote-service", false)
         );
     }
 
