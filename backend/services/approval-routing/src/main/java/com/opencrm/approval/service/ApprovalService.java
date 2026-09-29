@@ -108,7 +108,9 @@ public class ApprovalService {
         log.debug("Approving request ID: {}", id);
 
         ApprovalRequest request = findEntityById(id);
-        request.approve(authorizeDecision(request));
+        String approver = authorizeDecision(request);
+        requireNotSuperseded(request);
+        request.approve(approver);
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
 
@@ -121,7 +123,9 @@ public class ApprovalService {
         log.debug("Rejecting request ID: {}", id);
 
         ApprovalRequest request = findEntityById(id);
-        request.reject(authorizeDecision(request), rejectionReason);
+        String approver = authorizeDecision(request);
+        requireNotSuperseded(request);
+        request.reject(approver, rejectionReason);
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
 
@@ -176,6 +180,19 @@ public class ApprovalService {
                     HttpStatus.FORBIDDEN, "SELF_APPROVAL");
         }
         return user.actorId();
+    }
+
+    /**
+     * A superseded request was replaced by a newer one for the same quote line, carrying different figures (owner
+     * decision 9), so a decision on it would approve or reject figures nobody is asking about any more. Checked after
+     * {@link #authorizeDecision}, so a caller who may not decide learns nothing about the request's state.
+     */
+    private static void requireNotSuperseded(ApprovalRequest request) {
+        if (request.getStatus() == ApprovalStatus.SUPERSEDED) {
+            throw new BusinessException("Approval " + request.getId() + " was superseded by approval "
+                    + request.getSupersededBy() + " and can no longer be decided; decide the newer request",
+                    HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED");
+        }
     }
 
     private ApprovalRequest findEntityById(Long id) {

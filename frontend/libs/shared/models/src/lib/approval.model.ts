@@ -30,12 +30,17 @@ export function isApprovalTier(value: unknown): value is ApprovalTier {
  * Mirrors: com.opencrm.quote.approval.ApprovalStatus
  * Named ApprovalRequestStatus to avoid clashing with quote ApprovalState.
  */
-export type ApprovalRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type ApprovalRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'SUPERSEDED';
 
 export const APPROVAL_REQUEST_STATUSES: readonly ApprovalRequestStatus[] = [
   'PENDING',
   'APPROVED',
   'REJECTED',
+  'SUPERSEDED',
 ];
 
 export const APPROVAL_REQUEST_STATUS_LABELS: Record<
@@ -45,6 +50,7 @@ export const APPROVAL_REQUEST_STATUS_LABELS: Record<
   PENDING: 'Pending',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
+  SUPERSEDED: 'Superseded',
 };
 
 export function isApprovalRequestStatus(
@@ -71,6 +77,11 @@ export interface ApprovalRequestDto {
   comments?: string;
   requestedAt?: string;
   respondedAt?: string;
+  /**
+   * Set when `status` is SUPERSEDED: the approval that replaced this one. A superseded approval is history; deciding
+   * it answers 409 APPROVAL_SUPERSEDED (owner decision 9).
+   */
+  supersededBy?: number;
   createdAt?: string;
 }
 
