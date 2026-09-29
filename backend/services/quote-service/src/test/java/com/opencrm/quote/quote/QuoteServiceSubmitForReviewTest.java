@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
@@ -64,7 +65,8 @@ class QuoteServiceSubmitForReviewTest {
                 pricingServiceClient,
                 productServiceClient,
                 new ObjectMapper(),
-                outboxEventPublisher
+                outboxEventPublisher,
+                new CurrentActor("service:quote-service", false)
         );
     }
 
