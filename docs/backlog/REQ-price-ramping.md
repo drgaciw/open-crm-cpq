@@ -1,10 +1,10 @@
 # Requirements: Price ramping (multi-period pricing within a term)
 
 **ID:** REQ-PRC-001 (provisional — only REQ-AI-014 exists, so no numbering scheme is documented yet)
-**Status:** Draft for owner review. Nothing in this document is implemented; no decision below is taken until an ADR records it.
+**Status:** Draft for owner review. Nothing in this document is implemented; no decision below is taken until an ADR records it. D-01, D-02, D-04, D-05 and D-08 are drafted in ADR-023 (Proposed). D-09 (split the two stories) was instructed by the owner on 2026-09-29 and is applied in the backlog. D-03, D-06 and D-07 are open.
 **Created:** 2026-09-29
-**Architecture:** none yet. Decisions D-01, D-02, D-04, D-05 and D-08 are architectural and need an ADR before slice R1 starts.
-**Backlog:** Notion [BC-03-09](https://app.notion.com/p/3e3f7cb4e4df815dbf58ceab3530934f) (Phase 1, Not started) and [BC-09-04](https://app.notion.com/p/3e3f7cb4e4df81e0a557f20a78b6543b) (Phase 3, Not started). Linear epics DRG-283 (BC-03 Pricing) and DRG-291 (BC-09 Subscription and Usage). No Linear story issues exist for either story yet.
+**Architecture:** [ADR-023 Price ramp schedule model](../adr/ADR-023-price-ramp-schedule-model.md) (Proposed) records D-01, D-02, D-04, D-05 and D-08. It must be Accepted, in the same review as D-03, before slice R1 starts.
+**Backlog:** Stories allocated on 2026-09-29; each Notion page links its Linear issue. R1: [BC-03-09](https://app.notion.com/p/3e3f7cb4e4df815dbf58ceab3530934f), [DRG-336](https://linear.app/drgamtd-workspace/issue/DRG-336/bc-03-09-ramp-pricing-per-term-period). R2: [BC-04-07](https://app.notion.com/p/3eaf7cb4e4df810bb8b3f86c8469da16), [DRG-338](https://linear.app/drgamtd-workspace/issue/DRG-338/bc-04-07-ramp-governance-per-period-policy-and-approval-binding). R3: [BC-09-04](https://app.notion.com/p/3e3f7cb4e4df81e0a557f20a78b6543b), [DRG-339](https://linear.app/drgamtd-workspace/issue/DRG-339/bc-09-04-ramp-schedule-and-step-application). R4: [BC-09-07](https://app.notion.com/p/3eaf7cb4e4df8130a393dbe5406ee4db), [DRG-341](https://linear.app/drgamtd-workspace/issue/DRG-341/bc-09-07-hybrid-migration-ramp-with-dual-entitlement-window). Split out under D-09: [BC-03-12](https://app.notion.com/p/3eaf7cb4e4df8160b30dc5c1554995d9), [DRG-337](https://linear.app/drgamtd-workspace/issue/DRG-337/bc-03-12-usage-tier-rating-for-quoting) (usage tiers) and [BC-09-06](https://app.notion.com/p/3eaf7cb4e4df818c86bcd714082d710e), [DRG-340](https://linear.app/drgamtd-workspace/issue/DRG-340/bc-09-06-credit-draw-down-for-prepaid-balances) (credit draw-down). Epics DRG-283 (BC-03), DRG-286 (BC-04) and DRG-291 (BC-09).
 
 ## Outcome
 
@@ -108,9 +108,11 @@ For a line with periods `i = 1..n`, net monthly price `m_i` (after the waterfall
 
 - `periodAmount_i = round2(m_i × d_i)`; `lineTotal = sum(periodAmount_i)`; `TCV = sum(lineTotal)`.
 - `ACV = TCV / (term months / 12)`; `arr = sum(m_1) × 12`; `exitArr = sum(m_n) × 12` across lines.
-- A single-period schedule reduces to today's flat behaviour for TCV and ARR. ACV also matches only if D-03 is rejected.
+- A single-period schedule reduces to today's flat behaviour for TCV and ARR. Its ACV equals the ACV of the same quote without a schedule under whichever function D-03 selects: flat and ramp quotes never use different ACV functions (ADR-023 D-02).
 
 ## Acceptance scenarios
+
+ACV figures in AC-01 and AC-02 assume the D-03 recommended formula (TCV divided by term-years). Under today's formula (TCV / 12), AC-01 would show ACV 6,750 and AC-02 would show 11,300.
 
 | ID | Given / expected result |
 |---|---|
@@ -146,6 +148,8 @@ For a line with periods `i = 1..n`, net monthly price `m_i` (after the waterfall
 
 ## Decisions required
 
+Status on 2026-09-29: D-01, D-02, D-04, D-05 and D-08 are drafted in [ADR-023](../adr/ADR-023-price-ramp-schedule-model.md) (Proposed). D-09 is applied on the owner's instruction. D-03, D-06 and D-07 are open. D-02's ACV clause and D-03 are one change and are decided together.
+
 | ID | Decision | Options | Recommendation and why |
 |---|---|---|---|
 | D-01 | Where the schedule lives | Per-line schedule on the quote line; one quote line per period; rule-driven only | Per-line schedule. One commercial object gives one approval, one contract and correct TCV and amendment semantics. Per-period lines break those; rule-only cannot carry negotiated prices. |
@@ -164,13 +168,13 @@ Prerequisites before R1: P-1 populate waterfall steps (FR-06); P-2 real cost-bas
 
 | Slice | Content | Requirements | Backlog mapping |
 |---|---|---|---|
-| R1 | Pricing core and quote authoring, behind the flag | FR-01 to FR-11, FR-17, FR-18 | BC-03-09, ramp portion (Phase 1). Retitle to "Ramp pricing per term period". |
-| R2 | Governance, approvals, documents | FR-12 to FR-16, FR-19 | New story under BC-03 or BC-04 (id allocated on import). |
-| R3 | Events, subscription rate schedule, scheduler, amendment and renewal | FR-20 to FR-25 | BC-09-04, ramp portion (Phase 3). Credit draw-down moves to a separate story (D-09). |
-| R4 | Hybrid migration ramp | FR-26 | New story under BC-09 (id allocated on import). |
-| Split-out | Usage-tier rating; credit draw-down | not covered here | New stories BC-03-09b and BC-09-04b, each with its own REQ. |
+| R1 | Pricing core and quote authoring, behind the flag | FR-01 to FR-11, FR-17, FR-18 | BC-03-09 / DRG-336, "Ramp pricing per term period" (Phase 1) |
+| R2 | Governance and approvals | FR-12 to FR-16 (FR-19 rides on BC-06-03) | BC-04-07 / DRG-338, "Ramp governance: per-period policy and approval binding" (Phase 2) |
+| R3 | Events, subscription rate schedule, scheduler, amendment and renewal | FR-20 to FR-25 | BC-09-04 / DRG-339, "Ramp schedule and step application" (Phase 3). Credit draw-down moved to BC-09-06 (D-09) |
+| R4 | Hybrid migration ramp | FR-26 | BC-09-07 / DRG-341, "Hybrid migration ramp with dual-entitlement window" (Phase 3) |
+| Split-out | Usage-tier rating; credit draw-down | not covered here | BC-03-12 / DRG-337 and BC-09-06 / DRG-340, each needing its own REQ |
 
-The existing Notion estimates (8 and 5 points) were sized on stories with three acceptance criteria each. This scope spans pricing, quote, approval-routing, contract-asset and the CPQ UI, so the slices need re-estimating once D-01 to D-09 are settled.
+The existing Notion estimates (8 and 5 points) were sized on stories with three acceptance criteria each. This scope spans pricing, quote, approval-routing, contract-asset and the CPQ UI, so the slices need re-estimating once D-01 to D-09 are settled. BC-03-09 keeps 8 points and BC-09-04 keeps 5, both flagged as not revalidated in Linear and Notion; the four new stories carry no estimate. FR-19 is assigned to the existing story BC-06-03 ("Render document in PDF and DOCX per locale"), whose acceptance criteria do not mention the schedule table yet; add it when R2 is scheduled.
 
 ## Rollout and completion
 
@@ -180,11 +184,15 @@ The existing Notion estimates (8 and 5 points) were sized on stories with three 
 
 ## Traceability
 
+Source rows quote the acceptance criteria as they stood before the 2026-09-29 split.
+
 | Source | Covered by |
 |---|---|
 | Notion BC-03-09 "RampStep pricing produces per-period PriceElements" | FR-01, FR-05, FR-06, AC-01, AC-02 |
 | Notion BC-03-09 "Output feeds BC-09" | FR-20, FR-21, AC-10, AC-11 |
 | Notion BC-09-04 "RampApplied changes the active rate at the step date" | FR-22, FR-23, AC-11, AC-12 |
+| Notion BC-03-09 "Usage tiers rate estimated volumes for quoting" (moved to BC-03-12) | Out of scope here (D-09) |
+| Notion BC-09-04 "CreditBalance never goes negative without an exception" and "CreditDrawnDown event is emitted" (moved to BC-09-06) | Out of scope here (D-09) |
 | Capability Map: `RampStep`, `RampScheduler`, `ApplyRamp`, `GetRampSchedule`, `RampApplied` | Naming in FR-01, FR-22, FR-23 |
 | PRD §5.3 Cloud Migration Ramp + Dual Entitlement Window | FR-26 (slice R4) |
 | PRD §4.2 metric formulas | FR-10, D-02, D-03 |
@@ -192,12 +200,12 @@ The existing Notion estimates (8 and 5 points) were sized on stories with three 
 
 ## Out of scope
 
-Usage metering and rating, credit draw-down and prepaid balances (D-09), billing schedules and invoicing (BC-10), revenue recognition (BC-11), FX rate management beyond the quote currency, cross-quote price protection, any subscriptions or contract-asset UI (held), agent behaviour that consumes the schedule, and enabling any Jev flag. This document authorises no code change, schema change or data migration.
+Usage metering and rating, credit draw-down and prepaid balances (D-09; BC-03-12 and BC-09-06), billing schedules and invoicing (BC-10), revenue recognition (BC-11), FX rate management beyond the quote currency, cross-quote price protection, any subscriptions or contract-asset UI (held), agent behaviour that consumes the schedule, and enabling any Jev flag. This document authorises no code change, schema change or data migration.
 
 ## References
 
 - [PRD](../../cpq-pricing-prd.md) §4.2, §5.3, §7.4, §7.5, §11.1 and the glossary.
-- [ADR index](../adr/README.md); ADR-006, ADR-008, ADR-009, ADR-010, ADR-011, ADR-012, ADR-013, ADR-016, ADR-018.
+- [ADR index](../adr/README.md); [ADR-023](../adr/ADR-023-price-ramp-schedule-model.md); ADR-006, ADR-008, ADR-009, ADR-010, ADR-011, ADR-012, ADR-013, ADR-016, ADR-018.
 - [Event operations runbook](../runbooks/event-operations.md).
 - Code paths cited in the Current state table.
 - Format reference: [REQ-jev-openrouter-model-selection.md](./REQ-jev-openrouter-model-selection.md).
