@@ -86,6 +86,7 @@ The services check that a caller is authenticated, not that it holds `CPQ.User`.
 | `OPENCRM_ENV` | all | `prod`: the production marker. It refuses `dev` mode, an incomplete identity configuration and client secrets |
 | `OPENCRM_SECURITY_JWT_ISSUERURI` | all | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
 | `OPENCRM_SECURITY_JWT_AUDIENCES` | all | `<opencrm-api client id>,api://opencrm-api` |
+| `MANAGEMENT_SERVER_PORT` | all | `9091`: the port of the actuator, apart from the service port (section 5). Under `OPENCRM_ENV=prod` a service that exposes anything beyond `health` and `info` on its service port refuses to start, so this is required |
 | `OPENCRM_GATEWAY_LOGIN_CLIENTID` | gateway-service | the gateway app's client id |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | gateway-service | `framework` (section 5) |
 | `DB_PASSWORD` (`DB_PASS` in ai-service) | every service with a database | from the secret store, for example Key Vault through the CSI driver. The committed configuration has no default outside the `dev` and `test` profiles, so a missing value stops the service at startup |
@@ -97,7 +98,7 @@ Never set `OPENCRM_SECURITY_CLIENT_CLIENTSECRET`, `OPENCRM_GATEWAY_LOGIN_CLIENTS
 
 - **Ingress.** It terminates TLS and must **set** `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`, overwriting whatever the client sent. The gateway trusts them only with `SERVER_FORWARD_HEADERS_STRATEGY=framework`, and builds the login's redirect URI from them (`https://<crm-host>/login/oauth2/code/entra`). Set it on the gateway only; the domain services are not behind the ingress.
 - **Redis** holds the gateway's sessions (Spring Session, cookie `OPENCRM_SESSION`, 30 minutes idle). If Redis is lost, users sign in again; nothing else is lost. Use a highly available tier, TLS, and an eviction policy that does not evict sessions under normal load.
-- **Metrics.** `/actuator/prometheus` needs a token, as does everything except health and info. **Open decision for the owner** before go-live: a management port reachable only from the monitoring namespace (with the ADR-022 network policy), or a scraper workload identity with a token. Until then, metrics are not scraped.
+- **Metrics and probes** (decided: a management port, no scraper identity). Every service serves its actuator on a second port, `MANAGEMENT_SERVER_PORT` (`9091`), and nothing else. There `/actuator/health` (with `liveness` and `readiness`), `/actuator/info` and `/actuator/prometheus` need no token, and every other path answers `403`: `metrics`, `env`, the gateway's route inspection, the API. The service port serves no actuator endpoint at all. Because the management port has no credential, only the network protects it: apply [`infra/k8s/opencrm-management-port-networkpolicy.yaml`](../../infra/k8s/opencrm-management-port-networkpolicy.yaml) (adapt the two namespace names), confirm that the cluster's network plugin enforces NetworkPolicy, and never route the port through the ingress or the gateway. Point the pods' probes and Prometheus at the management port (the comments in that file show the fields). A service started with `OPENCRM_ENV=prod` and without the port refuses to start, and says how to fix it; to run without metrics, set `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info` instead. Without a management port the actuator shares the service port and `/actuator/prometheus` is readable with any user token, which is why production does not run that way.
 
 ## 6. Deploy
 
@@ -105,7 +106,7 @@ Never set `OPENCRM_SECURITY_CLIENT_CLIENTSECRET`, `OPENCRM_GATEWAY_LOGIN_CLIENTS
 2. Deploy all services. Each one logs a single line at startup; check that every pod says the same:
    ```
    ADR-016 identity: mode=jwt, production=true, issuer=https://login.microsoftonline.com/<tenant-id>/v2.0,
-   audiences=[<api client id>, api://opencrm-api], service identity=<client id> (workload identity)
+   audiences=[<api client id>, api://opencrm-api], management port=9091, service identity=<client id> (workload identity)
    ```
    A service with an incomplete configuration does not start; its log names every problem at once (`ADR-016 go-live gate (opencrm.env=prod): ...`).
 
@@ -113,7 +114,8 @@ Never set `OPENCRM_SECURITY_CLIENT_CLIENTSECRET`, `OPENCRM_GATEWAY_LOGIN_CLIENTS
 
 Tick every line in the environment, and keep the evidence (screenshots, log lines, request ids) with the change record.
 
-- [ ] Every pod logs the identity line in section 6, with `production=true` and a workload identity where the manifest lists one.
+- [ ] Every pod logs the identity line in section 6, with `production=true`, `management port=9091` and a workload identity where the manifest lists one.
+- [ ] Metrics: Prometheus shows every service's target `up` on port `9091`. From a pod in the monitoring namespace, `GET :9091/actuator/prometheus` returns `200`; from a pod in any other namespace the connection is refused or times out; `GET :9091/actuator/metrics` returns `403`; and `GET` `/actuator/prometheus` on the service port returns `401` anonymously and `404` with a user token.
 - [ ] An anonymous `GET /api/v1/quotes` gets `401`, `WWW-Authenticate: Bearer` and `X-OpenCRM-Login: /oauth2/authorization/entra`.
 - [ ] Opening the SPA redirects to Entra and back; the browser holds `OPENCRM_SESSION` (`HttpOnly`, `Secure`) and `XSRF-TOKEN`, and never a token.
 - [ ] The access token in the gateway's session, inspected in a test tenant: `ver` `2.0`, `aud` the API's client id, `scp` `access_as_user`, the user's `roles`, and `oid`.
@@ -149,7 +151,6 @@ Record:
 
 ## 9. Decisions still open for the owner
 
-- How Prometheus scrapes `/actuator/prometheus` (section 5).
 - Who may pass a quote's review (`IN_REVIEW` to `APPROVED` has no tier; today any signed-in user can). See ADR-016 step 4.
 - The discount-tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule. See ADR-016 step 4.
 

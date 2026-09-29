@@ -36,6 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>decision 6: actors come from the verified token. No request parameter, header or request body carries an
  *       identity, and no code records a hard-coded actor such as {@code "system"};</li>
  *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline;</li>
+ *   <li>owner decision 4: every service ships the Prometheus registry and exposes only {@code health}, {@code info}
+ *       and {@code prometheus} (the gateway also {@code gateway}, read-only);</li>
  *   <li>step 5 go-live gate: no secret in committed configuration. A secret-named key outside the local profiles is a
  *       placeholder with no default, or an empty one;</li>
  *   <li>step 5 go-live gate: {@code infra/entra/opencrm-identity.json}, the Entra configuration to apply, agrees with
@@ -518,6 +520,42 @@ class SecurityBaselineFitnessTest {
         assertThat(missing).isEmpty();
     }
 
+    @Test
+    @DisplayName("every service ships the Prometheus registry and exposes only health, info and prometheus (owner decision 4)")
+    void metricsAreScrapedAndNothingElseIsExposed() {
+        List<String> withoutRegistry = new ArrayList<>();
+        Map<String, Set<String>> exposedBeyondTheList = new java.util.TreeMap<>();
+        List<String> notScraped = new ArrayList<>();
+        for (ServiceSources service : services) {
+            if (!service.pom().contains("<artifactId>micrometer-registry-prometheus</artifactId>")) {
+                withoutRegistry.add(service.name());
+            }
+            Set<String> exposed = new TreeSet<>();
+            for (Map<String, Object> document : service.configDocuments()) {
+                Object include = nested(document, "management", "endpoints", "web", "exposure", "include");
+                if (include != null) {
+                    for (String id : include.toString().split(",")) {
+                        exposed.add(id.trim().toLowerCase(java.util.Locale.ROOT));
+                    }
+                }
+            }
+            if (!exposed.contains("prometheus")) {
+                notScraped.add(service.name());
+            }
+            exposed.removeAll(Set.of("health", "info", "prometheus"));
+            if (service.name().equals("gateway-service")) {
+                exposed.remove("gateway"); // read-only route inspection, refused on the management port
+            }
+            if (!exposed.isEmpty()) {
+                exposedBeyondTheList.put(service.name(), exposed);
+            }
+        }
+        assertThat(withoutRegistry).as("add micrometer-registry-prometheus (runtime): the scrape endpoint needs it").isEmpty();
+        assertThat(notScraped).as("management.endpoints.web.exposure.include must list prometheus").isEmpty();
+        assertThat(exposedBeyondTheList)
+                .as("metrics, env, beans and the rest are not exposed by default; ADR-018 alerts read the scrape")
+                .isEmpty();
+    }
     @SuppressWarnings("unchecked")
     private static Object securityProperty(Map<String, Object> document, String key) {
         Object flat = document.get("opencrm.security." + key);
