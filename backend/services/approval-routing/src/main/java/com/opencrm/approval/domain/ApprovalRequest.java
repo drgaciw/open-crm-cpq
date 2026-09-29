@@ -72,6 +72,13 @@ public class ApprovalRequest extends BaseEntity {
     
     @Column(name = "rejected_at")
     private Instant rejectedAt;
+
+    /** The request that replaced this one, when {@link ApprovalStatus#SUPERSEDED}. */
+    @Column(name = "superseded_by")
+    private Long supersededBy;
+
+    @Column(name = "superseded_at")
+    private Instant supersededAt;
     
     // State machine transitions
     public void approve(String approverId) {
@@ -94,9 +101,24 @@ public class ApprovalRequest extends BaseEntity {
     }
     
     public void cancel() {
-        if (status == ApprovalStatus.APPROVED || status == ApprovalStatus.REJECTED) {
+        if (status == ApprovalStatus.APPROVED || status == ApprovalStatus.REJECTED
+                || status == ApprovalStatus.SUPERSEDED) {
             throw new IllegalStateException("Cannot cancel already processed requests");
         }
         this.status = ApprovalStatus.CANCELLED;
+    }
+
+    /**
+     * Replaces this open request by a newer one for the same quote line (owner decision 9). Only a PENDING request can
+     * be superseded: a decided one is history that the new figures do not change.
+     */
+    public void supersede(Long newerRequestId) {
+        if (status != ApprovalStatus.PENDING) {
+            throw new IllegalStateException("Can only supersede PENDING requests");
+        }
+        java.util.Objects.requireNonNull(newerRequestId, "the request that supersedes this one");
+        this.status = ApprovalStatus.SUPERSEDED;
+        this.supersededBy = newerRequestId;
+        this.supersededAt = Instant.now();
     }
 }

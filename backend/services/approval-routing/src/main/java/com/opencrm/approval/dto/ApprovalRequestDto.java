@@ -41,6 +41,9 @@ public class ApprovalRequestDto {
     private Instant submittedAt;
     private Instant approvedAt;
     private Instant rejectedAt;
+    /** Set when the status is SUPERSEDED: the request that replaced this one, and when. */
+    private Long supersededBy;
+    private Instant supersededAt;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;
