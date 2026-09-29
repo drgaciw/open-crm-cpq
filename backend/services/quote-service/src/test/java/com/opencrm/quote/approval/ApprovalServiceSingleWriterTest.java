@@ -272,6 +272,27 @@ class ApprovalServiceSingleWriterTest {
         verify(approvalRepository, never()).findByQuoteIdAndDeletedFalseOrderByCreatedAtDesc(any());
     }
 
+    @Test
+    void historyShowsASupersededRequestAndWhatReplacedIt() {
+        ApprovalService routingOnly = new ApprovalService(
+                approvalRepository, quoteRepository, approvalRoutingClient, false);
+        Instant supersededAt = Instant.parse("2026-09-29T10:15:30Z");
+        RoutingApprovalDto superseded = historyRow(1L, "42", "SUPERSEDED");
+        superseded.setSupersededBy(2L);
+        superseded.setSupersededAt(supersededAt);
+        superseded.setReason("Discount exceeds standard threshold");
+        when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(superseded, historyRow(2L, "42", "PENDING")));
+
+        List<ApprovalRequestDto> history = routingOnly.getByQuoteId(42L);
+
+        ApprovalRequestDto replaced = history.get(0);
+        assertThat(replaced.getStatus()).isEqualTo(ApprovalStatus.SUPERSEDED);
+        assertThat(replaced.getSupersededBy()).isEqualTo(2L);
+        assertThat(replaced.getRespondedAt()).isEqualTo(supersededAt);
+        assertThat(replaced.getComments()).isEqualTo("Superseded by request 2");
+        assertThat(history.get(1).getSupersededBy()).as("only a superseded row names a replacement").isNull();
+    }
+
     private RoutingApprovalDto historyRow(Long id, String quoteId, String status) {
         return RoutingApprovalDto.builder().id(id).quoteId(quoteId).status(status)
                 .approvalTier("DEAL_DESK").build();

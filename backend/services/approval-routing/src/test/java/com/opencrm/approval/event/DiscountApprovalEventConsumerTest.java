@@ -25,12 +25,13 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,13 +53,22 @@ class DiscountApprovalEventConsumerTest {
 
     private DiscountApprovalEventConsumer consumer;
 
+    /** Ids the mocked repository hands out to new rows, as the database would. */
+    private final AtomicLong nextId = new AtomicLong(100);
+
     @BeforeEach
     void setUp() {
         consumer = new DiscountApprovalEventConsumer(approvalRequestRepository, new ObjectMapper(), discountTierShadow,
                 inbox, new CurrentActor("service:approval-routing", false));
         when(inbox.claim(eq(DiscountApprovalEventConsumer.CONSUMER_GROUP), any())).thenReturn(true);
         when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING)).thenReturn(List.of());
-        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(call -> call.getArgument(0));
+        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(call -> {
+            ApprovalRequest saved = call.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(nextId.getAndIncrement());
+            }
+            return saved;
+        });
     }
 
     private static ConsumerRecord<String, String> record(String payload) {
@@ -71,17 +81,23 @@ class DiscountApprovalEventConsumerTest {
                 .formatted(marginDelta));
     }
 
+    /** The request the event created: the one PENDING row saved (replaced rows are saved too, as SUPERSEDED). */
     private ApprovalRequest saved() {
         ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
-        verify(approvalRequestRepository).save(captor.capture());
-        return captor.getValue();
+        verify(approvalRequestRepository, atLeastOnce()).save(captor.capture());
+        List<ApprovalRequest> created = captor.getAllValues().stream()
+                .filter(request -> request.getStatus() == ApprovalStatus.PENDING).distinct().toList();
+        assertThat(created).as("exactly one new PENDING request").hasSize(1);
+        return created.get(0);
     }
 
-    private static ApprovalRequest open(String lineId, String discount, String marginDelta) {
-        return ApprovalRequest.builder()
+    private static ApprovalRequest open(long id, String lineId, String discount, String marginDelta) {
+        ApprovalRequest request = ApprovalRequest.builder()
                 .quoteId("Q-1").lineId(lineId).approvalType(ApprovalType.DISCOUNT).status(ApprovalStatus.PENDING)
                 .requestedDiscount(new BigDecimal(discount)).marginDelta(new BigDecimal(marginDelta))
                 .currencyCode("USD").requesterId("service:approval-routing").build();
+        request.setId(id);
+        return request;
     }
 
     @ParameterizedTest(name = "margin delta {0} routes to {1}")
@@ -133,7 +149,7 @@ class DiscountApprovalEventConsumerTest {
     @DisplayName("D6: an identical PENDING request for the quote line makes the event a duplicate (scale-insensitive)")
     void identicalOpenRequestIsADuplicate() {
         when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
-                .thenReturn(List.of(open("L-1", "18.50", "25.0000")));
+                .thenReturn(List.of(open(1L, "L-1", "18.50", "25.0000")));
 
         consumer.handleDiscountApprovalRequired(event("25"));
 
@@ -142,16 +158,94 @@ class DiscountApprovalEventConsumerTest {
     }
 
     @Test
-    @DisplayName("D6: different figures, or another line, still create a request (no supersede rule is invented)")
-    void differentFiguresStillCreate() {
+    @DisplayName("decision 9: changed figures create a new request and supersede the open one, naming its replacement")
+    void changedFiguresSupersedeTheOpenRequest() {
+        ApprovalRequest older = open(1L, "L-1", "18.50", "22");
         when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
-                .thenReturn(List.of(open("L-1", "18.50", "22"), open("L-2", "18.50", "25")));
+                .thenReturn(List.of(older));
+
+        consumer.handleDiscountApprovalRequired(event("25"));
+
+        ApprovalRequest created = saved();
+        assertThat(created.getId()).isEqualTo(100L);
+        assertThat(created.getMarginDelta()).isEqualByComparingTo("25");
+        assertThat(older.getStatus()).isEqualTo(ApprovalStatus.SUPERSEDED);
+        assertThat(older.getSupersededBy()).isEqualTo(100L);
+        assertThat(older.getSupersededAt()).isNotNull();
+        verify(approvalRequestRepository).save(older);
+        verify(discountTierShadow).recordAfterCommit(eq(100L), any(), eq("DIRECTOR"));
+    }
+
+    @Test
+    @DisplayName("decision 9: every open request for the line is superseded, oldest included")
+    void everyOpenRequestForTheLineIsSuperseded() {
+        ApprovalRequest first = open(1L, "L-1", "18.50", "22");
+        ApprovalRequest second = open(2L, "L-1", "18.50", "23");
+        when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
+                .thenReturn(List.of(second, first));
+
+        consumer.handleDiscountApprovalRequired(event("25"));
+
+        assertThat(first.getSupersededBy()).isEqualTo(100L);
+        assertThat(second.getSupersededBy()).isEqualTo(100L);
+        assertThat(saved().getId()).isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("decision 9: another quote line, and other approval types, are left alone")
+    void otherLinesAndTypesAreLeftAlone() {
+        ApprovalRequest otherLine = open(1L, "L-2", "18.50", "22");
+        ApprovalRequest otherType = open(2L, "L-1", "18.50", "22");
+        otherType.setApprovalType(ApprovalType.QUOTE);
+        ApprovalRequest wholeQuote = open(3L, null, "18.50", "22");
+        when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
+                .thenReturn(List.of(otherLine, otherType, wholeQuote));
 
         consumer.handleDiscountApprovalRequired(event("25"));
 
         assertThat(saved().getMarginDelta()).isEqualByComparingTo("25");
+        assertThat(List.of(otherLine, otherType, wholeQuote))
+                .allSatisfy(request -> {
+                    assertThat(request.getStatus()).isEqualTo(ApprovalStatus.PENDING);
+                    assertThat(request.getSupersededBy()).isNull();
+                });
+        verify(approvalRequestRepository, never()).save(otherLine);
+        verify(approvalRequestRepository, never()).save(otherType);
+        verify(approvalRequestRepository, never()).save(wholeQuote);
     }
 
+    @Test
+    @DisplayName("decision 9: an identical open request stays current; older ones with other figures are superseded by it")
+    void identicalRequestStaysCurrent() {
+        ApprovalRequest stale = open(1L, "L-1", "18.50", "22");
+        ApprovalRequest current = open(2L, "L-1", "18.50", "25.0000");
+        when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
+                .thenReturn(List.of(stale, current));
+
+        consumer.handleDiscountApprovalRequired(event("25"));
+
+        assertThat(stale.getStatus()).isEqualTo(ApprovalStatus.SUPERSEDED);
+        assertThat(stale.getSupersededBy()).isEqualTo(2L);
+        assertThat(current.getStatus()).isEqualTo(ApprovalStatus.PENDING);
+        assertThat(current.getSupersededBy()).isNull();
+        verify(approvalRequestRepository).save(stale);
+        verify(approvalRequestRepository, never()).save(current);
+        verifyNoInteractions(discountTierShadow);
+    }
+
+    @Test
+    @DisplayName("decision 9: with two identical open requests the newest stays and the older is superseded")
+    void newestIdenticalRequestStays() {
+        ApprovalRequest legacyDuplicate = open(1L, "L-1", "18.50", "25");
+        ApprovalRequest newest = open(2L, "L-1", "18.50", "25");
+        when(approvalRequestRepository.findByQuoteIdAndStatus("Q-1", ApprovalStatus.PENDING))
+                .thenReturn(List.of(newest, legacyDuplicate));
+
+        consumer.handleDiscountApprovalRequired(event("25"));
+
+        assertThat(legacyDuplicate.getSupersededBy()).isEqualTo(2L);
+        assertThat(newest.getStatus()).isEqualTo(ApprovalStatus.PENDING);
+    }
     @Test
     @DisplayName("D7: malformed JSON is not retryable, so it goes to the DLT; nothing is saved")
     void malformedJsonIsNotRetryable() {
@@ -189,7 +283,7 @@ class DiscountApprovalEventConsumerTest {
     void shadowReceivesTheAuthoritativeTier() {
         consumer.handleDiscountApprovalRequired(event("25"));
 
-        verify(discountTierShadow).recordAfterCommit(isNull(), any(), eq("DIRECTOR"));
+        verify(discountTierShadow).recordAfterCommit(eq(100L), any(), eq("DIRECTOR"));
         assertThat(saved().getApprovalTier()).isEqualTo("DIRECTOR");
     }
 }

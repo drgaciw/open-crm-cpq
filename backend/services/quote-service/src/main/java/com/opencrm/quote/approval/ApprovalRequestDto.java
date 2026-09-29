@@ -25,5 +25,7 @@ public class ApprovalRequestDto {
     private String comments;
     private Instant requestedAt;
     private Instant respondedAt;
+    /** Set when {@code status} is SUPERSEDED: the approval that replaced this one. */
+    private Long supersededBy;
     private Instant createdAt;
 }
