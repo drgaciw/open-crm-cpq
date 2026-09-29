@@ -66,6 +66,30 @@ def gha_has_ai_assist(gha_text: str) -> bool:
     return "ai-assist" in gha_text or "run-ai-stage" in gha_text
 
 
+def pr_gate_errors(repo: Path, contract: str) -> list[str]:
+    """Validate the pull-request gate workflow declared under github_pr_gate in the contract."""
+    m = re.search(r"^github_pr_gate:\s*\n\s+workflow:\s*(\S+)", contract, re.MULTILINE)
+    if not m:
+        return []
+    rel = m.group(1)
+    path = repo / rel
+    if not path.is_file():
+        return [f"github_pr_gate workflow {rel} is missing"]
+    text = load_text(path)
+    errors: list[str] = []
+    if "pull_request" not in text:
+        errors.append(f"{rel} must trigger on pull_request")
+    if re.search(r"^\s+push:", text, re.MULTILINE):
+        errors.append(f"{rel} must not trigger on push")
+    if not gha_has_run_core(text, "backend-unit"):
+        errors.append(f"{rel} missing run-core.sh backend-unit")
+    if "verify-drift.py" not in text:
+        errors.append(f"{rel} must run verify-drift.py")
+    if gha_has_ai_assist(text):
+        errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    return errors
+
+
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -146,6 +170,8 @@ def main() -> int:
 
     if gha_has_ai_assist(gha):
         errors.append("GHA workflow must not reference ai-assist (Jenkins-only per ADR-003)")
+
+    errors.extend(pr_gate_errors(repo, contract))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")
