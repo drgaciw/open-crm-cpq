@@ -1,8 +1,8 @@
 # ADR-018: Event delivery guarantees, event envelope and idempotent consumers
 
-**Status:** Proposed. This is documentation only; it changes no code, YAML or runtime behavior.
+**Status:** Accepted on 2026-09-28, when the project owner delegated the ten open decisions ([record](../forge/40-owner-decisions-adr-016-018.md#record)). Every decision D1 to D10 is implemented (see the [acceptance checklist](#acceptance-checklist-2026-09-23)). The D4 contract step and D8 step 3 stay ahead, until every environment has proven the release. The implementation log below was written while the ADR was Proposed and still says so; it is history.
 **Date:** 2026-09-22
-**Deciders:** Pending (project owner). Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (findings F2–F5).
+**Deciders:** Project owner, delegated on 2026-09-28. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (findings F2–F5).
 **Amends:** [ADR-010](ADR-010-kafka-outbox-events.md). The *direction* stays: transactional outbox → Kafka, with a published language in `libs/common`. On Acceptance, this ADR replaces ADR-010's delivery, versioning and consumer rules and its "emitters never lose events" claim.
 **Relates to:**
 - [ADR-008](ADR-008-postgres-schema-per-service.md) (outbox and inbox tables per owning schema)
@@ -62,7 +62,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
    - `QuoteService.accept` is the controller-wired path. It publishes the rich `QuoteAcceptedKafkaEventFactory` payload with `quoteId` = UUID.
    - `QuoteService.acceptQuote` is not wired. It publishes a 5-field payload with `quoteId` = quote number, on the **same topic**.
 
-## Decision (Proposed)
+## Decision
 
 **D1 — Kafka wiring, relay registration and visibility** (P0, verified defect).
 - Replace plain `spring-kafka` with `spring-boot-starter-kafka` in the 7 Kafka services. `libs/common` keeps `spring-kafka` optional.
@@ -328,7 +328,7 @@ Branch `feat/adr018-d6-d7-idempotent-consumers-dlt`, 2026-09-22. The ADR stays *
 
   | Consumer | Before | Now |
   |----------|--------|-----|
-  | approval-routing `DiscountApprovalEventConsumer` | new PENDING approval on every delivery | Inbox check, plus a natural-key backstop: an identical PENDING DISCOUNT request for the same quote line makes the event a duplicate. Different figures still create a request; whether they should supersede the open one is a business decision, not made here. |
+  | approval-routing `DiscountApprovalEventConsumer` | new PENDING approval on every delivery | Inbox check, plus a natural-key backstop: an identical PENDING DISCOUNT request for the same quote line makes the event a duplicate. Different figures for the same quote line **supersede** the open request (owner decision 9, 2026-09-28): the consumer saves a new PENDING request and marks the open one `SUPERSEDED` (terminal, names its replacement, row kept as history), so an approver can never approve figures the quote no longer carries. Decided requests, other lines and other approval types are untouched, and deciding a superseded request answers 409 `APPROVAL_SUPERSEDED`. |
   | contract-asset `QuoteAcceptedEventConsumer` | `UNIQUE(subscription_number)` violation on redelivery; ERP call inside the listener transaction | Inbox check, plus an `existsBySubscriptionNumber` backstop. The subscription is created with `erp_sync_status = QUEUED`, and the new `ErpSyncJob` handles the ERP step (see the next row). |
   | contract-asset `ErpSyncJob` (new) | n/a | Claims each `QUEUED` row with a compare-and-set to `IN_PROGRESS`, calls the ERP with no transaction open, then records the outcome: success → `SYNCED` and activated; rate limit → back to `QUEUED`; any other failure → `FAILED`. A stale `IN_PROGRESS` claim is requeued after 10 minutes. API-created subscriptions (`PENDING`) are untouched. |
   | document-generation `QuoteAcceptedEventConsumer` | idempotent by key; generation kicked off *inside* the transaction on an `@Async` thread, which could run before the commit and leave the job PENDING | Still idempotent by `idempotency_key`. Generation now starts after the commit. |
@@ -518,7 +518,7 @@ Branch `feat/adr018-close-out-metrics-dlt-replay-runbooks`, 2026-09-23. The oper
 
 ## Acceptance checklist (2026-09-23)
 
-Every decision is implemented. Accepting the ADR is the owner's call. The items below are what remains.
+Every decision is implemented, and the ADR was accepted on 2026-09-28. The table is the state of each decision; what still needs people is listed below it.
 
 | Decision | State | Evidence |
 |----------|-------|----------|
@@ -533,14 +533,16 @@ Every decision is implemented. Accepting the ADR is the owner's call. The items 
 | D9 One emitter | Done | `EventContractFitnessTest` |
 | D10 Metrics | Done | Runbook §1 |
 
-**Owner decisions still open.** Each is listed in runbook §7:
+## Owner decisions (2026-09-28)
 
-- DLT retention and alert routing;
-- the per-environment backlog decision;
-- the dual-run window and exit criterion;
-- the discount supersede rule;
-- ERP upsert by subscription number;
-- accepting this ADR.
+The project owner delegated the six ADR-018 decisions that were open, and they were decided as recommended (the [decision sheet](../forge/40-owner-decisions-adr-016-018.md) has the analysis and the record; [runbook §7](../runbooks/event-operations.md) applies them).
+
+- **Acceptance.** This ADR is Accepted. The D4 contract step and D8 step 3 wait for environment proof.
+- **DLT retention and alert routing.** At least 14 days on every `*.DLT`, 30 days on `cpq.quote.status.accepted.DLT`. Severities stay as in runbook §1: only a failed outbox row pages. Naming the page and ticket destinations is still owed.
+- **Backlog per environment and topic.** Skip rows that are test data, decide real history per topic, send `cpq.quote.status.accepted` history only with sign-off from the contracts and ERP owners, and start crm at the end of the topic in every environment.
+- **Dual-run exit criterion.** 7 consecutive days, at least one business week of real traffic, and at least 30 acceptances that have a deal, whichever ends later. The window starts when crm's Kafka listener is enabled in production. Then D8 step 3 removes the Redis channel.
+- **Changed discount figures.** They supersede the open approval (shipped in #559; see the D6 consumer table). One hazard is documented in the runbook: a record replayed from `cpq.discount.approval.required.DLT` after newer events were processed would bring back older figures, because the event has no ordering field. The operator checks the quote line before replaying.
+- **ERP upsert by subscription number.** The ERP upserts. `ErpAdapter` is a stub today, so nothing external is called; the ERP owner confirms the upsert before a real adapter is wired and the relay is enabled for `cpq.quote.status.accepted` there.
 
 ## Sources
 

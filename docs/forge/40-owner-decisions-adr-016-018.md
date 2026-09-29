@@ -1,25 +1,27 @@
-# Owner decisions still open: ADR-016 and ADR-018 (2026-09-28)
+# Owner decisions: ADR-016 and ADR-018 (decided 2026-09-28)
 
-Ten decisions stand between the merged code and a live environment. Each one has a recommended default, so the quickest way through this sheet is to accept or change one line per decision. A recommendation is not a decision: nothing here is applied until the owner records it.
+Ten decisions stood between the merged code and a live environment. On 2026-09-28 the project owner delegated all ten ("I delegate the ten decisions to you to determine"), and they were taken as the recommended defaults, with the corrections that reading the code forced (marked in the [Record](#record)). Three changed code and shipped (decisions 1, 4 and 9, as #557, #558 and #559). The other seven are documentation and runbook changes.
+
+The sections below are the analysis as it was put to the owner, kept so the reasoning stays readable. Where a "Fact" line turned out wrong, the Record says so. The Record says what was decided, what shipped and where each outcome now lives. The confirmations that only a person can give are in [What still needs a person](#what-still-needs-a-person).
 
 Sources: [ADR-016](../adr/ADR-016-identity-authentication-service-trust.md) (step 4 and step 5 notes), [ADR-018](../adr/ADR-018-event-delivery-guarantees-idempotency.md) (acceptance checklist), [identity go-live runbook](../runbooks/identity-go-live.md) sections 5 and 9, [event operations runbook](../runbooks/event-operations.md) sections 1, 2, 6 and 7.
 
 ## At a glance
 
-| # | Decision | Recommended default | Gates |
-|---|----------|--------------------|-------|
-| 1 | Who may pass a quote review (`IN_REVIEW` to `APPROVED`) | Deal Desk or above, and never the quote's own creator | Identity go-live (role table) |
-| 2 | Discount-tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) | Keep the current mapping, confirm the tiers the discount path emits | Identity go-live (role table) |
-| 3 | Four-eyes rule (requester cannot decide their own approval) | Keep it, with no exceptions, and staff the CFO group with two or more people | Identity go-live (role table) |
-| 4 | How Prometheus scrapes `/actuator/prometheus` | Separate management port, reachable only from the monitoring namespace | Identity go-live; every ADR-018 alert |
-| 5 | Accept ADR-018 | Accept, with the D4 contract step and D8 step 3 staged after environment proof | Nothing technical |
-| 6 | DLT retention and alert routing | 14 days minimum on every `*.DLT`; page only on a failed outbox row | Enabling the relay |
-| 7 | Backlog per environment and topic | Skip history that is not real business data; always start crm at the end of the topic | Enabling the relay |
-| 8 | Dual-run window and exit criterion | The proposed 7 days, plus a minimum number of acceptances | Removing Redis (D8 step 3) |
-| 9 | Changed discount figures: supersede or add | Supersede the open approval | Nothing technical |
-| 10 | ERP upsert by subscription number | ERP upserts; do not enable `cpq.quote.status.accepted` against a real ERP until confirmed | Enabling the relay |
+| # | Decision | Decided | Gates |
+|---|----------|---------|-------|
+| 1 | Who may pass a quote review (`IN_REVIEW` to `APPROVED`) | Deal Desk, Sales VP or CFO, and never the quote's own creator. Shipped (#557) | Identity go-live (role table) |
+| 2 | Discount-tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) | Keep the mapping. The discount-path owner still confirms the tier names it emits | Identity go-live (role table) |
+| 3 | Four-eyes rule (requester cannot decide their own approval) | Keep it always, with no exceptions. The CFO group needs two or more people | Identity go-live (role table) |
+| 4 | How Prometheus scrapes metrics | A management port with no token, reachable only from the monitoring namespace. Shipped (#558) | Identity go-live; every ADR-018 alert |
+| 5 | Accept ADR-018 | Accepted. The D4 contract step and D8 step 3 stay staged after environment proof | Nothing technical |
+| 6 | DLT retention and alert routing | 14 days on every `*.DLT`, 30 days on `cpq.quote.status.accepted.DLT`. Page only on a failed outbox row | Enabling the relay |
+| 7 | Backlog per environment and topic | Skip history that is not real business data; decide real history per topic; start crm at the end of the topic everywhere | Enabling the relay |
+| 8 | Dual-run window and exit criterion | 7 consecutive days and at least 30 acceptances, whichever ends later | Removing Redis (D8 step 3) |
+| 9 | Changed discount figures: supersede or add | Supersede the open approval. Shipped (#559) | Nothing technical |
+| 10 | ERP upsert by subscription number | The ERP upserts. Confirm it before a real ERP is wired | Enabling the relay for `cpq.quote.status.accepted` against a real ERP |
 
-Suggested order: 1 to 4 before the staging run of the identity runbook, 6, 7 and 10 before any relay is enabled, 8 once crm's Kafka listener is live, and 5 and 9 whenever convenient.
+Order in which the decisions bite: 1 to 4 before the staging run of the identity runbook, 6, 7 and 10 before any relay is enabled, 8 once crm's Kafka listener is live in production.
 
 ---
 
@@ -96,17 +98,33 @@ Every decision D1 to D10 is implemented and has evidence in the acceptance check
 
 ## Record
 
-Fill in when decided, then move the outcome into the ADR or runbook it changes.
+Decided 2026-09-28 by the delegate of the project owner. Each outcome has moved into the document it changes.
 
 | # | Decision taken | Date | Recorded in |
 |---|----------------|------|-------------|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
-| 6 |  |  |  |
-| 7 |  |  |  |
-| 8 |  |  |  |
-| 9 |  |  |  |
-| 10 |  |  |  |
+| 1 | Option (b). Deal Desk, Sales VP or CFO may pass or fail a review; `CPQ.User` and `Admin` may not. The creator cannot pass their own quote (403 `SELF_REVIEW`; failing it is allowed). A quote with no recorded creator has the role check only. Refusals: 401 `AUTHENTICATION_REQUIRED`, 403 `REVIEWER_MUST_BE_A_USER`, 403 `REVIEWER_ROLE_REQUIRED`. **Correction:** the sheet said the SPA would hide the button for other roles. The SPA has no way to learn the signed-in user's roles yet, so it still offers the button and shows the server's refusal. Hiding it needs a session-info endpoint (follow-up below) | 2026-09-28 | Code: #557 (`ReviewAuthority`, `QuoteService`). ADR-016 "Owner decisions"; identity runbook sections 3, 7 |
+| 2 | Keep the mapping (`DEAL_DESK` and `MANAGER`: Deal Desk, Sales VP or CFO; `SALES_VP`, `DIRECTOR`, `VP_SALES`: Sales VP or CFO; `CFO`: CFO; anything else: nobody). Owed before go-live: the discount-path owner confirms it emits only those tier names | 2026-09-28 | ADR-016 "Owner decisions"; identity runbook sections 3, 7 |
+| 3 | Keep four-eyes always, no exceptions. The CFO group in production has at least two people, because a `CFO`-tier approval raised by a CFO can only be decided by another CFO | 2026-09-28 | Identity runbook section 3 (group table) |
+| 4 | Option (a). Every service serves the actuator on `MANAGEMENT_SERVER_PORT` (9091), where `health`, `info` and `prometheus` need no token and every other path is 403; the service port serves no actuator endpoint. `OPENCRM_ENV=prod` refuses to start a service that exposes more than `health` and `info` on its service port. A network policy, shipped with the manifests, is the only protection of the port. **Correction:** the sheet said `/actuator/prometheus` needed a token. It did not exist: no service had a Prometheus registry, and three services did not expose the endpoint. Where a service exposed `metrics`, any valid user token could read it. Both are fixed | 2026-09-28 | Code: #558. Identity runbook sections 4, 5, 6, 7; event runbook section 1; `infra/k8s/opencrm-management-port-networkpolicy.yaml`; ADR-016 "Owner decisions" |
+| 5 | Accept ADR-018. The D4 contract step and D8 step 3 stay ahead, after every environment has proven the release | 2026-09-28 | ADR-018 (status, "Owner decisions") |
+| 6 | 14 days is the floor for `retention.ms` on every `*.DLT`; `cpq.quote.status.accepted.DLT` gets 30 days (`2592000000`). The runbook's severities stand: page only on a failed outbox row, tickets for the rest. The destinations are a deployment fact, still to be named (below) | 2026-09-28 | Event runbook section 1 |
+| 7 | Run the inventory query in each environment first. Rows that are test data are skipped (`SKIPPED`). Real history is decided per topic. `cpq.quote.status.accepted` history is sent only with sign-off from whoever owns contracts and the ERP. In every environment crm starts at the end of the topic, whatever else is decided | 2026-09-28 | Event runbook section 2 (steps 4 to 6) |
+| 8 | Accept the runbook's criterion (7 consecutive days, at least one business week of real traffic, Kafka `applied` + `duplicate` equal to Redis's, `failed` 0, no crm records on the DLT) and add a volume floor: at least 30 acceptances that have a deal, ending at whichever comes later. The window starts when crm's Kafka listener is enabled in production, and staging traffic does not count. Then remove `QuoteEventPublisher`, `QuoteAcceptedEventListener`, `RedisSubscriberConfig` and the fitness-test allowlist entry in one release | 2026-09-28 | Event runbook section 6; ADR-018 "Owner decisions" |
+| 9 | Supersede. A discount event with different figures for a quote line marks the open PENDING request `SUPERSEDED` (terminal, names its replacement) and creates a new PENDING one. An identical event is still a duplicate. Decided requests, other lines and other approval types are never touched. Deciding a superseded request answers 409 `APPROVAL_SUPERSEDED` (after the 403 checks). History keeps the row (ADR-013) | 2026-09-28 | Code: #559 (migration `V1_8`). ADR-018 D6 consumer table; event runbook sections 2, 5 |
+| 10 | The ERP upserts by subscription number: the subscription number is the ERP's idempotency key, and a sync repeated after a crash must be safe. **Finding:** `ErpAdapter` is a stub today (it returns `ERP-<number>` and calls nothing), so nothing external is at risk yet. The gate binds when a real adapter replaces it: the ERP owner confirms the upsert before the relay is enabled for `cpq.quote.status.accepted` in an environment wired to that ERP | 2026-09-28 | Event runbook sections 2 (step 4) and 7; ADR-018 "Owner decisions" |
+
+## What still needs a person
+
+Nothing below can be decided from the code. Each item names who can close it.
+
+- **Alert destinations (decision 6).** Name the team or channel that receives the page and the tickets. The event runbook leaves `<page channel>` and `<ticket channel>` for each environment.
+- **Discount tiers (decision 2).** Whoever owns the discount path confirms it emits only `MANAGER`, `DIRECTOR` or `VP_SALES` (and `DEAL_DESK`, `SALES_VP` or `CFO` through the quote BFF). An unknown tier is decided by nobody, so a mismatch shows up as a stuck approval.
+- **CFO group (decision 3).** Staff the production `CFO` group with two or more people before go-live.
+- **Contracts and ERP owners (decisions 7 and 10).** Sign off any history sent on `cpq.quote.status.accepted`, and confirm the ERP upserts by subscription number before a real adapter is wired.
+- **Each environment.** The identity runbook sections 1 to 8, and the event runbook section 2 (inventory, then skip, send or start crm at the end of the topic).
+
+## Follow-ups this exercise found
+
+- **The SPA cannot tell who is signed in.** Hiding Approve, Reject and the approvals inbox controls by role needs an endpoint on the gateway that returns the session's roles. Until then the server refuses and the SPA shows the refusal.
+- **A replayed discount event can bring back old figures.** The consumer has no ordering field: a record replayed from `cpq.discount.approval.required.DLT` after newer events for the same quote line were processed would supersede the current request with its older figures. The runbook tells the operator to check the line before replaying (section 5). A version or timestamp on the event would remove the hazard.
+- **No rule yet decides whether a quote needs a tiered approval at all.** That is a pricing rule, outside ADR-016 (unchanged).

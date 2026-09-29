@@ -1,6 +1,6 @@
 # ADR-016: Identity, authentication and service-to-service trust
 
-**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 5 are done in the code; see [Implementation log](#implementation-log). Going live still needs the environment work of the [identity go-live runbook](../runbooks/identity-go-live.md), including the recorded rollback exercise.
+**Status:** Accepted on 2026-09-23 by the project owner ("Proceed with ADR-016"). It is being implemented in rollout order, one PR per step. Steps 0 to 5 are done in the code, and the four owner decisions that were still open are recorded under [Owner decisions on ADR-016](#owner-decisions-on-adr-016-2026-09-28); see [Implementation log](#implementation-log). Going live still needs the environment work of the [identity go-live runbook](../runbooks/identity-go-live.md), including the recorded rollback exercise.
 **Date:** 2026-09-22 (proposed), 2026-09-23 (accepted)
 **Deciders:** Project owner. Drafted from the [GitNexus ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (finding F1).
 **Relates to:**
@@ -342,7 +342,7 @@ External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
   - the gateway's app registration: a Web redirect URI per environment, a federated identity credential for the gateway's service account, and the API's delegated permission with admin consent;
   - forwarded-header trust at the ingress, so `{baseUrl}` is the public https origin;
   - Redis availability and persistence for sessions, since Redis now affects login;
-  - how Prometheus scrapes `/actuator/prometheus`, which now needs a token here as at every service (a management port or a scraper identity).
+  - how Prometheus scrapes metrics (a management port or a scraper identity). *Decided 2026-09-28: a management port. This bullet also assumed that `/actuator/prometheus` existed behind a token; it did not. See [Owner decisions](#owner-decisions-on-adr-016-2026-09-28).*
 - **FE sign-out.** The SPA has no sign-out control yet. `POST /logout` needs the XSRF token, as a header or a `_csrf` form field.
 
 ### Step 4: actors and roles (2026-09-23)
@@ -414,9 +414,9 @@ External APIs (OpenRouter, Jev and the ERP adapter) keep their own credentials.
   - the `idtyp` optional claim on the API's access tokens, which makes service detection explicit;
   - assigning the DealDesk, SalesVP and CFO app roles to the right groups, since they now decide approvals;
   - existing rows keep their old actors (`"system"`, body values, or nothing); there is no backfill.
-- **For the owner:**
-  - who may pass a review: `IN_REVIEW` → `APPROVED` has no tier, and any authenticated user can do it, as before;
-  - the discount tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule above;
+- **For the owner** (all decided 2026-09-28, see [Owner decisions](#owner-decisions-on-adr-016-2026-09-28)):
+  - who may pass a review: `IN_REVIEW` → `APPROVED` had no tier, and any authenticated user could do it. Now Deal Desk, Sales VP or CFO, never the creator;
+  - the discount tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule above: both kept;
   - nothing yet decides whether a quote needs a tiered approval at all. That is a pricing rule, outside this ADR.
 - **Record-level authorization** stays deferred (decision 7): who may see or change whose quotes and configuration sessions.
 
@@ -471,8 +471,31 @@ The gate had four items: the Entra app registrations, roles and workload identit
 
 **Still open: needs an environment, or the owner.**
 - **In each environment:** apply sections 1 to 5 of the runbook, pass the section 7 checklist, and record the section 8 rollback exercise. These are the only gate items not done.
-- **For the owner:** how Prometheus scrapes metrics; who may pass an `IN_REVIEW` review; the discount-tier mapping and the four-eyes rule.
+- **For the owner:** how Prometheus scrapes metrics; who may pass an `IN_REVIEW` review; the discount-tier mapping and the four-eyes rule. *All four decided 2026-09-28; see [Owner decisions](#owner-decisions-on-adr-016-2026-09-28).*
 - **Record-level authorization** stays deferred (decision 7).
+
+### Owner decisions on ADR-016 (2026-09-28)
+
+The project owner delegated the four ADR-016 decisions that were still open (the [decision sheet](../forge/40-owner-decisions-adr-016-018.md) has the analysis and the record), and they were taken as recommended. Two changed code, in their own pull requests. The other two are policy that the runbook now states.
+
+- **Who may pass a quote review (decision 1): Deal Desk, Sales VP or CFO, and never the quote's creator.** Shipped in #557.
+  - `ReviewAuthority` reuses the role set that may decide a Deal Desk approval. `CPQ.User` and `Admin` may not review.
+  - The role is needed to pass or to fail a review. The creator cannot pass their own quote (403 `SELF_REVIEW`); failing it is allowed, since it only holds the quote back. A quote with no recorded creator (made before step 4) has the role check only.
+  - Refusals are 401 `AUTHENTICATION_REQUIRED`, 403 `REVIEWER_MUST_BE_A_USER` (a service token), 403 `REVIEWER_ROLE_REQUIRED` and 403 `SELF_REVIEW`.
+- **Discount-tier mapping (decision 2): kept.** `DEAL_DESK` and `MANAGER` are decided by Deal Desk, Sales VP or CFO; `SALES_VP`, `DIRECTOR` and `VP_SALES` by Sales VP or CFO; `CFO` by CFO; any other tier by nobody. The policy stays code. Owed before go-live: whoever owns the discount path confirms it emits only those names. A mismatch blocks an approval; it never weakens one.
+- **Four-eyes (decision 3): kept always, with no exception.** The consequence for operations: a `CFO`-tier approval raised by a CFO can be decided only by another holder of the role, so the production `CFO` group has two or more people (identity runbook section 3).
+- **Prometheus (decision 4): a management port, with no token.** Shipped in #558.
+  - Every service serves its actuator on `MANAGEMENT_SERVER_PORT` (9091). There `health`, `info` and `prometheus` need no token and every other path is 403. The service port serves no actuator endpoint.
+  - A dedicated security chain, matched on the management server namespace, guards it, because Spring Boot 4's child management context shares the parent's chain. The gateway has the reactive equivalent.
+  - The port has no credential, so the network is its protection: `infra/k8s/opencrm-management-port-networkpolicy.yaml` allows the monitoring namespace only. The runtime-topology ADR (ADR-022) does not exist yet, so the policy ships with the manifests.
+  - `OPENCRM_ENV=prod` refuses to start a service that exposes more than `health` and `info` on its service port (`OpenCrmIdentityPreflight`). The startup line now reports `management port=`.
+
+**Corrections to what this ADR said before.** Step 3's note assumed `/actuator/prometheus` existed behind a token. It did not: no service had a Prometheus registry, and three did not expose the endpoint. Where a service exposed `metrics`, any valid user token could read it. Decision 4 fixed both, with `micrometer-registry-prometheus` in every service. Decision 1's analysis said the SPA would hide the review buttons for other roles. It does not yet: the SPA cannot learn the user's roles, so it still offers the button and shows the server's refusal.
+
+**Follow-ups.**
+- A gateway endpoint that returns the session's roles, so the SPA can hide review and approval controls by role.
+- Nothing yet decides whether a quote needs a tiered approval at all. That is a pricing rule, outside this ADR (unchanged).
+- Record-level authorization stays deferred (decision 7).
 
 ## Consequences
 
@@ -520,6 +543,8 @@ Status on 2026-09-24, after step 5:
 | Go-live: app registrations, app roles and workload identities documented | **Done** in step 5: `infra/entra/opencrm-identity.json` and the runbook; `SecurityBaselineFitnessTest` keeps the file in step with the code |
 | Go-live: no secrets in YAML | **Done** in step 5: database password defaults moved to `dev \| test`; `SecurityBaselineFitnessTest` refuses secret values and defaults elsewhere |
 | Go-live: the production-marker guard verified | **Done** in step 5: `OpenCrmIdentityPreflight` at startup, and `productionMarkerGuards` in every service's `SecurityBaselineTest` |
+| Quote review authority (owner decision 1) | **Done** on 2026-09-28: `ReviewAuthority` and `QuoteService.authorizeReview`, tested by `QuoteServiceReviewDecisionTest` |
+| Metrics off the service port (owner decision 4) | **Done** on 2026-09-28: management port, `OpenCrmManagementPortTest` and its siblings, `GatewayManagementPortTest`, and the production preflight. `SecurityBaselineFitnessTest` pins the exposure list |
 | Go-live: rollback exercise recorded | **Open**: needs staging; procedure and record in runbook section 8 |
 | Gateway: login, one relayed token, no forged identity headers | **Done** in step 3: GatewaySecurityChainTest, IdentityRelayFilterTest, and IdentityRelayRoutingTest through real routing. SecurityBaselineFitnessTest checks one tenant, no B2C and no identity-adding route filters |
 
