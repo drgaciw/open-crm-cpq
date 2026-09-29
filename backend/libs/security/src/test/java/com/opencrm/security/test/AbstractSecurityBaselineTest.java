@@ -159,7 +159,8 @@ public abstract class AbstractSecurityBaselineTest {
         production.run(context -> assertThat(context).hasFailed().getFailure().rootCause()
                 .hasMessageContaining("must include the API's client id"));
         production.withPropertyValues(
-                        "opencrm.security.jwt.audiences=" + TestTokens.API_CLIENT_ID + ",api://opencrm-api")
+                        "opencrm.security.jwt.audiences=" + TestTokens.API_CLIENT_ID + ",api://opencrm-api",
+                        "management.server.port=9091")
                 .run(context -> assertThat(context).hasNotFailed());
     }
 

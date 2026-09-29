@@ -17,7 +17,7 @@ USER appuser
 EXPOSE 8090
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
-  CMD wget -qO- http://localhost:8090/actuator/health || exit 1
+  CMD wget -qO- http://localhost:${MANAGEMENT_SERVER_PORT:-8090}/actuator/health || exit 1
 
 ENTRYPOINT ["java", \
   "-Xms256m", "-Xmx1g", \

@@ -51,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,prometheus
 
 # Jev advisory decision support (ADR-015). Inert by default: every flag is false and the
 # transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so

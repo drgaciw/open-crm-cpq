@@ -64,7 +64,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,prometheus
 
 ---
 # Local and CI only: the well-known development database password. The default profile has no secret
