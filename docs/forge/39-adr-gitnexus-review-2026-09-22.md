@@ -293,6 +293,11 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - The check cannot be marked required. The repository is private and its plan offers no branch protection, so merging on green is procedural.
 >   - [Owner decision sheet](40-owner-decisions-adr-016-018.md): the ten open ADR-016 and ADR-018 decisions, each with a recommended default and what it gates. It also flags that passing a quote review (`IN_REVIEW`) has no role check.
 >   - This log and ADR-018 said the event actor was `user:<sub>`. The code has emitted `user:<oid>` and `service:<client-id>` since ADR-016 step 4, and the text is corrected.
+> - **Owner decisions taken (2026-09-28).** The ten decisions were delegated and decided as recommended ([record](40-owner-decisions-adr-016-018.md#record)). ADR-018 is Accepted.
+>   - Passing a quote review now needs Deal Desk, Sales VP or CFO and is closed to the quote's creator (#557).
+>   - Metrics are scraped from a management port with no token, protected by network policy (#558). The sheet's premise was wrong: no service had a Prometheus registry, so `/actuator/prometheus` never existed, and where `metrics` was exposed any valid user token could read it.
+>   - A discount event with changed figures supersedes the open approval (#559).
+>   - What remains is environment work and confirmations only people can give: alert destinations, the discount-path tier names, the CFO group's staffing, and the contracts and ERP owners' sign-off.
 
 ---
 
