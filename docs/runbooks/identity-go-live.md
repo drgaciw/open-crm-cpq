@@ -71,11 +71,16 @@ For each of them:
 
 | App role | Assign to | Decides |
 |----------|-----------|---------|
-| `CPQ.User` | everyone who uses OpenCRM | no approvals |
-| `DealDesk` | the deal desk | `DEAL_DESK` and `MANAGER` approvals |
-| `SalesVP` | sales vice presidents | `SALES_VP`, `DIRECTOR` and `VP_SALES`, and every Deal Desk tier |
-| `CFO` | finance leadership | every tier |
-| `Admin` | system administrators | no approvals (segregation of duties) |
+| `CPQ.User` | everyone who uses OpenCRM | no approvals, and no quote reviews |
+| `DealDesk` | the deal desk | `DEAL_DESK` and `MANAGER` approvals, and quote reviews |
+| `SalesVP` | sales vice presidents | `SALES_VP`, `DIRECTOR` and `VP_SALES`, and every Deal Desk tier, and quote reviews |
+| `CFO` | finance leadership | every tier, and quote reviews |
+| `Admin` | system administrators | no approvals and no quote reviews (segregation of duties) |
+
+A quote review is the step from `IN_REVIEW` to `APPROVED` (or `REJECTED`) on the quote itself. It needs one of `DealDesk`, `SalesVP` or `CFO`, and the quote's creator cannot pass their own quote (`SELF_REVIEW`). Failing one's own quote is allowed. Two rules follow from the four-eyes checks, which have no exceptions (owner decisions 1 and 3):
+
+- A person who creates quotes and holds `DealDesk`, `SalesVP` or `CFO` still needs a different reviewer for those quotes.
+- **The `CFO` group needs at least two people in production.** A `CFO`-tier approval raised by a CFO can be decided only by another holder of the role, so a group of one blocks it.
 
 The services check that a caller is authenticated, not that it holds `CPQ.User`. With assignment required, though, a user with no role gets no token. Assign `CPQ.User` to every user, and the approver roles on top of it; a user in several groups gets every role in the `roles` claim.
 
@@ -121,6 +126,10 @@ Tick every line in the environment, and keep the evidence (screenshots, log line
 - [ ] The access token in the gateway's session, inspected in a test tenant: `ver` `2.0`, `aud` the API's client id, `scp` `access_as_user`, the user's `roles`, and `oid`.
 - [ ] Creating a quote (a POST from the SPA) succeeds: the SPA sends `X-XSRF-TOKEN`.
 - [ ] Approvals: a `DealDesk` user decides a `DEAL_DESK` approval; the same user gets `403 APPROVER_ROLE_REQUIRED` on a `SALES_VP` approval; a requester gets `403 SELF_APPROVAL` on their own request. The recorded approver is the user's `oid`.
+- [ ] Quote review: a `DealDesk`, `SalesVP` or `CFO` user passes a quote that is `IN_REVIEW` (created by somebody else); a `CPQ.User` gets `403 REVIEWER_ROLE_REQUIRED`; the quote's creator, even with `DealDesk`, gets `403 SELF_REVIEW` on approve.
+- [ ] Discount tiers: the discount path's approvals arrive with one of `MANAGER`, `DIRECTOR` or `VP_SALES` (owner decision 2 waits on its owner's confirmation). An approval stuck with no possible decider names an unknown tier.
+- [ ] Superseded approvals: when the discount figures for a quote line change while its approval is `PENDING`, the old request shows as `SUPERSEDED`, only the new one is decidable, and deciding the old one answers `409 APPROVAL_SUPERSEDED`.
+- [ ] The `CFO` group has two or more members.
 - [ ] Service calls: a quote's configuration check (quote-service to configuration-engine `/internal`) and price-book lookups (pricing-service to pricebook-service `/internal`) succeed; the same `/internal` path with a user token gets `403`.
 - [ ] Sign-out (toolbar) ends the session at the gateway and at Entra, and returns to the app.
 - [ ] In staging, with the production configuration, a service started with `SPRING_PROFILES_ACTIVE=dev` refuses to start, and so does one without `OPENCRM_SECURITY_JWT_AUDIENCES`.
@@ -149,10 +158,18 @@ Record:
 | Problems seen, and follow-ups | |
 | Performed by / signed off by | |
 
-## 9. Decisions still open for the owner
+## 9. Decisions (recorded 2026-09-28)
 
-- Who may pass a quote's review (`IN_REVIEW` to `APPROVED` has no tier; today any signed-in user can). See ADR-016 step 4.
-- The discount-tier mapping (`MANAGER`, `DIRECTOR`, `VP_SALES`) and the four-eyes rule. See ADR-016 step 4.
+The four identity decisions were taken by the owner's delegate; the [decision sheet](../forge/40-owner-decisions-adr-016-018.md) has the reasoning and the record. What each means for this runbook:
+
+| Decision | Outcome | Where it applies here |
+|----------|---------|-----------------------|
+| 1. Who may pass a quote review | Deal Desk, Sales VP or CFO; never the quote's creator | Section 3 (role table), section 7 |
+| 2. Discount-tier mapping | Kept. Owed: the discount-path owner confirms the tier names | Section 3, section 7 |
+| 3. Four-eyes | Always, no exceptions; the `CFO` group has two or more people | Section 3, section 7 |
+| 4. Prometheus | A management port with no token, protected by network policy | Sections 4, 5, 6, 7 |
+
+**Still owed by people:** the discount-path owner's confirmation (decision 2), and staffing the `CFO` group (decision 3). The SPA does not yet hide the review and approval buttons by role, because it cannot learn the user's roles; the server refuses and the SPA shows the refusal. That needs a session-info endpoint on the gateway and is a follow-up, not part of go-live.
 
 ## References
 
