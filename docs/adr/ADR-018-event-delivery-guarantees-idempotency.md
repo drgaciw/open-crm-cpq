@@ -93,7 +93,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
 - `occurredAt`
 - `producer` (service name)
 - `correlationId` and `causationId`
-- `actor` (`user:<sub>` or `service:<client-id>`, per ADR-016)
+- `actor` (`user:<oid>` or `service:<client-id>`, per ADR-016)
 
 `OutboxEvent` gains a separate `topic` column (`event_type` then means the registry type), plus `status` and header columns. The Flyway migration is additive in each owning schema (ADR-008). Payloads stay JSON DTOs.
 - *Refined during implementation (2026-09-22):*
@@ -102,7 +102,7 @@ ADR-010 was reverse-engineered on 2026-09-19. It verified that the outbox, topic
     - The contract step switches `event_type` to the registry type once every environment runs the expand step.
   - **The `eventType` header comes from the registry**, looked up by topic. D5 makes topic-to-contract one-to-one and pins it by test.
   - **`correlationId` is always present.** An event that nothing correlated starts its own chain, correlated by its own `eventId`. A Kafka listener continues the chain of the record it is handling, and that record's `eventId` becomes the causation. A producer that already has a business correlation, such as a quote's UUID, opens a correlation scope around its publish.
-  - **`actor` is `user:<sub>` for an authenticated principal and `service:<spring.application.name>` otherwise.** `service:<client-id>` for service principals waits for ADR-016.
+  - **`actor` is `user:<oid>` for a person, `service:<client-id>` for a calling service, and this service itself when there is no caller.** The first version wrote `user:<sub>` and `service:<spring.application.name>`; ADR-016 step 4 replaced both, because `sub` is pairwise per client and `oid` is stable.
     - *Updated by ADR-016 step 4 (2026-09-23):* a person is now `user:<oid>`, because Entra makes `sub` pairwise per client; a calling service with a service token is `service:<client-id>`; and without a caller the service is `service:<client-id>` of its workload identity, or `service:<spring.application.name>` locally.
 
 **D5 — The registry is the contract.**
@@ -464,7 +464,7 @@ Branch `feat/adr018-d4-envelope-headers-topic-column`, 2026-09-22. The ADR stays
   - quote-service (`QuoteAccepted`, correlated by the quote UUID) and configuration-engine (`ConfigurationCommitted`) publish inside a scope taken from their payload's correlation snapshot, so the headers match the payload.
 - **Actor.**
   - `EventActorResolver` lives in `libs/common`. Its fallback, `EventActorAutoConfiguration`, answers `service:<spring.application.name>`.
-  - `libs/security` adds `SecurityEventActorAutoConfiguration` (its first auto-configuration), ordered before the fallback. Its resolver answers `user:<sub>` from `SecurityUtils.getCurrentUser()`, which already ignores anonymous callers, and the service otherwise.
+  - `libs/security` adds `SecurityEventActorAutoConfiguration` (its first auto-configuration), ordered before the fallback. Its resolver answers `user:<sub>` from `SecurityUtils.getCurrentUser()`, which already ignores anonymous callers, and the service otherwise. *Superseded by ADR-016 step 4: the resolver reads `CurrentActor`, so a person is `user:<oid>` and a calling service is `service:<client-id>`.*
 - **`KafkaTopics` clean-up.**
   - The 15 constants with no producer, no consumer, no reference and no contract are removed. Examples are `cpq.quote.created`, `cpq.approval.approved` and the six AMCP event mesh topics.
   - `KafkaTopics` now matches the registry one-to-one (12 topics). `EventContractRegistryTest` enforces this in both directions, so a topic name cannot come back without a `PUBLISHED` or `RESERVED` contract.
@@ -480,7 +480,7 @@ Branch `feat/adr018-d4-envelope-headers-topic-column`, 2026-09-22. The ADR stays
 - **Operations.**
   - **Contract step (later).** Once every environment runs this release, switch `event_type` to the registry type: new rows get `contract.eventType()`, and `UPDATE outbox_events SET event_type = <type for topic> WHERE topic IS NOT NULL` fixes the rest. After that, rolling back past this release needs the reverse update, `SET event_type = topic`, before a relay is enabled.
   - Consumers can now log and trace by `correlationId`. Putting it into MDC and tracing is ADR-020.
-- **Not done:** the D4 contract step, the service-principal `actor` (ADR-016), DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
+- **Not done:** the D4 contract step, the service-principal `actor` (done by ADR-016 step 4), DLT and lag metrics, the per-environment backlog decision, and D8 step 3.
 
 ### Close-out: D10 metrics, D7 dead-letter triage, backlog triage, dual-run evidence
 

@@ -228,7 +228,7 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - Every record now carries all eight D4 headers: `eventId`, `occurredAt`, `producer`, `eventType`, `eventVersion`, `correlationId`, `causationId` and `actor`.
 >   - Additive, nullable columns hold the envelope in all seven outbox schemas.
 >   - Kafka listeners continue the correlation chain of the record they handle.
->   - The actor is `user:<sub>` from the security context, or the service.
+>   - The actor is `user:<oid>` from the token (`user:<sub>` until ADR-016 step 4), `service:<client-id>` for a calling service, or the service itself.
 >   - `event_type` keeps holding the topic until a later contract step, so any release can still be rolled back.
 >   - `KafkaTopics` is cut to the 12 registered topics, and a test keeps it matched to the registry.
 > - **ADR-018 close-out (2026-09-23).**
@@ -288,6 +288,11 @@ Recommendation: commit these queries as `scripts/ci/adr-fitness.cypher.json` wit
 >   - A startup preflight logs the identity summary. Under the production marker it refuses to start on a non-jwt mode, a missing or multi-tenant issuer, audiences without the API's client ID, or a client secret. Every service's baseline test proves the guard.
 >   - The runbook `docs/runbooks/identity-go-live.md` has the `az`/Graph commands, the environment, the verification checklist and the rollback exercise. The rollback record, and with it F1, stays open until the runbook runs in staging.
 >   - Still for the owner: Prometheus scraping, who may pass an `IN_REVIEW` review, the discount-tier mapping and the four-eyes rule.
+> - **PR gate and owner decisions (2026-09-28).**
+>   - `main` had no commit statuses, so the fitness tests that enforce ADR-016 and ADR-018 were advisory. `.github/workflows/pr-check.yml` now runs the drift check and the Docker-free unit stage on every pull request (ADR-003 section 7). Its first run on GitHub: 15 modules, 1,494 tests, 0 failures, 4 min 13 s. The billing block that ended GitHub PR runs in May no longer applies.
+>   - The check cannot be marked required. The repository is private and its plan offers no branch protection, so merging on green is procedural.
+>   - [Owner decision sheet](40-owner-decisions-adr-016-018.md): the ten open ADR-016 and ADR-018 decisions, each with a recommended default and what it gates. It also flags that passing a quote review (`IN_REVIEW`) has no role check.
+>   - This log and ADR-018 said the event actor was `user:<sub>`. The code has emitted `user:<oid>` and `service:<client-id>` since ADR-016 step 4, and the text is corrected.
 
 ---
 
