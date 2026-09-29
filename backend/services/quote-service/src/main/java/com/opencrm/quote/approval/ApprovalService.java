@@ -247,6 +247,11 @@ public class ApprovalService {
 
         Instant respondedAt = remote.getApprovedAt() != null ? remote.getApprovedAt() : remote.getRejectedAt();
         String comments = remote.getRejectionReason() != null ? remote.getRejectionReason() : remote.getReason();
+        if (status == ApprovalStatus.SUPERSEDED) {
+            // Nobody responded: routing replaced it. Say by what, so the history reads without the reason column.
+            respondedAt = remote.getSupersededAt();
+            comments = "Superseded by request " + remote.getSupersededBy();
+        }
 
         return ApprovalRequestDto.builder()
                 .id(remote.getId())
@@ -259,6 +264,7 @@ public class ApprovalService {
                 .comments(comments)
                 .requestedAt(remote.getSubmittedAt())
                 .respondedAt(respondedAt)
+                .supersededBy(status == ApprovalStatus.SUPERSEDED ? remote.getSupersededBy() : null)
                 .createdAt(remote.getCreatedAt())
                 .build();
     }

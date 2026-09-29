@@ -31,5 +31,8 @@ public class RoutingApprovalDto {
     private Instant submittedAt;
     private Instant approvedAt;
     private Instant rejectedAt;
+    /** The request that replaced this one, when its status is SUPERSEDED. */
+    private Long supersededBy;
+    private Instant supersededAt;
     private Instant createdAt;
 }

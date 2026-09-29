@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -33,8 +35,13 @@ import java.util.Objects;
  *   <li>as a natural-key backstop for producer duplicates without an {@code eventId}, an event whose figures match an
  *       open PENDING discount approval for the same quote line is skipped.</li>
  * </ol>
- * An event with <em>different</em> figures for a line that already has an open approval still creates a second one,
- * as before; whether it should supersede the open request is a business rule this class does not decide.
+ *
+ * <p>Changed figures supersede (owner decision 9). An event with <em>different</em> figures for a line that already
+ * has an open PENDING approval creates a new PENDING request and marks the open one
+ * {@link ApprovalStatus#SUPERSEDED}, naming its replacement. Approvers therefore see one open request per quote line,
+ * carrying the figures they are actually being asked to approve, and the replaced request cannot be approved by
+ * mistake (approving or rejecting it answers 409 {@code APPROVAL_SUPERSEDED}). The replaced row stays as history. A
+ * request somebody already decided is never touched: new figures do not change what was approved.
  *
  * <p>An unreadable payload is not retryable and goes straight to {@code cpq.discount.approval.required.DLT} (D7).
  *
@@ -64,9 +71,17 @@ public class DiscountApprovalEventConsumer {
         DiscountApprovalRequiredEvent event = parse(record.value());
         log.info("Received discount approval required event for quote: {}", event.getQuoteId());
 
-        if (hasMatchingOpenRequest(event)) {
+        List<ApprovalRequest> open = openRequestsForLine(event);
+        ApprovalRequest identical = latestIdentical(open, event);
+        if (identical != null && open.size() == 1) {
             log.info("Skipping duplicate discount approval event for quote {} line {}: an identical request is PENDING",
                     event.getQuoteId(), event.getLineId());
+            return;
+        }
+        if (identical != null) {
+            // The current request already carries these figures; older open ones (a legacy duplicate, or figures
+            // that have since been re-sent) are replaced by it.
+            supersedeAll(open, identical, event);
             return;
         }
 
@@ -87,6 +102,7 @@ public class DiscountApprovalEventConsumer {
                 .build();
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
+        supersedeAll(open, saved, event);
 
         // Advisory shadow only (ADR-015): the rule above stays authoritative. Never throws, and runs
         // after this transaction commits, so it cannot cause a redelivery.
@@ -107,14 +123,44 @@ public class DiscountApprovalEventConsumer {
         }
     }
 
-    private boolean hasMatchingOpenRequest(DiscountApprovalRequiredEvent event) {
+    /** Open (PENDING) discount requests for the event's quote line, oldest first. */
+    private List<ApprovalRequest> openRequestsForLine(DiscountApprovalRequiredEvent event) {
         return approvalRequestRepository
                 .findByQuoteIdAndStatus(event.getQuoteId(), ApprovalStatus.PENDING).stream()
-                .anyMatch(open -> open.getApprovalType() == ApprovalType.DISCOUNT
-                        && Objects.equals(open.getLineId(), event.getLineId())
-                        && sameAmount(open.getRequestedDiscount(), event.getRequestedDiscount())
-                        && sameAmount(open.getMarginDelta(), event.getMarginDelta())
-                        && Objects.equals(open.getCurrencyCode(), event.getCurrencyCode()));
+                .filter(open -> open.getApprovalType() == ApprovalType.DISCOUNT
+                        && Objects.equals(open.getLineId(), event.getLineId()))
+                .sorted(Comparator.comparing(ApprovalRequest::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    /** The newest open request whose figures equal the event's, or {@code null}. */
+    private static ApprovalRequest latestIdentical(List<ApprovalRequest> open, DiscountApprovalRequiredEvent event) {
+        ApprovalRequest latest = null;
+        for (ApprovalRequest candidate : open) {
+            if (sameAmount(candidate.getRequestedDiscount(), event.getRequestedDiscount())
+                    && sameAmount(candidate.getMarginDelta(), event.getMarginDelta())
+                    && Objects.equals(candidate.getCurrencyCode(), event.getCurrencyCode())) {
+                latest = candidate;
+            }
+        }
+        return latest;
+    }
+
+    /** Marks every open request except {@code current} as superseded by it, and records why. */
+    private void supersedeAll(List<ApprovalRequest> open, ApprovalRequest current,
+                              DiscountApprovalRequiredEvent event) {
+        for (ApprovalRequest older : open) {
+            if (older == current) {
+                continue;
+            }
+            older.supersede(current.getId());
+            approvalRequestRepository.save(older);
+            log.info("Approval request {} for quote {} line {} superseded by {}: discount {} margin delta {} {} -> "
+                            + "discount {} margin delta {} {}",
+                    older.getId(), event.getQuoteId(), event.getLineId(), current.getId(),
+                    older.getRequestedDiscount(), older.getMarginDelta(), older.getCurrencyCode(),
+                    event.getRequestedDiscount(), event.getMarginDelta(), event.getCurrencyCode());
+        }
     }
 
     /** Scale-insensitive: the columns are NUMERIC(19,2) and (19,4), the event carries whatever scale it has. */

@@ -154,6 +154,40 @@ class ApprovalServiceTest {
         assertThrows(IllegalStateException.class, () -> approvalService.approve(1L));
     }
 
+    @Test
+    @DisplayName("decision 9: a superseded request answers 409 APPROVAL_SUPERSEDED, naming its replacement")
+    void supersededRequestCannotBeDecided() {
+        TestCallers.signInUser("manager-1", "DealDesk");
+        pendingRequest.supersede(2L);
+        stubFind(pendingRequest);
+
+        assertRefused(HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED", () -> approvalService.approve(1L));
+        assertRefused(HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED", () -> approvalService.reject(1L, "no"));
+        BusinessException refused = assertThrows(BusinessException.class, () -> approvalService.approve(1L));
+        assertTrue(refused.getMessage().contains("approval 2"), refused.getMessage());
+        verify(approvalRequestRepository, never()).save(any());
+        verifyNoInteractions(outboxEventPublisher);
+    }
+
+    @Test
+    @DisplayName("decision 9: a caller who may not decide gets 403, not 409, so a superseded request's state stays private")
+    void supersededStateIsNotRevealedToWhoMayNotDecide() {
+        TestCallers.signInUser("someone", "CPQ.User");
+        pendingRequest.supersede(2L);
+        stubFind(pendingRequest);
+
+        assertRefused(HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED", () -> approvalService.approve(1L));
+    }
+
+    @Test
+    @DisplayName("decision 9: superseded requests are not in the pending lists")
+    void supersededRequestsAreNotPending() {
+        when(approvalRequestRepository.findByStatus(ApprovalStatus.PENDING)).thenReturn(List.of(pendingRequest));
+
+        assertEquals(1, approvalService.getPendingApprovals().size());
+        verify(approvalRequestRepository, never()).findByStatus(ApprovalStatus.SUPERSEDED);
+    }
+
     @Nested
     @DisplayName("who may decide (ADR-016 decision 7)")
     class Authority {
