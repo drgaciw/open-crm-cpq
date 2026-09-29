@@ -18,7 +18,7 @@
 
 ## 1. Signals
 
-All meters are Micrometer meters on each service's `/actuator/metrics`. The backend that scrapes and alerts on them is ADR-020's decision. The names below are Micrometer names; Prometheus replaces the dots with underscores.
+All meters are Micrometer meters, scraped from each service's management port at `/actuator/prometheus` (no token; the port is open to the monitoring namespace only, see the [identity runbook](identity-go-live.md) section 5). The backend that alerts on them is ADR-020's decision. The names below are Micrometer names; Prometheus replaces the dots with underscores.
 
 | Meter | Service | Meaning |
 |-------|---------|---------|
@@ -31,7 +31,7 @@ All meters are Micrometer meters on each service's `/actuator/metrics`. The back
 | `kafka.consumer.fetch.manager.records.lag.max{client.id,…}` | consumers | Consumer lag, bound by Spring Boot's `KafkaMetricsAutoConfiguration` |
 | `opencrm.crm.quote.accepted{channel,outcome}` | crm-service | Quote acceptances by `redis` or `kafka` and by `applied`, `duplicate`, `deal-not-found`, `no-deal` or `failed` (§6) |
 
-The health indicator `outbox` (`/actuator/health`) is **DOWN** when a row is `FAILED` or pending rows are older than `opencrm.outbox.health.max-pending-age`. It is **UNKNOWN** while the relay is disabled.
+The health indicator `outbox` (`/actuator/health`, on the management port when there is one) is **DOWN** when a row is `FAILED` or pending rows are older than `opencrm.outbox.health.max-pending-age`. It is **UNKNOWN** while the relay is disabled.
 
 ### Recommended alerts
 

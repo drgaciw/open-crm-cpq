@@ -1,14 +1,22 @@
 package com.opencrm.security.web;
 
 import com.opencrm.security.web.OpenCrmSecurityProperties.SecurityMode;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.actuate.autoconfigure.web.server.ConditionalOnManagementPort;
+import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -19,6 +27,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 import java.util.Locale;
 import java.util.Set;
@@ -38,7 +48,14 @@ import java.util.Set;
  * </ul>
  * Stateless, CSRF off: services receive bearer tokens, never cookies (ADR-004 keeps CSRF at the edge).
  *
- * <p><strong>{@code dev} mode</strong>: permits everything, logs a WARN, and refuses to start when the production
+ * <p><strong>Management port</strong> (owner decision 4): with {@code management.server.port} set to a port other than
+ * the service's, the actuator runs on that second port and a second chain, ahead of the one above, governs it: only
+ * {@code health}, {@code info} and {@code prometheus} are served, without a token, and everything else is refused.
+ * Metrics are scraped without a credential, so that port must be reachable from the monitoring namespace only
+ * (a Kubernetes NetworkPolicy; see {@code docs/runbooks/identity-go-live.md}), and never through an ingress or the
+ * gateway. Without that setting the actuator shares the service port and the chain above applies to it, so
+ * {@code prometheus} needs a token there.
+ * * <p><strong>{@code dev} mode</strong>: permits everything, logs a WARN, and refuses to start when the production
  * marker {@code opencrm.env} ({@code OPENCRM_ENV}) is {@code prod} or {@code production}.
  */
 @Slf4j
@@ -93,6 +110,38 @@ public class OpenCrmSecurityAutoConfiguration {
                 .build();
     }
 
+    /**
+     * The chain of the management port (owner decision 4). It exists only when {@code management.server.port} differs
+     * from the service port, and it matches only requests that arrive on that port. It is ordered ahead of
+     * {@code openCrmSecurityFilterChain}, which keeps the service port.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(EndpointRequest.class)
+    @ConditionalOnManagementPort(ManagementPortType.DIFFERENT)
+    static class ManagementPortConfiguration {
+
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        SecurityFilterChain openCrmManagementFilterChain(HttpSecurity http, OpenCrmSecurityProperties properties,
+                                                        Environment environment) throws Exception {
+            http.securityMatcher(ManagementPortConfiguration::isManagementRequest)
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+            if (mode(properties, environment) == SecurityMode.DEV) {
+                return http.authorizeHttpRequests(rules -> rules.anyRequest().permitAll()).build();
+            }
+            return http.authorizeHttpRequests(rules -> rules
+                            .requestMatchers(EndpointRequest.to(ManagementEndpoints.publicIds())).permitAll()
+                            .anyRequest().denyAll())
+                    .build();
+        }
+
+        /** Whether the request arrived at the management web server rather than at the service's. */
+        static boolean isManagementRequest(HttpServletRequest request) {
+            WebApplicationContext context = WebApplicationContextUtils.getWebApplicationContext(request.getServletContext());
+            return context != null && WebServerApplicationContext.hasServerNamespace(context, "management");
+        }
+    }
     /** The token decoder of {@code jwt} mode. In {@code dev} mode it exists but is never used. */
     @Bean
     @ConditionalOnMissingBean

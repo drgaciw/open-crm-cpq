@@ -60,7 +60,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,prometheus
 
 # ADR-018 D6: inbox dedupe for the quote-accepted consumer (processed_events, V1_3), and the ERP sync that
 # the consumer queues instead of calling the ERP inside its Kafka transaction.

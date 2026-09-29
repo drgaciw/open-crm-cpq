@@ -135,7 +135,7 @@ class CpqGatewayRoutesTest {
     @DisplayName("management.endpoint.gateway.access must not nest under server.webflux")
     void applicationYamlEnablesGatewayActuatorEndpoint() {
         assertTrue(
-                yaml.contains("include: health,info,metrics,gateway,prometheus"),
+                yaml.contains("include: health,info,gateway,prometheus"),
                 "gateway must be in management.endpoints.web.exposure.include");
         assertTrue(
                 yaml.contains("gateway:\n      access: read-only")
