@@ -1,0 +1,43 @@
+# Pull-request gate (ADR-003 amendment, 2026-09-28).
+#
+# Runs the same Docker-free stage that Jenkins runs (scripts/ci/run-core.sh backend-unit) plus the
+# blocking CI-contract drift check, so the security-baseline and event-contract fitness tests
+# (ADR-016, ADR-018) run on every pull request even while no Jenkins instance is reachable.
+# Jenkins stays the primary CI and still owns integration, frontend and the AI assist stages.
+name: PR check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend-unit:
+    name: Backend Unit (PR gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: CI contract drift check
+        run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+      - name: Fast unit verification
+        run: bash scripts/ci/run-core.sh backend-unit
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-check-unit-test-reports
+          path: backend/**/target/surefire-reports/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
