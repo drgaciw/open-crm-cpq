@@ -1,10 +1,10 @@
-# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback only.
+# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback plus one pull-request gate.
 # Human docs: docs/ci-jenkins-cutover.md, infra/jenkins/README.md, docs/adr/ADR-003-ci-llm-integration.md
 # When changing Jenkinsfile, .github/workflows/ci.yml, or scripts/ci/*, update this file in the same PR.
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-09-22"
+last_reviewed: "2026-09-28"
 
 # JDK2 toolchain pins (GHA + Jenkins Maven/Node). Jenkins WAR stays on lts-jdk21.
 toolchain:
@@ -18,6 +18,7 @@ toolchain:
 execution:
   primary: jenkins
   fallback: github_actions_manual
+  pr_gate: github_actions_pr_check
   github_status_context: jenkins/opencrm-cpq-ci
 
 ssot:
@@ -146,6 +147,24 @@ github_actions:
       - shared-libraries
       - backend-unit
 
+# The only automatic GHA workflow (ADR-003 section 7, 2026-09-28). ci.yml above stays manual.
+github_pr_gate:
+  workflow: .github/workflows/pr-check.yml
+  role: pull_request_gate
+  trigger:
+    pull_request_branches: [main]
+  job: backend-unit
+  job_name: Backend Unit (PR gate)
+  runs:
+    - python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+    - bash scripts/ci/run-core.sh backend-unit
+  ai_assist: false
+  required_check_possible: false
+  notes: >-
+    Same Docker-free stage as Jenkins Backend Unit, so the security-baseline and event-contract
+    fitness tests run on every pull request. The repository is private and its plan offers no
+    branch protection, so merging on a green check is procedural (gh pr checks --watch).
+
 jenkins:
   file: Jenkinsfile
   job: opencrm-cpq
@@ -186,7 +205,8 @@ drift_prevention:
   rules:
     - Change scripts/ci stage scripts and run-core.sh case arms together.
     - Update this file when adding/removing Jenkins stages or GHA manual jobs.
-    - Do not re-enable GHA push/pull_request triggers without updating docs/ci-jenkins-cutover.md.
+    - Do not re-enable push/pull_request triggers on ci.yml without updating docs/ci-jenkins-cutover.md.
+    - The only automatic GHA workflow is pr-check.yml (github_pr_gate); it must call run-core.sh backend-unit and must not reference ai-assist.
     - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
     - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.

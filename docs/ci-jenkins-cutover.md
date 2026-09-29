@@ -7,7 +7,7 @@
 Rationale for this repo:
 
 - Single-org workflow (no fork CI requirement).
-- GitHub Actions billing blocked automated runs on PRs.
+- GitHub Actions billing blocked automated runs on PRs (May 2026). Resolved by 2026-09-28: a `pull_request` run started and executed steps (PR #555), which is why the unit gate below exists.
 - Jenkins already hosts advisory AI assist and drift checks.
 - `scripts/ci/run-core.sh` SSOT keeps commands identical if GHA is run manually.
 
@@ -51,6 +51,14 @@ On `main` (and release branches as needed):
 
 - Context: **`jenkins/opencrm-cpq-ci`**
 - States: `pending` → `success` / `failure`
+
+## PR gate on GitHub Actions (added 2026-09-28)
+
+`.github/workflows/pr-check.yml` runs on every pull request to `main` and executes the drift check plus `scripts/ci/run-core.sh backend-unit`. It exists because no Jenkins instance was reachable, so `main` had no commit statuses; see ADR-003 section 7.
+
+- It is fast and Docker-free. Integration, frontend and AI assist remain Jenkins-only or manual.
+- The repository is private and the plan offers no branch protection (the API answers 403), so the check cannot be marked required. Merge only when **Backend Unit (PR gate)** is green: `gh pr checks <n> --watch`.
+- If Jenkins comes back, keep requiring `jenkins/opencrm-cpq-ci` as described above. This job stays as the quick first signal.
 
 ## Manual GHA fallback
 
