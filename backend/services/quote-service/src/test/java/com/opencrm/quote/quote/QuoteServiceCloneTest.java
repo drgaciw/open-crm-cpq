@@ -2,6 +2,7 @@ package com.opencrm.quote.quote;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
@@ -63,7 +64,8 @@ class QuoteServiceCloneTest {
                 pricingServiceClient,
                 productServiceClient,
                 new ObjectMapper(),
-                outboxEventPublisher
+                outboxEventPublisher,
+                new CurrentActor("service:quote-service", false)
         );
     }
 
