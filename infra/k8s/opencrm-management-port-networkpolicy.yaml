@@ -1,0 +1,76 @@
+# Network policies for the management port (owner decision 4, ADR-016).
+#
+# Every OpenCRM service serves its actuator on a second port, MANAGEMENT_SERVER_PORT (9091 below). That port needs no
+# token: Prometheus scrapes /actuator/prometheus there, and the platform's probes read /actuator/health there. The only
+# thing that keeps it private is that nothing else can reach it, so apply both policies. This file is an example to
+# adapt to the runtime topology (ADR-022 does not exist yet); the two label values marked "adapt" are the parts that
+# depend on your cluster.
+#
+# A pod selected by any ingress policy accepts only what some policy allows. That is why the first policy lists the
+# service ports too: without it the second policy would cut the services off. If your platform already allows the
+# service ports elsewhere, keep only the second policy.
+#
+# NetworkPolicy does nothing unless the cluster's network plugin enforces it (on AKS: Azure Network Policy Manager,
+# Calico or Cilium). Check that before relying on it: with no enforcement the management port is open to every pod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opencrm-service-ports
+  namespace: opencrm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: opencrm
+  policyTypes: [Ingress]
+  ingress:
+    # Service-to-service calls and the gateway's routes, from inside the namespace.
+    - from:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 8080}
+        - {protocol: TCP, port: 8081}
+        - {protocol: TCP, port: 8082}
+        - {protocol: TCP, port: 8083}
+        - {protocol: TCP, port: 8084}
+        - {protocol: TCP, port: 8085}
+        - {protocol: TCP, port: 8086}
+        - {protocol: TCP, port: 8087}
+        - {protocol: TCP, port: 8088}
+        - {protocol: TCP, port: 8089}
+        - {protocol: TCP, port: 8090}
+    # Users reach the gateway only, through the ingress controller.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx   # adapt: the ingress controller's namespace
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opencrm-management-port
+  namespace: opencrm
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: opencrm
+  policyTypes: [Ingress]
+  ingress:
+    # Prometheus and the kubelet's probes, and nothing else.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring       # adapt: the namespace Prometheus runs in
+      ports:
+        - {protocol: TCP, port: 9091}
+#
+# The kubelet's probes come from the node, which no namespaceSelector matches. Most network plugins let the node reach its
+# own pods regardless of policy; if yours does not, allow the node CIDR here (adapt).
+#
+# Probes and scraping, in the pod spec of every service:
+#   env:
+#     - {name: MANAGEMENT_SERVER_PORT, value: "9091"}
+#   readinessProbe: {httpGet: {path: /actuator/health/readiness, port: 9091}}
+#   livenessProbe:  {httpGet: {path: /actuator/health/liveness,  port: 9091}}
+#   annotations:  prometheus.io/scrape: "true", prometheus.io/port: "9091", prometheus.io/path: /actuator/prometheus

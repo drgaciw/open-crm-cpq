@@ -3,22 +3,32 @@ package com.opencrm.gateway.config;
 import com.opencrm.gateway.security.GatewayAuthenticationEntryPoint;
 import com.opencrm.gateway.security.GatewayBffProperties;
 import com.opencrm.gateway.security.GatewayLogin;
+import com.opencrm.security.web.ManagementEndpoints;
 import com.opencrm.security.web.OpenCrmSecurityAutoConfiguration;
 import com.opencrm.security.web.OpenCrmSecurityProperties;
 import com.opencrm.security.web.OpenCrmSecurityProperties.SecurityMode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.actuate.autoconfigure.web.server.ConditionalOnManagementPort;
+import org.springframework.boot.actuate.autoconfigure.web.server.ManagementPortType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.reactive.EndpointRequest;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.DelegatingServerLogoutHandler;
 import org.springframework.security.web.server.authentication.logout.SecurityContextServerLogoutHandler;
@@ -27,6 +37,7 @@ import org.springframework.security.web.server.csrf.CookieServerCsrfTokenReposit
 import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
+import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 
@@ -51,6 +62,11 @@ import java.util.Set;
  * hint ({@link GatewayAuthenticationEntryPoint}); a page navigation is redirected to the login. {@code IdentityRelayFilter}
  * then forwards the one token the gateway vouches for. Without {@code opencrm.gateway.login.client-id} there is no
  * browser login, and the production marker refuses to start that way.
+ *
+ * <p><strong>Management port</strong> (owner decision 4): with {@code management.server.port} set to a port other than
+ * the gateway's, a second chain governs that port. It serves {@code health}, {@code info} and {@code prometheus}
+ * without a token and refuses everything else, the {@code gateway} route inspection included. That port must be
+ * reachable from the monitoring namespace only, and is never routed or published through the ingress.
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
@@ -111,6 +127,40 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * The chain of the management port. It exists only when {@code management.server.port} differs from the gateway's
+     * port, and matches only requests that arrive on that port; it is ordered ahead of the chain above.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnManagementPort(ManagementPortType.DIFFERENT)
+    static class ManagementPortConfiguration {
+
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        SecurityWebFilterChain gatewayManagementFilterChain(ServerHttpSecurity http, OpenCrmSecurityProperties security,
+                                                            Environment environment) {
+            // Nothing here authenticates, so a refusal is a plain 403 for everyone: no Basic challenge is advertised.
+            http.securityMatcher(ManagementPortConfiguration::onManagementPort)
+                    .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                    .exceptionHandling(exceptions -> exceptions
+                            .authenticationEntryPoint(new HttpStatusServerEntryPoint(HttpStatus.FORBIDDEN)));
+            if (OpenCrmSecurityAutoConfiguration.mode(security, environment) == SecurityMode.DEV) {
+                return http.authorizeExchange(exchanges -> exchanges.anyExchange().permitAll()).build();
+            }
+            return http.authorizeExchange(exchanges -> exchanges
+                            .matchers(EndpointRequest.to(ManagementEndpoints.publicIds())).permitAll()
+                            .anyExchange().denyAll())
+                    .build();
+        }
+
+        /** Whether the request arrived at the management web server rather than at the gateway's. */
+        static Mono<ServerWebExchangeMatcher.MatchResult> onManagementPort(ServerWebExchange exchange) {
+            ApplicationContext context = exchange.getApplicationContext();
+            return context != null && WebServerApplicationContext.hasServerNamespace(context, "management")
+                    ? ServerWebExchangeMatcher.MatchResult.match()
+                    : ServerWebExchangeMatcher.MatchResult.notMatch();
+        }
+    }
     /**
      * WebFlux defers the CSRF token: the {@code XSRF-TOKEN} cookie is only written when something subscribes to the
      * token. Without this filter the SPA never receives the cookie, so it cannot send {@code X-XSRF-TOKEN}, and every
