@@ -69,7 +69,8 @@ class QuoteServiceCalculateTest {
                 productServiceClient,
                 objectMapper,
                 outboxEventPublisher,
-                new CurrentActor("service:quote-service", false)
+                new CurrentActor("service:quote-service", false),
+                RampScheduleTestSupport.guard(quoteLineItemRepository)
         );
     }
 
@@ -137,6 +138,11 @@ class QuoteServiceCalculateTest {
         ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
         verify(pricingServiceClient).executePricing(contextCaptor.capture());
         assertThat(contextCaptor.getValue().get("quoteExternalId")).isEqualTo("Q-1");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sentLines =
+                (List<Map<String, Object>>) contextCaptor.getValue().get("lineItems");
+        assertThat(sentLines).allSatisfy(lineMap -> assertThat(lineMap.keySet())
+                .containsExactlyInAnyOrder("productExternalId", "lineItemType", "quantity"));
         verify(quoteLineItemRepository).saveAll(List.of(line));
     }
 

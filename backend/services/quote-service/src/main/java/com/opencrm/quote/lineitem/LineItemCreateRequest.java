@@ -1,5 +1,6 @@
 package com.opencrm.quote.lineitem;
 
+import com.opencrm.quote.ramp.RampScheduleDto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -35,4 +36,7 @@ public class LineItemCreateRequest {
     private String billingFrequency;
     private int sortOrder;
     private String notes;
+
+    /** Absent means today's flat line. Present steps or an escalator are a ramp schedule. */
+    private RampScheduleDto schedule;
 }
