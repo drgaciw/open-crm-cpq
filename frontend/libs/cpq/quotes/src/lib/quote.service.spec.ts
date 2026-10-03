@@ -328,7 +328,7 @@ describe('QuoteService', () => {
       escalator: {
         startPrice: 40,
         mode: 'PERCENT' as const,
-        amount: 0.05,
+        amount: 5,
         everyMonths: 12,
       },
     };
@@ -359,7 +359,7 @@ describe('QuoteService', () => {
       escalator: {
         startPrice: 40,
         mode: 'PERCENT' as const,
-        amount: 0.05,
+        amount: 5,
         everyMonths: 12,
       },
     };

@@ -65,6 +65,64 @@ describe('validateRampSchedule', () => {
     expect(issues.map((issue) => issue.code)).toEqual(['RAMP_GAP']);
   });
 
+  it('reports a gap when the schedule does not start at month 1', () => {
+    expect(
+      validateRampSchedule([step({ startMonth: 0, months: 12 })], 12, true).map(
+        (issue) => issue.code,
+      ),
+    ).toEqual(['RAMP_GAP']);
+    expect(
+      validateRampSchedule([step({ startMonth: 5, months: 12 })], 12, true).map(
+        (issue) => issue.code,
+      ),
+    ).toEqual(['RAMP_GAP']);
+  });
+
+  it('reports more than 36 periods as RAMP_TOO_MANY_PERIODS', () => {
+    const steps = Array.from({ length: 37 }, (_, index) =>
+      step({ sequence: index + 1, startMonth: index + 1, months: 1, unitPrice: 1 }),
+    );
+    expect(validateRampSchedule(steps, 37, true).map((issue) => issue.code)).toEqual([
+      'RAMP_TOO_MANY_PERIODS',
+    ]);
+  });
+
+  it('reports RAMP_PRICE_BASIS when the price fields disagree with the basis', () => {
+    expect(
+      validateRampSchedule(
+        [step({ unitPrice: 40, discountFraction: 0.05 })],
+        12,
+        true,
+      ).map((issue) => issue.code),
+    ).toEqual(['RAMP_PRICE_BASIS']);
+    expect(
+      validateRampSchedule(
+        [
+          step({
+            priceBasis: 'DISCOUNT_FRACTION',
+            unitPrice: undefined,
+            discountFraction: undefined,
+          }),
+        ],
+        12,
+        true,
+      ).map((issue) => issue.code),
+    ).toEqual(['RAMP_PRICE_BASIS']);
+    expect(
+      validateRampSchedule(
+        [
+          step({
+            priceBasis: 'DISCOUNT_FRACTION',
+            unitPrice: undefined,
+            discountFraction: 0.05,
+          }),
+        ],
+        12,
+        true,
+      ),
+    ).toEqual([]);
+  });
+
   it('reports a gap between month 12 and month 14', () => {
     const issues = validateRampSchedule(
       [
@@ -250,6 +308,91 @@ describe('QuoteRampEditorComponent', () => {
     expect(updateLineItem).not.toHaveBeenCalled();
   });
 
+  it('shows RAMP_PRICE_BASIS and does not save when both price fields are set', () => {
+    fill([
+      {
+        startMonth: 1,
+        months: 36,
+        quantity: 50,
+        priceBasis: 'ABSOLUTE',
+        unitPrice: 40,
+        discountFraction: 0.05,
+      },
+    ]);
+    expect(text()).toContain('RAMP_PRICE_BASIS');
+    expect(text()).not.toContain('needs a unit price');
+    component.onSave();
+    expect(updateLineItem).not.toHaveBeenCalled();
+  });
+
+  it('shows RAMP_TERM_MISMATCH when the escalator length does not divide the term', () => {
+    component.form.controls.escalator.setValue({
+      startPrice: 40,
+      mode: 'PERCENT',
+      amount: 5,
+      everyMonths: 10,
+    });
+    fixture.detectChanges();
+    expect(text()).toContain('RAMP_TERM_MISMATCH');
+    expect(text()).toContain('5 means 5%');
+    expect(text()).not.toContain('0.05 = 5%');
+    const generate = fixture.nativeElement.querySelector(
+      '[data-testid="expand-escalator"]',
+    ) as HTMLButtonElement;
+    expect(generate.disabled).toBe(true);
+    component.onExpand();
+    expect(expandRampSchedule).not.toHaveBeenCalled();
+  });
+
+  it('saves a discount fraction of 0.05 and an escalator of 5 percent points', () => {
+    fill([
+      {
+        startMonth: 1,
+        months: 36,
+        quantity: 50,
+        priceBasis: 'DISCOUNT_FRACTION',
+        discountFraction: 0.05,
+      },
+    ]);
+    component.form.controls.steps.at(0).controls.unitPrice.setValue(null);
+    component.form.controls.escalator.setValue({
+      startPrice: 40,
+      mode: 'PERCENT',
+      amount: 5,
+      everyMonths: 12,
+    });
+    fixture.detectChanges();
+    expect(text()).toContain('0.05 means 5% off list');
+    expect(text()).toContain('5 means 5%');
+    const save = fixture.nativeElement.querySelector(
+      '[data-testid="save-schedule"]',
+    ) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+    save.click();
+    expect(updateLineItem).toHaveBeenCalledWith(7, 1, {
+      productExternalId: 'seat',
+      productName: 'Named seat',
+      lineItemType: 'SUBSCRIPTION',
+      billingFrequency: 'MONTHLY',
+      listPrice: 40,
+      quantity: 50,
+      sortOrder: 0,
+      schedule: {
+        steps: [
+          {
+            sequence: 1,
+            startMonth: 1,
+            months: 36,
+            quantity: 50,
+            priceBasis: 'DISCOUNT_FRACTION',
+            discountFraction: 0.05,
+          },
+        ],
+        escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 },
+      },
+    });
+  });
+
   it('shows the disallowed line type and does not save a schedule', () => {
     fixture.componentRef.setInput(
       'lines',
@@ -288,7 +431,7 @@ describe('QuoteRampEditorComponent', () => {
     component.form.controls.escalator.setValue({
       startPrice: 40,
       mode: 'PERCENT',
-      amount: 0.05,
+      amount: 5,
       everyMonths: 12,
     });
     fixture.detectChanges();
@@ -304,7 +447,7 @@ describe('QuoteRampEditorComponent', () => {
       escalator: {
         startPrice: 40,
         mode: 'PERCENT',
-        amount: 0.05,
+        amount: 5,
         everyMonths: 12,
       },
     });
@@ -468,7 +611,7 @@ describe('QuoteRampEditorComponent HTTP', () => {
     fixture.componentInstance.form.controls.escalator.setValue({
       startPrice: 40,
       mode: 'PERCENT',
-      amount: 0.05,
+      amount: 5,
       everyMonths: 12,
     });
     fixture.detectChanges();
@@ -482,7 +625,7 @@ describe('QuoteRampEditorComponent HTTP', () => {
       escalator: {
         startPrice: 40,
         mode: 'PERCENT',
-        amount: 0.05,
+        amount: 5,
         everyMonths: 12,
       },
     });

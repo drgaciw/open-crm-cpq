@@ -41,7 +41,7 @@ import {
 import { CurrencyFormatPipe } from '@frontend/shared-ui';
 import { QuoteService } from '../quote.service';
 
-/** Quote-service cap. The UI does not change opencrm.pricing.ramp.enabled. */
+/** Default of opencrm.pricing.ramp.max-periods. The server remains authoritative. */
 export const RAMP_MAX_PERIODS = 36;
 
 const RAMP_BILLING_FREQUENCIES = [
@@ -60,7 +60,9 @@ export type RampScheduleIssueCode =
   | 'RAMP_TERM_MISMATCH'
   | 'RAMP_PERIOD_EMPTY'
   | 'RAMP_NEGATIVE_VALUE'
-  | 'RAMP_NOT_ALLOWED_FOR_LINE_TYPE';
+  | 'RAMP_NOT_ALLOWED_FOR_LINE_TYPE'
+  | 'RAMP_TOO_MANY_PERIODS'
+  | 'RAMP_PRICE_BASIS';
 
 export interface RampScheduleIssue {
   code: RampScheduleIssueCode;
@@ -118,7 +120,7 @@ export function validateRampSchedule(
   }
 
   for (const step of steps) {
-    if (!Number.isInteger(step.months) || step.months < 1) {
+    if (!Number.isFinite(step.months) || step.months < 1) {
       issues.push({
         code: 'RAMP_PERIOD_EMPTY',
         message: `RAMP_PERIOD_EMPTY: period ${step.sequence} must cover at least 1 whole month.`,
@@ -133,17 +135,25 @@ export function validateRampSchedule(
         message: `RAMP_NEGATIVE_VALUE: period ${step.sequence} has a negative price or quantity.`,
       });
     }
+    if (!rampStepMatchesBasis(step)) {
+      issues.push({
+        code: 'RAMP_PRICE_BASIS',
+        message: `RAMP_PRICE_BASIS: period ${step.sequence} must set exactly one price field that matches its basis.`,
+      });
+    }
     if (!Number.isInteger(step.startMonth)) {
       issues.push({
         code: 'RAMP_GAP',
-        message: `RAMP_GAP: period ${step.sequence} has no whole start month, so the term is not covered.`,
-      });
-    } else if (step.startMonth < 1) {
-      issues.push({
-        code: 'RAMP_OVERLAP',
-        message: 'RAMP_OVERLAP: a period starts before month 1.',
+        message: `RAMP_GAP: period ${step.sequence} has no whole start month, so the schedule does not start at month 1.`,
       });
     }
+  }
+
+  if (steps.length > RAMP_MAX_PERIODS) {
+    issues.push({
+      code: 'RAMP_TOO_MANY_PERIODS',
+      message: `RAMP_TOO_MANY_PERIODS: more than ${RAMP_MAX_PERIODS} periods.`,
+    });
   }
 
   const comparable = steps
@@ -151,15 +161,14 @@ export function validateRampSchedule(
       (step) =>
         Number.isInteger(step.months) &&
         step.months >= 1 &&
-        Number.isInteger(step.startMonth) &&
-        step.startMonth >= 1,
+        Number.isInteger(step.startMonth),
     )
     .sort((a, b) => a.startMonth - b.startMonth || a.sequence - b.sequence);
 
-  if (comparable.length > 0 && comparable[0].startMonth > 1) {
+  if (comparable.length > 0 && comparable[0].startMonth !== 1) {
     issues.push({
       code: 'RAMP_GAP',
-      message: `RAMP_GAP: the first period starts at month ${comparable[0].startMonth}; month 1 is not covered.`,
+      message: 'RAMP_GAP: the schedule does not start at month 1.',
     });
   }
   for (let index = 0; index < comparable.length - 1; index += 1) {
@@ -193,6 +202,24 @@ export function validateRampSchedule(
   }
 
   return issues;
+}
+
+/** Exactly one price field, and it must be the field `priceBasis` names. */
+export function rampStepMatchesBasis(
+  step: Pick<RampStep, 'priceBasis' | 'unitPrice' | 'discountFraction'>,
+): boolean {
+  const hasUnit = step.unitPrice != null && Number.isFinite(step.unitPrice);
+  const hasFraction = step.discountFraction != null && Number.isFinite(step.discountFraction);
+  return step.priceBasis === 'ABSOLUTE' ? hasUnit && !hasFraction : hasFraction && !hasUnit;
+}
+
+function escalatorDividesTerm(everyMonths: number, durationInMonths: number): boolean {
+  return (
+    Number.isInteger(everyMonths) &&
+    everyMonths >= 1 &&
+    Number.isInteger(durationInMonths) &&
+    durationInMonths % everyMonths === 0
+  );
 }
 
 function httpErrorMessage(err: unknown): string {
@@ -406,16 +433,11 @@ export class QuoteRampEditorComponent {
   readonly issues = computed(() => {
     this.formRevision();
     const scheduleIssues = validateRampSchedule(
-      this.readSteps(),
+      this.readSteps(true),
       this.durationInMonths(),
       this.lineAllowed(),
     );
     return [...scheduleIssues, ...this.escalatorIssues()];
-  });
-
-  readonly fieldErrors = computed(() => {
-    this.formRevision();
-    return this.collectFieldErrors();
   });
 
   readonly lineTypeNote = computed(() => {
@@ -429,7 +451,7 @@ export class QuoteRampEditorComponent {
   readonly previewRows = computed((): RampPreviewRow[] => {
     this.formRevision();
     const priced = this.selectedLine()?.pricedPeriods ?? [];
-    return this.readSteps().map((step) => {
+    return this.readSteps(false).map((step) => {
       const match = matchPricedPeriod(priced, step);
       return {
         sequence: step.sequence,
@@ -450,7 +472,7 @@ export class QuoteRampEditorComponent {
     if (line == null || line.listPrice == null) {
       return false;
     }
-    if (this.form.invalid || this.issues().length > 0 || this.fieldErrors().length > 0) {
+    if (this.form.invalid || this.issues().length > 0) {
       return false;
     }
     const count = this.form.controls.steps.length;
@@ -458,15 +480,6 @@ export class QuoteRampEditorComponent {
       return false;
     }
     return true;
-  });
-
-  readonly escalatorHint = computed(() => {
-    this.formRevision();
-    const everyMonths = finiteOrNull(this.form.controls.escalator.controls.everyMonths.value);
-    if (everyMonths != null && (!Number.isInteger(everyMonths) || everyMonths < 1)) {
-      return 'Escalator period length must be at least 1 whole month.';
-    }
-    return null;
   });
 
   readonly canExpand = computed(() => {
@@ -478,7 +491,7 @@ export class QuoteRampEditorComponent {
     if (escalator == null || escalator.startPrice < 0 || escalator.amount < 0) {
       return false;
     }
-    return Number.isInteger(escalator.everyMonths) && escalator.everyMonths >= 1;
+    return escalatorDividesTerm(escalator.everyMonths, this.durationInMonths());
   });
 
   constructor() {
@@ -633,8 +646,12 @@ export class QuoteRampEditorComponent {
   }
 
   private schedulePayload(): RampSchedule | null {
-    const steps = this.readSteps();
-    if (steps.some((step) => !Number.isInteger(step.startMonth) || step.startMonth < 1)) {
+    const steps = this.readSteps(false);
+    const checked = this.readSteps(true);
+    if (
+      steps.some((step) => !Number.isInteger(step.startMonth) || step.startMonth < 1) ||
+      checked.some((step) => !rampStepMatchesBasis(step))
+    ) {
       return null;
     }
     const schedule: RampSchedule = { steps };
@@ -681,7 +698,7 @@ export class QuoteRampEditorComponent {
     return request;
   }
 
-  private readSteps(): RampStep[] {
+  private readSteps(keepBothPrices: boolean): RampStep[] {
     const rows = this.form.controls.steps.getRawValue().map((row) => {
       const priceBasis = row.priceBasis;
       const step: RampStep = {
@@ -691,16 +708,13 @@ export class QuoteRampEditorComponent {
         quantity: finiteOrNull(row.quantity) ?? Number.NaN,
         priceBasis,
       };
-      if (priceBasis === 'ABSOLUTE') {
-        const unitPrice = finiteOrNull(row.unitPrice);
-        if (unitPrice != null) {
-          step.unitPrice = unitPrice;
-        }
-      } else {
-        const discountFraction = finiteOrNull(row.discountFraction);
-        if (discountFraction != null) {
-          step.discountFraction = discountFraction;
-        }
+      const unitPrice = finiteOrNull(row.unitPrice);
+      const discountFraction = finiteOrNull(row.discountFraction);
+      if ((keepBothPrices || priceBasis === 'ABSOLUTE') && unitPrice != null) {
+        step.unitPrice = unitPrice;
+      }
+      if ((keepBothPrices || priceBasis === 'DISCOUNT_FRACTION') && discountFraction != null) {
+        step.discountFraction = discountFraction;
       }
       return step;
     });
@@ -725,58 +739,27 @@ export class QuoteRampEditorComponent {
   }
 
   private escalatorIssues(): RampScheduleIssue[] {
+    const issues: RampScheduleIssue[] = [];
     const raw = this.form.controls.escalator.getRawValue();
     const startPrice = finiteOrNull(raw.startPrice);
     const amount = finiteOrNull(raw.amount);
     if ((startPrice != null && startPrice < 0) || (amount != null && amount < 0)) {
-      return [
-        {
-          code: 'RAMP_NEGATIVE_VALUE',
-          message: 'RAMP_NEGATIVE_VALUE: escalator price or amount is negative.',
-        },
-      ];
+      issues.push({
+        code: 'RAMP_NEGATIVE_VALUE',
+        message: 'RAMP_NEGATIVE_VALUE: escalator price or amount is negative.',
+      });
     }
-    return [];
-  }
-
-  private collectFieldErrors(): string[] {
-    const errors: string[] = [];
-    if (this.form.controls.steps.length > RAMP_MAX_PERIODS) {
-      errors.push(`At most ${RAMP_MAX_PERIODS} periods.`);
+    const escalator = this.readEscalator();
+    if (
+      escalator != null &&
+      !escalatorDividesTerm(escalator.everyMonths, this.durationInMonths())
+    ) {
+      issues.push({
+        code: 'RAMP_TERM_MISMATCH',
+        message: 'RAMP_TERM_MISMATCH: escalator length does not divide the quote term.',
+      });
     }
-    this.form.controls.steps.getRawValue().forEach((row, index) => {
-      const label = index + 1;
-      const startMonth = row.startMonth == null ? Number.NaN : Number(row.startMonth);
-      if (!Number.isInteger(startMonth) || startMonth < 1) {
-        errors.push(`Period ${label} must start on month 1 or later.`);
-      }
-      if (
-        row.priceBasis === 'ABSOLUTE' &&
-        (row.unitPrice == null || !Number.isFinite(Number(row.unitPrice)))
-      ) {
-        errors.push(`Period ${label} needs a unit price.`);
-      }
-      if (
-        row.priceBasis === 'DISCOUNT_FRACTION' &&
-        (row.discountFraction == null || !Number.isFinite(Number(row.discountFraction)))
-      ) {
-        errors.push(`Period ${label} needs a discount fraction.`);
-      }
-      if (row.quantity == null || !Number.isFinite(Number(row.quantity))) {
-        errors.push(`Period ${label} needs a quantity.`);
-      } else if (!Number.isInteger(Number(row.quantity))) {
-        errors.push(`Period ${label} quantity must be a whole number.`);
-      }
-      if (
-        row.months != null &&
-        Number.isFinite(Number(row.months)) &&
-        Number(row.months) >= 1 &&
-        !Number.isInteger(Number(row.months))
-      ) {
-        errors.push(`Period ${label} months must be a whole number.`);
-      }
-    });
-    return errors;
+    return issues;
   }
 
   private syncLock(editable = this.editable()): void {
