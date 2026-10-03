@@ -31,10 +31,22 @@ class RampScheduleValidatorTest {
 
         RampScheduleException ex = invalid(steps, 36, "MONTHLY", "SUBSCRIPTION");
 
-        assertThat(ex.getReasons()).contains(RampReasons.GAP);
-        assertThat(ex.getReasons()).doesNotContain(RampReasons.OVERLAP);
+        assertThat(ex.getReasons()).containsExactly(RampReasons.GAP);
+        assertThat(ex.getMessage()).isEqualTo(RampReasons.GAP);
         assertThat(ex.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
         assertThat(ex.getStatus().value()).isEqualTo(422);
+    }
+
+    @Test
+    @DisplayName("a schedule that does not start at month 1 reports only RAMP_GAP")
+    void firstPeriodMustStartAtMonthOne() {
+        RampScheduleException ex = invalid(
+                List.of(absolute(1, 2, 12, 1, "40")),
+                12,
+                "MONTHLY",
+                "SUBSCRIPTION");
+
+        assertThat(ex.getReasons()).containsExactly(RampReasons.GAP);
     }
 
     @Test
@@ -70,7 +82,7 @@ class RampScheduleValidatorTest {
                 "MONTHLY",
                 "SUBSCRIPTION");
 
-        assertThat(ex.getReasons()).contains(RampReasons.PERIOD_EMPTY);
+        assertThat(ex.getReasons()).containsExactly(RampReasons.PERIOD_EMPTY);
     }
 
     @Test
@@ -90,20 +102,30 @@ class RampScheduleValidatorTest {
                 "MONTHLY",
                 "SUBSCRIPTION");
 
-        assertThat(ex.getReasons()).contains(RampReasons.NEGATIVE_VALUE);
-        assertThat(ex.getReasons()).doesNotContain(RampReasons.NOT_BILLABLE);
+        assertThat(ex.getReasons()).containsExactly(RampReasons.NEGATIVE_VALUE);
+
+        RampStepDto negativeQuantity = absolute(1, 1, 12, 1, "40");
+        negativeQuantity.setQuantity(-1);
+        assertThat(invalid(List.of(negativeQuantity), 12, "MONTHLY", "SUBSCRIPTION").getReasons())
+                .containsExactly(RampReasons.NEGATIVE_VALUE);
     }
 
     @Test
-    @DisplayName("a zero price on every period reports RAMP_NOT_BILLABLE")
-    void zeroPriceIsNotBillable() {
-        RampScheduleException ex = invalid(
-                List.of(absolute(1, 1, 12, 1, "0")),
+    @DisplayName("a zero unit price, a zero quantity, and a full discount fraction are allowed")
+    void zeroPriceAndFullFractionAreAllowed() {
+        assertThatCode(() -> validator.validate(
+                List.of(absolute(1, 1, 12, 0, "0")),
                 12,
                 "SEMI_ANNUAL",
-                "SUBSCRIPTION");
+                "SUBSCRIPTION",
+                36)).doesNotThrowAnyException();
 
-        assertThat(ex.getReasons()).containsExactly(RampReasons.NOT_BILLABLE);
+        assertThatCode(() -> validator.validate(
+                List.of(fraction("1.0000")),
+                12,
+                "ANNUAL",
+                "PRODUCT",
+                36)).doesNotThrowAnyException();
     }
 
     @Test
@@ -146,8 +168,8 @@ class RampScheduleValidatorTest {
     }
 
     @Test
-    @DisplayName("a step needs exactly one price field and a quantity")
-    void priceBasisAndQuantity() {
+    @DisplayName("a step needs exactly one price field, and discountFraction is a fraction")
+    void priceBasisAndDiscountFraction() {
         RampStepDto both = absolute(1, 1, 12, 1, "40");
         both.setDiscountFraction(new BigDecimal("0.10"));
         assertThat(invalid(List.of(both), 12, "MONTHLY", "SUBSCRIPTION").getReasons())
@@ -156,30 +178,25 @@ class RampScheduleValidatorTest {
         RampStepDto missingQuantity = absolute(1, 1, 12, 1, "40");
         missingQuantity.setQuantity(null);
         assertThat(invalid(List.of(missingQuantity), 12, "MONTHLY", "SUBSCRIPTION").getReasons())
-                .contains(RampReasons.QUANTITY_REQUIRED)
-                .doesNotContain(RampReasons.NOT_BILLABLE);
+                .containsExactly(RampReasons.PERIOD_EMPTY);
 
-        RampStepDto fraction = RampStepDto.builder()
-                .sequence(1)
-                .startMonth(1)
-                .months(12)
-                .quantity(1)
-                .priceBasis(RampPriceBasis.DISCOUNT_FRACTION)
-                .discountFraction(new BigDecimal("0.2500"))
-                .build();
-        assertThatCode(() -> validator.validate(List.of(fraction), 12, "ANNUAL", "PRODUCT", 36))
+        assertThatCode(() -> validator.validate(List.of(fraction("0.05")), 12, "ANNUAL", "PRODUCT", 36))
+                .doesNotThrowAnyException();
+        assertThat(invalid(List.of(fraction("5")), 12, "ANNUAL", "PRODUCT").getReasons())
+                .containsExactly(RampReasons.PRICE_BASIS);
+        assertThatCode(() -> validator.validate(List.of(fraction("0.2500")), 12, "ANNUAL", "PRODUCT", 36))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("duplicate sequences report RAMP_SEQUENCE")
-    void duplicateSequence() {
+    @DisplayName("duplicate sequences are not a schedule reason")
+    void duplicateSequenceIsNotAReason() {
         List<RampStepDto> steps = List.of(
                 absolute(1, 1, 6, 1, "40"),
                 absolute(1, 7, 6, 1, "42"));
 
-        assertThat(invalid(steps, 12, "MONTHLY", "SUBSCRIPTION").getReasons())
-                .containsExactly(RampReasons.SEQUENCE);
+        assertThatCode(() -> validator.validate(steps, 12, "MONTHLY", "SUBSCRIPTION", 36))
+                .doesNotThrowAnyException();
     }
 
     private RampScheduleException invalid(List<RampStepDto> steps, int duration, String billing, String type) {
@@ -199,6 +216,17 @@ class RampScheduleValidatorTest {
             steps.add(absolute(i + 1, i + 1, 1, 1, "10"));
         }
         return steps;
+    }
+
+    private static RampStepDto fraction(String discountFraction) {
+        return RampStepDto.builder()
+                .sequence(1)
+                .startMonth(1)
+                .months(12)
+                .quantity(1)
+                .priceBasis(RampPriceBasis.DISCOUNT_FRACTION)
+                .discountFraction(new BigDecimal(discountFraction))
+                .build();
     }
 
     private static RampStepDto absolute(int sequence, int startMonth, int months, int quantity, String unitPrice) {

@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -118,6 +119,28 @@ class QuoteLineItemServiceRampTest {
     }
 
     @Test
+    @DisplayName("discountFraction 0.05 is stored at scale 4 and 5 is not stored")
+    void discountFractionIsAFraction() {
+        properties.setEnabled(true);
+        Quote quote = quote(12);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        stubSave();
+
+        service.addLineItem(1L, request(scheduleWith(discountStep("0.05"), null)));
+
+        QuoteRampStep row = saved().getRampSteps().getFirst();
+        assertThat(row.getDiscountFraction()).isEqualByComparingTo("0.0500");
+        assertThat(row.getDiscountFraction().scale()).isEqualTo(4);
+        assertThat(row.getUnitPrice()).isNull();
+
+        assertThatThrownBy(() -> service.addLineItem(1L, request(scheduleWith(discountStep("5"), null))))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
+                        .containsExactly(RampReasons.PRICE_BASIS));
+        verify(lineItemRepository, times(1)).save(any());
+    }
+
+    @Test
     @DisplayName("flag on expands an escalator and copies the line quantity onto each step")
     void flagOnExpandsEscalator() {
         properties.setEnabled(true);
@@ -149,7 +172,7 @@ class QuoteLineItemServiceRampTest {
                 .satisfies(ex -> {
                     RampScheduleException ramp = (RampScheduleException) ex;
                     assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getReasons()).contains(RampReasons.GAP);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.GAP);
                 });
 
         verify(lineItemRepository, never()).save(any());
@@ -179,6 +202,28 @@ class QuoteLineItemServiceRampTest {
                         .containsExactly(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE));
 
         verify(lineItemRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("an escalator that does not divide the term reports RAMP_TERM_MISMATCH and persists nothing")
+    void indivisibleEscalatorPersistsNothing() {
+        properties.setEnabled(true);
+        Quote quote = quote(14);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> service.addLineItem(
+                1L,
+                request(RampScheduleDto.builder().escalator(escalator()).build())))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
+                    assertThat(ramp.getStatus().value()).isEqualTo(422);
+                });
+
+        verify(lineItemRepository, never()).save(any());
+        verify(quoteRepository, never()).save(any());
     }
 
     @Test
@@ -272,6 +317,17 @@ class QuoteLineItemServiceRampTest {
 
     private static RampScheduleDto scheduleWith(List<RampStepDto> steps, RampEscalatorDto escalator) {
         return RampScheduleDto.builder().steps(steps).escalator(escalator).build();
+    }
+
+    private static RampStepDto discountStep(String discountFraction) {
+        return RampStepDto.builder()
+                .sequence(1)
+                .startMonth(1)
+                .months(12)
+                .quantity(2)
+                .priceBasis(RampPriceBasis.DISCOUNT_FRACTION)
+                .discountFraction(new BigDecimal(discountFraction))
+                .build();
     }
 
     private static RampStepDto step(int sequence, int start, int months, int quantity, String price) {

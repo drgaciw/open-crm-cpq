@@ -44,8 +44,8 @@ public class QuoteRampStep extends BaseEntity {
     @Column(name = "months", nullable = false)
     private int months;
 
-    @Column(name = "quantity")
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false)
+    private int quantity;
 
     @Column(name = "price_basis", nullable = false, length = 30)
     private String priceBasis;
@@ -53,6 +53,6 @@ public class QuoteRampStep extends BaseEntity {
     @Column(name = "unit_price", precision = 19, scale = 4)
     private BigDecimal unitPrice;
 
-    @Column(name = "discount_fraction", precision = 19, scale = 4)
+    @Column(name = "discount_fraction", precision = 10, scale = 4)
     private BigDecimal discountFraction;
 }

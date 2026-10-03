@@ -110,7 +110,7 @@ class QuoteServiceRampTest {
                 .satisfies(ex -> {
                     RampScheduleException ramp = (RampScheduleException) ex;
                     assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getReasons()).contains(RampReasons.TERM_MISMATCH);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
                     assertThat(ramp.getStatus().value()).isEqualTo(422);
                 });
         assertThat(quote.getStatus()).isEqualTo(QuoteStatus.DRAFT);
@@ -228,7 +228,7 @@ class QuoteServiceRampTest {
                 .satisfies(ex -> {
                     RampScheduleException ramp = (RampScheduleException) ex;
                     assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getReasons()).contains(RampReasons.TERM_MISMATCH);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
                 });
         verify(quoteRepository, never()).save(any());
     }

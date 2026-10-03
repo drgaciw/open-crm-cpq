@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Expands an escalator into explicit periods. Unit prices use scale 4, half-up.
- * PERCENT amount is the percent number: 5 means 5 percent, compounded each period.
- * AMOUNT adds the amount at each anniversary. The caller stores the steps, not a formula.
+ * Expands an escalator into explicit absolute periods. Unit prices use scale 4,
+ * half-up. PERCENT amount is percent points: 5 means 5 percent. AMOUNT adds
+ * currency units. Steps do not store a discount fraction. Each period is exactly
+ * {@code everyMonths} long. A term that length does not divide is
+ * {@code RAMP_TERM_MISMATCH} and produces no steps.
  */
 @Component
 public class RampEscalatorExpander {
@@ -21,37 +23,35 @@ public class RampEscalatorExpander {
         if (durationInMonths < 1) {
             throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
         }
-        if (escalator == null
-                || escalator.getMode() == null
-                || escalator.getEveryMonths() == null
-                || escalator.getEveryMonths() < 1
-                || escalator.getStartPrice() == null
-                || escalator.getAmount() == null) {
-            throw RampScheduleException.invalid(List.of(RampReasons.ESCALATOR_INVALID));
+        if (escalator == null || escalator.getEveryMonths() == null || escalator.getEveryMonths() < 1) {
+            throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
+        }
+        int everyMonths = escalator.getEveryMonths();
+        if (durationInMonths % everyMonths != 0) {
+            throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
+        }
+        if (escalator.getMode() == null || escalator.getStartPrice() == null || escalator.getAmount() == null) {
+            throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
         }
         if (escalator.getStartPrice().signum() < 0 || escalator.getAmount().signum() < 0) {
             throw RampScheduleException.invalid(List.of(RampReasons.NEGATIVE_VALUE));
         }
 
+        int count = durationInMonths / everyMonths;
         BigDecimal price = escalator.getStartPrice().setScale(UNIT_SCALE, RoundingMode.HALF_UP);
-        int remaining = durationInMonths;
-        int startMonth = 1;
-        int sequence = 1;
-        List<RampStepDto> steps = new ArrayList<>();
-        while (remaining > 0) {
-            int months = Math.min(escalator.getEveryMonths(), remaining);
+        List<RampStepDto> steps = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
             steps.add(RampStepDto.builder()
-                    .sequence(sequence)
-                    .startMonth(startMonth)
-                    .months(months)
+                    .sequence(index + 1)
+                    .startMonth(1 + (index * everyMonths))
+                    .months(everyMonths)
                     .quantity(quantity)
                     .priceBasis(RampPriceBasis.ABSOLUTE)
                     .unitPrice(price)
                     .build());
-            remaining -= months;
-            startMonth += months;
-            sequence++;
-            price = nextPrice(price, escalator);
+            if (index + 1 < count) {
+                price = nextPrice(price, escalator);
+            }
         }
         return List.copyOf(steps);
     }

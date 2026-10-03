@@ -4,15 +4,14 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 /**
- * Write-time checks for FR-02. Pricing-service repeats them later. This class
- * does not call pricing and does not share a validator with libs/common.
+ * Write-time checks for a ramp schedule. The first failing rule returns 422
+ * {@code RAMP_SCHEDULE_INVALID} with one reason token. This class does not call
+ * pricing and does not share a validator with libs/common.
  */
 @Component
 public class RampScheduleValidator {
@@ -29,15 +28,13 @@ public class RampScheduleValidator {
             String lineItemType,
             int maxPeriods) {
         if (!lineAllowsSchedule(billingFrequency, lineItemType)) {
-            throw RampScheduleException.invalid(List.of(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE));
+            fail(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE);
         }
         if (steps == null || steps.isEmpty()) {
-            throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
+            fail(RampReasons.PERIOD_EMPTY);
         }
-
-        LinkedHashSet<String> reasons = new LinkedHashSet<>();
         if (steps.size() > maxPeriods) {
-            reasons.add(RampReasons.TOO_MANY_PERIODS);
+            fail(RampReasons.TOO_MANY_PERIODS);
         }
 
         List<RampStepDto> ordered = steps.stream()
@@ -52,51 +49,27 @@ public class RampScheduleValidator {
 
         int expectedStart = 1;
         int coveredMonths = 0;
-        Set<Integer> sequences = new HashSet<>();
-        boolean pricesWellFormed = true;
-        boolean anyBillable = false;
-
         for (RampStepDto step : ordered) {
             if (step == null) {
-                reasons.add(RampReasons.PERIOD_EMPTY);
-                pricesWellFormed = false;
-                continue;
-            }
-            if (step.getSequence() == null || step.getSequence() < 1 || !sequences.add(step.getSequence())) {
-                reasons.add(RampReasons.SEQUENCE);
+                fail(RampReasons.PERIOD_EMPTY);
             }
             Integer months = step.getMonths();
             if (months == null || months < 1) {
-                reasons.add(RampReasons.PERIOD_EMPTY);
+                fail(RampReasons.PERIOD_EMPTY);
             }
             Integer start = step.getStartMonth();
-            if (start == null || start < 1) {
-                reasons.add(RampReasons.GAP);
-            } else if (months != null && months >= 1) {
-                if (start > expectedStart) {
-                    reasons.add(RampReasons.GAP);
-                }
-                if (start < expectedStart) {
-                    reasons.add(RampReasons.OVERLAP);
-                }
-                expectedStart = start + months;
-                coveredMonths += months;
+            if (start == null || start < 1 || start > expectedStart) {
+                fail(RampReasons.GAP);
             }
-            if (!priceWellFormed(step, reasons)) {
-                pricesWellFormed = false;
-            } else if (billable(step)) {
-                anyBillable = true;
+            if (start < expectedStart) {
+                fail(RampReasons.OVERLAP);
             }
+            expectedStart = start + months;
+            coveredMonths += months;
+            rejectPriceAndQuantity(step);
         }
-
         if (durationInMonths < 1 || coveredMonths != durationInMonths) {
-            reasons.add(RampReasons.TERM_MISMATCH);
-        }
-        if (pricesWellFormed && !anyBillable) {
-            reasons.add(RampReasons.NOT_BILLABLE);
-        }
-        if (!reasons.isEmpty()) {
-            throw RampScheduleException.invalid(List.copyOf(reasons));
+            fail(RampReasons.TERM_MISMATCH);
         }
     }
 
@@ -109,58 +82,40 @@ public class RampScheduleValidator {
         return type == null || !REJECTED_LINE_TYPES.contains(type);
     }
 
-    private static boolean priceWellFormed(RampStepDto step, Set<String> reasons) {
-        boolean wellFormed = true;
-        if (step.getQuantity() == null) {
-            reasons.add(RampReasons.QUANTITY_REQUIRED);
-            wellFormed = false;
-        } else if (step.getQuantity() < 0) {
-            reasons.add(RampReasons.NEGATIVE_VALUE);
-            wellFormed = false;
-        }
+    /**
+     * Price basis is checked before sign. A discount fraction above 1 is percent
+     * points stored in a fraction field, so it is {@code RAMP_PRICE_BASIS}.
+     * A missing quantity has no token of its own. The column is NOT NULL, so the
+     * step is refused as an incomplete period and nothing is persisted.
+     */
+    private static void rejectPriceAndQuantity(RampStepDto step) {
         if (step.getPriceBasis() == RampPriceBasis.ABSOLUTE) {
             if (step.getUnitPrice() == null || step.getDiscountFraction() != null) {
-                reasons.add(RampReasons.PRICE_BASIS);
-                wellFormed = false;
+                fail(RampReasons.PRICE_BASIS);
             } else if (step.getUnitPrice().signum() < 0) {
-                reasons.add(RampReasons.NEGATIVE_VALUE);
-                wellFormed = false;
+                fail(RampReasons.NEGATIVE_VALUE);
             }
         } else if (step.getPriceBasis() == RampPriceBasis.DISCOUNT_FRACTION) {
-            if (step.getDiscountFraction() == null || step.getUnitPrice() != null) {
-                reasons.add(RampReasons.PRICE_BASIS);
-                wellFormed = false;
-            } else if (step.getDiscountFraction().signum() < 0) {
-                reasons.add(RampReasons.NEGATIVE_VALUE);
-                wellFormed = false;
-            } else if (step.getDiscountFraction().compareTo(BigDecimal.ONE) > 0) {
-                reasons.add(RampReasons.PRICE_BASIS);
-                wellFormed = false;
+            BigDecimal discount = step.getDiscountFraction();
+            if (discount == null || step.getUnitPrice() != null || discount.compareTo(BigDecimal.ONE) > 0) {
+                fail(RampReasons.PRICE_BASIS);
+            } else if (discount.signum() < 0) {
+                fail(RampReasons.NEGATIVE_VALUE);
             }
         } else {
-            reasons.add(RampReasons.PRICE_BASIS);
-            wellFormed = false;
+            fail(RampReasons.PRICE_BASIS);
         }
-        return wellFormed;
+        Integer quantity = step.getQuantity();
+        if (quantity != null && quantity < 0) {
+            fail(RampReasons.NEGATIVE_VALUE);
+        }
+        if (quantity == null) {
+            fail(RampReasons.PERIOD_EMPTY);
+        }
     }
 
-    /**
-     * A period is billable when it can produce a positive charge: quantity above zero,
-     * and either a positive absolute unit price or a discount fraction strictly below 1.
-     */
-    private static boolean billable(RampStepDto step) {
-        if (step.getQuantity() == null || step.getQuantity() <= 0) {
-            return false;
-        }
-        if (step.getPriceBasis() == RampPriceBasis.ABSOLUTE) {
-            return step.getUnitPrice() != null && step.getUnitPrice().signum() > 0;
-        }
-        if (step.getPriceBasis() == RampPriceBasis.DISCOUNT_FRACTION) {
-            return step.getDiscountFraction() != null
-                    && step.getDiscountFraction().signum() >= 0
-                    && step.getDiscountFraction().compareTo(BigDecimal.ONE) < 0;
-        }
-        return false;
+    private static void fail(String reason) {
+        throw RampScheduleException.invalid(List.of(reason));
     }
 
     private static String normalize(String raw) {
