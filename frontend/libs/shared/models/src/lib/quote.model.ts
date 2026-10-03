@@ -111,18 +111,19 @@ export const RAMP_PRICE_BASIS_LABELS: Record<RampPriceBasis, string> = {
   DISCOUNT_FRACTION: 'Discount fraction off list',
 };
 
-/** Mirrors RampEscalator.mode. PERCENT amount is a fraction (0.05 = 5%). */
+/** Mirrors RampEscalator.mode. PERCENT amount is percent points (5 means 5%). */
 export const RAMP_ESCALATOR_MODES = ['PERCENT', 'AMOUNT'] as const;
 export type RampEscalatorMode = (typeof RAMP_ESCALATOR_MODES)[number];
 
 export const RAMP_ESCALATOR_MODE_LABELS: Record<RampEscalatorMode, string> = {
-  PERCENT: 'Percent',
+  PERCENT: 'Percent points',
   AMOUNT: 'Amount',
 };
 
 /**
  * One explicit ramp period. Field names match quote-service RampStep / libs/common RampStep.
  * quantity is a whole number. priceBasis selects which price field is meaningful.
+ * discountFraction is a fraction of list (0.05 means 5% off), not escalator percent points.
  */
 export interface RampStep {
   sequence: number;
@@ -137,6 +138,7 @@ export interface RampStep {
 /**
  * Authoring generator only. Expansion is POST .../ramp-schedule/expand.
  * The server stores the expanded steps; these inputs are display-only.
+ * PERCENT amount is percent points (5 means 5%). AMOUNT is a currency delta.
  */
 export interface RampEscalator {
   startPrice: number;

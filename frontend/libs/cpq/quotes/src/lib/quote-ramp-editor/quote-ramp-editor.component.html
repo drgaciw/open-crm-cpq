@@ -105,6 +105,7 @@
                     [attr.data-testid]="'period-discount-' + $index"
                     [readonly]="!editable()"
                   />
+                  <mat-hint>0.05 means 5% off list</mat-hint>
                 </mat-form-field>
               }
               @if (editable()) {
@@ -160,18 +161,10 @@
             }
           </ul>
         }
-        @if (fieldErrors().length > 0) {
-          <ul class="issue-list" data-testid="ramp-field-errors">
-            @for (message of fieldErrors(); track message) {
-              <li>{{ message }}</li>
-            }
-          </ul>
-        }
-
         <h3>Escalator</h3>
         <p class="hint" id="escalator-hint">
-          Percent mode uses a fraction (0.05 = 5%). Amount mode adds that currency value each
-          interval. Generate does not save the quote.
+          Percent mode is percent points (5 means 5%). Amount mode adds that currency value.
+          This is not the step discount fraction. Generate does not save the quote.
         </p>
         <div class="escalator-row" formGroupName="escalator">
           <mat-form-field appearance="outline">
@@ -235,9 +228,6 @@
             </div>
           }
         </div>
-        @if (escalatorHint(); as hint) {
-          <p class="line-note" role="status">{{ hint }}</p>
-        }
       </form>
 
       <h3>Preview</h3>
