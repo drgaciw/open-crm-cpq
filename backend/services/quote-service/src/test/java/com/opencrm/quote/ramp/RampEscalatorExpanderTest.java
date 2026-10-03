@@ -69,13 +69,16 @@ class RampEscalatorExpanderTest {
     }
 
     @Test
-    @DisplayName("the last period keeps the remainder months")
-    void lastPeriodTakesRemainder() {
-        List<RampStepDto> steps = expander.expand(14, escalator(RampEscalatorMode.PERCENT, "40", "5", 12), 1);
-
-        assertThat(steps).extracting(RampStepDto::getMonths).containsExactly(12, 2);
-        assertThat(steps).extracting(RampStepDto::getStartMonth).containsExactly(1, 13);
-        assertThat(steps.stream().mapToInt(RampStepDto::getMonths).sum()).isEqualTo(14);
+    @DisplayName("a term that everyMonths does not divide reports only RAMP_TERM_MISMATCH")
+    void indivisibleTermReportsMismatch() {
+        assertThatThrownBy(() -> expander.expand(14, escalator(RampEscalatorMode.PERCENT, "40", "5", 12), 1))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
+                    assertThat(ramp.getStatus().value()).isEqualTo(422);
+                });
     }
 
     @Test
@@ -88,19 +91,19 @@ class RampEscalatorExpanderTest {
     }
 
     @Test
-    @DisplayName("a missing mode or a non-positive interval reports RAMP_ESCALATOR_INVALID")
-    void invalidEscalator() {
+    @DisplayName("a missing mode or a non-positive interval reports RAMP_PERIOD_EMPTY")
+    void incompleteEscalator() {
         RampEscalatorDto missing = escalator(RampEscalatorMode.PERCENT, "40", "5", 12);
         missing.setMode(null);
         assertThatThrownBy(() -> expander.expand(12, missing, 1))
                 .isInstanceOf(RampScheduleException.class)
                 .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
-                        .containsExactly(RampReasons.ESCALATOR_INVALID));
+                        .containsExactly(RampReasons.PERIOD_EMPTY));
 
         assertThatThrownBy(() -> expander.expand(12, escalator(RampEscalatorMode.AMOUNT, "40", "5", 0), 1))
                 .isInstanceOf(RampScheduleException.class)
                 .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
-                        .containsExactly(RampReasons.ESCALATOR_INVALID));
+                        .containsExactly(RampReasons.PERIOD_EMPTY));
     }
 
     private static List<String> prices(List<RampStepDto> steps) {

@@ -1,10 +1,9 @@
 package com.opencrm.quote.ramp;
 
 /**
- * Machine-readable ramp reason codes. The HTTP {@code errorCode} is
- * {@link #SCHEDULE_INVALID}, {@link #NOT_SUPPORTED}, or {@link #SCHEDULE_STALE}.
- * FR-02 reasons travel on the exception, and in its message, so the API body
- * stays readable without a new response type.
+ * Machine-readable ramp codes. {@link #SCHEDULE_INVALID} carries exactly one
+ * of the eight reason tokens. {@link #NOT_SUPPORTED} and {@link #SCHEDULE_STALE}
+ * are separate error codes.
  */
 public final class RampReasons {
 
@@ -19,11 +18,7 @@ public final class RampReasons {
     public static final String NEGATIVE_VALUE = "RAMP_NEGATIVE_VALUE";
     public static final String NOT_ALLOWED_FOR_LINE_TYPE = "RAMP_NOT_ALLOWED_FOR_LINE_TYPE";
     public static final String TOO_MANY_PERIODS = "RAMP_TOO_MANY_PERIODS";
-    public static final String NOT_BILLABLE = "RAMP_NOT_BILLABLE";
     public static final String PRICE_BASIS = "RAMP_PRICE_BASIS";
-    public static final String QUANTITY_REQUIRED = "RAMP_QUANTITY_REQUIRED";
-    public static final String SEQUENCE = "RAMP_SEQUENCE";
-    public static final String ESCALATOR_INVALID = "RAMP_ESCALATOR_INVALID";
 
     private RampReasons() {
     }

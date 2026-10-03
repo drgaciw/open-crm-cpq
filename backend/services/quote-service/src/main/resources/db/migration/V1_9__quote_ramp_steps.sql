@@ -20,10 +20,10 @@ CREATE TABLE quote_ramp_steps (
     sequence INT NOT NULL,
     start_month INT NOT NULL,
     months INT NOT NULL,
-    quantity INT,
+    quantity INT NOT NULL,
     price_basis VARCHAR(30) NOT NULL,
     unit_price DECIMAL(19,4),
-    discount_fraction DECIMAL(19,4),
+    discount_fraction DECIMAL(10,4),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     created_by VARCHAR(100),
@@ -33,7 +33,7 @@ CREATE TABLE quote_ramp_steps (
     CONSTRAINT uq_quote_ramp_steps_line_sequence UNIQUE (line_item_id, sequence),
     CONSTRAINT chk_quote_ramp_steps_months CHECK (months >= 1),
     CONSTRAINT chk_quote_ramp_steps_start CHECK (start_month >= 1),
-    CONSTRAINT chk_quote_ramp_steps_quantity CHECK (quantity IS NULL OR quantity >= 0),
+    CONSTRAINT chk_quote_ramp_steps_quantity CHECK (quantity >= 0),
     CONSTRAINT chk_quote_ramp_steps_basis CHECK (
         (price_basis = 'ABSOLUTE' AND unit_price IS NOT NULL AND discount_fraction IS NULL)
         OR (price_basis = 'DISCOUNT_FRACTION' AND discount_fraction IS NOT NULL AND unit_price IS NULL)

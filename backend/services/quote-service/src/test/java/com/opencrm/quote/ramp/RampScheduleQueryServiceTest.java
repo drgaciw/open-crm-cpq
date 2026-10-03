@@ -88,6 +88,24 @@ class RampScheduleQueryServiceTest {
                 .isInstanceOf(RampScheduleException.class)
                 .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
                         .containsExactly(RampReasons.TOO_MANY_PERIODS));
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("a term the step length does not divide reports RAMP_TERM_MISMATCH and persists nothing")
+    void indivisibleTermPersistsNothing() {
+        properties.setEnabled(true);
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
+
+        assertThatThrownBy(() -> service.expand(7L, request(14, 1)))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
+                });
+
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     private static Quote quote() {

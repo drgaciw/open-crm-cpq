@@ -54,8 +54,10 @@ public class RampScheduleAttacher {
             clearEscalator(item);
             return;
         }
+        int fallbackSequence = 1;
         for (RampStepDto step : prepared.steps()) {
-            QuoteRampStep row = toRow(step);
+            QuoteRampStep row = toRow(step, fallbackSequence);
+            fallbackSequence++;
             row.setLineItem(item);
             item.getRampSteps().add(row);
         }
@@ -70,9 +72,13 @@ public class RampScheduleAttacher {
         return hasSteps || schedule.getEscalator() != null;
     }
 
-    private static QuoteRampStep toRow(RampStepDto step) {
+    private static QuoteRampStep toRow(RampStepDto step, int fallbackSequence) {
+        if (step.getQuantity() == null) {
+            throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
+        }
+        int sequence = step.getSequence() == null ? fallbackSequence : step.getSequence();
         return QuoteRampStep.builder()
-                .sequence(step.getSequence())
+                .sequence(sequence)
                 .startMonth(step.getStartMonth())
                 .months(step.getMonths())
                 .quantity(step.getQuantity())

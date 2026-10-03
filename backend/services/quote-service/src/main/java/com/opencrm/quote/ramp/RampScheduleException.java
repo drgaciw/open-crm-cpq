@@ -7,8 +7,8 @@ import org.springframework.http.HttpStatus;
 import java.util.List;
 
 /**
- * 422 for ramp authoring. {@code errorCode} is the failure class. {@code reasons}
- * are the machine-readable FR-02 codes (or {@link RampReasons#NOT_SUPPORTED}).
+ * 422 for ramp authoring. {@code errorCode} is the failure class.
+ * {@link RampReasons#SCHEDULE_INVALID} carries one reason token in the message.
  */
 @Getter
 public class RampScheduleException extends BusinessException {
@@ -27,6 +27,9 @@ public class RampScheduleException extends BusinessException {
     }
 
     public static RampScheduleException invalid(List<String> reasons) {
+        if (reasons == null || reasons.size() != 1) {
+            throw new IllegalArgumentException("RAMP_SCHEDULE_INVALID carries one reason token");
+        }
         return new RampScheduleException(RampReasons.SCHEDULE_INVALID, reasons);
     }
 
