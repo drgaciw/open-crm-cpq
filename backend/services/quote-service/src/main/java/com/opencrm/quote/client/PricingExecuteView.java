@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -27,8 +26,4 @@ public class PricingExecuteView {
     private String approvalTier;
     /** Opaque waterfall JSON retained for persistence as pricingWaterfallJson. */
     private JsonNode waterfall;
-    /** Optional period breakdown. Absent on flat quotes. Not required. */
-    private JsonNode pricedPeriods;
-    /** Optional exit ARR. Absent until pricing emits it. Not required. */
-    private BigDecimal exitArr;
 }

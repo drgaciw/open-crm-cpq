@@ -20,38 +20,51 @@ class PricingExecuteViewBindTest {
     };
 
     @Test
-    @DisplayName("pricedPeriods and exitArr bind through a plain ObjectMapper")
+    @DisplayName("typed priced periods and exitArr bind through a plain ObjectMapper")
     void bindsOptionalRampFields() throws Exception {
         String json = """
                 {
                   "success": true,
                   "data": {
                     "success": true,
-                    "pricedPeriods": [{"sequence": 1, "amount": "40.0000"}],
-                    "exitArr": 120.50,
                     "lineResults": [{
                       "productExternalId": "PROD-1",
                       "lineItemType": "SUBSCRIPTION",
-                      "pricedPeriods": {"months": 12},
-                      "exitArr": 10.00
+                      "pricedPeriods": [{
+                        "sequence": 1,
+                        "startMonth": 1,
+                        "months": 12,
+                        "quantity": 50,
+                        "netUnitPrice": 37.2000,
+                        "netMonthly": 1860.00,
+                        "periodAmount": 22320.00,
+                        "discountRate": 0.07,
+                        "explanationCodes": ["NAMED_SEAT"],
+                        "waterfall": [{"code": "LIST_PRICE"}]
+                      }]
                     }],
                     "financialMetrics": {
                       "acv": 450.00,
-                      "pricedPeriods": [1, 2],
                       "exitArr": 99.00
                     }
                   }
                 }
                 """;
 
-        ApiResponse<PricingExecuteView> response = objectMapper.readValue(json, responseType);
-        PricingExecuteView view = response.getData();
+        PricingExecuteView view = objectMapper.readValue(json, responseType).getData();
+        PricedPeriodView period = view.getLineResults().getFirst().getPricedPeriods().getFirst();
 
-        assertThat(view.getPricedPeriods().isArray()).isTrue();
-        assertThat(view.getExitArr()).isEqualByComparingTo(new BigDecimal("120.50"));
-        assertThat(view.getLineResults().getFirst().getPricedPeriods().get("months").asInt()).isEqualTo(12);
-        assertThat(view.getLineResults().getFirst().getExitArr()).isEqualByComparingTo(new BigDecimal("10.00"));
-        assertThat(view.getFinancialMetrics().getPricedPeriods().isArray()).isTrue();
+        assertThat(period.getSequence()).isEqualTo(1);
+        assertThat(period.getStartMonth()).isEqualTo(1);
+        assertThat(period.getMonths()).isEqualTo(12);
+        assertThat(period.getQuantity()).isEqualTo(50);
+        assertThat(period.getNetUnitPrice()).isEqualByComparingTo(new BigDecimal("37.2000"));
+        assertThat(period.getNetMonthly()).isEqualByComparingTo(new BigDecimal("1860.00"));
+        assertThat(period.getPeriodAmount()).isEqualByComparingTo(new BigDecimal("22320.00"));
+        assertThat(period.getDiscountRate()).isEqualByComparingTo(new BigDecimal("0.07"));
+        assertThat(period.getExplanationCodes()).containsExactly("NAMED_SEAT");
+        assertThat(period.getWaterfall().isArray()).isTrue();
+        assertThat(period.getWaterfall().get(0).get("code").asText()).isEqualTo("LIST_PRICE");
         assertThat(view.getFinancialMetrics().getExitArr()).isEqualByComparingTo(new BigDecimal("99.00"));
         assertThat(view.getFinancialMetrics().getAcv()).isEqualByComparingTo(new BigDecimal("450.00"));
     }
@@ -72,11 +85,7 @@ class PricingExecuteViewBindTest {
 
         PricingExecuteView view = objectMapper.readValue(json, responseType).getData();
 
-        assertThat(view.getPricedPeriods()).isNull();
-        assertThat(view.getExitArr()).isNull();
         assertThat(view.getLineResults().getFirst().getPricedPeriods()).isNull();
-        assertThat(view.getLineResults().getFirst().getExitArr()).isNull();
-        assertThat(view.getFinancialMetrics().getPricedPeriods()).isNull();
         assertThat(view.getFinancialMetrics().getExitArr()).isNull();
     }
 
@@ -88,6 +97,35 @@ class PricingExecuteViewBindTest {
                 """;
 
         assertThatThrownBy(() -> objectMapper.readValue(json, responseType))
+                .isInstanceOf(UnrecognizedPropertyException.class);
+    }
+
+    @Test
+    @DisplayName("execute view rejects pricedPeriods and exitArr, and a period rejects discountFraction")
+    void closedFieldListsRejectExtras() {
+        String rootPeriods = """
+                {"success": true, "data": {"success": true, "pricedPeriods": []}}
+                """;
+        String rootExit = """
+                {"success": true, "data": {"success": true, "exitArr": 1}}
+                """;
+        String periodFraction = """
+                {
+                  "success": true,
+                  "data": {
+                    "success": true,
+                    "lineResults": [{
+                      "pricedPeriods": [{"sequence": 1, "discountFraction": 0.05}]
+                    }]
+                  }
+                }
+                """;
+
+        assertThatThrownBy(() -> objectMapper.readValue(rootPeriods, responseType))
+                .isInstanceOf(UnrecognizedPropertyException.class);
+        assertThatThrownBy(() -> objectMapper.readValue(rootExit, responseType))
+                .isInstanceOf(UnrecognizedPropertyException.class);
+        assertThatThrownBy(() -> objectMapper.readValue(periodFraction, responseType))
                 .isInstanceOf(UnrecognizedPropertyException.class);
     }
 }

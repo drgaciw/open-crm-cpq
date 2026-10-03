@@ -1,6 +1,5 @@
 package com.opencrm.quote.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,8 +26,6 @@ public class PricingLineResultView {
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
     private List<String> explanationCodes;
-    /** Optional period breakdown for this line. Absent on flat quotes. Not required. */
-    private JsonNode pricedPeriods;
-    /** Optional exit ARR echoed on the line. Absent until pricing emits it. Not required. */
-    private BigDecimal exitArr;
+    /** Optional priced periods. Absent on flat quotes. Not required. */
+    private List<PricedPeriodView> pricedPeriods;
 }
