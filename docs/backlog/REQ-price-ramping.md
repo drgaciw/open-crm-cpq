@@ -1,9 +1,9 @@
 # Requirements: Price ramping (multi-period pricing within a term)
 
 **ID:** REQ-PRC-001 (provisional — only REQ-AI-014 exists, so no numbering scheme is documented yet)
-**Status:** Draft for owner review. Nothing in this document is implemented; no decision below is taken until an ADR records it. D-01, D-02, D-04, D-05 and D-08 are drafted in ADR-023 (Proposed). D-09 (split the two stories) was instructed by the owner on 2026-09-29 and is applied in the backlog. D-03, D-06 and D-07 are open.
-**Created:** 2026-09-29
-**Architecture:** [ADR-023 Price ramp schedule model](../adr/ADR-023-price-ramp-schedule-model.md) (Proposed) records D-01, D-02, D-04, D-05 and D-08. It must be Accepted, in the same review as D-03, before slice R1 starts.
+**Status:** Accepted for implementation on 2026-10-03, by [ADR-023](../adr/ADR-023-price-ramp-schedule-model.md). Nothing in this document is implemented in code yet. D-01, D-02, D-04, D-05 and D-08 stay as drafted. D-09 (split the two stories) was instructed by the owner on 2026-09-29 and stays applied. D-03, D-06 and D-07 were taken on 2026-10-03 in the same review, on the owner's instruction to process this sprint. There was no separate finance meeting and no separate sales-ops meeting. The sprint plan is [docs/forge/41-price-ramp-sprint.md](../forge/41-price-ramp-sprint.md).
+**Created:** 2026-09-29. Decisions closed 2026-10-03.
+**Architecture:** [ADR-023 Price ramp schedule model](../adr/ADR-023-price-ramp-schedule-model.md) (**Accepted** 2026-10-03) records D-01 through D-08. R1 starts only after that Acceptance is on `main`. The ramp flag stays default off.
 **Backlog:** Stories allocated on 2026-09-29; each Notion page links its Linear issue. R1: [BC-03-09](https://app.notion.com/p/3e3f7cb4e4df815dbf58ceab3530934f), [DRG-336](https://linear.app/drgamtd-workspace/issue/DRG-336/bc-03-09-ramp-pricing-per-term-period). R2: [BC-04-07](https://app.notion.com/p/3eaf7cb4e4df810bb8b3f86c8469da16), [DRG-338](https://linear.app/drgamtd-workspace/issue/DRG-338/bc-04-07-ramp-governance-per-period-policy-and-approval-binding). R3: [BC-09-04](https://app.notion.com/p/3e3f7cb4e4df81e0a557f20a78b6543b), [DRG-339](https://linear.app/drgamtd-workspace/issue/DRG-339/bc-09-04-ramp-schedule-and-step-application). R4: [BC-09-07](https://app.notion.com/p/3eaf7cb4e4df8130a393dbe5406ee4db), [DRG-341](https://linear.app/drgamtd-workspace/issue/DRG-341/bc-09-07-hybrid-migration-ramp-with-dual-entitlement-window). Split out under D-09: [BC-03-12](https://app.notion.com/p/3eaf7cb4e4df8160b30dc5c1554995d9), [DRG-337](https://linear.app/drgamtd-workspace/issue/DRG-337/bc-03-12-usage-tier-rating-for-quoting) (usage tiers) and [BC-09-06](https://app.notion.com/p/3eaf7cb4e4df818c86bcd714082d710e), [DRG-340](https://linear.app/drgamtd-workspace/issue/DRG-340/bc-09-06-credit-draw-down-for-prepaid-balances) (credit draw-down). Epics DRG-283 (BC-03), DRG-286 (BC-04) and DRG-291 (BC-09).
 
 ## Outcome
@@ -23,7 +23,7 @@ Today none of this exists: a quote has one price and one term, and a ramp can on
 
 ## Current state (evidence)
 
-Evidence from `origin/main` at `3b7c85c`, checked on 2026-09-29.
+Evidence from `origin/main` at `3b7c85c`, checked on 2026-09-29. Re-checked at `03bb6a67` on 2026-10-03: the line numbers in this table still match. Two facts that the original pass understated are recorded under [Re-check](#re-check-2026-10-03) and override the sentence they correct.
 
 | Area | Finding | Evidence |
 |---|---|---|
@@ -38,6 +38,17 @@ Evidence from `origin/main` at `3b7c85c`, checked on 2026-09-29.
 | Accepted-quote event and contract | `QuoteAccepted` carries `termMonths`, start/end and ARR/TCV/ACV totals. The contract consumer builds a Subscription with a hard-coded one-year term, plan "Standard Plan" and `arr = totalAmount`, ignoring the term. | `QuoteAcceptedEvent.java:124-162`, contract-asset-management `QuoteAcceptedEventConsumer.java:65-77` |
 | Adjacent rules | Renewal uplift (8% or 3%), amendment proration (days), migration credit (30% of book value). None is a ramp. | `renewal-uplift.drl`, `amendment-proration.drl`, `migration-credit.drl` |
 | Agent spec | `agents/term-coterming.md` and `agents/cpq-agent-020.md` describe a ramp preview and mid-ramp proration; the agent code has no ramp logic. | `TermCotermingAgent.java` |
+
+## Re-check 2026-10-03
+
+At `03bb6a67` the table above still holds, with these corrections. The sprint DAG uses the corrections.
+
+- **Supersession (#559) compares amounts, not a fingerprint.** `ApprovalService.java:69` still copies `requestedDiscount` on `submit`, and lines 190–195 still throw 409 `APPROVAL_SUPERSEDED`. The comparison lives in `DiscountApprovalEventConsumer`: a PENDING discount row for the same quote line is identical when `requestedDiscount`, `marginDelta` and `currencyCode` match. No fingerprint field exists.
+- **The quote pricing client fails on unknown response fields.** `PricingServiceClient.java:40` builds `new ObjectMapper()`. An extra property on the pricing response breaks every calculate call. The request path is the opposite: pricing-service uses Spring MVC, which ignores unknown JSON, so a schedule on the request is dropped and the line is priced flat. FR-09 is written for that pair of facts.
+- **Fixtures `execute/01` to `04` lock the whole metrics object, including ACV, and lock `steps` to `[]`.** `05` is an error fixture. P-1 may change `steps` only. The ACV version may change ACV only, and only in a fixture that names ADR-023. Prices stay.
+- **Execute does not insert `QuoteFact` and does not set `tcv` or `acv`.** Facts at `PricingExecutionService.java:218-220` are `Customer`, `PricingContext` and `PricingLineResult`. The 50k/100k rule is tested by inserting `acv` on a `QuoteFact` (`PricingDrulesGoldenFixtureTest`). Wiring that fact into execute is R2, not the ACV PR.
+- **`QuoteAccepted` stays on event version 1.** ADR-018 and `EventContractRegistry.java:29-30` treat added fields as non-breaking, and the registry keeps one contract per topic. FR-20 does not bump the version.
+- **The PDF a user can generate is quote-service's template.** document-generation's consumer creates a job and does not load the quote. FR-19 for this sprint is the quote-service template, in R2. The stub job stays out.
 
 ## Functional requirements
 
@@ -58,14 +69,14 @@ Evidence from `origin/main` at `3b7c85c`, checked on 2026-09-29.
 | FR-06 | The waterfall returned by `execute` contains ordered steps for every period (today the list is empty), including a new period-selection step type. `ExplainWaterfall` for a quote line explains each period. |
 | FR-07 | Pricing stays deterministic: identical inputs (schedule, price book version, rule-set, context) replay to identical per-period results. The pricing audit log records the schedule and the per-period output, and the response records the price book version and rule-set used. |
 | FR-08 | All arithmetic is `BigDecimal`. Unit prices carry 4 decimal places and amounts 2, rounded half-up (the current behaviour in `MetricsCalculator` and `QuoteService`). Period amount = round(net monthly × months). Line total = sum of period amounts. Quote total = sum of line totals. Totals are never rounded separately. |
-| FR-09 | Never price a ramp silently as flat. If a request carries a schedule that pricing-service cannot honour (flag off, older version, unsupported line type), it returns 422 `RAMP_NOT_SUPPORTED`. Quote-service treats a response with no per-period results for a line it sent a schedule for as a failed calculation and persists no totals. Rationale: the backend does not override Jackson's `FAIL_ON_UNKNOWN_PROPERTIES` outside two event-DTO tests, so Spring Boot's default (ignore unknown) applies, and a new quote-service talking to an old pricing-service would quietly price a three-year ramp at one rate. |
+| FR-09 | Never price a ramp silently as flat. If a request carries a schedule that pricing-service cannot honour (flag off, older version, unsupported line type), it returns 422 `RAMP_NOT_SUPPORTED`. Quote-service treats a response with no per-period results for a line it sent a schedule for as a failed calculation and persists no totals. The quote client parses the response with `new ObjectMapper()` (`PricingServiceClient.java:40`), so an unknown response field fails the call for every quote, flat ones included. The view DTOs therefore learn the optional period fields before pricing emits them. The request is the silent path: Spring MVC ignores an unknown schedule and would price the term at one rate. That is the failure this rule forbids. |
 
 ### Metrics
 
 | ID | Requirement |
 |---|---|
 | FR-10 | Metrics for a ramp quote: TCV = sum of period amounts across lines; ACV = TCV divided by (term months / 12); `arr` = run rate at term start × 12; new `exitArr` = final-period run rate × 12; plus a per-period summary. CLV must not be derived from a single flat monthly price for a ramp quote. Definitions follow decisions D-02 and D-03. |
-| FR-11 | Flat parity: a quote with no ramp produces numerically identical prices, waterfall and metrics to today, and the existing fixtures `fixtures/pricing/execute/01` to `05` pass unchanged. The only permitted difference is the ACV correction if D-03 is approved, which is recorded as an explicit fixture change. |
+| FR-11 | Flat parity: a quote with no ramp produces numerically identical prices and metrics to today while `acv-version` is `legacy`, and fixtures `execute/01` to `05` keep those numbers. P-1 may fill `steps` (they are `[]` today) and must not change prices or ACV. When `acv-version` is `term-years`, the only permitted numeric difference is ACV, committed with an ADR-023 reference. |
 
 ### Governance
 
@@ -89,7 +100,7 @@ Evidence from `origin/main` at `3b7c85c`, checked on 2026-09-29.
 
 | ID | Requirement |
 |---|---|
-| FR-20 | `QuoteAccepted` gains an additive per-line ramp array (sequence, start month, months, quantity, net unit price, net monthly, period amount) and `exitArr`, with an `eventVersion` bump through the ADR-018 D5 registry. `QuoteAcceptedEventToleranceTest` is extended with the new fields (the D8 precedent) to prove a consumer built before the change still reads the payload, and the registry fitness check passes. The three consumers (contract-asset-management, crm-service, document-generation) keep working unchanged, and the crm-service message (`QuoteAcceptedCrmMessage`) carries `tcv`, `acv` and `arr` with the FR-10 meaning. |
+| FR-20 | `QuoteAccepted` gains an additive per-line ramp array (sequence, start month, months, quantity, net unit price, net monthly, period amount) and `exitArr`, on event version 1. ADR-018 and `EventContractRegistry.java:29-30` say added fields are not a new version, and a second contract on `cpq.quote.status.accepted` fails the one-topic rule. `QuoteAcceptedEventToleranceTest` is extended with the new fields (the D8 precedent) to prove a consumer built before the change still reads the payload, and the registry fitness check passes. The three consumers (contract-asset-management, crm-service, document-generation) keep working unchanged, and the crm-service message (`QuoteAcceptedCrmMessage`) carries `tcv`, `acv` and `arr` with the FR-10 meaning. CRM does not gain Deal columns for those three figures. |
 | FR-21 | Contract-asset-management creates the subscription with the real term and dates from the event (today hard-coded to one year), and persists one rate period per `RampStep` with dates derived from the term start by calendar-date arithmetic. Processing stays idempotent (ADR-018 D6). |
 | FR-22 | `GetRampSchedule` returns the periods for a subscription. The active rate on a date is the period containing that date, and the boundary date belongs to the new period. Dates are calendar dates, not instants. |
 | FR-23 | A `RampScheduler` applies each step on its effective date. `ApplyRamp` is idempotent per subscription and sequence and emits `RampApplied` through the outbox carrying the effective date, not the run time. After downtime it catches up missed steps in order. Scheduler lag is a metric with an alert, following the ADR-018 D10 pattern. Duplicate or late runs never produce a second effect. |
@@ -148,17 +159,17 @@ ACV figures in AC-01 and AC-02 assume the D-03 recommended formula (TCV divided 
 
 ## Decisions required
 
-Status on 2026-09-29: D-01, D-02, D-04, D-05 and D-08 are drafted in [ADR-023](../adr/ADR-023-price-ramp-schedule-model.md) (Proposed). D-09 is applied on the owner's instruction. D-03, D-06 and D-07 are open. D-02's ACV clause and D-03 are one change and are decided together.
+Status on 2026-10-03: D-01 through D-08 are recorded in [ADR-023](../adr/ADR-023-price-ramp-schedule-model.md) (**Accepted**). D-09 stays applied. D-02's ACV clause and D-03 were decided together. Provenance is the owner's 2026-10-03 instruction to process this sprint, not a separate finance or sales-ops meeting.
 
 | ID | Decision | Options | Recommendation and why |
 |---|---|---|---|
 | D-01 | Where the schedule lives | Per-line schedule on the quote line; one quote line per period; rule-driven only | Per-line schedule. One commercial object gives one approval, one contract and correct TCV and amendment semantics. Per-period lines break those; rule-only cannot carry negotiated prices. |
 | D-02 | Metric definitions for a ramp | ARR at start or at exit; ACV as TCV over term-years or first-year value | TCV as the sum; ACV = TCV / term-years; `arr` at start, plus `exitArr`. Needs finance sign-off, because approval tiers and floors consume these figures. |
-| D-03 | Fix the ACV formula | Keep `(monthly × months) / 12`; change to TCV / term-years | Change, versioned. The formula equals TCV / 12, which matches the glossary definition (TCV / contract years) only at a 144-month term; for a 12-month term it returns the monthly price. The PRD contradicts itself (line 108 against glossary line 925). Correcting it changes existing ACV values and the behaviour of the 50k and 100k floor rule, so it is a separate, announced change. |
+| D-03 | Fix the ACV formula | Keep `(monthly × months) / 12`; change to TCV / term-years | **Taken.** ACV = TCV / term-years, property `opencrm.pricing.metrics.acv-version`, default `legacy`. Not the ramp flag. See ADR-023 D-03. Flat quotes keep today's numbers until `term-years` is set. The 50k and 100k floors are tested both ways. |
 | D-04 | Period granularity | Whole months on anniversary dates; day-level | Whole months. Day-level proration remains inside a period only. Keeps schedules readable and boundary dates unambiguous. |
 | D-05 | Renewal and extension base | Exit-period rate; average rate; Year-1 rate | Exit rate (see AC-14). |
-| D-06 | Governance before real margin exists | Interim guardrail (approval on high period discount or step-down; treat the 40.0 placeholder as non-authoritative); or block ramp until cost data lands | Interim guardrail with the flag off by default, so ramp is not blocked but is never trusted on the placeholder margin. |
-| D-07 | Volume tiers on quantity ramps | Per-period quantity; peak quantity; committed total | Per-period quantity (AC-02). It is a commercial policy, so it needs sales-ops confirmation. |
+| D-06 | Governance before real margin exists | Interim guardrail (approval on high period discount or step-down; treat the 40.0 placeholder as non-authoritative); or block ramp until cost data lands | **Taken.** Interim guardrail. Margin `40.0` is non-authoritative. Ramp is not generally available. Flag default off. |
+| D-07 | Volume tiers on quantity ramps | Per-period quantity; peak quantity; committed total | **Taken.** The period's own quantity (AC-02). Sales-ops confirmation is owner-delegated with the 2026-10-03 instruction, not independently confirmed. |
 | D-08 | Home for the rate schedule (BC-09) | contract-asset-management; a new subscription service | contract-asset-management, which already owns the `Subscription`. Subscriptions UI stays held. |
 | D-09 | Scope of the two stories | Keep usage tiers and credit draw-down inside BC-03-09 and BC-09-04; split them out | Split. Ramp is the shared core; usage tiers and credit draw-down are separate requirements with their own acceptance criteria. |
 
@@ -174,7 +185,16 @@ Prerequisites before R1: P-1 populate waterfall steps (FR-06); P-2 real cost-bas
 | R4 | Hybrid migration ramp | FR-26 | BC-09-07 / DRG-341, "Hybrid migration ramp with dual-entitlement window" (Phase 3) |
 | Split-out | Usage-tier rating; credit draw-down | not covered here | BC-03-12 / DRG-337 and BC-09-06 / DRG-340, each needing its own REQ |
 
-The existing Notion estimates (8 and 5 points) were sized on stories with three acceptance criteria each. This scope spans pricing, quote, approval-routing, contract-asset and the CPQ UI, so the slices need re-estimating once D-01 to D-09 are settled. BC-03-09 keeps 8 points and BC-09-04 keeps 5, both flagged as not revalidated in Linear and Notion; the four new stories carry no estimate. FR-19 is assigned to the existing story BC-06-03 ("Render document in PDF and DOCX per locale"), whose acceptance criteria do not mention the schedule table yet; add it when R2 is scheduled.
+Re-estimated on 2026-10-03. The old 8 (BC-03-09) and 5 (BC-09-04) counted stories with three acceptance criteria and were not revalidated. They are withdrawn.
+
+| Story | Was | Now | Why |
+| --- | --- | --- | --- |
+| DRG-336 / BC-03-09 (R1) | 8 | **21** | Waterfall, versioned ACV, quote persistence, pricing engine, wire, and the quote UI |
+| DRG-338 / BC-04-07 (R2) | none | **8** | Per-period discount, step-down, fingerprint supersession, quote banner, quote-service PDF table |
+| DRG-339 / BC-09-04 (R3) | 5 | **13** | Additive `QuoteAccepted`, real term on the subscription, rate periods, scheduler, amendment, renewal |
+| DRG-341 / BC-09-07 (R4) | none | **8** | Paired ramps, one migration credit, dual-entitlement window, approval |
+
+DRG-337 and DRG-340 are unchanged and stay out of this sprint. FR-19's user-visible table is in R2, on the quote-service template. BC-06-03 (document-generation's stub job) is not this sprint. The PR-level split and the points that are not the Linear rollup are in the sprint doc.
 
 ## Rollout and completion
 
@@ -200,7 +220,7 @@ Source rows quote the acceptance criteria as they stood before the 2026-09-29 sp
 
 ## Out of scope
 
-Usage metering and rating, credit draw-down and prepaid balances (D-09; BC-03-12 and BC-09-06), billing schedules and invoicing (BC-10), revenue recognition (BC-11), FX rate management beyond the quote currency, cross-quote price protection, any subscriptions or contract-asset UI (held), agent behaviour that consumes the schedule, and enabling any Jev flag. This document authorises no code change, schema change or data migration.
+Usage metering and rating, credit draw-down and prepaid balances (D-09; BC-03-12 / DRG-337 and BC-09-06 / DRG-340), billing schedules and invoicing (BC-10), revenue recognition (BC-11), FX rate management beyond the quote currency, cross-quote price protection, any subscriptions or contract-asset UI (held), agent behaviour that consumes the schedule, and enabling any Jev flag. This requirements file is not itself a schema or code change. The authorized implementation is the PR DAG in the sprint doc, after ADR-023 is on `main`, with both switches defaulting off.
 
 ## References
 

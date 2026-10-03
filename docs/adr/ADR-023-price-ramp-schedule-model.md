@@ -1,8 +1,8 @@
 # ADR-023: Price ramp schedule model
 
-**Status:** Proposed on 2026-09-29. Documentation only: nothing here is implemented, and no code, schema or flag change follows from this file until the ADR is Accepted. D-02 also needs finance sign-off, and it must be accepted in the same review as D-03 (see [D-02](#d-02--metric-definitions-for-a-ramp)).
-**Date:** 2026-09-29
-**Deciders:** Project owner (decision pending). Finance sign-off is required for D-02. Drafted from [REQ-PRC-001](../backlog/REQ-price-ramping.md), decisions D-01, D-02, D-04, D-05 and D-08.
+**Status:** Accepted on 2026-10-03. The project owner told the orchestrator, on that date, to pull the next sprints from the backlog and process them. That instruction is the authorization for this Acceptance, including D-02's finance sign-off and D-03, D-06 and D-07, taken in the same review. There was no separate finance meeting and no separate sales-ops meeting. The precedent is [the owner-delegated record for ADR-016 and ADR-018](../forge/40-owner-decisions-adr-016-018.md). Nothing in the tree implements a ramp yet. This file authorizes the PR DAG in [the price ramp sprint](../forge/41-price-ramp-sprint.md) and no other code. The ramp flag stays default off. Turning it on is not part of Acceptance.
+**Date:** 2026-09-29 (proposed). Accepted 2026-10-03.
+**Deciders:** Project owner, by the 2026-10-03 instruction above. D-01, D-02, D-04, D-05 and D-08 stay as drafted on 2026-09-29. D-03, D-06 and D-07 were open and are now taken as specified below. D-09 stays applied (usage tiers and credit draw-down are not in this sprint).
 **Amends:** none.
 **Relates to:**
 
@@ -17,13 +17,15 @@
 
 **Does not authorize:**
 
-- any code change, schema change, Flyway migration or data backfill
-- enabling any ramp flag (`opencrm.pricing.ramp.enabled` is proposed by the REQ and stays off)
-- the ACV formula correction (D-03), which is a separate decision that this ADR depends on, not one it takes
-- D-06 (governance before real margin exists), D-07 (volume tiers on quantity ramps) and D-09 (story split). D-09 is already applied to the backlog, and D-06 and D-07 belong to the owner and sales operations
-- usage-tier rating (BC-03-12) and credit draw-down (BC-09-06), which are separate requirements
+- enabling `opencrm.pricing.ramp.enabled` (default `false` on pricing-service and on quote-service) or setting `opencrm.pricing.metrics.acv-version` to anything but `legacy` in a shared config file
+- a second ACV function so that ramp quotes and flat quotes disagree
+- treating the placeholder margin `40.0` as a real margin, or routing a ramp on it
+- usage-tier rating (BC-03-12 / DRG-337) and credit draw-down (BC-09-06 / DRG-340). D-09 stays applied
 - any subscriptions or contract-asset user interface (held, see [ARCHITECTURE §17](../ARCHITECTURE.md))
-- enabling any Jev flag
+- enabling any `opencrm.jev.*.enabled` flag, Jev/OpenRouter model selection as runtime, or GLM-5 as runtime
+- the standing holds: Activities API (`/api/v1/activities/**`), CI #238, agent Kafka #241, flipping `APPROVALS_LEGACY_LOCAL_READ` off, NgRx, full SpEL, Kafka S2B-9, gateway domain validation, deleting product `POST /validate`, WhatsApp #430 undo, price-book list-row delete (harvest "R2", not ramp R2), Track 2 Spring AI, `SECURITY_OPEN`, Cookie CSRF on domain services (ADR-004: gateway only)
+- pricing or validation logic in `libs/common` (the shared ramp DTO is published language only, ADR-011) and any cross-database read (ADR-008)
+- a `QuoteAccepted` `eventVersion` bump. Adding fields is non-breaking ([ADR-018](ADR-018-event-delivery-guarantees-idempotency.md); `EventContractRegistry` keeps one contract per topic). The ramp array and `exitArr` are additive on v1
 
 **Why the number is 023:** ADR-017 to ADR-022 are reserved for other topics (synchronous calls, fitness functions and ADR lifecycle, observability, AI topology, runtime topology; see the [review](../forge/39-adr-gitnexus-review-2026-09-22.md)). This is the next free number, and it does not take one of the reserved ones.
 
@@ -31,7 +33,7 @@
 
 ## Context
 
-A recurring offer sold as "Year 1 at $40, Year 2 at $45, Year 3 at $50 per seat per month" has no place to live in the platform today. The REQ records the gap in full; this section keeps only the evidence that drives the five decisions below (checked on `main` at `a979892`, 2026-09-29).
+A recurring offer sold as "Year 1 at $40, Year 2 at $45, Year 3 at $50 per seat per month" has no place to live in the platform today. The REQ records the gap in full. The five model decisions below were checked on `main` at `a979892` (2026-09-29) and re-checked at `03bb6a67` (2026-10-03). The line numbers still match. D-03, D-06 and D-07 use the same tree.
 
 1. **One price and one term per line.** `quote_line_items` holds a single `quantity`, `list_price`, `unit_price`, `discount_rate`, `net_price`, `extended_amount` and one `pricing_waterfall_json` (`backend/services/quote-service/src/main/java/com/opencrm/quote/lineitem/QuoteLineItem.java:27-77`). The quote holds one `durationInMonths`, which defaults to 12 (`QuoteService.java:77-78`).
 2. **Pricing cannot see per-line data.** The pricing context sends only `productExternalId`, `lineItemType` and `quantity` for each line (`QuoteService.java:611-631`). Nothing about a period could reach pricing-service without widening that request.
@@ -65,9 +67,47 @@ For a line with periods `i = 1..n`, net monthly price `m_i` (after the waterfall
 
 **Worked figure (AC-01).** 50 seats, 36 months, $40, $45 and $50: monthly 2,000, 2,250 and 2,500; period totals 24,000, 27,000 and 30,000; TCV 81,000; `arr` 24,000; `exitArr` 30,000. Pricing the whole term at the Year-1 rate would give TCV 72,000 and understate the deal by 9,000.
 
-**Dependency on D-03 (read this before deciding).** D-02 fixes what TCV, `arr` and `exitArr` mean for a ramp. Its ACV clause is not separable from D-03. Under the recommended D-03 formula (ACV = TCV / term-years), AC-01 gives ACV 27,000. Under today's formula (TCV / 12) it would give 6,750, which is meaningless for a 36-month deal. A one-period schedule must report the same ACV as the same quote without a schedule, so a ramp cannot adopt one ACV formula while flat quotes keep another. This ADR therefore recommends accepting D-02 and D-03 together. If D-03 is rejected, the ramp figures that policy consumes (`tcv`, `arr`, `exitArr`) proceed, and ACV stays on the legacy function for flat and ramp alike until a definition is agreed.
+**Taken with D-03.** D-02 fixes what TCV, `arr` and `exitArr` mean for a ramp. Its ACV clause is the function D-03 selects, and both were accepted in this review. Under D-03, AC-01 gives ACV 27,000. Under today's formula (TCV / 12) it would give 6,750. A one-period schedule reports the same ACV as the same quote without a schedule, because both use the active version of the one function.
 
-Finance sign-off is required because approval tiers and floors consume these figures. Correcting ACV changes existing values and the behaviour of the 50k and 100k ACV floor rule, so it is announced and versioned, and any fixture change is committed with a reference to this ADR.
+Finance sign-off is owner-delegated by the 2026-10-03 instruction. It was not given in a separate finance meeting. Approval tiers and floors consume these figures. The correction is versioned (D-03). Any fixture change that exists only because the version is on is ACV, committed with a reference to this ADR.
+
+### D-03 — ACV formula, versioned
+
+**ACV = TCV / term-years, behind a version switch that is not the ramp flag. The default stays today's formula.**
+
+The property is `opencrm.pricing.metrics.acv-version`.
+
+| Value | Formula | Who it applies to |
+| --- | --- | --- |
+| `legacy` (default) | `(monthlyPrice × durationInMonths) / 12`, which equals TCV / 12 | Every quote while the version stays `legacy`. This is the number `MetricsCalculator.java:93-96` produces today |
+| `term-years` | TCV / (durationInMonths / 12) | Every quote, flat and ramp, once this value is explicitly set |
+
+Rejected: overloading `opencrm.pricing.ramp.enabled` so that "ramp on" also changes ACV. The correction changes the 50k and 100k floor for flat quotes that have no schedule. D-06 keeps ramp unavailable and the ramp flag default off. One switch would either hold the correction until ramp is turned on, or turn ramp on in order to correct ACV. The floor tests also need both formulas without pricing a schedule.
+
+Coupling, so the two shapes cannot disagree: pricing-service refuses to start when `opencrm.pricing.ramp.enabled=true` and the version is not `term-years`. With the ramp flag off, the only quotes are flat, and they keep today's numbers until the version is set. There is no supported mode in which a ramp quote and a flat quote use different functions.
+
+**Floor, both ways.** `acv-minimum-commitment.drl:19-22` sets a 50,000 floor when `acv < 50000` and a 100,000 floor when `acv < 100000`, and only when `finalPrice` is below that floor. The execute path still does not put `acv` on a `QuoteFact` (nothing under `pricing-service/src/main` calls `setDecimal("acv")`). The tests insert the ACV each formula produces.
+
+- Monthly price 5,000, term 12, TCV 60,000. Legacy ACV 5,000 → floor 50,000. Term-years ACV 60,000 → floor 100,000.
+- Monthly price 10,000, term 12, TCV 120,000. Legacy ACV 10,000 → floor 50,000. Term-years ACV 120,000 → no floor.
+
+Fixtures `execute/01` to `05` keep today's ACV while the version is `legacy`. When a fixture is run with `term-years`, the only numeric difference is ACV, and that file names this ADR.
+
+### D-06 — Governance before real margin exists
+
+**Interim guardrail. The placeholder margin is non-authoritative. Ramp is not generally available. The flag defaults off.**
+
+`MetricsCalculator.java:120-121` sets `estimatedMarginPct` to `40.0` and says cost data is deferred. `approval-margin-exception.drl` compares `estimatedMarginPct` to `0.35`, a fraction. The units do not match, and execute never copies the metric onto the fact. A ramp must not be approved or rejected because that constant is 40.
+
+Until real per-period cost exists (prerequisite P-2, not this sprint), governance is the per-period discount and the step-down rule (REQ FR-12 and FR-14). AC-16 stays untestable and is not a completion claim. `opencrm.pricing.ramp.enabled` defaults to `false` on pricing-service and on quote-service. Flag off returns 422 `RAMP_NOT_SUPPORTED`. It never prices the schedule as flat.
+
+### D-07 — Volume tiers on a quantity ramp
+
+**The tier uses that period's own quantity.** Not the peak quantity, and not the first period's quantity.
+
+Sales-ops confirmation is owner-delegated by the same 2026-10-03 instruction. It was not independently confirmed. AC-02 is final for this sprint: list $40, quantities 50 / 100 / 150, the named-seat 7% tier at 100 seats (`volume-discount-named-seat.drl:14-16`), TCV 135,600, ACV 45,200, `exitArr` 66,960. A tier taken from the first period only would give TCV 144,000. A tier taken from the peak quantity for every period would give TCV 133,920. The period pricer must not produce either.
+
+The classpath rule writes `finalPrice` as a discounted unit price and matches `QuoteLineItemFact`. Execute does not insert that fact (`PricingExecutionService.java:218-220` inserts `Customer`, `PricingContext` and `PricingLineResult`). The flat execute path stays as it is. The 7% tier for AC-02 is applied inside the period pricer, for a ramp line only.
 
 ### D-04 — Period granularity
 
@@ -109,6 +149,14 @@ Finance sign-off is required because approval tiers and floors consume these fig
 | D-02 | **A. TCV as the sum of periods, `arr` at start, plus `exitArr` (selected)** | Each figure has one meaning and the run rates are both visible |
 | D-02 | B. `arr` at exit only | **Rejected.** Overstates recurring revenue in year 1 and hides the discount |
 | D-02 | C. ACV as first-year value | **Rejected.** Disagrees with the glossary and makes ACV depend on which period is first |
+| D-03 | **A. TCV / term-years, property `opencrm.pricing.metrics.acv-version`, default `legacy` (selected)** | Flat quotes keep today's numbers until the version is set. Ramp cannot start on the other function |
+| D-03 | B. Same formula change, triggered by `opencrm.pricing.ramp.enabled` | **Rejected.** Couples an announced floor change to turning ramp on, which D-06 forbids by default |
+| D-03 | C. Keep `(monthly × months) / 12` forever | **Rejected.** Equals the glossary only at a 144-month term. A 12-month quote reports the monthly price as ACV |
+| D-06 | **A. Interim guardrail, flag default off, margin 40.0 ignored (selected)** | Ramp can be built and tested without pretending the constant is cost |
+| D-06 | B. Block all ramp code until cost data exists | **Rejected.** The owner instructed this sprint to proceed. The flag keeps it out of general use |
+| D-07 | **A. The period's own quantity (selected)** | AC-02. A seat tier follows the seats in that year |
+| D-07 | B. Peak quantity for every period | **Rejected.** Over-discounts the early periods (TCV 133,920 instead of 135,600) |
+| D-07 | C. First period's quantity for every period | **Rejected.** Under-discounts the later periods (TCV 144,000 instead of 135,600) |
 | D-04 | **A. Whole months on anniversary dates (selected)** | Readable schedules and unambiguous boundary dates |
 | D-04 | B. Day-level periods | **Rejected.** Every boundary needs day arithmetic, leap years and time zones, with no commercial benefit |
 | D-05 | **A. Exit-period rate (selected)** | Never lowers today's price (AC-14) |
@@ -125,18 +173,21 @@ Finance sign-off is required because approval tiers and floors consume these fig
 - **Gateway stays edge-only** (ADR-009). No ramp logic is added there.
 - **Rules stay behind the port** (ADR-012). Per-period policy is evaluated by calling the port once per period, and the worst period governs. That is R2, not this ADR.
 - **Approval-routing stays the single writer** (ADR-013). The fingerprint extends the discount comparison added in #559. The quote-service BFF only forwards.
-- **Not decided here:** the ACV formula (D-03), governance before real margin exists (D-06), volume tiers on quantity ramps (D-07), the persistence schema, and how the quote PDF obtains the schedule (FR-19, carried by BC-06-03).
+- **Decided here as of 2026-10-03:** D-03, D-06 and D-07, in the same review as D-02. The persistence schema and the PR order are in the sprint doc, not repeated as a second design.
+- **Quote PDF.** The job document-generation creates from `QuoteAccepted` does not load quote data (`DocumentGenerationService` still stubs the body). The PDF a user can generate today is quote-service's own template. The schedule table is R2, on that template. The document-generation stub stays out of this sprint (BC-06-03).
+- **`QuoteAccepted` stays v1.** ADR-018 says adding fields is non-breaking. `EventContractRegistry.java:29-30` says the same, and the registry allows one contract per topic. R3 adds the ramp array and `exitArr` to the v1 payload and extends `QuoteAcceptedEventToleranceTest`. It does not register a v2.
 - **Identity follows ADR-016.** Approver identity comes from the token, and four-eyes is unchanged.
 
-## Rollout (after Acceptance and a wave plan)
+## Rollout
 
-1. Decide D-03 in the same review as D-02, and record finance sign-off.
-2. Clear the prerequisites: P-1 (populate waterfall steps), P-3 (carry per-line data in the quote-to-pricing request), P-4 (the D-03 decision) and P-5 (wire the CPQ frontend tests into the CI gate; `scripts/ci/frontend.sh` line 19 skips `cpq-*` today).
-3. R1, BC-03-09: pricing core and quote authoring behind a default-off flag. Flag-off behaviour is a typed `422 RAMP_NOT_SUPPORTED`, never silent flat pricing.
-4. R2, BC-04-07: per-period governance and approval binding. Ramp is not generally available until this ships and margin per period is real (P-2), or the D-06 guardrail is in force.
-5. R3, BC-09-04: event, consumer, rate schedule, scheduler, amendment and renewal.
-6. R4, BC-09-07: hybrid migration ramp. Its design is deferred.
-7. Enable in a non-production environment first, and reconcile TCV, ACV and exit ARR against an independent spreadsheet before any production enablement.
+D-03, D-06 and D-07 are decided. Implementation is [docs/forge/41-price-ramp-sprint.md](../forge/41-price-ramp-sprint.md). The order that matters:
+
+1. P-1 populates flat waterfall steps without changing prices or ACV. P-4 is this ADR. P-5 adds `cpq-quotes` to the `scripts/ci/frontend.sh` allowlist (line 19). That allowlist is the only copy.
+2. R1 (DRG-336, re-estimated 21) behind both default-off flags. Flag-off behaviour is 422 `RAMP_NOT_SUPPORTED`.
+3. The quote view learns optional period fields before pricing emits them. Quote's `PricingServiceClient` builds `new ObjectMapper()` (`PricingServiceClient.java:40`), which fails on unknown properties. A new response field shipped first breaks every calculate call, including flat quotes.
+4. R2 (DRG-338, 8) is the D-06 guardrail: per-period discount and step-down, fingerprint supersession extending #559. Not the constant margin.
+5. R3 (DRG-339, 13) then the rate schedule, scheduler, amendment and renewal. R4 (DRG-341, 8) is the hybrid migration ramp, specified in the sprint doc.
+6. Enable in a non-production environment first. Reconcile TCV, ACV and exit ARR against an independent spreadsheet before any production enablement. The owner sets the sample size. This ADR does not enable either switch.
 
 ## Consequences
 
@@ -149,16 +200,17 @@ Finance sign-off is required because approval tiers and floors consume these fig
   - A child table in quote-service and another in contract-asset-management, and a wider pricing request.
   - Validation is implemented twice and kept in step by shared fixtures.
   - `QuoteAccepted` grows, and the three consumers must keep tolerating unknown fields.
-  - The ACV correction changes existing values and must be announced.
+  - The ACV correction changes existing values once `term-years` is set, and it must be announced. The default does not change them.
 - **Residual:**
-  - Margin per period cannot be real until P-2 (cost data) exists. Until then the D-06 guardrail governs, and the 40.0 placeholder must not be treated as authoritative.
-  - The carried estimates (8 and 5 points) were sized on smaller stories and need re-estimating after Acceptance.
-  - Sales operations must still confirm D-07 (per-period quantity for volume tiers) before AC-02 is final.
-  - Whether the document-generation service obtains the schedule from the event or from the quote API was not traced for this ADR.
+  - Margin per period is not real until P-2. Until then D-06 governs, and `40.0` is not a margin.
+  - Story points were re-estimated on 2026-10-03: DRG-336 is 21 (was 8), DRG-339 is 13 (was 5), DRG-338 is 8, DRG-341 is 8. The old 8 and 5 were not revalidated and are withdrawn.
+  - D-07 was not confirmed by sales operations independently. It stands because the owner delegated it. A later correction is a new ADR revision, not a silent change in the pricer.
+  - document-generation's PDF job still does not read the quote. R2 renders the schedule from quote-service's own template.
 
 ## Acceptance and fitness functions
 
-- **Golden fixtures** in the existing `fixtures/pricing/execute/` and `drl/` style: AC-01 (TCV 81,000), AC-02 (TCV 135,600, once D-07 is confirmed), AC-04 (escalator expansion), plus a flat-parity run of fixtures `execute/01` to `05` that passes unchanged. If D-03 is approved, the only permitted fixture difference is ACV, committed with a reference to this ADR.
+- **Golden fixtures** in the existing `fixtures/pricing/execute/` and `drl/` style: AC-01 (TCV 81,000, ACV 27,000), AC-02 (TCV 135,600, ACV 45,200), AC-04 (escalator expansion). Fixtures `execute/01` to `05` keep today's prices and today's ACV under `acv-version=legacy`. They currently also lock `steps` to `[]` (`PricingExecuteGoldenFixtureTest`). P-1 may change `steps` and nothing else in those files. When `acv-version=term-years`, the only permitted numeric difference is ACV, in a fixture that names this ADR.
+- **Floor, both ways (D-03):** the 5,000 / 12-month case and the 10,000 / 12-month case above, each formula inserted as `QuoteFact.acv`, asserting floor 50,000 vs 100,000 and floor 50,000 vs none. Do not wire `acv` into execute in that test. Wiring the fact is R2, and the waterfall PR owns `PricingExecutionService` until it merges.
 - **Property tests:** periods are contiguous, `sum(months)` equals the term, no period is empty, and identical inputs replay to identical per-period results and fingerprint.
 - **Boundary tests (D-04):** term start 2027-01-01 gives periods ending 2027-12-31, 2028-12-31 and 2029-12-31, with the active rate on 2027-12-31 in period 1 and on 2028-01-01 in period 2. A term starting 2027-01-31 gives boundaries 2027-02-28 and 2027-03-31.
 - **Event contract:** `QuoteAcceptedEventToleranceTest` is extended with the ramp array and `exitArr`, a captured pre-change payload still parses in every consumer, and `EventContractFitnessTest` stays green.
@@ -166,11 +218,15 @@ Finance sign-off is required because approval tiers and floors consume these fig
 - **Boundary fitness (source scan in the unit gate, in the style of `EventContractFitnessTest`):** the `RampStep` DTO in `libs/common` holds no logic (ADR-011), and no service other than contract-asset-management reads the rate-period tables (ADR-008).
 - **Renewal:** AC-14 (54.00, not 46.44) is asserted against the exit rate.
 
-## Evidence (`main` at `a979892`)
+## Evidence (`main` at `03bb6a67`, re-checked 2026-10-03; originally `a979892`)
 
 - `backend/services/quote-service/src/main/java/com/opencrm/quote/lineitem/QuoteLineItem.java:27-77`: single price fields and one waterfall per line.
 - `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteService.java:77-78` (default term 12 months) and `:611-631` (`buildPricingContext`).
-- `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/MetricsCalculator.java:74-102` (flat metrics), `:94-96` (ACV) and `:120-121` (constant margin).
+- `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/MetricsCalculator.java:74-102` (flat metrics), `:93-96` (ACV) and `:120-121` (constant margin `40.0`).
+- `backend/services/pricing-service/src/main/resources/rules/acv-minimum-commitment.drl:19-22` (50k / 100k) and `volume-discount-named-seat.drl:14-19` (7% at 100 seats, applied to the unit price).
+- `backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java:40` (`new ObjectMapper()`, fails on unknown response properties).
+- `scripts/ci/frontend.sh:19` (test allowlist; `cpq-quotes` is absent). `docs/ci-contract.yaml` points at that script and does not repeat the list.
+- GitNexus query `price ramp RampStep` on the index at `04909db` (2026-09-13, 145 commits behind the indexed checkout): no ramp flow. The only ramp symbol returned was `HYBRID_MIGRATION_RAMP` in `frontend/libs/shared/models/src/lib/pricing.model.ts:56`. Impact on the symbols named in the sprint DAG is recorded there. `risk: UNKNOWN` is unresolved. No result was HIGH or CRITICAL.
 - `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/PricingExecutionService.java:198-241` (rule ordering) and `:291-309` (empty waterfall steps).
 - `backend/libs/common/src/main/java/com/opencrm/common/event/dto/QuoteAcceptedEvent.java:124-162`, and `QuoteAcceptedEventToleranceTest.java` and `EventContractFitnessTest.java` under `backend/libs/common/src/test/`.
 - `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/domain/Subscription.java:25-71`, `.../event/QuoteAcceptedEventConsumer.java:65-77` and `src/main/resources/db/migration/V1_1` to `V1_5`.
