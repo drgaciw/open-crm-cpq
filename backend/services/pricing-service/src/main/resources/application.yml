@@ -104,6 +104,10 @@ opencrm:
     enabled: true
   pricebook:
     base-url: ${PRICEBOOK_SERVICE_URL:http://localhost:8089}
+  pricing:
+    metrics:
+      # ADR-023 D-03. Default stays today's ACV formula.
+      acv-version: legacy
 
 ---
 # Development profile

@@ -8,8 +8,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.mock.env.MockEnvironment;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -157,6 +163,84 @@ class MetricsCalculatorTest {
             assertThat(metrics.getTcv()).isEqualByComparingTo("144000.00");
             assertThat(metrics.getAcv()).isEqualByComparingTo("12000.00");
             assertThat(metrics.getClv()).isEqualByComparingTo("288000.00");
+        }
+    }
+
+    @Nested
+    @DisplayName("ADR-023 D-03 ACV version")
+    class AcvVersionSelection {
+
+        @Test
+        @DisplayName("default constructor keeps today's ACV on the floor examples")
+        void legacyDefaultKeepsTodaysAcv() {
+            FinancialMetrics fiveThousand = calculator.calculate(singleLineMonthly("5000"), 12);
+            assertThat(fiveThousand.getArr()).isEqualByComparingTo("60000.00");
+            assertThat(fiveThousand.getTcv()).isEqualByComparingTo("60000.00");
+            assertThat(fiveThousand.getAcv()).isEqualByComparingTo("5000.00");
+
+            FinancialMetrics tenThousand = calculator.calculate(singleLineMonthly("10000"), 12);
+            assertThat(tenThousand.getArr()).isEqualByComparingTo("120000.00");
+            assertThat(tenThousand.getTcv()).isEqualByComparingTo("120000.00");
+            assertThat(tenThousand.getAcv()).isEqualByComparingTo("10000.00");
+        }
+
+        @Test
+        @DisplayName("term-years is TCV / (months / 12) for every quote, and leaves other metrics")
+        void termYearsDividesTcvByTermYears() {
+            MetricsCalculator termYears = new MetricsCalculator(AcvVersion.TERM_YEARS);
+
+            FinancialMetrics fiveThousand = termYears.calculate(singleLineMonthly("5000"), 12);
+            assertThat(fiveThousand.getArr()).isEqualByComparingTo("60000.00");
+            assertThat(fiveThousand.getTcv()).isEqualByComparingTo("60000.00");
+            assertThat(fiveThousand.getAcv()).isEqualByComparingTo("60000.00");
+            assertThat(fiveThousand.getClv()).isEqualByComparingTo("120000.00");
+
+            FinancialMetrics tenThousand = termYears.calculate(singleLineMonthly("10000"), 12);
+            assertThat(tenThousand.getAcv()).isEqualByComparingTo("120000.00");
+            assertThat(tenThousand.getTcv()).isEqualByComparingTo("120000.00");
+
+            FinancialMetrics twoYears = termYears.calculate(singleLineMonthly("1000.00"), 24);
+            assertThat(twoYears.getArr()).isEqualByComparingTo("12000.00");
+            assertThat(twoYears.getTcv()).isEqualByComparingTo("24000.00");
+            assertThat(twoYears.getAcv()).isEqualByComparingTo("12000.00");
+            assertThat(twoYears.getClv()).isEqualByComparingTo("48000.00");
+        }
+
+        @Test
+        @DisplayName("a missing version on the property object stays legacy")
+        void nullPropertyVersionStaysLegacy() {
+            AcvVersionProperties properties = new AcvVersionProperties();
+            properties.setAcvVersion(null);
+            FinancialMetrics metrics = new MetricsCalculator(properties).calculate(singleLineMonthly("5000"), 12);
+            assertThat(metrics.getAcv()).isEqualByComparingTo("5000.00");
+        }
+
+        @Test
+        @DisplayName("committed application.yml binds acv-version legacy and does not select term-years")
+        void committedConfigBindsLegacy() throws Exception {
+            try (InputStream in = MetricsCalculatorTest.class.getResourceAsStream("/application.yml")) {
+                assertThat(in).isNotNull();
+                String yml = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                assertThat(yml).contains("acv-version: legacy");
+                assertThat(yml).doesNotContain("term-years");
+                assertThat(yml).doesNotContain("ramp.enabled");
+            }
+
+            var sources = new YamlPropertySourceLoader()
+                    .load("pricing-application", new ClassPathResource("application.yml"));
+            var environment = new MockEnvironment();
+            environment.getPropertySources().addFirst(sources.getFirst());
+            assertThat(Binder.get(environment)
+                    .bind("opencrm.pricing.metrics.acv-version", AcvVersion.class)
+                    .orElse(null))
+                    .isEqualTo(AcvVersion.LEGACY);
+
+            var termYears = new MockEnvironment();
+            termYears.setProperty("opencrm.pricing.metrics.acv-version", "term-years");
+            assertThat(Binder.get(termYears)
+                    .bind("opencrm.pricing.metrics.acv-version", AcvVersion.class)
+                    .orElse(null))
+                    .isEqualTo(AcvVersion.TERM_YEARS);
         }
     }
 
