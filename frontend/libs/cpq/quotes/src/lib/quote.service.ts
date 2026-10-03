@@ -14,6 +14,8 @@ import {
   DocumentType,
   PaginationMeta,
   SpringPageResponse,
+  RampScheduleExpandRequest,
+  RampStep,
 } from '@frontend/shared-models';
 
 /** H1-shaped banner text: `message [CODE]` when errorCode is present. */
@@ -218,6 +220,22 @@ export class QuoteService {
   removeLineItem(quoteId: number, lineItemId: number): Observable<void> {
     return this.http.delete<void>(
       `${this.basePath}/${quoteId}/line-items/${lineItemId}`,
+    );
+  }
+
+  /**
+   * Expand an escalator into explicit steps.
+   * POST /api/v1/quotes/{quoteId}/ramp-schedule/expand
+   * Returns steps and writes nothing: quote signals stay as they are.
+   * Does not change opencrm.pricing.ramp.enabled (that flag stays off).
+   */
+  expandRampSchedule(
+    quoteId: number,
+    request: RampScheduleExpandRequest,
+  ): Observable<RampStep[]> {
+    return this.http.post<RampStep[]>(
+      `${this.basePath}/${quoteId}/ramp-schedule/expand`,
+      request,
     );
   }
 
