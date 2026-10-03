@@ -20,6 +20,10 @@ import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import com.opencrm.quote.ramp.QuoteRampStep;
+import com.opencrm.quote.ramp.RampScheduleException;
+import com.opencrm.quote.ramp.RampScheduleGuard;
+import com.opencrm.quote.ramp.RampScheduleViews;
 import com.opencrm.security.Caller;
 import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +66,7 @@ public class QuoteService {
     private final ObjectMapper objectMapper;
     private final OutboxEventPublisher outboxEventPublisher;
     private final CurrentActor currentActor;
+    private final RampScheduleGuard rampScheduleGuard;
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -109,7 +114,11 @@ public class QuoteService {
             );
         }
 
+        int previousDuration = quote.getDurationInMonths();
+        String previousCurrency = quote.getCurrency();
+        String previousRegion = quote.getRegion();
         quoteMapper.updateEntity(request, quote);
+        rampScheduleGuard.markIfContextChanged(quote, previousDuration, previousCurrency, previousRegion);
         Quote updated = quoteRepository.save(quote);
         log.info("Updated quote: {}", updated.getQuoteNumber());
 
@@ -159,6 +168,7 @@ public class QuoteService {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
         }
 
+        rampScheduleGuard.refuseIfStale(quote);
         assertConfigurationPreflight(quote.getLineItems());
 
         quote.setStatus(QuoteStatus.IN_REVIEW);
@@ -335,6 +345,8 @@ public class QuoteService {
             throw new BusinessException("Only sent quotes can be accepted", "INVALID_STATUS_TRANSITION");
         }
 
+        rampScheduleGuard.refuseIfStale(quote);
+
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
         quote.recalculateTotals();
@@ -409,6 +421,7 @@ public class QuoteService {
                 .startDate(original.getStartDate())
                 .endDate(original.getEndDate())
                 .notes(original.getNotes())
+                .rampScheduleStale(original.isRampScheduleStale())
                 .build();
 
         Quote saved = quoteRepository.save(cloned);
@@ -436,7 +449,12 @@ public class QuoteService {
                     .sortOrder(source.getSortOrder())
                     .notes(source.getNotes())
                     .metadata(source.getMetadata())
+                    .rampEscalatorStartPrice(source.getRampEscalatorStartPrice())
+                    .rampEscalatorMode(source.getRampEscalatorMode())
+                    .rampEscalatorAmount(source.getRampEscalatorAmount())
+                    .rampEscalatorEveryMonths(source.getRampEscalatorEveryMonths())
                     .build();
+            copyRampSteps(source, copy);
             clonedLines.add(copy);
         }
 
@@ -473,6 +491,9 @@ public class QuoteService {
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         if (lineItems.isEmpty()) {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
+        }
+        if (lineItems.stream().anyMatch(RampScheduleViews::hasSteps)) {
+            throw RampScheduleException.notSupported();
         }
 
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
@@ -608,6 +629,35 @@ public class QuoteService {
         return pricingData;
     }
 
+    private void copyRampSteps(QuoteLineItem source, QuoteLineItem copy) {
+        if (source.getRampSteps() == null) {
+            return;
+        }
+        if (copy.getRampSteps() == null) {
+            copy.setRampSteps(new ArrayList<>());
+        }
+        for (QuoteRampStep step : source.getRampSteps()) {
+            if (step == null || step.isDeleted()) {
+                continue;
+            }
+            QuoteRampStep cloned = QuoteRampStep.builder()
+                    .lineItem(copy)
+                    .sequence(step.getSequence())
+                    .startMonth(step.getStartMonth())
+                    .months(step.getMonths())
+                    .quantity(step.getQuantity())
+                    .priceBasis(step.getPriceBasis())
+                    .unitPrice(step.getUnitPrice())
+                    .discountFraction(step.getDiscountFraction())
+                    .build();
+            copy.getRampSteps().add(cloned);
+        }
+    }
+
+    /**
+     * Flat pricing context only. A line that has steps never reaches here:
+     * calculate fails closed with RAMP_NOT_SUPPORTED. R1-WIRE sends the schedule.
+     */
     private Map<String, Object> buildPricingContext(Quote quote, List<QuoteLineItem> lineItems) {
         List<Map<String, Object>> contextLineItems = lineItems.stream()
                 .map(item -> {

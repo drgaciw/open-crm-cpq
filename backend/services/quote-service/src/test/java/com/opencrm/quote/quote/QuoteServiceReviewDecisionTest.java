@@ -62,7 +62,8 @@ class QuoteServiceReviewDecisionTest {
     private QuoteService quoteService(boolean devMode) {
         return new QuoteService(quoteRepository, quoteMapper, quoteNumberGenerator, eventPublisher,
                 quoteLineItemRepository, pricingServiceClient, productServiceClient, new ObjectMapper(),
-                outboxEventPublisher, new CurrentActor("service:quote-service", devMode));
+                outboxEventPublisher, new CurrentActor("service:quote-service", devMode),
+                RampScheduleTestSupport.guard(quoteLineItemRepository));
     }
 
     private QuoteService quoteService() {
