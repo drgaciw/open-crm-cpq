@@ -349,7 +349,9 @@ public class QuoteService {
 
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
-        quote.recalculateTotals();
+        // Acceptance freezes the totals the customer accepted. Quote.recalculateTotals() re-derives them from
+        // unitPrice and adds a fixed 10% tax, so the published total would no longer match the priced lines in
+        // QuoteAccepted.lineItems. Like clone(), do not call it here.
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
