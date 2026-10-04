@@ -12,6 +12,7 @@
       {
         "productExternalId": "PROD-SEAT",
         "lineItemType": "SAAS_SEAT_NAMED",
+        "billingFrequency": "MONTHLY",
         "quantity": 50,
         "schedule": [
           {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 50, "priceBasis": "ABSOLUTE", "unitPrice": 40},

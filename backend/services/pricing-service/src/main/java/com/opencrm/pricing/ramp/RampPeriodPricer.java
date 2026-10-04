@@ -14,6 +14,8 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Prices one ramp line from an already resolved list price. Named-seat tiers apply
@@ -32,7 +34,19 @@ public class RampPeriodPricer {
     private static final int RATE_SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
+    /**
+     * Lines that may carry a schedule. Same sets as quote-service's write-time
+     * {@code RampScheduleValidator}; ADR-011 keeps the two checks separate and the
+     * golden fixtures keep them aligned (ADR-023, "Validation lives twice").
+     */
+    static final Set<String> ALLOWED_BILLING = Set.of(
+            "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "BIENNIAL");
+    static final Set<String> REJECTED_LINE_TYPES = Set.of("DISCOUNT", "FEE", "TAX");
+
     public List<PricedPeriod> price(PricingLineRequest line, BigDecimal listPrice, int durationInMonths, int maxPeriods) {
+        if (!lineAllowsSchedule(line.getBillingFrequency(), line.getLineItemType())) {
+            throw invalid("RAMP_NOT_ALLOWED_FOR_LINE_TYPE");
+        }
         List<RampStep> steps = line.getSchedule();
         if (steps == null || steps.isEmpty()) {
             throw invalid("RAMP_PERIOD_EMPTY");
@@ -136,22 +150,53 @@ public class RampPeriodPricer {
                 .build();
     }
 
+    /**
+     * A schedule needs a recurring billing frequency and a line type that is not a
+     * discount, fee or tax. A missing frequency is refused: one-time and perpetual
+     * lines cannot be told apart from it otherwise.
+     */
+    static boolean lineAllowsSchedule(String billingFrequency, String lineItemType) {
+        String billing = normalize(billingFrequency);
+        if (billing == null || !ALLOWED_BILLING.contains(billing)) {
+            return false;
+        }
+        String type = normalize(lineItemType);
+        return type == null || !REJECTED_LINE_TYPES.contains(type);
+    }
+
+    /**
+     * Price basis is checked before sign, as in quote-service: a wrong field set or a
+     * fraction above 1 is {@code RAMP_PRICE_BASIS}; a negative price or fraction is
+     * {@code RAMP_NEGATIVE_VALUE}.
+     */
     private static BigDecimal baseUnit(BigDecimal listPrice, RampStep step) {
         if (step.getPriceBasis() == RampPriceBasis.ABSOLUTE) {
-            if (step.getUnitPrice() == null || step.getDiscountFraction() != null || step.getUnitPrice().signum() < 0) {
+            if (step.getUnitPrice() == null || step.getDiscountFraction() != null) {
                 throw invalid("RAMP_PRICE_BASIS");
+            }
+            if (step.getUnitPrice().signum() < 0) {
+                throw invalid("RAMP_NEGATIVE_VALUE");
             }
             return step.getUnitPrice();
         }
         if (step.getPriceBasis() == RampPriceBasis.DISCOUNT_FRACTION) {
             BigDecimal fraction = step.getDiscountFraction();
-            if (fraction == null || step.getUnitPrice() != null
-                    || fraction.signum() < 0 || fraction.compareTo(BigDecimal.ONE) > 0) {
+            if (fraction == null || step.getUnitPrice() != null || fraction.compareTo(BigDecimal.ONE) > 0) {
                 throw invalid("RAMP_PRICE_BASIS");
+            }
+            if (fraction.signum() < 0) {
+                throw invalid("RAMP_NEGATIVE_VALUE");
             }
             return listPrice.multiply(BigDecimal.ONE.subtract(fraction));
         }
         throw invalid("RAMP_PRICE_BASIS");
+    }
+
+    private static String normalize(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim().toUpperCase(Locale.ROOT);
     }
 
     private static PricingWaterfallStep step(WaterfallStepType type, String description, BigDecimal amount, BigDecimal running) {

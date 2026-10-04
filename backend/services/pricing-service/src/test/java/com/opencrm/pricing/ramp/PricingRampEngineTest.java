@@ -2,6 +2,7 @@ package com.opencrm.pricing.ramp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.customer.CustomerRegion;
@@ -200,6 +201,103 @@ class PricingRampEngineTest {
         }
     }
 
+    @Test
+    @DisplayName("FR-01 discount, fee and tax lines reject a schedule before pricing")
+    void rejectsScheduleOnNonRecurringLineTypes() {
+        for (String type : List.of("DISCOUNT", "FEE", "TAX", " fee ")) {
+            PricingLineRequest line = line(10);
+            line.setLineItemType(type);
+            assertScheduleInvalid(line, "RAMP_NOT_ALLOWED_FOR_LINE_TYPE");
+        }
+    }
+
+    @Test
+    @DisplayName("FR-01 a schedule needs a recurring billing frequency; missing, one-time and perpetual are refused")
+    void rejectsScheduleWithoutRecurringBilling() {
+        for (String billing : java.util.Arrays.asList(null, "", "ONE_TIME", "PERPETUAL")) {
+            PricingLineRequest line = line(10);
+            line.setBillingFrequency(billing);
+            assertScheduleInvalid(line, "RAMP_NOT_ALLOWED_FOR_LINE_TYPE");
+        }
+        for (String billing : List.of("MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL", "BIENNIAL", "annual")) {
+            PricingLineRequest line = line(10);
+            line.setBillingFrequency(billing);
+            assertThat(new RampPeriodPricer().price(line, new BigDecimal("100.00"), 12, 36)).hasSize(1);
+        }
+    }
+
+    @Test
+    @DisplayName("FR-02 execute refuses a fee line's schedule with 422 RAMP_SCHEDULE_INVALID")
+    void executeRejectsScheduleOnFeeLine() throws Exception {
+        JsonNode root = fixture("ac-01-absolute-three-year.json");
+        stub(root);
+        ObjectNode requestNode = (ObjectNode) root.get("request").deepCopy();
+        ((ObjectNode) requestNode.get("lineItems").get(0)).put("lineItemType", "FEE");
+        PricingContext request = MAPPER.treeToValue(requestNode, PricingContext.class);
+
+        assertThatThrownBy(() -> executionService.execute(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("RAMP_NOT_ALLOWED_FOR_LINE_TYPE")
+                .satisfies(thrown -> {
+                    BusinessException exception = (BusinessException) thrown;
+                    assertThat(exception.getErrorCode()).isEqualTo("RAMP_SCHEDULE_INVALID");
+                    assertThat(exception.getStatus().value()).isEqualTo(422);
+                });
+    }
+
+    @Test
+    @DisplayName("FR-02 a negative price or fraction is RAMP_NEGATIVE_VALUE; a malformed basis is RAMP_PRICE_BASIS")
+    void negativeValuesAndMalformedBasisHaveDistinctReasons() {
+        assertScheduleInvalid(lineWith(absolute(new BigDecimal("-1.00"))), "RAMP_NEGATIVE_VALUE");
+        assertScheduleInvalid(lineWith(fraction(new BigDecimal("-0.10"))), "RAMP_NEGATIVE_VALUE");
+
+        assertScheduleInvalid(lineWith(absolute(null)), "RAMP_PRICE_BASIS");
+        RampStep both = absolute(new BigDecimal("40.00"));
+        both.setDiscountFraction(new BigDecimal("0.10"));
+        assertScheduleInvalid(lineWith(both), "RAMP_PRICE_BASIS");
+        assertScheduleInvalid(lineWith(fraction(new BigDecimal("1.50"))), "RAMP_PRICE_BASIS");
+        assertScheduleInvalid(lineWith(fraction(null)), "RAMP_PRICE_BASIS");
+    }
+
+    private static void assertScheduleInvalid(PricingLineRequest line, String reason) {
+        assertThatThrownBy(() -> new RampPeriodPricer().price(line, new BigDecimal("100.00"), 12, 36))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(reason)
+                .satisfies(thrown -> {
+                    BusinessException exception = (BusinessException) thrown;
+                    assertThat(exception.getErrorCode()).isEqualTo("RAMP_SCHEDULE_INVALID");
+                    assertThat(exception.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                });
+    }
+
+    private static PricingLineRequest lineWith(RampStep step) {
+        PricingLineRequest line = line(10);
+        line.setSchedule(List.of(step));
+        return line;
+    }
+
+    private static RampStep absolute(BigDecimal unitPrice) {
+        return RampStep.builder()
+                .sequence(1)
+                .startMonth(1)
+                .months(12)
+                .quantity(10)
+                .priceBasis(RampPriceBasis.ABSOLUTE)
+                .unitPrice(unitPrice)
+                .build();
+    }
+
+    private static RampStep fraction(BigDecimal discountFraction) {
+        return RampStep.builder()
+                .sequence(1)
+                .startMonth(1)
+                .months(12)
+                .quantity(10)
+                .priceBasis(RampPriceBasis.DISCOUNT_FRACTION)
+                .discountFraction(discountFraction)
+                .build();
+    }
+
     private static AcvVersionProperties termYears() {
         AcvVersionProperties properties = new AcvVersionProperties();
         properties.setAcvVersion(AcvVersion.TERM_YEARS);
@@ -209,6 +307,7 @@ class PricingRampEngineTest {
     private static PricingLineRequest line(int quantity) {
         return PricingLineRequest.builder()
                 .lineItemType("SAAS_SEAT_NAMED")
+                .billingFrequency("MONTHLY")
                 .quantity(quantity)
                 .schedule(List.of(RampStep.builder()
                         .sequence(1)
