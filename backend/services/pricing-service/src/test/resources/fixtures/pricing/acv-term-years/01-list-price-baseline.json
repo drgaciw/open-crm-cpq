@@ -54,7 +54,32 @@
       "basePrice": 100.00,
       "netPrice": 500.00,
       "approvalState": "APPROVED",
-      "steps": []
+      "steps": [
+        {
+          "stepType": "LIST_PRICE",
+          "description": "Sum of line list prices",
+          "amount": 100.00,
+          "runningTotal": 100.00,
+          "ruleId": null,
+          "ruleName": null
+        },
+        {
+          "stepType": "BASE_PRICE",
+          "description": "Base price",
+          "amount": 100.00,
+          "runningTotal": 100.00,
+          "ruleId": null,
+          "ruleName": null
+        },
+        {
+          "stepType": "NET_PRICE",
+          "description": "Sum of line final prices",
+          "amount": 500.00,
+          "runningTotal": 500.00,
+          "ruleId": null,
+          "ruleName": null
+        }
+      ]
     },
     "financialMetrics": {
       "arr": 6000.00,
