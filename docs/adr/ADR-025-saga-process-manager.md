@@ -43,7 +43,7 @@ Both processes are orchestrated by a process manager that owns the sequence, dea
 
 - **Per-line fulfillment.** One parked line never stops the others, and the order header is derived from its lines ([ADR-024](ADR-024-order-orchestration-context.md) D-05).
 
-- **Billing starts per line.** Quote-to-Revenue reacts to each line's `DeliveryRecorded` by sending that line's `CreateBillingSchedule` and `IdentifyObligations` commands. A line delivered on day 3 starts billing on day 3, not when the last line lands.
+- **Billing starts per line.** Quote-to-Revenue reacts to each line's `DeliveryRecorded` by sending that line's `CreateBillingSchedule` command and, after its reply, the line's `IdentifyObligations` command. They are sequential because D-03 allows one command in flight per line. A line delivered on day 3 starts billing on day 3, not when the last line lands.
 - **Placement.** Both run in order-service, in separate tables. The backlog classes the Quote-to-Revenue saga as Core while BC-08 is Supporting. Hosting a Core process in a Supporting service is a deployment convenience that avoids a thirteenth service. ADR-024 option B rejected a different thing: putting every provider integration into the subscription context. Moving Quote-to-Revenue out later only means moving its tables and its consumer group.
 
 ### D-03 — Persisted state machine on PostgreSQL
