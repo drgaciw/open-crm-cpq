@@ -100,6 +100,83 @@ export const LINE_ITEM_TYPE_LABELS: Record<LineItemType, string> = {
 };
 
 /**
+ * Mirrors RampPriceBasis. Exactly one of unitPrice / discountFraction is set on a step.
+ * The type does not enforce that (ADR-011: validation stays in the service and the editor).
+ */
+export const RAMP_PRICE_BASES = ['ABSOLUTE', 'DISCOUNT_FRACTION'] as const;
+export type RampPriceBasis = (typeof RAMP_PRICE_BASES)[number];
+
+export const RAMP_PRICE_BASIS_LABELS: Record<RampPriceBasis, string> = {
+  ABSOLUTE: 'Absolute unit price',
+  DISCOUNT_FRACTION: 'Discount fraction off list',
+};
+
+/** Mirrors RampEscalator.mode. PERCENT amount is percent points (5 means 5%). */
+export const RAMP_ESCALATOR_MODES = ['PERCENT', 'AMOUNT'] as const;
+export type RampEscalatorMode = (typeof RAMP_ESCALATOR_MODES)[number];
+
+export const RAMP_ESCALATOR_MODE_LABELS: Record<RampEscalatorMode, string> = {
+  PERCENT: 'Percent points',
+  AMOUNT: 'Amount',
+};
+
+/**
+ * One explicit ramp period. Field names match quote-service RampStep / libs/common RampStep.
+ * quantity is a whole number. priceBasis selects which price field is meaningful.
+ * discountFraction is a fraction of list (0.05 means 5% off), not escalator percent points.
+ */
+export interface RampStep {
+  sequence: number;
+  startMonth: number;
+  months: number;
+  quantity: number;
+  priceBasis: RampPriceBasis;
+  unitPrice?: number;
+  discountFraction?: number;
+}
+
+/**
+ * Authoring generator only. Expansion is POST .../ramp-schedule/expand.
+ * The server stores the expanded steps; these inputs are display-only.
+ * PERCENT amount is percent points (5 means 5%). AMOUNT is a currency delta.
+ */
+export interface RampEscalator {
+  startPrice: number;
+  mode: RampEscalatorMode;
+  amount: number;
+  everyMonths: number;
+}
+
+/** Line write body: steps, plus the escalator when the user generated or kept one. */
+export interface RampSchedule {
+  steps: RampStep[];
+  escalator?: RampEscalator;
+}
+
+/**
+ * POST /api/v1/quotes/{quoteId}/ramp-schedule/expand
+ * Does not persist. durationInMonths is the quote term.
+ */
+export interface RampScheduleExpandRequest {
+  durationInMonths: number;
+  escalator: RampEscalator;
+}
+
+/**
+ * Per-period price result. Present on the line only when the quote payload includes it.
+ * netUnitPrice / netMonthly / periodAmount are the preview columns.
+ */
+export interface RampPricedPeriod {
+  sequence: number;
+  startMonth?: number;
+  months: number;
+  quantity: number;
+  netUnitPrice?: number;
+  netMonthly?: number;
+  periodAmount?: number;
+}
+
+/**
  * Mirrors: com.opencrm.quote.lineitem.QuoteLineItemDto
  * Nested under QuoteDto.lineItems; also returned by line-item endpoints.
  *
@@ -124,6 +201,10 @@ export interface QuoteLineItemDto {
   sortOrder: number;
   pricingExplanationCode?: string;
   notes?: string;
+  /** Absent means the line has no schedule and prices as one implicit period. */
+  schedule?: RampSchedule;
+  /** Filled when calculate returns period results. Preview-only. */
+  pricedPeriods?: RampPricedPeriod[];
   createdAt: string;
   updatedAt: string;
   version?: number;
@@ -144,6 +225,8 @@ export interface LineItemCreateRequest {
   billingFrequency?: string;
   sortOrder?: number;
   notes?: string;
+  /** Optional. Absent leaves the line without a schedule. */
+  schedule?: RampSchedule;
 }
 
 /**
@@ -173,6 +256,8 @@ export interface QuoteDto {
   arr?: number;
   tcv?: number;
   acv?: number;
+  /** Final-period run rate × 12. Present only when the quote payload includes it. */
+  exitArr?: number;
   approvalState?: QuoteApprovalState;
   approvalTier?: string;
   notes?: string;

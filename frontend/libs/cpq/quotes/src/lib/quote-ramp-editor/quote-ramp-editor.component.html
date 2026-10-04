@@ -1,0 +1,306 @@
+<mat-card class="ramp-card" data-testid="ramp-editor">
+  <mat-card-header>
+    <mat-card-title>Price ramp</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <p class="hint">
+      Periods are whole months. An escalator only fills the rows; Save schedule stores them.
+    </p>
+
+    @if (error(); as err) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ err }}</span>
+        <button mat-button type="button" (click)="clearError()">Dismiss</button>
+      </div>
+    }
+
+    @if (lines().length === 0) {
+      <p class="line-note">Add a line item before authoring a ramp.</p>
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Line</mat-label>
+        <mat-select
+          data-testid="ramp-line"
+          [value]="selectedLineId()"
+          (selectionChange)="onLineChange($event.value)"
+        >
+          @for (line of lines(); track line.id) {
+            <mat-option [value]="line.id">
+              {{ line.productExternalId }} — {{ line.productName || 'Line ' + line.id }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (lineTypeNote(); as note) {
+        <p class="line-note" role="status">{{ note }}</p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="onSave()">
+        <div formArrayName="steps">
+          @for (group of stepControls(); track $index) {
+            <div class="period-row" [formGroupName]="$index">
+              <mat-form-field appearance="outline">
+                <mat-label>Start month</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  formControlName="startMonth"
+                  [attr.data-testid]="'period-start-' + $index"
+                  [readonly]="!editable()"
+                />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Months</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  formControlName="months"
+                  [attr.data-testid]="'period-months-' + $index"
+                  [readonly]="!editable()"
+                />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Quantity</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  step="1"
+                  formControlName="quantity"
+                  [attr.data-testid]="'period-quantity-' + $index"
+                  [readonly]="!editable()"
+                />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Price basis</mat-label>
+                <mat-select formControlName="priceBasis">
+                  @for (basis of priceBases; track basis) {
+                    <mat-option [value]="basis">{{ priceBasisLabels[basis] }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              @if (group.controls.priceBasis.value === 'ABSOLUTE') {
+                <mat-form-field appearance="outline">
+                  <mat-label>Unit price</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    step="0.0001"
+                    formControlName="unitPrice"
+                    [attr.data-testid]="'period-unit-' + $index"
+                    [readonly]="!editable()"
+                  />
+                </mat-form-field>
+              } @else {
+                <mat-form-field appearance="outline">
+                  <mat-label>Discount fraction</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    step="0.0001"
+                    formControlName="discountFraction"
+                    [attr.data-testid]="'period-discount-' + $index"
+                    [readonly]="!editable()"
+                  />
+                  <mat-hint>0.05 means 5% off list</mat-hint>
+                </mat-form-field>
+              }
+              @if (editable()) {
+                <div class="row-actions">
+                  <button
+                    mat-button
+                    color="warn"
+                    type="button"
+                    data-testid="remove-period"
+                    (click)="removePeriod($index)"
+                    [disabled]="saving()"
+                  >
+                    Remove
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        @if (editable()) {
+          <div class="ramp-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="add-period"
+              (click)="addPeriod()"
+              [disabled]="saving() || !lineAllowed() || stepControls().length >= maxPeriods"
+            >
+              <mat-icon>add</mat-icon>
+              Add period
+            </button>
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              data-testid="save-schedule"
+              [disabled]="!canSave()"
+            >
+              @if (saving()) {
+                <mat-spinner diameter="20" />
+              } @else {
+                <span>Save schedule</span>
+              }
+            </button>
+          </div>
+        }
+
+        @if (issues().length > 0) {
+          <ul class="issue-list" role="alert" data-testid="ramp-issues">
+            @for (issue of issues(); track $index) {
+              <li>{{ issue.message }}</li>
+            }
+          </ul>
+        }
+        <h3>Escalator</h3>
+        <p class="hint" id="escalator-hint">
+          Percent mode is percent points (5 means 5%). Amount mode adds that currency value.
+          This is not the step discount fraction. Generate does not save the quote.
+        </p>
+        <div class="escalator-row" formGroupName="escalator">
+          <mat-form-field appearance="outline">
+            <mat-label>Start price</mat-label>
+            <input
+              matInput
+              type="number"
+              step="0.0001"
+              formControlName="startPrice"
+              data-testid="escalator-start"
+              [readonly]="!editable()"
+              aria-describedby="escalator-hint"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Mode</mat-label>
+            <mat-select formControlName="mode" data-testid="escalator-mode">
+              @for (mode of escalatorModes; track mode) {
+                <mat-option [value]="mode">{{ escalatorModeLabels[mode] }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Amount</mat-label>
+            <input
+              matInput
+              type="number"
+              step="0.0001"
+              formControlName="amount"
+              data-testid="escalator-amount"
+              [readonly]="!editable()"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Every months</mat-label>
+            <input
+              matInput
+              type="number"
+              min="1"
+              step="1"
+              formControlName="everyMonths"
+              data-testid="escalator-every"
+              [readonly]="!editable()"
+            />
+          </mat-form-field>
+          @if (editable()) {
+            <div class="escalator-actions">
+              <button
+                mat-stroked-button
+                type="button"
+                data-testid="expand-escalator"
+                (click)="onExpand()"
+                [disabled]="!canExpand()"
+              >
+                @if (expanding()) {
+                  <mat-spinner diameter="20" />
+                } @else {
+                  <span>Generate periods</span>
+                }
+              </button>
+            </div>
+          }
+        </div>
+      </form>
+
+      <h3>Preview</h3>
+      <div class="preview-wrap">
+        <table>
+          <caption class="sr-only">Ramp period preview</caption>
+          <thead>
+            <tr>
+              <th scope="col">Period</th>
+              <th scope="col">Months</th>
+              <th scope="col">Quantity</th>
+              <th scope="col">Net unit</th>
+              <th scope="col">Monthly</th>
+              <th scope="col">Period total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of previewRows(); track row.sequence) {
+              <tr>
+                <td [attr.data-testid]="'preview-period-' + row.sequence">{{ row.sequence }}</td>
+                <td [attr.data-testid]="'preview-months-' + row.sequence">{{ row.months }}</td>
+                <td [attr.data-testid]="'preview-quantity-' + row.sequence">{{ row.quantity }}</td>
+                <td [attr.data-testid]="'preview-net-' + row.sequence">
+                  @if (row.netUnitPrice != null) {
+                    {{ row.netUnitPrice | currencyFormat: currency() }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td [attr.data-testid]="'preview-monthly-' + row.sequence">
+                  @if (row.netMonthly != null) {
+                    {{ row.netMonthly | currencyFormat: currency() }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td [attr.data-testid]="'preview-total-' + row.sequence">
+                  @if (row.periodAmount != null) {
+                    {{ row.periodAmount | currencyFormat: currency() }}
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6">No periods yet.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="metrics" data-testid="ramp-metrics">
+        @if (tcv() != null) {
+          <div class="metric">
+            <span class="label">TCV</span>
+            <span data-testid="metric-tcv">{{ tcv() | currencyFormat: currency() }}</span>
+          </div>
+        }
+        @if (acv() != null) {
+          <div class="metric">
+            <span class="label">ACV</span>
+            <span data-testid="metric-acv">{{ acv() | currencyFormat: currency() }}</span>
+          </div>
+        }
+        @if (exitArr() != null) {
+          <div class="metric">
+            <span class="label">Exit ARR</span>
+            <span data-testid="metric-exit-arr">{{ exitArr() | currencyFormat: currency() }}</span>
+          </div>
+        }
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

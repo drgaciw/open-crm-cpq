@@ -39,6 +39,7 @@ import {
 import { QuoteService } from '../quote.service';
 import { QuoteDocumentsPanelComponent } from '../quote-documents-panel/quote-documents-panel.component';
 import { QuoteHeaderEditComponent } from '../quote-header-edit/quote-header-edit.component';
+import { QuoteRampEditorComponent } from '../quote-ramp-editor/quote-ramp-editor.component';
 
 function httpErrorMessage(err: unknown): string {
   const e = err as {
@@ -73,6 +74,7 @@ function httpErrorMessage(err: unknown): string {
     CurrencyFormatPipe,
     QuoteDocumentsPanelComponent,
     QuoteHeaderEditComponent,
+    QuoteRampEditorComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -470,6 +472,17 @@ function httpErrorMessage(err: unknown): string {
             }
           </mat-card-content>
         </mat-card>
+
+        <cpq-quote-ramp-editor
+          [quoteId]="numericId()"
+          [lines]="lineItems()"
+          [durationInMonths]="quote.durationInMonths"
+          [currency]="quote.currency || 'USD'"
+          [editable]="canEditLines()"
+          [tcv]="quote.tcv ?? null"
+          [acv]="quote.acv ?? null"
+          [exitArr]="quote.exitArr ?? null"
+        />
 
         @if (canEditLines()) {
           <mat-card class="line-item-card">
@@ -1126,6 +1139,9 @@ export class QuotesDetailComponent {
     const productName = raw.productName.trim();
     if (productName) {
       request.productName = productName;
+    }
+    if (line.schedule) {
+      request.schedule = line.schedule;
     }
     this.actionBusy.set(true);
     this.actionError.set(null);
