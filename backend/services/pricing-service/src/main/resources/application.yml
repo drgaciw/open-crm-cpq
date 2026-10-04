@@ -108,6 +108,10 @@ opencrm:
     metrics:
       # ADR-023 D-03. Default stays today's ACV formula.
       acv-version: legacy
+    ramp:
+      # ADR-023 D-06. Stays off in committed config.
+      enabled: false
+      max-periods: 36
 
 ---
 # Development profile
