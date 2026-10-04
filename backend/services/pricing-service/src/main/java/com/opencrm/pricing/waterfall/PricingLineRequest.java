@@ -1,11 +1,14 @@
 package com.opencrm.pricing.waterfall;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opencrm.common.pricing.RampStep;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,4 +25,8 @@ public class PricingLineRequest {
     private Integer quantity;
     private BigDecimal listPriceOverride;
     private Map<String, Object> metadata;
+
+    /** Explicit ramp periods. Absent on a flat line. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<RampStep> schedule;
 }

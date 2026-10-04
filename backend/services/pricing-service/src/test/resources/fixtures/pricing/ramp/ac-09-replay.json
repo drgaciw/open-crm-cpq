@@ -1,0 +1,33 @@
+{
+  "id": "ac-09",
+  "description": "Same schedule, price book and context replay to the same period results.",
+  "request": {
+    "customerExternalId": "CUST-RAMP-09",
+    "quoteExternalId": "Q-RAMP-09",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 36,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-SEAT",
+        "lineItemType": "SAAS_SEAT_NAMED",
+        "quantity": 50,
+        "schedule": [
+          {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 50, "priceBasis": "ABSOLUTE", "unitPrice": 40},
+          {"sequence": 2, "startMonth": 13, "months": 12, "quantity": 50, "priceBasis": "ABSOLUTE", "unitPrice": 45},
+          {"sequence": 3, "startMonth": 25, "months": 12, "quantity": 50, "priceBasis": "ABSOLUTE", "unitPrice": 50}
+        ]
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {"externalId": "CUST-RAMP-09", "name": "Ramp Nine", "region": "NA", "churnScore": 10},
+    "priceBookEntries": {"PROD-SEAT": {"entryMatched": true, "listPrice": 50.00, "currency": "USD"}}
+  },
+  "expected": {
+    "periodAmounts": [24000.00, 27000.00, 30000.00],
+    "tcv": 81000.00,
+    "exitArr": 30000.00
+  }
+}
