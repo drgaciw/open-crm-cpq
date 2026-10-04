@@ -289,8 +289,6 @@ public class PricingExecutionService {
     }
 
     private PricingWaterfall buildWaterfall(List<PricingLineResult> lineResults) {
-        List<PricingWaterfallStep> steps = new ArrayList<>();
-
         BigDecimal totalListPrice = lineResults.stream()
                 .map(PricingLineResult::getListPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -298,6 +296,26 @@ public class PricingExecutionService {
         BigDecimal totalFinalPrice = lineResults.stream()
                 .map(PricingLineResult::getFinalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<PricingWaterfallStep> steps = new ArrayList<>();
+        steps.add(PricingWaterfallStep.builder()
+                .stepType(WaterfallStepType.LIST_PRICE)
+                .description("Sum of line list prices")
+                .amount(totalListPrice)
+                .runningTotal(totalListPrice)
+                .build());
+        steps.add(PricingWaterfallStep.builder()
+                .stepType(WaterfallStepType.BASE_PRICE)
+                .description("Base price")
+                .amount(totalListPrice)
+                .runningTotal(totalListPrice)
+                .build());
+        steps.add(PricingWaterfallStep.builder()
+                .stepType(WaterfallStepType.NET_PRICE)
+                .description("Sum of line final prices")
+                .amount(totalFinalPrice)
+                .runningTotal(totalFinalPrice)
+                .build());
 
         return PricingWaterfall.builder()
                 .listPrice(totalListPrice)
