@@ -6,7 +6,10 @@ import org.mapstruct.*;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+        componentModel = "spring",
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        imports = com.opencrm.quote.ramp.RampScheduleViews.class)
 public interface QuoteMapper {
 
     @Mapping(target = "id", ignore = true)
@@ -21,6 +24,8 @@ public interface QuoteMapper {
     @Mapping(target = "arr", ignore = true)
     @Mapping(target = "tcv", ignore = true)
     @Mapping(target = "acv", ignore = true)
+    @Mapping(target = "exitArr", ignore = true)
+    @Mapping(target = "rampScheduleStale", ignore = true)
     @Mapping(target = "approvalTier", ignore = true)
     @Mapping(target = "acceptedAt", ignore = true)
     @Mapping(target = "pricingWaterfallJson", ignore = true)
@@ -37,6 +42,7 @@ public interface QuoteMapper {
     @Mapping(target = "lineItems", source = "lineItems")
     QuoteDto toDto(Quote quote);
 
+    @Mapping(target = "schedule", expression = "java(RampScheduleViews.toDto(lineItem))")
     QuoteLineItemDto toLineItemDto(QuoteLineItem lineItem);
 
     @Mapping(target = "id", ignore = true)
@@ -55,6 +61,8 @@ public interface QuoteMapper {
     @Mapping(target = "arr", ignore = true)
     @Mapping(target = "tcv", ignore = true)
     @Mapping(target = "acv", ignore = true)
+    @Mapping(target = "exitArr", ignore = true)
+    @Mapping(target = "rampScheduleStale", ignore = true)
     @Mapping(target = "pricingWaterfallJson", ignore = true)
     @Mapping(target = "metadata", ignore = true)
     @Mapping(target = "lineItems", ignore = true)

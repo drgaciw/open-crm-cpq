@@ -2,11 +2,15 @@ package com.opencrm.quote.lineitem;
 
 import com.opencrm.common.entity.BaseEntity;
 import com.opencrm.quote.quote.Quote;
+import com.opencrm.quote.ramp.QuoteRampStep;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "quote_line_items", indexes = {
@@ -81,4 +85,23 @@ public class QuoteLineItem extends BaseEntity {
 
     @Column(name = "metadata", columnDefinition = "TEXT")
     private String metadata;
+
+    /** Display-only escalator inputs. Priced rows live in {@link #rampSteps}. */
+    @Column(name = "ramp_escalator_start_price", precision = 19, scale = 4)
+    private BigDecimal rampEscalatorStartPrice;
+
+    @Column(name = "ramp_escalator_mode", length = 20)
+    private String rampEscalatorMode;
+
+    @Column(name = "ramp_escalator_amount", precision = 19, scale = 4)
+    private BigDecimal rampEscalatorAmount;
+
+    @Column(name = "ramp_escalator_every_months")
+    private Integer rampEscalatorEveryMonths;
+
+    @OneToMany(mappedBy = "lineItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sequence ASC")
+    @SQLRestriction("is_deleted = false")
+    @Builder.Default
+    private List<QuoteRampStep> rampSteps = new ArrayList<>();
 }

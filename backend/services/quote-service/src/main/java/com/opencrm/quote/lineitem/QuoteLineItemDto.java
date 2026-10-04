@@ -1,6 +1,7 @@
 package com.opencrm.quote.lineitem;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opencrm.quote.ramp.RampScheduleDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,6 +35,7 @@ public class QuoteLineItemDto {
     private int sortOrder;
     private String pricingExplanationCode;
     private String notes;
+    private RampScheduleDto schedule;
     private Instant createdAt;
     private Instant updatedAt;
     private Long version;

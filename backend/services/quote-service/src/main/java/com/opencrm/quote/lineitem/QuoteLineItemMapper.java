@@ -4,7 +4,10 @@ import org.mapstruct.*;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(
+        componentModel = "spring",
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        imports = com.opencrm.quote.ramp.RampScheduleViews.class)
 public interface QuoteLineItemMapper {
 
     @Mapping(target = "id", ignore = true)
@@ -18,6 +21,11 @@ public interface QuoteLineItemMapper {
     @Mapping(target = "pricingExplanationCode", ignore = true)
     @Mapping(target = "pricingWaterfallJson", ignore = true)
     @Mapping(target = "metadata", ignore = true)
+    @Mapping(target = "rampSteps", ignore = true)
+    @Mapping(target = "rampEscalatorStartPrice", ignore = true)
+    @Mapping(target = "rampEscalatorMode", ignore = true)
+    @Mapping(target = "rampEscalatorAmount", ignore = true)
+    @Mapping(target = "rampEscalatorEveryMonths", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
@@ -26,6 +34,7 @@ public interface QuoteLineItemMapper {
     @Mapping(target = "deleted", ignore = true)
     QuoteLineItem toEntity(LineItemCreateRequest request);
 
+    @Mapping(target = "schedule", expression = "java(RampScheduleViews.toDto(lineItem))")
     QuoteLineItemDto toDto(QuoteLineItem lineItem);
 
     @Mapping(target = "id", ignore = true)
@@ -40,6 +49,11 @@ public interface QuoteLineItemMapper {
     @Mapping(target = "pricingExplanationCode", ignore = true)
     @Mapping(target = "pricingWaterfallJson", ignore = true)
     @Mapping(target = "metadata", ignore = true)
+    @Mapping(target = "rampSteps", ignore = true)
+    @Mapping(target = "rampEscalatorStartPrice", ignore = true)
+    @Mapping(target = "rampEscalatorMode", ignore = true)
+    @Mapping(target = "rampEscalatorAmount", ignore = true)
+    @Mapping(target = "rampEscalatorEveryMonths", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)

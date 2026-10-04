@@ -108,6 +108,10 @@ opencrm:
       enabled: ${JEV_QUOTE_TIER_SUGGESTION_ENABLED:false}
       rubric-version: quote-tier-v1
       min-confidence: 0.6
+  pricing:
+    ramp:
+      enabled: false
+      max-periods: 36
 
 ---
 # Local and CI only: the well-known development database password. The default profile has no secret
