@@ -29,4 +29,11 @@ public class PricingLineRequest {
     /** Explicit ramp periods. Absent on a flat line. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<RampStep> schedule;
+
+    /**
+     * The line's billing frequency. Only read when {@link #schedule} is present: a schedule
+     * needs a recurring frequency (ADR-023 D-01, REQ FR-01/FR-02). Absent on today's flat calls.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String billingFrequency;
 }
