@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,6 +23,13 @@ import java.util.Map;
  * <p>ADR-018 D8 added {@link DealSnapshot} and the ARR/TCV/ACV totals on {@link PricingSnapshot} so crm-service can
  * move off the Redis {@code quote:accepted} channel. Additive and {@code NON_NULL}: consumers that do not know them
  * ignore them.
+ *
+ * <p>{@link #lineItems} carries the accepted lines, in the quote's order, so downstream contexts (order decomposition,
+ * the subscription rate schedule of ADR-023) read what was sold from the event instead of calling quote-service. It is
+ * additive on version 1, and its field names match {@link QuoteAcceptedCrmMessage.LineItemSnapshot}. A payload written
+ * before the field existed has no {@code lineItems} at all. The relay has never run, so its first run will publish
+ * outbox rows written before this change, and they carry none. Consumers must read {@code null} as "not provided",
+ * never as "no lines".
  */
 @Data
 @NoArgsConstructor
@@ -49,6 +57,7 @@ public class QuoteAcceptedEvent {
     private TermSnapshot terms;
     private CorrelationSnapshot correlation;
     private DealSnapshot deal;
+    private List<LineItemSnapshot> lineItems;
 
     public QuoteAcceptedEvent(
             String quoteId,
@@ -171,5 +180,34 @@ public class QuoteAcceptedEvent {
         private String correlationId;
         private String causationId;
         private String sourceService;
+    }
+
+    /**
+     * One accepted quote line. {@code lineUuid} is the quote line's UUID and is stable across redelivery.
+     * {@code unitPrice} is the priced unit price, {@code extendedAmount} is the line total after discount, and
+     * {@code netPrice} is that total divided by the quantity. List order is the quote's order; {@code sortOrder} can
+     * repeat.
+     */
+    @Data
+    @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LineItemSnapshot {
+        private String lineUuid;
+        private String productExternalId;
+        private String productName;
+        private String productType;
+        private String lineItemType;
+        private Integer quantity;
+        private String unitOfMeasure;
+        private BigDecimal listPrice;
+        private BigDecimal unitPrice;
+        private BigDecimal discountRate;
+        private BigDecimal discountAmount;
+        private BigDecimal netPrice;
+        private BigDecimal extendedAmount;
+        private String billingFrequency;
+        private Integer sortOrder;
     }
 }
