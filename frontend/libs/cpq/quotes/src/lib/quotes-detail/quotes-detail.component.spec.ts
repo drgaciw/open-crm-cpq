@@ -197,6 +197,7 @@ describe('QuotesDetailComponent', () => {
       addLineItem: addLineItemSpy,
       updateLineItem: updateLineItemSpy,
       removeLineItem: removeLineItemSpy,
+      expandRampSchedule: vi.fn(() => of([])),
     };
 
     await TestBed.configureTestingModule({
@@ -401,6 +402,44 @@ describe('QuotesDetailComponent', () => {
       productExternalId: 'prod-y',
       listPrice: 50,
       quantity: 1,
+    });
+  });
+
+  it('embeds the ramp editor and does not show a governing-period banner', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('cpq-quote-ramp-editor')).toBeTruthy();
+    expect(compiled.textContent).not.toContain('Governing period');
+    expect(compiled.textContent).not.toContain('governing period');
+  });
+
+  it('keeps an existing ramp schedule when a line is edited', () => {
+    const line = selectedQuote()!.lineItems![0];
+    line.schedule = {
+      steps: [
+        {
+          sequence: 1,
+          startMonth: 1,
+          months: 12,
+          quantity: 1,
+          priceBasis: 'ABSOLUTE',
+          unitPrice: 40,
+        },
+      ],
+    };
+    component.startLineEdit(line);
+    component.editForm.setValue({
+      productName: 'Updated name',
+      listPrice: 250,
+      quantity: 3,
+    });
+    component.onSaveLineEdit(line);
+
+    expect(updateLineItemSpy).toHaveBeenCalledWith(1, line.id, {
+      productExternalId: line.productExternalId,
+      productName: 'Updated name',
+      listPrice: 250,
+      quantity: 3,
+      schedule: line.schedule,
     });
   });
 

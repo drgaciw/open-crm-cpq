@@ -312,4 +312,92 @@ describe('QuoteService', () => {
     removeReq.flush(null);
     await expect(remove).resolves.toBeNull();
   });
+
+  it('updateLineItem sends schedule steps and escalator on the line write', async () => {
+    const schedule = {
+      steps: [
+        {
+          sequence: 1,
+          startMonth: 1,
+          months: 12,
+          quantity: 50,
+          priceBasis: 'ABSOLUTE' as const,
+          unitPrice: 40,
+        },
+      ],
+      escalator: {
+        startPrice: 40,
+        mode: 'PERCENT' as const,
+        amount: 5,
+        everyMonths: 12,
+      },
+    };
+    const update = firstValueFrom(
+      service.updateLineItem(7, 2, {
+        productExternalId: 'prod-2',
+        listPrice: 40,
+        schedule,
+      }),
+    );
+    const req = httpMock.expectOne('/api/v1/quotes/7/line-items/2');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({
+      productExternalId: 'prod-2',
+      listPrice: 40,
+      schedule,
+    });
+    req.flush(lineItem({ id: 2, productExternalId: 'prod-2', listPrice: 40 }));
+    await expect(update).resolves.toMatchObject({ id: 2 });
+  });
+
+  it('expandRampSchedule POSTs the escalator and does not change quote signals', async () => {
+    const beforeQuotes = service.quotes();
+    const beforeSelected = service.selectedQuote();
+    const beforeLines = service.lineItems();
+    const body = {
+      durationInMonths: 36,
+      escalator: {
+        startPrice: 40,
+        mode: 'PERCENT' as const,
+        amount: 5,
+        everyMonths: 12,
+      },
+    };
+    const steps = [
+      {
+        sequence: 1,
+        startMonth: 1,
+        months: 12,
+        quantity: 50,
+        priceBasis: 'ABSOLUTE' as const,
+        unitPrice: 40,
+      },
+      {
+        sequence: 2,
+        startMonth: 13,
+        months: 12,
+        quantity: 50,
+        priceBasis: 'ABSOLUTE' as const,
+        unitPrice: 42,
+      },
+      {
+        sequence: 3,
+        startMonth: 25,
+        months: 12,
+        quantity: 50,
+        priceBasis: 'ABSOLUTE' as const,
+        unitPrice: 44.1,
+      },
+    ];
+    const pending = firstValueFrom(service.expandRampSchedule(7, body));
+    const req = httpMock.expectOne('/api/v1/quotes/7/ramp-schedule/expand');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+    req.flush(steps);
+    await expect(pending).resolves.toEqual(steps);
+    expect(service.quotes()).toBe(beforeQuotes);
+    expect(service.selectedQuote()).toBe(beforeSelected);
+    expect(service.lineItems()).toBe(beforeLines);
+    httpMock.expectNone('/api/v1/quotes/7/line-items');
+  });
 });
