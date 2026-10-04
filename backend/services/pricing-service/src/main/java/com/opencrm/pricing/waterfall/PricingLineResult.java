@@ -1,5 +1,7 @@
 package com.opencrm.pricing.waterfall;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opencrm.pricing.ramp.PricedPeriod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,4 +31,8 @@ public class PricingLineResult {
     private BigDecimal finalPrice;
     private List<String> explanationCodes;
     private Map<String, Object> metadata;
+
+    /** Priced ramp periods. Omitted on a flat line. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<PricedPeriod> pricedPeriods;
 }

@@ -1,0 +1,38 @@
+{
+  "id": "ac-02",
+  "description": "List 40, quantities 50 / 100 / 150. Named-seat 7% uses each period's quantity.",
+  "request": {
+    "customerExternalId": "CUST-RAMP-02",
+    "quoteExternalId": "Q-RAMP-02",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 36,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-SEAT",
+        "lineItemType": "SAAS_SEAT_NAMED",
+        "quantity": 50,
+        "schedule": [
+          {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 50, "priceBasis": "DISCOUNT_FRACTION", "discountFraction": 0},
+          {"sequence": 2, "startMonth": 13, "months": 12, "quantity": 100, "priceBasis": "DISCOUNT_FRACTION", "discountFraction": 0},
+          {"sequence": 3, "startMonth": 25, "months": 12, "quantity": 150, "priceBasis": "DISCOUNT_FRACTION", "discountFraction": 0}
+        ]
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {"externalId": "CUST-RAMP-02", "name": "Ramp Two", "region": "NA", "churnScore": 10},
+    "priceBookEntries": {"PROD-SEAT": {"entryMatched": true, "listPrice": 40.00, "currency": "USD"}}
+  },
+  "expected": {
+    "netUnits": [40.0000, 37.2000, 37.2000],
+    "monthly": [2000.00, 3720.00, 5580.00],
+    "periodAmounts": [24000.00, 44640.00, 66960.00],
+    "tcv": 135600.00,
+    "acv": 45200.00,
+    "arr": 24000.00,
+    "exitArr": 66960.00,
+    "rejectedTcv": [144000.00, 133920.00]
+  }
+}

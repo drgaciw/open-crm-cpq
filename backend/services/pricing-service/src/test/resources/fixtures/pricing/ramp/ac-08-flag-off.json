@@ -1,0 +1,31 @@
+{
+  "id": "ac-08",
+  "description": "Flag off with a schedule is 422 RAMP_NOT_SUPPORTED.",
+  "request": {
+    "customerExternalId": "CUST-RAMP-08",
+    "quoteExternalId": "Q-RAMP-08",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 24,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-SEAT",
+        "lineItemType": "SAAS_SEAT_NAMED",
+        "quantity": 10,
+        "schedule": [
+          {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 10, "priceBasis": "ABSOLUTE", "unitPrice": 40},
+          {"sequence": 2, "startMonth": 13, "months": 12, "quantity": 10, "priceBasis": "ABSOLUTE", "unitPrice": 45}
+        ]
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {"externalId": "CUST-RAMP-08", "name": "Ramp Eight", "region": "NA", "churnScore": 10},
+    "priceBookEntries": {"PROD-SEAT": {"entryMatched": true, "listPrice": 50.00, "currency": "USD"}}
+  },
+  "expected": {
+    "errorCode": "RAMP_NOT_SUPPORTED",
+    "status": 422
+  }
+}
