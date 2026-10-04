@@ -16,7 +16,7 @@ npx nx --version
 npx nx run-many --target=build --all --parallel=3
 npx nx run-many --target=lint --all --parallel=3
 
-TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models shared-data-access"
+TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models shared-data-access cpq-quotes"
 AVAILABLE_PROJECTS="$(
   npx nx show projects --with-target=test \
     | { grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" || true; } \
