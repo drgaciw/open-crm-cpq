@@ -1,13 +1,24 @@
 # Price ramp sprint — ADR-023 implementation plan
 
-**Status:** Plan only. ADR-023 is **Accepted** in this same change. No product code is in this PR.  
+**Status:** Plan only. ADR-023 is **Accepted** in this same change. No product code is in this PR. Linear issues DRG-336, DRG-338, DRG-339, and DRG-341, and their Notion pages, stay **Backlog** until this docs pull request is on `main`.  
 **Architect:** opencrm-architect, worktree `/home/username01/Projects/open-crm-cpq/.worktrees/architect`, branch `docs/forge-ramp-sprint` at base `03bb6a67` (Merge PR #562).  
 **Date:** 2026-10-03  
 **Do not** edit `docs/forge/00-orchestrator-status.md`. **Do not** touch branch `docs/forge-architect` (`ed427578`). **Do not** merge. **Do not** push to `main`.
 
 The owner's instruction on 2026-10-03, to pull the next sprints from the backlog and process them, is the authorization. JDK 25 / Angular 22 remediation PRs #532–#537 are merged. GitHub had no open PRs when this plan was written. Issues #238 and #241 stay holds.
 
-Linear and Notion were not updated. This machine has no API credentials, and the pages are login walls. The story text of record is [REQ-PRC-001](../backlog/REQ-price-ramping.md). The paste block at the end is for a person to copy.
+**Provenance.** Fetched 2026-10-03 from the managed Grok connectors. Linear and Notion were authenticated. Team Drgamtd-workspace, project OPEN-CRM-CPQ. DRG-336, DRG-338, DRG-339, DRG-341, DRG-337, and DRG-340 are Backlog. The only other open title match was epic DRG-291. Notion page bodies match the Linear descriptions. The Notion notes on DRG-336 and DRG-339 still say ADR-023 is Proposed.
+
+| Issue | Notion page id |
+| --- | --- |
+| DRG-336 | `3e3f7cb4e4df815dbf58ceab3530934f` |
+| DRG-338 | `3eaf7cb4e4df810bb8b3f86c8469da16` |
+| DRG-339 | `3e3f7cb4e4df81e0a557f20a78b6543b` |
+| DRG-341 | `3eaf7cb4e4df8130a393dbe5406ee4db` |
+| DRG-337 | `3eaf7cb4e4df8160b30dc5c1554995d9` |
+| DRG-340 | `3eaf7cb4e4df818c86bcd714082d710e` |
+
+The improved acceptance criteria in section 3 stay. Section 8 is the story-update record. This pull request does not edit Linear or Notion.
 
 ---
 
@@ -87,7 +98,7 @@ Taken in ADR-023. This section is the implementation shape.
 
 ## 3. Stories
 
-Points are the Linear story, re-estimated. They are not the sum of the PR points in the DAG.
+The points below are the proposed story sizes in section 8. Live Linear, fetched 2026-10-03, is still DRG-336 at 8, DRG-338 with no estimate, DRG-339 at 5, and DRG-341 with no estimate. Story points are not the sum of the PR points in the DAG. The four issues stay Backlog until this docs pull request is on `main`.
 
 ### R1 — DRG-336 / BC-03-09 — 21 points (was 8)
 
@@ -329,56 +340,143 @@ Worker prompts for the six unblocked PRs are in `/tmp/herdr-ramp/architect-verdi
 
 ---
 
-## 8. Linear / Notion sync paste
+## 8. Story updates
 
-Not applied from this machine. Replace the description. Leave the title. Set the points. DRG-337 and DRG-340 stay unchanged: do not edit them.
+Fetched 2026-10-03. The live descriptions below are still the tracker text. Each replacement is the description to write to that Linear issue and to the matching Notion page when this docs pull request merges to `main`. Leave every title as it is. Leave every status **Backlog**. Do not mark the Linear issue or the Notion page Accepted before this pull request is on `main`. ADR-023 in this branch stays Accepted. The decision is recorded in this sprint doc and lands when the docs pull request merges.
 
-### DRG-336 (BC-03-09) — 21 points
+DRG-337 and DRG-340 are not edited.
 
-Ramp pricing per term period.
+### DRG-336 — live text should change
 
-A recurring quote line can carry an ordered schedule. Each step has a sequence, a 1-based start month, whole months, a quantity, and either an absolute unit price or a discount fraction off list. A line with no schedule prices as it does today. One-time, fee, tax and discount lines reject a schedule.
+Live: Backlog, estimate 8. Acceptance criteria are the REQ lines (AC-01, AC-03, AC-08, AC-07, AC-04, AC-17, AC-09, AC-02) with no AC-02 totals. The estimate note says the 8 points were carried over and not revalidated. Notion page `3e3f7cb4e4df815dbf58ceab3530934f` matches that description, and its note says ADR-023 is Proposed.
 
-pricing-service prices each period through the waterfall, one price-book lookup per product per request. Volume tiers use that period's quantity (50 / 100 / 150 at list $40 → TCV 135,600, not 144,000 and not 133,920). The worked three-year seat ramp is TCV 81,000, ACV 27,000, ARR 24,000, exit ARR 30,000.
+Change the estimate from 8 to 21. Replace the description with the markdown below. The 21 points replace the carried-over 8.
 
-ACV = TCV / term-years when `opencrm.pricing.metrics.acv-version=term-years`. The default is `legacy`, today's `(monthly × months) / 12`. Flat quotes keep today's numbers until the version is set. The ramp flag is a different switch and defaults off. Pricing-service will not start if the ramp flag is on and the version is still `legacy`. The 50k and 100k floors are tested both ways.
+**Replacement description:**
 
-Flag off, or a schedule the server will not price, is 422 `RAMP_NOT_SUPPORTED`. A missing per-period result persists no totals. The quote UI can add, edit and remove periods, expand an escalator, and preview TCV, ACV and exit ARR.
+~~~markdown
+**As a** pricing admin, **I want** ramp schedules (per-period price and quantity) validated and priced through the waterfall for each term period, **so that** multi-year subscription offers are quoted at the price the customer will pay in each period.
 
-Acceptance: AC-01, AC-02, AC-03, AC-04, AC-07, AC-08, AC-09 in `docs/backlog/REQ-price-ramping.md`, plus the two floor cases in ADR-023 D-03. Plan: `docs/forge/41-price-ramp-sprint.md`.
+**Acceptance criteria**
 
-### DRG-338 (BC-04-07) — 8 points
+* Given 50 named seats at list $50 per seat per month over 36 months with periods at $40, $45 and $50, when the quote is priced, then each period returns a PriceElement (monthly 2,000 / 2,250 / 2,500; period totals 24,000 / 27,000 / 30,000), TCV is 81,000, ACV 27,000, `arr` 24,000 and `exitArr` 30,000. Pricing the whole term at the Year-1 rate (TCV 72,000) fails (REQ AC-01).
+* Given list $40 and quantities 50, 100 and 150 for 12 months each, when tiers use that period's own quantity and the named-seat 7% starts at 100, then unit prices are 40 / 37.20 / 37.20, monthly amounts are 2,000 / 3,720 / 5,580, period totals are 24,000 / 44,640 / 66,960, TCV is 135,600, ACV is 45,200 and `exitArr` is 66,960. First-period quantity for every period (TCV 144,000) and peak quantity for every period (TCV 133,920) both fail (AC-02, decision D-07).
+* Given a schedule with a gap, an overlap, periods that do not sum to the term, a zero-month period, a negative price or a non-recurring line, then the request is rejected with 422 RAMP_SCHEDULE_INVALID and a reason code, and nothing is persisted (AC-03).
+* Given an escalator of 5% per anniversary from $40, then unit prices expand to 40.0000 / 42.0000 / 44.1000. Given +$5, then they expand to 40 / 45 / 50. Only the explicit steps are stored (AC-04). Given a term change, then the schedule is marked stale until it is re-validated and re-priced (AC-17).
+* Given the ramp flag is off, or pricing-service will not price the schedule, when a schedule is sent, then 422 RAMP_NOT_SUPPORTED is returned. A ramp is never priced as flat. A missing per-period result persists no totals (AC-08).
+* Given a quote with no ramp, and `opencrm.pricing.metrics.acv-version=legacy`, then prices, waterfall totals and metrics stay numerically identical to today. Waterfall `steps` may become a non-empty list. That is the only other change (AC-07).
+* Given recorded inputs, the same price book version, rule set and context, then per-period results and the fingerprint replay identically, and the waterfall lists ordered steps for every period (AC-09).
+* Given monthly 5,000 for 12 months, then legacy ACV 5,000 floors to 50,000 and term-years ACV 60,000 floors to 100,000. Given monthly 10,000 for 12 months, then legacy ACV 10,000 floors to 50,000 and term-years ACV 120,000 has no floor (ADR-023 D-03). The floor test inserts the ACV. It does not require the execute path to insert QuoteFact.
 
-Ramp governance: per-period policy and approval binding.
+**Realizes:** RampStep · PriceElement · PriceLines · ExplainWaterfall
 
-Discount thresholds are evaluated per period. The worst period governs, and the reason names it. A 32% / 10% / 0% schedule routes to Sales VP because of period 1. A step-down in quantity or price routes unless the product allows it. The placeholder margin 40.0 is not a margin and must not route or pass a quote.
+**Scope:** REQ slice R1 (FR-01 to FR-11, FR-17, FR-18), except the governing-period banner, which is DRG-338. Feature flag `opencrm.pricing.ramp.enabled` defaults to off on pricing-service and quote-service. Not generally available until DRG-338 ships. ACV uses `opencrm.pricing.metrics.acv-version`: `legacy` (default, today's `(monthly × months) / 12`) or `term-years` (TCV / term-years). Flat quotes keep today's numbers until that version is set. Pricing-service refuses to start if the ramp flag is true and the version is not `term-years`. The two switches stay separate.
 
-The approval binds to a fingerprint of the schedule, term and totals, extending the discount supersession shipped in #559. A changed fingerprint supersedes the open request. A late decision on the old one returns 409 `APPROVAL_SUPERSEDED`. An identical save does not. The quote cannot be submitted or accepted while the schedule is stale or while the current request is open or rejected. The accepted schedule is immutable.
+**Split:** usage tiers stay on DRG-337. This story does not edit DRG-337.
 
-The quote page names the governing period. The quote-service PDF includes the schedule table. document-generation is unchanged.
+**Depends on:** ADR-023, recorded Accepted in this branch. The Accepted status lands in the catalog when the docs pull request merges to main. Until that merge, this issue stays Backlog. Do not mark this Linear issue or Notion page `3e3f7cb4e4df815dbf58ceab3530934f` Accepted before that pull request is on main. Prerequisites P-1, P-3, P-4 and P-5 are in the sprint plan.
 
-Acceptance: AC-05, AC-06, AC-15, AC-17. Depends on DRG-336. Plan: `docs/forge/41-price-ramp-sprint.md`.
+**Estimate:** 21. The carried-over 8 is withdrawn. It was not revalidated.
 
-### DRG-339 (BC-09-04) — 13 points
+**Decision record:** `docs/forge/41-price-ramp-sprint.md` and ADR-023. This text lands when the docs pull request merges.
+~~~
 
-Ramp schedule and step application.
+### DRG-338 — live text should change
 
-`QuoteAccepted` gains the per-line steps and exit ARR as additive fields on version 1. Old payloads still parse. The contract consumer stores the quote's real term and one rate period per step. Dates come from the term start. The boundary date belongs to the new period. Redelivery does not duplicate periods.
+Live: Backlog, no estimate. Acceptance criteria are AC-05, AC-06, AC-15, AC-16 (once P-2) and FR-16. The scope sentence says FR-19 (the schedule table on the quote PDF) is carried by BC-06-03. Notion page `3eaf7cb4e4df810bb8b3f86c8469da16` matches that description.
 
-`GetRampSchedule` returns those periods. A scheduler applies each step on its effective date, catches up in order, and emits one `RampApplied` per step. The event carries the effective date.
+Change the estimate from none to 8. Replace the description with the markdown below. FR-19 for this sprint is the quote-service template. The document-generation stub (BC-06-03) stays out.
 
-An amendment at a whole-month boundary inherits the remaining periods and is not day-prorated. Renewal uplift uses the exit rate (8% of $50 is $54.00).
+**Replacement description:**
 
-The subscriptions UI is not in this story. Acceptance: AC-10 through AC-14. Depends on DRG-338. Plan: `docs/forge/41-price-ramp-sprint.md`.
+~~~markdown
+**As a** deal desk approver, **I want** discount and margin evaluated for every ramp period and the approval bound to the exact schedule, **so that** a back-loaded discount cannot be approved as if it were flat, and a changed schedule cannot ride on an old approval.
 
-### DRG-341 (BC-09-07) — 8 points
+**Acceptance criteria**
 
-Hybrid migration ramp with a dual-entitlement window.
+* Given list $50 with periods at $34, $45 and $50 (discounts 32%, 10%, 0%; blended 14%) and a 25% discount threshold, when the quote is evaluated, then it routes to SALES_VP citing period 1. A blended-only evaluation would not route it (REQ AC-05).
+* Given an open PENDING approval for that schedule and a rep changes period 2 from $45 to $40, then the maximum discount is unchanged but the fingerprint changes, the open request becomes SUPERSEDED, a new request is created, and a late decision on the old one returns 409 APPROVAL_SUPERSEDED. Re-saving an identical schedule supersedes nothing (AC-06).
+* Given quantity steps from 150 to 100 between periods, then the schedule is flagged as a step-down and routes for approval unless the product allows it (AC-15).
+* Given a term change to 24 months, then the schedule is marked stale. Submit and accept are refused until the periods match and the quote is re-priced (AC-17).
+* Given an accepted quote, then its schedule is immutable and a change creates a new quote version. `calculate` on an accepted quote does not rewrite the schedule (FR-16).
+* The quote page names the governing period. The quote-service PDF template renders the schedule table for lines that have one. document-generation is not modified, and BC-06-03 does not carry this table (FR-19 for this sprint).
+* No assertion uses `estimatedMarginPct` of 40.0 as a pass or a fail. AC-16 stays out until real cost data (P-2) exists. The placeholder 40.0 is not a margin (decision D-06).
 
-One declining on-prem or maintenance line and one rising SaaS line, each with its own ramp. The migration credit is 30% of book value, applied once to the declining line's first period, capped at that line's TCV, and never applied to the SaaS line. The dual-entitlement window defaults to 12 months. A longer overlap is rejected. The quote routes for approval because it is a hybrid ramp, not because margin is 40.
+**Realizes:** EvaluateQuote · ExplainPolicyBreach · SubmitForApproval
 
-`HYBRID_MIGRATION_RAMP` is the marker. Acceptance is the credit, cap, window and approval in `docs/forge/41-price-ramp-sprint.md`. Depends on DRG-338. Usage tiers (DRG-337) and credit draw-down (DRG-340) are not this story.
+**Scope:** REQ slice R2 (FR-12 to FR-16), the banner sentence of FR-18, and the quote-service PDF table (FR-19). Approval-routing stays the single canonical writer (ADR-013). The fingerprint extends the discount comparison added in #559. Ramp is not generally available. The flag stays default off.
 
-### Leave unchanged
+**Blocked by:** DRG-336. This issue stays Backlog until the docs pull request merges to main. Do not mark this Linear issue or Notion page `3eaf7cb4e4df810bb8b3f86c8469da16` Accepted before that pull request is on main.
 
-DRG-337 (BC-03-12, usage tiers) and DRG-340 (BC-09-06, credit draw-down). Do not rewrite them. D-09 split them out on 2026-09-29 and that split stands.
+**Estimate:** 8. There was no estimate on the live issue.
+
+**Decision record:** `docs/forge/41-price-ramp-sprint.md`. This text lands when the docs pull request merges.
+~~~
+
+### DRG-339 — live text should change
+
+Live: Backlog, estimate 5. Acceptance criteria AC-10 through AC-14 already carry the worked numbers (TCV 81,000, ACV 27,000, exitArr 30,000, the 2027–2029 period dates, one RampApplied, added TCV 17,400, renewal $54.00). The estimate note says the 5 points were carried over and not revalidated. Notion page `3e3f7cb4e4df81e0a557f20a78b6543b` matches that description, and its note says ADR-023 is Proposed. The live blocker is DRG-336 only.
+
+Change the estimate from 5 to 13. Replace the description with the markdown below. The worked AC-10 through AC-14 numbers stay. The dependency becomes DRG-338, because R3 and R2 both edit `QuoteService`. The ADR note changes from Proposed to the decision recorded on this branch.
+
+**Replacement description:**
+
+~~~markdown
+**As a** subscription manager, **I want** each ramp period stored on the subscription and applied on its effective date, **so that** the customer is billed the contracted rate for every period without manual intervention.
+
+**Acceptance criteria**
+
+* Given the 36-month ramp quote from DRG-336 is accepted, then QuoteAccepted version 1 carries three ramp periods, termMonths 36, TCV 81,000, ACV 27,000 and exitArr 30,000. A captured pre-change payload still parses in every consumer. The registry fitness check passes. There is no QuoteAccepted v2 (REQ AC-10, ADR-018).
+* Given term start 2027-01-01, then the subscription ends after 36 months (not one year) with three rate periods, 2027-01-01 to 2027-12-31, 2028-01-01 to 2028-12-31 and 2029-01-01 to 2029-12-31. Redelivery creates no duplicate periods. The active rate on 2027-12-31 is period 1 and on 2028-01-01 is period 2 (AC-11). The boundary date belongs to the new period (decision D-04).
+* Given the scheduler is down across 2028-01-01 for two days, then after restart exactly one RampApplied is emitted with effective date 2028-01-01. A second run or duplicate delivery has no further effect. The lag metric rises then clears (AC-12).
+* Given 20 seats added at the start of month 19, then added TCV is 17,400, co-termed at month 36, with no day-based proration at a whole-month boundary (AC-13).
+* Given a renewal of that subscription with an 8% uplift, then the renewal price is $54.00, based on the exit-period rate of $50, not $46.44 (AC-14, decision D-05).
+* GetRampSchedule returns a DTO. The subscriptions UI stays held. Existing subscriptions gain one implicit rate period by a non-destructive migration. CRM keeps copying tcv, acv and arr and does not gain Deal columns.
+
+**Realizes:** ApplyRamp · RampApplied · GetRampSchedule
+
+**Scope:** REQ slice R3 (FR-20 to FR-25). The rate schedule is hosted in contract-asset-management (ADR-023, decision D-08). Events are additive on QuoteAccepted version 1 through the ADR-018 registry. ApplyRamp is idempotent per subscription and sequence (ADR-018 D6). ADR-023 is Accepted in the docs branch. That catalog status lands when the docs pull request merges to main. Until then this issue stays Backlog, and the Notion note that says Proposed is replaced by this paragraph. Do not mark this Linear issue or Notion page `3e3f7cb4e4df81e0a557f20a78b6543b` Accepted before that pull request is on main.
+
+**Split:** credit draw-down stays on DRG-340. This story does not edit DRG-340.
+
+**Blocked by:** DRG-338 (R3 and R2 both edit QuoteService). DRG-336 is already required by DRG-338. BC-09-05 (renewal) follows decision D-05.
+
+**Estimate:** 13. The carried-over 5 is withdrawn. It was not revalidated. The slice spans the event, the consumer, the scheduler and the migration.
+
+**Decision record:** `docs/forge/41-price-ramp-sprint.md` and ADR-023. This text lands when the docs pull request merges.
+~~~
+
+### DRG-341 — live text should change
+
+Live: Backlog, no estimate. The acceptance text says the design is deferred and that how the migration credit is applied across periods is decided at slice design, before the story is estimated. Notion page `3eaf7cb4e4df8130a393dbe5406ee4db` matches that description. The live blockers are DRG-339, DRG-336, and DRG-338.
+
+Change the estimate from none to 8. Replace the description with the markdown below. The migration credit is decided: 30% of book value, once, on the declining line's first period, capped at that line's TCV, never on the rising SaaS line. After DRG-338 merges, this story is file-disjoint from DRG-339 and may run in parallel with it.
+
+**Replacement description:**
+
+~~~markdown
+**As a** sales lead selling an on-premises to SaaS migration, **I want** two coordinated recurring lines, one declining and one rising, each with its own ramp inside a dual-entitlement window, **so that** the customer moves platforms without paying twice at full price or losing entitlement mid-migration.
+
+**Acceptance criteria**
+
+* Given one declining on-premises or maintenance line and one rising SaaS line, each with its own ramp, and product type HYBRID_MIGRATION_RAMP on the rising line, then both lines are priced per period through the DRG-336 waterfall.
+* Given perpetual book value 10,000, then the migration credit is 3,000 (30% of book value, PRD §5.3), applied once to the declining line's first period. A later period does not receive another 3,000. The SaaS exit unit price is unchanged by the credit, so the exit rate that decision D-05 renews from stays intact.
+* Given a credit larger than the declining line's TCV, then the credit is capped at that TCV and the period amount does not go negative.
+* Given `opencrm.pricing.ramp.migration-window-months` default 12, then an overlap of 13 months is rejected with RAMP_SCHEDULE_INVALID, and an overlap of 12 months is stored.
+* Given a stored hybrid ramp, then the quote routes for approval because it is a hybrid ramp. The approval reason cites the hybrid window. It does not cite margin 40.0 (decision D-06).
+* Given a step-down in the declining line inside this window, then it is accepted as a migration ramp and is not flagged as an unapproved step-down (REQ FR-14 exception).
+
+**Realizes:** RampStep · PriceElement (via DRG-336). HYBRID_MIGRATION_RAMP is the marker. The ProductType enum is read and not edited.
+
+**Scope:** REQ slice R4 (FR-26). Source: PRD §5.3, "Cloud Migration Ramp + Dual Entitlement Window". The credit rule above is the slice design. It replaces the live sentence that left the credit undecided.
+
+**Blocked by:** DRG-338. After that story merges, this story is file-disjoint from DRG-339 and may run in parallel with it. This issue stays Backlog until the docs pull request merges to main. Do not mark this Linear issue or Notion page `3eaf7cb4e4df8130a393dbe5406ee4db` Accepted before that pull request is on main.
+
+**Estimate:** 8. The live issue had no estimate because the credit rule was open. The rule is now recorded.
+
+**Decision record:** `docs/forge/41-price-ramp-sprint.md` and ADR-023. This text lands when the docs pull request merges.
+~~~
+
+### DRG-337 and DRG-340 — not edited
+
+DRG-337 (BC-03-12, usage tier rating, Notion page `3eaf7cb4e4df8160b30dc5c1554995d9`) and DRG-340 (BC-09-06, credit draw-down, Notion page `3eaf7cb4e4df818c86bcd714082d710e`) stay out of this sprint. Their live descriptions, estimates (none), and Backlog status are left as fetched. D-09 split them out, and that split stands. No replacement description is written for either issue.
