@@ -45,7 +45,7 @@ A command is the mirror image of an event: one context sends it and exactly one 
 
 ### D-04 — Keys and ordering
 
-The Kafka record key of a command and of both its replies is the **order line id**, the subject the saga acts on. The relay keys each record by the outbox row's aggregate id (`OutboxRelayPublisher.java:195`), so the producer writes the order line id there, and the target copies it from the command into its reply rows. The target aggregate cannot be the key, because `ActivateSubscription` runs before the subscription exists.
+The Kafka record key of a line command and of both its replies is the **order line id**, the subject the saga acts on. Commands that act on a whole order or quote are keyed by their own subject instead (O-2). The relay keys each record by the outbox row's aggregate id (`OutboxRelayPublisher.java:195`), so the producer writes the order line id there, and the target copies it from the command into its reply rows. The target aggregate cannot be the key, because `ActivateSubscription` runs before the subscription exists.
 
 This keeps order only per key within one topic and one producer's outbox (ADR-018 D3). The design does not need more: a saga has at most one command in flight per order line and waits for its reply before sending the next ([ADR-025](ADR-025-saga-process-manager.md) D-03). Commands on different topics are never assumed to arrive in order.
 
@@ -75,3 +75,4 @@ A saga never changes another context's state with a synchronous call. Reads foll
 ## Open questions
 
 - O-1: Whether rejection replies need a closed set of reason codes per command, or one shared set.
+- O-2: The key for commands that act on a whole order or quote rather than one line, such as the Quote-to-Revenue contract step, or activation if [ADR-024](ADR-024-order-orchestration-context.md) O-5 keeps one subscription per order. The likely choice is the order id, or the quote UUID before an order exists.

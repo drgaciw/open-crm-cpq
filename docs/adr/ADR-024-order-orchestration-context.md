@@ -37,7 +37,7 @@ The service owns `Order`, `OrderLine`, `DecompositionRule`, `FulfillmentRequest`
 
 ### D-02 — The order owns everything that must be delivered
 
-Subscription activation becomes one fulfillment target of an order line. order-service sends it to contract-asset-management (BC-09) as an `ActivateSubscription` command ([ADR-026](ADR-026-command-messages.md)). The command carries what ADR-023 needs: the term, its dates, each line's ramp periods, and `exitArr`. contract-asset-management keeps building the rate periods and keeps hosting the schedule (ADR-023 D-08). Only the trigger changes, from `QuoteAccepted` to the command.
+Subscription activation becomes one fulfillment target of an order line. order-service sends it to contract-asset-management (BC-09) as an `ActivateSubscription` command ([ADR-026](ADR-026-command-messages.md)). The command carries what ADR-023 needs: the term, its dates, each line's ramp periods, and `exitArr`. contract-asset-management keeps building the rate periods and keeps hosting the schedule (ADR-023 D-08). Only the trigger changes, from `QuoteAccepted` to the command. Whether that is one command and one subscription per order, as today, or one per order line is open (O-5).
 
 The change is a strangler, switched per environment:
 
@@ -67,7 +67,7 @@ Such holds are prevented first and repaired second:
 
 - **Prevented.** order-service's consumer group starts at the latest offset when it is first deployed. Quotes accepted before then stay on the legacy subscription path (D-02), which the backlog triage in the [event runbook](../runbooks/event-operations.md) already covers.
 - **Repaired.** If a held order lacks lines anyway, quote-service re-emits `QuoteAccepted` for that accepted quote, now carrying `lineItems`, on an operator action. order-service accepts a second payload for an order it already holds only to supply the missing lines, then releases the hold. That keeps D-06's key unchanged and needs no synchronous read.
-  - The re-emit goes through `accept`'s existing publish call site, so ADR-018 D9's one-emitter rule still holds.
+  - `accept` itself cannot be reused, because it refuses any quote that is not SENT (`QuoteService.java:344-346`). The publish moves out of `accept` into one shared method in `QuoteService`, which both `accept` and the re-emit action call, so ADR-018 D9's one-emitter rule still holds.
   - The three existing consumers already deduplicate by quote UUID: document-generation's `quote-<id>-pdf` key, contract-asset-management's `SUB-<id>` check, and crm's claim in `processed_events`. A re-emit creates nothing twice.
 
 ### D-05 — Order lifecycle
@@ -126,6 +126,7 @@ A change after delivery is a new order whose lines each carry an action against 
 - O-2: Whether an ERP sales order is a fulfillment target in Phase 3 or waits for a real ERP adapter.
 - O-3: The BC-04 policy that decides when a contract is required.
 - O-4: `QuoteAccepted` does not say which subscription or asset an AMENDMENT, RENEWAL or EXPANSION acts on; neither does PR #575's line snapshot. D-07 needs that reference on the quote or its lines.
+- O-5: Whether activation creates one subscription per order or one per order line. Today there is one, `SUB-<quote UUID>`, per accepted quote (ADR-023 D-08). [ADR-026](ADR-026-command-messages.md) D-04 and [ADR-027](ADR-027-compensation-and-point-of-no-return.md) D-01 assume a per-line command. Keeping one subscription per order would make activation an order-level step, keyed by the order id and shared by that order's line sagas.
 
 ## Evidence (`main` at `1629070`)
 

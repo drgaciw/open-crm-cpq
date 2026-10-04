@@ -29,9 +29,9 @@ Other facts that shape the decision:
 - **No service-side circuit breaker or retry exists on any edge.** Clients that set timeouts each build their own request factory; E4 sets none. There is no shared default.
 - **Pricing execute is not free of side effects.** Every execute saves a `PricingAuditLog` row; simulate does not.
 - **Downstream failures are mapped inconsistently:**
-  - quote returns 502 when a callee is unreachable (`PRICING_SERVICE_UNAVAILABLE`, `CONFIGURATION_VALIDATE_UNAVAILABLE`, `APPROVAL_ROUTING_UNAVAILABLE`). pricing and configuration-engine return 503 for the same case (`PRICEBOOK_UNAVAILABLE`, `PRODUCT_SERVICE_UNAVAILABLE`).
-  - pricing turns a pricebook error status or empty body into 400 `PRICEBOOK_CLIENT_ERROR`, and configuration-engine turns other product failures into 400 `PRODUCT_RULES_FETCH_ERROR`.
-  - quote maps approval-routing errors per call. Submit, approve and reject pass 401, 403 and 409 through. A 404 on get-by-id, approve or reject becomes 404 `RESOURCE_NOT_FOUND`. Every other error, and every error on the three GETs, becomes 502.
+  - quote returns 502 `PRICING_SERVICE_UNAVAILABLE` or `CONFIGURATION_VALIDATE_UNAVAILABLE` for every failed pricing or configuration-engine call, including a 4xx or 5xx answer, because neither client handles status codes (`PricingServiceClient.java:45-50`, `ProductServiceClient.java:43-53`). It returns 502 `APPROVAL_ROUTING_UNAVAILABLE` when approval-routing is unreachable. pricing and configuration-engine return 503 for an unreachable callee (`PRICEBOOK_UNAVAILABLE`, `PRODUCT_SERVICE_UNAVAILABLE`).
+  - pricing turns a pricebook error status into 400. It keeps the pricebook's own `errorCode` when the error body parses, and uses `PRICEBOOK_CLIENT_ERROR` otherwise and for an empty body (`RestPriceBookResolutionClient.java:44-60`). configuration-engine turns other product failures into 400 `PRODUCT_RULES_FETCH_ERROR`.
+  - quote maps approval-routing errors per call. Submit, approve and reject pass 401, 403 and 409 through. A 404 on get-by-id, approve or reject becomes 404 `RESOURCE_NOT_FOUND`. Every other error status becomes 502: on the mutations, anything not listed; on the three GETs, anything except get-by-id's 404.
   - A product or pricebook 4xx becomes 400 in the caller, not the callee's status.
 - **The gateway has circuit breakers per route,** with a shared default of a 10-call window, 50% failure threshold and 5s open. It sets no explicit response timeout.
 - **`SecurityBaselineFitnessTest` already enforces two rules:** every client authenticates, and only allowlisted services may reference the gateway URL. Nothing checks timeouts, retries or which edges may exist.
@@ -75,7 +75,8 @@ Each edge gets a Resilience4j circuit breaker in the calling service, with the g
 
 What this changes, all to be checked against frontend handling first:
 
-- quote's three `*_UNAVAILABLE` responses move from 502 to 503;
+- quote's three `*_UNAVAILABLE` responses move from 502 to 503, and are used only when the callee is unreachable, timed out or behind an open circuit;
+- quote passes a pricing (E1) or configuration-engine (E2) 4xx through with the callee's status, and maps a 5xx or an unparseable body to 502 `PRICING_EXECUTE_FAILED` or `CONFIGURATION_VALIDATE_FAILED`, instead of 502 `*_UNAVAILABLE` for every error;
 - pricing's `PRICEBOOK_CLIENT_ERROR` and configuration-engine's `PRODUCT_RULES_FETCH_ERROR` move from 400 to 502 when the callee answered 5xx or an unparseable body;
 - quote passes through every 4xx from approval-routing on every call, including the three GETs, instead of mapping most of them to 502;
 - configuration-engine and pricing pass a product or pricebook 4xx through with the callee's status, instead of 400.
@@ -102,8 +103,8 @@ A state-changing synchronous call carries an `Idempotency-Key` header. The calle
 - **Positive:** Every edge has bounded latency, a breaker and a known retry class. New edges are reviewed, not discovered.
 - **Negative:** Several error responses change status code (D-06). Each edge gains configuration to maintain.
 - **Cleanup this enables**, all in quote-service unless noted:
-  - the unused product URL: `src/main/resources/application.yml:80-81`, `src/main/resources/application-test.yml:22-23`, `src/test/resources/application-test.yml:31-32`, and `PRODUCT_SERVICE_URL` in `backend/docker-compose.yml:230`;
-  - the test-only gateway URL: `src/test/resources/application-test.yml:33-34`;
+  - the unused product URL: `src/main/resources/application.yml:80-81`, `src/main/resources/application-test.yml:22-23`, `src/test/resources/application-test.yml:32-33`, and `PRODUCT_SERVICE_URL` in `backend/docker-compose.yml:230`;
+  - the test-only gateway URL: `src/test/resources/application-test.yml:34-35`;
   - the `/simulate` method on `PricingServiceClient`, unused in production code (only `PricingServiceClientTest` calls it).
 
 ## Fitness functions (on acceptance)
