@@ -1,0 +1,72 @@
+{
+  "id": "s2c-1b-01-list-price-baseline",
+  "matrixRef": "docs/backlog/CPQ_API_CONTRACT_MATRIX.md#4-pricing-apis",
+  "description": "Single line list-price waterfall with stubbed price book; no active Drools rules. ADR-023.",
+  "request": {
+    "customerExternalId": "CUST-GOLD-001",
+    "quoteExternalId": "Q-GOLD-001",
+    "region": "NA",
+    "currency": "USD",
+    "durationInMonths": 12,
+    "subscriptionType": "NEW",
+    "lineItems": [
+      {
+        "productExternalId": "PROD-001",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 5
+      }
+    ]
+  },
+  "stubs": {
+    "customer": {
+      "externalId": "CUST-GOLD-001",
+      "name": "Golden Fixture Corp",
+      "region": "NA",
+      "churnScore": 20
+    },
+    "priceBookEntries": {
+      "PROD-001": {
+        "entryMatched": true,
+        "listPrice": 100.00,
+        "currency": "USD"
+      }
+    },
+    "activeRules": []
+  },
+  "expected": {
+    "success": true,
+    "approvalState": "APPROVED",
+    "lineResults": [
+      {
+        "productExternalId": "PROD-001",
+        "lineItemType": "SUBSCRIPTION",
+        "quantity": 5,
+        "listPrice": 100.00,
+        "unitPrice": 100.00,
+        "discountRate": 0,
+        "discountAmount": 0,
+        "surchargeAmount": 0,
+        "finalPrice": 500.00
+      }
+    ],
+    "waterfall": {
+      "listPrice": 100.00,
+      "basePrice": 100.00,
+      "netPrice": 500.00,
+      "approvalState": "APPROVED",
+      "steps": []
+    },
+    "financialMetrics": {
+      "arr": 6000.00,
+      "tcv": 6000.00,
+      "acv": 6000.00,
+      "clv": 12000.00,
+      "churnScore": 20,
+      "discountRate": 0.0000,
+      "totalDiscount": 0,
+      "totalSurcharge": 0,
+      "priceMultiplier": 1.0000,
+      "estimatedMarginPct": 40.0
+    }
+  }
+}

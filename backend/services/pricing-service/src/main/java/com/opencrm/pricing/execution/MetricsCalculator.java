@@ -4,6 +4,7 @@ import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.waterfall.FinancialMetrics;
 import com.opencrm.pricing.waterfall.PricingLineResult;
 import com.opencrm.pricing.waterfall.PricingResult;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -22,6 +23,25 @@ public class MetricsCalculator {
 
     private static final int MONEY_SCALE = 2;
     private static final RoundingMode MONEY_ROUNDING = RoundingMode.HALF_UP;
+
+    private final AcvVersion acvVersion;
+
+    /**
+     * Legacy ACV. Kept so callers that construct the calculator directly, including the execute
+     * goldens, stay on today's formula when no property is supplied.
+     */
+    public MetricsCalculator() {
+        this(AcvVersion.LEGACY);
+    }
+
+    @Autowired
+    public MetricsCalculator(AcvVersionProperties properties) {
+        this(properties == null ? null : properties.getAcvVersion());
+    }
+
+    MetricsCalculator(AcvVersion acvVersion) {
+        this.acvVersion = acvVersion == null ? AcvVersion.LEGACY : acvVersion;
+    }
 
     /**
      * Calculate financial metrics from pricing result.
@@ -45,7 +65,9 @@ public class MetricsCalculator {
      * <ul>
      *   <li>ARR = monthlyPrice × 12</li>
      *   <li>TCV = monthlyPrice × durationInMonths</li>
-     *   <li>ACV = (monthlyPrice × durationInMonths) / 12</li>
+     *   <li>ACV = (monthlyPrice × durationInMonths) / 12 when {@link AcvVersion#LEGACY}
+     *       (default, ADR-023 D-03). {@link AcvVersion#TERM_YEARS} is TCV / (durationInMonths / 12).
+     *       The selected version is the same function for every quote.</li>
      *   <li>CLV = monthlyPrice × expectedDuration (else duration × 2 proxy)</li>
      * </ul>
      *
@@ -90,10 +112,8 @@ public class MetricsCalculator {
         // TCV = monthlyPrice * durationInMonths (source Calculate TCV)
         BigDecimal tcv = money(monthlyPrice.multiply(BigDecimal.valueOf(effectiveDurationInMonths)));
 
-        // ACV = (monthlyPrice * duration) / 12 (source Calculate ACV)
-        BigDecimal acv = monthlyPrice
-                .multiply(BigDecimal.valueOf(effectiveDurationInMonths))
-                .divide(BigDecimal.valueOf(12), MONEY_SCALE, MONEY_ROUNDING);
+        // ACV version is ADR-023 D-03. Legacy stays (monthlyPrice * duration) / 12.
+        BigDecimal acv = acvFor(monthlyPrice, tcv, effectiveDurationInMonths);
 
         // CLV = monthlyPrice * expectedDuration (source Calculate CLV); duration×2 proxy when unset
         int clvDurationMonths = expectedDurationMonths != null && expectedDurationMonths > 0
@@ -132,6 +152,20 @@ public class MetricsCalculator {
                 .priceMultiplier(priceMultiplier)
                 .estimatedMarginPct(estimatedMarginPct)
                 .build();
+    }
+
+    /**
+     * One ACV function for every quote. {@code term-years} is {@code TCV / (months / 12)},
+     * evaluated as {@code TCV × 12 / months} so a non-divisible term does not truncate.
+     */
+    private BigDecimal acvFor(BigDecimal monthlyPrice, BigDecimal tcv, int durationInMonths) {
+        if (acvVersion == AcvVersion.TERM_YEARS) {
+            return tcv.multiply(BigDecimal.valueOf(12))
+                    .divide(BigDecimal.valueOf(durationInMonths), MONEY_SCALE, MONEY_ROUNDING);
+        }
+        return monthlyPrice
+                .multiply(BigDecimal.valueOf(durationInMonths))
+                .divide(BigDecimal.valueOf(12), MONEY_SCALE, MONEY_ROUNDING);
     }
 
     private static BigDecimal money(BigDecimal value) {
