@@ -21,14 +21,20 @@ import com.opencrm.pricing.rule.RuleRepository;
 import com.opencrm.pricing.rule.RuleStatus;
 import com.opencrm.pricing.ruleset.RuleSet;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
+import com.opencrm.pricing.ramp.PricedPeriod;
+import com.opencrm.pricing.ramp.RampPeriodPricer;
+import com.opencrm.pricing.ramp.RampPricingProperties;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
 import com.opencrm.pricing.waterfall.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,6 +64,26 @@ public class PricingExecutionService {
     private final MetricsCalculator metricsCalculator;
     private final ObjectMapper objectMapper;
     private final DroolsRulesEngine droolsRulesEngine;
+
+    /** Default off. Spring sets this from {@link RampPricingProperties}. Tests may set it directly. */
+    private boolean rampEnabled;
+
+    private int maxPeriods = 36;
+
+    private final RampPeriodPricer rampPeriodPricer = new RampPeriodPricer();
+
+    @Autowired
+    void applyRampProperties(RampPricingProperties properties) {
+        if (properties == null) {
+            return;
+        }
+        this.rampEnabled = properties.isEnabled();
+        this.maxPeriods = properties.getMaxPeriods();
+    }
+
+    public void setRampEnabled(boolean rampEnabled) {
+        this.rampEnabled = rampEnabled;
+    }
 
     /**
      * Execute pricing with full audit trail.
@@ -118,6 +144,12 @@ public class PricingExecutionService {
         try {
             // 1. Validate context
             contextValidator.validate(context);
+            if (requestsRamp(context) && !rampEnabled) {
+                throw new BusinessException(
+                        "A ramp schedule cannot be priced while opencrm.pricing.ramp.enabled is false",
+                        HttpStatus.UNPROCESSABLE_CONTENT,
+                        "RAMP_NOT_SUPPORTED");
+            }
 
             // 2. Look up Customer
             Customer customer = customerRepository.findByExternalIdAndDeletedFalse(context.getCustomerExternalId())
@@ -191,6 +223,19 @@ public class PricingExecutionService {
                         .explanationCodes(new ArrayList<>())
                         .metadata(lineRequest.getMetadata())
                         .build();
+
+                if (hasSchedule(lineRequest)) {
+                    List<PricedPeriod> periods = rampPeriodPricer.price(
+                            lineRequest, listPrice, context.getDurationInMonths(), maxPeriods);
+                    lineResult.setPricedPeriods(periods);
+                    PricedPeriod first = periods.get(0);
+                    lineResult.setUnitPrice(first.getNetUnitPrice());
+                    lineResult.setFinalPrice(first.getNetMonthly());
+                    lineResult.setDiscountRate(first.getDiscountRate());
+                    lineResult.setDiscountAmount(listPrice.subtract(first.getNetUnitPrice())
+                            .multiply(BigDecimal.valueOf(first.getQuantity()))
+                            .setScale(2, RoundingMode.HALF_UP));
+                }
 
                 lineResults.add(lineResult);
             }
@@ -267,6 +312,14 @@ public class PricingExecutionService {
         }
     }
 
+    private static boolean requestsRamp(PricingContext context) {
+        return context.getLineItems().stream().anyMatch(PricingExecutionService::hasSchedule);
+    }
+
+    private static boolean hasSchedule(PricingLineRequest lineRequest) {
+        return lineRequest.getSchedule() != null && !lineRequest.getSchedule().isEmpty();
+    }
+
     private BigDecimal getListPrice(PricingLineRequest lineRequest, ResolveBatchResponse batch, Map<String, PricingProduct> fallbackProducts) {
         if (lineRequest.getListPriceOverride() != null) {
             return lineRequest.getListPriceOverride();
@@ -298,6 +351,22 @@ public class PricingExecutionService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<PricingWaterfallStep> steps = new ArrayList<>();
+        BigDecimal runningPeriods = BigDecimal.ZERO;
+        for (PricingLineResult line : lineResults) {
+            if (line.getPricedPeriods() == null) {
+                continue;
+            }
+            for (PricedPeriod period : line.getPricedPeriods()) {
+                BigDecimal amount = period.getPeriodAmount() != null ? period.getPeriodAmount() : BigDecimal.ZERO;
+                runningPeriods = runningPeriods.add(amount);
+                steps.add(PricingWaterfallStep.builder()
+                        .stepType(WaterfallStepType.PERIOD_SELECTION)
+                        .description("Period " + period.getSequence())
+                        .amount(amount)
+                        .runningTotal(runningPeriods)
+                        .build());
+            }
+        }
         steps.add(PricingWaterfallStep.builder()
                 .stepType(WaterfallStepType.LIST_PRICE)
                 .description("Sum of line list prices")

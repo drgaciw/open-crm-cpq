@@ -253,7 +253,8 @@ Run `npx nx test cpq-quotes`. If it is red before your change, stop and report. 
 
 **R1-ENGINE** (after the four dependencies):
 
-- `PricingLineRequest.java` optional `schedule`
+- `PricingLineRequest.java` optional `schedule` and `billingFrequency`
+- The pricer repeats quote-service's line check before pricing (FR-02): a schedule needs `billingFrequency` in the R1-QUOTE allowed set and a `lineItemType` not in `DISCOUNT`, `FEE`, `TAX`, else 422 `RAMP_SCHEDULE_INVALID` with `RAMP_NOT_ALLOWED_FOR_LINE_TYPE`. A missing frequency is refused. A negative price or fraction is `RAMP_NEGATIVE_VALUE`, not `RAMP_PRICE_BASIS`
 - `PricingExecutionService.java` period loop, reusing the existing price-book batch (one lookup per product per request, not per period)
 - `WaterfallStepType.java` add `PERIOD_SELECTION`
 - `MetricsCalculator.java` ramp branch: TCV is the sum of period amounts, ACV uses the active version, `arr` is the first period's monthly × 12, `exitArr` is the last, CLV is not the flat monthly proxy
@@ -267,7 +268,7 @@ Flag off with a schedule → 422 `RAMP_NOT_SUPPORTED`. Do not change `execute/01
 
 **R1-WIRE:**
 
-- `QuoteService.buildPricingContext` and the apply-pricing method
+- `QuoteService.buildPricingContext` and the apply-pricing method. Send each line's `billingFrequency` with its schedule: pricing refuses a schedule without a recurring one
 - Mapping of `pricedPeriods` and `exitArr`
 - Replace the calculate stub: call pricing, and if any sent schedule has no period results, persist no totals and return 422 `RAMP_NOT_SUPPORTED`
 
