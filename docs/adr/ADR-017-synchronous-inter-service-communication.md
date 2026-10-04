@@ -86,7 +86,7 @@ Services do not call the gateway. ai-service's agent tools (E6) are the one rati
 
 ### D-08 — Idempotency keys for state-changing calls
 
-A state-changing synchronous call carries an `Idempotency-Key` header. The callee returns the first result for a repeated key within at least the caller's retry window. Approval submission (E3) is the first edge to adopt it.
+A state-changing synchronous call carries an `Idempotency-Key` header. The callee returns the first result for a repeated key within at least the caller's retry window. Each E3 mutation (submit, approve and reject) is enabled for retries separately, and only after approval-routing deduplicates that operation's key. A lost approve or reject response must not be replayed unkeyed.
 
 ## Options considered
 
@@ -119,7 +119,7 @@ Extend the source scans in `SecurityBaselineFitnessTest`, or add a sibling test 
 1. The shared customizer, plus timeouts on E4.
 2. Circuit breakers per edge, and the gateway's explicit response timeout.
 3. D-06 error normalization, after a frontend check.
-4. `Idempotency-Key` on approval submission, then retries for E3.
+4. `Idempotency-Key` deduplication in approval-routing for submit, approve and reject. Each operation's retries are turned on only once its own key is honored.
 5. The fitness test.
 
 ## Open questions

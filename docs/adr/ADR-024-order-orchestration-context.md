@@ -63,6 +63,13 @@ order-service adds one event the capability map does not list, **`OrderFulfilled
 
 Decomposition reads `QuoteAccepted.lineItems` (PR #575). order-service makes no synchronous call to quote-service to learn what was sold. Under [ADR-017](ADR-017-synchronous-inter-service-communication.md) it starts with no outbound synchronous edges. A payload without `lineItems` (an outbox row written before PR #575) is placed on hold for missing source data, never fulfilled empty.
 
+Such holds are prevented first and repaired second:
+
+- **Prevented.** order-service's consumer group starts at the latest offset when it is first deployed. Quotes accepted before then stay on the legacy subscription path (D-02), which the backlog triage in the [event runbook](../runbooks/event-operations.md) already covers.
+- **Repaired.** If a held order lacks lines anyway, quote-service re-emits `QuoteAccepted` for that accepted quote, now carrying `lineItems`, on an operator action. order-service accepts a second payload for an order it already holds only to supply the missing lines, then releases the hold. That keeps D-06's key unchanged and needs no synchronous read.
+  - The re-emit goes through `accept`'s existing publish call site, so ADR-018 D9's one-emitter rule still holds.
+  - The three existing consumers already deduplicate by quote UUID: document-generation's `quote-<id>-pdf` key, contract-asset-management's `SUB-<id>` check, and crm's claim in `processed_events`. A re-emit creates nothing twice.
+
 ### D-05 — Order lifecycle
 
 **Header states:** `SUBMITTED`, `ON_HOLD`, `DECOMPOSED`, `IN_FULFILLMENT`, `NEEDS_ATTENTION`, `FULFILLED`, `CANCELLED`.
