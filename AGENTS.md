@@ -106,6 +106,7 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - When given bug reports, verify each issue in the repo before changing code; leave false positives untouched.
 - When restarting local apps, kill all related dev servers first, then bring the stack back up cleanly.
 - Keep committed `frontend/proxy.conf.json` targeting the gateway (`:8080`), not a temporary CRM-direct workaround.
+- When the user delegates CPQ product or architecture choices (e.g. "you are the cpq application" / "I delegate this decision"), decide and record the choice in the plan rather than blocking on clarifying questions.
 
 ## Learned Workspace Facts
 
@@ -115,3 +116,4 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - Frontend unit tests use Vitest (`@nx/vitest:test`, `vitest/globals`, Analog `setupTestBed`); `TestBed` + `vi.fn()` is the intended pattern, not Jasmine spies.
 - Chrome DevTools MCP needs Google Chrome stable; hosts with only Chromium should rely on Playwright and the Cursor browser for UI automation.
 - CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them).
+- Sibling-service reuse gap analyses and harvest backlogs live under `docs/plans/`; `docs/plans/00-harvest-index.md` is the agentic index for that work.
