@@ -28,11 +28,13 @@ What exists to build on: ADR-018's dead-letter topics and the replay and skip to
 
 | Class | Meaning | On failure |
 |---|---|---|
-| Compensatable | Has an undo command that restores the prior business state | Retried; if the deadline passes, earlier steps are compensated in reverse order |
+| Compensatable | Has an undo command that restores the prior business state | Retried; if the deadline passes, the current step and the earlier steps are compensated, in reverse order |
 | Pivot | After it succeeds, the saga only moves forward | Retried until success or deadline; then parked |
 | Retriable | Idempotent and must eventually succeed; follows a pivot | Retried until success or deadline; then parked |
 
 A saga-definition test rejects any step without a declared class ([ADR-025](ADR-025-saga-process-manager.md) fitness functions).
+
+**A timed-out step is compensated too.** A command whose reply was lost may still have applied its effect, so compensating only the earlier steps could leave the current one orphaned. Every compensation must therefore succeed as a no-op when the step it undoes never took effect. The handler checks the business state, for example whether a subscription exists for that order line, rather than its own history.
 
 ### D-02 — Point of no return, per order line
 
