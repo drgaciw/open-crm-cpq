@@ -41,6 +41,8 @@ public class QuoteDto {
     private BigDecimal arr;
     private BigDecimal tcv;
     private BigDecimal acv;
+    private BigDecimal exitArr;
+    private boolean rampScheduleStale;
     private ApprovalState approvalState;
     private String approvalTier;
     private String notes;

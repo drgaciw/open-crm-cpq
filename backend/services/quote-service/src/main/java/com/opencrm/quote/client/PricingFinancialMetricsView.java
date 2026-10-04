@@ -19,4 +19,6 @@ public class PricingFinancialMetricsView {
     private BigDecimal arr;
     private BigDecimal tcv;
     private BigDecimal acv;
+    /** Optional exit ARR. Absent until pricing emits it. Not required. */
+    private BigDecimal exitArr;
 }

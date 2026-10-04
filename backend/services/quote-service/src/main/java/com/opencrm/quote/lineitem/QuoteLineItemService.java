@@ -5,6 +5,8 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
+import com.opencrm.quote.ramp.RampScheduleAttacher;
+import com.opencrm.quote.ramp.RampScheduleViews;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class QuoteLineItemService {
 
     private final QuoteLineItemRepository lineItemRepository;
     private final QuoteRepository quoteRepository;
+    private final RampScheduleAttacher rampScheduleAttacher;
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -34,6 +37,8 @@ public class QuoteLineItemService {
         if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
             throw new BusinessException("Cannot modify line items in " + quote.getStatus() + " status", "QUOTE_NOT_EDITABLE");
         }
+
+        RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
 
         QuoteLineItem item = QuoteLineItem.builder()
                 .quote(quote)
@@ -51,6 +56,7 @@ public class QuoteLineItemService {
                 .sortOrder(request.getSortOrder())
                 .notes(request.getNotes())
                 .build();
+        rampScheduleAttacher.attach(item, prepared);
 
         QuoteLineItem saved = lineItemRepository.save(item);
         recalculateQuoteTotals(quote);
@@ -101,6 +107,8 @@ public class QuoteLineItemService {
             throw new BusinessException("Line item " + lineItemId + " does not belong to quote " + quoteId, "LINE_ITEM_QUOTE_MISMATCH");
         }
 
+        RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
+
         item.setProductExternalId(request.getProductExternalId());
         item.setProductName(request.getProductName());
         item.setProductType(request.getProductType());
@@ -114,6 +122,7 @@ public class QuoteLineItemService {
         item.setBillingFrequency(request.getBillingFrequency());
         item.setSortOrder(request.getSortOrder());
         item.setNotes(request.getNotes());
+        rampScheduleAttacher.attach(item, prepared);
 
         QuoteLineItem saved = lineItemRepository.save(item);
         recalculateQuoteTotals(quote);
@@ -159,6 +168,7 @@ public class QuoteLineItemService {
                 .sortOrder(item.getSortOrder())
                 .pricingExplanationCode(item.getPricingExplanationCode())
                 .notes(item.getNotes())
+                .schedule(RampScheduleViews.toDto(item))
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .version(item.getVersion())

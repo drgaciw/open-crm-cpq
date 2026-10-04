@@ -65,7 +65,8 @@ class QuoteServiceCloneTest {
                 productServiceClient,
                 new ObjectMapper(),
                 outboxEventPublisher,
-                new CurrentActor("service:quote-service", false)
+                new CurrentActor("service:quote-service", false),
+                RampScheduleTestSupport.guard(quoteLineItemRepository)
         );
     }
 

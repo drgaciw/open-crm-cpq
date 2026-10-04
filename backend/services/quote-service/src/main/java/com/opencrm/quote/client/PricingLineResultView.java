@@ -26,4 +26,6 @@ public class PricingLineResultView {
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
     private List<String> explanationCodes;
+    /** Optional priced periods. Absent on flat quotes. Not required. */
+    private List<PricedPeriodView> pricedPeriods;
 }

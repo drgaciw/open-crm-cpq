@@ -99,6 +99,13 @@ public class Quote extends BaseEntity {
     @Column(name = "acv", precision = 19, scale = 2)
     private BigDecimal acv;
 
+    @Column(name = "exit_arr", precision = 19, scale = 2)
+    private BigDecimal exitArr;
+
+    @Column(name = "ramp_schedule_stale", nullable = false)
+    @Builder.Default
+    private boolean rampScheduleStale = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "approval_state", length = 30)
     @Builder.Default
