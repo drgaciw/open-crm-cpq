@@ -3,6 +3,7 @@ package com.opencrm.quote.quote;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,7 +67,33 @@ final class QuoteAcceptedKafkaEventFactory {
                     .dealType(quote.getDealType() != null ? quote.getDealType().name() : null)
                     .build());
         }
+        // What was sold, line by line, in the quote's order. Additive on v1: an empty list means a quote with no
+        // lines, which is different from a missing field.
+        event.setLineItems(lineItems.stream()
+                .sorted(Comparator.comparingInt(QuoteLineItem::getSortOrder))
+                .map(QuoteAcceptedKafkaEventFactory::lineItemSnapshot)
+                .toList());
         return event;
+    }
+
+    private static QuoteAcceptedEvent.LineItemSnapshot lineItemSnapshot(QuoteLineItem lineItem) {
+        return QuoteAcceptedEvent.LineItemSnapshot.builder()
+                .lineUuid(lineItem.getUuid())
+                .productExternalId(lineItem.getProductExternalId())
+                .productName(lineItem.getProductName())
+                .productType(lineItem.getProductType())
+                .lineItemType(lineItem.getLineItemType())
+                .quantity(lineItem.getQuantity())
+                .unitOfMeasure(lineItem.getUnitOfMeasure())
+                .listPrice(lineItem.getListPrice())
+                .unitPrice(lineItem.getUnitPrice())
+                .discountRate(lineItem.getDiscountRate())
+                .discountAmount(lineItem.getDiscountAmount())
+                .netPrice(lineItem.getNetPrice())
+                .extendedAmount(lineItem.getExtendedAmount())
+                .billingFrequency(lineItem.getBillingFrequency())
+                .sortOrder(lineItem.getSortOrder())
+                .build();
     }
 
     private static String extractConfigurationId(String metadata) {
