@@ -43,6 +43,7 @@ public interface QuoteMapper {
     QuoteDto toDto(Quote quote);
 
     @Mapping(target = "schedule", expression = "java(RampScheduleViews.toDto(lineItem))")
+    @Mapping(target = "pricedPeriods", ignore = true)
     QuoteLineItemDto toLineItemDto(QuoteLineItem lineItem);
 
     @Mapping(target = "id", ignore = true)
