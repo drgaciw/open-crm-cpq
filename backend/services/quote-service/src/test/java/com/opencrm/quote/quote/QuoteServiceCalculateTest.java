@@ -1,5 +1,6 @@
 package com.opencrm.quote.quote;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.event.OutboxEventPublisher;
@@ -362,10 +363,16 @@ class QuoteServiceCalculateTest {
                 (List<Map<String, Object>>) contextCaptor.getValue().get("lineItems");
         assertThat(sentLines).hasSize(1);
         assertThat(sentLines.getFirst().get("billingFrequency")).isEqualTo("MONTHLY");
+        assertThat(sentLines.getFirst()).doesNotContainKeys("steps", "escalator");
+        JsonNode sentLine = objectMapper.valueToTree(sentLines.getFirst());
+        assertThat(sentLine.get("schedule").isArray()).isTrue();
+        assertThat(sentLine.get("schedule")).hasSize(3);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> schedule =
                 (List<Map<String, Object>>) sentLines.getFirst().get("schedule");
         assertThat(schedule).hasSize(3);
+        assertThat(schedule).allSatisfy(step -> assertThat(step.keySet()).containsExactlyInAnyOrder(
+                "sequence", "startMonth", "months", "quantity", "priceBasis", "unitPrice"));
         assertThat(schedule).extracting(step -> step.get("sequence")).containsExactly(1, 2, 3);
         assertThat(schedule).extracting(step -> step.get("startMonth")).containsExactly(1, 13, 25);
         assertThat(schedule).extracting(step -> step.get("months")).containsExactly(12, 12, 12);
