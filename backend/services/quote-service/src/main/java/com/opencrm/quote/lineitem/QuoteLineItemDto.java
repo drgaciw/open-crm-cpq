@@ -1,6 +1,7 @@
 package com.opencrm.quote.lineitem;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.opencrm.quote.client.PricedPeriodView;
 import com.opencrm.quote.ramp.RampScheduleDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -36,6 +38,8 @@ public class QuoteLineItemDto {
     private String pricingExplanationCode;
     private String notes;
     private RampScheduleDto schedule;
+    /** Priced ramp periods from calculate. Same fields as {@link PricedPeriodView}. */
+    private List<PricedPeriodView> pricedPeriods;
     private Instant createdAt;
     private Instant updatedAt;
     private Long version;
