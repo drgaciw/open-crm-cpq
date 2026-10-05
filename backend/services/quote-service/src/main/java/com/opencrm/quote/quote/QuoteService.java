@@ -23,6 +23,7 @@ import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemDto;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
 import com.opencrm.quote.ramp.QuoteRampStep;
+import com.opencrm.quote.ramp.RampReasons;
 import com.opencrm.quote.ramp.RampScheduleException;
 import com.opencrm.quote.ramp.RampScheduleGuard;
 import com.opencrm.quote.ramp.RampScheduleViews;
@@ -623,10 +624,7 @@ public class QuoteService {
         }
 
         if (pricingApiResponse == null || !pricingApiResponse.isSuccess()) {
-            String message = pricingApiResponse != null && pricingApiResponse.getMessage() != null
-                    ? pricingApiResponse.getMessage()
-                    : "Pricing execution failed";
-            throw new BusinessException(message, "PRICING_EXECUTION_FAILED");
+            throw pricingEnvelopeFailure(pricingApiResponse);
         }
 
         PricingExecuteView pricingData = pricingApiResponse.getData();
@@ -638,6 +636,28 @@ public class QuoteService {
         }
 
         return pricingData;
+    }
+
+    /**
+     * Flag-off is 422 {@code RAMP_NOT_SUPPORTED} with no success body. A line the engine
+     * will not price is 422 {@code RAMP_SCHEDULE_INVALID} and must not be relabeled as
+     * the empty-period failure.
+     */
+    private RuntimeException pricingEnvelopeFailure(ApiResponse<PricingExecuteView> pricingApiResponse) {
+        if (pricingApiResponse == null) {
+            return new BusinessException("Pricing execution failed", "PRICING_EXECUTION_FAILED");
+        }
+        String code = pricingApiResponse.getErrorCode();
+        String message = pricingApiResponse.getMessage();
+        if (RampReasons.NOT_SUPPORTED.equals(code)) {
+            return RampScheduleException.notSupported();
+        }
+        if (RampReasons.SCHEDULE_INVALID.equals(code)
+                && RampReasons.NOT_ALLOWED_FOR_LINE_TYPE.equals(message)) {
+            return RampScheduleException.invalid(List.of(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE));
+        }
+        String fallback = message != null ? message : "Pricing execution failed";
+        return new BusinessException(fallback, "PRICING_EXECUTION_FAILED");
     }
 
     private void copyRampSteps(QuoteLineItem source, QuoteLineItem copy) {
