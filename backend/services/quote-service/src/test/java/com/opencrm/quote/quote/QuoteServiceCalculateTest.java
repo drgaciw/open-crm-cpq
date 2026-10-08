@@ -1,10 +1,12 @@
 package com.opencrm.quote.quote;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.security.CurrentActor;
 import com.opencrm.common.exception.BusinessException;
+import com.opencrm.quote.client.PricedPeriodView;
 import com.opencrm.quote.client.PricingExecuteView;
 import com.opencrm.quote.client.PricingFinancialMetricsView;
 import com.opencrm.quote.client.PricingLineResultView;
@@ -12,7 +14,9 @@ import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
+import com.opencrm.quote.lineitem.QuoteLineItemDto;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import com.opencrm.quote.ramp.QuoteRampStep;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -103,6 +108,7 @@ class QuoteServiceCalculateTest {
                         .arr(new BigDecimal("5400"))
                         .tcv(new BigDecimal("5400"))
                         .acv(new BigDecimal("450.00"))
+                        .exitArr(new BigDecimal("99.00"))
                         .build())
                 .waterfall(objectMapper.readTree("""
                         {"listPrice":100.00,"netPrice":450.00,"approvalState":"APPROVED"}
@@ -114,7 +120,7 @@ class QuoteServiceCalculateTest {
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toDto(quote)).thenReturn(QuoteDto.builder().id(1L).quoteNumber("Q-1").build());
 
-        quoteService.calculate(1L);
+        QuoteDto view = quoteService.calculate(1L);
 
         assertThat(line.getListPrice()).isEqualByComparingTo("100.00");
         assertThat(line.getUnitPrice()).isEqualByComparingTo("90.00");
@@ -130,6 +136,8 @@ class QuoteServiceCalculateTest {
         assertThat(quote.getArr()).isEqualByComparingTo("5400");
         assertThat(quote.getTcv()).isEqualByComparingTo("5400");
         assertThat(quote.getAcv()).isEqualByComparingTo("450.00");
+        assertThat(quote.getExitArr()).isEqualByComparingTo("99.00");
+        assertThat(view.getExitArr()).isEqualByComparingTo("99.00");
         assertThat(quote.getApprovalState()).isEqualTo(ApprovalState.APPROVED);
         assertThat(quote.getApprovalTier()).isEqualTo("TIER_1");
         assertThat(quote.getPricingWaterfallJson()).contains("\"netPrice\":450.0");
@@ -268,6 +276,118 @@ class QuoteServiceCalculateTest {
                 .isEqualTo("PRICING_RESULT_MISMATCH");
     }
 
+    @Test
+    @DisplayName("AC-01 calculate returns TCV 81000, ACV 27000, arr 24000, and exitArr 30000")
+    void calculateAc01ReturnsRampTotalsOnTheQuoteView() {
+        Quote quote = draftQuote();
+        quote.setQuoteNumber("Q-RAMP-01");
+        quote.setCustomerExternalId("CUST-RAMP-01");
+        quote.setDurationInMonths(36);
+        QuoteLineItem line = lineItem(quote, "PROD-SEAT", "SAAS_SEAT_NAMED", 50, new BigDecimal("50.00"));
+        line.setId(5L);
+        line.setBillingFrequency("MONTHLY");
+        line.setRampSteps(new ArrayList<>());
+        line.getRampSteps().add(absoluteStep(line, 1, 1, "40"));
+        line.getRampSteps().add(absoluteStep(line, 2, 13, "45"));
+        line.getRampSteps().add(absoluteStep(line, 3, 25, "50"));
+        QuoteRampStep deleted = absoluteStep(line, 4, 37, "1");
+        deleted.softDelete();
+        line.getRampSteps().add(deleted);
+
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(line));
+
+        List<PricedPeriodView> periods = List.of(
+                period(1, 1, "40.0000", "2000.00", "24000.00"),
+                period(2, 13, "45.0000", "2250.00", "27000.00"),
+                period(3, 25, "50.0000", "2500.00", "30000.00"));
+        PricingExecuteView pricingData = PricingExecuteView.builder()
+                .success(true)
+                .lineResults(List.of(
+                        PricingLineResultView.builder()
+                                .productExternalId("PROD-SEAT")
+                                .lineItemType("SAAS_SEAT_NAMED")
+                                .quantity(50)
+                                .listPrice(new BigDecimal("50.00"))
+                                .unitPrice(new BigDecimal("40.0000"))
+                                .discountRate(new BigDecimal("0.2000"))
+                                .discountAmount(new BigDecimal("500.00"))
+                                .finalPrice(new BigDecimal("2000.00"))
+                                .pricedPeriods(periods)
+                                .build()))
+                .financialMetrics(PricingFinancialMetricsView.builder()
+                        .arr(new BigDecimal("24000.00"))
+                        .tcv(new BigDecimal("81000.00"))
+                        .acv(new BigDecimal("27000.00"))
+                        .exitArr(new BigDecimal("30000.00"))
+                        .build())
+                .build();
+        when(pricingServiceClient.executePricing(anyMap()))
+                .thenReturn(ApiResponse.success(pricingData, "ok"));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        QuoteLineItemDto lineDto = QuoteLineItemDto.builder()
+                .id(5L)
+                .productExternalId("PROD-SEAT")
+                .lineItemType("SAAS_SEAT_NAMED")
+                .quantity(50)
+                .build();
+        QuoteDto mapped = QuoteDto.builder()
+                .id(1L)
+                .quoteNumber("Q-RAMP-01")
+                .lineItems(new ArrayList<>(List.of(lineDto)))
+                .build();
+        when(quoteMapper.toDto(quote)).thenReturn(mapped);
+
+        QuoteDto view = quoteService.calculate(1L);
+
+        assertThat(view.getTcv()).isEqualByComparingTo("81000.00");
+        assertThat(view.getAcv()).isEqualByComparingTo("27000.00");
+        assertThat(view.getArr()).isEqualByComparingTo("24000.00");
+        assertThat(view.getExitArr()).isEqualByComparingTo("30000.00");
+        assertThat(quote.getTcv()).isEqualByComparingTo("81000.00");
+        assertThat(quote.getAcv()).isEqualByComparingTo("27000.00");
+        assertThat(quote.getArr()).isEqualByComparingTo("24000.00");
+        assertThat(quote.getExitArr()).isEqualByComparingTo("30000.00");
+        assertThat(view.getLineItems().getFirst().getPricedPeriods()).containsExactlyElementsOf(periods);
+        assertThat(view.getLineItems().getFirst().getPricedPeriods())
+                .extracting(PricedPeriodView::getPeriodAmount)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                .containsExactly(new BigDecimal("24000.00"), new BigDecimal("27000.00"), new BigDecimal("30000.00"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(pricingServiceClient).executePricing(contextCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sentLines =
+                (List<Map<String, Object>>) contextCaptor.getValue().get("lineItems");
+        assertThat(sentLines).hasSize(1);
+        assertThat(sentLines.getFirst().get("billingFrequency")).isEqualTo("MONTHLY");
+        assertThat(sentLines.getFirst()).doesNotContainKeys("steps", "escalator");
+        JsonNode sentLine = objectMapper.valueToTree(sentLines.getFirst());
+        assertThat(sentLine.get("schedule").isArray()).isTrue();
+        assertThat(sentLine.get("schedule")).hasSize(3);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> schedule =
+                (List<Map<String, Object>>) sentLines.getFirst().get("schedule");
+        assertThat(schedule).hasSize(3);
+        assertThat(schedule).allSatisfy(step -> assertThat(step.keySet()).containsExactlyInAnyOrder(
+                "sequence", "startMonth", "months", "quantity", "priceBasis", "unitPrice"));
+        assertThat(schedule).extracting(step -> step.get("sequence")).containsExactly(1, 2, 3);
+        assertThat(schedule).extracting(step -> step.get("startMonth")).containsExactly(1, 13, 25);
+        assertThat(schedule).extracting(step -> step.get("months")).containsExactly(12, 12, 12);
+        assertThat(schedule).extracting(step -> step.get("quantity")).containsExactly(50, 50, 50);
+        assertThat(schedule).allSatisfy(step -> {
+            assertThat(step.get("priceBasis")).isEqualTo("ABSOLUTE");
+            assertThat(step).doesNotContainKey("discountFraction");
+        });
+        assertThat((BigDecimal) schedule.get(0).get("unitPrice")).isEqualByComparingTo("40");
+        assertThat((BigDecimal) schedule.get(1).get("unitPrice")).isEqualByComparingTo("45");
+        assertThat((BigDecimal) schedule.get(2).get("unitPrice")).isEqualByComparingTo("50");
+        verify(quoteLineItemRepository).saveAll(List.of(line));
+        verify(quoteRepository).save(quote);
+    }
+
     private static Quote draftQuote() {
         Quote quote = Quote.builder()
                 .quoteNumber("Q-1")
@@ -294,6 +414,37 @@ class QuoteServiceCalculateTest {
                 .lineItemType(lineItemType)
                 .quantity(quantity)
                 .listPrice(listPrice)
+                .build();
+    }
+
+    private static QuoteRampStep absoluteStep(
+            QuoteLineItem line, int sequence, int startMonth, String unitPrice) {
+        QuoteRampStep step = QuoteRampStep.builder()
+                .lineItem(line)
+                .sequence(sequence)
+                .startMonth(startMonth)
+                .months(12)
+                .quantity(50)
+                .priceBasis("ABSOLUTE")
+                .unitPrice(new BigDecimal(unitPrice))
+                .build();
+        return step;
+    }
+
+    private static PricedPeriodView period(
+            int sequence,
+            int startMonth,
+            String netUnitPrice,
+            String netMonthly,
+            String periodAmount) {
+        return PricedPeriodView.builder()
+                .sequence(sequence)
+                .startMonth(startMonth)
+                .months(12)
+                .quantity(50)
+                .netUnitPrice(new BigDecimal(netUnitPrice))
+                .netMonthly(new BigDecimal(netMonthly))
+                .periodAmount(new BigDecimal(periodAmount))
                 .build();
     }
 }

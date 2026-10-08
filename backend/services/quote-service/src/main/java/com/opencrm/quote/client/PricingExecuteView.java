@@ -26,4 +26,8 @@ public class PricingExecuteView {
     private String approvalTier;
     /** Opaque waterfall JSON retained for persistence as pricingWaterfallJson. */
     private JsonNode waterfall;
+    /** Engine timing. Accepted so a real success body can bind. */
+    private Long executionTimeMs;
+    /** Quote-level codes from pricing. Distinct from each line's explanationCodes. */
+    private List<String> explanationCodes;
 }
