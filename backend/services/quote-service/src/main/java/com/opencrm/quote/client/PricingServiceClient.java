@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -37,29 +38,35 @@ public class PricingServiceClient {
      */
     public PricingServiceClient(@Qualifier("pricingRestClient") RestClient restClient) {
         this.restClient = restClient;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = new ObjectMapper().findAndRegisterModules();
     }
 
     public ApiResponse<PricingExecuteView> executePricing(Map<String, Object> pricingContext) {
         log.debug("Calling pricing service to execute pricing");
-        String raw = restClient.post()
-                .uri("/api/v1/pricing/execute")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(pricingContext)
-                .retrieve()
-                .body(String.class);
-        return parsePricingResponse(raw);
+        return parsePricingResponse(postForBody("/api/v1/pricing/execute", pricingContext));
     }
 
     public ApiResponse<PricingExecuteView> simulatePricing(Map<String, Object> pricingContext) {
         log.debug("Calling pricing service to simulate pricing");
-        String raw = restClient.post()
-                .uri("/api/v1/pricing/simulate")
+        return parsePricingResponse(postForBody("/api/v1/pricing/simulate", pricingContext));
+    }
+
+    /**
+     * 4xx bodies are pricing refusals (422 with no success payload). 5xx stays a transport failure.
+     */
+    private String postForBody(String uri, Map<String, Object> pricingContext) {
+        return restClient.post()
+                .uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(pricingContext)
                 .retrieve()
+                .onStatus(HttpStatusCode::is5xxServerError, (request, response) -> {
+                    throw new RestClientException(
+                            "Pricing service status " + response.getStatusCode().value());
+                })
+                .onStatus(HttpStatusCode::is4xxClientError, (request, response) ->
+                        log.debug("Pricing service returned {}", response.getStatusCode().value()))
                 .body(String.class);
-        return parsePricingResponse(raw);
     }
 
     private ApiResponse<PricingExecuteView> parsePricingResponse(String raw) {

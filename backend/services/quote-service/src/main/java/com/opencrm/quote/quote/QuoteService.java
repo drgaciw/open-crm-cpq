@@ -12,6 +12,7 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.quote.client.PricedPeriodView;
 import com.opencrm.quote.client.PricingExecuteView;
 import com.opencrm.quote.client.PricingFinancialMetricsView;
 import com.opencrm.quote.client.PricingLineResultView;
@@ -19,8 +20,10 @@ import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
+import com.opencrm.quote.lineitem.QuoteLineItemDto;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
 import com.opencrm.quote.ramp.QuoteRampStep;
+import com.opencrm.quote.ramp.RampReasons;
 import com.opencrm.quote.ramp.RampScheduleException;
 import com.opencrm.quote.ramp.RampScheduleGuard;
 import com.opencrm.quote.ramp.RampScheduleViews;
@@ -494,16 +497,15 @@ public class QuoteService {
         if (lineItems.isEmpty()) {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
         }
-        if (lineItems.stream().anyMatch(RampScheduleViews::hasSteps)) {
-            throw RampScheduleException.notSupported();
-        }
 
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
         PricingExecuteView pricingData = fetchPricingData(pricingContext);
         Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine =
                 indexLineResults(pricingData.getLineResults());
+        refuseUnpricedSchedules(lineItems, pricingResultByLine);
 
-        PricingTotals totals = applyPricingToLineItems(lineItems, pricingResultByLine);
+        Map<Long, List<PricedPeriodView>> pricedByLineId = new HashMap<>();
+        PricingTotals totals = applyPricingToLineItems(lineItems, pricingResultByLine, pricedByLineId);
         quoteLineItemRepository.saveAll(lineItems);
 
         quote.setSubtotal(totals.subtotal());
@@ -514,7 +516,9 @@ public class QuoteService {
 
         Quote saved = quoteRepository.save(quote);
         log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
-        return quoteMapper.toDto(saved);
+        QuoteDto dto = quoteMapper.toDto(saved);
+        stampRampView(dto, saved, pricedByLineId);
+        return dto;
     }
 
     private void updateQuoteFromPricingData(Quote quote, PricingExecuteView pricingData) {
@@ -523,6 +527,7 @@ public class QuoteService {
             quote.setArr(decimalOrFallback(financialMetrics.getArr(), quote.getArr()));
             quote.setTcv(decimalOrFallback(financialMetrics.getTcv(), quote.getTcv()));
             quote.setAcv(decimalOrFallback(financialMetrics.getAcv(), quote.getAcv()));
+            quote.setExitArr(decimalOrFallback(financialMetrics.getExitArr(), quote.getExitArr()));
         }
 
         String approvalState = pricingData.getApprovalState();
@@ -550,7 +555,8 @@ public class QuoteService {
 
     private PricingTotals applyPricingToLineItems(
             List<QuoteLineItem> lineItems,
-            Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine) {
+            Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine,
+            Map<Long, List<PricedPeriodView>> pricedByLineId) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalDiscount = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -585,6 +591,10 @@ public class QuoteService {
             lineItem.setDiscountAmount(lineDiscount);
             lineItem.setNetPrice(netUnit);
             lineItem.setExtendedAmount(lineFinal);
+            List<PricedPeriodView> periods = lineResult.getPricedPeriods();
+            if (lineItem.getId() != null && periods != null && !periods.isEmpty()) {
+                pricedByLineId.put(lineItem.getId(), List.copyOf(periods));
+            }
 
             List<String> explanationCodes = lineResult.getExplanationCodes();
             if (explanationCodes != null && !explanationCodes.isEmpty()) {
@@ -614,10 +624,7 @@ public class QuoteService {
         }
 
         if (pricingApiResponse == null || !pricingApiResponse.isSuccess()) {
-            String message = pricingApiResponse != null && pricingApiResponse.getMessage() != null
-                    ? pricingApiResponse.getMessage()
-                    : "Pricing execution failed";
-            throw new BusinessException(message, "PRICING_EXECUTION_FAILED");
+            throw pricingEnvelopeFailure(pricingApiResponse);
         }
 
         PricingExecuteView pricingData = pricingApiResponse.getData();
@@ -629,6 +636,28 @@ public class QuoteService {
         }
 
         return pricingData;
+    }
+
+    /**
+     * Flag-off is 422 {@code RAMP_NOT_SUPPORTED} with no success body. A line the engine
+     * will not price is 422 {@code RAMP_SCHEDULE_INVALID} and must not be relabeled as
+     * the empty-period failure.
+     */
+    private RuntimeException pricingEnvelopeFailure(ApiResponse<PricingExecuteView> pricingApiResponse) {
+        if (pricingApiResponse == null) {
+            return new BusinessException("Pricing execution failed", "PRICING_EXECUTION_FAILED");
+        }
+        String code = pricingApiResponse.getErrorCode();
+        String message = pricingApiResponse.getMessage();
+        if (RampReasons.NOT_SUPPORTED.equals(code)) {
+            return RampScheduleException.notSupported();
+        }
+        if (RampReasons.SCHEDULE_INVALID.equals(code)
+                && RampReasons.NOT_ALLOWED_FOR_LINE_TYPE.equals(message)) {
+            return RampScheduleException.invalid(List.of(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE));
+        }
+        String fallback = message != null ? message : "Pricing execution failed";
+        return new BusinessException(fallback, "PRICING_EXECUTION_FAILED");
     }
 
     private void copyRampSteps(QuoteLineItem source, QuoteLineItem copy) {
@@ -657,18 +686,13 @@ public class QuoteService {
     }
 
     /**
-     * Flat pricing context only. A line that has steps never reaches here:
-     * calculate fails closed with RAMP_NOT_SUPPORTED. R1-WIRE sends the schedule.
+     * Flat lines send product, type, and quantity. A line with steps also sends
+     * {@code billingFrequency} and {@code schedule}. Pricing refuses a schedule
+     * that has no recurring frequency.
      */
     private Map<String, Object> buildPricingContext(Quote quote, List<QuoteLineItem> lineItems) {
         List<Map<String, Object>> contextLineItems = lineItems.stream()
-                .map(item -> {
-                    Map<String, Object> line = new HashMap<>();
-                    line.put("productExternalId", item.getProductExternalId());
-                    line.put("lineItemType", item.getLineItemType());
-                    line.put("quantity", item.getQuantity());
-                    return line;
-                })
+                .map(this::toPricingLine)
                 .toList();
 
         Map<String, Object> context = new HashMap<>();
@@ -702,5 +726,83 @@ public class QuoteService {
 
     private BigDecimal decimalOrFallback(BigDecimal value, BigDecimal fallback) {
         return value != null ? value : fallback;
+    }
+
+    private Map<String, Object> toPricingLine(QuoteLineItem item) {
+        Map<String, Object> line = new HashMap<>();
+        line.put("productExternalId", item.getProductExternalId());
+        line.put("lineItemType", item.getLineItemType());
+        line.put("quantity", item.getQuantity());
+        List<QuoteRampStep> steps = RampScheduleViews.activeSteps(item);
+        if (!steps.isEmpty()) {
+            line.put("billingFrequency", item.getBillingFrequency());
+            line.put("schedule", steps.stream().map(this::toPricingStep).toList());
+        }
+        return line;
+    }
+
+    private Map<String, Object> toPricingStep(QuoteRampStep step) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("sequence", step.getSequence());
+        row.put("startMonth", step.getStartMonth());
+        row.put("months", step.getMonths());
+        row.put("quantity", step.getQuantity());
+        row.put("priceBasis", step.getPriceBasis());
+        if (step.getUnitPrice() != null) {
+            row.put("unitPrice", step.getUnitPrice());
+        }
+        if (step.getDiscountFraction() != null) {
+            row.put("discountFraction", step.getDiscountFraction());
+        }
+        return row;
+    }
+
+    /**
+     * A sent schedule with no period results is refused before any total is saved.
+     */
+    private void refuseUnpricedSchedules(
+            List<QuoteLineItem> lineItems,
+            Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine) {
+        Map<String, ArrayDeque<PricingLineResultView>> pending = new HashMap<>();
+        for (Map.Entry<String, ArrayDeque<PricingLineResultView>> entry : pricingResultByLine.entrySet()) {
+            pending.put(entry.getKey(), new ArrayDeque<>(entry.getValue()));
+        }
+        for (QuoteLineItem lineItem : lineItems) {
+            if (!RampScheduleViews.hasSteps(lineItem)) {
+                continue;
+            }
+            String key = lineKey(lineItem.getProductExternalId(), lineItem.getLineItemType());
+            ArrayDeque<PricingLineResultView> queue = pending.get(key);
+            PricingLineResultView lineResult = queue != null ? queue.pollFirst() : null;
+            List<PricedPeriodView> periods = lineResult != null ? lineResult.getPricedPeriods() : null;
+            if (periods == null || periods.isEmpty()) {
+                throw RampScheduleException.notSupported();
+            }
+        }
+    }
+
+    private void stampRampView(
+            QuoteDto dto,
+            Quote quote,
+            Map<Long, List<PricedPeriodView>> pricedByLineId) {
+        if (dto == null) {
+            return;
+        }
+        dto.setArr(quote.getArr());
+        dto.setTcv(quote.getTcv());
+        dto.setAcv(quote.getAcv());
+        dto.setExitArr(quote.getExitArr());
+        if (dto.getLineItems() == null || pricedByLineId.isEmpty()) {
+            return;
+        }
+        for (QuoteLineItemDto lineDto : dto.getLineItems()) {
+            if (lineDto.getId() == null) {
+                continue;
+            }
+            List<PricedPeriodView> periods = pricedByLineId.get(lineDto.getId());
+            if (periods != null && !periods.isEmpty()) {
+                lineDto.setPricedPeriods(periods);
+            }
+        }
     }
 }
