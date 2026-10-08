@@ -1,8 +1,12 @@
 package com.opencrm.quote.quote;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.quote.client.PricedPeriodView;
+import com.opencrm.quote.client.PricingExecuteView;
+import com.opencrm.quote.client.PricingLineResultView;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
@@ -27,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -329,12 +334,36 @@ class QuoteServiceRampTest {
     }
 
     @Test
-    @DisplayName("calculate with steps returns 422 RAMP_NOT_SUPPORTED and does not call pricing")
-    void calculateWithScheduleDoesNotCallPricing() {
+    @DisplayName("calculate with a schedule and no period results returns 422 and persists nothing")
+    void calculateWithScheduleAndNoPeriodsPersistsNothing() {
+        assertUnpricedScheduleRejected(null);
+    }
+
+    @Test
+    @DisplayName("calculate with a schedule and an empty period list returns 422 and persists nothing")
+    void calculateWithScheduleAndEmptyPeriodsPersistsNothing() {
+        assertUnpricedScheduleRejected(List.of());
+    }
+
+    private void assertUnpricedScheduleRejected(List<PricedPeriodView> periods) {
         Quote quote = quote(QuoteStatus.DRAFT, 12);
         QuoteLineItem line = lineWithStep(quote, 12);
         when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
         when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of(line));
+
+        PricingLineResultView.PricingLineResultViewBuilder result = PricingLineResultView.builder()
+                .productExternalId("10")
+                .lineItemType("SUBSCRIPTION")
+                .listPrice(new BigDecimal("40.00"))
+                .finalPrice(new BigDecimal("40.00"));
+        if (periods != null) {
+            result.pricedPeriods(periods);
+        }
+        when(pricingServiceClient.executePricing(anyMap()))
+                .thenReturn(ApiResponse.success(PricingExecuteView.builder()
+                        .success(true)
+                        .lineResults(List.of(result.build()))
+                        .build()));
 
         assertThatThrownBy(() -> quoteService.calculate(1L))
                 .isInstanceOf(RampScheduleException.class)
@@ -344,7 +373,127 @@ class QuoteServiceRampTest {
                     assertThat(ramp.getStatus().value()).isEqualTo(422);
                 });
 
-        verify(pricingServiceClient, never()).executePricing(anyMap());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(pricingServiceClient).executePricing(contextCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sentLines =
+                (List<Map<String, Object>>) contextCaptor.getValue().get("lineItems");
+        assertThat(sentLines.getFirst().get("billingFrequency")).isEqualTo("ANNUAL");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> schedule =
+                (List<Map<String, Object>>) sentLines.getFirst().get("schedule");
+        assertThat(schedule).hasSize(1);
+        assertThat(schedule.getFirst()).containsEntry("priceBasis", "ABSOLUTE");
+        assertThat(quote.getTcv()).isNull();
+        assertThat(quote.getAcv()).isNull();
+        assertThat(quote.getArr()).isNull();
+        assertThat(quote.getExitArr()).isNull();
+        assertThat(quote.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(line.getListPrice()).isEqualByComparingTo("40.00");
+        verify(quoteRepository, never()).save(any());
+        verify(quoteLineItemRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("flag-off 422 with no success body is RAMP_NOT_SUPPORTED and persists nothing")
+    void calculateFlagOffIsNotSupported() {
+        Quote quote = quote(QuoteStatus.DRAFT, 36);
+        QuoteLineItem line = lineWithStep(quote, 36);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of(line));
+        when(pricingServiceClient.executePricing(anyMap())).thenReturn(ApiResponse.error(
+                "A ramp schedule cannot be priced while opencrm.pricing.ramp.enabled is false",
+                RampReasons.NOT_SUPPORTED,
+                "trace-off"));
+
+        assertThatThrownBy(() -> quoteService.calculate(1L))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.NOT_SUPPORTED);
+                    assertThat(ramp.getStatus().value()).isEqualTo(422);
+                });
+
+        assertThat(quote.getTcv()).isNull();
+        assertThat(quote.getExitArr()).isNull();
+        verify(quoteRepository, never()).save(any());
+        verify(quoteLineItemRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("one-time frequency stays 422 RAMP_SCHEDULE_INVALID and is not relabeled")
+    void calculateOneTimeFrequencyStaysScheduleInvalid() {
+        assertNotAllowed("ONE_TIME", "SUBSCRIPTION");
+    }
+
+    @Test
+    @DisplayName("a blank frequency stays 422 RAMP_SCHEDULE_INVALID")
+    void calculateBlankFrequencyStaysScheduleInvalid() {
+        assertNotAllowed("  ", "SUBSCRIPTION");
+    }
+
+    @Test
+    @DisplayName("a missing frequency stays 422 RAMP_SCHEDULE_INVALID")
+    void calculateMissingFrequencyStaysScheduleInvalid() {
+        assertNotAllowed(null, "SUBSCRIPTION");
+    }
+
+    @Test
+    @DisplayName("perpetual frequency stays 422 RAMP_SCHEDULE_INVALID")
+    void calculatePerpetualFrequencyStaysScheduleInvalid() {
+        assertNotAllowed("PERPETUAL", "SUBSCRIPTION");
+    }
+
+    @Test
+    @DisplayName("a DISCOUNT line stays 422 RAMP_SCHEDULE_INVALID")
+    void calculateDiscountLineStaysScheduleInvalid() {
+        assertNotAllowed("MONTHLY", "DISCOUNT");
+    }
+
+    @Test
+    @DisplayName("a FEE line stays 422 RAMP_SCHEDULE_INVALID")
+    void calculateFeeLineStaysScheduleInvalid() {
+        assertNotAllowed("MONTHLY", "FEE");
+    }
+
+    @Test
+    @DisplayName("a TAX line stays 422 RAMP_SCHEDULE_INVALID")
+    void calculateTaxLineStaysScheduleInvalid() {
+        assertNotAllowed("MONTHLY", "TAX");
+    }
+
+    private void assertNotAllowed(String billingFrequency, String lineItemType) {
+        Quote quote = quote(QuoteStatus.DRAFT, 36);
+        QuoteLineItem line = lineWithStep(quote, 36);
+        line.setBillingFrequency(billingFrequency);
+        line.setLineItemType(lineItemType);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of(line));
+        when(pricingServiceClient.executePricing(anyMap())).thenReturn(ApiResponse.error(
+                RampReasons.NOT_ALLOWED_FOR_LINE_TYPE,
+                RampReasons.SCHEDULE_INVALID,
+                "trace-type"));
+
+        assertThatThrownBy(() -> quoteService.calculate(1L))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
+                    assertThat(ramp.getReasons()).containsExactly(RampReasons.NOT_ALLOWED_FOR_LINE_TYPE);
+                    assertThat(ramp.getStatus().value()).isEqualTo(422);
+                });
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(pricingServiceClient).executePricing(contextCaptor.capture());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sentLines =
+                (List<Map<String, Object>>) contextCaptor.getValue().get("lineItems");
+        assertThat(sentLines.getFirst()).containsKey("billingFrequency");
+        assertThat(sentLines.getFirst().get("billingFrequency")).isEqualTo(billingFrequency);
+        assertThat(sentLines.getFirst().get("schedule")).isInstanceOf(List.class);
+        assertThat(sentLines.getFirst()).doesNotContainKeys("steps", "escalator");
         verify(quoteRepository, never()).save(any());
         verify(quoteLineItemRepository, never()).saveAll(any());
     }
