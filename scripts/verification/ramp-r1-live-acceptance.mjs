@@ -8,11 +8,12 @@ if (process.env.RAMP_ACCEPTANCE_DATABASE !== 'ramp_wave_20261009') {
 }
 const origins = { quote: 'http://127.0.0.1:18084', pricing: 'http://127.0.0.1:18082', pricebook: 'http://127.0.0.1:18087' };
 const runId = `RAMP-AC01-${Date.now()}`;
+const region = `RW-${runId.slice('RAMP-AC01-'.length)}`;
 const customerExternalId = `${runId}-CUSTOMER`;
 const productExternalId = `${runId}-SEAT`;
-const request = async (service, path, body, expectedStatus) => {
+const request = async (service, path, body, expectedStatus, method) => {
   const response = await fetch(`${origins[service]}${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
+    method: method ?? (body === undefined ? 'GET' : 'POST'),
     headers: { 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(30000),
@@ -35,16 +36,21 @@ const assertMetrics = (quote) => {
 await request('pricing', '/api/v1/pricing-customers', {
   externalId: customerExternalId, name: `Synthetic ${runId}`, segment: 'SMB', region: 'NA',
 });
-const priorBooks = await request('pricebook', '/api/v1/price-books?region=NA&page=0&size=20');
-assert.ok(priorBooks.content.every((book) => book.name.startsWith('Synthetic RAMP-AC01-')), 'isolated database may contain only this script\'s synthetic regional books');
-assert.ok(priorBooks.content.length <= 1, 'one synthetic regional book is expected');
-const book = priorBooks.content[0] ?? await request('pricebook', '/api/v1/price-books', {
-  name: `Synthetic ${runId}`, region: 'NA', currency: 'USD', isDefault: true,
-  effectiveDate: '2020-01-01',
+const priorBooks = await request('pricebook', '/api/v1/price-books?page=0&size=100');
+assert.ok(priorBooks.content.every((book) => book.name.startsWith('Synthetic RAMP-AC01-')), 'isolated database may contain only this script\'s synthetic books');
+assert.equal(priorBooks.totalElements, priorBooks.content.length, 'inspect all prior fixture books before adding a new isolated region');
+// Preserve earlier published fixtures. Author a new draft in a unique region, then publish after adding its entry.
+const book = await request('pricebook', '/api/v1/price-books', {
+  name: `Synthetic ${runId}`, region, currency: 'USD', isDefault: false, effectiveDate: null,
 });
 await request('pricebook', `/api/v1/price-books/${book.id}/entries`, { productExternalId, listPrice: 50, currency: 'USD' });
+await request('pricebook', `/api/v1/price-books/${book.id}`, { effectiveDate: '2020-01-01' }, undefined, 'PUT');
+const resolved = await request('pricebook', '/internal/v1/price-books/resolve-batch', { region, productExternalIds: [productExternalId] });
+assert.equal(resolved.priceBookId, book.id, 'real regional resolution selects the newly published fixture');
+assert.equal(resolved.entries[productExternalId].entryMatched, true);
+assert.equal(Number(resolved.entries[productExternalId].listPrice), 50);
 const quote = await request('quote', '/api/v1/quotes', {
-  name: `Synthetic ${runId}`, customerExternalId, currency: 'USD', region: 'NA', durationInMonths: 36,
+  name: `Synthetic ${runId}`, customerExternalId, currency: 'USD', region, durationInMonths: 36,
   startDate: '2027-01-01', endDate: '2029-12-31',
 });
 const steps = [40, 45, 50].map((unitPrice, index) => ({
@@ -52,7 +58,7 @@ const steps = [40, 45, 50].map((unitPrice, index) => ({
 }));
 const line = {
   productExternalId, productName: `Synthetic ${runId} seats`, productType: 'SAAS_SEAT_NAMED',
-  lineItemType: 'SAAS_SEAT_NAMED', quantity: 50, listPrice: 50, billingFrequency: 'MONTHLY', schedule: { steps },
+  lineItemType: 'SAAS_SEAT_NAMED', quantity: 50, sortOrder: 0, listPrice: 50, billingFrequency: 'MONTHLY', schedule: { steps },
 };
 await request('quote', `/api/v1/quotes/${quote.id}/line-items`, line);
 const calculated = await request('quote', `/api/v1/quotes/${quote.id}/calculate`, {});
@@ -93,7 +99,7 @@ assert.deepEqual(replayed.lineItems[0].pricedPeriods, periods, 'unchanged pricin
 
 // R2 policy is checked through the same real stack, while canonical event consumption stays out of scope.
 const governedQuote = await request('quote', '/api/v1/quotes', {
-  name: `Synthetic ${runId} governance`, customerExternalId, currency: 'USD', region: 'NA', durationInMonths: 36,
+  name: `Synthetic ${runId} governance`, customerExternalId, currency: 'USD', region, durationInMonths: 36,
   startDate: '2027-01-01', endDate: '2029-12-31',
 });
 const governedLine = structuredClone(line);
@@ -109,7 +115,7 @@ const governedReload = await request('quote', `/api/v1/quotes/${governedQuote.id
 assert.deepEqual(governedReload.rampGovernance, governed.rampGovernance, 'governing period persists after GET');
 
 const report = {
-  runId, database: process.env.RAMP_ACCEPTANCE_DATABASE, origins, quoteId: quote.id, bookId: book.id,
+  runId, region, database: process.env.RAMP_ACCEPTANCE_DATABASE, origins, quoteId: quote.id, bookId: book.id,
   checks: ['real quote-to-pricing-to-pricebook HTTP', 'AC-01 arithmetic', 'schedule and totals persisted after GET', 'AC-03 rejected gap leaves no new line', 'unchanged-context period replay', 'R2 AC-05 period-one SALES_VP policy and persisted banner'],
   governedQuoteId: governedQuote.id,
   documentId: document.id,

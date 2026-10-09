@@ -33,9 +33,13 @@ class QuoteDocumentRampTest {
     @Test
     void generatedPdfIncludesPersistedAc01PeriodsAndEscapesProductName() throws Exception {
         Quote quote = quote();
+        quote.setName("Synthetic RAMP-AC01-1791585948963");
+        quote.setCustomerExternalId("RAMP-AC01-1791585948963-CUSTOMER");
+        quote.setStartDate(java.time.LocalDate.of(2027, 1, 1));
+        quote.setEndDate(java.time.LocalDate.of(2029, 12, 31));
         QuoteLineItem line = QuoteLineItem.builder()
                 .quote(quote)
-                .productName("Seats <script>unsafe</script>")
+                .productName("Synthetic RAMP-AC01-1791585948963 Seats <script>unsafe</script>")
                 .quantity(50).listPrice(new BigDecimal("50")).build();
         line.setRampSteps(List.of(QuoteRampStep.builder().sequence(1).startMonth(1).months(12).build(),
                 QuoteRampStep.builder().sequence(2).startMonth(13).months(12).build(),
@@ -62,6 +66,12 @@ class QuoteDocumentRampTest {
                     "USD 40.0000", "USD 45.0000", "USD 50.0000", "USD 24000.00", "USD 27000.00", "USD 30000.00",
                     "Initial amount:", "USD 2000.00", "Total contract value:", "USD 81000.00", "Annual contract value:",
                     "Starting annual run rate:", "Exit annual run rate:");
+            for (int page = 1; page <= pdf.getNumberOfPages(); page++) {
+                PDFTextStripper pageText = new PDFTextStripper();
+                pageText.setStartPage(page);
+                pageText.setEndPage(page);
+                assertThat(pageText.getText(pdf).trim()).as("rendered page %s contains content", page).isNotEmpty();
+            }
         }
     }
 
