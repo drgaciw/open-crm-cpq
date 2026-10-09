@@ -61,7 +61,7 @@ public class DiscountApprovalEventConsumer {
     private final KafkaInbox inbox;
     private final CurrentActor currentActor;
 
-    @KafkaListener(topics = KafkaTopics.DISCOUNT_APPROVAL_REQUIRED, groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = {KafkaTopics.DISCOUNT_APPROVAL_REQUIRED, KafkaTopics.RAMP_APPROVAL_BINDING_CHANGED}, groupId = CONSUMER_GROUP)
     @Transactional
     public void handleDiscountApprovalRequired(ConsumerRecord<String, String> record) {
         if (!inbox.claim(CONSUMER_GROUP, record)) {
@@ -69,6 +69,9 @@ public class DiscountApprovalEventConsumer {
             return;
         }
         DiscountApprovalRequiredEvent event = parse(record.value());
+        if (KafkaTopics.RAMP_APPROVAL_BINDING_CHANGED.equals(record.topic()) && event.getPricingFingerprint() == null) {
+            throw new NonRetryableEventException("Ramp binding contract requires a pricing fingerprint");
+        }
         log.info("Received discount approval required event for quote: {}", event.getQuoteId());
 
         List<ApprovalRequest> open = openRequestsForLine(event);
@@ -85,20 +88,24 @@ public class DiscountApprovalEventConsumer {
             return;
         }
 
-        String ruleTier = determineApprovalTier(event.getMarginDelta());
+        String ruleTier = event.getPricingFingerprint() == null
+                ? determineApprovalTier(event.getMarginDelta()) : event.getApprovalTier();
         ApprovalRequest request = ApprovalRequest.builder()
                 .quoteId(event.getQuoteId())
                 .lineId(event.getLineId())
                 .approvalType(ApprovalType.DISCOUNT)
-                .status(ApprovalStatus.PENDING)
+                .status(Boolean.FALSE.equals(event.getApprovalRequired()) ? ApprovalStatus.CANCELLED : ApprovalStatus.PENDING)
                 .requestedDiscount(event.getRequestedDiscount())
                 .marginDelta(event.getMarginDelta())
                 .currencyCode(event.getCurrencyCode())
+                .pricingFingerprint(event.getPricingFingerprint())
+                .governingPeriod(event.getGoverningPeriod())
                 // The consumer acts as this service (ADR-016 decision 6); the event carries no verified user.
                 .requesterId(currentActor.self())
                 .submittedAt(Instant.now())
                 .approvalTier(ruleTier)
-                .reason("Discount exceeds standard threshold")
+                .reason(event.getPricingFingerprint() == null
+                        ? "Discount exceeds standard threshold" : event.getReason())
                 .build();
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
@@ -106,7 +113,7 @@ public class DiscountApprovalEventConsumer {
 
         // Advisory shadow only (ADR-015): the rule above stays authoritative. Never throws, and runs
         // after this transaction commits, so it cannot cause a redelivery.
-        discountTierShadow.recordAfterCommit(saved.getId(), event, ruleTier);
+        if (saved.getStatus() == ApprovalStatus.PENDING) discountTierShadow.recordAfterCommit(saved.getId(), event, ruleTier);
 
         log.info("Created approval request for quote: {}", event.getQuoteId());
     }
@@ -116,6 +123,12 @@ public class DiscountApprovalEventConsumer {
             DiscountApprovalRequiredEvent event = objectMapper.readValue(payload, DiscountApprovalRequiredEvent.class);
             if (event == null || event.getQuoteId() == null || event.getMarginDelta() == null) {
                 throw new NonRetryableEventException("Discount approval event lacks quoteId or marginDelta: " + payload);
+            }
+            if (event.getPricingFingerprint() != null && (!event.getPricingFingerprint().matches("[a-f0-9]{64}")
+                    || event.getGoverningPeriod() == null || event.getGoverningPeriod() < 1
+                    || !("SALES_VP".equals(event.getApprovalTier()) || "DEAL_DESK".equals(event.getApprovalTier())
+                    || "CFO".equals(event.getApprovalTier())))) {
+                throw new NonRetryableEventException("Invalid ramp approval binding");
             }
             return event;
         } catch (JsonProcessingException e) {
@@ -127,8 +140,9 @@ public class DiscountApprovalEventConsumer {
     private List<ApprovalRequest> openRequestsForLine(DiscountApprovalRequiredEvent event) {
         return approvalRequestRepository
                 .findByQuoteIdAndStatus(event.getQuoteId(), ApprovalStatus.PENDING).stream()
-                .filter(open -> open.getApprovalType() == ApprovalType.DISCOUNT
-                        && Objects.equals(open.getLineId(), event.getLineId()))
+                .filter(open -> (open.getApprovalType() == ApprovalType.DISCOUNT && Objects.equals(open.getLineId(), event.getLineId())
+                        && (event.getPricingFingerprint() != null || open.getPricingFingerprint() == null))
+                        || (event.getPricingFingerprint() != null && open.getPricingFingerprint() != null))
                 .sorted(Comparator.comparing(ApprovalRequest::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .toList();
     }
@@ -137,9 +151,13 @@ public class DiscountApprovalEventConsumer {
     private static ApprovalRequest latestIdentical(List<ApprovalRequest> open, DiscountApprovalRequiredEvent event) {
         ApprovalRequest latest = null;
         for (ApprovalRequest candidate : open) {
-            if (sameAmount(candidate.getRequestedDiscount(), event.getRequestedDiscount())
+            boolean identicalRamp = event.getPricingFingerprint() != null
+                    && event.getPricingFingerprint().equals(candidate.getPricingFingerprint());
+            boolean identicalLegacy = event.getPricingFingerprint() == null && candidate.getPricingFingerprint() == null
+                    && sameAmount(candidate.getRequestedDiscount(), event.getRequestedDiscount())
                     && sameAmount(candidate.getMarginDelta(), event.getMarginDelta())
-                    && Objects.equals(candidate.getCurrencyCode(), event.getCurrencyCode())) {
+                    && Objects.equals(candidate.getCurrencyCode(), event.getCurrencyCode());
+            if (identicalRamp || identicalLegacy) {
                 latest = candidate;
             }
         }

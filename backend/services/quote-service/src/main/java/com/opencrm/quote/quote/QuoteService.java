@@ -110,7 +110,8 @@ public class QuoteService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
-        if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
+        if (!EDITABLE_STATUSES.contains(quote.getStatus()) && !(quote.getStatus() == QuoteStatus.PENDING_APPROVAL
+                && com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null)) {
             throw new BusinessException(
                     "Quote can only be edited in DRAFT or REJECTED status. Current: " + quote.getStatus(),
                     "QUOTE_NOT_EDITABLE"
@@ -120,8 +121,19 @@ public class QuoteService {
         int previousDuration = quote.getDurationInMonths();
         String previousCurrency = quote.getCurrency();
         String previousRegion = quote.getRegion();
+        String previousAuthoring = com.opencrm.quote.ramp.RampPricingSnapshot.authoringFingerprint(quote,
+                quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id));
+        String previousSubscriptionType = quote.getSubscriptionType();
+        java.time.LocalDate previousStart = quote.getStartDate();
+        java.time.LocalDate previousEnd = quote.getEndDate();
         quoteMapper.updateEntity(request, quote);
         rampScheduleGuard.markIfContextChanged(quote, previousDuration, previousCurrency, previousRegion);
+        if (!Objects.equals(previousStart, quote.getStartDate()) || !Objects.equals(previousEnd, quote.getEndDate())
+                || !Objects.equals(previousSubscriptionType, quote.getSubscriptionType())) {
+            List<QuoteLineItem> lines = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+            if (lines.stream().anyMatch(RampScheduleViews::hasSteps)) quote.setRampScheduleStale(true);
+        }
+        rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
         Quote updated = quoteRepository.save(quote);
         log.info("Updated quote: {}", updated.getQuoteNumber());
 
@@ -334,6 +346,7 @@ public class QuoteService {
             throw new BusinessException("Only approved quotes can be sent", "INVALID_STATUS_TRANSITION");
         }
 
+        rampScheduleGuard.requireApproved(quote);
         quote.setStatus(QuoteStatus.SENT);
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} sent", saved.getQuoteNumber());
@@ -348,7 +361,7 @@ public class QuoteService {
             throw new BusinessException("Only sent quotes can be accepted", "INVALID_STATUS_TRANSITION");
         }
 
-        rampScheduleGuard.refuseIfStale(quote);
+        rampScheduleGuard.requireApproved(quote);
 
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
@@ -477,6 +490,7 @@ public class QuoteService {
         saved.setSubtotal(subtotal);
         saved.setTotalDiscount(totalDiscount);
         saved.setTotalAmount(subtotal.subtract(totalDiscount));
+        if (clonedLines.stream().anyMatch(RampScheduleViews::hasSteps)) saved.setRampScheduleStale(true);
         saved = quoteRepository.save(saved);
 
         saved.getLineItems().addAll(clonedLines);
@@ -493,6 +507,13 @@ public class QuoteService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
+        if (quote.getStatus() == QuoteStatus.ACCEPTED) {
+            throw new BusinessException("Accepted quote pricing is immutable; create a new version",
+                    HttpStatus.CONFLICT, "QUOTE_NOT_EDITABLE");
+        }
+        String previousFingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote);
+        boolean previouslyRequired = com.opencrm.quote.ramp.RampPricingSnapshot.read(quote.getPricingWaterfallJson()).hasNonNull("rampGovernance");
+        ApprovalState previousApproval = quote.getApprovalState();
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         if (lineItems.isEmpty()) {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
@@ -513,6 +534,8 @@ public class QuoteService {
         quote.setTotalAmount(totals.totalAmount());
 
         updateQuoteFromPricingData(quote, pricingData);
+        quote.setRampScheduleStale(false);
+        bindRampSnapshot(quote, lineItems, previousFingerprint, previousApproval, previouslyRequired);
 
         Quote saved = quoteRepository.save(quote);
         log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
@@ -592,6 +615,21 @@ public class QuoteService {
             lineItem.setNetPrice(netUnit);
             lineItem.setExtendedAmount(lineFinal);
             List<PricedPeriodView> periods = lineResult.getPricedPeriods();
+            if (periods != null && !periods.isEmpty()) {
+                try {
+                    Map<String, Object> snapshot = new HashMap<>();
+                    snapshot.put("pricedPeriods", periods);
+                    snapshot.put("rampPolicyContext", lineResult.getMetadata().get("rampPolicyContext"));
+                    if (lineResult.getMetadata() != null && lineResult.getMetadata().get("rampGovernance") != null) {
+                        snapshot.put("rampGovernance", lineResult.getMetadata().get("rampGovernance"));
+                    }
+                    lineItem.setPricingWaterfallJson(objectMapper.writeValueAsString(snapshot));
+                } catch (JsonProcessingException ex) {
+                    throw new BusinessException("Cannot persist ramp pricing", "RAMP_PRICING_SNAPSHOT_INVALID");
+                }
+            } else {
+                lineItem.setPricingWaterfallJson(null);
+            }
             if (lineItem.getId() != null && periods != null && !periods.isEmpty()) {
                 pricedByLineId.put(lineItem.getId(), List.copyOf(periods));
             }
@@ -609,6 +647,61 @@ public class QuoteService {
         }
 
         return new PricingTotals(subtotal, totalDiscount, totalAmount);
+    }
+
+    private void bindRampSnapshot(Quote quote, List<QuoteLineItem> lines,
+                                  String previousFingerprint, ApprovalState previousApproval, boolean previouslyRequired) {
+        if (lines.stream().noneMatch(RampScheduleViews::hasSteps) && !previouslyRequired) return;
+        com.opencrm.quote.ramp.RampGovernanceDto governing = null;
+        String selectedTier = null;
+        for (QuoteLineItem line : lines) {
+            if (!RampScheduleViews.hasSteps(line)) continue;
+            JsonNode candidate = com.opencrm.quote.ramp.RampPricingSnapshot.read(line.getPricingWaterfallJson()).get("rampGovernance");
+            if (candidate == null || candidate.isNull()) continue;
+            String candidateTier = candidate.path("approvalTier").asText();
+            com.fasterxml.jackson.databind.node.ObjectNode copied = (com.fasterxml.jackson.databind.node.ObjectNode) candidate.deepCopy();
+            copied.remove("approvalTier");
+            com.opencrm.quote.ramp.RampGovernanceDto value = objectMapper.convertValue(copied, com.opencrm.quote.ramp.RampGovernanceDto.class);
+            value.setGoverningLineItemId(line.getId());
+            boolean anyStepDown = value.isStepDown() || (governing != null && governing.isStepDown());
+            List<String> allReasons = new ArrayList<>(value.getReasons());
+            if (governing != null) allReasons.addAll(governing.getReasons());
+            if (governing == null || (candidateTier.equals(quote.getApprovalTier()) && !candidateTier.equals(selectedTier))
+                    || (candidateTier.equals(selectedTier) && value.getDiscountPercent().compareTo(governing.getDiscountPercent()) > 0)) {
+                governing = value;
+                selectedTier = candidateTier;
+            }
+            governing.setStepDown(anyStepDown);
+            governing.setReasons(allReasons.stream().distinct().toList());
+        }
+        String fingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote, lines);
+        com.fasterxml.jackson.databind.node.ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.set("waterfall", com.opencrm.quote.ramp.RampPricingSnapshot.read(quote.getPricingWaterfallJson()));
+        snapshot.put("pricingFingerprint", fingerprint);
+        if (governing != null) snapshot.set("rampGovernance", objectMapper.valueToTree(governing));
+        try { quote.setPricingWaterfallJson(objectMapper.writeValueAsString(snapshot)); }
+        catch (JsonProcessingException ex) { throw new BusinessException("Cannot bind ramp approval", "RAMP_PRICING_SNAPSHOT_INVALID"); }
+        if (Objects.equals(fingerprint, previousFingerprint)) {
+            quote.setApprovalState(previousApproval);
+            return;
+        }
+        if (governing != null) {
+            quote.setApprovalState(ApprovalState.PENDING);
+            com.opencrm.common.event.dto.DiscountApprovalRequiredEvent event = new com.opencrm.common.event.dto.DiscountApprovalRequiredEvent(
+                    String.valueOf(quote.getId()), String.valueOf(governing.getGoverningLineItemId()),
+                    BigDecimal.ZERO, governing.getDiscountPercent().divide(BigDecimal.valueOf(100)), quote.getCurrency(),
+                    fingerprint, governing.getGoverningPeriod(), quote.getApprovalTier(),
+                    "Ramp period " + governing.getGoverningPeriod() + ": " + String.join(", ", governing.getReasons()));
+            rampScheduleGuard.publishBinding(event);
+        } else if (previouslyRequired) {
+            QuoteLineItem line = lines.stream().filter(RampScheduleViews::hasSteps).findFirst().orElse(lines.getFirst());
+            com.opencrm.common.event.dto.DiscountApprovalRequiredEvent retired = new com.opencrm.common.event.dto.DiscountApprovalRequiredEvent(
+                    String.valueOf(quote.getId()), String.valueOf(line.getId()), BigDecimal.ZERO, BigDecimal.ZERO,
+                    quote.getCurrency(), fingerprint, 1,
+                    "DEAL_DESK", "Ramp policy cleared; previous approval snapshot retired");
+            retired.setApprovalRequired(false);
+            rampScheduleGuard.publishBinding(retired);
+        }
     }
 
     private PricingExecuteView fetchPricingData(Map<String, Object> pricingContext) {
@@ -775,7 +868,8 @@ public class QuoteService {
             ArrayDeque<PricingLineResultView> queue = pending.get(key);
             PricingLineResultView lineResult = queue != null ? queue.pollFirst() : null;
             List<PricedPeriodView> periods = lineResult != null ? lineResult.getPricedPeriods() : null;
-            if (periods == null || periods.isEmpty()) {
+            if (periods == null || periods.isEmpty() || lineResult.getMetadata() == null
+                    || !Boolean.TRUE.equals(lineResult.getMetadata().get("rampGovernanceEvaluated"))) {
                 throw RampScheduleException.notSupported();
             }
         }

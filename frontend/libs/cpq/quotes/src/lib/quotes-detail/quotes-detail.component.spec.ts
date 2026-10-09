@@ -300,6 +300,171 @@ describe('QuotesDetailComponent', () => {
     expect(submitSpy).not.toHaveBeenCalled();
   });
 
+  it('names the server governing period and pending approval instead of a blended discount', () => {
+    selectedQuote.set({
+      ...toQuoteDto(MOCK_QUOTES[0]),
+      approvalTier: 'SALES_VP',
+      approvalState: 'PENDING',
+      rampGovernance: {
+        governingLineItemId: 1,
+        governingPeriod: 1,
+        discountPercent: 32,
+        reasons: ['Period 1 exceeds the 25% discount threshold.'],
+      },
+    });
+    fixture.detectChanges();
+    const banner = fixture.nativeElement.querySelector('[data-testid="ramp-governance-banner"]') as HTMLElement;
+    expect(banner.textContent).toContain('Governing period: 1');
+    expect(banner.textContent).toContain('Product 0');
+    expect(banner.textContent).toContain('Discount: 32%');
+    expect(banner.textContent).toContain('Period 1 exceeds the 25% discount threshold.');
+    expect(banner.textContent).toContain('Use the current request in Approvals');
+    expect(banner.textContent).not.toContain('14%');
+  });
+
+  it('shows the server step-down reason without inventing a margin decision', () => {
+    selectedQuote.set({
+      ...toQuoteDto(MOCK_QUOTES[0]),
+      rampGovernance: { governingPeriod: 2, stepDown: true, reasons: ['Quantity decreases from 150 to 100.'] },
+    });
+    fixture.detectChanges();
+    const banner = fixture.nativeElement.querySelector('[data-testid="ramp-governance-banner"]') as HTMLElement;
+    expect(banner.textContent).toContain('A decrease in quantity or unit price requires approval');
+    expect(banner.textContent).toContain('Quantity decreases from 150 to 100.');
+    expect(banner.textContent).not.toContain('margin');
+  });
+
+  it('blocks submit, send and accept while stale and hides the previous governing policy', () => {
+    for (const status of ['DRAFT', 'APPROVED', 'SENT'] as const) {
+      selectedQuote.set({
+        ...toQuoteDto(MOCK_QUOTES[0]), status, rampScheduleStale: true,
+        rampGovernance: { governingPeriod: 1, discountPercent: 32 },
+      });
+      fixture.detectChanges();
+      expect(component.canSubmit()).toBe(false);
+      expect(component.canSend()).toBe(false);
+      expect(component.canAccept()).toBe(false);
+      component.onSubmit();
+      component.onSend();
+      component.onAccept();
+      expect(fixture.nativeElement.querySelector('[data-testid="ramp-stale-banner"]')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="ramp-governance-banner"]')).toBeNull();
+    }
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps Calculate available to repair stale pricing and re-enables submit after a fresh result', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), rampScheduleStale: true });
+    calculateSpy.mockReturnValue(of({ ...toQuoteDto(MOCK_QUOTES[0]), rampScheduleStale: false }));
+    expect(component.canCalculate()).toBe(true);
+    expect(component.canSubmit()).toBe(false);
+    component.onCalculate();
+    expect(calculateSpy).toHaveBeenCalledWith(1);
+    expect(component.canSubmit()).toBe(true);
+  });
+
+  it('blocks send and accept on pending or rejected ramp approval until the current request is approved', () => {
+    for (const approvalState of ['PENDING', 'REJECTED'] as const) {
+      selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'APPROVED', approvalState, rampGovernance: { governingPeriod: 1 } });
+      expect(component.canSend()).toBe(false);
+      component.onSend();
+      selectedQuote.update((quote) => quote ? { ...quote, status: 'SENT' } : quote);
+      expect(component.canAccept()).toBe(false);
+      component.onAccept();
+    }
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
+    selectedQuote.update((quote) => quote ? { ...quote, approvalState: 'APPROVED' } : quote);
+    expect(component.canAccept()).toBe(true);
+  });
+
+  it('allows a fresh draft ramp to submit for its pending approval', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'DRAFT', approvalState: 'PENDING', rampGovernance: { governingPeriod: 1 } });
+    expect(component.canSubmit()).toBe(true);
+    component.onSubmit();
+    expect(submitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('allows a bound pending ramp edit, then reprices the stale draft returned by the server', () => {
+    const quote = toQuoteDto(MOCK_QUOTES[0]);
+    const line = quote.lineItems?.[0];
+    if (!line) { throw new Error('Expected a quote fixture line'); }
+    const rampLine: QuoteLineItemDto = { ...line, lineItemType: 'SUBSCRIPTION', billingFrequency: 'MONTHLY',
+      schedule: { steps: [{ sequence: 1, startMonth: 1, months: quote.durationInMonths, quantity: 50, priceBasis: 'ABSOLUTE', unitPrice: 40 }] },
+    };
+    selectedQuote.set({ ...quote, status: 'PENDING_APPROVAL', approvalState: 'PENDING', lineItems: [rampLine],
+      rampGovernance: { governingLineItemId: line.id, governingPeriod: 1, discountPercent: 32 },
+    });
+    fixture.detectChanges();
+    expect(component.canEditLines()).toBe(true);
+    expect(component.canCalculate()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Editing this ramp retires its current approval');
+    getByIdSpy.mockImplementation(() => selectedQuote.set({ ...quote, status: 'DRAFT', rampScheduleStale: true, lineItems: [rampLine] }));
+    component.startLineEdit(rampLine);
+    component.editForm.controls.productName.setValue('Changed pending offer');
+    component.onSaveLineEdit(rampLine);
+    expect(updateLineItemSpy).toHaveBeenCalledWith(1, line.id, expect.objectContaining({ schedule: rampLine.schedule, billingFrequency: 'MONTHLY' }));
+    expect(component.canCalculate()).toBe(true);
+    expect(component.canSubmit()).toBe(false);
+    calculateSpy.mockReturnValue(of({ ...quote, status: 'DRAFT', rampScheduleStale: false, lineItems: [rampLine] }));
+    component.onCalculate();
+    expect(calculateSpy).toHaveBeenCalledWith(1);
+    expect(component.canSubmit()).toBe(true);
+  });
+
+  it('keeps flat pending approvals and unbound old ramp payloads locked', () => {
+    const quote = toQuoteDto(MOCK_QUOTES[0]);
+    selectedQuote.set({ ...quote, status: 'PENDING_APPROVAL', approvalState: 'PENDING' });
+    expect(component.canEditLines()).toBe(false);
+    expect(component.canCalculate()).toBe(false);
+    selectedQuote.update((value) => value ? { ...value, rampGovernance: { governingPeriod: 1 } } : value);
+    expect(component.canEditLines()).toBe(false); // A policy object alone is not a persisted ramp.
+  });
+
+  it('detects a term mismatch in an older payload without a stale flag', () => {
+    const quote = toQuoteDto(MOCK_QUOTES[0]);
+    const line = quote.lineItems?.[0];
+    if (!line) { throw new Error('Expected a quote fixture line'); }
+    selectedQuote.set({
+      ...quote, durationInMonths: 24,
+      lineItems: [{ ...line, lineItemType: 'SUBSCRIPTION', billingFrequency: 'MONTHLY',
+        schedule: { steps: [{ sequence: 1, startMonth: 1, months: 36, quantity: 50, priceBasis: 'ABSOLUTE', unitPrice: 40 }] },
+      }],
+    });
+    fixture.detectChanges();
+    expect(component.canSubmit()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[data-testid="ramp-stale-banner"]').textContent).toContain('24-month quote term');
+  });
+
+  it('leaves flat and older quote payloads without a ramp policy banner', () => {
+    fixture.detectChanges();
+    expect(component.canSubmit()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[data-testid="ramp-governance-banner"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="ramp-stale-banner"]')).toBeNull();
+  });
+
+  it('keeps accepted quotes immutable including Calculate', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'ACCEPTED' });
+    expect(component.canEditLines()).toBe(false);
+    component.onCalculate();
+    expect(calculateSpy).not.toHaveBeenCalled();
+  });
+
+  it('explains approval supersession and stale schedule errors with recovery steps', () => {
+    submitSpy.mockReturnValue(throwError(() => ({ error: { errorCode: 'APPROVAL_SUPERSEDED', message: 'Superseded' } })));
+    component.onSubmit();
+    expect(component.actionError()).toContain('use the current request in Approvals');
+    submitSpy.mockReturnValue(throwError(() => ({ error: { errorCode: 'RAMP_SCHEDULE_STALE', message: 'Stale' } })));
+    component.onSubmit();
+    expect(component.actionError()).toContain('save, and Calculate');
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), status: 'SENT' });
+    acceptSpy.mockReturnValue(throwError(() => ({ error: { errorCode: 'RAMP_APPROVAL_REQUIRED', message: 'Approval required' } })));
+    component.onAccept();
+    expect(component.actionError()).toContain('resolve the current request in Approvals');
+  });
+
   it('enables Approve/Reject for IN_REVIEW only; PENDING_APPROVAL is decided in the approvals inbox', () => {
     selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW
     fixture.detectChanges();
@@ -414,6 +579,11 @@ describe('QuotesDetailComponent', () => {
 
   it('keeps an existing ramp schedule when a line is edited', () => {
     const line = selectedQuote()!.lineItems![0];
+    line.lineItemType = 'SUBSCRIPTION';
+    line.billingFrequency = 'MONTHLY';
+    line.productType = 'NAMED_SEAT';
+    line.unitOfMeasure = 'seat';
+    line.notes = 'Keep the negotiated commitment';
     line.schedule = {
       steps: [
         {
@@ -440,6 +610,12 @@ describe('QuotesDetailComponent', () => {
       listPrice: 250,
       quantity: 3,
       schedule: line.schedule,
+      lineItemType: 'SUBSCRIPTION',
+      billingFrequency: 'MONTHLY',
+      productType: 'NAMED_SEAT',
+      unitOfMeasure: 'seat',
+      notes: 'Keep the negotiated commitment',
+      sortOrder: line.sortOrder,
     });
   });
 
@@ -459,6 +635,7 @@ describe('QuotesDetailComponent', () => {
       productName: 'Updated name',
       listPrice: 250,
       quantity: 3,
+      sortOrder: line.sortOrder,
     });
     expect(getByIdSpy).toHaveBeenCalledWith(1);
     expect(component.editingLineId()).toBeNull();

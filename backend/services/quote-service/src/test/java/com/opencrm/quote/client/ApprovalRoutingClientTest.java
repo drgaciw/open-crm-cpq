@@ -123,6 +123,26 @@ class ApprovalRoutingClientTest {
     }
 
     @Test
+    void submitIncludesRampBindingWhenPresent() {
+        String fingerprint = "a".repeat(64);
+        server.expect(requestTo("http://routing.test/api/v1/approvals"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("""
+                        {"quoteId":"42","tier":"SALES_VP","reason":"Ramp governance",
+                         "pricingFingerprint":"%s","governingPeriod":2}
+                        """.formatted(fingerprint), true))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":{"id":9002,"quoteId":"42","status":"PENDING",
+                         "approvalTier":"SALES_VP","pricingFingerprint":"%s","governingPeriod":2}}
+                        """.formatted(fingerprint), MediaType.APPLICATION_JSON));
+        RoutingApprovalDto dto = client.submit(RoutingApprovalSubmitRequest.builder()
+                .quoteId("42").tier("SALES_VP").reason("Ramp governance")
+                .pricingFingerprint(fingerprint).governingPeriod(2).build());
+        assertThat(dto.getPricingFingerprint()).isEqualTo(fingerprint);
+        assertThat(dto.getGoverningPeriod()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("getPending parses list payload")
     void getPendingParsesList() {
         server.expect(requestTo("http://routing.test/api/v1/approvals/pending"))
