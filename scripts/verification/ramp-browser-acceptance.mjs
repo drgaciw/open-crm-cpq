@@ -23,11 +23,15 @@ export async function runRampBrowserAcceptance() {
     assert.ok(persisted.name.includes(evidence.runId), 'Only the API fixture synthetic quotes may be edited');
     assert.equal(persisted.lineItems.length, 1);
     assert.equal(persisted.lineItems[0].schedule.steps.length, 3);
+    if (Number(id) === Number(evidence.governedQuoteId)) {
+      assert.equal(persisted.status, 'DRAFT', 'Scoped browser fixture must remain a draft quote');
+      assert.equal(persisted.approvalState, 'PENDING', 'Scoped draft fixture must have pending governance');
+    }
   }
   const require = createRequire(resolve(process.argv[3] || resolve(root, 'frontend'), 'package.json'));
   const { chromium } = require('playwright');
   const server = await startRampAcceptanceServer(root);
-  const report = { checks: [], pageErrors: [], consoleErrors: [], failedResponses: [], knownGaps: ['gateway and authenticated identity', 'canonical approval inbox and event consumption', 'complete submit/send/accept lifecycle', 'unrelated CRM/catalog dependencies'] };
+  const report = { checks: [], pageErrors: [], consoleErrors: [], failedResponses: [], knownGaps: ['gateway and authenticated identity', 'canonical approval inbox and event consumption', 'actual PENDING_APPROVAL-status edit gate (unit coverage only)', 'complete submit/send/accept lifecycle', 'unrelated CRM/catalog dependencies'] };
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
@@ -36,7 +40,12 @@ export async function runRampBrowserAcceptance() {
     page.on('pageerror', error => report.pageErrors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
     page.on('response', response => { if (response.status() >= 400) report.failedResponses.push({ url: response.url(), status: response.status() }); });
-    await page.route('**/*', route => new URL(route.request().url()).origin === server.origin ? route.continue() : route.abort());
+    await page.route('**/*', route => {
+      const url = new URL(route.request().url());
+      const fontAsset = url.protocol === 'https:' && ['fonts.googleapis.com', 'fonts.gstatic.com'].includes(url.hostname)
+        && route.request().method() === 'GET';
+      return url.origin === server.origin || fontAsset ? route.continue() : route.abort();
+    });
     const assertDisabled = async name => assert.equal(await page.getByRole('button', { name, exact: true }).isDisabled(), true, `${name} must be disabled`);
     await page.goto(`${server.origin}/quotes/${evidence.quoteId}`);
     for (let period = 1; period <= 3; period++) {
@@ -55,13 +64,13 @@ export async function runRampBrowserAcceptance() {
     const bannerText = await banner.innerText();
     assert.match(bannerText, /32/); assert.match(bannerText, /period:\s*1/i); assert.match(bannerText, /PENDING/); assert.match(bannerText, /Sales VP|SALES_VP/i);
     await assertDisabled('Send'); await assertDisabled('Accept');
-    report.checks.push('Real AC05 governing-period banner and pending downstream actions blocked');
+    report.checks.push('Real AC05 DRAFT quote with pending governance banner and downstream actions blocked');
     // Same persisted schedule save must not invalidate priced data or governance.
     const identicalSaved = page.waitForResponse(response => response.url().includes('/line-items/') && response.request().method() === 'PUT');
     await page.getByTestId('save-schedule').click(); assert.ok((await identicalSaved).ok());
     await page.reload(); await banner.waitFor();
     assert.equal(await page.getByTestId('ramp-stale-banner').count(), 0);
-    report.checks.push('Identical pending-ramp save preserves priced binding');
+    report.checks.push('Identical DRAFT save with pending governance preserves priced binding');
     // Change a non-governing period while maintaining the worst 32% discount.
     await page.getByTestId('period-unit-1').fill('44');
     const saved = page.waitForResponse(response => response.url().includes('/line-items/') && response.request().method() === 'PUT');
@@ -71,7 +80,7 @@ export async function runRampBrowserAcceptance() {
     assert.equal(await banner.count(), 0);
     assert.match(await page.getByTestId('preview-net-2').innerText(), /—/);
     await page.screenshot({ path: resolve(artifacts, 'ramp-browser-stale.png'), fullPage: true });
-    report.checks.push('Real pending-ramp edit persists stale state and hides old preview/governance');
+    report.checks.push('Real DRAFT edit with pending governance persists stale state and hides old preview/governance');
     const recalculated = page.waitForResponse(response => response.url().endsWith('/calculate') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Calculate', exact: true }).click(); assert.ok((await recalculated).ok());
     await page.reload(); await banner.waitFor();

@@ -122,18 +122,25 @@ public class QuoteLineItemService {
         item.setQuantity(request.getQuantity());
         item.setUnitOfMeasure(request.getUnitOfMeasure());
         item.setListPrice(request.getListPrice());
-        item.setUnitPrice(request.getListPrice());
-        item.setNetPrice(request.getListPrice());
-        item.setExtendedAmount(request.getListPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
         item.setBillingFrequency(request.getBillingFrequency());
         item.setSortOrder(request.getSortOrder());
         item.setNotes(request.getNotes());
         rampScheduleAttacher.attach(item, prepared);
-        item.setPricingWaterfallJson(null);
+
+        boolean unchangedBoundAuthoring = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null
+                && previousAuthoring.equals(authoringFingerprint(quote));
+        if (!unchangedBoundAuthoring) {
+            item.setUnitPrice(request.getListPrice());
+            item.setNetPrice(request.getListPrice());
+            item.setExtendedAmount(request.getListPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
+            item.setPricingWaterfallJson(null);
+        }
 
         QuoteLineItem saved = lineItemRepository.save(item);
-        rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
-        recalculateQuoteTotals(quote);
+        if (!unchangedBoundAuthoring) {
+            rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
+            recalculateQuoteTotals(quote);
+        }
         log.info("Updated line item {} in quote {}", lineItemId, quote.getQuoteNumber());
 
         return toDto(saved);

@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Validates a schedule before the line is saved, then replaces child rows.
+ * Validates a schedule before the line is saved, then reconciles child rows by sequence.
  * Flag off throws before any mutation. Explicit steps win over the escalator.
  * Escalator inputs are stored for display only.
  */
@@ -49,18 +49,35 @@ public class RampScheduleAttacher {
         if (item.getRampSteps() == null) {
             item.setRampSteps(new ArrayList<>());
         }
-        item.getRampSteps().clear();
         if (prepared == null) {
+            item.getRampSteps().clear();
             clearEscalator(item);
             return;
         }
+        // Reuse persisted identities: Hibernate may INSERT new rows before orphan DELETEs,
+        // so clear-and-recreate violates the unique (line_item_id, sequence) constraint.
+        java.util.Map<Integer, QuoteRampStep> existing = new java.util.HashMap<>();
+        item.getRampSteps().forEach(row -> existing.put(row.getSequence(), row));
+        java.util.Set<Integer> retained = new java.util.HashSet<>();
         int fallbackSequence = 1;
         for (RampStepDto step : prepared.steps()) {
-            QuoteRampStep row = toRow(step, fallbackSequence);
+            QuoteRampStep authored = toRow(step, fallbackSequence);
             fallbackSequence++;
-            row.setLineItem(item);
-            item.getRampSteps().add(row);
+            retained.add(authored.getSequence());
+            QuoteRampStep row = existing.get(authored.getSequence());
+            if (row == null) {
+                authored.setLineItem(item);
+                item.getRampSteps().add(authored);
+            } else {
+                row.setStartMonth(authored.getStartMonth());
+                row.setMonths(authored.getMonths());
+                row.setQuantity(authored.getQuantity());
+                row.setPriceBasis(authored.getPriceBasis());
+                row.setUnitPrice(authored.getUnitPrice());
+                row.setDiscountFraction(authored.getDiscountFraction());
+            }
         }
+        item.getRampSteps().removeIf(row -> !retained.contains(row.getSequence()));
         applyEscalator(item, prepared.escalator());
     }
 

@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('validate','start','stop')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('validate','start','check-api','stop')][string]$Action,
     [Parameter(Mandatory)][string]$IntegrationRoot
 )
 $ErrorActionPreference = 'Stop'
@@ -17,28 +17,47 @@ $serviceSpecs = @(
     @{Name='quote-service'; Port=18084; Extra=@('--opencrm.pricing.ramp.enabled=true','--services.pricing.url=http://127.0.0.1:18082')}
 )
 
-if ($Action -eq 'stop') {
+if ($Action -eq 'stop' -or $Action -eq 'check-api') {
     if (!(Test-Path -LiteralPath $manifestPath)) { throw 'No wave-owned process manifest exists.' }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.worktree -ne $resolvedRoot -or $manifest.database -ne $databaseName -or !$manifest.databaseCreatedByWave) {
+        throw 'Manifest does not match this isolated acceptance worktree/database.'
+    }
+    if ($Action -eq 'check-api' -and @($manifest.processes).Count -ne 3) { throw 'API check requires all three owned applications.' }
     foreach ($owned in $manifest.processes) {
         $process = Get-Process -Id $owned.pid -ErrorAction SilentlyContinue
-        if (!$process) { continue }
+        if (!$process) {
+            if ($Action -eq 'check-api') { throw "Owned acceptance process $($owned.name) is no longer live." }
+            continue
+        }
         $actual = Get-CimInstance Win32_Process -Filter "ProcessId = $($owned.pid)"
-        if ($process.StartTime.ToUniversalTime().ToString('O') -ne $owned.startUtc -or
+        # PowerShell 7 may materialize ISO JSON dates as DateTime; compare exact UTC instants, not string coercions.
+        $recordedUtcTicks = if ($owned.startUtc -is [DateTime]) { $owned.startUtc.ToUniversalTime().Ticks }
+            else { [DateTimeOffset]::Parse([string]$owned.startUtc, [Globalization.CultureInfo]::InvariantCulture).UtcTicks }
+        if ($process.StartTime.ToUniversalTime().Ticks -ne $recordedUtcTicks -or
             $actual.Name -ne 'java.exe' -or !$actual.CommandLine.Contains($owned.jar) -or
             !$actual.CommandLine.Contains("--server.port=$($owned.port)")) {
             throw "PID $($owned.pid) no longer matches the recorded acceptance process; refusing to stop it."
         }
+        if ($Action -eq 'check-api') { continue }
         Stop-Process -Id $owned.pid
         if (!$process.WaitForExit(5000)) { throw "Owned acceptance PID $($owned.pid) did not exit." }
         Write-Output "Stopped owned acceptance process $($owned.name), PID $($owned.pid)."
     }
-    Write-Output 'Dedicated database retained for evidence; no container or development service was stopped.'
+    if ($Action -eq 'check-api') {
+        $freeGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+        $rssMB = (@($manifest.processes | ForEach-Object { (Get-Process -Id $_.pid).WorkingSet64 }) | Measure-Object -Sum).Sum / 1MB
+        @{timestampUtc=[DateTime]::UtcNow.ToString('O'); phase='before-api'; freeGB=$freeGB; ownedRssMB=$rssMB} | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $artifactDir 'memory.jsonl')
+        Write-Output "Before API: $([math]::Round($freeGB,2))GB free, $([math]::Round($rssMB))MB owned JVM RSS."
+        if ($freeGB -lt 0.8) { throw 'Need at least 0.8GB free RAM for bounded API/PDF acceptance; stop owned processes in finally.' }
+    } else { Write-Output 'Dedicated database retained for evidence; no container or development service was stopped.' }
     return
 }
 
 $freeGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
-if ($freeGB -lt 3.5) { throw "Need at least 3.5GB free RAM before isolated acceptance launch; available $([math]::Round($freeGB,2))GB." }
+# Prior same-artifact bounded run measured 1.15GB aggregate RSS for all three ready JVMs.
+# Staging still refuses each next JVM below 1.5GB and retains the 0.8GB API/OS reserve.
+if ($freeGB -lt 2.5) { throw "Need at least 2.5GB free RAM before staged isolated acceptance launch; available $([math]::Round($freeGB,2))GB." }
 foreach ($spec in $serviceSpecs) {
     $spec.Jar = Join-Path $resolvedRoot "backend/services/$($spec.Name)/target/$($spec.Name)-1.0.0-SNAPSHOT.jar"
     if (!(Test-Path -LiteralPath $spec.Jar)) { throw "Missing assembled artifact for $($spec.Name)." }
@@ -81,8 +100,12 @@ $priorDatabase = $env:DB_NAME
 $env:DB_NAME = $databaseName
 try {
     foreach ($spec in $serviceSpecs) {
+        $freeGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+        if (@($manifest.processes).Count -gt 0 -and $freeGB -lt 1.5) {
+            throw "Need at least 1.5GB free before the next owned JVM; available $([math]::Round($freeGB,2))GB. Stop owned processes in finally."
+        }
         $schema = if ($spec.Name -eq 'quote-service') { 'quote' } else { 'pricing' }
-        $arguments = @('-Xmx384m','-XX:MaxMetaspaceSize=192m','-jar',('"' + $spec.Jar + '"'),
+        $arguments = @('-Xmx384m','-XX:MaxMetaspaceSize=192m','-XX:MaxDirectMemorySize=64m','-XX:ReservedCodeCacheSize=64m','-jar',('"' + $spec.Jar + '"'),
             '--server.address=127.0.0.1',"--server.port=$($spec.Port)",'--spring.profiles.active=dev',
             "--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/$($databaseName)?currentSchema=$schema",
             '--spring.datasource.username=postgres','--spring.data.redis.host=127.0.0.1','--spring.data.redis.port=6379',
@@ -108,6 +131,11 @@ try {
             Start-Sleep -Seconds 2
         }
         if (!$ready) { throw "$($spec.Name) not healthy; stop owned PIDs before retrying." }
+        $freeGB = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB
+        $rssMB = (@($manifest.processes | ForEach-Object { (Get-Process -Id $_.pid).WorkingSet64 }) | Measure-Object -Sum).Sum / 1MB
+        @{timestampUtc=[DateTime]::UtcNow.ToString('O'); phase="$($spec.Name)-ready"; freeGB=$freeGB; ownedRssMB=$rssMB} | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $artifactDir 'memory.jsonl')
+        Write-Output "Measured $([math]::Round($freeGB,2))GB free, $([math]::Round($rssMB))MB owned JVM RSS."
+        if ($freeGB -lt 0.8) { throw 'Free RAM fell below 0.8GB reserve after readiness; stop owned processes in finally.' }
         Write-Output "$($spec.Name) application readiness is UP."
     }
     Write-Output 'All isolated acceptance applications ready. Aggregate dependency health is not asserted. Set RAMP_ACCEPTANCE_DATABASE=ramp_wave_20261009 and run the synthetic acceptance script.'
