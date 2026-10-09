@@ -35,7 +35,7 @@ public interface QuoteLineItemMapper {
     QuoteLineItem toEntity(LineItemCreateRequest request);
 
     @Mapping(target = "schedule", expression = "java(RampScheduleViews.toDto(lineItem))")
-    @Mapping(target = "pricedPeriods", ignore = true)
+    @Mapping(target = "pricedPeriods", expression = "java(com.opencrm.quote.ramp.RampPricingSnapshot.pricedPeriods(lineItem))")
     QuoteLineItemDto toDto(QuoteLineItem lineItem);
 
     @Mapping(target = "id", ignore = true)

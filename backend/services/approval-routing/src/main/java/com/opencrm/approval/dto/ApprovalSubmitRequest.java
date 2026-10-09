@@ -36,4 +36,6 @@ public class ApprovalSubmitRequest {
     private BigDecimal marginDelta;
 
     private String currencyCode;
+    private String pricingFingerprint;
+    private Integer governingPeriod;
 }

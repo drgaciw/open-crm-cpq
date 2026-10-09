@@ -81,7 +81,7 @@ class PricingRampEngineTest {
                 new PricingContextValidator(),
                 new MetricsCalculator(termYears()),
                 MAPPER,
-                mock(DroolsRulesEngine.class)
+                new DroolsRulesEngine(new com.opencrm.rules.drools.DroolsSessionFactory(new com.opencrm.rules.drools.DroolsRuleCompiler()))
         );
         executionService.setRampEnabled(true);
         this.customerRepository = customerRepository;

@@ -33,6 +33,8 @@ public class ApprovalRequestDto {
     private BigDecimal requestedDiscount;
     private BigDecimal marginDelta;
     private String currencyCode;
+    private String pricingFingerprint;
+    private Integer governingPeriod;
     private String requesterId;
     private String approverId;
     private String approvalTier;

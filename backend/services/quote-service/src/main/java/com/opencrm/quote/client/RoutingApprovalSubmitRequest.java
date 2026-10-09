@@ -1,5 +1,6 @@
 package com.opencrm.quote.client;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,4 +20,8 @@ public class RoutingApprovalSubmitRequest {
     /** Quote BFF tier name: DEAL_DESK, SALES_VP, CFO. */
     private String tier;
     private String reason;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String pricingFingerprint;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Integer governingPeriod;
 }

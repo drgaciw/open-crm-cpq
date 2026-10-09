@@ -40,6 +40,7 @@ import { QuoteService } from '../quote.service';
 import { QuoteDocumentsPanelComponent } from '../quote-documents-panel/quote-documents-panel.component';
 import { QuoteHeaderEditComponent } from '../quote-header-edit/quote-header-edit.component';
 import { QuoteRampEditorComponent } from '../quote-ramp-editor/quote-ramp-editor.component';
+import { rampLineAllowsSchedule, validateRampSchedule } from '../quote-ramp-editor/quote-ramp-editor.component';
 
 function httpErrorMessage(err: unknown): string {
   const e = err as {
@@ -49,6 +50,15 @@ function httpErrorMessage(err: unknown): string {
   } | null;
   const code = e?.errorCode || e?.error?.errorCode;
   const message = e?.error?.message || e?.message || 'An error occurred';
+  if (code === 'RAMP_SCHEDULE_STALE') {
+    return 'The ramp schedule has changed. Check its periods against the quote term, save, and Calculate before continuing. [RAMP_SCHEDULE_STALE]';
+  }
+  if (code === 'APPROVAL_SUPERSEDED') {
+    return 'This approval was replaced after the quote changed. Refresh the quote and use the current request in Approvals. [APPROVAL_SUPERSEDED]';
+  }
+  if (code === 'RAMP_APPROVAL_REQUIRED') {
+    return 'The current ramp approval is not complete. Refresh the quote and resolve the current request in Approvals before sending or accepting. [RAMP_APPROVAL_REQUIRED]';
+  }
   if (code) {
     return `${message} [${code}]`;
   }
@@ -122,7 +132,7 @@ function httpErrorMessage(err: unknown): string {
             [title]="
               canSubmit()
                 ? 'Submit quote for review'
-                : 'Submit is available only for DRAFT quotes'
+                : rampPricingBlocked() ? 'Check the ramp schedule and Calculate before submitting' : 'Submit is available only for DRAFT quotes'
             "
           >
             <mat-icon>send</mat-icon>
@@ -137,7 +147,7 @@ function httpErrorMessage(err: unknown): string {
             [title]="
               canSend()
                 ? 'Send approved quote to customer'
-                : 'Send is available only for APPROVED quotes'
+                : rampPricingBlocked() ? 'Check the ramp schedule and Calculate before sending' : rampApprovalBlocked() ? 'Resolve the current request in Approvals before sending' : 'Send is available only for APPROVED quotes'
             "
           >
             <mat-icon>outgoing_mail</mat-icon>
@@ -152,7 +162,7 @@ function httpErrorMessage(err: unknown): string {
             [title]="
               canAccept()
                 ? 'Mark sent quote as accepted'
-                : 'Accept is available only for SENT quotes'
+                : rampPricingBlocked() ? 'Check the ramp schedule and Calculate before accepting' : rampApprovalBlocked() ? 'Resolve the current request in Approvals before accepting' : 'Accept is available only for SENT quotes'
             "
           >
             <mat-icon>done_all</mat-icon>
@@ -290,6 +300,28 @@ function httpErrorMessage(err: unknown): string {
       }
 
       <div class="detail-body">
+        @if (rampPricingBlocked()) {
+          <section class="ramp-feedback" role="alert" data-testid="ramp-stale-banner">
+            <strong>Ramp schedule needs review and recalculation</strong>
+            <p>Check the periods against the {{ quote.durationInMonths }}-month quote term, save the schedule, and Calculate. Submit, Send and Accept are unavailable until pricing is current.</p>
+          </section>
+        } @else if (quote.rampGovernance; as governance) {
+          <section class="ramp-feedback" role="status" aria-live="polite" data-testid="ramp-governance-banner">
+            <strong>Ramp approval policy</strong>
+            @if (governance.governingPeriod != null) {
+              <p>Governing period: {{ governance.governingPeriod }}{{ governingLineName() ? ' — ' + governingLineName() : '' }}.
+                @if (governance.discountPercent != null) { Discount: {{ governance.discountPercent }}%. }
+              </p>
+            }
+            @if (quote.approvalTier) { <p>Approval tier: {{ tierLabels[quote.approvalTier] || quote.approvalTier }}.</p> }
+            @if (quote.approvalState) { <p>Approval status: {{ quote.approvalState }}.</p> }
+            @if (quote.approvalState === 'PENDING') { <p>Use the current request in Approvals to record a decision.</p> }
+            @if (quote.status === 'PENDING_APPROVAL' && canEditLines()) { <p>Editing this ramp retires its current approval. Calculate the changed draft before resubmitting.</p> }
+            @if (governance.stepDown) { <p>A decrease in quantity or unit price requires approval unless the product or rule permits it.</p> }
+            @if (rampApprovalBlocked()) { <p>Resolve the current request in Approvals before sending or accepting this quote.</p> }
+            @for (reason of governance.reasons ?? []; track $index) { <p>{{ reason }}</p> }
+          </section>
+        }
         <mat-card>
           <mat-card-header>
             <mat-card-title>Quote details</mat-card-title>
@@ -603,6 +635,14 @@ function httpErrorMessage(err: unknown): string {
         gap: 16px;
       }
 
+      .ramp-feedback {
+        padding: 16px;
+        border-radius: 8px;
+        background: #fff8e1;
+        color: #5d4037;
+      }
+      .ramp-feedback p { margin: 8px 0 0; }
+
       .info-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -744,6 +784,24 @@ export class QuotesDetailComponent {
   readonly quote = computed(() => this.quoteService.selectedQuote());
   readonly lineItems = computed(() => this.quote()?.lineItems ?? []);
   readonly lineItemCount = computed(() => this.lineItems().length);
+  readonly rampPricingBlocked = computed(() => {
+    const quote = this.quote();
+    if (!quote) { return false; }
+    return quote.rampScheduleStale === true || this.lineItems().some((line) => {
+      const steps = line.schedule?.steps ?? [];
+      return steps.length > 0 && validateRampSchedule(steps, quote.durationInMonths, rampLineAllowsSchedule(line)).length > 0;
+    });
+  });
+  readonly governingLineName = computed(() => {
+    const lineId = this.quote()?.rampGovernance?.governingLineItemId;
+    const line = this.lineItems().find((item) => item.id === lineId);
+    return line?.productName || line?.productExternalId || '';
+  });
+  readonly rampApprovalBlocked = computed(() => {
+    const quote = this.quote();
+    const hasRamp = quote?.rampGovernance != null || this.lineItems().some((line) => (line.schedule?.steps.length ?? 0) > 0);
+    return hasRamp && (quote?.approvalState === 'PENDING' || quote?.approvalState === 'REJECTED');
+  });
 
   readonly actionBusy = signal(false);
   readonly actionError = signal<string | null>(null);
@@ -764,15 +822,18 @@ export class QuotesDetailComponent {
   });
 
   /** Submit only from DRAFT (matches quote-service). */
-  readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT');
+  readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT' && !this.rampPricingBlocked());
 
-  /** Calculate / add / edit / remove line when quote is editable. */
+  /** A bound pending ramp may be amended; the server retires its approval and returns it to DRAFT. */
   readonly canEditLines = computed(() => {
-    const status = this.quote()?.status;
-    return status === 'DRAFT' || status === 'REJECTED';
+    const quote = this.quote();
+    return quote?.status === 'DRAFT' || quote?.status === 'REJECTED' ||
+      (quote?.status === 'PENDING_APPROVAL' && quote.rampGovernance != null &&
+        this.lineItems().some((line) => (line.schedule?.steps.length ?? 0) > 0));
   });
 
-  readonly canCalculate = computed(() => this.canEditLines());
+  /** Reprice after a commercial edit moves the pending ramp back to DRAFT. */
+  readonly canCalculate = computed(() => this.quote()?.status === 'DRAFT' || this.quote()?.status === 'REJECTED');
 
   /**
    * Approve / Reject a review. A PENDING_APPROVAL quote is decided in the approvals inbox,
@@ -780,9 +841,9 @@ export class QuotesDetailComponent {
    */
   readonly canApproveReject = computed(() => this.quote()?.status === 'IN_REVIEW');
 
-  readonly canSend = computed(() => this.quote()?.status === 'APPROVED');
+  readonly canSend = computed(() => this.quote()?.status === 'APPROVED' && !this.rampPricingBlocked() && !this.rampApprovalBlocked());
 
-  readonly canAccept = computed(() => this.quote()?.status === 'SENT');
+  readonly canAccept = computed(() => this.quote()?.status === 'SENT' && !this.rampPricingBlocked() && !this.rampApprovalBlocked());
 
   /** Expire only from SENT (matches quote-service). */
   readonly canExpire = computed(() => this.quote()?.status === 'SENT');
@@ -1143,6 +1204,13 @@ export class QuotesDetailComponent {
     if (line.schedule) {
       request.schedule = line.schedule;
     }
+    // This endpoint replaces the line. The inline editor only changes name, price and quantity.
+    if (line.productType != null) { request.productType = line.productType; }
+    if (line.lineItemType != null) { request.lineItemType = line.lineItemType; }
+    if (line.billingFrequency != null) { request.billingFrequency = line.billingFrequency; }
+    if (line.unitOfMeasure != null) { request.unitOfMeasure = line.unitOfMeasure; }
+    if (line.notes != null) { request.notes = line.notes; }
+    request.sortOrder = line.sortOrder;
     this.actionBusy.set(true);
     this.actionError.set(null);
     this.quoteService.updateLineItem(numericId, line.id, request).subscribe({

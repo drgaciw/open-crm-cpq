@@ -44,16 +44,19 @@ public class ApprovalService {
     private final QuoteRepository quoteRepository;
     private final ApprovalRoutingClient approvalRoutingClient;
     private final boolean legacyLocalReadEnabled;
+    private final com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard;
 
     public ApprovalService(
             ApprovalRequestRepository approvalRepository,
             QuoteRepository quoteRepository,
             ApprovalRoutingClient approvalRoutingClient,
-            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled) {
+            @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled,
+            com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard) {
         this.approvalRepository = approvalRepository;
         this.quoteRepository = quoteRepository;
         this.approvalRoutingClient = approvalRoutingClient;
         this.legacyLocalReadEnabled = legacyLocalReadEnabled;
+        this.rampScheduleGuard = rampScheduleGuard;
     }
 
     public ApprovalRequestDto submitForApproval(Long quoteId, ApprovalSubmitRequest request) {
@@ -69,10 +72,28 @@ public class ApprovalService {
             );
         }
 
+        rampScheduleGuard.refuseIfStale(quote);
+        String fingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote);
+        com.opencrm.quote.ramp.RampGovernanceDto governance = com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote);
+        if (governance != null) {
+            RoutingApprovalDto pending = approvalRoutingClient.getByQuoteId(quoteId).stream()
+                    .filter(remote -> fingerprint != null && fingerprint.equals(remote.getPricingFingerprint()))
+                    .filter(remote -> "PENDING".equals(remote.getStatus())).findFirst()
+                    .orElseThrow(() -> new BusinessException("Current ramp approval is not ready; retry after routing catches up",
+                            HttpStatus.CONFLICT, "RAMP_APPROVAL_REQUIRED"));
+            quote.setStatus(QuoteStatus.PENDING_APPROVAL);
+            quote.setApprovalState(ApprovalState.PENDING);
+            quote.setApprovalTier(pending.getApprovalTier());
+            quoteRepository.save(quote);
+            return toDtoFromRouting(pending);
+        }
+
         RoutingApprovalDto remote = approvalRoutingClient.submit(RoutingApprovalSubmitRequest.builder()
                 .quoteId(String.valueOf(quoteId))
                 .tier(request.getTier().name())
                 .reason("Quote approval submitted via BFF")
+                .pricingFingerprint(fingerprint)
+                .governingPeriod(fingerprint == null ? null : 1)
                 .build());
 
         // Single-writer: do NOT persist a local ApprovalRequest on submit.
@@ -88,6 +109,7 @@ public class ApprovalService {
 
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {
         try {
+            refuseStaleDecision(approvalRoutingClient.getById(approvalId));
             RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.APPROVED, ApprovalState.APPROVED);
             log.info("Approval {} approved via routing for quote {} by {}",
@@ -101,6 +123,7 @@ public class ApprovalService {
     public ApprovalRequestDto rejectRequest(Long approvalId, ApprovalResponseRequest request) {
         String comments = request != null ? request.getComments() : null;
         try {
+            refuseStaleDecision(approvalRoutingClient.getById(approvalId));
             RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.REJECTED, ApprovalState.REJECTED);
             log.info("Approval {} rejected via routing for quote {} by {}",
@@ -135,6 +158,8 @@ public class ApprovalService {
 
         try {
             for (RoutingApprovalDto remote : approvalRoutingClient.getByQuoteId(quoteId)) {
+                // Terminal policy-retirement rows are routing audit records, not approver decisions.
+                if (remote.getPricingFingerprint() != null && "CANCELLED".equals(remote.getStatus())) continue;
                 if (!String.valueOf(quoteId).equals(remote.getQuoteId())) {
                     continue;
                 }
@@ -218,6 +243,17 @@ public class ApprovalService {
         quoteRepository.save(quote);
     }
 
+    private void refuseStaleDecision(RoutingApprovalDto remote) {
+        if (remote == null || remote.getPricingFingerprint() == null) return;
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(parseQuoteId(remote.getQuoteId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", remote.getQuoteId()));
+        if (quote.isRampScheduleStale()
+                || !remote.getPricingFingerprint().equals(com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote))) {
+            throw new BusinessException("Approval belongs to an older ramp pricing snapshot",
+                    HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED");
+        }
+    }
+
     private static Long parseQuoteId(String quoteIdRaw) {
         if (quoteIdRaw == null || quoteIdRaw.isBlank()) {
             throw new BusinessException("Routing approval missing quoteId", "INVALID_ROUTING_APPROVAL");
@@ -262,6 +298,10 @@ public class ApprovalService {
                 .requestedBy(remote.getRequesterId())
                 .approver(remote.getApproverId())
                 .comments(comments)
+                .pricingFingerprint(remote.getPricingFingerprint())
+                .governingPeriod(remote.getGoverningPeriod())
+                .requestedDiscount(remote.getRequestedDiscount())
+                .reason(remote.getReason())
                 .requestedAt(remote.getSubmittedAt())
                 .respondedAt(respondedAt)
                 .supersededBy(status == ApprovalStatus.SUPERSEDED ? remote.getSupersededBy() : null)
