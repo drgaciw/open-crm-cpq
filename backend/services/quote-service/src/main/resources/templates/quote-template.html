@@ -4,7 +4,7 @@
     <meta charset="UTF-8"/>
     <title>Quote Proposal</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 40px; }
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 40px 40px 0; }
         .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
         .header h1 { color: #2563eb; font-size: 24px; margin: 0; }
         .header .quote-number { color: #666; font-size: 14px; margin-top: 5px; }
@@ -96,24 +96,68 @@
         </table>
     </div>
 
+    <div class="section" th:if="${rampLines != null and !rampLines.isEmpty()}">
+        <h2>Ramp Schedule</h2>
+        <div th:each="rampLine : ${rampLines}">
+            <h3 th:text="${rampLine.productName}">Recurring Product</h3>
+            <table class="line-items">
+                <thead>
+                    <tr>
+                        <th>Period</th><th>Start Month</th><th>Months</th><th>Qty</th>
+                        <th>Net Unit Price</th><th>Monthly Amount</th><th>Period Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="period : ${rampLine.periods}">
+                        <td th:text="${period.sequence}">1</td>
+                        <td th:text="${period.startMonth}">1</td>
+                        <td th:text="${period.months}">12</td>
+                        <td th:text="${period.quantity}">50</td>
+                        <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(period.netUnitPrice, 1, 4)}">USD 40.0000</td>
+                        <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(period.netMonthly, 1, 2)}">USD 2,000.00</td>
+                        <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(period.periodAmount, 1, 2)}">USD 24,000.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="totals">
         <table>
             <tr>
-                <td class="total-label">Subtotal:</td>
-                <td th:text="'$' + ${#numbers.formatDecimal(quote.subtotal, 1, 2)}">$0.00</td>
+                <td class="total-label" th:text="${rampLines != null and !rampLines.isEmpty() ? 'Initial subtotal:' : 'Subtotal:'}">Subtotal:</td>
+                <td th:text="${(rampLines != null and !rampLines.isEmpty() ? quote.currency + ' ' : '$') + #numbers.formatDecimal(quote.subtotal, 1, 2)}">$0.00</td>
             </tr>
             <tr>
-                <td class="total-label">Discount:</td>
-                <td th:text="'-$' + ${#numbers.formatDecimal(quote.totalDiscount, 1, 2)}">-$0.00</td>
+                <td class="total-label" th:text="${rampLines != null and !rampLines.isEmpty() ? 'Initial discount:' : 'Discount:'}">Discount:</td>
+                <td th:text="${(rampLines != null and !rampLines.isEmpty() ? quote.currency + ' -' : '-$') + #numbers.formatDecimal(quote.totalDiscount, 1, 2)}">-$0.00</td>
             </tr>
             <tr>
-                <td class="total-label">Tax:</td>
-                <td th:text="'$' + ${#numbers.formatDecimal(quote.totalTax, 1, 2)}">$0.00</td>
+                <td class="total-label" th:text="${rampLines != null and !rampLines.isEmpty() ? 'Initial tax:' : 'Tax:'}">Tax:</td>
+                <td th:text="${(rampLines != null and !rampLines.isEmpty() ? quote.currency + ' ' : '$') + #numbers.formatDecimal(quote.totalTax, 1, 2)}">$0.00</td>
             </tr>
             <tr class="grand-total">
-                <td class="total-label">Total:</td>
-                <td th:text="'$' + ${#numbers.formatDecimal(quote.totalAmount, 1, 2)}">$0.00</td>
+                <td class="total-label" th:text="${rampLines != null and !rampLines.isEmpty() ? 'Initial amount:' : 'Total:'}">Total:</td>
+                <td th:text="${(rampLines != null and !rampLines.isEmpty() ? quote.currency + ' ' : '$') + #numbers.formatDecimal(quote.totalAmount, 1, 2)}">$0.00</td>
             </tr>
+            <th:block th:if="${rampLines != null and !rampLines.isEmpty()}">
+                <tr th:if="${quote.tcv != null}">
+                    <td class="total-label">Total contract value:</td>
+                    <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(quote.tcv, 1, 2)}">USD 81000.00</td>
+                </tr>
+                <tr th:if="${quote.acv != null}">
+                    <td class="total-label">Annual contract value:</td>
+                    <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(quote.acv, 1, 2)}">USD 27000.00</td>
+                </tr>
+                <tr th:if="${quote.arr != null}">
+                    <td class="total-label">Starting annual run rate:</td>
+                    <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(quote.arr, 1, 2)}">USD 24000.00</td>
+                </tr>
+                <tr th:if="${quote.exitArr != null}">
+                    <td class="total-label">Exit annual run rate:</td>
+                    <td th:text="${quote.currency + ' ' + #numbers.formatDecimal(quote.exitArr, 1, 2)}">USD 30000.00</td>
+                </tr>
+            </th:block>
         </table>
     </div>
 

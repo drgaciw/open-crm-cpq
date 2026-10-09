@@ -15,10 +15,14 @@ public final class RampScheduleTestSupport {
     }
 
     public static RampScheduleGuard guard(QuoteLineItemRepository lineItems) {
+        return guard(lineItems, org.mockito.Mockito.mock(com.opencrm.common.event.OutboxEventPublisher.class));
+    }
+
+    public static RampScheduleGuard guard(QuoteLineItemRepository lineItems, com.opencrm.common.event.OutboxEventPublisher outbox) {
         return new RampScheduleGuard(
                 lineItems,
                 mock(QuoteRampStepRepository.class),
                 new RampScheduleValidator(),
-                new RampPricingProperties());
+                new RampPricingProperties(), org.mockito.Mockito.mock(com.opencrm.quote.client.ApprovalRoutingClient.class), outbox);
     }
 }

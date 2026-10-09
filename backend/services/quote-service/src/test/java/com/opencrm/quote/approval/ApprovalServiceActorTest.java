@@ -42,7 +42,7 @@ class ApprovalServiceActorTest {
     private ApprovalRoutingClient approvalRoutingClient;
 
     private ApprovalService service(boolean legacyLocalRead) {
-        return new ApprovalService(approvalRepository, quoteRepository, approvalRoutingClient, legacyLocalRead);
+        return new ApprovalService(approvalRepository, quoteRepository, approvalRoutingClient, legacyLocalRead, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
     }
 
     private Quote quote(QuoteStatus status) {

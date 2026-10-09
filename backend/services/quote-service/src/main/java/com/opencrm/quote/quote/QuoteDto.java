@@ -43,6 +43,7 @@ public class QuoteDto {
     private BigDecimal acv;
     private BigDecimal exitArr;
     private boolean rampScheduleStale;
+    private com.opencrm.quote.ramp.RampGovernanceDto rampGovernance;
     private ApprovalState approvalState;
     private String approvalTier;
     private String notes;

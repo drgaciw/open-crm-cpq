@@ -233,6 +233,15 @@ export interface LineItemCreateRequest {
  * Mirrors: com.opencrm.quote.quote.QuoteDto
  * Returned by GET /api/v1/quotes, GET /api/v1/quotes/:id
  */
+/** Server-authoritative ramp policy result. discountPercent uses percent points (32 means 32%). */
+export interface RampGovernance {
+  governingLineItemId?: number;
+  governingPeriod?: number;
+  discountPercent?: number;
+  stepDown?: boolean;
+  reasons?: string[];
+}
+
 export interface QuoteDto {
   id: number;
   uuid: string;
@@ -258,6 +267,10 @@ export interface QuoteDto {
   acv?: number;
   /** Final-period run rate × 12. Present only when the quote payload includes it. */
   exitArr?: number;
+  /** Authoring changed since pricing. Submit/send/accept require successful recalculation. */
+  rampScheduleStale?: boolean;
+  /** Worst-period policy explanation; absent on flat quotes and older payloads. */
+  rampGovernance?: RampGovernance;
   approvalState?: QuoteApprovalState;
   approvalTier?: string;
   notes?: string;

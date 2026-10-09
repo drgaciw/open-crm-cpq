@@ -27,6 +27,9 @@ public class RoutingApprovalDto {
     private String approverId;
     private String approvalTier;
     private String reason;
+    private String pricingFingerprint;
+    private Integer governingPeriod;
+    private java.math.BigDecimal requestedDiscount;
     private String rejectionReason;
     private Instant submittedAt;
     private Instant approvedAt;
