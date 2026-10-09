@@ -197,6 +197,9 @@ public class PricingExecutionService {
             }
 
             Map<String, PricingProduct> fallbackProducts = new HashMap<>();
+            // Ramp exception policy is authoritative product data, never caller metadata.
+            context.getLineItems().stream().filter(PricingExecutionService::hasSchedule)
+                    .map(PricingLineRequest::getProductExternalId).forEach(unresolvedProductIds::add);
             if (!unresolvedProductIds.isEmpty()) {
                 List<PricingProduct> products = pricingProductRepository
                         .findByExternalIdInAndDeletedFalse(unresolvedProductIds);
@@ -285,10 +288,20 @@ public class PricingExecutionService {
 
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
             result.setFinancialMetrics(metrics);
+            if (requestsRamp(context)) {
+                List<RuleDefinition> governanceRules = activeRules.stream().map(rule -> RuleDefinition.builder()
+                        .id(String.valueOf(rule.getId())).name(rule.getName()).content(rule.getContent())
+                        .priority(rule.getPriority()).ruleType(rule.getRuleType() == null ? null : rule.getRuleType().name())
+                        .conditionGroup(rule.getConditionGroup()).actionSet(rule.getActionSet())
+                        .conflictPolicy(rule.getConflictPolicy()).explanationCode(rule.getExplanationCode()).build()).toList();
+                new com.opencrm.pricing.ramp.PeriodGovernance().evaluate(
+                        context, result, droolsRulesEngine, fallbackProducts, governanceRules);
+            }
 
             // 12. Build PricingWaterfall
             PricingWaterfall waterfall = buildWaterfall(lineResults);
             result.setWaterfall(waterfall);
+            waterfall.setApprovalState(result.getApprovalState());
 
             long executionTime = System.currentTimeMillis() - startTime;
             result.setExecutionTimeMs(executionTime);

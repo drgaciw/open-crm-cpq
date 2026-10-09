@@ -48,8 +48,25 @@ class ApprovalServiceSingleWriterTest {
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
-                true
+                true, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class)
         );
+    }
+
+    @Test
+    void pausedBindingDeliveryBlocksBothOldBffDecisionsWithConflict() {
+        Quote quote = Quote.builder().quoteNumber("Q-42").status(QuoteStatus.DRAFT).rampScheduleStale(true)
+                .pricingWaterfallJson("{\"pricingFingerprint\":\"" + "a".repeat(64) + "\"}").build();
+        quote.setId(42L);
+        when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        when(approvalRoutingClient.getById(9L)).thenReturn(RoutingApprovalDto.builder().id(9L).quoteId("42")
+                .pricingFingerprint("a".repeat(64)).status("PENDING").build());
+        assertThatThrownBy(() -> approvalService.approveRequest(9L, null)).isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
+        assertThatThrownBy(() -> approvalService.rejectRequest(9L, null)).isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
+        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).reject(any(), any());
+        verify(quoteRepository, never()).save(any());
     }
 
     @Test
@@ -190,7 +207,7 @@ class ApprovalServiceSingleWriterTest {
                 approvalRepository,
                 quoteRepository,
                 approvalRoutingClient,
-                false
+                false, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class)
         );
         when(approvalRoutingClient.getPending()).thenReturn(List.of(
                 RoutingApprovalDto.builder()
@@ -212,7 +229,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyRetainsDecisionsAndIsolatesQuoteWithLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
         when(approvalRoutingClient.getByQuoteId(42L)).thenReturn(List.of(
                 historyRow(1L, "42", "PENDING"),
                 historyRow(2L, "42", "APPROVED"),
@@ -264,7 +281,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyPropagatesRoutingFailureWhenLegacyDisabled() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
         BusinessException failure = new BusinessException("unavailable", "APPROVAL_ROUTING_UNAVAILABLE");
         when(approvalRoutingClient.getByQuoteId(42L)).thenThrow(failure);
 
@@ -275,7 +292,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     void historyShowsASupersededRequestAndWhatReplacedIt() {
         ApprovalService routingOnly = new ApprovalService(
-                approvalRepository, quoteRepository, approvalRoutingClient, false);
+                approvalRepository, quoteRepository, approvalRoutingClient, false, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
         Instant supersededAt = Instant.parse("2026-09-29T10:15:30Z");
         RoutingApprovalDto superseded = historyRow(1L, "42", "SUPERSEDED");
         superseded.setSupersededBy(2L);

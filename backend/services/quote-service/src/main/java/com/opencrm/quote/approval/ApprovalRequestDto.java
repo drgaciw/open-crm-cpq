@@ -23,6 +23,10 @@ public class ApprovalRequestDto {
     private String requestedBy;
     private String approver;
     private String comments;
+    private String pricingFingerprint;
+    private Integer governingPeriod;
+    private java.math.BigDecimal requestedDiscount;
+    private String reason;
     private Instant requestedAt;
     private Instant respondedAt;
     /** Set when {@code status} is SUPERSEDED: the approval that replaced this one. */

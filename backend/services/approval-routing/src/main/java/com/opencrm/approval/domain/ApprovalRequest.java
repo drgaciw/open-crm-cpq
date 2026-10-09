@@ -48,6 +48,12 @@ public class ApprovalRequest extends BaseEntity {
     
     @Column(name = "currency_code", length = 3)
     private String currencyCode;
+
+    @Column(name = "pricing_fingerprint", length = 64)
+    private String pricingFingerprint;
+
+    @Column(name = "governing_period")
+    private Integer governingPeriod;
     
     @Column(name = "requester_id", nullable = false)
     private String requesterId;

@@ -85,8 +85,13 @@ Do this once per environment, in order. The relay is off everywhere (`opencrm.ou
    |-------|-----------|----------------------------------|
    | `cpq.quote.status.accepted` | document-generation, contract-asset, crm | A PDF job per quote; a **subscription and an ERP sync** per quote; deal set WON (see step 6) |
    | `cpq.discount.approval.required` | approval-routing | A PENDING approval request per event whose figures differ from the open one for that quote line, which becomes `SUPERSEDED` (an identical event is a duplicate). Replaying history in order leaves one open request per line, carrying the last figures |
+   | `cpq.quote.ramp.approval.binding.changed` | approval-routing | Quote-owned exact schedule/policy binding. A required binding creates the current request and supersedes prior open ramp requests across governing lines; `approvalRequired=false` creates a terminal retirement marker. Replay in quote-aggregate order; duplicate event IDs and identical bindings do not create another current request |
    | `cpq.product.status.retired`, `cpq.product.updated`, `cpq.product.bundle.structure.changed` | configuration-engine | Cancels in-progress sessions for retired products; cache invalidation |
    | `cpq.configuration.committed`, `cpq.subscription.renewal.eligible`, `cpq.quote.approval.rejected` | none yet | None |
+
+   **Ramp binding propagation.** The quote-service registry contract is `RampApprovalBindingChanged` v1; the original discount contract remains pricing-owned. Authoring invalidation and recalculation use the same quote aggregate, so the outbox relay's per-aggregate FIFO preserves their order. Apply the normal 14-day DLT retention and lag monitoring to `cpq.quote.ramp.approval.binding.changed` as well.
+
+   Retirement is asynchronous: committing an edit enqueues its binding event, and approval-routing retires the old open request when it consumes that event. A late decision on a superseded row returns `409 APPROVAL_SUPERSEDED` after replacement is consumed. During propagation, the quote BFF refuses obsolete decisions, and Send/Accept verify the current fingerprint and canonical approval. An old canonical approval cannot finalize a changed quote. Inspect the quote's current binding through its BFF rather than treating an older routing audit row as a current grant; policy-retirement `CANCELLED` rows are audit records. Replay both approval topics with these semantics intact. A legacy discount event must not displace a fingerprint-bound ramp request.
 
    There are three levers:
    - **Skip rows** (step 5): nobody gets them.
@@ -141,7 +146,7 @@ Do this once per environment, in order. The relay is off everywhere (`opencrm.ou
 - **Before the D4 contract step**, any release can be rolled back by redeploying the previous one.
 - **D4 contract step (later).** Once every environment runs the D4 expand release, switch `event_type` to the registry type:
   - change `OutboxEventPublisher` to write `contract.eventType()`;
-  - run `UPDATE outbox_events SET event_type = <registry type for topic> WHERE topic IS NOT NULL`, with one `CASE` over the 12 registered topics.
+  - run `UPDATE outbox_events SET event_type = <registry type for topic> WHERE topic IS NOT NULL`, with one `CASE` covering every topic registered by the deployed release's `EventContractRegistry.all()`.
 
   After that step, rolling back past D4 first needs the relay off and the reverse update, `UPDATE outbox_events SET event_type = topic WHERE topic IS NOT NULL AND status NOT IN ('PUBLISHED', 'SKIPPED')`. Otherwise a relay from before D4 would send those rows to a topic named after the event type.
 - **`SKIPPED` and rollback.** A release from before the `SKIPPED` migration treats a `SKIPPED` row as blocking its aggregate. If you roll back that far, mark the skipped rows `PUBLISHED` first; their `error_message` still says they were skipped.

@@ -76,6 +76,7 @@ class EventContractRegistryTest {
         Map<String, String> expected = new LinkedHashMap<>();
         expected.put("cpq.quote.status.accepted", "QuoteAccepted v1, quote-service, PUBLISHED");
         expected.put("cpq.discount.approval.required", "DiscountApprovalRequired v1, pricing-service, PUBLISHED");
+        expected.put("cpq.quote.ramp.approval.binding.changed", "RampApprovalBindingChanged v1, quote-service, PUBLISHED");
         expected.put("cpq.product.status.retired", "ProductRetired v1, product-service, PUBLISHED");
         expected.put("cpq.product.updated", "ProductUpdated v1, product-service, PUBLISHED");
         expected.put("cpq.product.bundle.structure.changed", "BundleStructureChanged v1, product-service, PUBLISHED");

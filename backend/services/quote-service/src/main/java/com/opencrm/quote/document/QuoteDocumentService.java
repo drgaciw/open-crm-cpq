@@ -5,6 +5,10 @@ import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
+import com.opencrm.quote.client.PricedPeriodView;
+import com.opencrm.quote.ramp.RampPricingSnapshot;
+import com.opencrm.quote.ramp.RampScheduleException;
+import com.opencrm.quote.ramp.RampScheduleViews;
 import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +22,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
@@ -40,9 +45,24 @@ public class QuoteDocumentService {
         List<QuoteLineItem> lineItems = lineItemRepository
                 .findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(quoteId);
 
+        if (quote.isRampScheduleStale()) {
+            throw RampScheduleException.stale();
+        }
+        List<RampDocumentLine> rampLines = new ArrayList<>();
+        for (QuoteLineItem line : lineItems) {
+            List<PricedPeriodView> periods = RampPricingSnapshot.pricedPeriods(line);
+            if ((periods == null || periods.isEmpty()) && !RampScheduleViews.activeSteps(line).isEmpty()) {
+                throw RampScheduleException.stale();
+            }
+            if (periods != null && !periods.isEmpty()) {
+                rampLines.add(new RampDocumentLine(line.getProductName(), periods));
+            }
+        }
+
         Context ctx = new Context();
         ctx.setVariable("quote", quote);
         ctx.setVariable("lineItems", lineItems);
+        ctx.setVariable("rampLines", rampLines);
 
         String html = templateEngine.process("quote-template", ctx);
         byte[] pdfBytes;
@@ -100,4 +120,6 @@ public class QuoteDocumentService {
                 .createdAt(doc.getCreatedAt())
                 .build();
     }
+
+    public record RampDocumentLine(String productName, List<PricedPeriodView> periods) {}
 }

@@ -18,7 +18,7 @@ class RampPricingYamlTest {
         String yaml;
         try (InputStream in = getClass().getClassLoader().getResourceAsStream("application.yml")) {
             assertThat(in).isNotNull();
-            yaml = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            yaml = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         }
 
         int ramp = yaml.indexOf("\n    ramp:\n");

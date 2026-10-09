@@ -55,7 +55,7 @@ class QuoteLineItemServiceRampTest {
                 properties,
                 new RampScheduleValidator(),
                 new RampEscalatorExpander());
-        service = new QuoteLineItemService(lineItemRepository, quoteRepository, attacher);
+        service = new QuoteLineItemService(lineItemRepository, quoteRepository, attacher, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
     }
 
     @Test
