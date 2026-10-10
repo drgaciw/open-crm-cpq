@@ -308,9 +308,9 @@ function httpErrorMessage(err: unknown): string {
         } @else if (quote.rampGovernance; as governance) {
           <section class="ramp-feedback" role="status" aria-live="polite" data-testid="ramp-governance-banner">
             <strong>Ramp approval policy</strong>
-            @if (governance.governingPeriod != null) {
+            @if (governance.governingPeriod !== null && governance.governingPeriod !== undefined) {
               <p>Governing period: {{ governance.governingPeriod }}{{ governingLineName() ? ' — ' + governingLineName() : '' }}.
-                @if (governance.discountPercent != null) { Discount: {{ governance.discountPercent }}%. }
+                @if (governance.discountPercent !== null && governance.discountPercent !== undefined) { Discount: {{ governance.discountPercent }}%. }
               </p>
             }
             @if (quote.approvalTier) { <p>Approval tier: {{ tierLabels[quote.approvalTier] || quote.approvalTier }}.</p> }
@@ -347,7 +347,7 @@ function httpErrorMessage(err: unknown): string {
               <div class="info-item">
                 <span class="label">Total amount</span>
                 <span class="value">{{
-                  quote.totalAmount != null
+                  quote.totalAmount !== null && quote.totalAmount !== undefined
                     ? (quote.totalAmount | currencyFormat: quote.currency || 'USD')
                     : '—'
                 }}</span>
@@ -355,7 +355,7 @@ function httpErrorMessage(err: unknown): string {
               <div class="info-item">
                 <span class="label">ARR</span>
                 <span class="value">{{
-                  quote.arr != null
+                  quote.arr !== null && quote.arr !== undefined
                     ? (quote.arr | currencyFormat: quote.currency || 'USD')
                     : '—'
                 }}</span>
@@ -437,7 +437,7 @@ function httpErrorMessage(err: unknown): string {
                         </mat-form-field>
                       </span>
                       <span role="cell">{{
-                        line.netPrice != null
+                        line.netPrice !== null && line.netPrice !== undefined
                           ? (line.netPrice | currencyFormat: quote.currency || 'USD')
                           : '—'
                       }}</span>
@@ -465,12 +465,12 @@ function httpErrorMessage(err: unknown): string {
                       <span role="cell">{{ line.productName || '—' }}</span>
                       <span role="cell">{{ line.quantity }}</span>
                       <span role="cell">{{
-                        line.listPrice != null
+                        line.listPrice !== null && line.listPrice !== undefined
                           ? (line.listPrice | currencyFormat: quote.currency || 'USD')
                           : '—'
                       }}</span>
                       <span role="cell">{{
-                        line.netPrice != null
+                        line.netPrice !== null && line.netPrice !== undefined
                           ? (line.netPrice | currencyFormat: quote.currency || 'USD')
                           : '—'
                       }}</span>
