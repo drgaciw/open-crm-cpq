@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Tag("unit")
 class MigrationWindowPropertiesTest {
@@ -26,6 +27,18 @@ class MigrationWindowPropertiesTest {
     void invalidZeroMaximumFailsConfigurationBinding() {
         context.withPropertyValues("opencrm.pricing.ramp.migration-window-months=0")
                 .run(application -> assertThat(application).hasFailed());
+    }
+
+    @Test
+    void configuredMaximumCannotExceedTheAcceptedContractCeiling() {
+        context.withPropertyValues("opencrm.pricing.ramp.migration-window-months=13")
+                .run(application -> assertThat(application).hasFailed());
+    }
+
+    @Test
+    void policyConstructionCannotBypassTheAcceptedContractCeiling() {
+        assertThat(new HybridMigrationPolicy(12)).isNotNull();
+        assertThatThrownBy(() -> new HybridMigrationPolicy(13)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Configuration(proxyBeanMethods = false)
