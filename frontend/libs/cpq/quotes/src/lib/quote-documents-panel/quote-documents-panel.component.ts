@@ -86,7 +86,7 @@ function triggerBlobDownload(blob: Blob, fileName: string): void {
             mat-stroked-button
             color="primary"
             type="submit"
-            [disabled]="busy() || quoteId() == null"
+            [disabled]="busy() || quoteId() === null || quoteId() === undefined"
           >
             <mat-icon>picture_as_pdf</mat-icon>
             Generate
