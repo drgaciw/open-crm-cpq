@@ -333,7 +333,7 @@ function httpErrorMessage(
                     <mat-card-subtitle>
                       {{ group.selectionType }} · min {{ group.minSelections
                       }}{{
-                        group.maxSelections != null
+                        group.maxSelections !== null && group.maxSelections !== undefined
                           ? ' · max ' + group.maxSelections
                           : ''
                       }}
@@ -350,7 +350,7 @@ function httpErrorMessage(
                             @if (opt.defaultOption) {
                               <span class="badge">default</span>
                             }
-                            @if (opt.priceAdjustment != null) {
+                            @if (opt.priceAdjustment !== null && opt.priceAdjustment !== undefined) {
                               <span class="muted">
                                 {{ opt.priceAdjustment
                                 }}{{

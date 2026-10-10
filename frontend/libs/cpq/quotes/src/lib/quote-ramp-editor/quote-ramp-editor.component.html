@@ -251,21 +251,21 @@
                 <td [attr.data-testid]="'preview-months-' + row.sequence">{{ row.months }}</td>
                 <td [attr.data-testid]="'preview-quantity-' + row.sequence">{{ row.quantity }}</td>
                 <td [attr.data-testid]="'preview-net-' + row.sequence">
-                  @if (row.netUnitPrice != null) {
+                  @if (row.netUnitPrice !== null && row.netUnitPrice !== undefined) {
                     {{ row.netUnitPrice | currencyFormat: currency() }}
                   } @else {
                     —
                   }
                 </td>
                 <td [attr.data-testid]="'preview-monthly-' + row.sequence">
-                  @if (row.netMonthly != null) {
+                  @if (row.netMonthly !== null && row.netMonthly !== undefined) {
                     {{ row.netMonthly | currencyFormat: currency() }}
                   } @else {
                     —
                   }
                 </td>
                 <td [attr.data-testid]="'preview-total-' + row.sequence">
-                  @if (row.periodAmount != null) {
+                  @if (row.periodAmount !== null && row.periodAmount !== undefined) {
                     {{ row.periodAmount | currencyFormat: currency() }}
                   } @else {
                     —
@@ -282,19 +282,19 @@
       </div>
 
       <div class="metrics" data-testid="ramp-metrics">
-        @if (tcv() != null) {
+        @if (tcv() !== null && tcv() !== undefined) {
           <div class="metric">
             <span class="label">TCV</span>
             <span data-testid="metric-tcv">{{ tcv() | currencyFormat: currency() }}</span>
           </div>
         }
-        @if (acv() != null) {
+        @if (acv() !== null && acv() !== undefined) {
           <div class="metric">
             <span class="label">ACV</span>
             <span data-testid="metric-acv">{{ acv() | currencyFormat: currency() }}</span>
           </div>
         }
-        @if (exitArr() != null) {
+        @if (exitArr() !== null && exitArr() !== undefined) {
           <div class="metric">
             <span class="label">Exit ARR</span>
             <span data-testid="metric-exit-arr">{{ exitArr() | currencyFormat: currency() }}</span>
