@@ -81,7 +81,7 @@ public final class HybridMigrationPolicy {
                 throw invalid("Migration members require explicit recurring schedules");
             }
             Member member = new Member(index, product.getExternalId(), product.getProductType(), product.getCurrency(),
-                    pairId, role, start, months, book, entitlement(line.getSchedule(), context.getDurationInMonths()));
+                    pairId, role, start, months, book, entitlement(line.getSchedule(), context.getDurationInMonths(), role));
             groups.computeIfAbsent(pairId, ignored -> new ArrayList<>()).add(member);
         }
         List<Pair> pairs = new ArrayList<>();
@@ -178,14 +178,22 @@ public final class HybridMigrationPolicy {
         }
     }
 
-    private static List<Interval> entitlement(List<RampStep> schedule, int term) {
+    private static List<Interval> entitlement(List<RampStep> schedule, int term, String role) {
         List<Interval> result = new ArrayList<>();
-        for (RampStep step : schedule) {
+        List<RampStep> ordered = schedule.stream().sorted(Comparator.comparing(step ->
+                step == null || step.getStartMonth() == null ? Integer.MAX_VALUE : step.getStartMonth())).toList();
+        Integer previousQuantity = null;
+        for (RampStep step : ordered) {
             if (step == null || step.getStartMonth() == null || step.getStartMonth() < 1
                     || step.getMonths() == null || step.getMonths() < 1 || step.getQuantity() == null || step.getQuantity() < 0
                     || (long) step.getStartMonth() + step.getMonths() > (long) term + 1) {
                 throw invalid("Invalid migration entitlement period");
             }
+            if (previousQuantity != null && ("RISING".equals(role)
+                    ? step.getQuantity() < previousQuantity : step.getQuantity() > previousQuantity)) {
+                throw invalid("Migration quantity direction disagrees with authorized role");
+            }
+            previousQuantity = step.getQuantity();
             if (step.getQuantity() > 0) result.add(new Interval(step.getStartMonth(), step.getStartMonth() + step.getMonths()));
         }
         return List.copyOf(result);
