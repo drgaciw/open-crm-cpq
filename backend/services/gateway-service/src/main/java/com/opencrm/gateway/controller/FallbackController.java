@@ -44,7 +44,10 @@ public class FallbackController {
         return buildFallbackResponse("Price Book Service");
     }
 
-    @GetMapping("/pricing")
+    @RequestMapping(value = "/pricing", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> pricingFallback() {
         return buildFallbackResponse("Pricing Service");
     }
@@ -54,7 +57,10 @@ public class FallbackController {
         return buildFallbackResponse("Product Service");
     }
 
-    @GetMapping("/quote")
+    @RequestMapping(value = "/quote", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> quoteFallback() {
         return buildFallbackResponse("Quote Service");
     }
