@@ -11,6 +11,8 @@ import com.opencrm.contract.repository.SubscriptionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -42,6 +44,8 @@ class SubscriptionServiceTest {
     @Mock
     private SubscriptionMapper subscriptionMapper;
 
+    @Mock private SubscriptionRateApplyService rateApply;
+
     @InjectMocks
     private SubscriptionService subscriptionService;
 
@@ -65,6 +69,17 @@ class SubscriptionServiceTest {
         pendingSubscription.setId(1L);
     }
 
+    @Test void activationAppliesDueRatesBeforeSyntheticErpSnapshot() {
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pendingSubscription));
+        when(subscriptionRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(erpAdapter.syncToErp(any())).thenReturn("ERP-SUB-001");
+        subscriptionService.activate(1L);
+        var ordered = inOrder(subscriptionRepository, rateApply, erpAdapter);
+        ordered.verify(subscriptionRepository).findByIdForUpdate(1L);
+        ordered.verify(rateApply).applyLocked(pendingSubscription);
+        ordered.verify(erpAdapter).syncToErp(pendingSubscription);
+    }
+
     @Test
     @DisplayName("list returns paginated DTOs")
     void listPaginated() {
@@ -84,7 +99,7 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("activate syncs ERP, persists ERP fields, returns DTO")
     void activateSyncsErp() {
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pendingSubscription));
         when(erpAdapter.syncToErp(pendingSubscription)).thenReturn("ERP-SUB-001");
         when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
         when(subscriptionMapper.toDto(any(Subscription.class))).thenAnswer(inv -> dto(inv.getArgument(0)));
@@ -103,7 +118,7 @@ class SubscriptionServiceTest {
     @Test
     @DisplayName("activate marks ERP FAILED when sync throws (does not remove ErpAdapter call)")
     void activateErpFailurePersistsFailed() {
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pendingSubscription));
         when(erpAdapter.syncToErp(pendingSubscription))
                 .thenThrow(new ErpSyncException("ERP down"));
         when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -143,6 +158,20 @@ class SubscriptionServiceTest {
     void getByIdNotFound() {
         when(subscriptionRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> subscriptionService.getById(99L));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SubscriptionStatus.class, names = {"CANCELLED", "EXPIRED"})
+    void rejectedCancellationDoesNotPersist(SubscriptionStatus initial) {
+        pendingSubscription.setStatus(initial);
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+        lenient().when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThrows(IllegalStateException.class, () -> subscriptionService.cancel(1L));
+
+        assertEquals(initial, pendingSubscription.getStatus());
+        verify(subscriptionRepository, never()).save(any());
+        verifyNoInteractions(erpAdapter, subscriptionMapper);
     }
 
     private static SubscriptionDto dto(Subscription s) {
