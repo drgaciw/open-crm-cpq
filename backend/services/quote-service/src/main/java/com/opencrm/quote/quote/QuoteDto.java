@@ -34,6 +34,9 @@ public class QuoteDto {
     private int durationInMonths;
     private LocalDate startDate;
     private LocalDate endDate;
+    private String targetSubscriptionNumber;
+    private Long observedRevision;
+    private LocalDate subscriptionEffectiveDate;
     private BigDecimal subtotal;
     private BigDecimal totalDiscount;
     private BigDecimal totalTax;

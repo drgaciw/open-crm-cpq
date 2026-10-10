@@ -40,6 +40,9 @@ public class QuoteLineItemDto {
     private RampScheduleDto schedule;
     /** Priced ramp periods from calculate. Same fields as {@link PricedPeriodView}. */
     private List<PricedPeriodView> pricedPeriods;
+    private String sourceSubscriptionLineUuid;
+    private com.opencrm.quote.ramp.HybridMigrationContext hybridMigration;
+    private com.opencrm.common.event.dto.QuoteAcceptedEvent.ProrationSnapshot initialProration;
     private Instant createdAt;
     private Instant updatedAt;
     private Long version;

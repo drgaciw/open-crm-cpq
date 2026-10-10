@@ -70,6 +70,12 @@ public class QuoteService {
     private final OutboxEventPublisher outboxEventPublisher;
     private final CurrentActor currentActor;
     private final RampScheduleGuard rampScheduleGuard;
+    private QuoteContinuationService continuationService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setContinuationService(QuoteContinuationService continuationService) {
+        this.continuationService = continuationService;
+    }
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -362,6 +368,8 @@ public class QuoteService {
         }
 
         rampScheduleGuard.requireApproved(quote);
+        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        validateContinuation(quote,lineItems);
 
         quote.setStatus(QuoteStatus.ACCEPTED);
         quote.setAcceptedAt(Instant.now());
@@ -371,12 +379,11 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
-        List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
+        QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
         // ADR-018 D8 dual run: best-effort Redis publish after commit; the outbox row below is the reliable channel.
         // D9: this is the only emitter of cpq.quote.status.accepted (the unwired acceptQuote path was removed).
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
 
-        QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
         // ADR-018 D4: the envelope headers carry the same correlation as the payload's snapshot (the quote UUID).
         QuoteAcceptedEvent.CorrelationSnapshot correlation = kafkaEvent.getCorrelation();
         try (EventCorrelation.Scope ignored =
@@ -438,6 +445,10 @@ public class QuoteService {
                 .durationInMonths(original.getDurationInMonths())
                 .startDate(original.getStartDate())
                 .endDate(original.getEndDate())
+                .targetSubscriptionNumber(original.getTargetSubscriptionNumber())
+                .observedRevision(original.getObservedRevision())
+                .subscriptionEffectiveDate(original.getSubscriptionEffectiveDate())
+                .continuationRequestJson(original.getContinuationRequestJson())
                 .notes(original.getNotes())
                 .rampScheduleStale(original.isRampScheduleStale())
                 .build();
@@ -467,6 +478,9 @@ public class QuoteService {
                     .sortOrder(source.getSortOrder())
                     .notes(source.getNotes())
                     .metadata(source.getMetadata())
+                    .sourceSubscriptionLineUuid(source.getSourceSubscriptionLineUuid())
+                    .hybridMigrationJson(source.getHybridMigrationJson())
+                    .initialProrationJson(source.getInitialProrationJson())
                     .rampEscalatorStartPrice(source.getRampEscalatorStartPrice())
                     .rampEscalatorMode(source.getRampEscalatorMode())
                     .rampEscalatorAmount(source.getRampEscalatorAmount())
@@ -490,7 +504,7 @@ public class QuoteService {
         saved.setSubtotal(subtotal);
         saved.setTotalDiscount(totalDiscount);
         saved.setTotalAmount(subtotal.subtract(totalDiscount));
-        if (clonedLines.stream().anyMatch(RampScheduleViews::hasSteps)) saved.setRampScheduleStale(true);
+        if (clonedLines.stream().anyMatch(RampScheduleViews::hasSteps) || saved.getTargetSubscriptionNumber() != null) saved.setRampScheduleStale(true);
         saved = quoteRepository.save(saved);
 
         saved.getLineItems().addAll(clonedLines);
@@ -519,11 +533,23 @@ public class QuoteService {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");
         }
 
+        QuoteContinuationPolicy.Plan continuation = validateContinuation(quote,lineItems);
+        PricingExecuteView partialPolicy = continuation != null && continuation.initialProration() != null
+                ? priceInitialInterval(quote,lineItems,continuation) : null;
+        if (continuation != null && continuation.periods().isEmpty()) {
+            applyPartialOnly(quote,lineItems.getFirst(),continuation,partialPolicy);
+            quote.setRampScheduleStale(false);
+            bindRampSnapshot(quote,lineItems,previousFingerprint,previousApproval,previouslyRequired);
+            quoteLineItemRepository.saveAll(lineItems);
+            return quoteMapper.toDto(quoteRepository.save(quote));
+        }
+
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
         PricingExecuteView pricingData = fetchPricingData(pricingContext);
         Map<String, ArrayDeque<PricingLineResultView>> pricingResultByLine =
                 indexLineResults(pricingData.getLineResults());
         refuseUnpricedSchedules(lineItems, pricingResultByLine);
+        if (continuation != null) verifyContinuationPeriods(continuation,pricingData,lineItems);
 
         Map<Long, List<PricedPeriodView>> pricedByLineId = new HashMap<>();
         PricingTotals totals = applyPricingToLineItems(lineItems, pricingResultByLine, pricedByLineId);
@@ -534,6 +560,7 @@ public class QuoteService {
         quote.setTotalAmount(totals.totalAmount());
 
         updateQuoteFromPricingData(quote, pricingData);
+        if (partialPolicy != null) applyInitialInterval(quote,lineItems,continuation,partialPolicy);
         quote.setRampScheduleStale(false);
         bindRampSnapshot(quote, lineItems, previousFingerprint, previousApproval, previouslyRequired);
 
@@ -615,11 +642,17 @@ public class QuoteService {
             lineItem.setNetPrice(netUnit);
             lineItem.setExtendedAmount(lineFinal);
             List<PricedPeriodView> periods = lineResult.getPricedPeriods();
+            Object authoritativeType = lineResult.getMetadata() == null ? null : lineResult.getMetadata().get("authoritativeProductType");
+            if (periods != null && !periods.isEmpty() && !AcceptedRampSnapshots.matchesAuthority(lineItem,authoritativeType))
+                throw new BusinessException("Ramp pricing product classification is unverified or conflicts with the quote", "RAMP_PRICING_SNAPSHOT_INVALID");
             if (periods != null && !periods.isEmpty()) {
                 try {
                     Map<String, Object> snapshot = new HashMap<>();
+                    snapshot.put("authoritativeProductType",authoritativeType);
                     snapshot.put("pricedPeriods", periods);
                     snapshot.put("rampPolicyContext", lineResult.getMetadata().get("rampPolicyContext"));
+                    if (lineResult.getMetadata().get("migrationCreditAudit") != null)
+                        snapshot.put("migrationCreditAudit",lineResult.getMetadata().get("migrationCreditAudit"));
                     if (lineResult.getMetadata() != null && lineResult.getMetadata().get("rampGovernance") != null) {
                         snapshot.put("rampGovernance", lineResult.getMetadata().get("rampGovernance"));
                     }
@@ -628,7 +661,10 @@ public class QuoteService {
                     throw new BusinessException("Cannot persist ramp pricing", "RAMP_PRICING_SNAPSHOT_INVALID");
                 }
             } else {
-                lineItem.setPricingWaterfallJson(null);
+                try {
+                    lineItem.setPricingWaterfallJson(authoritativeType instanceof String
+                            ? objectMapper.writeValueAsString(Map.of("authoritativeProductType",authoritativeType)) : null);
+                } catch (JsonProcessingException ex) { throw new BusinessException("Cannot persist pricing product authority", "RAMP_PRICING_SNAPSHOT_INVALID"); }
             }
             if (lineItem.getId() != null && periods != null && !periods.isEmpty()) {
                 pricedByLineId.put(lineItem.getId(), List.copyOf(periods));
@@ -651,11 +687,11 @@ public class QuoteService {
 
     private void bindRampSnapshot(Quote quote, List<QuoteLineItem> lines,
                                   String previousFingerprint, ApprovalState previousApproval, boolean previouslyRequired) {
-        if (lines.stream().noneMatch(RampScheduleViews::hasSteps) && !previouslyRequired) return;
+        if (lines.stream().noneMatch(RampScheduleViews::hasSteps) && !previouslyRequired && quote.getTargetSubscriptionNumber() == null) return;
         com.opencrm.quote.ramp.RampGovernanceDto governing = null;
         String selectedTier = null;
         for (QuoteLineItem line : lines) {
-            if (!RampScheduleViews.hasSteps(line)) continue;
+            if (!RampScheduleViews.hasSteps(line) && line.getInitialProrationJson() == null) continue;
             JsonNode candidate = com.opencrm.quote.ramp.RampPricingSnapshot.read(line.getPricingWaterfallJson()).get("rampGovernance");
             if (candidate == null || candidate.isNull()) continue;
             String candidateTier = candidate.path("approvalTier").asText();
@@ -675,6 +711,9 @@ public class QuoteService {
             governing.setReasons(allReasons.stream().distinct().toList());
         }
         String fingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote, lines);
+        long distinctPairs=lines.stream().map(com.opencrm.quote.ramp.RampPricingSnapshot::hybridMigration)
+                .filter(Objects::nonNull).map(com.opencrm.quote.ramp.HybridMigrationContext::pairId).distinct().count();
+        if (governing != null && distinctPairs > 1) governing.setHybridMigration(null);
         com.fasterxml.jackson.databind.node.ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.set("waterfall", com.opencrm.quote.ramp.RampPricingSnapshot.read(quote.getPricingWaterfallJson()));
         snapshot.put("pricingFingerprint", fingerprint);
@@ -826,6 +865,9 @@ public class QuoteService {
         line.put("productExternalId", item.getProductExternalId());
         line.put("lineItemType", item.getLineItemType());
         line.put("quantity", item.getQuantity());
+        if (item.getHybridMigrationJson() != null) {
+            line.put("metadata", Map.of("hybridMigration",com.opencrm.quote.ramp.RampPricingSnapshot.hybridMigration(item)));
+        }
         List<QuoteRampStep> steps = RampScheduleViews.activeSteps(item);
         if (!steps.isEmpty()) {
             line.put("billingFrequency", item.getBillingFrequency());
@@ -833,6 +875,117 @@ public class QuoteService {
         }
         return line;
     }
+
+    private QuoteContinuationPolicy.Plan validateContinuation(Quote quote,List<QuoteLineItem> lines) {
+        if (quote.getDealType() == DealType.NEW && quote.getTargetSubscriptionNumber() == null) return null;
+        if (continuationService == null) throw new BusinessException("Typed subscription continuation validation is unavailable","SUBSCRIPTION_CONTINUATION_INVALID");
+        return continuationService.validate(quote,lines);
+    }
+
+    /** A real positive-month policy evaluation; this period is never authored or emitted as sold coverage. */
+    private PricingExecuteView priceInitialInterval(Quote quote,List<QuoteLineItem> lines,QuoteContinuationPolicy.Plan plan) {
+        QuoteLineItem line=lines.stream().filter(AcceptedRampSnapshots::recurring).findFirst().orElseThrow();
+        var partial=plan.initialProration();
+        Map<String,Object> context=buildPricingContext(quote,lines);
+        Map<String,Object> policyLine=new HashMap<>();
+        policyLine.put("productExternalId",line.getProductExternalId());policyLine.put("lineItemType",line.getLineItemType());
+        policyLine.put("quantity",partial.getQuantity());policyLine.put("billingFrequency",line.getBillingFrequency());
+        policyLine.put("schedule",List.of(Map.of("sequence",1,"startMonth",1,"months",1,"quantity",partial.getQuantity(),
+                "priceBasis","ABSOLUTE","unitPrice",partial.getNetUnitPrice())));
+        context.put("lineItems",List.of(policyLine));context.put("durationInMonths",1);
+        PricingExecuteView result=fetchPricingData(context);
+        var matches=result.getLineResults() == null ? List.<PricingLineResultView>of() : result.getLineResults();
+        if (matches.size() != 1 || matches.getFirst().getPricedPeriods() == null || matches.getFirst().getPricedPeriods().size() != 1
+                || matches.getFirst().getMetadata() == null || !Boolean.TRUE.equals(matches.getFirst().getMetadata().get("rampGovernanceEvaluated")))
+            throw RampScheduleException.notSupported();
+        var evaluated=matches.getFirst().getPricedPeriods().getFirst();
+        if (!Objects.equals(matches.getFirst().getProductExternalId(),line.getProductExternalId())
+                || !Objects.equals(matches.getFirst().getLineItemType(),line.getLineItemType())
+                || !AcceptedRampSnapshots.matchesAuthority(line,matches.getFirst().getMetadata().get("authoritativeProductType"))
+                || !Objects.equals(evaluated.getQuantity(),partial.getQuantity()) || !Objects.equals(evaluated.getMonths(),1)
+                || !Objects.equals(evaluated.getStartMonth(),1) || !Objects.equals(evaluated.getSequence(),1)
+                || evaluated.getNetUnitPrice() == null || evaluated.getNetUnitPrice().compareTo(partial.getNetUnitPrice()) != 0
+                || evaluated.getNetMonthly() == null || evaluated.getNetMonthly().compareTo(partial.getNetMonthly()) != 0
+                || evaluated.getPeriodAmount() == null || evaluated.getPeriodAmount().compareTo(partial.getNetMonthly()) != 0
+                || evaluated.getGrossPeriodAmount() != null || evaluated.getMigrationCredit() != null)
+            throw new BusinessException("Current pricing policy cannot preserve the accepted partial unit rate; author a fresh commercial change","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+        return result;
+    }
+
+    private void applyPartialOnly(Quote quote,QuoteLineItem line,QuoteContinuationPolicy.Plan plan,PricingExecuteView policy) {
+        var result=policy.getLineResults().getFirst();
+        line.setPricingWaterfallJson(null);
+        quote.setPricingWaterfallJson(null);
+        quote.setApprovalState(ApprovalState.NONE);quote.setApprovalTier(null);
+        line.setListPrice(result.getListPrice());
+        quote.setTcv(BigDecimal.ZERO);quote.setAcv(BigDecimal.ZERO);quote.setExitArr(plan.initialProration().getNetMonthly().multiply(BigDecimal.valueOf(12)));
+        quote.setSubtotal(result.getListPrice().multiply(BigDecimal.valueOf(line.getQuantity())));
+        quote.setTotalTax(BigDecimal.ZERO);
+        applyInitialInterval(quote,List.of(line),plan,policy);
+    }
+
+    private void verifyContinuationPeriods(QuoteContinuationPolicy.Plan plan,PricingExecuteView pricing,List<QuoteLineItem> items) {
+        QuoteLineItem line=items.stream().filter(AcceptedRampSnapshots::recurring).findFirst().orElseThrow();
+        List<PricingLineResultView> matches=pricing.getLineResults().stream().filter(r -> Objects.equals(r.getProductExternalId(),line.getProductExternalId())
+                && Objects.equals(r.getLineItemType(),line.getLineItemType())).toList();
+        if (matches.size() != 1 || matches.getFirst().getPricedPeriods() == null || matches.getFirst().getPricedPeriods().size() != plan.periods().size())
+            throw new BusinessException("Current pricing cannot preserve the inherited continuation schedule","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+        for(int i=0;i<plan.periods().size();i++) {
+            var expected=plan.periods().get(i);var actual=matches.getFirst().getPricedPeriods().get(i);
+            if (actual == null || !Objects.equals(actual.getSequence(),expected.sequence()) || !Objects.equals(actual.getStartMonth(),expected.startMonth())
+                    || !Objects.equals(actual.getMonths(),expected.months()) || !Objects.equals(actual.getQuantity(),expected.quantity())
+                    || actual.getNetUnitPrice() == null || actual.getNetUnitPrice().compareTo(expected.unitPrice()) != 0
+                    || actual.getGrossPeriodAmount() != null || actual.getMigrationCredit() != null)
+                throw new BusinessException("Current pricing changes the inherited continuation unit rate; author a fresh commercial change","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+        }
+    }
+
+    private void applyInitialInterval(Quote quote,List<QuoteLineItem> lines,QuoteContinuationPolicy.Plan plan,PricingExecuteView policy) {
+        QuoteLineItem line=lines.stream().filter(AcceptedRampSnapshots::recurring).findFirst().orElseThrow();
+        var partial=plan.initialProration();var result=policy.getLineResults().getFirst();
+        BigDecimal previousMonthly=line.getExtendedAmount() == null ? BigDecimal.ZERO : line.getExtendedAmount();
+        BigDecimal previousDiscount=line.getDiscountAmount() == null ? BigDecimal.ZERO : line.getDiscountAmount();
+        line.setUnitPrice(partial.getNetUnitPrice());line.setNetPrice(partial.getNetUnitPrice());line.setExtendedAmount(partial.getNetMonthly());
+        line.setDiscountRate(result.getPricedPeriods().getFirst().getDiscountRate());
+        line.setDiscountAmount(result.getDiscountAmount() == null ? BigDecimal.ZERO : result.getDiscountAmount());
+        quote.setTotalAmount(plan.periods().isEmpty() ? partial.getNetMonthly() : quote.getTotalAmount().subtract(previousMonthly).add(partial.getNetMonthly()));
+        quote.setTotalDiscount(plan.periods().isEmpty() ? line.getDiscountAmount() : quote.getTotalDiscount().subtract(previousDiscount).add(line.getDiscountAmount()));
+        quote.setArr(partial.getNetMonthly().multiply(BigDecimal.valueOf(12)));
+        quote.setTcv(quote.getTcv().add(partial.getPeriodAmount()));
+        quote.setAcv(quote.getTcv().multiply(BigDecimal.valueOf(12)).divide(BigDecimal.valueOf(quote.getDurationInMonths()),2,RoundingMode.HALF_UP));
+        var snapshot=(com.fasterxml.jackson.databind.node.ObjectNode)com.opencrm.quote.ramp.RampPricingSnapshot.read(line.getPricingWaterfallJson()).deepCopy();
+        snapshot.set("authoritativeProductType",objectMapper.valueToTree(result.getMetadata().get("authoritativeProductType")));
+        snapshot.set("initialProrationPolicyContext",objectMapper.valueToTree(result.getMetadata().get("rampPolicyContext")));
+        JsonNode partialGovernance=objectMapper.valueToTree(result.getMetadata().get("rampGovernance"));
+        if (partialGovernance != null && partialGovernance.isObject()) {
+            var copied=(com.fasterxml.jackson.databind.node.ObjectNode)partialGovernance.deepCopy();copied.put("governingPeriod",0);
+            snapshot.set("initialProrationGovernance",copied);
+            snapshot.set("rampGovernance",mergeGovernance(snapshot.get("rampGovernance"),copied));
+        }
+        JsonNode governing=snapshot.get("rampGovernance");
+        if (governing != null && governing.isObject()) {
+            String tier=governing.path("approvalTier").asText(null);
+            if (tierRank(tier)>tierRank(quote.getApprovalTier())) {quote.setApprovalTier(tier);quote.setApprovalState(ApprovalState.PENDING);}
+        }
+        try {
+            line.setInitialProrationJson(objectMapper.writeValueAsString(partial));
+            line.setPricingWaterfallJson(objectMapper.writeValueAsString(snapshot));
+        } catch(JsonProcessingException ex) { throw new BusinessException("Cannot persist verified partial pricing","RAMP_PRICING_SNAPSHOT_INVALID"); }
+    }
+
+    private JsonNode mergeGovernance(JsonNode full,JsonNode partial) {
+        if (full == null || full.isNull()) return partial;
+        boolean selectPartial=tierRank(partial.path("approvalTier").asText(null))>tierRank(full.path("approvalTier").asText(null))
+                || (tierRank(partial.path("approvalTier").asText(null))==tierRank(full.path("approvalTier").asText(null))
+                && partial.path("discountPercent").decimalValue().compareTo(full.path("discountPercent").decimalValue())>0);
+        var merged=(com.fasterxml.jackson.databind.node.ObjectNode)(selectPartial ? partial : full).deepCopy();
+        Set<String> reasons=new LinkedHashSet<>();
+        if (full.path("reasons").isArray()) full.path("reasons").forEach(r -> reasons.add(r.asText()));
+        if (partial.path("reasons").isArray()) partial.path("reasons").forEach(r -> reasons.add(r.asText()));
+        merged.set("reasons",objectMapper.valueToTree(reasons));merged.put("stepDown",full.path("stepDown").asBoolean() || partial.path("stepDown").asBoolean());
+        return merged;
+    }
+    private int tierRank(String tier) { return tier == null ? 0 : switch(tier) {case "CFO" -> 3;case "SALES_VP" -> 2;case "DEAL_DESK" -> 1;default -> throw new BusinessException("Unknown current pricing approval tier","RAMP_PRICING_SNAPSHOT_INVALID");}; }
 
     private Map<String, Object> toPricingStep(QuoteRampStep step) {
         Map<String, Object> row = new HashMap<>();

@@ -18,6 +18,24 @@ public final class RampPricingSnapshot {
     private static final ObjectMapper JSON = new ObjectMapper();
     private RampPricingSnapshot() {}
 
+    public static HybridMigrationContext hybridMigration(QuoteLineItem line) {
+        if (line.getHybridMigrationJson() == null) return null;
+        try { return JSON.readValue(line.getHybridMigrationJson(), HybridMigrationContext.class); }
+        catch (Exception ex) { throw invalid(); }
+    }
+
+    public static com.opencrm.common.event.dto.QuoteAcceptedEvent.ProrationSnapshot initialProration(QuoteLineItem line) {
+        if (line.getInitialProrationJson() == null || line.getQuote().isRampScheduleStale()) return null;
+        try { return JSON.readValue(line.getInitialProrationJson(), com.opencrm.common.event.dto.QuoteAcceptedEvent.ProrationSnapshot.class); }
+        catch (Exception ex) { throw invalid(); }
+    }
+
+    public static String hybridJson(HybridMigrationContext context) {
+        if (context == null) return null;
+        try { return JSON.writeValueAsString(context); }
+        catch (Exception ex) { throw invalid(); }
+    }
+
     public static List<PricedPeriodView> pricedPeriods(QuoteLineItem line) {
         if (!RampScheduleViews.hasSteps(line) || line.getQuote().isRampScheduleStale()) return null;
         JsonNode node = read(line.getPricingWaterfallJson()).get("pricedPeriods");
@@ -49,18 +67,26 @@ public final class RampPricingSnapshot {
     private static String hash(Quote quote, List<QuoteLineItem> lines, boolean includePricing) {
         List<Object> canonical = new ArrayList<>();
         canonical.add(Arrays.asList(quote.getDurationInMonths(), quote.getStartDate(), quote.getEndDate(),
-                quote.getCurrency(), quote.getRegion(), quote.getSubscriptionType(), quote.getCustomerExternalId()));
+                quote.getCurrency(), quote.getRegion(), quote.getSubscriptionType(), quote.getCustomerExternalId(),
+                quote.getDealType(), quote.getTargetSubscriptionNumber(), quote.getObservedRevision(),
+                quote.getSubscriptionEffectiveDate(), normalized(read(quote.getContinuationRequestJson()))));
         if (includePricing) canonical.add(Arrays.asList(number(quote.getTcv()), number(quote.getAcv()),
                 number(quote.getArr()), number(quote.getExitArr()), number(quote.getTotalAmount()),
                 number(quote.getSubtotal()), number(quote.getTotalDiscount()), number(quote.getTotalTax())));
         lines.stream().filter(line -> !line.isDeleted()).sorted(Comparator.comparing(QuoteLineItem::getId,
                 Comparator.nullsFirst(Comparator.naturalOrder()))).forEach(line -> {
-            canonical.add(Arrays.asList(line.getId(), line.getProductExternalId(), line.getLineItemType(),
-                    line.getQuantity(), line.getBillingFrequency(), number(line.getListPrice())));
+            canonical.add(Arrays.asList(line.getId(), line.getUuid(), line.getProductExternalId(), line.getProductType(), line.getLineItemType(),
+                    line.getQuantity(), line.getBillingFrequency(), number(line.getListPrice()),
+                    line.getSourceSubscriptionLineUuid(), normalized(read(line.getHybridMigrationJson())),
+                    normalized(read(line.getInitialProrationJson()))));
             if (includePricing) {
                 JsonNode snapshot = read(line.getPricingWaterfallJson());
                 canonical.add(Arrays.asList(number(line.getExtendedAmount()), normalized(snapshot.get("rampGovernance")),
-                        normalized(snapshot.get("rampPolicyContext"))));
+                        normalized(snapshot.get("authoritativeProductType")),
+                        normalized(snapshot.get("rampPolicyContext")), normalized(snapshot.get("pricedPeriods")),
+                        normalized(snapshot.get("initialProrationPolicyContext")), normalized(snapshot.get("initialProrationGovernance")),
+                        number(line.getUnitPrice()), number(line.getNetPrice()), number(line.getDiscountRate()),
+                        number(line.getDiscountAmount())));
             }
             for (QuoteRampStep step : RampScheduleViews.activeSteps(line)) {
                 canonical.add(Arrays.asList(step.getSequence(), step.getStartMonth(), step.getMonths(),

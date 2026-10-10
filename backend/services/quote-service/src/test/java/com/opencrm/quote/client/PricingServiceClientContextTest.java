@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * UAT-1 #531: quote-service failed to boot because Spring could not construct
  * {@link PricingServiceClient} (no default constructor; two ctors, neither
- * {@code @Autowired}). Slice proves the three named RestClient beans plus the
+ * {@code @Autowired}). Slice proves the named RestClient beans plus the
  * pricing client load without a full {@code @SpringBootTest}. Since ADR-016 step 2 each client takes the
  * {@link OutboundAuth} interceptors from the {@code libs/security} auto-configuration, and the gateway client is gone.
  */
@@ -45,15 +45,16 @@ class PricingServiceClientContextTest {
     RestClient pricingRestClient;
 
     @Test
-    @DisplayName("loads pricingRestClient, configurationEngineRestClient, approvalRoutingRestClient, and PricingServiceClient")
+    @DisplayName("loads pricing, configuration, approval, subscription clients, and PricingServiceClient")
     void loadsNamedRestClientsAndPricingServiceClient() {
         assertThat(pricingServiceClient).isNotNull();
         assertThat(pricingRestClient).isNotNull();
         assertThat(context.getBean("pricingRestClient", RestClient.class)).isSameAs(pricingRestClient);
         assertThat(context.getBean("configurationEngineRestClient", RestClient.class)).isNotNull();
         assertThat(context.getBean("approvalRoutingRestClient", RestClient.class)).isNotNull();
+        assertThat(context.getBean("subscriptionScheduleRestClient", RestClient.class)).isNotNull();
         assertThat(context.getBeansOfType(RestClient.class))
-                .containsOnlyKeys("pricingRestClient", "configurationEngineRestClient", "approvalRoutingRestClient");
+                .containsOnlyKeys("pricingRestClient", "configurationEngineRestClient", "approvalRoutingRestClient", "subscriptionScheduleRestClient");
         assertThat(context.getBean(OutboundAuth.class)).isNotNull();
     }
 }

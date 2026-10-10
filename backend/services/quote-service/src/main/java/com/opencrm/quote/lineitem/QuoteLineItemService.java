@@ -57,6 +57,8 @@ public class QuoteLineItemService {
                 .billingFrequency(request.getBillingFrequency())
                 .sortOrder(request.getSortOrder())
                 .notes(request.getNotes())
+                .sourceSubscriptionLineUuid(request.getSourceSubscriptionLineUuid())
+                .hybridMigrationJson(com.opencrm.quote.ramp.RampPricingSnapshot.hybridJson(request.getHybridMigration()))
                 .build();
         rampScheduleAttacher.attach(item, prepared);
 
@@ -125,6 +127,8 @@ public class QuoteLineItemService {
         item.setBillingFrequency(request.getBillingFrequency());
         item.setSortOrder(request.getSortOrder());
         item.setNotes(request.getNotes());
+        item.setSourceSubscriptionLineUuid(request.getSourceSubscriptionLineUuid());
+        item.setHybridMigrationJson(com.opencrm.quote.ramp.RampPricingSnapshot.hybridJson(request.getHybridMigration()));
         rampScheduleAttacher.attach(item, prepared);
 
         boolean unchangedBoundAuthoring = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null
@@ -201,6 +205,9 @@ public class QuoteLineItemService {
                 .notes(item.getNotes())
                 .schedule(RampScheduleViews.toDto(item))
                 .pricedPeriods(com.opencrm.quote.ramp.RampPricingSnapshot.pricedPeriods(item))
+                .sourceSubscriptionLineUuid(item.getSourceSubscriptionLineUuid())
+                .hybridMigration(com.opencrm.quote.ramp.RampPricingSnapshot.hybridMigration(item))
+                .initialProration(com.opencrm.quote.ramp.RampPricingSnapshot.initialProration(item))
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .version(item.getVersion())

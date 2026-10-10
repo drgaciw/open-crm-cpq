@@ -34,6 +34,9 @@ public class QuoteUpdateRequest {
     private LocalDate startDate;
 
     private LocalDate endDate;
+    private String targetSubscriptionNumber;
+    private Long observedRevision;
+    private LocalDate subscriptionEffectiveDate;
 
     private String notes;
 }

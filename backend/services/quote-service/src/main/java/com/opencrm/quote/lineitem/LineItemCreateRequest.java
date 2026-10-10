@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-@NoArgsConstructor
+@NoArgsConstructor(onConstructor_ = @com.fasterxml.jackson.annotation.JsonCreator)
 @AllArgsConstructor
 public class LineItemCreateRequest {
 
@@ -39,4 +39,6 @@ public class LineItemCreateRequest {
 
     /** Absent means today's flat line. Present steps or an escalator are a ramp schedule. */
     private RampScheduleDto schedule;
+    private String sourceSubscriptionLineUuid;
+    private com.opencrm.quote.ramp.HybridMigrationContext hybridMigration;
 }
