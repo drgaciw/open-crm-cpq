@@ -8,6 +8,7 @@ import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.contract.acl.ErpAdapter;
 import com.opencrm.contract.repository.SubscriptionRepository;
+import com.opencrm.contract.service.AcceptedQuoteSubscriptionService;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -54,6 +55,7 @@ class KafkaListenerInfrastructureContextTest {
                 .withBean(SubscriptionRepository.class, () -> mock(SubscriptionRepository.class))
                 .withBean(ErpAdapter.class, () -> mock(ErpAdapter.class))
                 .withBean(KafkaInbox.class, () -> mock(KafkaInbox.class))
+                .withBean(AcceptedQuoteSubscriptionService.class, () -> mock(AcceptedQuoteSubscriptionService.class))
                 .withBean(QuoteAcceptedEventConsumer.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withConfiguration(AutoConfigurations.of(KafkaAutoConfiguration.class))

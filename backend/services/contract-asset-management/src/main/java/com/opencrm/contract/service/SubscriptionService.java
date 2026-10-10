@@ -30,6 +30,7 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final ErpAdapter erpAdapter;
     private final SubscriptionMapper subscriptionMapper;
+    private final SubscriptionRateApplyService rateApply;
 
     @Transactional(readOnly = true)
     public SubscriptionDto getById(Long id) {
@@ -52,8 +53,10 @@ public class SubscriptionService {
     }
 
     public SubscriptionDto activate(Long id) {
-        Subscription subscription = findEntityById(id);
+        Subscription subscription = subscriptionRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription", id));
         subscription.activate();
+        rateApply.applyLocked(subscription);
 
         // Sync to ERP on activation — do not remove or bypass ErpAdapter
         try {
