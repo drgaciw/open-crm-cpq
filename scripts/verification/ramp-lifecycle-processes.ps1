@@ -4,7 +4,8 @@ param(
     [string]$ArtifactSource,
     [string]$GatewayArtifactSource,
     [string]$Services,
-    [switch]$RampDisabled
+    [switch]$RampDisabled,
+    [switch]$IncludeContract
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $IntegrationRoot).Path
@@ -21,6 +22,11 @@ $specs = @{
     'quote-service' = @{port=19084; heap=320; schema='quote'; extra=@('--services.pricing.url=http://127.0.0.1:19082','--services.configuration-engine.url=http://127.0.0.1:19088','--services.approval-routing.url=http://127.0.0.1:19085')}
     'approval-routing' = @{port=19085; heap=256; schema='approval'; extra=@()}
     'configuration-engine' = @{port=19088; heap=192; schema='configuration'; extra=@('--services.product.url=http://127.0.0.1:19083','--services.product.rules-cache-ttl=0s')}
+}
+if ($IncludeContract) {
+    $specs['contract-asset-management'] = @{port=19089; heap=256; schema='contract'; extra=@(
+        '--opencrm.erp-sync.enabled=false', '--opencrm.subscription-ramp.enabled=true',
+        '--opencrm.subscription-ramp.poll-interval=PT1S')}
 }
 function Save-LifecycleManifest {
     $script:manifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $manifestPath
@@ -62,6 +68,7 @@ function Start-LifecycleService([string]$Name) {
     $env:PRODUCT_SERVICE_URI='http://127.0.0.1:19083'
     $env:APPROVAL_ROUTING_URI='http://127.0.0.1:19085'
     $env:CONFIGURATION_ENGINE_URI='http://127.0.0.1:19088'
+    if ($IncludeContract) { $env:CONTRACT_ASSET_MANAGEMENT_URI='http://127.0.0.1:19089' }
     $env:KAFKA_BOOTSTRAP_SERVERS='127.0.0.1:19392'
     $arguments = @("-Xmx$($spec.heap)m",'-XX:MaxMetaspaceSize=192m','-XX:MaxDirectMemorySize=48m','-XX:ReservedCodeCacheSize=48m',
         '-jar',('"'+$jar+'"'),'--server.address=127.0.0.1',"--server.port=$($spec.port)",
@@ -70,6 +77,9 @@ function Start-LifecycleService([string]$Name) {
         '--opencrm.jev.discount-tier-shadow.enabled=false','--approvals.legacy-local-read-enabled=true',
         '--spring.data.redis.host=127.0.0.1','--spring.data.redis.port=19379','--management.endpoint.health.probes.enabled=true',
         '--logging.level.com.opencrm=INFO','--logging.level.org.hibernate.SQL=WARN','--spring.jpa.show-sql=false') + $spec.extra
+    if ($IncludeContract -and $Name -eq 'quote-service') {
+        $arguments += '--services.contract-asset-management.url=http://127.0.0.1:19089'
+    }
     if ($spec.schema) {
         $arguments += @("--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/$($manifest.database)?currentSchema=$($spec.schema)",
             '--spring.datasource.username=postgres','--spring.datasource.hikari.maximum-pool-size=3','--spring.datasource.hikari.minimum-idle=1',
@@ -78,9 +88,9 @@ function Start-LifecycleService([string]$Name) {
     $ramp = if ($RampDisabled) { 'false' } else { 'true' }
     if ($Name -in @('quote-service','pricing-service')) { $arguments += "--opencrm.pricing.ramp.enabled=$ramp" }
     # Only a fresh, manifest-owned database is replayed to this isolated broker; no shared backlog is enabled.
-    if ($Name -eq 'quote-service') { $arguments += @('--opencrm.outbox.relay.enabled=true','--opencrm.outbox.relay.poll-interval=PT1S') }
+    if ($Name -eq 'quote-service' -or ($IncludeContract -and $Name -eq 'contract-asset-management')) { $arguments += @('--opencrm.outbox.relay.enabled=true','--opencrm.outbox.relay.poll-interval=PT1S') }
     else { $arguments += '--opencrm.outbox.relay.enabled=false' }
-    if ($Name -ne 'approval-routing') { $arguments += '--spring.kafka.listener.auto-startup=false' }
+    if ($Name -ne 'approval-routing' -and !($IncludeContract -and $Name -eq 'contract-asset-management')) { $arguments += '--spring.kafka.listener.auto-startup=false' }
     $attempt = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfff')
     $process = Start-Process -FilePath (Get-Command java.exe).Source -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $artifacts "$Name-$attempt.stdout.log") -RedirectStandardError (Join-Path $artifacts "$Name-$attempt.stderr.log")
@@ -131,7 +141,7 @@ if ($Action -eq 'prepare') {
     @{sourceWorktree=$source; sourceHead=(& git -C $source rev-parse HEAD); gatewaySourceWorktree=$gatewaySource; gatewaySourceHead=(& git -C $gatewaySource rev-parse HEAD); targetHead=(& git -C $root rev-parse HEAD); sources=$sources; jars=$jars} |
         ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $artifacts 'artifact-provenance.json')
     $stamp = [DateTime]::UtcNow.ToString('yyyyMMddHHmmss')
-    $manifest = @{worktree=$root; database="ramp_next_acceptance_$stamp"; databaseCreatedByWave=$false; broker=$null; redis=$null; processes=@(); artifacts=$jars}
+    $manifest = @{worktree=$root; database="ramp_next_acceptance_$stamp"; databaseCreatedByWave=$false; broker=$null; redis=$null; processes=@(); artifacts=$jars; includeContract=[bool]$IncludeContract}
     Save-LifecycleManifest
     Write-Output "Verified $($sources.Count) backend file hashes and $($jars.Count) reusable clean-build jars. Runtime has not started."
     return
@@ -139,6 +149,9 @@ if ($Action -eq 'prepare') {
 if (!(Test-Path -LiteralPath $manifestPath)) { throw 'Run prepare first.' }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
 if ($manifest.worktree -ne $root -or $manifest.database -notmatch '^ramp_next_acceptance_[0-9]{14}$') { throw 'Ownership manifest mismatch.' }
+if ($Action -in @('start-broker','start') -and [bool]$manifest.includeContract -ne [bool]$IncludeContract) {
+    throw 'Contract acceptance mode differs from the prepared artifact manifest; refusing startup.'
+}
 if ($Action -eq 'start-broker') {
     Assert-LifecycleMemory 2.5
     if ($manifest.broker -or $manifest.redis) { throw 'An owned container is already recorded.' }
