@@ -319,15 +319,16 @@ async function runContinuationAcceptance(subscription, original, customerExterna
   assert.ok(report.fixtureTokenClients.includes('ramp-acceptance-quote-service'));
   await manage('stop', ['pricing-service', 'pricebook-service', 'contract-asset-management']);
   await manage('start', ['product-service', 'configuration-engine', 'approval-routing']);
-  await request(`/api/v1/quotes/${draft.id}/submit`, { method: 'POST', body: {} });
-  // Inherited period2 unit40 versus catalog50 requires the real current approval gate.
-  const approval = await poll('continuation canonical approval binding',
-    () => request(`/api/v1/approvals/quote/${draft.id}`), (rows) => rows.some((row) => row.status === 'PENDING'));
-  const pending = approval.filter((row) => row.status === 'PENDING');
-  assert.equal(pending.length, 1);
-  assert.notEqual(pending[0].approvalTier, 'CFO', 'synthetic continuation is approvable by the verified VP identity');
-  await request(`/api/v1/quotes/${draft.id}/approvals`, { method: 'POST', body: { tier: pending[0].approvalTier } });
-  await request(`/api/v1/quotes/approvals/${pending[0].id}/approve`, { method: 'POST', body: {}, token: vp() });
+  const submitted = await request(`/api/v1/quotes/${draft.id}/submit`, { method: 'POST', body: {} });
+  // Inherited unit 40 versus current list 50 is 20%, below the strict >25% period gate.
+  assert.equal(submitted.status, 'IN_REVIEW');
+  assert.equal(submitted.approvalState, 'APPROVED');
+  assert.equal(Object.hasOwn(submitted, 'approvalTier'), false, 'no discount escalation tier is serialized');
+  assert.deepEqual(await request(`/api/v1/approvals/quote/${draft.id}`), [],
+    'below-threshold continuation must not create a canonical approval request');
+  await request(`/api/v1/quotes/${draft.id}/approve`, { method: 'POST', body: {}, status: 403, code: 'REVIEWER_ROLE_REQUIRED' });
+  const reviewed = await request(`/api/v1/quotes/${draft.id}/approve`, { method: 'POST', body: {}, token: vp() });
+  assert.equal(reviewed.status, 'APPROVED', 'a distinct verified reviewer completes ordinary quote review');
   await request(`/api/v1/quotes/${draft.id}/send`, { method: 'POST', body: {} });
   // Acceptance revalidates the target over the real internal authenticated read.
   await manage('stop', ['product-service', 'configuration-engine']);
@@ -349,7 +350,7 @@ async function runContinuationAcceptance(subscription, original, customerExterna
     'a continuation does not create a second subscription');
   report.continuationAcceptance = { quoteId: accepted.uuid, targetSubscriptionNumber: subscription.subscriptionNumber,
     tcv: Number(accepted.tcv), commercialRevision: target.commercialRevision, activeArr: target.activeArr, exitArr: target.exitArr };
-  mark('real target-linked preview→pricing→approval→accept→Kafka mutation preserves original and adds the expansion');
+  mark('real target-linked preview→pricing→ordinary VP review→accept→Kafka mutation preserves original and adds the expansion');
   await manage('stop', ['approval-routing']);
 }
 async function runHybridAcceptance(baseQuote, book, runId) {
