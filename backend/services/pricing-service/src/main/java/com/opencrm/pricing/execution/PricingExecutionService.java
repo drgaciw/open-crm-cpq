@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.Set;
 
@@ -205,8 +206,8 @@ public class PricingExecutionService {
             }
 
             Map<String, PricingProduct> fallbackProducts = new HashMap<>();
-            // Ramp exception policy is authoritative product data, never caller metadata.
-            context.getLineItems().stream().filter(PricingExecutionService::hasSchedule)
+            // Reusable rate classification must come from catalog data even when the price book matches.
+            context.getLineItems().stream()
                     .map(PricingLineRequest::getProductExternalId).forEach(unresolvedProductIds::add);
             if (!unresolvedProductIds.isEmpty()) {
                 List<PricingProduct> products = pricingProductRepository
@@ -222,7 +223,25 @@ public class PricingExecutionService {
             // 6. Initialize line results with list prices
             List<PricingLineResult> lineResults = new ArrayList<>();
             for (PricingLineRequest lineRequest : context.getLineItems()) {
+                PricingProduct authoritativeProduct = fallbackProducts.get(lineRequest.getProductExternalId());
                 BigDecimal listPrice = getListPrice(lineRequest, priceBookBatch, fallbackProducts);
+                List<PricedPeriod> validatedPeriods = hasSchedule(lineRequest)
+                        ? rampPeriodPricer.price(lineRequest, listPrice, context.getDurationInMonths(), maxPeriods) : null;
+                if (validatedPeriods != null) {
+                    String actualType = authoritativeProduct != null && authoritativeProduct.getProductType() != null
+                            ? authoritativeProduct.getProductType().name() : null;
+                    Set<String> fixedTypes = Set.of("SAAS_SEAT_NAMED", "SAAS_SEAT_CONCURRENT", "ONPREM_SUPPORT", "HYBRID_MIGRATION_RAMP");
+                    Set<String> genericKinds = Set.of("PRODUCT", "SERVICE", "SUBSCRIPTION");
+                    if (actualType == null || !fixedTypes.contains(actualType)
+                            || (!genericKinds.contains(Objects.toString(lineRequest.getLineItemType(), ""))
+                            && !actualType.equals(lineRequest.getLineItemType()))) {
+                        throw new BusinessException("Scheduled reusable rates require an authoritative fixed recurring product and matching line kind",
+                                HttpStatus.UNPROCESSABLE_ENTITY, "RAMP_SCHEDULE_INVALID");
+                    }
+                }
+                Map<String, Object> serverMetadata = new HashMap<>();
+                if (lineRequest.getMetadata() != null) serverMetadata.putAll(lineRequest.getMetadata());
+                serverMetadata.remove("authoritativeProductType");
 
                 PricingLineResult lineResult = PricingLineResult.builder()
                         .productExternalId(lineRequest.getProductExternalId())
@@ -235,12 +254,11 @@ public class PricingExecutionService {
                         .surchargeAmount(BigDecimal.ZERO)
                         .finalPrice(listPrice.multiply(BigDecimal.valueOf(lineRequest.getQuantity())))
                         .explanationCodes(new ArrayList<>())
-                        .metadata(lineRequest.getMetadata())
+                        .metadata(serverMetadata)
                         .build();
 
                 if (hasSchedule(lineRequest)) {
-                    List<PricedPeriod> periods = rampPeriodPricer.price(
-                            lineRequest, listPrice, context.getDurationInMonths(), maxPeriods);
+                    List<PricedPeriod> periods = validatedPeriods;
                     lineResult.setPricedPeriods(periods);
                     PricedPeriod first = periods.get(0);
                     lineResult.setUnitPrice(first.getNetUnitPrice());
@@ -308,6 +326,17 @@ public class PricingExecutionService {
                         .conflictPolicy(rule.getConflictPolicy()).explanationCode(rule.getExplanationCode()).build()).toList();
                 new com.opencrm.pricing.ramp.PeriodGovernance().evaluate(
                         context, result, droolsRulesEngine, fallbackProducts, governanceRules, migrationPlan);
+            }
+
+            // Stamp after mutable rule/governance execution; caller or configured facts cannot mint authority.
+            for (PricingLineResult lineResult : lineResults) {
+                Map<String, Object> metadata = new HashMap<>();
+                if (lineResult.getMetadata() != null) metadata.putAll(lineResult.getMetadata());
+                metadata.remove("authoritativeProductType");
+                PricingProduct authoritativeProduct = fallbackProducts.get(lineResult.getProductExternalId());
+                if (authoritativeProduct != null && authoritativeProduct.getProductType() != null)
+                    metadata.put("authoritativeProductType", authoritativeProduct.getProductType().name());
+                lineResult.setMetadata(metadata);
             }
 
             // 12. Build PricingWaterfall

@@ -18,6 +18,8 @@ import com.opencrm.pricing.integration.pricebook.PriceBookResolutionClient;
 import com.opencrm.pricing.integration.pricebook.ProductEntryResolveDto;
 import com.opencrm.pricing.integration.pricebook.ResolveBatchResponse;
 import com.opencrm.pricing.product.PricingProductRepository;
+import com.opencrm.pricing.product.PricingProduct;
+import com.opencrm.pricing.product.ProductType;
 import com.opencrm.pricing.rule.RuleRepository;
 import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.waterfall.PricingContext;
@@ -46,6 +48,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -60,11 +63,13 @@ class PricingRampEngineTest {
 
     private PriceBookResolutionClient priceBookResolutionClient;
     private PricingExecutionService executionService;
+    private PricingProductRepository productRepository;
 
     @BeforeEach
     void setUp() {
         CustomerRepository customerRepository = mock(CustomerRepository.class);
         priceBookResolutionClient = mock(PriceBookResolutionClient.class);
+        productRepository = mock(PricingProductRepository.class);
         PricingAuditLogRepository auditLogRepository = mock(PricingAuditLogRepository.class);
         when(auditLogRepository.save(any(PricingAuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
         RuleSetRepository ruleSetRepository = mock(RuleSetRepository.class);
@@ -73,7 +78,7 @@ class PricingRampEngineTest {
 
         executionService = new PricingExecutionService(
                 customerRepository,
-                mock(PricingProductRepository.class),
+                productRepository,
                 ruleSetRepository,
                 mock(RuleRepository.class),
                 priceBookResolutionClient,
@@ -362,6 +367,11 @@ class PricingRampEngineTest {
         }
         when(priceBookResolutionClient.resolveBatch(anyString(), anyList()))
                 .thenReturn(ResolveBatchResponse.builder().entries(entries).priceBookCurrency("USD").build());
+        // AC-01/02/09 sell the synthetic PROD-SEAT named-seat catalog product.
+        when(productRepository.findByExternalIdInAndDeletedFalse(anyCollection())).thenReturn(
+                entries.containsKey("PROD-SEAT") ? List.of(PricingProduct.builder().externalId("PROD-SEAT")
+                        .productType(ProductType.SAAS_SEAT_NAMED).currency("USD")
+                        .listPrice(entries.get("PROD-SEAT").getListPrice()).build()) : List.of());
     }
 
     private static JsonNode fixture(String name) throws Exception {
