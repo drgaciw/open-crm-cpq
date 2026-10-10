@@ -1,0 +1,132 @@
+{
+  "eventType": "QuoteAccepted",
+  "eventVersion": 1,
+  "quoteId": "11111111-1111-4111-8111-000000000105",
+  "acceptedAt": "2026-10-10T05:00:00Z",
+  "customerId": "synthetic-r3-customer",
+  "totalAmount": 1500,
+  "currencyCode": "USD",
+  "quote": {
+    "quoteId": "11111111-1111-4111-8111-000000000105",
+    "quoteNumber": "Q-R3-FIXTURE-105",
+    "acceptedAt": "2026-10-10T05:00:00Z"
+  },
+  "customer": {
+    "customerId": "synthetic-r3-customer"
+  },
+  "pricing": {
+    "totalAmount": 1500,
+    "currencyCode": "USD",
+    "arr": 18000,
+    "tcv": 43800,
+    "acv": 14600,
+    "exitArr": 14400
+  },
+  "configuration": {
+    "committedVersion": "v1",
+    "attributes": {
+      "region": "US",
+      "subscriptionType": "STANDARD",
+      "lineCount": "2"
+    }
+  },
+  "terms": {
+    "termMonths": 36,
+    "startDate": "2027-01-01",
+    "endDate": "2029-12-31"
+  },
+  "correlation": {
+    "correlationId": "11111111-1111-4111-8111-000000000105",
+    "causationId": "quote-accept:Q-R3-FIXTURE-105",
+    "sourceService": "quote-service"
+  },
+  "deal": {
+    "dealExternalId": "11111111-1111-4111-8111-000000000999",
+    "dealType": "NEW"
+  },
+  "lineItems": [
+    {
+      "lineUuid": "11111111-1111-4111-8111-000000000205",
+      "productExternalId": "synthetic-product-205",
+      "productName": "Recurring on-prem maintenance",
+      "productType": "ONPREM_SUPPORT",
+      "lineItemType": "ONPREM_SUPPORT",
+      "quantity": 10,
+      "unitOfMeasure": "SEAT",
+      "unitPrice": 100,
+      "netPrice": 100,
+      "extendedAmount": 1000,
+      "billingFrequency": "MONTHLY",
+      "sortOrder": 1,
+      "ramp": [
+        {
+          "sequence": 1,
+          "startMonth": 1,
+          "months": 12,
+          "quantity": 10,
+          "netUnitPrice": 100,
+          "netMonthly": 1000,
+          "periodAmount": 9000,
+          "grossPeriodAmount": 12000,
+          "migrationCredit": 3000
+        },
+        {
+          "sequence": 2,
+          "startMonth": 13,
+          "months": 24,
+          "quantity": 0,
+          "netUnitPrice": 100,
+          "netMonthly": 0,
+          "periodAmount": 0
+        }
+      ],
+      "hybridMigration": {
+        "pairId": "synthetic-pair-1",
+        "role": "DECLINING",
+        "startMonth": 1,
+        "months": 12,
+        "bookValue": 10000
+      }
+    },
+    {
+      "lineUuid": "11111111-1111-4111-8111-000000000206",
+      "productExternalId": "synthetic-product-206",
+      "productName": "Hybrid SaaS",
+      "productType": "HYBRID_MIGRATION_RAMP",
+      "lineItemType": "HYBRID_MIGRATION_RAMP",
+      "quantity": 10,
+      "unitOfMeasure": "SEAT",
+      "unitPrice": 50,
+      "netPrice": 50,
+      "extendedAmount": 500,
+      "billingFrequency": "MONTHLY",
+      "sortOrder": 2,
+      "ramp": [
+        {
+          "sequence": 1,
+          "startMonth": 1,
+          "months": 12,
+          "quantity": 10,
+          "netUnitPrice": 50,
+          "netMonthly": 500,
+          "periodAmount": 6000
+        },
+        {
+          "sequence": 2,
+          "startMonth": 13,
+          "months": 24,
+          "quantity": 20,
+          "netUnitPrice": 60,
+          "netMonthly": 1200,
+          "periodAmount": 28800
+        }
+      ],
+      "hybridMigration": {
+        "pairId": "synthetic-pair-1",
+        "role": "RISING",
+        "startMonth": 1,
+        "months": 12
+      }
+    }
+  ]
+}

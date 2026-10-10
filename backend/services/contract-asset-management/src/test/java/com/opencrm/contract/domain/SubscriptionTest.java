@@ -3,6 +3,8 @@ package com.opencrm.contract.domain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -67,6 +69,22 @@ class SubscriptionTest {
     void cancel() {
         subscription.cancel();
         assertEquals(SubscriptionStatus.CANCELLED, subscription.getStatus());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SubscriptionStatus.class, names = {"PENDING", "ACTIVE", "SUSPENDED"})
+    void cancelAllowedCommercialStates(SubscriptionStatus initial) {
+        subscription.setStatus(initial);
+        subscription.cancel();
+        assertEquals(SubscriptionStatus.CANCELLED, subscription.getStatus());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SubscriptionStatus.class, names = {"CANCELLED", "EXPIRED"})
+    void rejectsCancellationOfTerminalStates(SubscriptionStatus initial) {
+        subscription.setStatus(initial);
+        assertThrows(IllegalStateException.class, subscription::cancel);
+        assertEquals(initial, subscription.getStatus());
     }
 
     @Test

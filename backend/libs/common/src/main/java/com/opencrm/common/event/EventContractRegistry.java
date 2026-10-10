@@ -102,6 +102,10 @@ public final class EventContractRegistry {
             "ConfigurationCommitted", "configuration-engine", KafkaTopics.CONFIGURATION_COMMITTED,
             ConfigurationCommittedEvent.class);
 
+    /** Contract/asset owns the transactional rate application and its sole outbox publish site. */
+    public static final EventContract RAMP_APPLIED_V1 = published(
+            "RampApplied", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RAMP_APPLIED, RampAppliedEvent.class);
+
     public static final EventContract QUOTE_APPROVAL_REJECTED_V1 = published(
             "QuoteApprovalRejected", "approval-routing", KafkaTopics.QUOTE_APPROVAL_REJECTED,
             ApprovalRejectedEvent.class);
@@ -120,10 +124,6 @@ public final class EventContractRegistry {
 
     public static final EventContract APPROVAL_OUTCOME_COMPLETED_V1 = reserved(
             "ApprovalOutcomeCompleted", "approval-routing", KafkaTopics.APPROVAL_OUTCOME_COMPLETED, null);
-
-    /** Promoted only alongside its sole owned publisher in the integrated R3 patch. */
-    public static final EventContract RAMP_APPLIED_V1 = reserved(
-            "RampApplied", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RAMP_APPLIED, RampAppliedEvent.class);
 
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,

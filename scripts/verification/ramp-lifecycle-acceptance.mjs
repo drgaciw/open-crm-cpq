@@ -14,6 +14,9 @@ const root = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const artifacts = path.join(root, '.acceptance-artifacts', 'lifecycle');
 const launcher = path.join(root, 'scripts', 'verification', 'ramp-lifecycle-processes.ps1');
 const manifestPath = path.join(artifacts, 'processes.json');
+assert.ok(process.env.RAMP_NEXT_CONTINUATION_ACCEPTANCE === undefined
+  || ['0', '1'].includes(process.env.RAMP_NEXT_CONTINUATION_ACCEPTANCE), 'continuation acceptance mode must be0 or1');
+const includeContract = process.env.RAMP_NEXT_CONTINUATION_ACCEPTANCE === '1';
 const origin = 'http://127.0.0.1:19080';
 const issuer = 'http://127.0.0.1:19090/synthetic-tenant/v2.0';
 const fixtureSecret = randomBytes(32).toString('base64url');
@@ -69,7 +72,7 @@ const fixture = createServer(async (request, response) => {
     for await (const chunk of request) chunks.push(chunk);
     const form = new URLSearchParams(Buffer.concat(chunks).toString());
     const id = form.get('client_id');
-    const allowedClients = ['quote-service', 'pricing-service', 'pricebook-service', 'configuration-engine', 'product-service', 'approval-routing', 'gateway-service']
+    const allowedClients = ['quote-service', 'pricing-service', 'pricebook-service', 'configuration-engine', 'product-service', 'approval-routing', 'gateway-service', ...(includeContract ? ['contract-asset-management'] : [])]
       .map((name) => `ramp-acceptance-${name}`);
     if (form.get('grant_type') !== 'client_credentials' || form.get('client_secret') !== fixtureSecret || !allowedClients.includes(id)) {
       response.statusCode = 401;
@@ -103,6 +106,7 @@ const invoke = (file, args, { echo = true } = {}) => new Promise((resolve, rejec
 const manage = (action, services, disabled = false) => invoke('pwsh.exe', [
   '-NoProfile', '-File', launcher, '-Action', action, '-IntegrationRoot', root,
   ...(services ? ['-Services', services.join(',')] : []), ...(disabled ? ['-RampDisabled'] : []),
+  ...(includeContract ? ['-IncludeContract'] : []),
 ]);
 const mark = (name) => { report.assertions.push(name); console.log(`PASS ${name}`); };
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -243,10 +247,203 @@ async function runPendingBrowserAcceptance(quoteId, mode) {
     if (server.listening) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
   }
 }
+async function runContractIngestAcceptance(accepted, customerExternalId) {
+  assert.match(accepted.uuid, /^[a-f0-9-]{36}$/i);
+  await manage('stop', ['product-service', 'configuration-engine', 'approval-routing']);
+  await manage('start', ['contract-asset-management']);
+  const rows = await poll('accepted quote delivery to contract consumer',
+    () => request(`/api/v1/subscriptions/customer/${encodeURIComponent(customerExternalId)}`),
+    (subscriptions) => subscriptions.some((subscription) => subscription.quoteId === accepted.uuid));
+  const matches = rows.filter((subscription) => subscription.quoteId === accepted.uuid);
+  assert.equal(matches.length, 1, 'one accepted NEW quote creates exactly one subscription');
+  const subscription = matches[0];
+  assert.equal(subscription.subscriptionNumber, `SUB-${accepted.uuid}`);
+  assert.equal(subscription.status, 'PENDING', 'isolated ERP job is disabled until explicit activation');
+  assert.equal(subscription.startDate, accepted.startDate);
+  assert.equal(subscription.endDate, accepted.endDate);
+  assert.equal(Number(subscription.arr), Number(accepted.arr));
+  const schedule = await request(`/api/v1/subscriptions/by-number/${encodeURIComponent(subscription.subscriptionNumber)}/ramp-schedule`);
+  assert.equal(schedule.customerId, customerExternalId);
+  assert.equal(schedule.currencyCode, accepted.currency);
+  assert.equal(schedule.lines.length, 1);
+  assert.equal(schedule.lines[0].acceptedLineUuid, accepted.lineItems[0].uuid);
+  assert.equal(schedule.lines[0].billingAnchorDate, accepted.startDate);
+  const periods = schedule.lines[0].periods;
+  assert.equal(periods.length, 3);
+  for (let index = 0; index < periods.length; index++) {
+    const expected = accepted.lineItems[0].pricedPeriods[index];
+    for (const field of ['sequence', 'startMonth', 'months', 'quantity', 'netUnitPrice', 'netMonthly', 'periodAmount']) {
+      assert.equal(Number(periods[index][field]), Number(expected[field]), `consumer period${index + 1} ${field}`);
+    }
+    assert.equal(periods[index].applied, false, 'future pending rate is not prematurely applied');
+  }
+  assert.equal(periods[0].startDate, accepted.startDate);
+  assert.equal(periods[2].endDate, accepted.endDate);
+  assert.equal(Number(schedule.exitArr), Number(accepted.exitArr));
+  assert.equal(await sql(`SELECT count(*) FROM contract.applied_quote_acceptances WHERE accepted_quote_id='${accepted.uuid}'`), '1');
+  assert.equal(await sql(`SELECT count(*) FROM contract.subscription_rate_periods WHERE accepted_quote_id='${accepted.uuid}' AND is_deleted=false`), '3');
+  report.contractAcceptance = { subscriptionNumber: subscription.subscriptionNumber,
+    subscriptionId: subscription.id, commercialRevision: schedule.commercialRevision, periodsVerified: 3,
+    erpIntegration: 'existing local placeholder; no external ERP delivery validated' };
+  report.knownGaps = report.knownGaps.filter((gap) => gap !== 'downstream QuoteAccepted CRM/subscription consumption');
+  report.knownGaps.push('downstream QuoteAccepted CRM consumption', 'real ERP integration');
+  mark('real accepted outbox→Kafka→contract consumer persists sold term, rates and quote replay ledger');
+  await runContinuationAcceptance(subscription, accepted, customerExternalId);
+  await manage('stop', ['contract-asset-management']);
+}
+async function runContinuationAcceptance(subscription, original, customerExternalId) {
+  const activated = await request(`/api/v1/subscriptions/${subscription.id}/activate`, { method: 'POST', body: {} });
+  assert.equal(activated.status, 'ACTIVE');
+  // This invokes the repository's local ERP placeholder; it does not certify ERP delivery.
+  await manage('start', ['pricing-service', 'pricebook-service']);
+  const defaultBook = await request('/api/v1/price-books', { method: 'POST', body: {
+    name: 'Synthetic continuation current-policy default', region: null, currency: 'USD', isDefault: true, effectiveDate: null,
+  } });
+  await request(`/api/v1/price-books/${defaultBook.id}/entries`, { method: 'POST', body: {
+    productExternalId: original.lineItems[0].productExternalId, listPrice: 50, currency: 'USD',
+  } });
+  await request(`/api/v1/price-books/${defaultBook.id}`, { method: 'PUT', body: { effectiveDate: '2020-01-01' } });
+  const sourceSchedule = await request(`/api/v1/subscriptions/by-number/${encodeURIComponent(subscription.subscriptionNumber)}/ramp-schedule`);
+  const input = { operation: 'EXPANSION', targetSubscriptionNumber: subscription.subscriptionNumber,
+    sourceSubscriptionLineUuid: original.lineItems[0].uuid, observedRevision: sourceSchedule.commercialRevision,
+    customerExternalId, currency: 'USD', quantity: 20, effectiveDate: '2028-07-01', name: 'Synthetic target-linked expansion' };
+  await request('/api/v1/quotes/continuations/preview', { method: 'POST', body: { ...input, observedRevision: input.observedRevision + 1 },
+    status: 409, code: 'SUBSCRIPTION_CONTINUATION_INVALID' });
+  const preview = await request('/api/v1/quotes/continuations/preview', { method: 'POST', body: input });
+  assert.ok(preview, 'real internal service-token schedule read yields a continuation plan');
+  const draft = await request('/api/v1/quotes/continuations', { method: 'POST', body: input });
+  const calculated = await request(`/api/v1/quotes/${draft.id}/calculate`, { method: 'POST', body: {} });
+  assert.deepEqual(Object.fromEntries(['tcv', 'acv', 'arr', 'exitArr'].map((key) => [key, Number(calculated[key])])),
+    { tcv: 16800, acv: 11200, arr: 9600, exitArr: 12000 });
+  assert.equal(calculated.lineItems[0].sourceSubscriptionLineUuid, original.lineItems[0].uuid);
+  assert.ok(report.fixtureTokenClients.includes('ramp-acceptance-quote-service'));
+  await manage('stop', ['pricing-service', 'pricebook-service', 'contract-asset-management']);
+  await manage('start', ['product-service', 'configuration-engine', 'approval-routing']);
+  await request(`/api/v1/quotes/${draft.id}/submit`, { method: 'POST', body: {} });
+  // Inherited period2 unit40 versus catalog50 requires the real current approval gate.
+  const approval = await poll('continuation canonical approval binding',
+    () => request(`/api/v1/approvals/quote/${draft.id}`), (rows) => rows.some((row) => row.status === 'PENDING'));
+  const pending = approval.filter((row) => row.status === 'PENDING');
+  assert.equal(pending.length, 1);
+  assert.notEqual(pending[0].approvalTier, 'CFO', 'synthetic continuation is approvable by the verified VP identity');
+  await request(`/api/v1/quotes/${draft.id}/approvals`, { method: 'POST', body: { tier: pending[0].approvalTier } });
+  await request(`/api/v1/quotes/approvals/${pending[0].id}/approve`, { method: 'POST', body: {}, token: vp() });
+  await request(`/api/v1/quotes/${draft.id}/send`, { method: 'POST', body: {} });
+  // Acceptance revalidates the target over the real internal authenticated read.
+  await manage('stop', ['product-service', 'configuration-engine']);
+  await manage('start', ['contract-asset-management']);
+  const accepted = await request(`/api/v1/quotes/${draft.id}/accept`, { method: 'POST', body: {} });
+  assert.equal(accepted.status, 'ACCEPTED');
+  await poll('target-linked acceptance ledger', () => sql(`SELECT count(*) FROM contract.applied_quote_acceptances WHERE accepted_quote_id='${accepted.uuid}'`),
+    (count) => count === '1');
+  const target = await request(`/api/v1/subscriptions/by-number/${encodeURIComponent(subscription.subscriptionNumber)}/ramp-schedule?asOf=2028-07-01`);
+  assert.equal(Number(target.commercialRevision), Number(sourceSchedule.commercialRevision) + 1);
+  assert.equal(target.lines.length, 2, 'expansion adds a line and preserves its source');
+  assert.equal(Number(target.activeMrr), 2800);
+  assert.equal(Number(target.activeArr), 33600);
+  assert.equal(Number(target.exitArr), 42000);
+  const matching = (await request(`/api/v1/subscriptions/customer/${encodeURIComponent(customerExternalId)}`))
+    .filter((row) => row.subscriptionNumber === subscription.subscriptionNumber);
+  assert.equal(matching.length, 1);
+  assert.equal(await sql(`SELECT count(*) FROM contract.subscriptions WHERE quote_id='${accepted.uuid}'`), '0',
+    'a continuation does not create a second subscription');
+  report.continuationAcceptance = { quoteId: accepted.uuid, targetSubscriptionNumber: subscription.subscriptionNumber,
+    tcv: Number(accepted.tcv), commercialRevision: target.commercialRevision, activeArr: target.activeArr, exitArr: target.exitArr };
+  mark('real target-linked preview→pricing→approval→accept→Kafka mutation preserves original and adds the expansion');
+  await manage('stop', ['approval-routing']);
+}
+async function runHybridAcceptance(baseQuote, book, runId) {
+  await manage('start', ['product-service']);
+  const products = [];
+  for (const [suffix, productType, listPrice, category] of [
+    ['SUPPORT', 'ONPREM_SUPPORT', 100, 'SUPPORT'], ['MIGRATION', 'HYBRID_MIGRATION_RAMP', 60, 'SUBSCRIPTION'],
+  ]) {
+    products.push(await request('/api/v1/products', { method: 'POST', body: {
+      sku: `${runId}-${suffix}`, name: `Synthetic ${runId} ${suffix}`, productType, category,
+      listPrice, currency: 'USD', billingFrequency: 'MONTHLY',
+    } }));
+  }
+  await manage('stop', ['product-service']);
+  await manage('start', ['pricing-service', 'pricebook-service']);
+  for (const [index, product] of products.entries()) {
+    assert.ok(Number.isSafeInteger(product.id));
+    const type = index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP';
+    const price = index === 0 ? 100 : 60;
+    // Pricing has no catalog ingestion API/listener. Seed only this synthetic database's
+    // authoritative product reference; the real pricing repository reads it thereafter.
+    await sql(`INSERT INTO pricing.pricing_products(uuid,external_id,name,product_type,category,list_price,currency)
+      VALUES('${randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')}',
+      '${product.id}','Synthetic ${type}','${type}','${index === 0 ? 'SUPPORT' : 'SUBSCRIPTION'}',${price},'USD')`);
+    await request(`/api/v1/price-books/${book.id}/entries`, { method: 'POST', body: {
+      productExternalId: String(product.id), listPrice: price, currency: 'USD',
+    } });
+  }
+  const quote = await request('/api/v1/quotes', { method: 'POST', body: { ...baseQuote, dealType: 'NEW', name: 'Synthetic persisted hybrid migration' } });
+  const inputs = products.map((product, index) => ({ productExternalId: String(product.id), productName: product.name,
+    productType: index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP',
+    lineItemType: index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP', quantity: 10,
+    listPrice: index === 0 ? 100 : 60, billingFrequency: 'MONTHLY', sortOrder: index,
+    hybridMigration: { pairId: `${runId}-PAIR`, role: index === 0 ? 'DECLINING' : 'RISING', startMonth: 1, months: 12,
+      ...(index === 0 ? { bookValue: 10000 } : {}) },
+    schedule: { steps: [
+      { sequence: 1, startMonth: 1, months: 12, quantity: 10, priceBasis: 'ABSOLUTE', unitPrice: index === 0 ? 100 : 50 },
+      { sequence: 2, startMonth: 13, months: 24, quantity: index === 0 ? 0 : 20, priceBasis: 'ABSOLUTE', unitPrice: index === 0 ? 100 : 60 },
+    ] },
+  }));
+  for (const line of inputs) await request(`/api/v1/quotes/${quote.id}/line-items`, { method: 'POST', body: line });
+  const priced = await request(`/api/v1/quotes/${quote.id}/calculate`, { method: 'POST', body: {} });
+  assert.deepEqual(Object.fromEntries(['tcv', 'acv', 'arr', 'exitArr'].map((key) => [key, Number(priced[key])])),
+    { tcv: 43800, acv: 14600, arr: 18000, exitArr: 14400 });
+  assert.equal(priced.approvalTier, 'DEAL_DESK');
+  const reloaded = await request(`/api/v1/quotes/${quote.id}`);
+  const support = reloaded.lineItems.find((line) => line.productType === 'ONPREM_SUPPORT');
+  assert.deepEqual(support.hybridMigration, inputs[0].hybridMigration);
+  assert.equal(Number(support.pricedPeriods[0].grossPeriodAmount), 12000);
+  assert.equal(Number(support.pricedPeriods[0].migrationCredit), 3000);
+  assert.equal(Number(support.pricedPeriods[0].periodAmount), 9000);
+  assert.equal(Number(support.pricedPeriods[0].netMonthly), 1000);
+  await manage('stop', ['pricing-service', 'pricebook-service']);
+  await manage('start', ['product-service', 'configuration-engine', 'approval-routing']);
+  const rows = await poll('mandatory hybrid canonical approval',
+    () => request(`/api/v1/approvals/quote/${quote.id}`), (items) => items.filter((item) => item.status === 'PENDING').length === 1);
+  const pending = rows.find((row) => row.status === 'PENDING');
+  assert.equal(pending.approvalTier, 'DEAL_DESK');
+  await request(`/api/v1/quotes/${quote.id}/submit`, { method: 'POST', body: {} });
+  await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: { tier: 'DEAL_DESK' } });
+  await request(`/api/v1/quotes/approvals/${pending.id}/approve`, { method: 'POST', body: {}, status: 403, code: 'APPROVER_ROLE_REQUIRED' });
+  await request(`/api/v1/quotes/approvals/${pending.id}/approve`, { method: 'POST', body: {}, token: vp() });
+  await request(`/api/v1/quotes/${quote.id}/send`, { method: 'POST', body: {} });
+  const accepted = await request(`/api/v1/quotes/${quote.id}/accept`, { method: 'POST', body: {} });
+  assert.equal(accepted.status, 'ACCEPTED');
+  await manage('stop', ['product-service', 'configuration-engine', 'approval-routing']);
+  await manage('start', ['contract-asset-management']);
+  const subscriptions = await poll('persisted hybrid accepted consumer',
+    () => request(`/api/v1/subscriptions/customer/${encodeURIComponent(baseQuote.customerExternalId)}`),
+    (items) => items.some((item) => item.quoteId === accepted.uuid));
+  const sold = subscriptions.find((item) => item.quoteId === accepted.uuid);
+  assert.equal(Number(sold.arr), 18000);
+  const schedule = await request(`/api/v1/subscriptions/by-number/${encodeURIComponent(sold.subscriptionNumber)}/ramp-schedule`);
+  assert.equal(schedule.lines.length, 2);
+  assert.equal(Number(schedule.exitArr), 14400);
+  const supportRate = schedule.lines.find((line) => line.productType === 'ONPREM_SUPPORT').periods[0];
+  assert.equal(Number(supportRate.periodAmount), 9000);
+  assert.equal(Number(supportRate.grossPeriodAmount), 12000);
+  assert.equal(Number(supportRate.migrationCredit), 3000);
+  assert.equal(Number(supportRate.netMonthly), 1000);
+  assert.equal(await sql(`SELECT count(*) FROM contract.subscription_rate_periods WHERE accepted_quote_id='${accepted.uuid}' AND is_deleted=false`), '4');
+  assert.equal(await sql(`SELECT count(*) FROM contract.applied_quote_acceptances WHERE accepted_quote_id='${accepted.uuid}'`), '1');
+  report.hybridAcceptance = { quoteId: accepted.uuid, subscriptionNumber: sold.subscriptionNumber,
+    metrics: metricSnapshot(accepted), migrationCredit: supportRate.migrationCredit,
+    authoritativePricingProducts: 'synthetic isolated SQL fixture; catalog replication not validated' };
+  report.knownGaps.push('product catalog replication into pricing authoritative reference');
+  mark('persisted hybrid inputs→real pricing→mandatory approval→accepted outbox→contract retain exact30% capped credit and recurring rates');
+  await manage('stop', ['contract-asset-management']);
+}
 async function runLifecycleAcceptance() {
   if (!process.env.DB_PASSWORD) throw new Error('Supply DB_PASSWORD in the secure process environment; it is never written to evidence.');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   assert.equal(path.resolve(manifest.worktree), root);
+  assert.equal(Boolean(manifest.includeContract), includeContract, 'runner mode must match prepared artifacts');
   assert.equal(manifest.databaseCreatedByWave, false, 'start only from a prepared, never-run lifecycle manifest');
   const provenance = JSON.parse(await readFile(path.join(artifacts, 'artifact-provenance.json'), 'utf8'));
   report.sourceHead = provenance.targetHead;
@@ -269,6 +466,13 @@ async function runLifecycleAcceptance() {
   report.productId = product.id;
   await manage('stop', ['product-service']);
   await manage('start', ['pricing-service', 'pricebook-service', 'quote-service']);
+  // Pricing's authoritative catalog reference has no replication boundary in this harness.
+  // Seed only this owned synthetic product; real pricing must resolve its classification.
+  assert.ok(Number.isSafeInteger(product.id), 'synthetic catalog product has a numeric identity');
+  await sql(`INSERT INTO pricing.pricing_products(uuid,external_id,name,product_type,category,list_price,currency)
+    VALUES ('${randomBytes(16).toString('hex')}','${product.id}','Synthetic ${runId} seats',
+    'SAAS_SEAT_NAMED','SUBSCRIPTION',50,'USD')`);
+  report.knownGaps.push('product catalog replication into pricing authoritative reference; isolated synthetic SQL fixture');
   const customerExternalId = `${runId}-CUSTOMER`;
   const region = `RN-${Date.now()}`;
   await request('/api/v1/pricing-customers', { method: 'POST', body: { externalId: customerExternalId, name: `Synthetic ${runId}`, segment: 'SMB', region: 'NA' } });
@@ -370,6 +574,10 @@ async function runLifecycleAcceptance() {
   report.originalApprovalId = originalApproval.id;
   report.replacementApprovalId = replacement.id;
   mark('gateway/auth full submit→canonical approval→send→accept preserves priced periods/totals and freezes accepted authoring');
+  if (includeContract) {
+    await runContractIngestAcceptance(accepted, customerExternalId);
+    await runHybridAcceptance(baseQuote, book, runId);
+  }
   await manage('stop', ['product-service', 'configuration-engine', 'approval-routing', 'quote-service']);
   await manage('start', ['pricing-service', 'pricebook-service', 'quote-service'], true);
   const flagOffQuote = await request('/api/v1/quotes', { method: 'POST', body: { ...baseQuote, name: `Synthetic ${runId} flag off` } });
