@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "lineResults": [
+    {
+      "productExternalId": "R4-SYNTHETIC-ONPREM-SUPPORT-001",
+      "lineItemType": "ONPREM_SUPPORT",
+      "pricedPeriods": [
+        {
+          "sequence": 1, "startMonth": 1, "months": 12, "quantity": 10,
+          "netUnitPrice": 100.00, "netMonthly": 1000.00,
+          "grossPeriodAmount": 12000.00, "migrationCredit": 3000.00, "periodAmount": 9000.00
+        },
+        {
+          "sequence": 2, "startMonth": 13, "months": 24, "quantity": 0,
+          "netUnitPrice": 100.00, "netMonthly": 0.00, "periodAmount": 0.00
+        }
+      ]
+    },
+    {
+      "productExternalId": "R4-SYNTHETIC-HYBRID-RISING-001",
+      "lineItemType": "HYBRID_MIGRATION_RAMP",
+      "pricedPeriods": [
+        {
+          "sequence": 1, "startMonth": 1, "months": 12, "quantity": 10,
+          "netUnitPrice": 50.00, "netMonthly": 500.00, "periodAmount": 6000.00
+        },
+        {
+          "sequence": 2, "startMonth": 13, "months": 24, "quantity": 20,
+          "netUnitPrice": 60.00, "netMonthly": 1200.00, "periodAmount": 28800.00
+        }
+      ]
+    }
+  ],
+  "financialMetrics": {"tcv": 43800.00, "acv": 14600.00, "arr": 18000.00, "exitArr": 14400.00},
+  "approvalState": "PENDING",
+  "approvalTier": "DEAL_DESK",
+  "explanationCodes": ["RAMP_HYBRID_WINDOW"]
+}

@@ -1,0 +1,139 @@
+{
+  "eventType" : "QuoteAccepted",
+  "eventVersion" : 1,
+  "quoteId" : "00000000-0000-4000-8000-000000000001",
+  "acceptedAt" : 1791644400.000000000,
+  "customerId" : "synthetic-r4-customer",
+  "totalAmount" : 1500.00,
+  "currencyCode" : "USD",
+  "quote" : {
+    "quoteId" : "00000000-0000-4000-8000-000000000001",
+    "quoteNumber" : "Q-R4",
+    "acceptedAt" : 1791644400.000000000
+  },
+  "customer" : {
+    "customerId" : "synthetic-r4-customer",
+    "accountName" : null
+  },
+  "pricing" : {
+    "totalAmount" : 1500.00,
+    "currencyCode" : "USD",
+    "arr" : 18000.00,
+    "tcv" : 43800.00,
+    "acv" : 14600.00,
+    "exitArr" : 14400.00
+  },
+  "configuration" : {
+    "configurationId" : null,
+    "committedVersion" : "v1",
+    "attributes" : {
+      "lineCount" : "2",
+      "region" : "",
+      "subscriptionType" : ""
+    }
+  },
+  "terms" : {
+    "termMonths" : 36,
+    "startDate" : "2027-01-01",
+    "endDate" : "2029-12-31"
+  },
+  "correlation" : {
+    "correlationId" : "00000000-0000-4000-8000-000000000001",
+    "causationId" : "quote-accept:Q-R4",
+    "sourceService" : "quote-service"
+  },
+  "deal" : {
+    "dealExternalId" : null,
+    "dealType" : "NEW"
+  },
+  "lineItems" : [ {
+    "lineUuid" : "00000000-0000-4000-8000-000000000003",
+    "productExternalId" : "R4-SYNTHETIC-ONPREM-SUPPORT-001",
+    "productName" : null,
+    "productType" : "ONPREM_SUPPORT",
+    "lineItemType" : "ONPREM_SUPPORT",
+    "quantity" : 10,
+    "unitOfMeasure" : null,
+    "listPrice" : 100.00,
+    "unitPrice" : 100.0000,
+    "discountRate" : 0.0000,
+    "discountAmount" : 0.00,
+    "netPrice" : 100.0000,
+    "extendedAmount" : 1000.00,
+    "billingFrequency" : "MONTHLY",
+    "sortOrder" : 0,
+    "ramp" : [ {
+      "sequence" : 1,
+      "startMonth" : 1,
+      "months" : 12,
+      "quantity" : 10,
+      "netUnitPrice" : 100.0,
+      "netMonthly" : 1000.0,
+      "periodAmount" : 9000.0,
+      "discountRate" : 0.0,
+      "explanationCodes" : [ "ABSOLUTE_PRICE", "RAMP_MIGRATION_CREDIT" ],
+      "grossPeriodAmount" : 12000.0,
+      "migrationCredit" : 3000.0
+    }, {
+      "sequence" : 2,
+      "startMonth" : 13,
+      "months" : 24,
+      "quantity" : 0,
+      "netUnitPrice" : 100.0,
+      "netMonthly" : 0.0,
+      "periodAmount" : 0.0,
+      "discountRate" : 0.0,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ]
+    } ],
+    "hybridMigration" : {
+      "pairId" : "R4-SYNTHETIC-PAIR-001",
+      "role" : "DECLINING",
+      "startMonth" : 1,
+      "months" : 12,
+      "bookValue" : 10000.0
+    }
+  }, {
+    "lineUuid" : "00000000-0000-4000-8000-000000000004",
+    "productExternalId" : "R4-SYNTHETIC-HYBRID-RISING-001",
+    "productName" : null,
+    "productType" : "HYBRID_MIGRATION_RAMP",
+    "lineItemType" : "HYBRID_MIGRATION_RAMP",
+    "quantity" : 10,
+    "unitOfMeasure" : null,
+    "listPrice" : 60.00,
+    "unitPrice" : 50.0000,
+    "discountRate" : 0.1667,
+    "discountAmount" : 100.00,
+    "netPrice" : 50.0000,
+    "extendedAmount" : 500.00,
+    "billingFrequency" : "MONTHLY",
+    "sortOrder" : 1,
+    "ramp" : [ {
+      "sequence" : 1,
+      "startMonth" : 1,
+      "months" : 12,
+      "quantity" : 10,
+      "netUnitPrice" : 50.0,
+      "netMonthly" : 500.0,
+      "periodAmount" : 6000.0,
+      "discountRate" : 0.1667,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ]
+    }, {
+      "sequence" : 2,
+      "startMonth" : 13,
+      "months" : 24,
+      "quantity" : 20,
+      "netUnitPrice" : 60.0,
+      "netMonthly" : 1200.0,
+      "periodAmount" : 28800.0,
+      "discountRate" : 0.0,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ]
+    } ],
+    "hybridMigration" : {
+      "pairId" : "R4-SYNTHETIC-PAIR-001",
+      "role" : "RISING",
+      "startMonth" : 1,
+      "months" : 12
+    }
+  } ]
+}

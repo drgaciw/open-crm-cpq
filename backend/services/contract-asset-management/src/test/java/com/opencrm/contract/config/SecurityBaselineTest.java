@@ -15,4 +15,9 @@ class SecurityBaselineTest extends AbstractSecurityBaselineTest {
     protected String userApiPath() {
         return "/api/v1/subscriptions";
     }
+
+    @Override
+    protected String internalPath() {
+        return "/internal/v1/subscriptions/by-number/SUB-fixture/ramp-schedule";
+    }
 }
