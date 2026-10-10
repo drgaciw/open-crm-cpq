@@ -366,6 +366,12 @@ async function runHybridAcceptance(baseQuote, book, runId) {
   }
   await manage('stop', ['product-service']);
   await manage('start', ['pricing-service', 'pricebook-service']);
+  const hybridRegion = `${baseQuote.region}-HYB`;
+  const hybridBook = await request('/api/v1/price-books', { method: 'POST', body: {
+    name: `Synthetic ${runId} hybrid`, region: hybridRegion, currency: baseQuote.currency,
+    isDefault: false, effectiveDate: null,
+  } });
+  assert.notEqual(hybridBook.id, book.id, 'hybrid setup must preserve the published original price book');
   for (const [index, product] of products.entries()) {
     assert.ok(Number.isSafeInteger(product.id));
     const type = index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP';
@@ -375,11 +381,14 @@ async function runHybridAcceptance(baseQuote, book, runId) {
     await sql(`INSERT INTO pricing.pricing_products(uuid,external_id,name,product_type,category,list_price,currency)
       VALUES('${randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')}',
       '${product.id}','Synthetic ${type}','${type}','${index === 0 ? 'SUPPORT' : 'SUBSCRIPTION'}',${price},'USD')`);
-    await request(`/api/v1/price-books/${book.id}/entries`, { method: 'POST', body: {
+    await request(`/api/v1/price-books/${hybridBook.id}/entries`, { method: 'POST', body: {
       productExternalId: String(product.id), listPrice: price, currency: 'USD',
     } });
   }
-  const quote = await request('/api/v1/quotes', { method: 'POST', body: { ...baseQuote, dealType: 'NEW', name: 'Synthetic persisted hybrid migration' } });
+  await request(`/api/v1/price-books/${hybridBook.id}`, { method: 'PUT', body: { effectiveDate: '2020-01-01' } });
+  const quote = await request('/api/v1/quotes', { method: 'POST', body: {
+    ...baseQuote, region: hybridRegion, dealType: 'NEW', name: 'Synthetic persisted hybrid migration',
+  } });
   const inputs = products.map((product, index) => ({ productExternalId: String(product.id), productName: product.name,
     productType: index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP',
     lineItemType: index === 0 ? 'ONPREM_SUPPORT' : 'HYBRID_MIGRATION_RAMP', quantity: 10,
@@ -434,6 +443,7 @@ async function runHybridAcceptance(baseQuote, book, runId) {
   assert.equal(await sql(`SELECT count(*) FROM contract.subscription_rate_periods WHERE accepted_quote_id='${accepted.uuid}' AND is_deleted=false`), '4');
   assert.equal(await sql(`SELECT count(*) FROM contract.applied_quote_acceptances WHERE accepted_quote_id='${accepted.uuid}'`), '1');
   report.hybridAcceptance = { quoteId: accepted.uuid, subscriptionNumber: sold.subscriptionNumber,
+    priceBookId: hybridBook.id, region: hybridRegion,
     metrics: metricSnapshot(accepted), migrationCredit: supportRate.migrationCredit,
     authoritativePricingProducts: 'synthetic isolated SQL fixture; catalog replication not validated' };
   report.knownGaps.push('product catalog replication into pricing authoritative reference');
