@@ -1,6 +1,7 @@
 // Interceptors
 export * from './lib/api-response.interceptor';
 export * from './lib/auth-redirect.interceptor';
+export * from './lib/csrf-bootstrap.interceptor';
 export * from './lib/error.interceptor';
 export * from './lib/loading.interceptor';
 
