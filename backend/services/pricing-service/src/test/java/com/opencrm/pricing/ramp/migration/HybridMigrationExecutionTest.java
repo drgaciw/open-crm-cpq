@@ -98,6 +98,36 @@ class HybridMigrationExecutionTest {
     }
 
     @Test
+    void risingQuantityCannotDecreaseWithinAuthorizedOverlap() {
+        var original = context.getLineItems().get(1).getSchedule();
+        var first = original.getFirst();
+        context.getLineItems().get(1).setSchedule(List.of(
+                com.opencrm.common.pricing.RampStep.builder().sequence(1).startMonth(1).months(6).quantity(10)
+                        .priceBasis(first.getPriceBasis()).unitPrice(first.getUnitPrice()).build(),
+                com.opencrm.common.pricing.RampStep.builder().sequence(2).startMonth(7).months(6).quantity(8)
+                        .priceBasis(first.getPriceBasis()).unitPrice(first.getUnitPrice()).build(),
+                com.opencrm.common.pricing.RampStep.builder().sequence(3).startMonth(13).months(24).quantity(20)
+                        .priceBasis(original.getLast().getPriceBasis()).unitPrice(original.getLast().getUnitPrice()).build()));
+        assertThatThrownBy(() -> service.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("direction");
+    }
+
+    @Test
+    void decliningQuantityCannotIncreaseWithinAuthorizedOverlap() {
+        var original = context.getLineItems().getFirst().getSchedule();
+        var first = original.getFirst();
+        context.getLineItems().getFirst().setSchedule(List.of(
+                com.opencrm.common.pricing.RampStep.builder().sequence(1).startMonth(1).months(6).quantity(10)
+                        .priceBasis(first.getPriceBasis()).unitPrice(first.getUnitPrice()).build(),
+                com.opencrm.common.pricing.RampStep.builder().sequence(2).startMonth(7).months(6).quantity(12)
+                        .priceBasis(first.getPriceBasis()).unitPrice(first.getUnitPrice()).build(),
+                com.opencrm.common.pricing.RampStep.builder().sequence(3).startMonth(13).months(24).quantity(0)
+                        .priceBasis(original.getLast().getPriceBasis()).unitPrice(original.getLast().getUnitPrice()).build()));
+        assertThatThrownBy(() -> service.execute(context)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("direction");
+    }
+
+    @Test
     void noSpillAndZeroBookStillRequireHybridApproval() {
         migration(0).put("bookValue", new BigDecimal("1000000"));
         var capped = service.simulate(context);
