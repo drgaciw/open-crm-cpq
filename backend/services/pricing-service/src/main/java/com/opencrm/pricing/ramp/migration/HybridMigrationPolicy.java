@@ -24,7 +24,8 @@ public final class HybridMigrationPolicy {
     private final MigrationCreditPolicy creditPolicy = new MigrationCreditPolicy();
 
     public HybridMigrationPolicy(int maxWindowMonths) {
-        if (maxWindowMonths < 1) throw new IllegalArgumentException("Migration window must be positive");
+        if (maxWindowMonths < 1 || maxWindowMonths > 12)
+            throw new IllegalArgumentException("Migration window must be between 1 and 12 months");
         this.maxWindowMonths = maxWindowMonths;
     }
 
