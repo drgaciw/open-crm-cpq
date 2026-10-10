@@ -1,6 +1,7 @@
 package com.opencrm.pricing.ramp;
 
 import com.opencrm.common.exception.BusinessException;
+import com.opencrm.pricing.ramp.migration.HybridMigrationPolicy;
 import com.opencrm.pricing.waterfall.*;
 import com.opencrm.rules.engine.*;
 import com.opencrm.rules.model.QuoteFact;
@@ -34,11 +35,26 @@ public final class PeriodGovernance {
                 if ($quote.getString("approvalTier") == null) $quote.setString("approvalTier", "DEAL_DESK");
                 $quote.setString("stepDownReason", "RAMP_STEP_DOWN");
             end
+            rule "Hybrid migration window"
+            salience 80
+            when
+                $quote : QuoteFact()
+                eval(Boolean.TRUE.equals($quote.getBoolean("hybridWindow")))
+            then
+                if ($quote.getString("approvalTier") == null) $quote.setString("approvalTier", "DEAL_DESK");
+                $quote.setString("hybridWindowReason", "RAMP_HYBRID_WINDOW");
+            end
             """).build();
 
     public void evaluate(PricingContext context, PricingResult result, RulesEngine engine,
                          Map<String, com.opencrm.pricing.product.PricingProduct> products,
                          List<RuleDefinition> configuredRules) {
+        evaluate(context, result, engine, products, configuredRules, HybridMigrationPolicy.Plan.empty());
+    }
+
+    public void evaluate(PricingContext context, PricingResult result, RulesEngine engine,
+                         Map<String, com.opencrm.pricing.product.PricingProduct> products,
+                         List<RuleDefinition> configuredRules, HybridMigrationPolicy.Plan migrationPlan) {
         // D-06 excludes placeholder margin policy. All other configured policies see the same aggregate metrics.
         List<RuleDefinition> policies = new ArrayList<>(configuredRules.stream()
                 .filter(rule -> rule.getContent() == null || !rule.getContent().contains("estimatedMarginPct"))
@@ -71,6 +87,7 @@ public final class PeriodGovernance {
                                 + ":" + String.valueOf(rule.getConditionGroup()) + ":" + String.valueOf(rule.getActionSet()))
                         .reduce("", (left, right) -> left + "\n" + right);
                 policyContext += "\nstepDownAllowed=" + allowed + "\nlistPrice=" + line.getListPrice().stripTrailingZeros().toPlainString();
+                if (migrationPlan.hasLine(lineIndex)) policyContext += "\n" + migrationPlan.policyContext(lineIndex);
                 safeMetadata.put("rampPolicyContext", java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                         .digest(policyContext.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
             } catch (java.security.NoSuchAlgorithmException ex) {
@@ -89,7 +106,8 @@ public final class PeriodGovernance {
                 fact.setDecimal("tcv", result.getFinancialMetrics().getTcv());
                 fact.setDecimal("acv", result.getFinancialMetrics().getAcv());
                 fact.setBoolean("stepDown", stepDown);
-                fact.setBoolean("stepDownAllowed", allowed);
+                fact.setBoolean("stepDownAllowed", allowed || migrationPlan.allowsStepDown(lineIndex, period));
+                fact.setBoolean("hybridWindow", migrationPlan.hasLine(lineIndex));
                 RuleExecutionContext ruleContext = RuleExecutionContext.builder().engineType(RulesEngineType.DROOLS).build();
                 ruleContext.getFacts().add(fact);
                 RuleExecutionResult decision = engine.execute(ruleContext, policies);
@@ -97,6 +115,9 @@ public final class PeriodGovernance {
                     throw new BusinessException("Ramp governance evaluation failed", "RULE_EXECUTION_ERROR");
                 }
                 String tier = canonicalTier(fact.getString("approvalTier"));
+                // A configured rule may clear facts after the built-in rule. Validated migration
+                // authority still requires approval; mutable rule facts cannot waive that minimum.
+                if (migrationPlan.hasLine(lineIndex) && rank(tier) < rank("DEAL_DESK")) tier = "DEAL_DESK";
                 stepDown = fact.getString("stepDownReason") != null;
                 // Owner-delegated R2 choice: explicit negotiated periods stay fixed. A configured price policy
                 // requiring a different commitment is a Deal Desk exception, never a silent period reallocation.
@@ -109,6 +130,7 @@ public final class PeriodGovernance {
                     List<String> reasons = new ArrayList<>();
                     if (fact.getString("explanationCode") != null) reasons.add(fact.getString("explanationCode"));
                     if (fact.getString("stepDownReason") != null) reasons.add(fact.getString("stepDownReason"));
+                    if (migrationPlan.hasLine(lineIndex)) reasons.add("RAMP_HYBRID_WINDOW");
                     if (commitmentMismatch) reasons.add("RAMP_POLICY_COMMITMENT: required "
                             + fact.getFinalPrice().stripTrailingZeros().toPlainString() + " " + context.getCurrency()
                             + ", scheduled " + result.getFinancialMetrics().getTcv().stripTrailingZeros().toPlainString());
@@ -118,6 +140,7 @@ public final class PeriodGovernance {
                     governance.put("stepDown", stepDown);
                     governance.put("reasons", reasons);
                     governance.put("approvalTier", tier);
+                    if (migrationPlan.hasLine(lineIndex)) governance.put("hybridMigration", migrationPlan.input(lineIndex));
                     Map<String, Object> metadata = line.getMetadata() == null
                             ? new HashMap<>() : new HashMap<>(line.getMetadata());
                     Map<?, ?> prior = metadata.get("rampGovernance") instanceof Map<?, ?> map ? map : null;
