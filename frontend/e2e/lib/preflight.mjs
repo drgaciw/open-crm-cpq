@@ -5,6 +5,7 @@
  * Probes go through the dev-server origin, i.e. the same path the app uses (proxy -> gateway).
  */
 import { BASE } from './browser.mjs';
+import { createCsrfOptions } from './csrf.mjs';
 
 /**
  * One probe per backend the UI depends on. `gates` documents what a non-'up' result blocks.
@@ -42,6 +43,7 @@ export function classify({ status, error }) {
  * @returns {Promise<Record<string, {state:string, status?:number, error?:string, gates:string}>>}
  */
 export async function runPreflight(request, { base = BASE, timeoutMs = 8000 } = {}) {
+  const csrfOptions = createCsrfOptions(request, { base });
   const results = {};
   for (const probe of PROBES) {
     let observed;
@@ -49,7 +51,7 @@ export async function runPreflight(request, { base = BASE, timeoutMs = 8000 } = 
       const options = { timeout: timeoutMs, failOnStatusCode: false };
       const response =
         probe.method === 'POST'
-          ? await request.post(`${base}${probe.path}`, { ...options, data: probe.body })
+          ? await request.post(`${base}${probe.path}`, await csrfOptions('POST', `${base}${probe.path}`, { ...options, data: probe.body }))
           : await request.get(`${base}${probe.path}`, options);
       observed = { status: response.status() };
     } catch (cause) {
