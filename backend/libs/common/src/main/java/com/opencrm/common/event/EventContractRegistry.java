@@ -8,6 +8,7 @@ import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 
 import java.util.List;
@@ -120,8 +121,13 @@ public final class EventContractRegistry {
     public static final EventContract APPROVAL_OUTCOME_COMPLETED_V1 = reserved(
             "ApprovalOutcomeCompleted", "approval-routing", KafkaTopics.APPROVAL_OUTCOME_COMPLETED, null);
 
+    /** Promoted only alongside its sole owned publisher in the integrated R3 patch. */
+    public static final EventContract RAMP_APPLIED_V1 = reserved(
+            "RampApplied", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RAMP_APPLIED, RampAppliedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
+            RAMP_APPLIED_V1,
             DISCOUNT_APPROVAL_REQUIRED_V1,
             RAMP_APPROVAL_BINDING_CHANGED_V1,
             PRODUCT_RETIRED_V1,
