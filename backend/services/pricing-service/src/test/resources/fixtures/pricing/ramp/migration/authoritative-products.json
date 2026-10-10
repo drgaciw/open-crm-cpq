@@ -1,0 +1,20 @@
+[
+  {
+    "externalId": "R4-SYNTHETIC-ONPREM-SUPPORT-001",
+    "name": "Synthetic recurring on-premises support",
+    "productType": "ONPREM_SUPPORT",
+    "category": "SUPPORT",
+    "listPrice": 100.00,
+    "currency": "USD",
+    "metadata": "{\"rampStepDownAllowed\":false}"
+  },
+  {
+    "externalId": "R4-SYNTHETIC-HYBRID-RISING-001",
+    "name": "Synthetic rising hybrid migration subscription",
+    "productType": "HYBRID_MIGRATION_RAMP",
+    "category": "SUBSCRIPTION",
+    "listPrice": 60.00,
+    "currency": "USD",
+    "metadata": "{\"rampStepDownAllowed\":false}"
+  }
+]

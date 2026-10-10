@@ -24,6 +24,8 @@ import com.opencrm.pricing.ruleset.RuleSetRepository;
 import com.opencrm.pricing.ramp.PricedPeriod;
 import com.opencrm.pricing.ramp.RampPeriodPricer;
 import com.opencrm.pricing.ramp.RampPricingProperties;
+import com.opencrm.pricing.ramp.migration.HybridMigrationPolicy;
+import com.opencrm.pricing.ramp.migration.MigrationWindowProperties;
 import com.opencrm.pricing.ruleset.RuleSetStatus;
 import com.opencrm.pricing.waterfall.*;
 import lombok.RequiredArgsConstructor;
@@ -69,8 +71,14 @@ public class PricingExecutionService {
     private boolean rampEnabled;
 
     private int maxPeriods = 36;
+    private int migrationWindowMonths = 12;
 
     private final RampPeriodPricer rampPeriodPricer = new RampPeriodPricer();
+
+    @Autowired
+    void applyMigrationProperties(MigrationWindowProperties properties) {
+        this.migrationWindowMonths = properties.getMigrationWindowMonths();
+    }
 
     @Autowired
     void applyRampProperties(RampPricingProperties properties) {
@@ -208,6 +216,9 @@ public class PricingExecutionService {
                 }
             }
 
+            HybridMigrationPolicy migrationPolicy = new HybridMigrationPolicy(migrationWindowMonths);
+            HybridMigrationPolicy.Plan migrationPlan = migrationPolicy.prepare(context, fallbackProducts, priceBookBatch);
+
             // 6. Initialize line results with list prices
             List<PricingLineResult> lineResults = new ArrayList<>();
             for (PricingLineRequest lineRequest : context.getLineItems()) {
@@ -286,6 +297,7 @@ public class PricingExecutionService {
                     .approvalState("APPROVED")
                     .build();
 
+            migrationPolicy.apply(migrationPlan, lineResults);
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
             result.setFinancialMetrics(metrics);
             if (requestsRamp(context)) {
@@ -295,7 +307,7 @@ public class PricingExecutionService {
                         .conditionGroup(rule.getConditionGroup()).actionSet(rule.getActionSet())
                         .conflictPolicy(rule.getConflictPolicy()).explanationCode(rule.getExplanationCode()).build()).toList();
                 new com.opencrm.pricing.ramp.PeriodGovernance().evaluate(
-                        context, result, droolsRulesEngine, fallbackProducts, governanceRules);
+                        context, result, droolsRulesEngine, fallbackProducts, governanceRules, migrationPlan);
             }
 
             // 12. Build PricingWaterfall
@@ -375,9 +387,15 @@ public class PricingExecutionService {
                 steps.add(PricingWaterfallStep.builder()
                         .stepType(WaterfallStepType.PERIOD_SELECTION)
                         .description("Period " + period.getSequence())
-                        .amount(amount)
-                        .runningTotal(runningPeriods)
+                        .amount(period.getGrossPeriodAmount() == null ? amount : period.getGrossPeriodAmount())
+                        .runningTotal(runningPeriods.add(period.getMigrationCredit() == null ? BigDecimal.ZERO : period.getMigrationCredit()))
                         .build());
+                if (period.getMigrationCredit() != null) {
+                    steps.add(PricingWaterfallStep.builder().stepType(WaterfallStepType.DISCOUNT)
+                            .description("One-time migration credit for period " + period.getSequence())
+                            .amount(period.getMigrationCredit().negate()).runningTotal(runningPeriods)
+                            .ruleId("hybrid-migration-credit").build());
+                }
             }
         }
         steps.add(PricingWaterfallStep.builder()
