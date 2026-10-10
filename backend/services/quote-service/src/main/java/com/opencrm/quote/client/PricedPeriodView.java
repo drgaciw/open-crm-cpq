@@ -18,6 +18,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 public class PricedPeriodView {
 
     private Integer sequence;
@@ -27,6 +28,8 @@ public class PricedPeriodView {
     private BigDecimal netUnitPrice;
     private BigDecimal netMonthly;
     private BigDecimal periodAmount;
+    private BigDecimal grossPeriodAmount;
+    private BigDecimal migrationCredit;
     private BigDecimal discountRate;
     private List<String> explanationCodes;
     private JsonNode waterfall;

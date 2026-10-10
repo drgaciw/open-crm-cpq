@@ -31,6 +31,7 @@ public interface QuoteMapper {
     @Mapping(target = "pricingWaterfallJson", ignore = true)
     @Mapping(target = "metadata", ignore = true)
     @Mapping(target = "lineItems", ignore = true)
+    @Mapping(target = "continuationRequestJson", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
@@ -45,6 +46,8 @@ public interface QuoteMapper {
 
     @Mapping(target = "schedule", expression = "java(RampScheduleViews.toDto(lineItem))")
     @Mapping(target = "pricedPeriods", expression = "java(com.opencrm.quote.ramp.RampPricingSnapshot.pricedPeriods(lineItem))")
+    @Mapping(target = "hybridMigration", expression = "java(com.opencrm.quote.ramp.RampPricingSnapshot.hybridMigration(lineItem))")
+    @Mapping(target = "initialProration", expression = "java(com.opencrm.quote.ramp.RampPricingSnapshot.initialProration(lineItem))")
     QuoteLineItemDto toLineItemDto(QuoteLineItem lineItem);
 
     @Mapping(target = "id", ignore = true)
@@ -52,6 +55,7 @@ public interface QuoteMapper {
     @Mapping(target = "quoteNumber", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "dealType", ignore = true)
+    @Mapping(target = "continuationRequestJson", ignore = true)
     @Mapping(target = "customerExternalId", ignore = true)
     @Mapping(target = "approvalState", ignore = true)
     @Mapping(target = "approvalTier", ignore = true)

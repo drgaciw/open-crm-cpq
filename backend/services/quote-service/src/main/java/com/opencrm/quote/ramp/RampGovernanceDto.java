@@ -14,4 +14,5 @@ public class RampGovernanceDto {
     private BigDecimal discountPercent;
     private boolean stepDown;
     private List<String> reasons;
+    private HybridMigrationContext hybridMigration;
 }

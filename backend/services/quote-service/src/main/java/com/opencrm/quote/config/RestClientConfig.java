@@ -16,6 +16,12 @@ import java.time.Duration;
  */
 @Configuration
 public class RestClientConfig {
+    @Bean("subscriptionScheduleRestClient")
+    public RestClient subscriptionScheduleRestClient(
+            @Value("${services.contract-asset-management.url:http://localhost:8087}") String baseUrl, OutboundAuth outboundAuth) {
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(createRequestFactory())
+                .requestInterceptor(outboundAuth.serviceToken()).build();
+    }
 
     /** pricing {@code /api/v1/pricing/**}: user-initiated, so the caller's token is relayed. */
     @Bean("pricingRestClient")

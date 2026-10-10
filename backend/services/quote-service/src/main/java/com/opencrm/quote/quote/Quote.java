@@ -74,6 +74,19 @@ public class Quote extends BaseEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "target_subscription_number")
+    private String targetSubscriptionNumber;
+
+    @Column(name = "observed_revision")
+    private Long observedRevision;
+
+    @Column(name = "subscription_effective_date")
+    private LocalDate subscriptionEffectiveDate;
+
+    /** Server-authored continuation request, revalidated against the subscription before pricing/acceptance. */
+    @Column(name = "continuation_request_json", columnDefinition = "TEXT")
+    private String continuationRequestJson;
+
     @Column(name = "subtotal", precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal subtotal = BigDecimal.ZERO;
