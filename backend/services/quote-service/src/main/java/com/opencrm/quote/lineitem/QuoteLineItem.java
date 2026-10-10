@@ -86,6 +86,16 @@ public class QuoteLineItem extends BaseEntity {
     @Column(name = "metadata", columnDefinition = "TEXT")
     private String metadata;
 
+    @Column(name = "source_subscription_line_uuid")
+    private String sourceSubscriptionLineUuid;
+
+    @Column(name = "hybrid_migration_json", columnDefinition = "TEXT")
+    private String hybridMigrationJson;
+
+    /** Verified actual-days initial interval; never a zero-month authored ramp step. */
+    @Column(name = "initial_proration_json", columnDefinition = "TEXT")
+    private String initialProrationJson;
+
     /** Display-only escalator inputs. Priced rows live in {@link #rampSteps}. */
     @Column(name = "ramp_escalator_start_price", precision = 19, scale = 4)
     private BigDecimal rampEscalatorStartPrice;
