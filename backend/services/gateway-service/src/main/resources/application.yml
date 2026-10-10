@@ -54,7 +54,10 @@ spring:
               predicates:
                 - Path=/api/v1/pricing/**,/api/v1/pricing-customers/**,/api/v1/rule-sets/**,/api/v1/rules/**
               filters:
-                - CircuitBreaker=name=pricingCircuitBreaker,fallbackUri=forward:/fallback/pricing
+                - name: CircuitBreaker
+                  args:
+                    name: pricingCircuitBreaker
+                    fallbackUri: forward:/fallback/pricing
 
             # CPQ gateway aliases delegate pricing commands to the pricing aggregate owner.
             - id: cpq-pricing-service
@@ -63,7 +66,10 @@ spring:
                 - Path=/api/v1/cpq/pricing/**,/api/v1/cpq/pricing-customers/**,/api/v1/cpq/rule-sets/**,/api/v1/cpq/rules/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>pricing|pricing-customers|rule-sets|rules)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=pricingCircuitBreaker,fallbackUri=forward:/fallback/pricing
+                - name: CircuitBreaker
+                  args:
+                    name: pricingCircuitBreaker
+                    fallbackUri: forward:/fallback/pricing
 
             # Price Book Service routes
             - id: pricebook-service
@@ -127,7 +133,10 @@ spring:
               predicates:
                 - Path=/api/v1/quotes/**
               filters:
-                - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
+                - name: CircuitBreaker
+                  args:
+                    name: quoteCircuitBreaker
+                    fallbackUri: forward:/fallback/quote
 
             # CPQ gateway alias delegates quote and approval commands to the quote aggregate owner.
             - id: cpq-quote-service
@@ -136,7 +145,10 @@ spring:
                 - Path=/api/v1/cpq/quotes/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>quotes)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=quoteCircuitBreaker,fallbackUri=forward:/fallback/quote
+                - name: CircuitBreaker
+                  args:
+                    name: quoteCircuitBreaker
+                    fallbackUri: forward:/fallback/quote
 
             # Configuration Engine routes
             - id: configuration-engine
@@ -249,6 +261,24 @@ security:
 
 # Resilience4j Circuit Breaker
 resilience4j:
+  timelimiter:
+    # Cloud's reactive factory resolves named configs by breaker ID. Keep its
+    # configuration lookup and the TimeLimiter instances on the same budgets.
+    configs:
+      # Quote's pricing client allows 5s connect + 30s read. Leave another 10s
+      # for service-token acquisition/local orchestration instead of the library's
+      # 1s default, which times out successful cold rule compilation.
+      quoteCircuitBreaker:
+        timeoutDuration: ${QUOTE_GATEWAY_TIMEOUT:45s}
+      # Direct pricing requests have no quote-service hop, but still need the
+      # same bounded computation budget as quote's outbound pricing request.
+      pricingCircuitBreaker:
+        timeoutDuration: ${PRICING_GATEWAY_TIMEOUT:35s}
+    instances:
+      quoteCircuitBreaker:
+        baseConfig: quoteCircuitBreaker
+      pricingCircuitBreaker:
+        baseConfig: pricingCircuitBreaker
   circuitbreaker:
     configs:
       default:
