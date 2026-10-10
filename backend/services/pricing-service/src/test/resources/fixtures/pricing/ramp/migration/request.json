@@ -1,0 +1,47 @@
+{
+  "customerExternalId": "R4-SYNTHETIC-CUSTOMER-001",
+  "quoteExternalId": "R4-SYNTHETIC-QUOTE-001",
+  "region": "US",
+  "currency": "USD",
+  "durationInMonths": 36,
+  "subscriptionType": "NEW",
+  "lineItems": [
+    {
+      "productExternalId": "R4-SYNTHETIC-ONPREM-SUPPORT-001",
+      "lineItemType": "ONPREM_SUPPORT",
+      "quantity": 10,
+      "billingFrequency": "MONTHLY",
+      "metadata": {
+        "hybridMigration": {
+          "pairId": "R4-SYNTHETIC-PAIR-001",
+          "role": "DECLINING",
+          "startMonth": 1,
+          "months": 12,
+          "bookValue": 10000.00
+        }
+      },
+      "schedule": [
+        {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 10, "priceBasis": "ABSOLUTE", "unitPrice": 100.00},
+        {"sequence": 2, "startMonth": 13, "months": 24, "quantity": 0, "priceBasis": "ABSOLUTE", "unitPrice": 100.00}
+      ]
+    },
+    {
+      "productExternalId": "R4-SYNTHETIC-HYBRID-RISING-001",
+      "lineItemType": "HYBRID_MIGRATION_RAMP",
+      "quantity": 10,
+      "billingFrequency": "MONTHLY",
+      "metadata": {
+        "hybridMigration": {
+          "pairId": "R4-SYNTHETIC-PAIR-001",
+          "role": "RISING",
+          "startMonth": 1,
+          "months": 12
+        }
+      },
+      "schedule": [
+        {"sequence": 1, "startMonth": 1, "months": 12, "quantity": 10, "priceBasis": "ABSOLUTE", "unitPrice": 50.00},
+        {"sequence": 2, "startMonth": 13, "months": 24, "quantity": 20, "priceBasis": "ABSOLUTE", "unitPrice": 60.00}
+      ]
+    }
+  ]
+}

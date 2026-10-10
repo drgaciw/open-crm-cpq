@@ -69,6 +69,16 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "erp_subscription_id")
     private String erpSubscriptionId;
+
+    @Column(name = "commercial_revision", nullable = false)
+    @Builder.Default
+    private Long commercialRevision = 0L;
+
+    @Column(name = "erp_sync_claim_token", length = 36)
+    private String erpSyncClaimToken;
+
+    @Column(name = "erp_sync_claim_revision")
+    private Long erpSyncClaimRevision;
     
     public void activate() {
         if (status != SubscriptionStatus.PENDING) {
@@ -85,6 +95,10 @@ public class Subscription extends BaseEntity {
     }
     
     public void cancel() {
+        if (status != SubscriptionStatus.PENDING && status != SubscriptionStatus.ACTIVE
+                && status != SubscriptionStatus.SUSPENDED) {
+            throw new IllegalStateException("Can only cancel PENDING, ACTIVE or SUSPENDED subscriptions");
+        }
         this.status = SubscriptionStatus.CANCELLED;
     }
     
