@@ -57,7 +57,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
           color="primary"
           type="button"
           class="add-rule-btn"
-          [disabled]="busy() || productId() == null"
+          [disabled]="busy() || productId() === null || productId() === undefined"
           (click)="openCreate()"
         >
           <mat-icon>add</mat-icon>
