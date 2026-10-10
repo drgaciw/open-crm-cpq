@@ -6,10 +6,7 @@ import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
 import com.opencrm.common.event.NonRetryableEventException;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
-import com.opencrm.contract.domain.ErpSyncStatus;
-import com.opencrm.contract.domain.Subscription;
-import com.opencrm.contract.domain.SubscriptionStatus;
-import com.opencrm.contract.repository.SubscriptionRepository;
+import com.opencrm.contract.service.AcceptedQuoteSubscriptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -17,7 +14,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 
 /**
  * Consumes quote accepted events and creates subscriptions.
@@ -42,9 +38,9 @@ public class QuoteAcceptedEventConsumer {
     /** Kafka consumer group; also the inbox namespace. */
     public static final String CONSUMER_GROUP = "contract-asset-management";
 
-    private final SubscriptionRepository subscriptionRepository;
     private final ObjectMapper objectMapper;
     private final KafkaInbox inbox;
+    private final AcceptedQuoteSubscriptionService acceptedQuotes;
 
     @KafkaListener(topics = KafkaTopics.QUOTE_STATUS_ACCEPTED, groupId = CONSUMER_GROUP)
     @Transactional
@@ -56,28 +52,7 @@ public class QuoteAcceptedEventConsumer {
         QuoteAcceptedEvent event = parse(record.value());
         log.info("Received quote accepted event for quote: {}", event.getQuoteId());
 
-        String subscriptionNumber = "SUB-" + event.getQuoteId();
-        if (subscriptionRepository.existsBySubscriptionNumber(subscriptionNumber)) {
-            log.info("Subscription {} already exists; quote accepted event is a duplicate", subscriptionNumber);
-            return;
-        }
-
-        Subscription subscription = Subscription.builder()
-                .subscriptionNumber(subscriptionNumber)
-                .customerId(event.getCustomerId())
-                .quoteId(event.getQuoteId())
-                .status(SubscriptionStatus.PENDING)
-                .planName("Standard Plan") // In production, extract from quote
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusYears(1))
-                .renewalDate(LocalDate.now().plusYears(1).minusDays(30))
-                .arr(event.getTotalAmount())
-                .currencyCode(event.getCurrencyCode())
-                .erpSyncStatus(ErpSyncStatus.QUEUED)
-                .build();
-        subscriptionRepository.save(subscription);
-
-        log.info("Created subscription {} for quote {}; ERP sync queued", subscriptionNumber, event.getQuoteId());
+        acceptedQuotes.apply(event);
     }
 
     private QuoteAcceptedEvent parse(String payload) {

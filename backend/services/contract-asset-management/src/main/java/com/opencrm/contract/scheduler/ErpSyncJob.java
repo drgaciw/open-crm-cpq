@@ -6,6 +6,7 @@ import com.opencrm.contract.domain.ErpSyncStatus;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.repository.SubscriptionRepository;
+import com.opencrm.contract.service.SubscriptionRateApplyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Syncs subscriptions created from quote-accepted events to the ERP, then activates them (ADR-018 D6). This used to run
@@ -46,6 +49,7 @@ public class ErpSyncJob {
 
     private final SubscriptionRepository repository;
     private final ErpAdapter erpAdapter;
+    private final SubscriptionRateApplyService rateApply;
     private final TransactionTemplate tx;
     private final Clock clock;
     private final int batchSize;
@@ -55,17 +59,19 @@ public class ErpSyncJob {
     public ErpSyncJob(
             SubscriptionRepository repository,
             ErpAdapter erpAdapter,
+            SubscriptionRateApplyService rateApply,
             PlatformTransactionManager transactionManager,
             @Value("${opencrm.erp-sync.batch-size:20}") int batchSize,
             @Value("${opencrm.erp-sync.stale-after:PT10M}") Duration staleAfter) {
-        this(repository, erpAdapter, new TransactionTemplate(transactionManager), Clock.systemUTC(), batchSize,
+        this(repository, erpAdapter, rateApply, new TransactionTemplate(transactionManager), Clock.systemUTC(), batchSize,
                 staleAfter);
     }
 
-    ErpSyncJob(SubscriptionRepository repository, ErpAdapter erpAdapter, TransactionTemplate tx, Clock clock,
+    ErpSyncJob(SubscriptionRepository repository, ErpAdapter erpAdapter, SubscriptionRateApplyService rateApply, TransactionTemplate tx, Clock clock,
                int batchSize, Duration staleAfter) {
         this.repository = repository;
         this.erpAdapter = erpAdapter;
+        this.rateApply = rateApply;
         this.tx = tx;
         this.clock = clock;
         this.batchSize = batchSize;
@@ -88,40 +94,57 @@ public class ErpSyncJob {
     }
 
     void syncOne(Long id) {
-        if (!transition(id, ErpSyncStatus.QUEUED, ErpSyncStatus.IN_PROGRESS)) {
+        String claimToken = UUID.randomUUID().toString();
+        Integer claimed = tx.execute(status -> repository.claimErpSync(id, claimToken, clock.instant()));
+        if (claimed == null || claimed != 1) {
             return; // another replica claimed it
         }
         Subscription subscription = tx.execute(status -> repository.findById(id).orElse(null));
-        if (subscription == null) {
+        if (subscription == null || !ErpSyncStatus.IN_PROGRESS.equals(subscription.getErpSyncStatus())
+                || !claimToken.equals(subscription.getErpSyncClaimToken())
+                || subscription.getErpSyncClaimRevision() == null
+                || !Objects.equals(subscription.getErpSyncClaimRevision(), subscription.getCommercialRevision())) {
             return;
         }
+        Long claimedRevision = subscription.getErpSyncClaimRevision();
         String erpSubscriptionId;
         try {
             erpSubscriptionId = erpAdapter.syncToErp(subscription);
         } catch (ErpRateLimitException e) {
             log.info("ERP rate limit reached; subscription {} stays queued", subscription.getSubscriptionNumber());
-            transition(id, ErpSyncStatus.IN_PROGRESS, ErpSyncStatus.QUEUED);
+            finishClaim(id, claimToken, claimedRevision, ErpSyncStatus.QUEUED);
             return;
         } catch (RuntimeException e) {
             log.error("ERP sync failed for subscription {}", subscription.getSubscriptionNumber(), e);
-            transition(id, ErpSyncStatus.IN_PROGRESS, ErpSyncStatus.FAILED);
+            finishClaim(id, claimToken, claimedRevision, ErpSyncStatus.FAILED);
             return;
         }
-        tx.executeWithoutResult(status -> {
-            Subscription fresh = repository.findById(id).orElseThrow();
+        Boolean completed = tx.execute(status -> {
+            Subscription fresh = repository.findByIdForUpdate(id).orElse(null);
+            if (fresh == null || !ErpSyncStatus.IN_PROGRESS.equals(fresh.getErpSyncStatus())
+                    || !claimToken.equals(fresh.getErpSyncClaimToken())
+                    || !Objects.equals(claimedRevision, fresh.getErpSyncClaimRevision())
+                    || !Objects.equals(claimedRevision, fresh.getCommercialRevision())) {
+                log.info("ERP completion for subscription {} no longer owns the current commercial revision", id);
+                return false;
+            }
             fresh.setErpSubscriptionId(erpSubscriptionId);
             fresh.setErpSyncStatus(ErpSyncStatus.SYNCED);
+            fresh.setErpSyncClaimToken(null);
+            fresh.setErpSyncClaimRevision(null);
             if (fresh.getStatus() == SubscriptionStatus.PENDING) {
                 fresh.activate();
             }
+            rateApply.applyLocked(fresh);
             repository.save(fresh);
+            return true;
         });
-        log.info("Synced subscription {} to ERP ({}) and activated it", subscription.getSubscriptionNumber(),
-                erpSubscriptionId);
+        if (Boolean.TRUE.equals(completed)) {
+            log.info("Synced subscription {} to ERP ({})", subscription.getSubscriptionNumber(), erpSubscriptionId);
+        }
     }
 
-    private boolean transition(Long id, String from, String to) {
-        Integer changed = tx.execute(status -> repository.transitionErpSyncStatus(id, from, to, clock.instant()));
-        return changed != null && changed == 1;
+    private void finishClaim(Long id, String token, Long revision, String status) {
+        tx.executeWithoutResult(txStatus -> repository.finishErpSyncClaim(id, token, revision, status, clock.instant()));
     }
 }
