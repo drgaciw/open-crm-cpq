@@ -58,6 +58,7 @@ public class QuoteAcceptedEvent {
     private CorrelationSnapshot correlation;
     private DealSnapshot deal;
     private List<LineItemSnapshot> lineItems;
+    private SubscriptionChangeSnapshot subscriptionChange;
 
     public QuoteAcceptedEvent(
             String quoteId,
@@ -136,6 +137,8 @@ public class QuoteAcceptedEvent {
         private BigDecimal arr;
         private BigDecimal tcv;
         private BigDecimal acv;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private BigDecimal exitArr;
     }
 
     /** The CRM deal the quote belongs to (ADR-018 D8); {@code dealExternalId} is the CRM {@code Deal.uuid}. */
@@ -209,5 +212,66 @@ public class QuoteAcceptedEvent {
         private BigDecimal extendedAmount;
         private String billingFrequency;
         private Integer sortOrder;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private List<RampPeriodSnapshot> ramp;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private String sourceSubscriptionLineUuid;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private HybridMigrationSnapshot hybridMigration;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private ProrationSnapshot initialProration;
+    }
+
+    /** Accepted priced facts, never an instruction to reprice authored steps. */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class RampPeriodSnapshot {
+        private Integer sequence;
+        private Integer startMonth;
+        private Integer months;
+        private Integer quantity;
+        private BigDecimal netUnitPrice;
+        private BigDecimal netMonthly;
+        private BigDecimal periodAmount;
+        private BigDecimal discountRate;
+        private List<String> explanationCodes;
+        private BigDecimal grossPeriodAmount;
+        private BigDecimal migrationCredit;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SubscriptionChangeSnapshot {
+        private String targetSubscriptionNumber;
+        private Long observedRevision;
+        private String effectiveDate;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class HybridMigrationSnapshot {
+        private String pairId;
+        private String role;
+        private Integer startMonth;
+        private Integer months;
+        private BigDecimal bookValue;
+    }
+
+    /** Initial actual-day interval preceding the next full anchored billing month. */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ProrationSnapshot {
+        private String startDate;
+        private String endDate;
+        private String billingPeriodStart;
+        private String billingPeriodEnd;
+        private Integer quantity;
+        private BigDecimal netUnitPrice;
+        private BigDecimal netMonthly;
+        private BigDecimal periodAmount;
     }
 }
