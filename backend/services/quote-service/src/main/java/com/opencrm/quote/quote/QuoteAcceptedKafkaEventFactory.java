@@ -19,6 +19,7 @@ final class QuoteAcceptedKafkaEventFactory {
     }
 
     static QuoteAcceptedEvent from(Quote quote, List<QuoteLineItem> lineItems) {
+        AcceptedRampSnapshots.validatePairs(quote, lineItems);
         String quoteId = quote.getUuid() != null ? quote.getUuid() : quote.getQuoteNumber();
         String correlationId = quote.getUuid() != null ? quote.getUuid() : UUID.randomUUID().toString();
 
@@ -43,6 +44,7 @@ final class QuoteAcceptedKafkaEventFactory {
                         .arr(quote.getArr())
                         .tcv(quote.getTcv())
                         .acv(quote.getAcv())
+                        .exitArr(quote.getExitArr())
                         .build(),
                 QuoteAcceptedEvent.ConfigurationSnapshot.builder()
                         .configurationId(extractConfigurationId(quote.getMetadata()))
@@ -71,12 +73,25 @@ final class QuoteAcceptedKafkaEventFactory {
         // lines, which is different from a missing field.
         event.setLineItems(lineItems.stream()
                 .sorted(Comparator.comparingInt(QuoteLineItem::getSortOrder))
-                .map(QuoteAcceptedKafkaEventFactory::lineItemSnapshot)
+                .map(line -> lineItemSnapshot(quote, line))
                 .toList());
+        if (quote.getTargetSubscriptionNumber() != null) {
+            if (quote.getDealType() == DealType.NEW || quote.getObservedRevision() == null || quote.getObservedRevision() < 0
+                    || quote.getSubscriptionEffectiveDate() == null) {
+                throw new com.opencrm.common.exception.BusinessException("Incomplete typed subscription change", "SUBSCRIPTION_CHANGE_INVALID");
+            }
+            if (quote.getDealType() == DealType.AMENDMENT && lineItems.stream().filter(AcceptedRampSnapshots::recurring)
+                    .anyMatch(line -> line.getSourceSubscriptionLineUuid() == null || line.getSourceSubscriptionLineUuid().isBlank())) {
+                throw new com.opencrm.common.exception.BusinessException("Amendment requires an accepted source line identity", "SUBSCRIPTION_CHANGE_INVALID");
+            }
+            event.setSubscriptionChange(QuoteAcceptedEvent.SubscriptionChangeSnapshot.builder()
+                    .targetSubscriptionNumber(quote.getTargetSubscriptionNumber()).observedRevision(quote.getObservedRevision())
+                    .effectiveDate(quote.getSubscriptionEffectiveDate().toString()).build());
+        }
         return event;
     }
 
-    private static QuoteAcceptedEvent.LineItemSnapshot lineItemSnapshot(QuoteLineItem lineItem) {
+    private static QuoteAcceptedEvent.LineItemSnapshot lineItemSnapshot(Quote quote, QuoteLineItem lineItem) {
         return QuoteAcceptedEvent.LineItemSnapshot.builder()
                 .lineUuid(lineItem.getUuid())
                 .productExternalId(lineItem.getProductExternalId())
@@ -93,6 +108,10 @@ final class QuoteAcceptedKafkaEventFactory {
                 .extendedAmount(lineItem.getExtendedAmount())
                 .billingFrequency(lineItem.getBillingFrequency())
                 .sortOrder(lineItem.getSortOrder())
+                .ramp(AcceptedRampSnapshots.periods(quote, lineItem))
+                .sourceSubscriptionLineUuid(lineItem.getSourceSubscriptionLineUuid())
+                .hybridMigration(AcceptedRampSnapshots.hybrid(lineItem) != null ? AcceptedRampSnapshots.hybrid(lineItem).snapshot() : null)
+                .initialProration(AcceptedRampSnapshots.proration(quote, lineItem))
                 .build();
     }
 

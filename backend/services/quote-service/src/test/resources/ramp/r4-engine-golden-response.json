@@ -1,0 +1,340 @@
+{
+  "success" : true,
+  "lineResults" : [ {
+    "productExternalId" : "R4-SYNTHETIC-ONPREM-SUPPORT-001",
+    "lineItemType" : "ONPREM_SUPPORT",
+    "quantity" : 10,
+    "listPrice" : 100.00,
+    "unitPrice" : 100.0000,
+    "discountRate" : 0.0000,
+    "discountAmount" : 0.00,
+    "surchargeAmount" : 0,
+    "finalPrice" : 1000.00,
+    "explanationCodes" : [ ],
+    "metadata" : {
+      "migrationCreditAudit" : {
+        "bookValue" : 10000.0,
+        "requestedCredit" : 3000.00,
+        "effectiveCredit" : 3000.00,
+        "unusedCredit" : 0.00,
+        "grossDecliningLineTCV" : 12000.00,
+        "firstGrossPeriodAmount" : 12000.00
+      },
+      "rampGovernanceEvaluated" : true,
+      "hybridMigration" : {
+        "pairId" : "R4-SYNTHETIC-PAIR-001",
+        "role" : "DECLINING",
+        "startMonth" : 1,
+        "months" : 12,
+        "bookValue" : 10000.0
+      },
+      "rampPolicyContext" : "d775f2534530e6bae950cd68e9cc020b00354e2a42d635c980cac36c65054b6d",
+      "rampGovernance" : {
+        "governingPeriod" : 1,
+        "discountPercent" : 0.0000,
+        "stepDown" : false,
+        "reasons" : [ "RAMP_HYBRID_WINDOW" ],
+        "approvalTier" : "DEAL_DESK",
+        "hybridMigration" : {
+          "pairId" : "R4-SYNTHETIC-PAIR-001",
+          "role" : "DECLINING",
+          "startMonth" : 1,
+          "months" : 12,
+          "bookValue" : 10000.0
+        }
+      },
+      "authoritativeProductType" : "ONPREM_SUPPORT"
+    },
+    "pricedPeriods" : [ {
+      "sequence" : 1,
+      "startMonth" : 1,
+      "months" : 12,
+      "quantity" : 10,
+      "netUnitPrice" : 100.0000,
+      "netMonthly" : 1000.00,
+      "periodAmount" : 9000.00,
+      "grossPeriodAmount" : 12000.00,
+      "migrationCredit" : 3000.00,
+      "discountRate" : 0.0000,
+      "explanationCodes" : [ "ABSOLUTE_PRICE", "RAMP_MIGRATION_CREDIT" ],
+      "waterfall" : [ {
+        "stepType" : "PERIOD_SELECTION",
+        "description" : "Period 1 month 1 for 12 months, quantity 10",
+        "amount" : 12000.00,
+        "runningTotal" : 12000.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "LIST_PRICE",
+        "description" : "List price",
+        "amount" : 100.00,
+        "runningTotal" : 100.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "BASE_PRICE",
+        "description" : "Base price",
+        "amount" : 100.00,
+        "runningTotal" : 100.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "NET_PRICE",
+        "description" : "Net unit price",
+        "amount" : 100.0000,
+        "runningTotal" : 1000.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "DISCOUNT",
+        "description" : "One-time migration credit on period amount",
+        "amount" : -3000.00,
+        "runningTotal" : 9000.00,
+        "ruleId" : "hybrid-migration-credit",
+        "ruleName" : null
+      } ]
+    }, {
+      "sequence" : 2,
+      "startMonth" : 13,
+      "months" : 24,
+      "quantity" : 0,
+      "netUnitPrice" : 100.0000,
+      "netMonthly" : 0.00,
+      "periodAmount" : 0.00,
+      "discountRate" : 0.0000,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ],
+      "waterfall" : [ {
+        "stepType" : "PERIOD_SELECTION",
+        "description" : "Period 2 month 13 for 24 months, quantity 0",
+        "amount" : 0.00,
+        "runningTotal" : 0.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "LIST_PRICE",
+        "description" : "List price",
+        "amount" : 100.00,
+        "runningTotal" : 100.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "BASE_PRICE",
+        "description" : "Base price",
+        "amount" : 100.00,
+        "runningTotal" : 100.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "NET_PRICE",
+        "description" : "Net unit price",
+        "amount" : 100.0000,
+        "runningTotal" : 0.00,
+        "ruleId" : null,
+        "ruleName" : null
+      } ]
+    } ]
+  }, {
+    "productExternalId" : "R4-SYNTHETIC-HYBRID-RISING-001",
+    "lineItemType" : "HYBRID_MIGRATION_RAMP",
+    "quantity" : 10,
+    "listPrice" : 60.00,
+    "unitPrice" : 50.0000,
+    "discountRate" : 0.1667,
+    "discountAmount" : 100.00,
+    "surchargeAmount" : 0,
+    "finalPrice" : 500.00,
+    "explanationCodes" : [ ],
+    "metadata" : {
+      "rampGovernanceEvaluated" : true,
+      "hybridMigration" : {
+        "pairId" : "R4-SYNTHETIC-PAIR-001",
+        "role" : "RISING",
+        "startMonth" : 1,
+        "months" : 12
+      },
+      "rampPolicyContext" : "f62247be35a26ebb8a54f9e5931ee22de67408d72b307388912f0d5d9bb91fc6",
+      "rampGovernance" : {
+        "governingPeriod" : 1,
+        "discountPercent" : 16.6700,
+        "stepDown" : false,
+        "reasons" : [ "RAMP_HYBRID_WINDOW" ],
+        "approvalTier" : "DEAL_DESK",
+        "hybridMigration" : {
+          "pairId" : "R4-SYNTHETIC-PAIR-001",
+          "role" : "RISING",
+          "startMonth" : 1,
+          "months" : 12
+        }
+      },
+      "authoritativeProductType" : "HYBRID_MIGRATION_RAMP"
+    },
+    "pricedPeriods" : [ {
+      "sequence" : 1,
+      "startMonth" : 1,
+      "months" : 12,
+      "quantity" : 10,
+      "netUnitPrice" : 50.0000,
+      "netMonthly" : 500.00,
+      "periodAmount" : 6000.00,
+      "discountRate" : 0.1667,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ],
+      "waterfall" : [ {
+        "stepType" : "PERIOD_SELECTION",
+        "description" : "Period 1 month 1 for 12 months, quantity 10",
+        "amount" : 6000.00,
+        "runningTotal" : 6000.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "LIST_PRICE",
+        "description" : "List price",
+        "amount" : 60.00,
+        "runningTotal" : 60.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "BASE_PRICE",
+        "description" : "Base price",
+        "amount" : 50.00,
+        "runningTotal" : 50.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "DISCOUNT",
+        "description" : "Discount",
+        "amount" : 10.0000,
+        "runningTotal" : 50.0000,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "NET_PRICE",
+        "description" : "Net unit price",
+        "amount" : 50.0000,
+        "runningTotal" : 500.00,
+        "ruleId" : null,
+        "ruleName" : null
+      } ]
+    }, {
+      "sequence" : 2,
+      "startMonth" : 13,
+      "months" : 24,
+      "quantity" : 20,
+      "netUnitPrice" : 60.0000,
+      "netMonthly" : 1200.00,
+      "periodAmount" : 28800.00,
+      "discountRate" : 0.0000,
+      "explanationCodes" : [ "ABSOLUTE_PRICE" ],
+      "waterfall" : [ {
+        "stepType" : "PERIOD_SELECTION",
+        "description" : "Period 2 month 13 for 24 months, quantity 20",
+        "amount" : 28800.00,
+        "runningTotal" : 28800.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "LIST_PRICE",
+        "description" : "List price",
+        "amount" : 60.00,
+        "runningTotal" : 60.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "BASE_PRICE",
+        "description" : "Base price",
+        "amount" : 60.00,
+        "runningTotal" : 60.00,
+        "ruleId" : null,
+        "ruleName" : null
+      }, {
+        "stepType" : "NET_PRICE",
+        "description" : "Net unit price",
+        "amount" : 60.0000,
+        "runningTotal" : 1200.00,
+        "ruleId" : null,
+        "ruleName" : null
+      } ]
+    } ]
+  } ],
+  "waterfall" : {
+    "listPrice" : 160.00,
+    "basePrice" : 160.00,
+    "netPrice" : 1500.00,
+    "steps" : [ {
+      "stepType" : "PERIOD_SELECTION",
+      "description" : "Period 1",
+      "amount" : 12000.00,
+      "runningTotal" : 12000.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "DISCOUNT",
+      "description" : "One-time migration credit for period 1",
+      "amount" : -3000.00,
+      "runningTotal" : 9000.00,
+      "ruleId" : "hybrid-migration-credit",
+      "ruleName" : null
+    }, {
+      "stepType" : "PERIOD_SELECTION",
+      "description" : "Period 2",
+      "amount" : 0.00,
+      "runningTotal" : 9000.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "PERIOD_SELECTION",
+      "description" : "Period 1",
+      "amount" : 6000.00,
+      "runningTotal" : 15000.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "PERIOD_SELECTION",
+      "description" : "Period 2",
+      "amount" : 28800.00,
+      "runningTotal" : 43800.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "LIST_PRICE",
+      "description" : "Sum of line list prices",
+      "amount" : 160.00,
+      "runningTotal" : 160.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "BASE_PRICE",
+      "description" : "Base price",
+      "amount" : 160.00,
+      "runningTotal" : 160.00,
+      "ruleId" : null,
+      "ruleName" : null
+    }, {
+      "stepType" : "NET_PRICE",
+      "description" : "Sum of line final prices",
+      "amount" : 1500.00,
+      "runningTotal" : 1500.00,
+      "ruleId" : null,
+      "ruleName" : null
+    } ],
+    "approvalState" : "PENDING",
+    "explanationCodes" : [ ]
+  },
+  "financialMetrics" : {
+    "arr" : 18000.00,
+    "tcv" : 43800.00,
+    "acv" : 14600.00,
+    "exitArr" : 14400.00,
+    "clv" : 87600.00,
+    "churnScore" : null,
+    "discountRate" : 0.0625,
+    "totalDiscount" : 100.00,
+    "totalSurcharge" : 0,
+    "priceMultiplier" : 0.9375,
+    "estimatedMarginPct" : 40.0
+  },
+  "explanationCodes" : [ "RAMP_HYBRID_WINDOW", "RAMP_HYBRID_WINDOW", "RAMP_HYBRID_WINDOW", "RAMP_HYBRID_WINDOW" ],
+  "approvalState" : "PENDING",
+  "approvalTier" : "DEAL_DESK",
+  "executionTimeMs" : 142,
+  "errorMessage" : null
+}

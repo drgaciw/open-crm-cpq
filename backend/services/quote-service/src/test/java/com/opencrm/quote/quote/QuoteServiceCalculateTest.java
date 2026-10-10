@@ -284,6 +284,7 @@ class QuoteServiceCalculateTest {
         quote.setCustomerExternalId("CUST-RAMP-01");
         quote.setDurationInMonths(36);
         QuoteLineItem line = lineItem(quote, "PROD-SEAT", "SAAS_SEAT_NAMED", 50, new BigDecimal("50.00"));
+        line.setProductType("SAAS_SEAT_NAMED");
         line.setId(5L);
         line.setBillingFrequency("MONTHLY");
         line.setRampSteps(new ArrayList<>());
@@ -314,7 +315,8 @@ class QuoteServiceCalculateTest {
                                 .discountRate(new BigDecimal("0.2000"))
                                 .discountAmount(new BigDecimal("500.00"))
                                 .finalPrice(new BigDecimal("2000.00"))
-                                .metadata(Map.of("rampGovernanceEvaluated", true)).pricedPeriods(periods)
+                                .metadata(Map.of("rampGovernanceEvaluated", true,
+                                        "authoritativeProductType", "SAAS_SEAT_NAMED")).pricedPeriods(periods)
                                 .build()))
                 .financialMetrics(PricingFinancialMetricsView.builder()
                         .arr(new BigDecimal("24000.00"))
@@ -416,6 +418,7 @@ class QuoteServiceCalculateTest {
     void rampRepricingClearsStalePersistsPeriodsAndPublishesOnlyChangedBindings() {
         Quote quote = draftQuote(); quote.setDurationInMonths(36); quote.setRampScheduleStale(true);
         QuoteLineItem line = lineItem(quote, "PROD-SEAT", "SUBSCRIPTION", 50, new BigDecimal("50"));
+        line.setProductType("SAAS_SEAT_NAMED");
         line.setId(5L); line.setBillingFrequency("MONTHLY"); line.setRampSteps(new ArrayList<>());
         line.getRampSteps().add(absoluteStep(line, 1, 1, "34"));
         line.getRampSteps().add(absoluteStep(line, 2, 13, "45"));
@@ -430,7 +433,7 @@ class QuoteServiceCalculateTest {
                 .discountAmount(new BigDecimal("800"))
                 .pricedPeriods(List.of(period(1, 1, "34", "1700", "20400"),
                         period(2, 13, "45", "2250", "27000"), period(3, 25, "50", "2500", "30000")))
-                .metadata(Map.of("rampGovernanceEvaluated", true, "rampGovernance", Map.of("governingPeriod", 1, "discountPercent", 32,
+                .metadata(Map.of("rampGovernanceEvaluated", true, "authoritativeProductType", "SAAS_SEAT_NAMED", "rampGovernance", Map.of("governingPeriod", 1, "discountPercent", 32,
                         "stepDown", false, "reasons", List.of("RAMP_DISCOUNT_THRESHOLD"), "approvalTier", "SALES_VP"))).build();
         PricingExecuteView response = PricingExecuteView.builder().success(true).approvalState("PENDING").approvalTier("SALES_VP")
                 .lineResults(List.of(priced)).financialMetrics(PricingFinancialMetricsView.builder()
@@ -462,7 +465,8 @@ class QuoteServiceCalculateTest {
                 .publish(org.mockito.ArgumentMatchers.eq("Quote"), org.mockito.ArgumentMatchers.eq("1"),
                         org.mockito.ArgumentMatchers.eq(com.opencrm.common.event.EventContractRegistry.RAMP_APPROVAL_BINDING_CHANGED_V1),
                         org.mockito.ArgumentMatchers.any(com.opencrm.common.event.dto.DiscountApprovalRequiredEvent.class));
-        priced.setMetadata(Map.of("rampGovernanceEvaluated", true)); response.setApprovalState("APPROVED"); response.setApprovalTier(null);
+        priced.setMetadata(Map.of("rampGovernanceEvaluated", true, "authoritativeProductType", "SAAS_SEAT_NAMED"));
+        response.setApprovalState("APPROVED"); response.setApprovalTier(null);
         line.getRampSteps().getFirst().setUnitPrice(new BigDecimal("50"));
         line.getRampSteps().get(1).setUnitPrice(new BigDecimal("50"));
         quoteService.calculate(1L);
@@ -474,7 +478,8 @@ class QuoteServiceCalculateTest {
         line.getRampSteps().clear();
         priced.setPricedPeriods(null);
         quoteService.calculate(1L);
-        assertThat(line.getPricingWaterfallJson()).isNull();
+        assertThat(line.getPricingWaterfallJson())
+                .isEqualTo("{\"authoritativeProductType\":\"SAAS_SEAT_NAMED\"}");
         assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote)).isNull();
     }
 
