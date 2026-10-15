@@ -112,6 +112,11 @@ opencrm:
       # ADR-023 D-06. Stays off in committed config.
       enabled: false
       max-periods: 36
+    margin:
+      # DRG-438. placeholder keeps today's non-authoritative 40.0 and runs no margin policy (ADR-023 D-06).
+      # cost-basis derives margin from the Finance cost basis (F-1) and fails closed to DEAL_DESK on a missing cost.
+      # Stays placeholder in committed config.
+      source: placeholder
 
 ---
 # Development profile
