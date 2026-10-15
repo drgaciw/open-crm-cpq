@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MarginGovernanceTest {
 
     private final RulesEngine port = new DroolsRulesEngine(new DroolsSessionFactory(new DroolsRuleCompiler()));
-    private final CostBasisLookup seatCost = (product, asOf) ->
+    private final CostBasisLookup seatCost = (product, effectiveOn, pricedOn) ->
             Optional.of(cost(product, "10.48", "USD", LocalDate.of(2026, 10, 1), 1));
 
     @Test
@@ -58,7 +58,7 @@ class MarginGovernanceTest {
     @Test
     @DisplayName("exactly 35% is at the floor, not under it, so it is not routed")
     void exactlyAtFloorIsApproved() {
-        CostBasisLookup lookup = (product, asOf) ->
+        CostBasisLookup lookup = (product, effectiveOn, pricedOn) ->
                 Optional.of(cost(product, "6.50", "USD", LocalDate.of(2026, 10, 1), 1));
         PricingResult result = result(flat("PROD-X", 1, "10.00"));
         MarginAssessment assessment = govern(result, lookup);
@@ -74,7 +74,7 @@ class MarginGovernanceTest {
     @Test
     @DisplayName("just under 35% (0.3499) is routed")
     void justUnderFloorIsRouted() {
-        CostBasisLookup lookup = (product, asOf) ->
+        CostBasisLookup lookup = (product, effectiveOn, pricedOn) ->
                 Optional.of(cost(product, "6.5001", "USD", LocalDate.of(2026, 10, 1), 1));
         PricingResult result = result(flat("PROD-X", 1, "10.00"));
         govern(result, lookup);
@@ -89,8 +89,8 @@ class MarginGovernanceTest {
     @Test
     @DisplayName("a missing cost routes to DEAL_DESK naming the product, with no margin value")
     void missingCostRoutesAndNamesProduct() {
-        CostBasisLookup lookup = (product, asOf) -> "PROD-SEAT".equals(product)
-                ? seatCost.find(product, asOf) : Optional.empty();
+        CostBasisLookup lookup = (product, effectiveOn, pricedOn) -> "PROD-SEAT".equals(product)
+                ? seatCost.find(product, effectiveOn, pricedOn) : Optional.empty();
         PricingResult result = result(flat("PROD-SEAT", 1, "40.00"), flat("PROD-NEW", 1, "100.00"));
         govern(result, lookup);
 
@@ -108,8 +108,8 @@ class MarginGovernanceTest {
     @Test
     @DisplayName("a missing period cost governs a ramp line ahead of any computed margin")
     void missingPeriodGoverns() {
-        CostBasisLookup lookup = (product, asOf) -> asOf.isBefore(LocalDate.of(2027, 10, 1))
-                ? seatCost.find(product, asOf) : Optional.empty();
+        CostBasisLookup lookup = (product, effectiveOn, pricedOn) -> effectiveOn.isBefore(LocalDate.of(2027, 10, 1))
+                ? seatCost.find(product, effectiveOn, pricedOn) : Optional.empty();
         PricingResult result = result(ramp("PROD-SEAT", period(1, 1, 10, "15.00"), period(2, 13, 10, "40.00")));
         govern(result, lookup);
 
@@ -122,13 +122,41 @@ class MarginGovernanceTest {
     @Test
     @DisplayName("currency mismatch routes and names both currencies")
     void currencyMismatchRoutes() {
-        CostBasisLookup lookup = (product, asOf) ->
+        CostBasisLookup lookup = (product, effectiveOn, pricedOn) ->
                 Optional.of(cost(product, "10.48", "EUR", LocalDate.of(2026, 10, 1), 1));
         PricingResult result = result(flat("PROD-SEAT", 1, "40.00"));
         govern(result, lookup);
         assertThat(result.getApprovalTier()).isEqualTo("DEAL_DESK");
         assertThat(result.getExplanationCodes())
                 .contains("MARGIN_COST_CURRENCY_MISMATCH: PROD-SEAT (cost EUR, price USD)");
+    }
+
+    @Test
+    @DisplayName("m1: a zero-net line is margin-not-applicable: no routing, no fact, the reason is in the trace")
+    void zeroNetDoesNotRoute() {
+        PricingResult result = result(flat("PROD-SEAT", 1, "40.00"), flat("PROD-FREE", 1, "0.00"));
+        MarginAssessment assessment = govern(result, seatCost);
+
+        assertThat(result.getApprovalState()).isEqualTo("APPROVED");
+        assertThat(result.getApprovalTier()).isNull();
+        assertThat(result.getExplanationCodes()).noneMatch(code -> code.startsWith("MARGIN_"));
+        assertThat(result.getLineResults().get(1).getMetadata()).doesNotContainKey("marginGovernance");
+        LineMargin free = (LineMargin) result.getLineResults().get(1).getMetadata().get("margin");
+        assertThat(free.getNotApplicableReason()).isEqualTo("MARGIN_NOT_APPLICABLE_ZERO_NET");
+        assertThat(assessment.getQuoteMarginFraction()).isEqualByComparingTo("0.7380");
+    }
+
+    @Test
+    @DisplayName("m1: a negative net still routes to DEAL_DESK as MARGIN_NET_NOT_POSITIVE")
+    void negativeNetRoutes() {
+        PricingResult result = result(flat("PROD-SEAT", 1, "-5.00"));
+        govern(result, seatCost);
+
+        assertThat(result.getApprovalState()).isEqualTo("PENDING");
+        assertThat(result.getApprovalTier()).isEqualTo("DEAL_DESK");
+        assertThat(result.getExplanationCodes()).contains("MARGIN_NET_NOT_POSITIVE: PROD-SEAT");
+        assertThat((List<?>) marginGovernance(result, 0).get("reasons"))
+                .containsExactly("MARGIN_NET_NOT_POSITIVE: PROD-SEAT");
     }
 
     @Test
@@ -164,7 +192,7 @@ class MarginGovernanceTest {
     void ruleSeesFractionNotPlaceholder() {
         PricingResult result = result(flat("PROD-SEAT", 1, "40.00"));
         result.getFinancialMetrics().setEstimatedMarginPct(new BigDecimal("40.0"));
-        govern(result, (product, asOf) -> Optional.of(cost(product, "39.00", "USD", LocalDate.of(2026, 10, 1), 1)));
+        govern(result, (product, effectiveOn, pricedOn) -> Optional.of(cost(product, "39.00", "USD", LocalDate.of(2026, 10, 1), 1)));
         // 2.5% margin: if the rule had read 40.0 it would not fire.
         assertThat(result.getExplanationCodes()).contains("MARGIN_BELOW_FLOOR");
     }
