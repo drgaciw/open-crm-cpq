@@ -48,6 +48,18 @@ function parseSnapshot(result: unknown): {
   };
 }
 
+/**
+ * WebMCP hands each tool untyped JSON input, and `find()` over the mixed-schema
+ * tools array yields a union whose `execute` parameter is the intersection of all
+ * three inputs, so call it through the shape the runtime actually uses.
+ */
+function runTool(name: string, input: Record<string, unknown>): unknown {
+  const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === name);
+  expect(tool).toBeTruthy();
+  const execute = tool!.execute as (args: Record<string, unknown>) => unknown;
+  return execute(input);
+}
+
 describe('quotes-list WebMCP', () => {
   let listSpy: ReturnType<typeof vi.fn>;
   const quotes = signal<QuoteDto[]>(MOCK_QUOTES.map(toQuoteDto));
@@ -103,11 +115,8 @@ describe('quotes-list WebMCP', () => {
   });
 
   it('listQuotes execute hits QuoteService.list and quotes/pagination signals', () => {
-    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'listQuotes');
-    expect(tool).toBeTruthy();
-
     const snapshot = TestBed.runInInjectionContext(() =>
-      parseSnapshot(tool!.execute({})),
+      parseSnapshot(runTool('listQuotes', {})),
     );
 
     expect(listSpy).toHaveBeenCalledWith(0, 10, 'createdAt,desc');
@@ -119,12 +128,9 @@ describe('quotes-list WebMCP', () => {
   });
 
   it('filterQuotes execute hits QuoteService.list with status/dealType and filters quotes()', () => {
-    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'filterQuotes');
-    expect(tool).toBeTruthy();
-
     const snapshot = TestBed.runInInjectionContext(() =>
       parseSnapshot(
-        tool!.execute({
+        runTool('filterQuotes', {
           status: 'DRAFT',
           dealType: 'NEW',
           query: 'Q-2026-0001',
@@ -141,11 +147,8 @@ describe('quotes-list WebMCP', () => {
   });
 
   it('pageQuotes execute hits QuoteService.list with page and size', () => {
-    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'pageQuotes');
-    expect(tool).toBeTruthy();
-
     const snapshot = TestBed.runInInjectionContext(() =>
-      parseSnapshot(tool!.execute({ page: 2, size: 5 })),
+      parseSnapshot(runTool('pageQuotes', { page: 2, size: 5 })),
     );
 
     expect(listSpy).toHaveBeenCalledWith(2, 5, 'createdAt,desc', {

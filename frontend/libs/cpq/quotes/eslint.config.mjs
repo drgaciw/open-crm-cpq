@@ -36,6 +36,9 @@ export default [
     rules: {
       '@angular-eslint/template/click-events-have-key-events': 'off',
       '@angular-eslint/template/interactive-supports-focus': 'off',
+      // `x != null` is the deliberate null-or-undefined idiom in these templates; strict
+      // equality is still enforced everywhere else (P-5 lint gate, DRG-527).
+      '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }],
     },
   },
 ];

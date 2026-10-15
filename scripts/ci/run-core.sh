@@ -16,7 +16,7 @@ Stages:
   backend-unit         Fast Docker-free Maven unit profile (all backend modules)
   backend-integration  Full Maven verify (Testcontainers)
   cpq-beta-python      cpq_beta pytest (best-effort)
-  frontend             Nx build, lint, targeted tests
+  frontend             Nx gate check, then build, lint, typecheck, test on every project
   security-audit       npm audit + OWASP dependency-check (non-blocking findings)
 EOF
   exit 2

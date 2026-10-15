@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import type { Mock } from 'vitest';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
@@ -89,7 +90,7 @@ describe('CatalogDetailComponent', () => {
   let fixture: ComponentFixture<CatalogDetailComponent>;
   let component: CatalogDetailComponent;
   let router: Router;
-  let getByIdSpy: ReturnType<typeof vi.fn>;
+  let getByIdSpy: Mock<(id: number) => void>;
   let updateSpy: ReturnType<typeof vi.fn>;
   let deleteSpy: ReturnType<typeof vi.fn>;
   let listGroupsSpy: ReturnType<typeof vi.fn>;
