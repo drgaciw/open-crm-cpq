@@ -134,3 +134,21 @@ The review found 1 blocker, 6 major and 9 minor findings. It recomputed every fi
 - **(b) Ramp period starts count from the pricing date: accepted as interim.** Follow-up DRG-531 carries the contract term start into the pricing context.
 - **(c) The eslint relaxation: accepted.** It is template-only and kept as its own commit.
 - **(d) File-level import refusals: not audited.** They are logged at WARN with the actor, the file SHA-256 and the error code.
+
+### Review fixes merged (integration `c7eb395`)
+
+- **FA** (`d59bc02`, `9b73fc3`, `1305b98`): B1 lookup, M3 `GET /api/v1/cost-basis/products/{id}`, m3, m8, m4, (d), and the M5 wording. Admin only. A product with only forward-dated cost rows uses that cost (it cannot be stale yet).
+- **FB** (`03efc4a`, `aaacd66`): B1 evaluator, M1 replay pinning, M2 credit, M6 context tests, m1, m2, m7.
+  - AC-02 on mock v1 gives 0.7380 / 0.7182 / 0.7182, and 0.7217 for the quote. A hybrid period with the migration credit gives 0.2222.
+  - A zero-net ramp period has no margin, but its cost still counts in the line and quote totals.
+
+### DoD rubric status
+
+| Lane | D1 backlog DoD | D2 wave gates | D3 Jev |
+|------|----------------|---------------|--------|
+| L1 cost basis | Met on paper | **Open:** Maven compile and unit tests; Docker integration tests | **Open** |
+| L2 margin | Met on paper | **Open:** Maven compile and unit tests; Docker integration and context tests | **Open** |
+| L3 frontend CI | N/A (accepted) | **Met:** 20/20 projects, 701 tests. The production `crm` build needs Google Fonts | **Open** |
+| L4 gateway | N/A (accepted) | **Open:** Maven compile and route-family tests | **Open** |
+
+**Blocked.** `repo.maven.apache.org`, `repo.spring.io` and `api.typesafe.ai` are refused from this workspace, and no TypeSafe key is configured. The owner's computer is offline. **No PR opens until every cell reads Met.**
