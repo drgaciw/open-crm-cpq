@@ -42,6 +42,9 @@ class DealServiceTest {
     @Mock
     private DealMapper dealMapper;
 
+    @Mock
+    private DealCurrencyConverter currencyConverter;
+
     @InjectMocks
     private DealService dealService;
 
@@ -113,7 +116,9 @@ class DealServiceTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getName()).isEqualTo("Big Deal");
-            verify(dealRepository).save(deal);
+            var inOrder = inOrder(currencyConverter, dealRepository);
+            inOrder.verify(currencyConverter).freeze(deal);
+            inOrder.verify(dealRepository).save(deal);
         }
 
         @Test
@@ -270,6 +275,26 @@ class DealServiceTest {
 
             assertThat(result).isNotNull();
             verify(dealMapper).updateEntity(updateRequest, deal);
+        }
+
+        @Test
+        @DisplayName("should re-check the base amount with the amount and currency from before the edit (ADR-032 D-03)")
+        void shouldPassPreviousAmountAndCurrencyToConverter() {
+            deal.setAmount(new BigDecimal("1000.00"));
+            deal.setCurrency("EUR");
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            doAnswer(inv -> {
+                Deal target = inv.getArgument(1);
+                target.setAmount(new BigDecimal("2000.00"));
+                target.setCurrency("GBP");
+                return null;
+            }).when(dealMapper).updateEntity(updateRequest, deal);
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            dealService.update(1L, updateRequest);
+
+            verify(currencyConverter).freezeIfNeeded(deal, new BigDecimal("1000.00"), "EUR");
         }
 
         @Test
@@ -551,6 +576,7 @@ class DealServiceTest {
 
             dealService.win(1L);
 
+            verify(currencyConverter).freeze(deal);
             assertThat(deal.getStage()).isEqualTo(DealStage.WON);
             assertThat(deal.getProbability()).isEqualTo(100);
             assertThat(deal.getWonAt()).isNotNull();
@@ -594,6 +620,7 @@ class DealServiceTest {
 
             dealService.lose(1L, loseRequest);
 
+            verify(currencyConverter).freeze(deal);
             assertThat(deal.getStage()).isEqualTo(DealStage.LOST);
             assertThat(deal.getProbability()).isEqualTo(0);
             assertThat(deal.getLostReason()).isEqualTo("Competitor won");
@@ -627,14 +654,15 @@ class DealServiceTest {
     class GetPipelineSummary {
 
         @Test
-        @DisplayName("should return pipeline summary")
+        @DisplayName("should return pipeline summary in the base currency")
         void shouldReturnPipelineSummary() {
             List<PipelineSummaryProjection> mockResults = List.of(
-                    projection(DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000)),
-                    projection(DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000)),
-                    projection(DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000))
+                    projection(DealStage.PROSPECTING, 5L, BigDecimal.valueOf(100000), BigDecimal.valueOf(10000), 0L),
+                    projection(DealStage.QUALIFICATION, 3L, BigDecimal.valueOf(75000), BigDecimal.valueOf(15000), 1L),
+                    projection(DealStage.NEGOTIATION, 2L, BigDecimal.valueOf(200000), BigDecimal.valueOf(160000), 0L)
             );
-            when(dealRepository.findPipelineSummary()).thenReturn(mockResults);
+            when(currencyConverter.baseCurrency()).thenReturn("USD");
+            when(dealRepository.findPipelineSummary("USD")).thenReturn(mockResults);
 
             List<PipelineSummaryDto> result = dealService.getPipelineSummary();
 
@@ -642,27 +670,43 @@ class DealServiceTest {
             assertThat(result.get(0).getStage()).isEqualTo(DealStage.PROSPECTING);
             assertThat(result.get(0).getCount()).isEqualTo(5L);
             assertThat(result.get(0).getTotalAmount()).isEqualTo(BigDecimal.valueOf(100000));
+            assertThat(result).allSatisfy(row -> assertThat(row.getBaseCurrency()).isEqualTo("USD"));
             assertThat(result.get(1).getStage()).isEqualTo(DealStage.QUALIFICATION);
+            assertThat(result.get(1).getUnconvertedCount()).isEqualTo(1L);
             assertThat(result.get(2).getStage()).isEqualTo(DealStage.NEGOTIATION);
+        }
+
+        @Test
+        @DisplayName("should report zero unconverted deals when the projection returns null")
+        void shouldDefaultUnconvertedCountToZero() {
+            when(currencyConverter.baseCurrency()).thenReturn("EUR");
+            when(dealRepository.findPipelineSummary("EUR")).thenReturn(List.of(
+                    projection(DealStage.PROPOSAL, 1L, BigDecimal.TEN, BigDecimal.ONE, null)));
+
+            List<PipelineSummaryDto> result = dealService.getPipelineSummary();
+
+            assertThat(result.get(0).getUnconvertedCount()).isZero();
+            assertThat(result.get(0).getBaseCurrency()).isEqualTo("EUR");
         }
 
         @Test
         @DisplayName("should return empty summary when no deals")
         void shouldReturnEmptySummary() {
-            when(dealRepository.findPipelineSummary()).thenReturn(List.of());
+            when(currencyConverter.baseCurrency()).thenReturn("USD");
+            when(dealRepository.findPipelineSummary("USD")).thenReturn(List.of());
 
             List<PipelineSummaryDto> result = dealService.getPipelineSummary();
 
             assertThat(result).isEmpty();
         }
 
-        private static PipelineSummaryProjection projection(
-                DealStage stage, Long count, BigDecimal totalAmount, BigDecimal weightedAmount) {
-            return new PipelineSummaryRow(stage, count, totalAmount, weightedAmount);
+        private static PipelineSummaryProjection projection(DealStage stage, Long count, BigDecimal totalAmount,
+                                                            BigDecimal weightedAmount, Long unconvertedCount) {
+            return new PipelineSummaryRow(stage, count, totalAmount, weightedAmount, unconvertedCount);
         }
 
-        private record PipelineSummaryRow(
-                DealStage stage, Long count, BigDecimal totalAmount, BigDecimal weightedAmount)
+        private record PipelineSummaryRow(DealStage stage, Long count, BigDecimal totalAmount,
+                                          BigDecimal weightedAmount, Long unconvertedCount)
                 implements PipelineSummaryProjection {
             @Override
             public DealStage getStage() {
@@ -682,6 +726,11 @@ class DealServiceTest {
             @Override
             public BigDecimal getWeightedAmount() {
                 return weightedAmount;
+            }
+
+            @Override
+            public Long getUnconvertedCount() {
+                return unconvertedCount;
             }
         }
     }

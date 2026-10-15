@@ -64,6 +64,32 @@ describe('DashboardComponent', () => {
     vi.restoreAllMocks();
   });
 
+  it('ADR-032: shows totals in the base currency and how many deals were not converted', () => {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/deals/pipeline').flush([
+      { stage: 'PROSPECTING', count: 3, totalAmount: 2085000, weightedAmount: 208500, baseCurrency: 'EUR', unconvertedCount: 1 },
+      { stage: 'WON', count: 1, totalAmount: 1000, weightedAmount: 1000, baseCurrency: 'EUR', unconvertedCount: 0 },
+    ]);
+    httpMock.expectOne((req) => req.url === '/api/v1/deals').flush({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 5 });
+    httpMock.expectOne((req) => req.url === '/api/v1/leads').flush({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 5 });
+    fixture.detectChanges();
+
+    expect(component.baseCurrency()).toBe('EUR');
+    expect(component.unconvertedCount()).toBe(1);
+    const note = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="unconverted-note"]');
+    expect(note?.textContent).toContain('1 deal not converted to EUR');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('€2,085,000');
+  });
+
+  it('ADR-032: no note and USD fallback when the backend omits the new fields', () => {
+    fixture.detectChanges();
+    flushSuccess();
+    fixture.detectChanges();
+
+    expect(component.baseCurrency()).toBe('USD');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="unconverted-note"]')).toBeNull();
+  });
+
   it('renders app-page-header', () => {
     fixture.detectChanges();
     flushSuccess();

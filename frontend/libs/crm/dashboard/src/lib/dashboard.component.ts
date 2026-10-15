@@ -8,7 +8,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
-import { DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, STAGE_COLORS, STAGE_LABELS, STATUS_COLORS } from '@frontend/shared-models';
+import { DEFAULT_BASE_CURRENCY, DealDto, LeadDto, PipelineSummaryDto, DealStage, SpringPageResponse, STAGE_COLORS, STAGE_LABELS, STATUS_COLORS } from '@frontend/shared-models';
 import { LeadService } from '@frontend/crm-leads';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
@@ -56,8 +56,13 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
         <mat-card class="kpi-card">
           <mat-icon class="kpi-icon" style="color:#4caf50">attach_money</mat-icon>
           <div class="kpi-info">
-            <span class="kpi-value">{{ totalValue() | currency:'USD':'symbol':'1.0-0' }}</span>
+            <span class="kpi-value">{{ totalValue() | currency:baseCurrency():'symbol':'1.0-0' }}</span>
             <span class="kpi-label">Pipeline Value</span>
+            @if (unconvertedCount() > 0) {
+              <span class="kpi-note" data-testid="unconverted-note">
+                {{ unconvertedCount() }} {{ unconvertedCount() === 1 ? 'deal' : 'deals' }} not converted to {{ baseCurrency() }}
+              </span>
+            }
           </div>
         </mat-card>
         <mat-card class="kpi-card">
@@ -70,7 +75,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
         <mat-card class="kpi-card">
           <mat-icon class="kpi-icon" style="color:#9c27b0">emoji_events</mat-icon>
           <div class="kpi-info">
-            <span class="kpi-value">{{ wonValue() | currency:'USD':'symbol':'1.0-0' }}</span>
+            <span class="kpi-value">{{ wonValue() | currency:baseCurrency():'symbol':'1.0-0' }}</span>
             <span class="kpi-label">Won Value</span>
           </div>
         </mat-card>
@@ -89,7 +94,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                     <div class="bar" [style.width.%]="barWidth(stage)" [style.background]="stageColor(stage)"></div>
                   </div>
                   <span class="stage-stats">
-                    {{ stageCount(stage) }} deals &middot; {{ stageValue(stage) | currency:'USD':'symbol':'1.0-0' }}
+                    {{ stageCount(stage) }} deals &middot; {{ stageValue(stage) | currency:baseCurrency():'symbol':'1.0-0' }}
                   </span>
                 </div>
               }
@@ -117,7 +122,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                 </ng-container>
                 <ng-container matColumnDef="amount">
                   <th mat-header-cell *matHeaderCellDef>Amount</th>
-                  <td mat-cell *matCellDef="let d">{{ d.amount | currency:'USD':'symbol':'1.0-0' }}</td>
+                  <td mat-cell *matCellDef="let d">{{ d.amount | currency:(d.currency || 'USD'):'symbol':'1.0-0' }}</td>
                 </ng-container>
                 <ng-container matColumnDef="stage">
                   <th mat-header-cell *matHeaderCellDef>Stage</th>
@@ -186,6 +191,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
     .kpi-info { display: flex; flex-direction: column; }
     .kpi-value { font-size: 1.5rem; font-weight: 700; }
     .kpi-label { font-size: 0.8rem; color: #666; }
+    .kpi-note { font-size: 0.75rem; color: #8a5a00; }
 
     .pipeline-card { margin-bottom: 24px; }
     .pipeline-bars { display: flex; flex-direction: column; gap: 12px; padding: 16px 0; }
@@ -229,6 +235,11 @@ export class DashboardComponent implements OnInit {
   // ⚡ Bolt: Use computed signals to memoize expensive array operations instead of re-evaluating on every change detection cycle
   totalDeals = computed(() => this.pipeline().reduce((sum, item) => sum + item.count, 0));
   totalValue = computed(() => this.pipeline().reduce((sum, item) => sum + item.totalAmount, 0));
+
+  /** ADR-032: every pipeline amount is in this one currency. */
+  baseCurrency = computed(() => this.pipeline().find((p) => p.baseCurrency)?.baseCurrency ?? DEFAULT_BASE_CURRENCY);
+  /** Deals left out of the totals because no FX rate was available (ADR-032 D-04). */
+  unconvertedCount = computed(() => this.pipeline().reduce((sum, item) => sum + (item.unconvertedCount ?? 0), 0));
 
   // ⚡ Bolt: Convert O(N) array search into O(1) map lookup for frequent stage lookups
   pipelineMap = computed(() => {

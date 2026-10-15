@@ -31,6 +31,9 @@ spring:
     enabled: true
     schemas: crm
     locations: classpath:db/migration
+    placeholders:
+      # ADR-032: used by V6 backfill; must equal opencrm.crm.fx.base-currency.
+      crm_base_currency: ${CRM_BASE_CURRENCY:USD}
   data:
     redis:
       host: localhost
@@ -123,6 +126,10 @@ opencrm:
       # NAMES sends organization names and needs the ADR-015 data-processing sign-off.
       pii-mode: FEATURES_ONLY
   crm:
+    # ADR-032 (Accepted 2026-10-15): interim base currency for pipeline totals until BC-19-02 provides one per
+    # tenant. Must equal spring.flyway.placeholders.crm_base_currency (V6 backfill).
+    fx:
+      base-currency: ${CRM_BASE_CURRENCY:USD}
     # Local pg_trgm candidate lookup only; no data leaves the service.
     duplicate-hints:
       enabled: ${CRM_DUPLICATE_HINTS_ENABLED:false}

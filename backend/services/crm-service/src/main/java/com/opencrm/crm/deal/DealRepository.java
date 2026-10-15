@@ -55,16 +55,25 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     long countByStageAndDeletedFalse(DealStage stage);
 
     /**
-     * Sum amount by stage (excluding deleted).
+     * Sum of base-currency amounts by stage (excluding deleted). Deals not converted to {@code baseCurrency} are
+     * left out (ADR-032 D-04, D-06); never sums {@code amount} across currencies.
      */
-    @Query("SELECT COALESCE(SUM(d.amount), 0) FROM Deal d WHERE d.stage = :stage AND d.deleted = false")
-    BigDecimal sumAmountByStageAndDeletedFalse(@Param("stage") DealStage stage);
+    @Query("SELECT COALESCE(SUM(d.baseAmount), 0) FROM Deal d " +
+           "WHERE d.stage = :stage AND d.deleted = false AND d.baseCurrency = :baseCurrency")
+    BigDecimal sumBaseAmountByStageAndDeletedFalse(@Param("stage") DealStage stage,
+                                                   @Param("baseCurrency") String baseCurrency);
 
     /**
-     * Get pipeline summary - count, sum of amount, and sum of weighted amount by stage.
+     * Pipeline summary by stage in the base currency (ADR-032 D-06).
+     *
+     * <p>{@code totalAmount} and {@code weightedAmount} sum only deals converted to {@code baseCurrency}.
+     * {@code unconvertedCount} counts deals with an amount that are not (no rate yet, or frozen against another base).
      */
-    @Query("SELECT d.stage as stage, COUNT(d) as count, COALESCE(SUM(d.amount), 0) as totalAmount, " +
-           "COALESCE(SUM(d.weightedAmount), 0) as weightedAmount " +
+    @Query("SELECT d.stage as stage, COUNT(d) as count, " +
+           "COALESCE(SUM(CASE WHEN d.baseCurrency = :baseCurrency THEN d.baseAmount ELSE NULL END), 0) as totalAmount, " +
+           "COALESCE(SUM(CASE WHEN d.baseCurrency = :baseCurrency THEN d.baseWeightedAmount ELSE NULL END), 0) as weightedAmount, " +
+           "COALESCE(SUM(CASE WHEN d.amount IS NOT NULL AND (d.baseAmount IS NULL OR d.baseCurrency IS NULL " +
+           "OR d.baseCurrency <> :baseCurrency) THEN 1 ELSE 0 END), 0) as unconvertedCount " +
            "FROM Deal d WHERE d.deleted = false GROUP BY d.stage ORDER BY d.stage")
-    List<PipelineSummaryProjection> findPipelineSummary();
+    List<PipelineSummaryProjection> findPipelineSummary(@Param("baseCurrency") String baseCurrency);
 }

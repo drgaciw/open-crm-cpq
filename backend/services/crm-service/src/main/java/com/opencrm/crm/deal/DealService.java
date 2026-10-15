@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class DealService {
     private final ContactRepository contactRepository;
     private final OrganizationRepository organizationRepository;
     private final DealMapper dealMapper;
+    private final DealCurrencyConverter currencyConverter;
 
     /**
      * Create a new deal.
@@ -56,6 +58,8 @@ public class DealService {
                     .orElseThrow(() -> new ResourceNotFoundException("Organization", request.getOrganizationId()));
             deal.setOrganization(org);
         }
+
+        currencyConverter.freeze(deal);
 
         Deal saved = dealRepository.save(deal);
         log.info("Created deal with ID: {}", saved.getId());
@@ -117,7 +121,11 @@ public class DealService {
             }
         }
 
+        BigDecimal previousAmount = deal.getAmount();
+        String previousCurrency = deal.getCurrency();
+
         dealMapper.updateEntity(request, deal);
+        currencyConverter.freezeIfNeeded(deal, previousAmount, previousCurrency);
 
         // Update primary contact if provided
         if (request.getPrimaryContactId() != null) {
@@ -243,6 +251,7 @@ public class DealService {
         }
 
         deal.markWon();
+        currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
 
         log.info("Marked deal ID {} as won", id);
@@ -272,6 +281,7 @@ public class DealService {
         }
 
         deal.markLost(request.getReason());
+        currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
 
         log.info("Marked deal ID {} as lost", id);
@@ -279,13 +289,14 @@ public class DealService {
     }
 
     /**
-     * Get pipeline summary statistics.
+     * Get pipeline summary statistics in the base currency (ADR-032 D-06).
      */
     @Transactional(readOnly = true)
     public List<PipelineSummaryDto> getPipelineSummary() {
         log.debug("Fetching pipeline summary");
 
-        List<PipelineSummaryProjection> results = dealRepository.findPipelineSummary();
+        String baseCurrency = currencyConverter.baseCurrency();
+        List<PipelineSummaryProjection> results = dealRepository.findPipelineSummary(baseCurrency);
         List<PipelineSummaryDto> summary = new ArrayList<>();
 
         for (PipelineSummaryProjection projection : results) {
@@ -294,6 +305,8 @@ public class DealService {
                     .count(projection.getCount())
                     .totalAmount(projection.getTotalAmount())
                     .weightedAmount(projection.getWeightedAmount())
+                    .baseCurrency(baseCurrency)
+                    .unconvertedCount(projection.getUnconvertedCount() != null ? projection.getUnconvertedCount() : 0L)
                     .build();
             summary.add(dto);
         }
