@@ -18,6 +18,13 @@ public interface PricingAuditLogRepository extends JpaRepository<PricingAuditLog
     List<PricingAuditLog> findByQuoteExternalIdOrderByExecutedAtDesc(String quoteExternalId);
 
     /**
+     * The most recent 20 cost-basis executions of a quote, newest first: the bounded candidate set for margin replay
+     * (review finding m2). Only cost-basis executions write {@code waterfall_trace}, so the rest are skipped in SQL.
+     */
+    List<PricingAuditLog> findTop20ByQuoteExternalIdAndWaterfallTraceIsNotNullOrderByExecutedAtDescIdDesc(
+            String quoteExternalId);
+
+    /**
      * Find audit logs by customer external ID, ordered by execution time descending.
      */
     List<PricingAuditLog> findByCustomerExternalIdOrderByExecutedAtDesc(String customerExternalId);

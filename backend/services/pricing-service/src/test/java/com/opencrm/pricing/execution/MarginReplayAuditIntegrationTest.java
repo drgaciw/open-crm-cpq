@@ -78,7 +78,7 @@ class MarginReplayAuditIntegrationTest {
     private PricingAuditLogRepository auditLogRepository;
     private final AtomicReference<String> seatCost = new AtomicReference<>("10.48");
     private final AtomicReference<Long> seatVersion = new AtomicReference<>(1L);
-    private final CostBasisLookup lookup = (product, asOf) -> Optional.of(new UnitCost(product, "seat",
+    private final CostBasisLookup lookup = (product, effectiveOn, pricedOn) -> Optional.of(new UnitCost(product, "seat",
             new BigDecimal(seatCost.get()), "USD", LocalDate.of(2026, 10, 1), seatVersion.get(),
             Map.of(CostComponent.DIRECT, new BigDecimal(seatCost.get()))));
 
@@ -105,10 +105,12 @@ class MarginReplayAuditIntegrationTest {
                     Timestamp.from(log.getExecutedAt()));
             return log;
         });
-        when(auditLogRepository.findByQuoteExternalIdOrderByExecutedAtDesc(anyString())).thenAnswer(invocation ->
+        // The SQL Spring Data derives for the bounded replay query (m2).
+        when(auditLogRepository.findTop20ByQuoteExternalIdAndWaterfallTraceIsNotNullOrderByExecutedAtDescIdDesc(
+                anyString())).thenAnswer(invocation ->
                 jdbc.query("SELECT uuid, quote_external_id, input_snapshot, output_snapshot, waterfall_trace "
                                 + "FROM pricing.pricing_audit_log WHERE quote_external_id = ? "
-                                + "ORDER BY executed_at DESC, id DESC",
+                                + "AND waterfall_trace IS NOT NULL ORDER BY executed_at DESC, id DESC LIMIT 20",
                         (rs, row) -> PricingAuditLog.builder().uuid(rs.getString(1)).quoteExternalId(rs.getString(2))
                                 .inputSnapshot(rs.getString(3)).outputSnapshot(rs.getString(4))
                                 .waterfallTrace(rs.getString(5)).build(),

@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
-/** Margin of one ramp period: monthly net against unit cost × the period's quantity. */
+/**
+ * Margin of one ramp period: the period amount (after any hybrid migration credit) against unit cost × quantity ×
+ * months (review finding M2).
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,13 +24,17 @@ public class PeriodMargin {
     private String costAsOf;
     private Integer quantity;
     private Integer months;
-    /** Net per month for the period. */
+    /** Net for the whole period: its {@code periodAmount}, which a hybrid migration credit lowers. */
     private BigDecimal net;
-    /** Unit cost × quantity, per month. Absent when no usable cost exists. */
+    /** The hybrid migration credit already deducted from {@code net}, when the period carries one. */
+    private BigDecimal migrationCredit;
+    /** Unit cost × quantity × months. Absent when no usable cost exists. */
     private BigDecimal cost;
     /** {@code (net − cost) / net}, a fraction. Absent when the cost is missing or the net is not positive. */
     private BigDecimal marginFraction;
     private CostEvidence unitCost;
     /** Why there is no margin, one of the {@link CostBasisMarginEvaluator} reason codes. */
     private String missingCostReason;
+    /** {@code MARGIN_NOT_APPLICABLE_ZERO_NET}: the period net is exactly zero; its cost still counts in the totals. */
+    private String notApplicableReason;
 }
