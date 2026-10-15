@@ -141,6 +141,95 @@ class JpaCostBasisLookupTest {
         assertThat(lookup.find("P", Q4)).isEqualTo(first);
     }
 
+    @Test
+    @DisplayName("B1: priced 2026-10-15 on fresh v1, a period starting 2028-10-15 still gets v1 at 10.48")
+    void farFuturePeriodPricedOnFreshBasis() {
+        storeSeatVersionOne();
+
+        UnitCost cost = lookup.find("PROD-SEAT", LocalDate.of(2028, 10, 15), LocalDate.of(2026, 10, 15))
+                .orElseThrow();
+
+        assertThat(cost.unitCost()).isEqualByComparingTo("10.48");
+        assertThat(cost.effectiveFrom()).isEqualTo(Q4);
+        assertThat(cost.version()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("B1: priced on 2027-04-01, v1 is stale, so every period is empty, past or future")
+    void stalePricingDateFailsClosed() {
+        storeSeatVersionOne();
+        LocalDate pricedOn = LocalDate.of(2027, 4, 1);
+
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2028, 10, 15), pricedOn)).isEmpty();
+        assertThat(lookup.find("PROD-SEAT", pricedOn, pricedOn)).isEmpty();
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2026, 11, 1), pricedOn)).isEmpty();
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2027, 3, 31), LocalDate.of(2027, 3, 31))).isPresent();
+    }
+
+    @Test
+    @DisplayName("B1: a future-dated row effective 2027-07-01 governs a period starting 2027-10-15 priced 2026-10-15")
+    void futureDatedRowGovernsLaterPeriod() {
+        storeSeatVersionOne();
+        LocalDate q3 = LocalDate.of(2027, 7, 1);
+        store("PROD-SEAT", CostComponent.DIRECT, "7.0000", q3, 2);
+        store("PROD-SEAT", CostComponent.COST_TO_SERVE, "5.0000", q3, 2);
+
+        UnitCost later = lookup.find("PROD-SEAT", LocalDate.of(2027, 10, 15), LocalDate.of(2026, 10, 15))
+                .orElseThrow();
+        assertThat(later.effectiveFrom()).isEqualTo(q3);
+        assertThat(later.unitCost()).isEqualByComparingTo("12.00");
+        assertThat(later.version()).isEqualTo(2L);
+
+        UnitCost first = lookup.find("PROD-SEAT", LocalDate.of(2026, 11, 1), LocalDate.of(2026, 10, 15))
+                .orElseThrow();
+        assertThat(first.effectiveFrom()).isEqualTo(Q4);
+        assertThat(first.unitCost()).isEqualByComparingTo("10.48");
+    }
+
+    @Test
+    @DisplayName("B1: freshness is judged on the rows effective on the pricing date, never on a future period start")
+    void freshnessIsJudgedOnThePricingDate() {
+        storeSeatVersionOne();
+        // 2028-10-15 is two years after v1: judged against the period start, it would be stale.
+        assertThat(CostBasisStaleness.isStale(Q4, LocalDate.of(2028, 10, 15))).isTrue();
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2028, 10, 15), LocalDate.of(2027, 3, 31))).isPresent();
+    }
+
+    @Test
+    @DisplayName("B1: a refresh effective after the pricing date does not rescue a basis stale on the pricing date")
+    void laterRefreshDoesNotRescueStalePricingDate() {
+        storeSeatVersionOne();
+        store("PROD-SEAT", CostComponent.DIRECT, "7.0000", LocalDate.of(2027, 7, 1), 2);
+
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2027, 10, 15), LocalDate.of(2027, 5, 1))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("B1: with no row effective on the pricing date, a Finance-approved forward cost is used")
+    void onlyForwardRowsAreUsable() {
+        store("P", CostComponent.DIRECT, "2.0000", Q1, 1);
+
+        assertThat(lookup.find("P", LocalDate.of(2026, 12, 1), LocalDate.of(2026, 10, 15))).isEmpty();
+        assertThat(lookup.find("P", Q1, LocalDate.of(2026, 10, 15)).orElseThrow().unitCost())
+                .isEqualByComparingTo("2");
+    }
+
+    @Test
+    @DisplayName("B1: a null id or either null date gives empty; the 2-arg default equals both dates the same")
+    void threeArgumentNullsAndDefault() {
+        storeSeatVersionOne();
+        assertThat(lookup.find("PROD-SEAT", null, Q4)).isEmpty();
+        assertThat(lookup.find("PROD-SEAT", Q4, null)).isEmpty();
+        assertThat(lookup.find(null, Q4, Q4)).isEmpty();
+        LocalDate day = LocalDate.of(2026, 11, 15);
+        assertThat(lookup.find("PROD-SEAT", day)).isEqualTo(lookup.find("PROD-SEAT", day, day));
+    }
+
+    private void storeSeatVersionOne() {
+        store("PROD-SEAT", CostComponent.DIRECT, "6.0800", Q4, 1);
+        store("PROD-SEAT", CostComponent.COST_TO_SERVE, "4.4000", Q4, 1);
+    }
+
     private void store(String product, CostComponent component, String cost, LocalDate from, long version) {
         stored.add(row(product, component, "seat", cost, "USD", from, version));
     }
