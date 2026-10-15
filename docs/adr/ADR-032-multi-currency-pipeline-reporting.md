@@ -1,11 +1,11 @@
 # ADR-032: Multi-currency deals and pipeline reporting with a frozen base amount
 
-**Status:** Proposed on 2026-10-15. Not accepted. Recommended for decision first in Track CC1 because it fixes a live defect.
+**Status:** Accepted on 2026-10-15 by the project owner. Authorizes DRG-509 (BC-13-05) only, within the acceptance notes below.
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner.
 **Relates to:** BC-03-07 (multi-currency and regional pricing), BC-13-05, the `Money` shared-kernel type (BC-12-01).
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `docs/currency.md` and `ExchangeRate` model, at `6d4793d`.
-**Does not authorize:** any code or migration.
+**Authorizes:** DRG-509 — `crm-service` columns, migration, rate lookup and pipeline-summary change described here. Nothing else.
 
 ---
 
@@ -44,3 +44,13 @@ Pipeline and forecast queries sum `base_amount` and group by stage. Per-currency
 ## Alternatives considered
 - **Convert on read at the latest rate.** Rejected: history drifts.
 - **Require one currency per tenant.** Rejected: cross-border sellers are a core segment.
+
+## Acceptance notes (2026-10-15)
+
+The owner accepted this ADR with three interim choices, because the pieces D-01 and D-05 point to do not exist yet:
+
+1. **Base currency (D-01).** BC-19-02 tenancy is not built and `crm-service` has no tenant. Until it is, the base currency is the configuration property `crm.fx.base-currency` (default `USD`, the existing deal default). When per-tenant base currency arrives, it replaces the property; the columns do not change.
+2. **Rate source (D-05).** BC-03-07 has no rate service. `crm-service` reads rates through an `FxRateProvider` interface. The first adapter reads a `fx_rates` table in `crm-service`'s schema (from, to, rate, as-of, source). Rates are loaded by an operator; there is no rate endpoint and no external provider in this change. When BC-03-07 ships a rate service, a new adapter replaces the table and the table is retired. This does not give CRM its own provider.
+3. **Floating open pipeline (D-03).** Not built. The default was off; it needs its own story if wanted.
+
+Backfill: existing deals in the base currency get `base_amount = amount`, rate 1, source `IDENTITY`. Other existing deals stay unconverted (null) until a rate exists and the deal is next edited or closed, and they are counted as unconverted in totals.
