@@ -32,12 +32,14 @@ CREATE INDEX idx_deal_base_currency ON deals (base_currency);
 
 -- Backfill (ADR-032 acceptance notes): deals already in the base currency convert 1:1 with source IDENTITY.
 -- Deals in any other currency stay unconverted (NULL) until a rate exists and the deal is next edited or closed.
+-- Normalize the placeholder the same way FxProperties does (trim, upper case). A raw comparison
+-- would skip existing EUR deals when CRM_BASE_CURRENCY is "eur" or " EUR ", while runtime reporting uses EUR.
 UPDATE deals
 SET base_amount          = amount,
-    base_currency        = '${crm_base_currency}',
+    base_currency        = UPPER(TRIM('${crm_base_currency}')),
     base_weighted_amount = weighted_amount,
     fx_rate              = 1,
     fx_rate_as_of        = NOW(),
     fx_source            = 'IDENTITY'
 WHERE amount IS NOT NULL
-  AND UPPER(TRIM(currency)) = '${crm_base_currency}';
+  AND UPPER(TRIM(currency)) = UPPER(TRIM('${crm_base_currency}'));
