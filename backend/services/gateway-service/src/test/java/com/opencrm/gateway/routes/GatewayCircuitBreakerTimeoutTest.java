@@ -56,9 +56,7 @@ class GatewayCircuitBreakerTimeoutTest {
                     .isEqualTo(Duration.ofSeconds(45));
             assertThat(registry.timeLimiter("pricingCircuitBreaker").getTimeLimiterConfig().getTimeoutDuration())
                     .isEqualTo(Duration.ofSeconds(35));
-            // Unrelated service budgets keep the existing library default.
-            assertThat(registry.timeLimiter("crmCircuitBreaker").getTimeLimiterConfig().getTimeoutDuration())
-                    .isEqualTo(Duration.ofSeconds(1));
+            // The other route families' budgets: GatewayRouteFamilyCircuitBreakerTest (DRG-528).
         });
     }
 

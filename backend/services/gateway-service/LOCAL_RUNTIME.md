@@ -19,7 +19,27 @@ The TimeLimiter configs are named by breaker ID and referenced by their instance
 
 `GatewayCircuitBreakerTimeoutTest` exercises all four packaged compute routes with real Netty forwarding and the actual reactive breaker: a successful upstream delayed 1.6 seconds returns HTTP 200; a configured 150 ms deadline around a two-second upstream returns HTTP 503 JSON for POST. It also checks the configured 45/35-second limits and unrelated CRM's existing one-second default. This fixture isolates auth/Redis, which their dedicated tests cover.
 
-Remaining scope: other default-profile service routes still use the same malformed CircuitBreaker shortcut. Their binding/fallback correction is separate work; this focused quote lifecycle fix does not certify their circuit-breaker behavior. Dev-profile routes retain their existing configuration.
+## Other route budgets (DRG-528)
+
+Every other default-profile route family now uses the same structured `name`/`fallbackUri` arguments: crm, pricebook, configuration (including the validate shim), product, approval, document, contract, communication and ai, plus their CPQ aliases. Each family also has its own named TimeLimiter config and instance, and fallback handlers for GET, POST, PUT, PATCH and DELETE that keep the HTTP 503 JSON response. Paths, destinations, rewrites, security and circuit-breaker thresholds are unchanged.
+
+| Breaker | Property (default) | Basis |
+|---------|--------------------|-------|
+| `crmCircuitBreaker`, `pricebookCircuitBreaker`, `productCircuitBreaker`, `approvalCircuitBreaker`, `documentCircuitBreaker`, `contractCircuitBreaker` | `CRM_`, `PRICEBOOK_`, `PRODUCT_`, `APPROVAL_`, `DOCUMENT_`, `CONTRACT_GATEWAY_TIMEOUT` (`10s`) | Database-bound: no outbound HTTP on the request path. Document generation and ERP sync are asynchronous. The budget is well above the 1s library default and below Hikari's 30s acquire timeout. |
+| `configurationCircuitBreaker` | `CONFIGURATION_GATEWAY_TIMEOUT` (`45s`) | A cold rules cache reads product-service with 5s connect and 30s read, plus 10s for token handling and evaluation, as quote does. |
+| `communicationCircuitBreaker` | `COMMUNICATION_GATEWAY_TIMEOUT` (`10s`) | `lb://communication-service` has no registry. It fails at once and degrades to its fallback. |
+| `aiCircuitBreaker` | `AI_GATEWAY_TIMEOUT` (`120s`) | One completion, one 35s gateway tool call and a second completion come to about 95s. ai-service caps its own model timeouts at 2 minutes. |
+
+A deadline bounds the wait for the upstream's response headers. An ai-service SSE stream that has already started is not cut while its body continues.
+
+`GatewayRouteFamilyCircuitBreakerTest` uses real Netty forwarding through the actual reactive breaker on all 17 routes. For each route it checks that a 1.6-second successful upstream returns 200 and is recorded on the intended breaker ID. It also checks that a 150 ms budget, set through the family's named property, returns the family's 503 JSON for every admitted method. The test also checks:
+
+- the bound structured arguments;
+- the named defaults and their overrides;
+- communication's packaged `lb://` destination degrading to its fallback;
+- the ai SSE case.
+
+`FallbackControllerTest` covers all eleven breaker fallbacks for the five methods. Dev-profile routes declare no circuit breakers and keep their existing configuration.
 
 ## Verification evidence (2026-09-19)
 

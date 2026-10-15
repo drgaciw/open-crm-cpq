@@ -46,7 +46,10 @@ spring:
               predicates:
                 - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**
               filters:
-                - CircuitBreaker=name=crmCircuitBreaker,fallbackUri=forward:/fallback/crm
+                - name: CircuitBreaker
+                  args:
+                    name: crmCircuitBreaker
+                    fallbackUri: forward:/fallback/crm
 
             # Pricing Service routes
             - id: pricing-service
@@ -77,7 +80,10 @@ spring:
               predicates:
                 - Path=/api/v1/price-books/**
               filters:
-                - CircuitBreaker=name=pricebookCircuitBreaker,fallbackUri=forward:/fallback/pricebook
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
 
             # CPQ gateway alias delegates price book commands to the price book aggregate owner.
             - id: cpq-pricebook-service
@@ -86,7 +92,10 @@ spring:
                 - Path=/api/v1/cpq/price-books/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>price-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=pricebookCircuitBreaker,fallbackUri=forward:/fallback/pricebook
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
 
             # S2B-11: agent validate must precede configuration/** (product CRUD) or SCG
             # first-match keeps agents on product List<String>. Route + rewrite only.
@@ -98,7 +107,10 @@ spring:
                 - Path=/api/v1/configuration/validate
               filters:
                 - RewritePath=/api/v1/configuration/validate, /api/v1/configurations/evaluate
-                - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+                - name: CircuitBreaker
+                  args:
+                    name: configurationCircuitBreaker
+                    fallbackUri: forward:/fallback/configuration
 
             - id: cpq-configuration-validate
               uri: ${CONFIGURATION_ENGINE_URI:http://localhost:8088}
@@ -107,7 +119,10 @@ spring:
                 - Path=/api/v1/cpq/configuration/validate
               filters:
                 - RewritePath=/api/v1/cpq/configuration/validate, /api/v1/configurations/evaluate
-                - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+                - name: CircuitBreaker
+                  args:
+                    name: configurationCircuitBreaker
+                    fallbackUri: forward:/fallback/configuration
 
             # Product Service routes (rules CRUD under configuration/** stays here)
             - id: product-service
@@ -115,7 +130,10 @@ spring:
               predicates:
                 - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
               filters:
-                - CircuitBreaker=name=productCircuitBreaker,fallbackUri=forward:/fallback/product
+                - name: CircuitBreaker
+                  args:
+                    name: productCircuitBreaker
+                    fallbackUri: forward:/fallback/product
 
             # CPQ gateway aliases delegate product, bundle, option, attribute, and configuration
             # commands to the product aggregate owner.
@@ -125,7 +143,10 @@ spring:
                 - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=productCircuitBreaker,fallbackUri=forward:/fallback/product
+                - name: CircuitBreaker
+                  args:
+                    name: productCircuitBreaker
+                    fallbackUri: forward:/fallback/product
 
             # Quote Service routes
             - id: quote-service
@@ -156,7 +177,10 @@ spring:
               predicates:
                 - Path=/api/v1/configurations/**
               filters:
-                - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+                - name: CircuitBreaker
+                  args:
+                    name: configurationCircuitBreaker
+                    fallbackUri: forward:/fallback/configuration
 
             # CPQ gateway alias delegates configuration session commands to the configuration owner.
             - id: cpq-configuration-engine
@@ -165,7 +189,10 @@ spring:
                 - Path=/api/v1/cpq/configurations/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>configurations)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=configurationCircuitBreaker,fallbackUri=forward:/fallback/configuration
+                - name: CircuitBreaker
+                  args:
+                    name: configurationCircuitBreaker
+                    fallbackUri: forward:/fallback/configuration
 
             # Approval Routing routes
             - id: approval-routing
@@ -173,7 +200,10 @@ spring:
               predicates:
                 - Path=/api/v1/approvals/**
               filters:
-                - CircuitBreaker=name=approvalCircuitBreaker,fallbackUri=forward:/fallback/approval
+                - name: CircuitBreaker
+                  args:
+                    name: approvalCircuitBreaker
+                    fallbackUri: forward:/fallback/approval
 
             # CPQ gateway alias delegates approval workflow commands to the approval owner.
             - id: cpq-approval-routing
@@ -182,7 +212,10 @@ spring:
                 - Path=/api/v1/cpq/approvals/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>approvals)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=approvalCircuitBreaker,fallbackUri=forward:/fallback/approval
+                - name: CircuitBreaker
+                  args:
+                    name: approvalCircuitBreaker
+                    fallbackUri: forward:/fallback/approval
 
             # Document Generation routes
             - id: document-generation
@@ -190,7 +223,10 @@ spring:
               predicates:
                 - Path=/api/v1/documents/**
               filters:
-                - CircuitBreaker=name=documentCircuitBreaker,fallbackUri=forward:/fallback/document
+                - name: CircuitBreaker
+                  args:
+                    name: documentCircuitBreaker
+                    fallbackUri: forward:/fallback/document
 
             # CPQ gateway alias delegates document commands to the document generation owner.
             - id: cpq-document-generation
@@ -199,7 +235,10 @@ spring:
                 - Path=/api/v1/cpq/documents/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>documents)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=documentCircuitBreaker,fallbackUri=forward:/fallback/document
+                - name: CircuitBreaker
+                  args:
+                    name: documentCircuitBreaker
+                    fallbackUri: forward:/fallback/document
 
             # Contract/Asset Management routes
             - id: contract-asset-management
@@ -207,7 +246,10 @@ spring:
               predicates:
                 - Path=/api/v1/subscriptions/**
               filters:
-                - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
+                - name: CircuitBreaker
+                  args:
+                    name: contractCircuitBreaker
+                    fallbackUri: forward:/fallback/contract
 
             # CPQ gateway alias delegates subscription commands to the contract/asset owner.
             - id: cpq-contract-asset-management
@@ -216,7 +258,10 @@ spring:
                 - Path=/api/v1/cpq/subscriptions/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>subscriptions)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
-                - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
+                - name: CircuitBreaker
+                  args:
+                    name: contractCircuitBreaker
+                    fallbackUri: forward:/fallback/contract
 
             # ERP adapter placeholder (S2A-7): agent-contract paths reserved until erp-adapter-service exists
             - id: erp-stub
@@ -230,7 +275,10 @@ spring:
               predicates:
                 - Path=/api/v1/emails/**,/api/v1/calls/**,/api/v1/templates/**
               filters:
-                - CircuitBreaker=name=communicationCircuitBreaker,fallbackUri=forward:/fallback/communication
+                - name: CircuitBreaker
+                  args:
+                    name: communicationCircuitBreaker
+                    fallbackUri: forward:/fallback/communication
 
             # AI Service routes
             - id: ai-service
@@ -238,7 +286,10 @@ spring:
               predicates:
                 - Path=/api/v1/ai/**,/api/v1/copilot/**
               filters:
-                - CircuitBreaker=name=aiCircuitBreaker,fallbackUri=forward:/fallback/ai
+                - name: CircuitBreaker
+                  args:
+                    name: aiCircuitBreaker
+                    fallbackUri: forward:/fallback/ai
 
   # Redis for rate limiting and, through Spring Session, the BFF sessions (ADR-016 step 3)
   data:
@@ -274,11 +325,69 @@ resilience4j:
       # same bounded computation budget as quote's outbound pricing request.
       pricingCircuitBreaker:
         timeoutDuration: ${PRICING_GATEWAY_TIMEOUT:35s}
+      # DRG-528: every other route family gets its own finite budget. A deadline
+      # bounds the wait for the upstream's response headers, not a body that is
+      # still streaming.
+      #
+      # crm, pricebook, product, approval, document and contract make no outbound
+      # HTTP calls on their request paths; they are database-bound, and document
+      # generation and ERP sync run asynchronously. 10s is well above the 1s
+      # library default, which cuts valid cold or large-page reads, and well below
+      # Hikari's 30s connection-acquire timeout, so an exhausted pool degrades to
+      # the fallback before the service itself would give up.
+      crmCircuitBreaker:
+        timeoutDuration: ${CRM_GATEWAY_TIMEOUT:10s}
+      pricebookCircuitBreaker:
+        timeoutDuration: ${PRICEBOOK_GATEWAY_TIMEOUT:10s}
+      productCircuitBreaker:
+        timeoutDuration: ${PRODUCT_GATEWAY_TIMEOUT:10s}
+      approvalCircuitBreaker:
+        timeoutDuration: ${APPROVAL_GATEWAY_TIMEOUT:10s}
+      documentCircuitBreaker:
+        timeoutDuration: ${DOCUMENT_GATEWAY_TIMEOUT:10s}
+      contractCircuitBreaker:
+        timeoutDuration: ${CONTRACT_GATEWAY_TIMEOUT:10s}
+      # Configuration-engine evaluate (including the validate shim) reads rules
+      # from product-service with a 5s connect and 30s read timeout when its
+      # rules cache is cold. Like quote's pricing hop, leave another 10s for
+      # token handling and local evaluation.
+      configurationCircuitBreaker:
+        timeoutDuration: ${CONFIGURATION_GATEWAY_TIMEOUT:45s}
+      # communication-service has no registry in-tree; its lb:// destination
+      # fails at once and degrades to the fallback. 10s matches the other CRUD
+      # services if a real destination is configured.
+      communicationCircuitBreaker:
+        timeoutDuration: ${COMMUNICATION_GATEWAY_TIMEOUT:10s}
+      # An agent invoke is an LLM completion whose tools call back through this
+      # gateway (5s connect + 30s read each, ADR-016 bearer lane). One completion,
+      # one tool call and a second completion at ai-service's 30s model default
+      # come to about 95s. ai-service rejects any model timeout over 2 minutes,
+      # so 120s is the ceiling.
+      aiCircuitBreaker:
+        timeoutDuration: ${AI_GATEWAY_TIMEOUT:120s}
     instances:
       quoteCircuitBreaker:
         baseConfig: quoteCircuitBreaker
       pricingCircuitBreaker:
         baseConfig: pricingCircuitBreaker
+      crmCircuitBreaker:
+        baseConfig: crmCircuitBreaker
+      pricebookCircuitBreaker:
+        baseConfig: pricebookCircuitBreaker
+      productCircuitBreaker:
+        baseConfig: productCircuitBreaker
+      approvalCircuitBreaker:
+        baseConfig: approvalCircuitBreaker
+      documentCircuitBreaker:
+        baseConfig: documentCircuitBreaker
+      contractCircuitBreaker:
+        baseConfig: contractCircuitBreaker
+      configurationCircuitBreaker:
+        baseConfig: configurationCircuitBreaker
+      communicationCircuitBreaker:
+        baseConfig: communicationCircuitBreaker
+      aiCircuitBreaker:
+        baseConfig: aiCircuitBreaker
   circuitbreaker:
     configs:
       default:

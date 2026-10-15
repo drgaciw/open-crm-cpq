@@ -19,7 +19,10 @@ import java.util.Map;
 @RequestMapping("/fallback")
 public class FallbackController {
 
-    @GetMapping("/crm")
+    @RequestMapping(value = "/crm", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> crmFallback() {
         return buildFallbackResponse("CRM Service");
     }
@@ -29,17 +32,26 @@ public class FallbackController {
         return buildFallbackResponse("CPQ Service");
     }
 
-    @GetMapping("/communication")
+    @RequestMapping(value = "/communication", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> communicationFallback() {
         return buildFallbackResponse("Communication Service");
     }
 
-    @GetMapping("/ai")
+    @RequestMapping(value = "/ai", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> aiFallback() {
         return buildFallbackResponse("AI Service");
     }
 
-    @GetMapping("/pricebook")
+    @RequestMapping(value = "/pricebook", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> pricebookFallback() {
         return buildFallbackResponse("Price Book Service");
     }
@@ -52,7 +64,10 @@ public class FallbackController {
         return buildFallbackResponse("Pricing Service");
     }
 
-    @GetMapping("/product")
+    @RequestMapping(value = "/product", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> productFallback() {
         return buildFallbackResponse("Product Service");
     }
@@ -65,22 +80,34 @@ public class FallbackController {
         return buildFallbackResponse("Quote Service");
     }
 
-    @GetMapping("/configuration")
+    @RequestMapping(value = "/configuration", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> configurationFallback() {
         return buildFallbackResponse("Configuration Engine");
     }
 
-    @GetMapping("/approval")
+    @RequestMapping(value = "/approval", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> approvalFallback() {
         return buildFallbackResponse("Approval Routing Service");
     }
 
-    @GetMapping("/document")
+    @RequestMapping(value = "/document", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> documentFallback() {
         return buildFallbackResponse("Document Generation Service");
     }
 
-    @GetMapping("/contract")
+    @RequestMapping(value = "/contract", method = {
+            RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
+            RequestMethod.PATCH, RequestMethod.DELETE
+    })
     public ResponseEntity<Map<String, Object>> contractFallback() {
         return buildFallbackResponse("Contract/Asset Management Service");
     }
