@@ -53,6 +53,46 @@ Real per-period margin is the last open prerequisite of ADR-023 (P-2, AC-16). Th
    - Each lane reports its test counts, its graph results, and anything left unverified.
 6. **Independent review.** After integration, a fresh agent reviews the combined diff against this plan and the ADRs before any PR is opened.
 
+## Definition of done rubric
+
+The owner's instruction of 2026-10-15: **no PR is opened until every row below is satisfied for every lane**, and Jev then scores the integrated implementation until it is complete. Each row is either met with evidence, or marked N/A with a reason that the independent reviewer accepts.
+
+### D1 — Backlog Definition of Done
+
+This is the Notion capability map's convention for every story.
+
+| Item | L1 cost basis | L2 margin | L3 CI | L4 gateway |
+|------|---------------|-----------|-------|------------|
+| Exposed via Open Host Service: a versioned `/api/v1` DTO API under the ADR-016 baseline | Import and lookup API | Margin in the existing pricing response (additive field) | N/A: build tooling | N/A: edge-only; no domain API (ADR-009) |
+| Events in the schema registry (`EventContract`) | N/A unless the lane adds an event. Any event it adds must be registered and fitness-tested | N/A: no new event | N/A | N/A |
+| Written through the outbox | Same rule as above | N/A | N/A | N/A |
+| Audit entry where a commercial decision is touched | **Required.** Every import records version, approver, actor, accepted and rejected counts | **Required.** The margin used, its source and any missing-cost reason are in the pricing audit trail and waterfall trace | N/A | N/A |
+| Event-replay integration test | Replay or re-ingest of the same version is a no-op (PostgreSQL integration) | Replaying a priced quote returns the original cost and margin | N/A | N/A |
+
+### D2 — Wave gates
+
+These are the gates listed above, for every lane:
+
+- GitNexus impact before edits, with HIGH, CRITICAL and UNKNOWN reported;
+- red-first tests;
+- module tests green under the unit profile;
+- a complete `detect-changes`, not partial or truncated;
+- no forge hold touched;
+- defaults unchanged.
+
+Integration tests that need Docker are run where Docker exists, either the owner's machine or the CI integration job. **Until they have run, the lane is not done.**
+
+### D3 — Jev scoring
+
+This follows the repository rubric, [jev-requirement-implementation-rubric.md](jev-requirement-implementation-rubric.md), R1–R4.
+
+- **R1.** Each lane's acceptance criteria are passed to `jev_check_requirement`, using the GitNexus evidence packet. Every criterion must be `covered`, or explicitly deferred in this plan. `partial` means revise the smallest missing piece. `not_verifiable` means fill the evidence, never mark it covered.
+- **R2.** `jev_review` on the integrated diff must return `safe_to_apply` true, with no blocking test gap. A GitNexus result of HIGH, CRITICAL or UNKNOWN still means human review before merge.
+- **R3.** `jev_assess_change_risk` is mandatory for L1 (Flyway and a new API), L2 (pricing execute) and L4 (gateway routes). `escalate` stops the slice, and nobody edits code to chase a better score.
+- **R4.** The local veto on holds always wins over any score.
+
+The loop is: score, revise, re-score, until R1 and R2 pass. The PR opens only after that, as a draft for owner review. Jev's judgments are recorded in this plan's results section.
+
 ## Environment note
 
 This cloud workspace cannot reach Maven Central, and the owner's computer was offline at planning time. Backend lanes L1, L2 and L4 start once Maven resolution works: either the host is allow-listed, or the owner's computer is back online. L3 needs only npm and starts immediately.
