@@ -12,7 +12,7 @@
 
 Read this file first. Then open only the track docs for the workstream you are assigned. Do **not** invent paths, flip forge holds, or merge source repos wholesale.
 
-**Naming (do not confuse):** harvest **Track T1 / T2** (pricing-ai-rules queues A/B) are **not** forge **Wave T** (skipped — do not name forge T1/T2). Harvest tracks: pricing T1/T2, deal-desk D1/D2, price-book P1–P4.
+**Naming (do not confuse):** harvest **Track T1 / T2** (pricing-ai-rules queues A/B) are **not** forge **Wave T** (skipped — do not name forge T1/T2). Harvest tracks: pricing T1/T2, deal-desk D1/D2, price-book P1–P4, trycompai CRM CC1.
 
 ---
 
@@ -124,6 +124,16 @@ Paths are relative to `docs/plans/`.
 
 - `price-book-capability-matrix-p1.md` (E1)
 - `price-book-harvest-backlog-p1.md` (E2)
+
+### 3.6 CRM relationship data — `trycompai/crm` (Track CC1)
+
+| Doc | Purpose | Track | Status |
+|-----|---------|-------|--------|
+| [trycompai-crm-reuse-gap-analysis.md](./trycompai-crm-reuse-gap-analysis.md) | Parent plan, architecture gate, comparison with Notion/Linear, dispositions | CC1 | **Plan ready** (docs only) |
+| [trycompai-crm-capability-matrix-cc1.md](./trycompai-crm-capability-matrix-cc1.md) | Capability matrix @ `6d4793d` | CC1 | **Done** (docs) |
+| [trycompai-crm-harvest-backlog-cc1.md](./trycompai-crm-harvest-backlog-cc1.md) | 17 ranked stories, gated on ADR-028 to ADR-034 (Proposed) | CC1 | **Filed** in Linear P-DRG-6 and Notion; no code authorized |
+
+Source is MIT and in TypeScript/Next/Prisma: **patterns only**, no file copies. The Activities hold is **not** lifted by this track; ADR-030 proposes it.
 
 ### 3.5 Out of harvest scope (same folder)
 
