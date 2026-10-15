@@ -1,0 +1,60 @@
+package com.opencrm.pricing.cost;
+
+import com.opencrm.common.dto.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Finance cost basis ingestion (DRG-526 / BC-03-13, F-2 export contract). Admin only: see
+ * {@link CostBasisSecurityConfiguration}. DTOs only at this boundary (ADR-006).
+ */
+@RestController
+@RequestMapping(CostBasisImportController.PATH)
+@Tag(name = "Cost Basis", description = "Finance cost export ingestion and its audit trail")
+public class CostBasisImportController {
+
+    static final String PATH = "/api/v1/cost-basis/imports";
+
+    private final CostBasisIngestionService ingestion;
+
+    public CostBasisImportController(CostBasisIngestionService ingestion) {
+        this.ingestion = ingestion;
+    }
+
+    /**
+     * Ingests one F-2 export, sent as the raw CSV body. Rows are rejected one by one and the rest loads; re-sending the
+     * same version is a no-op. A missing header (400), too many rows, or more than one version or approver (422)
+     * refuses the whole file.
+     */
+    @PostMapping(consumes = {"text/csv", "text/plain"})
+    @Operation(summary = "Ingest a Finance cost export (F-2 CSV)",
+            description = "Idempotent by version. Returns the audit entry and every rejected row.")
+    public ApiResponse<CostBasisImportReport> ingest(@RequestBody String csv) {
+        CostBasisImportReport report = ingestion.ingest(csv);
+        return ApiResponse.success(report, report.audit().rejected() == 0
+                ? "Cost export ingested" : "Cost export ingested with rejected rows");
+    }
+
+    /** The audit trail of ingestions, newest first. */
+    @GetMapping
+    @Operation(summary = "List cost export ingestions", description = "Audit entries, newest first.")
+    public ApiResponse<Page<CostBasisImportSummary>> list(@PageableDefault(size = 20) Pageable pageable) {
+        Page<CostBasisImportSummary> page = ingestion.list(pageable);
+        return ApiResponse.success(page, ApiResponse.PageInfo.builder()
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .hasNext(page.hasNext())
+                .hasPrevious(page.hasPrevious())
+                .build());
+    }
+}
