@@ -101,13 +101,45 @@ public class Deal extends BaseEntity {
     /**
      * Calculate weighted amount based on probability.
      */
+    /**
+     * Amount in {@link #baseCurrency}, frozen at {@link #fxRate} (ADR-032). Null when not converted.
+     * Set only by {@link DealCurrencyConverter}.
+     */
+    @Column(name = "base_amount", precision = 19, scale = 2)
+    private BigDecimal baseAmount;
+
+    @Column(name = "base_currency", length = 3)
+    private String baseCurrency;
+
+    @Column(name = "base_weighted_amount", precision = 19, scale = 2)
+    private BigDecimal baseWeightedAmount;
+
+    /** {@code baseAmount = amount * fxRate}. */
+    @Column(name = "fx_rate", precision = 19, scale = 10)
+    private BigDecimal fxRate;
+
+    @Column(name = "fx_rate_as_of")
+    private Instant fxRateAsOf;
+
+    @Column(name = "fx_source", length = 30)
+    private String fxSource;
+
     @PrePersist
     @PreUpdate
     protected void calculateWeightedAmount() {
+        recalculateWeightedAmounts();
+    }
+
+    /** Recomputes weighted amounts from the current probability, in deal and base currency. */
+    public void recalculateWeightedAmounts() {
         if (amount != null && probability != null) {
-            this.weightedAmount = amount.multiply(BigDecimal.valueOf(probability))
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            this.weightedAmount = weigh(amount, probability);
         }
+        this.baseWeightedAmount = (baseAmount != null && probability != null) ? weigh(baseAmount, probability) : null;
+    }
+
+    private static BigDecimal weigh(BigDecimal value, int probability) {
+        return value.multiply(BigDecimal.valueOf(probability)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     private static final Map<DealStage, DealStage> STAGE_TRANSITIONS = Map.of(

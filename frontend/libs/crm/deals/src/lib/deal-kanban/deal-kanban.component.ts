@@ -8,7 +8,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe } from '@angular/common';
 import { DealService } from '../deal.service';
-import { DealDto, DealStage } from '@frontend/shared-models';
+import { DEFAULT_BASE_CURRENCY, DealDto, DealStage } from '@frontend/shared-models';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 
 interface KanbanColumn {
@@ -16,7 +16,10 @@ interface KanbanColumn {
   label: string;
   color: string;
   deals: DealDto[];
+  /** Sum of base amounts in the board's base currency (ADR-032). */
   totalValue: number;
+  /** Deals with an amount but no base amount in that currency. */
+  unconverted: number;
 }
 
 @Component({
@@ -36,8 +39,11 @@ interface KanbanColumn {
       @if (pipelineTotals(); as totals) {
         <div class="pipeline-totals" aria-label="Pipeline summary">
           <span class="total-chip">{{ totals.count }} open</span>
-          <span class="total-chip amount">{{ totals.amount | currency:'USD':'symbol':'1.0-0' }}</span>
-          <span class="total-chip weighted">{{ totals.weighted | currency:'USD':'symbol':'1.0-0' }} weighted</span>
+          <span class="total-chip amount">{{ totals.amount | currency:baseCurrency():'symbol':'1.0-0' }}</span>
+          <span class="total-chip weighted">{{ totals.weighted | currency:baseCurrency():'symbol':'1.0-0' }} weighted</span>
+          @if (totals.unconverted > 0) {
+            <span class="total-chip unconverted" data-testid="unconverted-chip">{{ totals.unconverted }} not converted</span>
+          }
         </div>
       }
       <span class="spacer"></span>
@@ -66,7 +72,10 @@ interface KanbanColumn {
               <span class="column-count">{{ col.deals.length }}</span>
             </div>
             <div class="column-summary">
-              {{ col.totalValue | currency:'USD':'symbol':'1.0-0' }}
+              {{ col.totalValue | currency:baseCurrency():'symbol':'1.0-0' }}
+              @if (col.unconverted > 0) {
+                <span class="column-unconverted">+{{ col.unconverted }} not converted</span>
+              }
             </div>
             <div class="column-cards">
               @for (deal of col.deals; track deal.id) {
@@ -100,7 +109,7 @@ interface KanbanColumn {
                     }
                   </div>
                   @if (deal.amount) {
-                    <div class="card-amount">{{ deal.amount | currency:'USD':'symbol':'1.0-0' }}</div>
+                    <div class="card-amount">{{ deal.amount | currency:(deal.currency || 'USD'):'symbol':'1.0-0' }}</div>
                   }
                   @if (deal.primaryContactName) {
                     <div class="card-contact">
@@ -158,6 +167,8 @@ interface KanbanColumn {
       background: #e0e0e0; border-radius: 50%; width: 24px; height: 24px;
       display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;
     }
+    .column-unconverted { margin-left: 6px; color: #8a5a00; }
+    .total-chip.unconverted { color: #8a5a00; }
     .column-summary { padding: 8px 16px; font-size: 0.8rem; color: #666; background: white; border-bottom: 1px solid #eee; }
     .column-cards { padding: 8px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
     .deal-card { cursor: pointer; padding: 12px !important; }
@@ -188,18 +199,29 @@ export class DealKanbanComponent implements OnInit {
     { stage: 'LOST', label: 'Lost', color: '#757575' },
   ];
 
+  /** ADR-032: currency of every total on the board, from GET /deals/pipeline. */
+  baseCurrency = computed(
+    () => this.service.pipelineSummary()?.find((s) => s.baseCurrency)?.baseCurrency ?? DEFAULT_BASE_CURRENCY,
+  );
+
   /** Single-pass O(stages + deals) bucketing (salvage #436); avoids filter-per-stage. */
   columns = computed<KanbanColumn[]>(() => {
     const deals = this.service.deals();
-    const stageMap = new Map<DealStage, { deals: DealDto[]; totalValue: number }>();
+    const base = this.baseCurrency();
+    const stageMap = new Map<DealStage, { deals: DealDto[]; totalValue: number; unconverted: number }>();
     for (const cfg of this.stageConfig) {
-      stageMap.set(cfg.stage, { deals: [], totalValue: 0 });
+      stageMap.set(cfg.stage, { deals: [], totalValue: 0, unconverted: 0 });
     }
     for (const d of deals) {
       const bucket = stageMap.get(d.stage);
       if (bucket) {
         bucket.deals.push(d);
-        bucket.totalValue += d.amount ?? 0;
+        // ADR-032: add base amounts only; never add amounts in different currencies.
+        if (d.baseAmount != null && d.baseCurrency === base) {
+          bucket.totalValue += d.baseAmount;
+        } else if (d.amount != null) {
+          bucket.unconverted += 1;
+        }
       }
     }
     return this.stageConfig.map((cfg) => {
@@ -208,6 +230,7 @@ export class DealKanbanComponent implements OnInit {
         ...cfg,
         deals: bucket.deals,
         totalValue: bucket.totalValue,
+        unconverted: bucket.unconverted,
       };
     });
   });
@@ -222,6 +245,7 @@ export class DealKanbanComponent implements OnInit {
       count: source.reduce((n, s) => n + (s.count ?? 0), 0),
       amount: source.reduce((n, s) => n + (s.totalAmount ?? 0), 0),
       weighted: source.reduce((n, s) => n + (s.weightedAmount ?? 0), 0),
+      unconverted: source.reduce((n, s) => n + (s.unconvertedCount ?? 0), 0),
     };
   });
 

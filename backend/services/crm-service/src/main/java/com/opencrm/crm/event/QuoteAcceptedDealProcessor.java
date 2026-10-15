@@ -3,6 +3,7 @@ package com.opencrm.crm.event;
 import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.deal.Deal;
+import com.opencrm.crm.deal.DealCurrencyConverter;
 import com.opencrm.crm.deal.DealRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ public class QuoteAcceptedDealProcessor {
 
     private final DealRepository dealRepository;
     private final KafkaInbox inbox;
+    private final DealCurrencyConverter currencyConverter;
 
     /**
      * Marks the deal WON from quote acceptance fields, once per quote.
@@ -62,6 +64,8 @@ public class QuoteAcceptedDealProcessor {
         if (event.getCurrency() != null && !event.getCurrency().isBlank()) {
             deal.setCurrency(event.getCurrency());
         }
+        // ADR-032 D-03: freeze the base amount at close, after the accepted amount and currency are applied.
+        currencyConverter.freeze(deal);
         dealRepository.save(deal);
         String amountLog = event.getTotalAmount() != null ? event.getTotalAmount().toPlainString() : "n/a";
         log.info("Updated deal {} to WON from quote {} (amount={})",

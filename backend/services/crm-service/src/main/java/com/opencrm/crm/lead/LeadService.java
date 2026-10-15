@@ -5,6 +5,7 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.deal.Deal;
+import com.opencrm.crm.deal.DealCurrencyConverter;
 import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealStage;
 import com.opencrm.crm.deal.DealType;
@@ -35,6 +36,7 @@ public class LeadService {
     private final OrganizationRepository organizationRepository;
     private final DealRepository dealRepository;
     private final LeadMapper leadMapper;
+    private final DealCurrencyConverter dealCurrencyConverter;
     private final com.opencrm.crm.lead.scoring.LeadScoreAdvisor leadScoreAdvisor;
 
     /**
@@ -286,6 +288,7 @@ public class LeadService {
                 .probability(10)
                 .build();
 
+        dealCurrencyConverter.freeze(deal);
         Deal savedDeal = dealRepository.save(deal);
         log.info("Created deal ID {} from lead ID {}", savedDeal.getId(), id);
 

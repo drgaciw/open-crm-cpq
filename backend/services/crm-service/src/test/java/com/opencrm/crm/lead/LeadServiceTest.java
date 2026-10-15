@@ -5,6 +5,7 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.deal.Deal;
+import com.opencrm.crm.deal.DealCurrencyConverter;
 import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealStage;
 import com.opencrm.crm.organization.Organization;
@@ -53,6 +54,9 @@ class LeadServiceTest {
 
     @Mock
     private com.opencrm.crm.lead.scoring.LeadScoreAdvisor leadScoreAdvisor;
+
+    @Mock
+    private DealCurrencyConverter dealCurrencyConverter;
 
     @InjectMocks
     private LeadService leadService;
@@ -530,6 +534,8 @@ class LeadServiceTest {
             assertThat(lead.getStatus()).isEqualTo(LeadStatus.CONVERTED);
             assertThat(lead.getConvertedDealId()).isEqualTo(10L);
             verify(dealRepository).save(any(Deal.class));
+            // ADR-032 D-03: a deal created from a lead gets its base amount frozen like any other new deal.
+            verify(dealCurrencyConverter).freeze(any(Deal.class));
         }
 
         @Test

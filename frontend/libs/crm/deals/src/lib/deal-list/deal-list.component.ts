@@ -94,7 +94,7 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
           </ng-container>
           <ng-container matColumnDef="amount">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Amount</th>
-            <td mat-cell *matCellDef="let d">{{ d.amount | currency:'USD':'symbol':'1.0-0' }}</td>
+            <td mat-cell *matCellDef="let d">{{ d.amount | currency:(d.currency || 'USD'):'symbol':'1.0-0' }}</td>
           </ng-container>
           <ng-container matColumnDef="stage">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Stage</th>
