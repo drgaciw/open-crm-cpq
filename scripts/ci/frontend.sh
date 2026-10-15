@@ -13,19 +13,12 @@ node --version
 npm --version
 npx nx --version
 
+# Every gate below runs over the whole Nx project graph (--all), so a new project is gated
+# automatically. The check fails first if any project lacks a gate target, because
+# `run-many --all` would otherwise skip it without a word (P-5, DRG-527).
+bash "${SCRIPT_DIR}/frontend-gate-check.sh"
+
 npx nx run-many --target=build --all --parallel=3
 npx nx run-many --target=lint --all --parallel=3
-
-TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models shared-data-access cpq-quotes"
-AVAILABLE_PROJECTS="$(
-  npx nx show projects --with-target=test \
-    | { grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" || true; } \
-    | paste -sd, -
-)"
-
-if [[ -n "${AVAILABLE_PROJECTS}" ]]; then
-  echo "Running tests for: ${AVAILABLE_PROJECTS}"
-  npx nx run-many --target=test --projects="${AVAILABLE_PROJECTS}" --parallel=3
-else
-  echo "No targeted CRM/shared projects expose a test target — skipping frontend tests"
-fi
+npx nx run-many --target=typecheck --all --parallel=3
+npx nx run-many --target=test --all --parallel=3
