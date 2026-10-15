@@ -13,12 +13,17 @@ import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.unit.DataSize;
+
+import java.nio.charset.StandardCharsets;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,12 +40,14 @@ class CostBasisImportControllerTest {
             Instant.parse("2026-10-15T09:00:00Z"), "a".repeat(64), 2, 1, 1, 0, 0, 1, 1);
 
     private CostBasisIngestionService service;
+    private CostBasisProperties properties;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(CostBasisIngestionService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new CostBasisImportController(service))
+        properties = new CostBasisProperties();
+        mvc = MockMvcBuilders.standaloneSetup(new CostBasisImportController(service, properties))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .build();
@@ -73,6 +80,44 @@ class CostBasisImportControllerTest {
         mvc.perform(post("/api/v1/cost-basis/imports").contentType("text/csv").content("x"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("COST_EXPORT_HEADER_INVALID"));
+    }
+
+    @Test
+    @DisplayName("m3: a body over max-bytes is 413 COST_EXPORT_BODY_TOO_LARGE and never reaches ingestion")
+    void oversizeBody() throws Exception {
+        properties.setMaxBytes(DataSize.ofBytes(8));
+        when(service.bodyTooLarge(anyLong())).thenReturn(new BusinessException("too large",
+                HttpStatus.CONTENT_TOO_LARGE, "COST_EXPORT_BODY_TOO_LARGE"));
+
+        mvc.perform(post("/api/v1/cost-basis/imports").contentType("text/csv").content("123456789"))
+                .andExpect(status().is(413))
+                .andExpect(jsonPath("$.errorCode").value("COST_EXPORT_BODY_TOO_LARGE"));
+        verify(service).bodyTooLarge(9L);
+        verify(service, never()).ingest(anyString());
+    }
+
+    @Test
+    @DisplayName("m3: a body of exactly max-bytes is read in full and passed on as UTF-8")
+    void bodyAtTheLimitIsDecodedAsUtf8() throws Exception {
+        String csv = "Ünï,cödé";
+        properties.setMaxBytes(DataSize.ofBytes(csv.getBytes(StandardCharsets.UTF_8).length));
+        when(service.ingest(anyString())).thenReturn(new CostBasisImportReport(SUMMARY, List.of()));
+
+        mvc.perform(post("/api/v1/cost-basis/imports").contentType("text/csv")
+                        .content(csv.getBytes(StandardCharsets.UTF_8)))
+                .andExpect(status().isOk());
+        verify(service).ingest(csv);
+    }
+
+    @Test
+    @DisplayName("M5: the response carries the billing unit check scope")
+    void reportCarriesBillingUnitCheck() throws Exception {
+        when(service.ingest(anyString())).thenReturn(new CostBasisImportReport(SUMMARY, List.of()));
+
+        mvc.perform(post("/api/v1/cost-basis/imports").contentType("text/csv").content("csv"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.billingUnitCheck").value(org.hamcrest.Matchers.containsString(
+                        "only where the catalog metadata carries billingUnit")));
     }
 
     @Test

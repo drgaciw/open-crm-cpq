@@ -40,7 +40,9 @@ import java.util.stream.Collectors;
  *
  * <p>Order of checks, each removing the rows it rejects before the next:
  * <ol>
- *   <li>the file: header, size, one {@code version} and one {@code approvedBy} per export (else refused whole);</li>
+ *   <li>the file: body size ({@code max-bytes}, 413), header (400), row count ({@code max-rows}, 422), one
+ *       {@code version} and one {@code approvedBy} per export (422). Any of these refuses the file whole: it is logged
+ *       at WARN with actor, SHA-256 and error code, and no audit row is written;</li>
  *   <li>each row's format ({@link CostExportCsv});</li>
  *   <li>the catalog replica {@code pricing_products}: the product must exist and not be deleted; where its
  *       {@code metadata} JSON states a {@code billingUnit}, the row's must match it, ignoring case. The replica has no
@@ -53,6 +55,12 @@ import java.util.stream.Collectors;
  *   <li>after the merge, the effective components of each product and date (highest version per component) must still
  *       share billing unit and currency, else the new rows of that group are rejected.</li>
  * </ol>
+ *
+ * <p><b>Billing unit coverage (M5, partial F-2).</b> The billing unit is checked only where the catalog metadata carries
+ * {@code billingUnit}; every other accepted row is counted in {@code unitUnchecked} and the report says so.
+ *
+ * <p><b>Omitted components (m4).</b> A newer version that omits a component does not remove it: the stored row of that
+ * component keeps applying on its effective date. To retire a component, export it with {@code unitCost} 0.
  */
 @Slf4j
 @Service
@@ -89,10 +97,22 @@ public class CostBasisIngestionService {
     @Transactional
     public CostBasisImportReport ingest(String csv) {
         String ingestedBy = verifiedActor();
-        CostExportCsv.Result parsed = CostExportCsv.read(csv, properties.getMaxRows());
-        Long exportVersion = single(parsed.rows(), CostExportRow::version, "version", "COST_EXPORT_MIXED_VERSIONS");
-        String approvedBy = single(parsed.rows(), CostExportRow::approvedBy, "approvedBy",
-                "COST_EXPORT_MIXED_APPROVERS");
+        String contentSha256 = sha256(csv);
+        CostExportCsv.Result parsed;
+        Long exportVersion;
+        String approvedBy;
+        try {
+            long bytes = (csv == null ? "" : csv).getBytes(StandardCharsets.UTF_8).length;
+            if (bytes > properties.getMaxBytes().toBytes()) {
+                throw tooLarge(bytes + " bytes");
+            }
+            parsed = CostExportCsv.read(csv, properties.getMaxRows());
+            exportVersion = single(parsed.rows(), CostExportRow::version, "version", "COST_EXPORT_MIXED_VERSIONS");
+            approvedBy = single(parsed.rows(), CostExportRow::approvedBy, "approvedBy", "COST_EXPORT_MIXED_APPROVERS");
+        } catch (BusinessException refused) {
+            warnRefused(ingestedBy, contentSha256, refused);
+            throw refused;
+        }
 
         List<RowRejection> rejections = new ArrayList<>(parsed.rejections());
         Set<Integer> unitUnchecked = new HashSet<>();
@@ -138,7 +158,7 @@ public class CostBasisIngestionService {
                 .approvedBy(approvedBy)
                 .ingestedBy(ingestedBy)
                 .ingestedAt(ingestedAt)
-                .contentSha256(sha256(csv))
+                .contentSha256(contentSha256)
                 .rowsReceived(parsed.received())
                 .rowsAccepted(accepted)
                 .rowsInserted(toInsert.size())
@@ -171,6 +191,35 @@ public class CostBasisIngestionService {
     @Transactional(readOnly = true)
     public Page<CostBasisImportSummary> list(Pageable pageable) {
         return imports.findAllByOrderByIngestedAtDescIdDesc(pageable).map(CostBasisImport::toSummary);
+    }
+
+    /**
+     * The refusal of a body the controller did not read because it is over {@code max-bytes} (m3). Logged like every
+     * whole-file refusal, with {@code sha256=unread}: the body was never read in full, so it has no hash. Nothing is
+     * persisted.
+     *
+     * @param bytes the declared {@code Content-Length}, or the bytes read before the limit was passed
+     */
+    public BusinessException bodyTooLarge(long bytes) {
+        BusinessException refused = tooLarge(bytes > 0 ? "at least " + bytes + " bytes" : "an undeclared length");
+        warnRefused(currentActor.id(), "unread", refused);
+        return refused;
+    }
+
+    private BusinessException tooLarge(String size) {
+        return new BusinessException("A cost export body may hold at most " + properties.getMaxBytes().toBytes()
+                + " bytes (opencrm.pricing.cost-basis.max-bytes); this one has " + size,
+                HttpStatus.CONTENT_TOO_LARGE, "COST_EXPORT_BODY_TOO_LARGE");
+    }
+
+    /**
+     * (d) A whole file refused (bad header, too many rows, mixed version or approver, oversize) is logged at WARN with
+     * the actor, the file's SHA-256 and the error code. No audit row is written for it: the audit trail records
+     * ingestions, and the refusal rolls back with the transaction.
+     */
+    private static void warnRefused(String actor, String contentSha256, BusinessException refused) {
+        log.warn("Cost export refused whole: actor={} sha256={} errorCode={} status={}", actor, contentSha256,
+                refused.getErrorCode(), refused.getStatus().value());
     }
 
     /** ADR-016 step 4: the actor comes from the verified token only. Only dev mode may proceed without one. */

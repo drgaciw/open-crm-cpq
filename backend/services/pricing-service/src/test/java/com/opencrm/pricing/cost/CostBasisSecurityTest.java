@@ -48,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CostBasisSecurityTest {
 
     private static final String IMPORTS = "/api/v1/cost-basis/imports";
+    private static final String PRODUCT = "/api/v1/cost-basis/products/PROD-SEAT";
 
     /** Not a stereotype, so component scanning elsewhere never picks it up. */
     @EnableWebMvc
@@ -77,15 +78,18 @@ class CostBasisSecurityTest {
     void anonymous() throws Exception {
         mvc.perform(post(IMPORTS)).andExpect(status().isUnauthorized());
         mvc.perform(get(IMPORTS)).andExpect(status().isUnauthorized());
+        mvc.perform(get(PRODUCT)).andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("CPQ.User, DealDesk and CFO are 403")
+    @DisplayName("CPQ.User, DealDesk, SalesVP and CFO are 403, for the cost lookup too")
     void nonAdminRolesAreForbidden() throws Exception {
-        for (String role : new String[]{"CPQ.User", "DealDesk", "CFO"}) {
+        for (String role : new String[]{"CPQ.User", "DealDesk", "SalesVP", "CFO"}) {
             mvc.perform(post(IMPORTS).header(HttpHeaders.AUTHORIZATION, TestTokens.user("bob", role).bearer()))
                     .andExpect(status().isForbidden());
             mvc.perform(get(IMPORTS).header(HttpHeaders.AUTHORIZATION, TestTokens.user("bob", role).bearer()))
+                    .andExpect(status().isForbidden());
+            mvc.perform(get(PRODUCT).header(HttpHeaders.AUTHORIZATION, TestTokens.user("bob", role).bearer()))
                     .andExpect(status().isForbidden());
         }
     }
@@ -96,14 +100,19 @@ class CostBasisSecurityTest {
         mvc.perform(post(IMPORTS)
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.service("quote-service", "Internal.Invoke").bearer()))
                 .andExpect(status().isForbidden());
+        mvc.perform(get(PRODUCT)
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.service("quote-service", "Internal.Invoke").bearer()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("Admin reaches import and listing")
+    @DisplayName("Admin reaches import, listing and the cost lookup")
     void adminIsAllowed() throws Exception {
         mvc.perform(post(IMPORTS).header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", "Admin").bearer()))
                 .andExpect(status().isOk());
         mvc.perform(get(IMPORTS).header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", "Admin").bearer()))
+                .andExpect(status().isOk());
+        mvc.perform(get(PRODUCT).header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", "Admin").bearer()))
                 .andExpect(status().isOk());
     }
 

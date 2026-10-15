@@ -1,5 +1,9 @@
 package com.opencrm.pricing.cost;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.pricing.product.PricingProduct;
 import com.opencrm.pricing.product.PricingProductRepository;
@@ -10,9 +14,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.util.unit.DataSize;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,6 +29,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,18 +54,21 @@ class CostBasisIngestionServiceTest {
     private final List<CostBasisRow> stored = new ArrayList<>();
     private final List<CostBasisImport> audits = new ArrayList<>();
     private final AtomicLong ids = new AtomicLong();
+    private PricingProductRepository products;
+    private CostBasisRowRepository rows;
+    private CostBasisImportRepository imports;
     private CurrentActor actor;
     private CostBasisIngestionService service;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void wire() {
-        PricingProductRepository products = mock(PricingProductRepository.class);
+        products = mock(PricingProductRepository.class);
         when(products.findByExternalIdInAndDeletedFalse(anyCollection())).thenAnswer(call ->
                 ((Collection<String>) call.getArgument(0)).stream().map(catalog::get)
                         .filter(java.util.Objects::nonNull).toList());
 
-        CostBasisRowRepository rows = mock(CostBasisRowRepository.class);
+        rows = mock(CostBasisRowRepository.class);
         when(rows.findByProductExternalIdInAndEffectiveFromIn(anyCollection(), anyCollection())).thenAnswer(call -> {
             Collection<String> ids = call.getArgument(0);
             Collection<LocalDate> dates = call.getArgument(1);
@@ -68,7 +81,7 @@ class CostBasisIngestionServiceTest {
             return saved;
         });
 
-        CostBasisImportRepository imports = mock(CostBasisImportRepository.class);
+        imports = mock(CostBasisImportRepository.class);
         when(imports.save(any(CostBasisImport.class))).thenAnswer(call -> {
             CostBasisImport audit = call.getArgument(0);
             audit.setId(ids.incrementAndGet());
@@ -297,6 +310,151 @@ class CostBasisIngestionServiceTest {
         when(actor.id()).thenReturn("service:pricing-service");
         assertThat(service.ingest(HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance").audit().ingestedBy())
                 .isEqualTo("service:pricing-service");
+    }
+
+    @Test
+    @DisplayName("m3: a body over opencrm.pricing.cost-basis.max-bytes is refused whole (413), not parsed, not audited")
+    void oversizeBodyIsRefused() {
+        know("P");
+        String csv = HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance";
+        CostBasisProperties small = new CostBasisProperties();
+        small.setMaxBytes(DataSize.ofBytes(csv.getBytes(StandardCharsets.UTF_8).length - 1L));
+        CostBasisIngestionService limited = withProperties(small);
+
+        assertThatThrownBy(() -> limited.ingest(csv))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+                    assertThat(e.getErrorCode()).isEqualTo("COST_EXPORT_BODY_TOO_LARGE");
+                });
+        assertThat(audits).isEmpty();
+        assertThat(stored).isEmpty();
+
+        small.setMaxBytes(DataSize.ofBytes(csv.getBytes(StandardCharsets.UTF_8).length));
+        assertThat(limited.ingest(csv).audit().inserted()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("m3: max-bytes counts UTF-8 bytes, not characters")
+    void maxBytesCountsUtf8Bytes() {
+        know("P");
+        String csv = HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Ünïcödé Finance";
+        CostBasisProperties small = new CostBasisProperties();
+        small.setMaxBytes(DataSize.ofBytes(csv.length()));
+        assertThatThrownBy(() -> withProperties(small).ingest(csv))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo("COST_EXPORT_BODY_TOO_LARGE"));
+    }
+
+    @Test
+    @DisplayName("(d): every whole-file refusal is logged at WARN with actor, file SHA-256 and error code; no audit row")
+    void wholeFileRefusalsAreLoggedAtWarn() {
+        know("P");
+        String badHeader = "nope\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance";
+        String mixedVersions = HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance"
+                + "\nP,COST_TO_SERVE,seat,1,USD,2026-10-01,2,Finance";
+        String mixedApprovers = HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance"
+                + "\nP,COST_TO_SERVE,seat,1,USD,2026-10-01,1,Someone else";
+        CostBasisProperties oneRow = new CostBasisProperties();
+        oneRow.setMaxRows(1);
+
+        ListAppender<ILoggingEvent> logged = capture();
+        try {
+            assertRefusedAndLogged(service, badHeader, "COST_EXPORT_HEADER_INVALID", logged);
+            assertRefusedAndLogged(service, mixedVersions, "COST_EXPORT_MIXED_VERSIONS", logged);
+            assertRefusedAndLogged(service, mixedApprovers, "COST_EXPORT_MIXED_APPROVERS", logged);
+            assertRefusedAndLogged(withProperties(oneRow), mixedVersions, "COST_EXPORT_TOO_LARGE", logged);
+            CostBasisProperties tiny = new CostBasisProperties();
+            tiny.setMaxBytes(DataSize.ofBytes(10));
+            assertRefusedAndLogged(withProperties(tiny), mixedVersions, "COST_EXPORT_BODY_TOO_LARGE", logged);
+        } finally {
+            release(logged);
+        }
+        assertThat(audits).isEmpty();
+    }
+
+    @Test
+    @DisplayName("(d): an accepted file is not logged as refused")
+    void acceptedFileIsNotLoggedAsRefused() {
+        know("P");
+        ListAppender<ILoggingEvent> logged = capture();
+        try {
+            service.ingest(HEADER + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance");
+            assertThat(logged.list).noneMatch(event -> event.getLevel() == Level.WARN);
+        } finally {
+            release(logged);
+        }
+    }
+
+    @Test
+    @DisplayName("(d): an oversize body the controller never read is logged with the actor, the code and no hash")
+    void unreadOversizeBodyIsLogged() {
+        ListAppender<ILoggingEvent> logged = capture();
+        try {
+            BusinessException refused = service.bodyTooLarge(6_000_000L);
+            assertThat(refused.getStatus()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+            assertThat(refused.getErrorCode()).isEqualTo("COST_EXPORT_BODY_TOO_LARGE");
+            assertThat(logged.list).singleElement().satisfies(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                assertThat(event.getFormattedMessage()).contains("oid-of-admin", "COST_EXPORT_BODY_TOO_LARGE",
+                        "sha256=unread");
+            });
+        } finally {
+            release(logged);
+        }
+        assertThat(audits).isEmpty();
+    }
+
+    @Test
+    @DisplayName("M5: the report says plainly that the billing unit is checked only where the catalog states one")
+    void reportStatesBillingUnitCheckScope() {
+        know("P");
+        knowWithUnit("Q", "seat");
+
+        CostBasisImportReport report = service.ingest(HEADER
+                + "\nP,DIRECT,seat,1,USD,2026-10-01,1,Finance"
+                + "\nQ,DIRECT,seat,1,USD,2026-10-01,1,Finance");
+
+        assertThat(report.audit().unitUnchecked()).isEqualTo(1);
+        assertThat(report.billingUnitCheck())
+                .contains("only where the catalog metadata carries billingUnit")
+                .contains("1 accepted row");
+    }
+
+    private void assertRefusedAndLogged(CostBasisIngestionService target, String csv, String code,
+                                        ListAppender<ILoggingEvent> logged) {
+        logged.list.clear();
+        assertThatThrownBy(() -> target.ingest(csv))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(code));
+        String sha = HexFormat.of().formatHex(sha256(csv));
+        assertThat(logged.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("oid-of-admin", "sha256=" + sha, code);
+        });
+    }
+
+    private static byte[] sha256(String csv) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(csv.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private CostBasisIngestionService withProperties(CostBasisProperties properties) {
+        return new CostBasisIngestionService(products, rows, imports, actor, properties,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static ListAppender<ILoggingEvent> capture() {
+        Logger logger = (Logger) LoggerFactory.getLogger(CostBasisIngestionService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    private static void release(ListAppender<ILoggingEvent> appender) {
+        ((Logger) LoggerFactory.getLogger(CostBasisIngestionService.class)).detachAppender(appender);
     }
 
     private void knowAllProductsIn(String csv) {

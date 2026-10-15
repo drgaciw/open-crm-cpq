@@ -10,6 +10,10 @@ import org.springframework.context.annotation.Configuration;
  * role in the ADR-016 table is closer ({@code CFO} is an approval tier, not data administration). The rule is added
  * to the {@code libs/security} baseline chain in {@code jwt} mode; in {@code dev} mode the chain permits everything,
  * as for every other API.
+ *
+ * <p>The rule covers the whole of {@code /api/v1/cost-basis/**}: the import, its audit trail, and the read-only product
+ * lookup ({@link CostBasisLookupController}). The table has no read-only Finance role, and per-unit cost is not for
+ * sellers or approval tiers, so the lookup is {@code Admin} too.
  */
 @Configuration(proxyBeanMethods = false)
 class CostBasisSecurityConfiguration {
