@@ -119,7 +119,7 @@ The review found 1 blocker, 6 major and 9 minor findings. It recomputed every fi
 | **M2** Period margin ignored the hybrid migration credit | Period net comes from `periodAmount` (FB) |
 | **M3** No lookup API | `GET /api/v1/cost-basis/products/{id}` (FA) |
 | **M4** Cost basis API unreachable through the gateway | `/api/v1/cost-basis/**` is added to the pricing route (root, `9b1ad09`) |
-| **M5** Billing-unit check is practically inert | **Deferred, recorded as partial F-2 coverage.** The pricing catalog replica has no unit column; follow-up DRG-529 |
+| **M5** Billing-unit check is practically inert | **Deferred, recorded as partial F-2 coverage.** The pricing catalog replica has no unit column; follow-up DRG-530 |
 | **M6** No application-context test | Context test for bean selection and properties binding (FB) |
 | m1 Zero-net lines always route | **Decision (owner's delegate):** net exactly 0 is margin-not-applicable, excluded and not routed. Negative net routes (FB) |
 | m2, m3, m7, m8 | Fixed (FA, FB) |
