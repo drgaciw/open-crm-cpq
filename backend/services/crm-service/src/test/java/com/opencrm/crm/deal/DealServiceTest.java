@@ -317,6 +317,81 @@ class DealServiceTest {
         }
 
         @Test
+        @DisplayName("should reject an amount change on a won deal without re-freezing")
+        void shouldRejectAmountChangeOnWonDeal() {
+            deal.setStage(DealStage.WON);
+            deal.setAmount(new BigDecimal("1000.00"));
+            deal.setCurrency("EUR");
+            updateRequest.setAmount(new BigDecimal("2000.00"));
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+
+            assertThatThrownBy(() -> dealService.update(1L, updateRequest))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("amount or currency")
+                    .hasMessageContaining("WON or LOST");
+
+            verify(dealMapper, never()).updateEntity(any(), any());
+            verify(currencyConverter, never()).freezeIfNeeded(any(), any(), any());
+            verify(currencyConverter, never()).freeze(any());
+            verify(dealRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a currency change on a lost deal without re-freezing")
+        void shouldRejectCurrencyChangeOnLostDeal() {
+            deal.setStage(DealStage.LOST);
+            deal.setAmount(new BigDecimal("1000.00"));
+            deal.setCurrency("EUR");
+            updateRequest.setCurrency("USD");
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+
+            assertThatThrownBy(() -> dealService.update(1L, updateRequest))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("amount or currency");
+
+            verify(dealMapper, never()).updateEntity(any(), any());
+            verify(currencyConverter, never()).freezeIfNeeded(any(), any(), any());
+            verify(dealRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should keep a closed deal's frozen conversion on a non-financial edit")
+        void shouldNotRefreezeClosedDealOnNonFinancialEdit() {
+            deal.setStage(DealStage.WON);
+            deal.setAmount(new BigDecimal("1000.00"));
+            deal.setCurrency("EUR");
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            DealDto result = dealService.update(1L, updateRequest);
+
+            assertThat(result).isNotNull();
+            verify(dealMapper).updateEntity(updateRequest, deal);
+            verify(currencyConverter, never()).freezeIfNeeded(any(), any(), any());
+            verify(currencyConverter, never()).freeze(any());
+        }
+
+        @Test
+        @DisplayName("should allow a closed-deal update that repeats the same amount and currency")
+        void shouldAllowClosedDealUpdateWithSameMoney() {
+            deal.setStage(DealStage.LOST);
+            deal.setAmount(new BigDecimal("1000.00"));
+            deal.setCurrency("EUR");
+            updateRequest.setAmount(new BigDecimal("1000.0"));
+            updateRequest.setCurrency("eur");
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            dealService.update(1L, updateRequest);
+
+            verify(dealMapper).updateEntity(updateRequest, deal);
+            verify(currencyConverter, never()).freezeIfNeeded(any(), any(), any());
+            verify(currencyConverter, never()).freeze(any());
+        }
+
+        @Test
         @DisplayName("should throw when updating stage on WON deal")
         void shouldThrowWhenUpdatingStageOnWon() {
             deal.setStage(DealStage.WON);
