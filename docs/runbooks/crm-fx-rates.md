@@ -16,7 +16,7 @@ INSERT INTO crm.fx_rates (from_currency, to_currency, rate, as_of, source)
 VALUES ('EUR', 'USD', 1.0850000000, '2026-10-15T00:00:00Z', 'MANUAL');
 ```
 
-The lookup takes the latest `as_of` at or before the moment of conversion. Rows are history; do not update old ones — insert a new `as_of`.
+The lookup takes the latest `as_of` at or before the moment of conversion. Create, edit, win, and lose use processing time. A quote-accepted close uses the quote's `acceptedAt`, and uses processing time only when that timestamp is absent. Rows are history; do not update old ones — insert a new `as_of`.
 
 ## Convert deals that are waiting for a rate
 Loading a rate does not touch existing deals (closed deals must never move, ADR-032 D-03). Open deals convert on their next edit. To list what is waiting:

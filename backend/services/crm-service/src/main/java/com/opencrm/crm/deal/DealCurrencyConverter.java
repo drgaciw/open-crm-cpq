@@ -20,7 +20,8 @@ import java.util.Optional;
  *
  * <p>Rules:
  * <ul>
- *   <li>D-03: callers freeze on create, when amount or currency changes, and at close (won or lost).</li>
+ *   <li>D-03: callers freeze on create, when amount or currency changes, and at close (won or lost).
+ *       {@link #freeze(Deal, Instant)} values the close at a caller-supplied instant, such as quote acceptance.</li>
  *   <li>D-04: with no rate, the base fields are cleared. A missing rate is never treated as 1:1.</li>
  *   <li>Same currency as base: rate 1, source {@code IDENTITY}.</li>
  * </ul>
@@ -50,7 +51,16 @@ public class DealCurrencyConverter {
 
     /** Converts at the current rate and freezes the result on the deal. */
     public void freeze(Deal deal) {
-        Instant now = clock.instant();
+        freeze(deal, null);
+    }
+
+    /**
+     * Converts at the rate effective at {@code asOf} and freezes the result.
+     *
+     * @param asOf when the conversion is valued; {@code null} uses the converter clock (processing time)
+     */
+    public void freeze(Deal deal, Instant asOf) {
+        Instant effectiveAsOf = asOf != null ? asOf : clock.instant();
         BigDecimal amount = deal.getAmount();
         String currency = CurrencyCodes.normalize(deal.getCurrency());
 
@@ -60,8 +70,8 @@ public class DealCurrencyConverter {
         }
 
         Optional<FxRate> rate = currency.equals(baseCurrency)
-                ? Optional.of(FxRate.identity(baseCurrency, now))
-                : rateProvider.findRate(currency, baseCurrency, now);
+                ? Optional.of(FxRate.identity(baseCurrency, effectiveAsOf))
+                : rateProvider.findRate(currency, baseCurrency, effectiveAsOf);
 
         if (rate.isEmpty()) {
             log.warn("No FX rate {}->{} for deal {}; base amount left unconverted", currency, baseCurrency, deal.getUuid());
