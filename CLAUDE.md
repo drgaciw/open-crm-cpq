@@ -94,5 +94,6 @@ node e2e/chaos-crm.mjs         # network/fault injection
 These need the full stack running and are **not** wired into CI.
 
 CI: **Jenkins is primary** (`Jenkinsfile`); `.github/workflows/ci.yml` is the `workflow_dispatch`
-fallback — see ADR-003. The GHA frontend job selects projects through a grep allowlist, so a new Nx
-project is silently skipped unless that list is updated.
+fallback — see ADR-003. `scripts/ci/frontend.sh` runs build, lint, typecheck and test on every Nx
+project (`nx run-many --all`); `scripts/ci/frontend-gate-check.sh` fails first if any project lacks a
+`lint`, `typecheck` or `test` target, so declare all three in each new `project.json`.

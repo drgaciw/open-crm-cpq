@@ -92,8 +92,8 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 `autojev-completion-review` — always list these under known gaps when they apply, never omit them:
 
 - `*IntegrationTest` classes need Docker; a Docker-less run did not execute them.
-- `scripts/ci/frontend.sh` tests only an allowlist (`crm-*`, `shared-models`, `shared-data-access`);
-  `cpq-*`, `shared-ui` and any new Nx project are silently skipped. `scripts/ci/backend-unit.sh` runs
+- `scripts/ci/frontend.sh` gates every Nx project, but `crm:build:production` needs Google Fonts at
+  build time; a sandbox without that host cannot run the script end to end. `scripts/ci/backend-unit.sh` runs
   every backend module's unit tests and fails if one starts a Testcontainer; tag Docker tests `integration`.
 - CPQ services are often down during CRM UAT — empty lists or 503 fallbacks are expected then, and prove
   nothing about the feature.
