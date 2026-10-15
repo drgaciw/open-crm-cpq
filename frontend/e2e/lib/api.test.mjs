@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi, unwrap, ApiCallError } from './api.mjs';
-import { classify } from './preflight.mjs';
+import { classify, runPreflight } from './preflight.mjs';
 
 /** Minimal stand-in for Playwright's APIResponse. */
 const res = (status, body, headers = {}) => ({
@@ -25,6 +25,7 @@ function fakeRequest(sequence) {
   };
   return {
     calls,
+    storageState: async () => ({ cookies: [{ name: 'XSRF-TOKEN', value: 'test-token', domain: 'x', path: '/', expires: -1, secure: false, httpOnly: false }] }),
     get: (u, o) => next('GET', u, o),
     post: (u, o) => next('POST', u, o),
     put: (u, o) => next('PUT', u, o),
@@ -33,6 +34,64 @@ function fakeRequest(sequence) {
 }
 
 const noSleep = async () => {};
+
+const csrfCookie = (overrides = {}) => ({ name: 'XSRF-TOKEN', value: 'real%20token', domain: 'localhost', path: '/', expires: -1, secure: false, httpOnly: false, ...overrides });
+function cookieRequest(cookies = [csrfCookie()], bootstrapStatus = 204) {
+  const calls = [];
+  return {
+    calls,
+    storageState: async () => ({ cookies }),
+    get: async (url, options) => {
+      calls.push({ method: 'GET', url, options });
+      if (url.endsWith('/api/v1/csrf') && bootstrapStatus === 204) cookies.push(csrfCookie());
+      return res(url.endsWith('/api/v1/csrf') ? bootstrapStatus : 200, {});
+    },
+    post: async (url, options) => { calls.push({ method: 'POST', url, options }); return res(201, { id: 1 }); },
+    put: async (url, options) => { calls.push({ method: 'PUT', url, options }); return res(200, {}); },
+    delete: async (url, options) => { calls.push({ method: 'DELETE', url, options }); return res(204, ''); },
+  };
+}
+
+test('API writes echo a real scoped cookie and Origin, while reads send neither', async () => {
+  const request = cookieRequest();
+  const api = createApi(request, { base: 'http://localhost:4200' });
+  await api.get('/api/v1/organizations');
+  await api.post('/api/v1/organizations', { name: 'synthetic' });
+  await api.put('/api/v1/organizations/1', { name: 'updated' });
+  await api.del('/api/v1/organizations/1');
+  assert.equal(request.calls[0].options.headers, undefined);
+  for (const call of request.calls.slice(1)) {
+    assert.equal(call.options.headers.Origin, 'http://localhost:4200');
+    assert.equal(call.options.headers['X-XSRF-TOKEN'], 'real token');
+    assert.equal(call.options.maxRedirects, 0);
+  }
+});
+
+test('first API mutation bootstraps a genuine cookie before sending the mutation', async () => {
+  const request = cookieRequest([]);
+  const api = createApi(request, { base: 'http://localhost:4200' });
+  await api.post('/api/v1/organizations', {});
+  assert.deepEqual(request.calls.map(call => call.method), ['GET', 'POST']);
+  assert.equal(request.calls[0].url, 'http://localhost:4200/api/v1/csrf');
+  assert.equal(request.calls[1].options.headers['X-XSRF-TOKEN'], 'real token');
+});
+
+test('failed CSRF bootstrap prevents the mutation instead of retrying it', async () => {
+  const request = cookieRequest([], 503);
+  const api = createApi(request, { base: 'http://localhost:4200' });
+  await assert.rejects(() => api.post('/api/v1/organizations'), /CSRF.*503/);
+  assert.deepEqual(request.calls.map(call => call.method), ['GET']);
+});
+
+test('preflight POST probes use the same genuine token and Origin', async () => {
+  const request = cookieRequest();
+  const result = await runPreflight(request, { base: 'http://localhost:4200' });
+  assert.equal(result.configValidate.state, 'up');
+  for (const call of request.calls.filter(call => call.method === 'POST')) {
+    assert.equal(call.options.headers.Origin, 'http://localhost:4200');
+    assert.equal(call.options.headers['X-XSRF-TOKEN'], 'real token');
+  }
+});
 
 // ── unwrap ────────────────────────────────────────────────────────────────────
 

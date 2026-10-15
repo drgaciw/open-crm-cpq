@@ -7,6 +7,7 @@
  * teardown loop can, so 429 is retried with Retry-After awareness rather than reported.
  */
 import { BASE } from './browser.mjs';
+import { createCsrfOptions } from './csrf.mjs';
 
 export class ApiCallError extends Error {
   constructor(method, url, status, body) {
@@ -38,6 +39,7 @@ const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * @param {(ms:number)=>Promise<void>} [options.sleep] Injected for tests.
  */
 export function createApi(request, { base = BASE, maxRetries = 4, sleep = defaultSleep } = {}) {
+  const csrfOptions = createCsrfOptions(request, { base });
   /** @type {{type:string,id:string|number,path:string}[]} */
   const ledger = [];
 
@@ -45,7 +47,8 @@ export function createApi(request, { base = BASE, maxRetries = 4, sleep = defaul
     const url = `${base}${path}`;
     const fn = { GET: 'get', POST: 'post', PUT: 'put', DELETE: 'delete' }[method];
     for (let attempt = 0; ; attempt++) {
-      const response = await request[fn](url, data === undefined ? {} : { data });
+      const options = await csrfOptions(method, url, data === undefined ? {} : { data });
+      const response = await request[fn](url, options);
       const status = response.status();
 
       if (status === 429 && attempt < maxRetries) {

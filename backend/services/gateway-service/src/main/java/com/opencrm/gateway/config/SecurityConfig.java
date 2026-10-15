@@ -58,7 +58,7 @@ import java.util.Set;
  *   <li><strong>Bearer lane.</strong> Agents and ai-service send {@code Authorization: Bearer}. The gateway validates it
  *       like every service does. Such requests carry no ambient credential, so CSRF does not apply to them.</li>
  * </ul>
- * Health and info are public; everything else is authenticated. An unauthenticated API call gets 401 with the login
+ * Health, info and {@code GET /api/v1/csrf} are public; everything else is authenticated. An unauthenticated API call gets 401 with the login
  * hint ({@link GatewayAuthenticationEntryPoint}); a page navigation is redirected to the login. {@code IdentityRelayFilter}
  * then forwards the one token the gateway vouches for. Without {@code opencrm.gateway.login.client-id} there is no
  * browser login, and the production marker refuses to start that way.
@@ -103,6 +103,7 @@ public class SecurityConfig {
                     + "only.");
         }
         http.authorizeExchange(exchanges -> {
+                    exchanges.pathMatchers(HttpMethod.GET, "/api/v1/csrf").permitAll();
                     exchanges.pathMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
                     if (security.isPermitApiDocs()) {
                         exchanges.pathMatchers("/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**",
