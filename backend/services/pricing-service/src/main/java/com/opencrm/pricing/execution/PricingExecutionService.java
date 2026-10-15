@@ -85,6 +85,9 @@ public class PricingExecutionService {
 
     private final RampPeriodPricer rampPeriodPricer = new RampPeriodPricer();
 
+    /** The replay candidate window: the newest cost-basis audit rows of a quote, as the repository query bounds it. */
+    static final int MARGIN_REPLAY_WINDOW = 20;
+
     /** Default placeholder (ADR-023 D-06). Spring sets this from {@link MarginProperties}. Tests may set it directly. */
     private MarginSource marginSource = MarginSource.PLACEHOLDER;
     private CostBasisMarginEvaluator costBasisMarginEvaluator;
@@ -500,13 +503,17 @@ public class PricingExecutionService {
      * A replay is a re-execution of input identical to an earlier cost-basis execution of the same quote. It returns
      * the cost and margin recorded then, not the current cost basis (F-1, DRG-526 acceptance). Any change to the
      * input prices on the current cost basis. Both snapshots are taken after execution has normalised the context.
+     *
+     * <p>Only the {@link #MARGIN_REPLAY_WINDOW} most recent cost-basis audit rows of the quote are read (m2). The
+     * evaluator still refuses the candidate unless every recorded cost was present and is fresh today (M1).
      */
     private MarginAssessment findMarginReplay(PricingContext context) throws JsonProcessingException {
         if (context.getQuoteExternalId() == null) {
             return null;
         }
-        List<PricingAuditLog> prior = auditLogRepository.findByQuoteExternalIdOrderByExecutedAtDesc(
-                context.getQuoteExternalId());
+        List<PricingAuditLog> prior = auditLogRepository
+                .findTop20ByQuoteExternalIdAndWaterfallTraceIsNotNullOrderByExecutedAtDescIdDesc(
+                        context.getQuoteExternalId());
         if (prior == null || prior.isEmpty()) {
             return null;
         }
