@@ -168,7 +168,7 @@ public final class CostExportCsv {
 
     /** RFC 4180 splitting that never throws: broken quoting marks the record malformed instead. */
     static List<Record> split(String csv) {
-        String text = csv.startsWith("﻿") ? csv.substring(1) : csv;
+        String text = csv.startsWith("\uFEFF") ? csv.substring(1) : csv;
         List<Record> records = new ArrayList<>();
         List<String> fields = new ArrayList<>();
         StringBuilder field = new StringBuilder();

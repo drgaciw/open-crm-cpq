@@ -51,12 +51,26 @@ class CostExportCsvTest {
     @Test
     @DisplayName("CRLF and LF line endings, a BOM and trailing blank lines are accepted")
     void lineEndings() {
-        String csv = "﻿" + HEADER + "\r\nP-1,DIRECT,seat,1.5,USD,2026-10-01,2,Finance\r\n\r\n";
+        String csv = "\uFEFF" + HEADER + "\r\nP-1,DIRECT,seat,1.5,USD,2026-10-01,2,Finance\r\n\r\n";
         CostExportCsv.Result result = CostExportCsv.read(csv, 10);
         assertThat(result.rows()).singleElement().satisfies(row -> {
             assertThat(row.unitCost()).isEqualByComparingTo(new BigDecimal("1.5"));
             assertThat(row.unitCost().scale()).isEqualTo(4);
         });
+    }
+
+    @Test
+    @DisplayName("m8: only a leading U+FEFF is stripped; the reader's source holds no literal BOM")
+    void bomIsAnEscapeNotALiteral() throws IOException {
+        String csv = "\uFEFF" + HEADER + "\nP-1,DIRECT,seat,1,USD,2026-10-01,1,F";
+        assertThat(CostExportCsv.read(csv, 10).rows()).hasSize(1);
+        assertThatThrownBy(() -> CostExportCsv.read("\uFEFF\uFEFF" + HEADER, 10))
+                .isInstanceOf(BusinessException.class);
+
+        java.nio.file.Path source = java.nio.file.Path.of(
+                "src/main/java/com/opencrm/pricing/cost/CostExportCsv.java");
+        assertThat(source).exists();
+        assertThat(java.nio.file.Files.readString(source, StandardCharsets.UTF_8)).doesNotContain("\uFEFF");
     }
 
     @Test

@@ -7,6 +7,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.util.unit.DataSize;
+
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +51,33 @@ class CostBasisWiringTest {
                         .isEqualTo(50));
         properties.withPropertyValues("opencrm.pricing.cost-basis.max-rows=0")
                 .run(application -> assertThat(application).hasFailed());
+    }
+
+    @Test
+    @DisplayName("m3: opencrm.pricing.cost-basis.max-bytes defaults to 5 MB, binds sizes like 64KB, and must be 1 B to 100 MB")
+    void maxBytes() {
+        ApplicationContextRunner properties = new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class);
+        properties.run(application -> assertThat(application.getBean(CostBasisProperties.class).getMaxBytes())
+                .isEqualTo(DataSize.ofMegabytes(5)));
+        properties.withPropertyValues("opencrm.pricing.cost-basis.max-bytes=64KB")
+                .run(application -> assertThat(application.getBean(CostBasisProperties.class).getMaxBytes())
+                        .isEqualTo(DataSize.ofKilobytes(64)));
+        properties.withPropertyValues("opencrm.pricing.cost-basis.max-bytes=2048")
+                .run(application -> assertThat(application.getBean(CostBasisProperties.class).getMaxBytes())
+                        .isEqualTo(DataSize.ofBytes(2048)));
+        properties.withPropertyValues("opencrm.pricing.cost-basis.max-bytes=0")
+                .run(application -> assertThat(application).hasFailed());
+        properties.withPropertyValues("opencrm.pricing.cost-basis.max-bytes=101MB")
+                .run(application -> assertThat(application).hasFailed());
+    }
+
+    @Test
+    @DisplayName("B1: the adapter answers the 3-argument port; the 2-argument default delegates with equal dates")
+    void adapterImplementsThreeArgumentPort() {
+        CostBasisLookup lookup = new JpaCostBasisLookup(mock(CostBasisRowRepository.class));
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2028, 10, 15), LocalDate.of(2026, 10, 15))).isEmpty();
+        assertThat(lookup.find("PROD-SEAT", LocalDate.of(2026, 10, 15))).isEmpty();
     }
 
     @Configuration(proxyBeanMethods = false)
