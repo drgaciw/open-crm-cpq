@@ -96,3 +96,41 @@ The loop is: score, revise, re-score, until R1 and R2 pass. The PR opens only af
 ## Environment note
 
 This cloud workspace cannot reach Maven Central, and the owner's computer was offline at planning time. Backend lanes L1, L2 and L4 start once Maven resolution works: either the host is allow-listed, or the owner's computer is back online. L3 needs only npm and starts immediately.
+
+## Results
+
+### Lanes (2026-10-15)
+
+- **L3 frontend CI gate, DRG-527: complete and run.**
+  - All 20 Nx projects are gated on lint, typecheck and test, with 701 tests passing. The gate fails when a spec, a type or a target is broken.
+  - `frontend-gate-check.sh` fails CI when any project lacks one of the three targets.
+  - The `eqeqeq allowNullOrUndefined` relaxation is a separate commit (`9dce2d7`), and the owner may revert it.
+  - Not run end to end here: `crm:build:production` needs Google Fonts.
+- **L1 cost basis, L2 margin, L4 gateway: written without Maven, so not compiled or run.** Each is checkpointed as an UNVERIFIED WIP commit on its own pushed branch, and all four lanes are merged on `wave/margin-20261015-integration`.
+
+### Independent review of the integration branch
+
+The review found 1 blocker, 6 major and 9 minor findings. It recomputed every figure in the tests and found them correct. No forge hold is touched (R4).
+
+| Finding | Resolution |
+|---------|------------|
+| **B1** Staleness was judged against future ramp period starts, so every period six months or more after the pricing date failed closed | The port takes `effectiveOn`, which selects the cost row, and `pricedOn`, which judges freshness (root, `9b1ad09`). FA and FB implement it, with an AC-02 test across the real staleness semantics |
+| **M1** Implicit replay pinned missing and stale costs | Replay is reused only when the input is identical, every cost is present, and every cost is still fresh on the pricing date (FB) |
+| **M2** Period margin ignored the hybrid migration credit | Period net comes from `periodAmount` (FB) |
+| **M3** No lookup API | `GET /api/v1/cost-basis/products/{id}` (FA) |
+| **M4** Cost basis API unreachable through the gateway | `/api/v1/cost-basis/**` is added to the pricing route (root, `9b1ad09`) |
+| **M5** Billing-unit check is practically inert | **Deferred, recorded as partial F-2 coverage.** The pricing catalog replica has no unit column; follow-up DRG-529 |
+| **M6** No application-context test | Context test for bean selection and properties binding (FB) |
+| m1 Zero-net lines always route | **Decision (owner's delegate):** net exactly 0 is margin-not-applicable, excluded and not routed. Negative net routes (FB) |
+| m2, m3, m7, m8 | Fixed (FA, FB) |
+| m4 Omitted component persists | Documented; a zero-cost row retires a component (FA) |
+| m5 `/fallback/cpq` is GET-only | Accepted: no route uses it |
+| m6 Retries of non-idempotent POSTs after a gateway timeout | Accepted for this wave. Idempotency keys are ADR-018 E3 work and stay out of scope |
+| m9 `@ConditionalOnMissingBean` in a plain `@Configuration` | Covered by the M6 context test |
+
+### Open points, decided
+
+- **(a) L4 per-route deadlines against held ADR-017: accepted.** They are provisional values under ADR-017 D-03, following PR 581's precedent. No service-side Resilience4j or retries are added.
+- **(b) Ramp period starts count from the pricing date: accepted as interim.** Follow-up DRG-530 carries the contract term start into the pricing context.
+- **(c) The eslint relaxation: accepted.** It is template-only and kept as its own commit.
+- **(d) File-level import refusals: not audited.** They are logged at WARN with the actor, the file SHA-256 and the error code.
