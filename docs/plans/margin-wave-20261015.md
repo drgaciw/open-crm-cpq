@@ -131,6 +131,6 @@ The review found 1 blocker, 6 major and 9 minor findings. It recomputed every fi
 ### Open points, decided
 
 - **(a) L4 per-route deadlines against held ADR-017: accepted.** They are provisional values under ADR-017 D-03, following PR 581's precedent. No service-side Resilience4j or retries are added.
-- **(b) Ramp period starts count from the pricing date: accepted as interim.** Follow-up DRG-530 carries the contract term start into the pricing context.
+- **(b) Ramp period starts count from the pricing date: accepted as interim.** Follow-up DRG-531 carries the contract term start into the pricing context.
 - **(c) The eslint relaxation: accepted.** It is template-only and kept as its own commit.
 - **(d) File-level import refusals: not audited.** They are logged at WARN with the actor, the file SHA-256 and the error code.
