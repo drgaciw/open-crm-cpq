@@ -136,4 +136,45 @@ class DealPipelineCurrencyIntegrationTest extends BaseIntegrationTest {
         assertThat(deal.getBaseAmount()).isEqualByComparingTo("1100.00");
         assertThat(deal.getFxRate()).isEqualByComparingTo("1.10");
     }
+
+    @Test
+    @DisplayName("a later edit of a won deal does not re-freeze, and amount or currency changes are rejected")
+    void wonDealEditDoesNotRefreeze() throws Exception {
+        rate("EUR", "USD", "1.10", Instant.now().minus(2, ChronoUnit.DAYS));
+        long eur = createDeal("Euro deal", "1000", "EUR");
+        mockMvc.perform(post("/api/v1/deals/{id}/win", eur)).andExpect(status().isOk());
+
+        jdbcTemplate.update("""
+                UPDATE crm.deals
+                   SET base_amount = NULL,
+                       base_currency = 'EUR',
+                       fx_rate = NULL,
+                       fx_source = NULL
+                 WHERE id = ?
+                """, eur);
+        rate("EUR", "USD", "1.50", Instant.now().minus(1, ChronoUnit.SECONDS));
+
+        mockMvc.perform(put("/api/v1/deals/{id}", eur)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"note after close\"}"))
+                .andExpect(status().isOk());
+
+        Deal afterNote = dealRepository.findById(eur).orElseThrow();
+        assertThat(afterNote.getDescription()).isEqualTo("note after close");
+        assertThat(afterNote.getAmount()).isEqualByComparingTo("1000");
+        assertThat(afterNote.getCurrency()).isEqualTo("EUR");
+        assertThat(afterNote.getBaseAmount()).isNull();
+        assertThat(afterNote.getBaseCurrency()).isEqualTo("EUR");
+
+        mockMvc.perform(put("/api/v1/deals/{id}", eur)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":2000,\"currency\":\"USD\"}"))
+                .andExpect(status().isBadRequest());
+
+        Deal afterReject = dealRepository.findById(eur).orElseThrow();
+        assertThat(afterReject.getAmount()).isEqualByComparingTo("1000");
+        assertThat(afterReject.getCurrency()).isEqualTo("EUR");
+        assertThat(afterReject.getBaseAmount()).isNull();
+        assertThat(afterReject.getBaseCurrency()).isEqualTo("EUR");
+    }
 }
