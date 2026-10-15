@@ -224,6 +224,8 @@ class CpqGatewayRoutesTest {
                 "Pricing customers must route to pricing-service");
         assertTrue(yaml.contains("/api/v1/rules/**"),
                 "DRL rules must route to pricing-service");
+        assertTrue(yaml.contains("/api/v1/rules/**,/api/v1/cost-basis/**"),
+                "Cost basis imports (DRG-526) must route to pricing-service");
         assertTrue(yaml.contains("Path=/api/v1/price-books/**"),
                 "Price books must route to pricebook-service");
         assertTrue(yaml.contains("Path=/api/v1/quotes/**"),

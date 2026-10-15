@@ -12,6 +12,6 @@ class CostBasisConfiguration {
     @Bean
     @ConditionalOnMissingBean(CostBasisLookup.class)
     CostBasisLookup emptyCostBasisLookup() {
-        return (productExternalId, asOf) -> Optional.empty();
+        return (productExternalId, effectiveOn, pricedOn) -> Optional.empty();
     }
 }
