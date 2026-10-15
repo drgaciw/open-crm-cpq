@@ -1,6 +1,8 @@
 package com.opencrm.pricing.execution;
 
 import com.opencrm.pricing.customer.Customer;
+import com.opencrm.pricing.execution.margin.MarginAssessment;
+import com.opencrm.pricing.execution.margin.MarginSource;
 import com.opencrm.pricing.ramp.PricedPeriod;
 import com.opencrm.pricing.waterfall.FinancialMetrics;
 import com.opencrm.pricing.waterfall.PricingLineResult;
@@ -25,6 +27,7 @@ public class MetricsCalculator {
 
     private static final int MONEY_SCALE = 2;
     private static final RoundingMode MONEY_ROUNDING = RoundingMode.HALF_UP;
+    private static final int MARGIN_SCALE = 4;
 
     private final AcvVersion acvVersion;
 
@@ -143,7 +146,8 @@ public class MetricsCalculator {
                 ? monthlyPrice.divide(listPrice, 4, MONEY_ROUNDING)
                 : BigDecimal.ZERO;
 
-        // Estimated margin (placeholder - would need cost data; matrix M5 defer)
+        // Placeholder margin, a non-authoritative percent (ADR-023 D-06). Under
+        // opencrm.pricing.margin.source=cost-basis, applyCostBasisMargin replaces it (DRG-438).
         BigDecimal estimatedMarginPct = BigDecimal.valueOf(40.0);
 
         return FinancialMetrics.builder()
@@ -229,6 +233,33 @@ public class MetricsCalculator {
                 .priceMultiplier(priceMultiplier)
                 .estimatedMarginPct(BigDecimal.valueOf(40.0))
                 .build();
+    }
+
+    /**
+     * Finance decision F-1: {@code (net − cost) / net}, a fraction at scale 4.
+     *
+     * <p>Rounds toward negative infinity so a margin just under the 0.35 floor can never round up onto it.
+     * Returns null when the net is not positive or either input is missing: there is no margin then.
+     */
+    public static BigDecimal marginFraction(BigDecimal net, BigDecimal cost) {
+        if (net == null || cost == null || net.signum() <= 0) {
+            return null;
+        }
+        return net.subtract(cost).divide(net, MARGIN_SCALE, RoundingMode.FLOOR);
+    }
+
+    /**
+     * Replaces the placeholder margin with the cost-basis margin (DRG-438). {@code estimatedMarginPct} keeps its
+     * percent meaning, {@code marginFraction} carries the fraction, and both are null when a cost is missing:
+     * the 40.0 placeholder never survives in cost-basis mode.
+     */
+    public FinancialMetrics applyCostBasisMargin(FinancialMetrics metrics, MarginAssessment assessment) {
+        BigDecimal fraction = assessment == null ? null : assessment.getQuoteMarginFraction();
+        metrics.setMarginFraction(fraction);
+        metrics.setEstimatedMarginPct(fraction == null ? null
+                : fraction.multiply(BigDecimal.valueOf(100)).setScale(MONEY_SCALE, RoundingMode.FLOOR));
+        metrics.setMarginSource(MarginSource.COST_BASIS.wireValue());
+        return metrics;
     }
 
     private BigDecimal acvFromTcv(BigDecimal tcv, int durationInMonths) {

@@ -1,7 +1,15 @@
 package com.opencrm.pricing.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.opencrm.pricing.execution.margin.CostBasisMarginEvaluator;
+import com.opencrm.pricing.execution.margin.MarginAssessment;
+import com.opencrm.pricing.execution.margin.MarginGovernance;
+import com.opencrm.pricing.execution.margin.MarginProperties;
+import com.opencrm.pricing.execution.margin.MarginSource;
 import com.opencrm.rules.drools.DroolsRulesEngine;
 import com.opencrm.rules.engine.RuleDefinition;
 import com.opencrm.rules.engine.RuleExecutionContext;
@@ -42,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -75,6 +84,29 @@ public class PricingExecutionService {
     private int migrationWindowMonths = 12;
 
     private final RampPeriodPricer rampPeriodPricer = new RampPeriodPricer();
+
+    /** Default placeholder (ADR-023 D-06). Spring sets this from {@link MarginProperties}. Tests may set it directly. */
+    private MarginSource marginSource = MarginSource.PLACEHOLDER;
+    private CostBasisMarginEvaluator costBasisMarginEvaluator;
+    private final MarginGovernance marginGovernance = new MarginGovernance();
+
+    @Autowired
+    void applyMarginProperties(MarginProperties properties, CostBasisMarginEvaluator evaluator) {
+        if (properties == null) {
+            return;
+        }
+        setMarginConfiguration(properties.getSource(), evaluator);
+    }
+
+    /** Selects the margin source. {@code cost-basis} requires an evaluator; with no cost adapter its lookup is empty. */
+    public void setMarginConfiguration(MarginSource source, CostBasisMarginEvaluator evaluator) {
+        MarginSource resolved = source == null ? MarginSource.PLACEHOLDER : source;
+        if (resolved == MarginSource.COST_BASIS && evaluator == null) {
+            throw new IllegalStateException("opencrm.pricing.margin.source=cost-basis needs a CostBasisMarginEvaluator");
+        }
+        this.marginSource = resolved;
+        this.costBasisMarginEvaluator = evaluator;
+    }
 
     @Autowired
     void applyMigrationProperties(MigrationWindowProperties properties) {
@@ -328,6 +360,14 @@ public class PricingExecutionService {
                         context, result, droolsRulesEngine, fallbackProducts, governanceRules, migrationPlan);
             }
 
+            // 11b. Cost-basis margin (DRG-438). Placeholder mode skips this entirely, so it is unchanged.
+            MarginAssessment marginAssessment = null;
+            if (marginSource == MarginSource.COST_BASIS) {
+                marginAssessment = costBasisMarginEvaluator.assess(context, lineResults, findMarginReplay(context));
+                metricsCalculator.applyCostBasisMargin(metrics, marginAssessment);
+                marginGovernance.evaluate(result, marginAssessment, droolsRulesEngine, context.getCurrency());
+            }
+
             // Stamp after mutable rule/governance execution; caller or configured facts cannot mint authority.
             for (PricingLineResult lineResult : lineResults) {
                 Map<String, Object> metadata = new HashMap<>();
@@ -349,7 +389,7 @@ public class PricingExecutionService {
 
             // 13. Persist audit log for execute mode only
             if (persistAudit) {
-                persistAuditLog(context, result, ruleSet, executionTime);
+                persistAuditLog(context, result, ruleSet, executionTime, marginAssessment);
             }
 
             return result;
@@ -456,11 +496,56 @@ public class PricingExecutionService {
                 .build();
     }
 
+    /**
+     * A replay is a re-execution of input identical to an earlier cost-basis execution of the same quote. It returns
+     * the cost and margin recorded then, not the current cost basis (F-1, DRG-526 acceptance). Any change to the
+     * input prices on the current cost basis. Both snapshots are taken after execution has normalised the context.
+     */
+    private MarginAssessment findMarginReplay(PricingContext context) throws JsonProcessingException {
+        if (context.getQuoteExternalId() == null) {
+            return null;
+        }
+        List<PricingAuditLog> prior = auditLogRepository.findByQuoteExternalIdOrderByExecutedAtDesc(
+                context.getQuoteExternalId());
+        if (prior == null || prior.isEmpty()) {
+            return null;
+        }
+        // Exact decimals: a recorded unit cost must not pass through a double on its way back.
+        ObjectReader exact = objectMapper.readerFor(JsonNode.class)
+                .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+        JsonNode input = exact.readValue(objectMapper.writeValueAsString(context));
+        for (PricingAuditLog audit : prior) {
+            if (audit.getWaterfallTrace() == null || audit.getInputSnapshot() == null) {
+                continue;
+            }
+            try {
+                if (!input.equals(exact.readValue(audit.getInputSnapshot()))) {
+                    continue;
+                }
+                JsonNode margin = exact.<JsonNode>readValue(audit.getWaterfallTrace()).get("margin");
+                if (margin == null || !MarginSource.COST_BASIS.wireValue().equals(margin.path("source").asText())) {
+                    continue;
+                }
+                return objectMapper.treeToValue(margin, MarginAssessment.class).withReplayedFrom(audit.getUuid());
+            } catch (JsonProcessingException ex) {
+                log.warn("Ignoring unreadable pricing audit {} for margin replay: {}", audit.getUuid(), ex.getMessage());
+            }
+        }
+        return null;
+    }
+
     private void persistAuditLog(PricingContext context, PricingResult result,
-                                   RuleSet ruleSet, long executionTime) {
+                                   RuleSet ruleSet, long executionTime, MarginAssessment marginAssessment) {
         try {
             String inputSnapshot = objectMapper.writeValueAsString(context);
             String outputSnapshot = objectMapper.writeValueAsString(result);
+            String waterfallTrace = null;
+            if (marginAssessment != null) {
+                Map<String, Object> trace = new LinkedHashMap<>();
+                trace.put("waterfall", result.getWaterfall());
+                trace.put("margin", marginAssessment);
+                waterfallTrace = objectMapper.writeValueAsString(trace);
+            }
 
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
@@ -468,6 +553,7 @@ public class PricingExecutionService {
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
+                    .waterfallTrace(waterfallTrace)
                     .executionTimeMs(executionTime)
                     .build();
 

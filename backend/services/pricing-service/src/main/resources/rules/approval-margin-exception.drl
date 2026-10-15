@@ -3,11 +3,16 @@ package com.opencrm.pricing.rules;
 import com.opencrm.rules.model.QuoteFact;
 import java.math.BigDecimal;
 
+// estimatedMarginPct on a QuoteFact is a FRACTION (0.35 = 35%), finance decision F-1. It is fed from the
+// pricing response's marginFraction, never from the response's estimatedMarginPct, which is a percent and is
+// the 40.0 placeholder unless opencrm.pricing.margin.source=cost-basis (ADR-023 D-06). Exactly 0.35 is at the
+// floor and does not route. An absent margin never fires here; a missing cost is routed by the caller.
 rule "Route Approval for Margin Exception"
 salience 930
 when
     $quote: QuoteFact(finalPrice != null, basePrice != null)
-    eval($quote.getDecimal("estimatedMarginPct").compareTo(new BigDecimal("0.35")) < 0)
+    eval($quote.getDecimal("estimatedMarginPct") != null
+         && $quote.getDecimal("estimatedMarginPct").compareTo(new BigDecimal("0.35")) < 0)
 then
     $quote.setString("approvalState", "PENDING");
     $quote.setString("approvalTier", "DEAL_DESK");
