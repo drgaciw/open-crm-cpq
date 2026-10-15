@@ -22,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -86,18 +88,30 @@ class QuoteAcceptedDealProcessorTest {
     void applyWinFromQuote_freezesBaseAmountWithAcceptedCurrency() {
         when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
         when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(true);
+        Instant acceptedAt = Instant.parse("2025-05-02T12:00:00Z");
         String[] currencyAtFreeze = new String[1];
-        org.mockito.Mockito.doAnswer(inv -> {
+        doAnswer(inv -> {
             currencyAtFreeze[0] = inv.<Deal>getArgument(0).getCurrency();
             return null;
-        }).when(dealCurrencyConverter).freeze(deal);
+        }).when(dealCurrencyConverter).freeze(deal, acceptedAt);
 
-        processor.applyWinFromQuote(message(Instant.parse("2025-05-02T12:00:00Z")), deal.getUuid());
+        processor.applyWinFromQuote(message(acceptedAt), deal.getUuid());
 
-        var inOrder = org.mockito.Mockito.inOrder(dealCurrencyConverter, dealRepository);
-        inOrder.verify(dealCurrencyConverter).freeze(deal);
-        inOrder.verify(dealRepository).save(deal);
+        var ordered = inOrder(dealCurrencyConverter, dealRepository);
+        ordered.verify(dealCurrencyConverter).freeze(deal, acceptedAt);
+        ordered.verify(dealRepository).save(deal);
         assertThat(currencyAtFreeze[0]).isEqualTo("EUR");
+    }
+
+    @Test
+    @DisplayName("a quote accepted without acceptedAt freezes with a null instant so the converter uses processing time")
+    void applyWinFromQuote_freezesAtProcessingTimeWhenAcceptedAtMissing() {
+        when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
+        when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, "quote-uuid-1")).thenReturn(true);
+
+        processor.applyWinFromQuote(message(null), deal.getUuid());
+
+        verify(dealCurrencyConverter).freeze(deal, null);
     }
 
     @Test

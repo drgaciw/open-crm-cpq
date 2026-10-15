@@ -65,7 +65,9 @@ public class QuoteAcceptedDealProcessor {
             deal.setCurrency(event.getCurrency());
         }
         // ADR-032 D-03: freeze the base amount at close, after the accepted amount and currency are applied.
-        currencyConverter.freeze(deal);
+        // Value the rate at acceptance time so a delayed or retried event does not pick up a later rate.
+        // A missing acceptedAt falls back to processing time inside the converter.
+        currencyConverter.freeze(deal, event.getAcceptedAt());
         dealRepository.save(deal);
         String amountLog = event.getTotalAmount() != null ? event.getTotalAmount().toPlainString() : "n/a";
         log.info("Updated deal {} to WON from quote {} (amount={})",

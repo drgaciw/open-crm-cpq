@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -114,6 +115,48 @@ class DealCurrencyConverterTest {
         assertThat(deal.getFxRateAsOf()).isNull();
         assertThat(deal.getFxSource()).isNull();
         assertThat(deal.getBaseWeightedAmount()).isNull();
+    }
+
+    @Test
+    @DisplayName("freeze at an explicit instant looks up the rate as of that instant")
+    void freezeUsesSuppliedInstant() {
+        Instant acceptedAt = Instant.parse("2026-10-01T00:00:00Z");
+        when(rateProvider.findRate("EUR", "USD", acceptedAt))
+                .thenReturn(Optional.of(new FxRate("EUR", "USD", new BigDecimal("1.05"), acceptedAt.minusSeconds(3600), "MANUAL")));
+        Deal deal = deal("1000.00", "EUR", 100);
+
+        converter.freeze(deal, acceptedAt);
+
+        assertThat(deal.getBaseAmount()).isEqualByComparingTo("1050.00");
+        assertThat(deal.getFxRateAsOf()).isEqualTo(acceptedAt.minusSeconds(3600));
+        verify(rateProvider, never()).findRate(anyString(), anyString(), eq(NOW));
+    }
+
+    @Test
+    @DisplayName("a null instant falls back to the converter clock")
+    void nullInstantUsesClock() {
+        when(rateProvider.findRate("EUR", "USD", NOW))
+                .thenReturn(Optional.of(new FxRate("EUR", "USD", new BigDecimal("1.1"), RATE_AS_OF, "MANUAL")));
+        Deal deal = deal("1000.00", "EUR", 10);
+
+        converter.freeze(deal, null);
+
+        assertThat(deal.getBaseAmount()).isEqualByComparingTo("1100.00");
+        verify(rateProvider).findRate("EUR", "USD", NOW);
+    }
+
+    @Test
+    @DisplayName("identity freeze records the supplied instant as the rate as-of")
+    void identityUsesSuppliedInstant() {
+        Instant acceptedAt = Instant.parse("2026-10-01T00:00:00Z");
+        Deal deal = deal("1000.00", "USD", 100);
+
+        converter.freeze(deal, acceptedAt);
+
+        assertThat(deal.getBaseAmount()).isEqualByComparingTo("1000.00");
+        assertThat(deal.getFxRateAsOf()).isEqualTo(acceptedAt);
+        assertThat(deal.getFxSource()).isEqualTo(FxRate.SOURCE_IDENTITY);
+        verify(rateProvider, never()).findRate(anyString(), anyString(), any());
     }
 
     @Test
