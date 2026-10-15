@@ -105,7 +105,7 @@ describe('QuoteDocumentsPanelComponent', () => {
     const anchors = (
       document.createElement as unknown as ReturnType<typeof vi.fn>
     ).mock.results
-      .map((r: { value: HTMLElement }) => r.value)
+      .map((r) => r.value as HTMLElement)
       .filter((el: HTMLElement) => el.tagName === 'A') as HTMLAnchorElement[];
     expect(anchors.at(-1)?.download).toBe('quote-5-proposal.pdf');
   });

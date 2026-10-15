@@ -18,7 +18,7 @@ describe('NotificationService', () => {
     });
 
     service = TestBed.inject(NotificationService);
-    snackBarSpy = TestBed.inject(MatSnackBar) as { open: ReturnType<typeof vi.fn>; dismiss: ReturnType<typeof vi.fn> };
+    snackBarSpy = TestBed.inject(MatSnackBar) as unknown as typeof snackBarSpy;
   });
 
   it('should be created', () => {
