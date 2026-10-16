@@ -1,6 +1,6 @@
 # Draft proposal: reconcile ADR-024 to ADR-027 with the amendment spine
 
-**Status:** Proposed. The project owner accepts ADRs. This draft assigns no number and leaves [ADR-024](../../adr/ADR-024-order-orchestration-context.md), [ADR-025](../../adr/ADR-025-saga-process-manager.md), [ADR-026](../../adr/ADR-026-command-messages.md) and [ADR-027](../../adr/ADR-027-compensation-and-point-of-no-return.md) Proposed.
+**Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
 **Date:** 2026-10-16
 **Story:** [DRG-577](https://linear.app/drgamtd-workspace/issue/DRG-577/reconcile-proposed-order-model-adr-024-to-adr-027-with-the-amendment) (RA-43), project OPEN-CRM-CPQ, team DRG.
 **Deciders:** Project owner (acceptance still pending). The ruling in this file is CPQ Decision, recorded on DRG-577 on 2026-10-16, medium confidence 0.7.

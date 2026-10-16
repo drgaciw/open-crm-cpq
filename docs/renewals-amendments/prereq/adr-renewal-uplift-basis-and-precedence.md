@@ -1,6 +1,6 @@
 # Renewal uplift basis, cap and floor, price-as-of date, and precedence
 
-**Status:** Proposed on 2026-10-16. Not accepted. The project owner accepts ADRs.
+**Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
 **Date:** 2026-10-16
 **Deciders:** Project owner (pending).
 **Number:** none. This file is a draft proposal under `docs/renewals-amendments/prereq/`. It is not an entry in `docs/adr/` and it does not take a number.
