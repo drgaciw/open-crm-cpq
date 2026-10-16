@@ -1,0 +1,224 @@
+# DRAFT ADR: Renewal segment schedule, multi-year escalators, and time-bounded price locks
+
+**Status:** Proposed on 2026-10-16. Not accepted.
+**Date:** 2026-10-16
+**Deciders:** none. The recommendation below is a proposal. The project owner decides it.
+**Number:** none. This file stays under `docs/renewals-amendments/prereq/` with a `DRAFT-` prefix. It is not an entry in `docs/adr/` and it does not take a number. Do not add a row to `docs/adr/README.md` from this draft.
+**Story:** [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending) (escalator base, compounding, rounding; an addendum to ADR-023). Linear status when read: Backlog.
+**Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the owner accepts and a status-change PR merges.
+**Informs:** [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no) (the generator that expands a term and an escalator), [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534/ramp-amendments-lock-elapsed-periods-amend-future-periods-re-govern-on) (amendments of stored periods).
+**Reads, and does not edit:** Accepted [ADR-023](../../adr/ADR-023-price-ramp-schedule-model.md) D-01, D-02, D-04, D-05, D-06, D-07. Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-01 through D-07, including D-06. Accepted [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md).
+**Does not accept:** ADR-017, ADR-024, ADR-025, ADR-026, or ADR-027. Each of those files on this tree says Proposed on 2026-10-04 and not accepted. This draft does not change their status. It does not accept `prereq/specs/ramp-amendments.md`, `price-lock-policy-stub.md`, `DRAFT-openapi-amendments.yaml`, or the pricing-policy sanity check.
+**Does not authorize:** code, a schema change, a Drools edit, a flag, a route, a deploy, or a merge. `opencrm.pricing.ramp.enabled` stays default off. No `opencrm.jev.*.enabled` flag is turned on. Later renewal periods stay unpriced while this file is Proposed.
+
+---
+
+## Context
+
+DRG-533 asks for the escalator procedure ADR-023 left open: which base a percent hits, whether the percent compounds, and at which scale each step rounds. DRG-568 cannot price a 36-month renewal escalator or a lock that ends inside a renewal until that procedure has a name. The accepted uplift record already says the later periods wait.
+
+D-06 of [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) (Accepted 2026-10-16):
+
+> A multi-year renewal escalator, when one exists, starts from the single price this decision already computed. It does not grow later periods until DRG-533 is accepted.
+
+The same decision says DRG-568 owns the segment schedule and the time-bounded locks, consumes the first-period price and the per-step cap check, and does not choose a second compounding rule. This draft is that missing procedure. It stays Proposed, so D-06 still holds.
+
+### What the tree does today
+
+Checked on this branch's base, `origin/main` at `e3ee211b`. The Java citations below were read in this pass.
+
+1. **A renewal is one flat period at the exit rate, times one uplift, at scale 2.** `QuoteContinuationPolicy.plan` treats `RENEWAL` and `EXTENSION` together (`QuoteContinuationPolicy.java`, the `renewal` branch). The start date is the day after the subscription end. `termMonths` defaults to 12 and must be from 1 to 1200. A null `upliftPercent` becomes zero. The unit is `money(exitNet × (1 + upliftPercent/100))` with `money` = scale 2, half-up. The plan contains one `Period` whose `months` equals the whole term. Extension rejects a non-zero percent. `QuoteContinuationPolicyTest.renewalUsesExitRateAndEightPercentUplift` asserts an 8% uplift on an exit rate of 50 yields unit 54 and TCV 32,400 for 50 seats and 12 months (`54 × 50 × 12`). The same formula, applied to a 36-month term, a 7% uplift, and an exit net of 40, is one period of 36 months at 42.80. No test in that class asserts the 36-month case. That path does not call `RampEscalatorExpander`.
+
+2. **The eligibility draft writes that flat period at zero uplift.** `QuoteContinuationService.draftRenewal` builds a `RENEWAL` request with no `upliftPercent` and no `termMonths`, so the policy uses zero and 12 months. The audit row stores `upliftPercent` as the string `"0"`. `renewalSource` requires exactly one accepted recurring line. A second line, a second segment, and a non-zero policy percent are outside this method.
+
+3. **The new-quote escalator compounds on the prior unit at scale 4, in equal blocks.** `RampEscalatorExpander.expand` is used by `RampScheduleAttacher` and `RampScheduleQueryService`. It is not used by continuation. Percent mode sets the next unit to `prior × (1 + amount/100)` at scale 4, half-up. Amount mode adds the currency amount at scale 4, half-up. The amount is percent points: the class comment says 5 means 5 percent. Period 1 is the start price, already rounded to scale 4; the percent applies from period 2 onward. Every period has the same `everyMonths`. If the term is not divisible by that length, the expander throws `RAMP_TERM_MISMATCH` and returns no steps (`RampEscalatorExpanderTest`, 14 months with a 12-month step). `RampEscalatorExpanderTest` asserts 5% on 40.0000 for 36 months yields 40.0000, 42.0000, 44.1000, and that 1.1125% on 2.0000 yields 2.0223. Explicit steps win over the escalator (`RampScheduleAttacher`). With the ramp flag off, `prepare` throws `RAMP_NOT_SUPPORTED` (HTTP 422) before expansion. ADR-023 D-01 already says the escalator inputs are display-only after expansion, and D-06 keeps the flag off.
+
+4. **An absolute ramp step is then discounted again when the line type is a named seat.** `RampPeriodPricer.baseUnit` returns an `ABSOLUTE` unit price unchanged. `priceStep` then multiplies by `(1 − namedSeatFraction)` at scale 4, half-up. The fraction is 0.07 at quantity 100 or more, 0.12 at 500 or more, and 0.18 at 1,000 or more, and only when `lineItemType` is `SAAS_SEAT_NAMED`. Other line types use a fraction of zero. Continuation does not go through this pricer. A renewal net that was later submitted as an absolute ramp step on a named-seat line would be reduced a second time.
+
+5. **ADR-023 stored the shape and left the procedure open.** D-01 stores explicit periods with an absolute unit price or a discount fraction off list, and treats an escalator as a generator. D-02 rounds unit prices to scale 4 and amounts to scale 2, half-up. D-04 uses whole months on anniversary dates from the term start, and day proration only inside a period. D-05 starts a renewal as one flat period at the exit rate unless a new ramp is authored. D-07 applies a volume tier from that period's own quantity. The accepted uplift record amends D-05 only by naming `ContractedNet` as the default basis and allowing a rung to select `CurrentList` or `ListLessContractedDiscount`. Its D-05 rounds the single renewal unit at scale 4 and leaves per-step escalator rounding to DRG-533. Its D-02 re-checks cap and floor on stored prices. Its D-06 forbids growing later periods until this procedure is accepted.
+
+6. **The illustrations DRG-568 cites are not what either path produces.** Sanity-check scenario 1 (example numbers, not customer data): exit net 40, 7% a year, 36 months, per-year rounding to scale 2 gives 42.80, then 45.80, then 49.01, TCV 330,264 at 200 seats. The same note says compounding with no intermediate rounding gives a year-3 unit of 40 × 1.07³ = 49.00. DRG-568 repeats 42.80 / 45.80 / 49.01, and 49.00 when compounding is unrounded. Scenario 4: an AI Assist line at 20, locked until 2027-03-31 inside a 14-month renewal from 2026-11-01, then 7%, is 5 months at 20 and 9 months at 21.40, total 14,630 at 50 seats. The expander, given start price 42.8000 and 7%, would emit 42.8000, 45.7960, 49.0017. Given start price 40, it would emit 40.0000, 42.8000, 45.7960, because period 1 is the start price and the percent begins at period 2. A 14-month term with a 12-month step is `RAMP_TERM_MISMATCH`. Continuation emits one 36-month period at 42.80 (scale 2) when the caller passes 7, or one 12-month period at the exit rate when the eligibility draft passes nothing.
+
+The arithmetic in the next section was recomputed with `Decimal` half-up in this pass. It is not a quote from a test, except where a test is named.
+
+## Decision
+
+Proposed. Nothing in this section amends an Accepted ADR. Acceptance is a later status-change pull request, after the owner answers the section "Owner decision needed".
+
+### D-01 — Where a renewal escalator starts
+
+**Period 1 is the single renewal unit the accepted uplift record already computes (its D-01 through D-05). Later periods start from the prior period's stored absolute unit.**
+
+That unit is the default `ContractedNet` result unless a rung selected another basis. It is already cap-checked and floor-checked. The escalator does not apply the renewal percent a second time to produce period 1. `RampEscalatorExpander` today does the opposite when its start price is the exit net: period 1 stays at the exit net and the percent starts at period 2. A renewal generator that wants 42.8000 in year 1 passes that computed unit as the start price.
+
+`Same` has no later growth: every segment stays on the exit net. `List` and `Override` are explicit segment modes below, not silent inputs to the percent. Extension still rejects a non-zero uplift, as the policy does today. This draft does not give an extension a multi-year escalator.
+
+### D-02 — Compounding
+
+**The default is compound-on-prior. Each later percent step is `storedPrior × (1 + percentPoints / 100)`. A stored flag `compound` may be false. False applies each step's percent to the period-1 unit.**
+
+Percent points match the accepted uplift record and `QuoteContinuationRequest.upliftPercent`: `7` means 7 percent. An amount step adds the currency amount to the prior stored unit, at the scale in D-03, and does not compound. `RampEscalatorExpander` rejects a negative start price or a negative amount with `RAMP_NEGATIVE_VALUE`. This proposal keeps that refusal. A price cut is an explicit `Override` or a basis change on the segment, not a negative escalator amount.
+
+`compound = false` is the procedure the DRG-533 issue attributes to Salesforce RCA: a stated 5% is 5% of the original base in every year, and a compound path is entered as a cumulative percent of that base (5% compounded twice is 10.25% in the third year). **Unverified:** this draft did not re-fetch the Salesforce `initiateRenewal` page. The sentence is the Linear issue's source note, read 2026-10-16.
+
+The landed expander has no flag. It always compounds on the prior unit. That behavior matches the recommended default. It is not, by itself, the decision. DRG-532 is where the generator learns to take the flag. This draft does not build that generator.
+
+### D-03 — Rounding
+
+**Each expanded unit is half-up at scale 4. Each extended amount is half-up at scale 2. The scale-4 unit is what the next period compounds from, and what the next renewal will read as its exit net.**
+
+Scale 4 is ADR-023 D-02 and the accepted uplift record's D-05. Applying it per step to the scenario-1 start price:
+
+| Step | Exact product | Stored unit (scale 4, half-up) | Period amount at 200 seats × 12 months (scale 2) |
+| --- | --- | --- | --- |
+| Year 1, the uplift unit, not a further percent | 40 × 1.07 = 42.8 | 42.8000 | 102,720.00 |
+| Year 2 | 42.8000 × 1.07 = 45.796 | 45.7960 | 109,910.40 |
+| Year 3 | 45.7960 × 1.07 = 49.00172 | 49.0017 | 117,604.08 |
+
+TCV is 330,234.48. The sanity-check and DRG-568 figure of 42.80 / 45.80 / 49.01 and TCV 330,264.00 is the same chain rounded half-up to scale 2 at each step (45.796 → 45.80, then 45.80 × 1.07 = 49.006 → 49.01). Rounding only the final unit of an unrounded `40 × 1.07³` (= 49.00172) to scale 2 yields 49.00. Those two results stay illustrations. This proposal does not adopt them, because they would store a different exit rate from the scale the accepted records already fixed for the single unit.
+
+The expander's own 1.1125% case (2.0000 → 2.0223) is this same per-step scale-4 half-up. A renewal uses that rule. It does not round the unit to scale 2 the way `QuoteContinuationPolicy.money` does today.
+
+### D-04 — Renewal segment schedule
+
+**A multi-period renewal line is an ordered list of segments. A pure annual escalator expands into equal whole-month segments. A time-bounded lock is an explicit list of unequal segments. The expander's equal-block rule does not grow a lock.**
+
+Segment fields, as DRG-568's suggested next step names them: `from`, `to`, `mode`, `value`. Modes used here are the uplift record's modes that name a price (`Same`, `List`, `UpliftPct`, `UpliftAmt`, `Override`) plus a lock, which is an absolute unit held through `to`. `Renegotiate` still has no unit price.
+
+Equal-block expansion, for a percent or amount escalator with no lock:
+
+- Period length is `everyMonths`, a positive whole number of months.
+- The term months must be divisible by `everyMonths`. Otherwise the result is `RAMP_TERM_MISMATCH` and no segments, which is what `RampEscalatorExpander` does today.
+- Boundaries follow ADR-023 D-04: segment `k` starts at `termStart.plusMonths(startMonth − 1)`. The boundary date belongs to the new segment. A term that starts on the 31st does not drift.
+- Each segment stores an absolute unit at scale 4 (D-03). The percent or amount that produced it is kept for display, as ADR-023 D-01 already requires for escalator inputs.
+- Cap and floor from the accepted uplift record are applied to every stored absolute, reading that stored unit. The check does not re-derive the generator. A generated `UpliftPct` or `UpliftAmt` segment clamps to the normalized bounds the way that record's D-02 clamps those modes. An explicit `Override` or an explicit lock that falls outside the bounds is `PRICE_PROTECTION_CONFLICT` and stores no price, matching that record's treatment of `Override`.
+
+The 14-month AI Assist illustration is not this expansion. 14 divided by 12 leaves a remainder, so the expander rejects it. The schedule is two explicit segments:
+
+| Segment | Dates in the illustration | Months | Mode | Unit |
+| --- | --- | --- | --- | --- |
+| Lock | 2026-11-01 through 2027-03-31 | 5 | lock, absolute 20 | 20.0000 |
+| After the lock | 2027-04-01 through 2027-12-31 | 9 | `UpliftPct` 7 on the locked unit | 21.4000 |
+
+50 × 20 × 5 + 50 × 21.40 × 9 = 14,630.00. At scale 4, 20 × 1.07 is 21.4000, so this particular illustration does not distinguish D-03 from scale-2 rounding. The post-lock segment applies the percent once to the locked unit. It does not compound across the lock, and it does not open a second compounding rule.
+
+Both illustration boundaries fall on whole months from a term start of 2026-11-01. ADR-023 D-04 and the accepted proration record charge a whole-month boundary with no day stub. The day-stub in `QuoteContinuationPolicy` remains the amendment and expansion formula. A renewal does not call it.
+
+A lock whose end is not a month boundary from the renewal start has no splitter in the tree. **Unverified** as a product rule: this draft does not choose day proration for that end. The owner decision section asks whether DRG-568 includes it.
+
+`draftRenewal` still writes one line. A renewal with Analytics Cloud, AI Assist, and a non-renewed connector is several lines, each with its own segment list. DRG-568 builds that list. This draft only fixes the price on each segment.
+
+### D-05 — Discount and cost
+
+**The unit stored on a renewal segment is the net unit after the renewal procedure. The named-seat tier does not run on it again. Cost does not enter the escalator formula.**
+
+`RampPeriodPricer` applies the named-seat fraction on top of an absolute base for `SAAS_SEAT_NAMED`. The scenario-1 line is described as seats. **Unverified:** the sanity check does not name `lineItemType`, so it is not established that Analytics Cloud is `SAAS_SEAT_NAMED`. If a later implementation priced these renewal absolutes through `RampPeriodPricer` on that line type, 200 seats would take a further 7% off 42.8000. The recommendation is that renewal-generated segments skip that subtraction. The discount fraction used for governance is `(list − storedNet) / list` when list is present, which is the fraction `RampPeriodPricer` already computes after the net is known. ADR-023 D-07 still applies the period's own quantity when a period is priced as a discount off list, rather than as a finished renewal net.
+
+DRG-526 (read 2026-10-16, status In Progress) owns effective-dated cost and says each ramp period uses the cost effective on that period's start, failing closed when cost is missing. This escalator does not read cost, does not treat the placeholder margin `40.0` as a margin, and does not turn margin governance on. ADR-023 D-06 remains the guardrail. This draft does not accept DRG-526. The project doc `finance-decisions-cost-basis.md` was not opened in this pass. **Unverified** beyond the Linear issue text.
+
+### D-06 — What stays a marker
+
+**`ENABLE_12M_PRICE_PROTECTION` remains the retention marker the accepted uplift record describes. A time-bounded lock is an explicit segment with dates. This draft does not turn the marker into a lock.**
+
+The accepted record assigns that choice to DRG-568. DRG-568 can make it only after this procedure is accepted, and only in its own implementation. A contract cap is still the price protection that wins, as that record's D-02 says.
+
+## Options considered
+
+| Topic | Option | Consequence | Verdict |
+| --- | --- | --- | --- |
+| Later-period base | **Prior stored absolute, period 1 = the accepted uplift unit (recommended)** | Year 2 of a 7% escalator grows from 42.8000. Matches D-06's "starts from the single price". | Recommended |
+| Later-period base | Exit net as the expander start price, percent applied from period 2 | Periods are 40.0000, 42.8000, 45.7960. Year 1 never receives the renewal percent. | Rejected as the renewal default |
+| Later-period base | Current list, or the term average | A list drop or the average can price below the exit rate. ADR-023 D-05 and the uplift record already refused the average and year-1 of the prior ramp. | Rejected |
+| Compounding | **`compound = true` by default; `false` applies the percent to period 1 (recommended)** | "7% a year" yields the growing series the sanity check describes. RCA's non-compound entry stays available by setting the flag false and typing a cumulative percent when compounding is intended. | Recommended |
+| Compounding | Always percent-of-original, no flag | Year 3 at a stated 7% is 7% above period 1 (45.7960 if period 1 is 42.8000), not 49.0017. The DRG-568 illustration does not match. | Rejected as the default |
+| Compounding | Adopt the expander with no flag and no documented default | The class already compounds, and DRG-533 exists because that class was not a decision. Shipping it unlabeled leaves RCA-style contracts and the illustration on the same path. | Rejected |
+| Rounding | **Per-step half-up at scale 4, amounts at scale 2 (recommended)** | Units 42.8000, 45.7960, 49.0017. TCV 330,234.48. The next renewal's exit net is the stored scale-4 unit. | Recommended |
+| Rounding | Per-step half-up at scale 2 | Units 42.80, 45.80, 49.01. TCV 330,264.00. Matches DRG-568's cited illustration and stores a coarser exit rate than the accepted single-unit scale. | Open. Owner may replace the recommendation |
+| Rounding | Full-precision compound, round the final unit once | Year 3 at scale 2 is 49.00. Intermediate units are not stable stored prices, so a cap check and the next period have no scale-4 absolute to read. | Rejected |
+| Lock shape | **Explicit segments `{from, to, mode, value}`; post-lock percent applies once to the locked unit (recommended)** | Scenario 4 is 5 months at 20.0000 and 9 months at 21.4000, total 14,630.00. The equal-block expander is not on this path. | Recommended |
+| Lock shape | Encode the lock as `everyMonths` on `RampEscalatorExpander` | 14 months with a 12-month step is `RAMP_TERM_MISMATCH`. Equal blocks cannot be 5 and 9. | Rejected |
+| Lock vs marker | **Keep `ENABLE_12M_PRICE_PROTECTION` as a marker (recommended)** | Agrees with the accepted uplift record. DRG-568 may still decide that a marker becomes a dated segment, after this draft is accepted. | Recommended |
+| Named-seat tier | **Renewal segment nets skip a second named-seat subtraction (recommended)** | Stops 200 seats taking another 7% off a unit that is already net. | Recommended |
+| Named-seat tier | Run `RampPeriodPricer` unchanged on renewal absolutes | For `SAAS_SEAT_NAMED` at quantity ≥ 100, the net falls by the tier. Continuation does not do this today. | Rejected |
+| Off-boundary lock end | Day-stub from the proration record | The proration record prices amendments and expansions. No renewal splitter exists. | Deferred. Owner decision |
+| Off-boundary lock end | **DRG-568's first slice uses month-boundary locks only (recommended)** | Scenario 4 is in scope. A lock ending on the 15th waits. | Recommended |
+
+## Consequences
+
+- After the owner accepts this text and a status-change pull request merges, D-06 of the uplift record is satisfied for compounding, base, and per-step rounding. Later periods may then be priced from the stored absolutes. Until that merge, the priced renewal remains the one flat period ADR-023 D-05 and the uplift record require. Escalator inputs may be copied as intent. They are not expanded.
+- DRG-568 implements the segment list, the lock dates, and the multi-line renewal. It uses D-01 through D-06. It does not choose another compound rule or another unit scale.
+- DRG-532's generator, when it is built, takes `compound`, the period-1 unit, the percent or amount, and `everyMonths`, and emits the equal-block segments in D-04. It refuses a term the step length does not divide.
+- DRG-534 amends stored absolute periods. Regenerating them from the percent waits on this acceptance, and the amendment story still owns elapsed-period locking. This draft does not accept `prereq/specs/ramp-amendments.md`.
+- The commercial difference between the recommended scale and the illustration is 29.52 of TCV on the 200-seat, 36-month example (330,264.00 versus 330,234.48). A seller who has been shown 45.80 and 49.01 is looking at the scale-2 option, which remains an owner choice.
+- `QuoteContinuationPolicy` rounding the renewal unit to scale 2, and `draftRenewal` writing `"0"`, stay as they are. This draft does not change them.
+- ADR-023 is not edited. ADR-017 and ADR-024 through ADR-027 stay Proposed.
+
+## Risks
+
+- Accepting scale 4 while DRG-568's issue text cites 45.80 / 49.01 / 330,264 will look like a wrong implementation if the writer follows the issue text instead of this procedure. The control is the worked table in D-03, and the owner fork in the next section.
+- `compound = true` prices a growing series. A contract written to the RCA note in DRG-533 (stated 5% means 5% of the original base unless the year-3 cell is entered as 10.25%) will be overpriced if the flag stays at the default. The control is the stored `compound` flag on the snapshot DRG-568 writes.
+- Calling `RampEscalatorExpander` for the 14-month lock throws `RAMP_TERM_MISMATCH` and prices nothing. The control is D-04: locks are explicit segments.
+- Sending a finished renewal net through `RampPeriodPricer` on `SAAS_SEAT_NAMED` takes the named-seat tier off again. The control is D-05.
+- Expanding later periods before the status-change pull request merges contradicts the accepted uplift record's D-06.
+- Treating this Proposed file, the price-lock stub, or the ramp-amendment proposal as accepted would let an implementation merge against text the owner has not adopted.
+
+## What DRG-568 needs from this draft
+
+DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator and the AI Assist lock are not expressible, and that it depends on DRG-533. After acceptance, DRG-568 has these inputs and no others from this file:
+
+1. Period 1 is the uplift record's unit (42.8000 in the example). Later percent steps use D-02 and D-03.
+2. Under the recommendation, the 36-month series is 42.8000, 45.7960, 49.0017, TCV 330,234.48, not 42.80 / 45.80 / 49.01, unless the owner replaces D-03 with scale 2.
+3. The lock is two explicit segments, 20.0000 for five months and 21.4000 for nine, total 14,630.00. The post-lock mode applies the percent once to the locked unit.
+4. Cap and floor are re-checked on every stored absolute. A generated step clamps. An explicit lock or override outside the bounds is `PRICE_PROTECTION_CONFLICT`.
+5. The segment list is per line. `draftRenewal`'s single-line, zero-uplift, 12-month draft is the current writer. Replacing it is DRG-568's work, and it is not authorized by this Proposed file.
+6. The retention marker is not a lock unless DRG-568 itself decides that, after this acceptance.
+7. Month-boundary locks are the first slice if the owner keeps that recommendation. A lock ending mid-month is not specified here.
+8. No second compounding rule, and no use of the equal-block expander for unequal lock segments.
+
+## Owner decision needed
+
+This file is Proposed. The recommendations are not in force. The owner decides each row. A status-change pull request is what records the answers and sets Status to Accepted. That pull request is a separate change. This draft does not set it.
+
+| # | Question | Recommendation in this draft |
+| --- | --- | --- |
+| 1 | Default for "N% a year" | `compound = true` (prior stored unit). `compound = false` remains the percent-of-period-1 procedure. |
+| 2 | Per-step unit scale | Scale 4 half-up. Amounts scale 2. This does not reproduce 45.80 / 49.01. |
+| 3 | Post-lock price | One application of the segment's percent or amount to the locked unit. `List`, `Same`, and `Override` stay explicit modes. |
+| 4 | Unequal segments | Explicit `{from, to, mode, value}` only. The equal-block expander does not build them. |
+| 5 | Named-seat tier on a renewal net | Do not apply it a second time. |
+| 6 | Lock end that is not a month boundary | Out of DRG-568's first slice. The amendment day-stub is not reused for it here. |
+| 7 | Retention marker | Stays a marker. DRG-568 may propose a dated segment later, after acceptance. |
+
+Until those answers are accepted and the status-change pull request merges, D-06 of the uplift record stands: later periods do not grow.
+
+**Unblocks: DRG-568 only after the owner accepts and a status-change PR merges.**
+
+## Out of scope
+
+One-action authoring of equal blocks (DRG-532). Elapsed-period locking on an amendment (DRG-534). Renewal mode inheritance beyond what the accepted uplift record already fixed (DRG-549). Price-book retrieval (DRG-539). The audit table (DRG-564). Cost ingestion (DRG-526). True-up, maintenance percent, conversion, and amendment proration. Any subscriptions user interface. Any flag. Any edit to an Accepted ADR. Accepting ADR-017 or ADR-024 through ADR-027.
+
+## Unverified
+
+- Salesforce RCA `initiateRenewal` / `rampOptionsDetails`, and the claim that a standard procedure does not compound. Source in this pass: the DRG-533 issue text. The Salesforce page was not re-fetched.
+- Maxio Renewal Factor and Lock-in Date. Source: the DRG-568 issue and the sanity check. The Maxio page was not re-fetched.
+- `lineItemType` of the illustrative Analytics Cloud and AI Assist lines. The double-discount risk is conditional on `SAAS_SEAT_NAMED`.
+- `finance-decisions-cost-basis.md`. DRG-526's issue text was read. The project doc was not.
+- `amendment-entity-field-schema.md` field names (`segment_schedule`, `policy_slot`). The price-lock stub cites them. That stub is a stub. The schema file was not re-opened, and the stub is not accepted.
+- Day proration for a lock that ends off a month boundary. No renewal segment splitter was found in `QuoteContinuationPolicy` or `RampEscalatorExpander`.
+- GitNexus impact on this draft. No GitNexus runner is present on this VM (`.gitnexus/run.cjs` is absent). Impact is UNKNOWN.
+- Notion DoD page `verification.state` was `unverified` at fetch (2026-10-16). The page body that was fetched says v0.2 is approved. This draft does not edit that page.
+
+## References
+
+- `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteContinuationPolicy.java` — renewal branch, one period, scale-2 `money`.
+- `backend/services/quote-service/src/test/java/com/opencrm/quote/quote/QuoteContinuationPolicyTest.java` — `renewalUsesExitRateAndEightPercentUplift`.
+- `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteContinuationService.java` — `draftRenewal`, one source line, audit `upliftPercent` `"0"`.
+- `backend/services/quote-service/src/main/java/com/opencrm/quote/ramp/RampEscalatorExpander.java` — compound-on-prior, scale 4, equal blocks, `RAMP_TERM_MISMATCH`.
+- `backend/services/quote-service/src/test/java/com/opencrm/quote/ramp/RampEscalatorExpanderTest.java` — 40.0000 / 42.0000 / 44.1000 and the 2.0223 half-up case.
+- `backend/services/quote-service/src/main/java/com/opencrm/quote/ramp/RampScheduleAttacher.java` — explicit steps win; flag off throws before expansion.
+- `backend/services/pricing-service/src/main/java/com/opencrm/pricing/ramp/RampPeriodPricer.java` — absolute base, then named-seat fraction for `SAAS_SEAT_NAMED`.
+- [ADR-023](../../adr/ADR-023-price-ramp-schedule-model.md) D-01, D-02, D-04, D-05, D-06, D-07.
+- [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-05 and D-06.
+- [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md) — day-stub for amendments and expansions.
+- `docs/renewals-amendments/cpq-pricing-policy-sanity-check.md` — scenarios 1 and 4.
+- [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending), [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal), [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no), [DRG-526](https://linear.app/drgamtd-workspace/issue/DRG-526/bc-03-13-cost-basis-ownership-and-ingestion-from-erp-p-2).
