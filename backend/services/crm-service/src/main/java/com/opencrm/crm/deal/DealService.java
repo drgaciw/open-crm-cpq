@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
+import com.opencrm.crm.fx.CurrencyCodes;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Service for managing deals.
@@ -29,6 +32,7 @@ public class DealService {
     private final ContactRepository contactRepository;
     private final OrganizationRepository organizationRepository;
     private final DealMapper dealMapper;
+    private final DealCurrencyConverter currencyConverter;
 
     /**
      * Create a new deal.
@@ -56,6 +60,8 @@ public class DealService {
                     .orElseThrow(() -> new ResourceNotFoundException("Organization", request.getOrganizationId()));
             deal.setOrganization(org);
         }
+
+        currencyConverter.freeze(deal);
 
         Deal saved = dealRepository.save(deal);
         log.info("Created deal with ID: {}", saved.getId());
@@ -110,14 +116,26 @@ public class DealService {
             throw new ResourceNotFoundException("Deal", id);
         }
 
-        // Validate stage update if provided
-        if (request.getStage() != null) {
-            if (deal.getStage() == DealStage.WON || deal.getStage() == DealStage.LOST) {
-                throw new BusinessException("Cannot update a deal that is already WON or LOST", "INVALID_STATE_TRANSITION");
-            }
+        // ADR-032 D-03: once won or lost, the conversion frozen at close stays put.
+        // A later edit must not look up a new rate, including when base fields are null
+        // or were frozen against an older base currency.
+        boolean closed = deal.getStage() == DealStage.WON || deal.getStage() == DealStage.LOST;
+        if (request.getStage() != null && closed) {
+            throw new BusinessException("Cannot update a deal that is already WON or LOST", "INVALID_STATE_TRANSITION");
+        }
+        if (closed && changesAmountOrCurrency(deal, request)) {
+            throw new BusinessException(
+                    "Cannot change amount or currency on a deal that is already WON or LOST",
+                    "INVALID_STATE_TRANSITION");
         }
 
+        BigDecimal previousAmount = deal.getAmount();
+        String previousCurrency = deal.getCurrency();
+
         dealMapper.updateEntity(request, deal);
+        if (!closed) {
+            currencyConverter.freezeIfNeeded(deal, previousAmount, previousCurrency);
+        }
 
         // Update primary contact if provided
         if (request.getPrimaryContactId() != null) {
@@ -243,6 +261,7 @@ public class DealService {
         }
 
         deal.markWon();
+        currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
 
         log.info("Marked deal ID {} as won", id);
@@ -272,6 +291,7 @@ public class DealService {
         }
 
         deal.markLost(request.getReason());
+        currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
 
         log.info("Marked deal ID {} as lost", id);
@@ -279,13 +299,14 @@ public class DealService {
     }
 
     /**
-     * Get pipeline summary statistics.
+     * Get pipeline summary statistics in the base currency (ADR-032 D-06).
      */
     @Transactional(readOnly = true)
     public List<PipelineSummaryDto> getPipelineSummary() {
         log.debug("Fetching pipeline summary");
 
-        List<PipelineSummaryProjection> results = dealRepository.findPipelineSummary();
+        String baseCurrency = currencyConverter.baseCurrency();
+        List<PipelineSummaryProjection> results = dealRepository.findPipelineSummary(baseCurrency);
         List<PipelineSummaryDto> summary = new ArrayList<>();
 
         for (PipelineSummaryProjection projection : results) {
@@ -294,10 +315,36 @@ public class DealService {
                     .count(projection.getCount())
                     .totalAmount(projection.getTotalAmount())
                     .weightedAmount(projection.getWeightedAmount())
+                    .baseCurrency(baseCurrency)
+                    .unconvertedCount(projection.getUnconvertedCount() != null ? projection.getUnconvertedCount() : 0L)
                     .build();
             summary.add(dto);
         }
 
         return summary;
+    }
+
+    /**
+     * True when the request would replace the deal's amount or currency.
+     * Null fields are omitted by the mapper and are not a change. An equal amount or a
+     * case-only currency difference is not a change.
+     */
+    private static boolean changesAmountOrCurrency(Deal deal, DealUpdateRequest request) {
+        if (request.getAmount() != null && !sameAmount(deal.getAmount(), request.getAmount())) {
+            return true;
+        }
+        if (request.getCurrency() != null) {
+            return !Objects.equals(
+                    CurrencyCodes.normalize(deal.getCurrency()),
+                    CurrencyCodes.normalize(request.getCurrency()));
+        }
+        return false;
+    }
+
+    private static boolean sameAmount(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
     }
 }

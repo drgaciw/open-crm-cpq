@@ -44,6 +44,13 @@ public class DealDto {
     private LocalDate nextStepDate;
     private String competitors;
     private BigDecimal weightedAmount;
+    /** ADR-032: amount frozen in the base currency; null when not converted. */
+    private BigDecimal baseAmount;
+    private String baseCurrency;
+    private BigDecimal baseWeightedAmount;
+    private BigDecimal fxRate;
+    private Instant fxRateAsOf;
+    private String fxSource;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;

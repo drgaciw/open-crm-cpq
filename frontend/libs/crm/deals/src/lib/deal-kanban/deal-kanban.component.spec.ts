@@ -28,17 +28,17 @@ describe('DealKanbanComponent pipeline wiring', () => {
   let dialogOpen: ReturnType<typeof vi.fn>;
 
   const deals = signal<DealDto[]>([
-    deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000 }),
-    deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000 }),
-    deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250 }),
+    deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000, currency: 'USD', baseAmount: 1000, baseCurrency: 'USD' }),
+    deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000, currency: 'USD', baseAmount: 5000, baseCurrency: 'USD' }),
+    deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250, currency: 'USD', baseAmount: 250, baseCurrency: 'USD' }),
     deal({ id: 4, name: 'D', stage: 'NEGOTIATION' }),
   ]);
   const loading = signal(false);
   const error = signal<string | null>(null);
   const pipelineSummary = signal<PipelineSummaryDto[] | null>([
-    { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100 },
-    { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500 },
-    { stage: 'WON', count: 3, totalAmount: 9000, weightedAmount: 9000 },
+    { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD', unconvertedCount: 0 },
+    { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500, baseCurrency: 'USD', unconvertedCount: 0 },
+    { stage: 'WON', count: 3, totalAmount: 9000, weightedAmount: 9000, baseCurrency: 'USD', unconvertedCount: 0 },
   ]);
 
   beforeEach(async () => {
@@ -49,9 +49,9 @@ describe('DealKanbanComponent pipeline wiring', () => {
     markLostSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'LOST' })));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
     deals.set([
-      deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000 }),
-      deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000 }),
-      deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250 }),
+      deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000, currency: 'USD', baseAmount: 1000, baseCurrency: 'USD' }),
+      deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000, currency: 'USD', baseAmount: 5000, baseCurrency: 'USD' }),
+      deal({ id: 3, name: 'C', stage: 'PROSPECTING', amount: 250, currency: 'USD', baseAmount: 250, baseCurrency: 'USD' }),
       deal({ id: 4, name: 'D', stage: 'NEGOTIATION' }),
     ]);
     error.set(null);
@@ -100,6 +100,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
       count: 2,
       amount: 6000,
       weighted: 2600,
+      unconverted: 0,
     });
   });
 
@@ -120,6 +121,32 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(negotiation?.totalValue).toBe(0);
     expect(qualification?.deals).toEqual([]);
     expect(qualification?.totalValue).toBe(0);
+  });
+
+  it('ADR-032: column totals add base amounts only and count deals without a base amount', () => {
+    deals.set([
+      deal({ id: 1, name: 'USD', stage: 'PROSPECTING', amount: 1000000, currency: 'USD', baseAmount: 1000000, baseCurrency: 'USD' }),
+      deal({ id: 2, name: 'EUR converted', stage: 'PROSPECTING', amount: 1000000, currency: 'EUR', baseAmount: 1085000, baseCurrency: 'USD' }),
+      deal({ id: 3, name: 'GBP no rate', stage: 'PROSPECTING', amount: 500000, currency: 'GBP' }),
+    ]);
+
+    const prospecting = component.columns().find((c) => c.stage === 'PROSPECTING');
+
+    expect(prospecting?.totalValue).toBe(2085000);
+    expect(prospecting?.unconverted).toBe(1);
+  });
+
+  it('ADR-032: base currency comes from the pipeline summary', () => {
+    pipelineSummary.set([{ stage: 'PROSPECTING', count: 1, totalAmount: 10, weightedAmount: 1, baseCurrency: 'EUR', unconvertedCount: 2 }]);
+
+    expect(component.baseCurrency()).toBe('EUR');
+    expect(component.pipelineTotals()?.unconverted).toBe(2);
+
+    pipelineSummary.set([
+      { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD', unconvertedCount: 0 },
+      { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500, baseCurrency: 'USD', unconvertedCount: 0 },
+      { stage: 'WON', count: 3, totalAmount: 9000, weightedAmount: 9000, baseCurrency: 'USD', unconvertedCount: 0 },
+    ]);
   });
 
   it('onAdvance wires advanceStage and refreshes board + summary', () => {

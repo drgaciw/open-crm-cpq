@@ -53,6 +53,13 @@ export interface DealDto {
   stage: DealStage;
   amount?: number;
   currency?: string;
+  /** ADR-032: amount frozen in the base currency; absent when not converted. */
+  baseAmount?: number;
+  baseCurrency?: string;
+  baseWeightedAmount?: number;
+  fxRate?: number;
+  fxRateAsOf?: string;
+  fxSource?: string;
   probability?: number;
   expectedCloseDate?: string;
   actualCloseDate?: string;
@@ -122,7 +129,17 @@ export interface DealLoseRequest {
  */
 export interface PipelineSummaryDto {
   stage: DealStage;
+  /** All deals in the stage, converted or not. */
   count: number;
+  /** Sum of base amounts in `baseCurrency` (ADR-032). Excludes unconverted deals. */
   totalAmount: number;
+  /** Probability-weighted sum of base amounts in `baseCurrency`. */
   weightedAmount: number;
+  /** ISO 4217 code for totalAmount / weightedAmount. */
+  baseCurrency?: string;
+  /** Deals with an amount left out of the totals because no FX rate was available. */
+  unconvertedCount?: number;
 }
+
+/** Fallback when an older backend omits baseCurrency. */
+export const DEFAULT_BASE_CURRENCY = 'USD';

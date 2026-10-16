@@ -71,7 +71,12 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
           <mat-card-header><mat-card-title>Deal Information</mat-card-title></mat-card-header>
           <mat-card-content>
             <div class="info-grid">
-              <div class="info-item"><span class="label">Amount</span><span class="value">{{ deal.amount ? (deal.amount | currency:'USD':'symbol':'1.0-0') : '—' }}</span></div>
+              <div class="info-item"><span class="label">Amount</span><span class="value">{{ deal.amount ? (deal.amount | currency:(deal.currency || 'USD'):'symbol':'1.0-0') : '—' }}</span></div>
+              @if (deal.amount && deal.baseCurrency && deal.baseCurrency !== deal.currency) {
+                <div class="info-item" data-testid="base-amount"><span class="label">Amount ({{ deal.baseCurrency }})</span><span class="value">{{ deal.baseAmount | currency:deal.baseCurrency:'symbol':'1.0-0' }} at {{ deal.fxRate }} ({{ deal.fxSource }}, {{ deal.fxRateAsOf | date:'mediumDate' }})</span></div>
+              } @else if (deal.amount && !deal.baseCurrency) {
+                <div class="info-item" data-testid="base-amount-missing"><span class="label">Base amount</span><span class="value">Not converted: no FX rate for {{ deal.currency }}</span></div>
+              }
               <div class="info-item"><span class="label">Probability</span><span class="value">{{ deal.probability ? deal.probability + '%' : '—' }}</span></div>
               <div class="info-item"><span class="label">Expected Close</span><span class="value">{{ deal.expectedCloseDate ? (deal.expectedCloseDate | date:'mediumDate') : '—' }}</span></div>
               <div class="info-item"><span class="label">Created</span><span class="value">{{ deal.createdAt | date:'mediumDate' }}</span></div>

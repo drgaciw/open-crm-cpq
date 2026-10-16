@@ -84,7 +84,7 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | POST | `/api/v1/deals/{id}/advance` | `DealService.advanceStage` | `DealDto` |
 | POST | `/api/v1/deals/{id}/win` | `DealService.markWon` | `DealDto` |
 | POST | `/api/v1/deals/{id}/lose` | `DealService.markLost` | `DealDto` |
-| GET | `/api/v1/deals/pipeline` | `DealService.loadPipelineSummary`, `DashboardComponent` | `PipelineSummaryDto[]` |
+| GET | `/api/v1/deals/pipeline` | `DealService.loadPipelineSummary`, `DashboardComponent` | `PipelineSummaryDto[]` — amounts in `baseCurrency`; `unconvertedCount` per stage (ADR-032, DRG-509) |
 | POST | `/api/v1/contacts` | `ContactService.create` | `ContactCreateRequest` → `ContactDto` |
 | GET | `/api/v1/contacts` | `ContactService.list` | `ContactDto`, `SpringPageResponse` |
 | GET | `/api/v1/contacts/{id}` | `ContactService.getById` | `ContactDto` |
@@ -101,6 +101,7 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 
 ### FE-only / indirect usage
 
+- **Pipeline currency (ADR-032, DRG-509):** `totalAmount` and `weightedAmount` sum frozen base amounts in `baseCurrency` only; deals without a rate are left out and counted in `unconvertedCount`. `DealDto` adds `baseAmount`, `baseCurrency`, `baseWeightedAmount`, `fxRate`, `fxRateAsOf`, `fxSource` (omitted when null). Additive fields; no new route. `PUT /api/v1/deals/{id}` on a WON or LOST deal rejects amount or currency changes (`INVALID_STATE_TRANSITION`) and does not re-freeze the rate.
 - **`DashboardComponent`** (`libs/crm/dashboard`) calls `HttpClient` for `/api/v1/deals/pipeline`, `/api/v1/deals`, `/api/v1/leads` (preview rows). Same routes as `DealService` / lead list; not duplicate API surface. Preview lists also use `content ?? rows` unwrap.
 
 ### Optional query params (API ⊇ FE)
