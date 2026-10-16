@@ -26,6 +26,7 @@ public final class KafkaTopics {
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";
     public static final String PRICE_CALCULATED = "cpq.price.calculated";
+    public static final String RULE_SET_PUBLISHED = "cpq.pricing.ruleset.published";
 
     // Quote Events
     public static final String QUOTE_STATUS_ACCEPTED = "cpq.quote.status.accepted";

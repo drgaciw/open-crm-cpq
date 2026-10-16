@@ -89,6 +89,7 @@ class EventContractRegistryTest {
         expected.put("cpq.contract.executed", "ContractExecuted v1, contract-asset-management, RESERVED");
         expected.put("cpq.approval.step.decided", "ApprovalStepDecided v1, approval-routing, RESERVED");
         expected.put("cpq.approval.outcome.completed", "ApprovalOutcomeCompleted v1, approval-routing, RESERVED");
+        expected.put("cpq.pricing.ruleset.published", "RuleSetPublished v1, pricing-service, RESERVED");
 
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
