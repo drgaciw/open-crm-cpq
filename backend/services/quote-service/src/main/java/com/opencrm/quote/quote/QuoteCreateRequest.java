@@ -26,6 +26,15 @@ public class QuoteCreateRequest {
 
     private String dealExternalId;
 
+    /**
+     * CRM opportunity type ({@code com.opencrm.crm.deal.DealType} name).
+     * When set, {@link CrmQuoteDealTypeMapping} assigns {@link #dealType} during
+     * {@link QuoteService#create}. When omitted, {@link #dealType} is stored as given,
+     * or {@link DealType#NEW} when that is omitted too.
+     */
+    private String crmDealType;
+
+    /** Quote deal type. Ignored when {@link #crmDealType} is set, unless the two disagree. */
     private DealType dealType;
 
     private String subscriptionType;
