@@ -25,15 +25,16 @@ import java.util.Set;
  *   <caption>Handoff table</caption>
  *   <tr><th>CRM DealType</th><th>Quote DealType</th><th>Commercial meaning</th></tr>
  *   <tr><td>NEW_BUSINESS</td><td>NEW</td><td>First sale. Renewal uplift and amendment proration do not apply.</td></tr>
- *   <tr><td>EXISTING_BUSINESS</td><td>AMENDMENT</td><td>Existing relationship that is not a renewal or a growth motion. Amendment proration keys on AMENDMENT.</td></tr>
+ *   <tr><td>EXISTING_BUSINESS</td><td>EXPANSION</td><td>Generic existing-customer deal. Growth on an existing account without replacing a source line. {@code AMENDMENT} is not a CRM mapping target; it is reached only by typed continuation ({@code QuoteContinuationRequest.Operation.AMENDMENT}). Flip {@code Source.EXISTING_BUSINESS} to change this row.</td></tr>
  *   <tr><td>RENEWAL</td><td>RENEWAL</td><td>Term renewal. Renewal uplift keys on RENEWAL.</td></tr>
  *   <tr><td>UPSELL</td><td>EXPANSION</td><td>Growth on products the customer already has. The quote enum has no UPSELL.</td></tr>
  *   <tr><td>CROSS_SELL</td><td>EXPANSION</td><td>Growth by adding a product. The quote enum has no CROSS_SELL. UPSELL and CROSS_SELL are not distinguished after the handoff.</td></tr>
  * </table>
  *
- * <p>Quote-only names ({@code NEW}, {@code AMENDMENT}, {@code EXPANSION}) and continuation
- * operation {@code EXTENSION} are not CRM types and are rejected. EXTENSION versus RENEWAL
- * on a continuation quote is DRG-546 and is not decided here.
+ * <p>No CRM name maps to {@link DealType#AMENDMENT}. Amendment is a continuation operation,
+ * not an opportunity type. Quote-only names ({@code NEW}, {@code AMENDMENT}, {@code EXPANSION})
+ * and continuation operation {@code EXTENSION} are rejected as CRM input. EXTENSION versus
+ * RENEWAL on a continuation quote is DRG-546 and is not decided here.
  */
 public final class CrmQuoteDealTypeMapping {
 
@@ -46,7 +47,8 @@ public final class CrmQuoteDealTypeMapping {
      */
     private enum Source {
         NEW_BUSINESS(DealType.NEW),
-        EXISTING_BUSINESS(DealType.AMENDMENT),
+        // Single flip point. Do not map any CRM type to AMENDMENT.
+        EXISTING_BUSINESS(DealType.EXPANSION),
         RENEWAL(DealType.RENEWAL),
         UPSELL(DealType.EXPANSION),
         CROSS_SELL(DealType.EXPANSION);
@@ -95,6 +97,15 @@ public final class CrmQuoteDealTypeMapping {
     /** CRM names this table accepts. Same set as {@code com.opencrm.crm.deal.DealType}. */
     public static Set<String> crmNames() {
         return TABLE.keySet();
+    }
+
+    /**
+     * The handoff table. {@code Source.EXISTING_BUSINESS} is the single flip for that row.
+     * {@code CrmQuoteDealTypeMappingTest#decidedRowsStayPinned} must change with it.
+     * The map is unmodifiable.
+     */
+    public static Map<String, DealType> rows() {
+        return TABLE;
     }
 
     private static BusinessException required(String message) {
