@@ -23,9 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * T1-5: verbatim compile of the pricing-service DRL corpus on the parent Drools BOM (10.2.0).
  *
- * <p>Phase 0 catalog is 8 files ({@code docs/phase0/phase0-drools-compatibility.md},
- * {@code docs/phase0/phase0-rule-catalog-reconciliation.md}). T1-3 added 3 metric-gated
- * policy DRLs. This suite compiles every {@code .drl} in the service rules directory.
+ * <p>Phase 0 catalog compiled here is 7 files. DRG-542 removed {@code amendment-proration.drl};
+ * {@code docs/phase0/phase0-drools-compatibility.md} and
+ * {@code docs/phase0/phase0-rule-catalog-reconciliation.md} still name the historical eight.
+ * T1-3 added 3 metric-gated policy DRLs. This suite compiles every {@code .drl} in the
+ * service rules directory.
  */
 @Tag("unit")
 @DisplayName("Pricing DRL corpus compile (Drools 10.2.0)")
@@ -38,7 +40,6 @@ class PricingDrlCorpusCompileTest {
             "core-license-pack.drl",
             "migration-credit.drl",
             "approval-margin-exception.drl",
-            "amendment-proration.drl",
             "renewal-uplift.drl"
     );
 
@@ -59,10 +60,11 @@ class PricingDrlCorpusCompileTest {
     }
 
     @Test
-    void phase0EightDrlsArePresent() throws IOException {
+    void phase0SevenDrlsArePresent() throws IOException {
         List<String> names = corpusFileNames();
-        assertThat(PHASE0_DRLS).hasSize(8);
+        assertThat(PHASE0_DRLS).hasSize(7);
         assertThat(names).containsAll(PHASE0_DRLS);
+        assertThat(names).doesNotContain("amendment-proration.drl");
     }
 
     @Test
