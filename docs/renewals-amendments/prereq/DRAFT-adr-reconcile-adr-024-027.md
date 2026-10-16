@@ -71,13 +71,13 @@ The source of an on-prem order is the executed AmendmentDocument, or the outbox 
 | Level | Idempotency key |
 |---|---|
 | Order header | `(DOCUMENT, document id, amendment_seq)` |
-| Application unit / order line | `(document id, unit_no, content digest)`, the spine V13 apply key |
+| Application unit / order line | `(document id, unit_no)`, the spine V13 apply identity; store the content digest as replay data, no-op on a matching digest and reject/audit a different digest |
 
 `orderId` stays a UUID, as ADR-024 D-06 states. Submitting the same executed document twice returns the same order. A second executed amendment on the same contract is a new document, a new sequence, and a new order.
 
 ### D-R4 — One apply trigger
 
-CAM applies each ApplicationUnit after EXECUTED, inside the ledger transaction, idempotent on `(document id, unit_no, content digest)`.
+CAM applies each ApplicationUnit after EXECUTED, inside the ledger transaction, idempotent on `(document id, unit_no)`, with the content digest stored and checked on replay. A matching digest is a no-op; a different digest is rejected and audited.
 
 There is no v1 `ApplyAmendmentUnit` command from order-service to CAM. That command would be a second writer. Order-service, once the owner accepts it, sends fulfilment commands for on-prem lines and receives entitlement evidence back. CAM writes the commercial result.
 
@@ -147,7 +147,7 @@ These four ADRs are not edited by this proposal and are not accepted by it. On o
 
 **ADR-025.** The in-house process manager stays the proposed mechanism for on-prem fulfilment sagas, one saga per on-prem order line, started after EXECUTED. A mid-term SaaS amendment starts no fulfilment saga and no Quote-to-Revenue saga in v1. Correlation for an on-prem fulfilment saga is the document id, and the quote UUID when the document has a quote. Quote-to-Revenue remains Proposed and is not the amendment apply path.
 
-**ADR-026.** Kafka commands with registered replies stay the proposed transport for on-prem fulfilment. The payload's business key includes `(document id, unit_no, content digest)`. The Kafka record key may remain the order line id (ADR-026 D-04) once the line exists. No command in v1 applies commercial state in CAM.
+**ADR-026.** Kafka commands with registered replies stay the proposed transport for on-prem fulfilment. The payload's business identity is `(document id, unit_no)`; it also carries the content digest as a value to validate on replay, not as an additional unique-key component. The Kafka record key may remain the order line id (ADR-026 D-04) once the line exists. No command in v1 applies commercial state in CAM.
 
 **ADR-027.** The per-line point of no return applies to on-prem fulfilment lines and is crossed when the first non-compensatable request is dispatched (licence issued, shipment released, ERP posting). `REVOKE` and `REGENERATE` are non-compensatable. After that point, a further commercial change is a new AmendmentDocument; the on-prem line on that document is a new order. SaaS corrections in v1 are new amendments under spine rule A1, outside saga compensation. Holds (ADR-027 D-06) still pause an on-prem saga and do not compensate it.
 
