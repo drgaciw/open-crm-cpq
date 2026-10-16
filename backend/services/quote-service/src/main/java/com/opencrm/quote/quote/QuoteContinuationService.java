@@ -12,6 +12,7 @@ import com.opencrm.quote.ramp.*;
 import com.opencrm.security.CurrentActor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -186,14 +187,35 @@ public class QuoteContinuationService {
     }
 
     private Optional<Quote> liveRenewal(String subscriptionNumber, LocalDate start) {
-        return quotes.findAll((root, query, cb) -> cb.and(
+        PageRequest page = PageRequest.of(0, 50, Sort.by("id"));
+        while (true) {
+            var candidates = quotes.findAll((root, query, cb) -> cb.and(
                 cb.isFalse(root.get("deleted")),
                 cb.equal(root.get("dealType"), DealType.RENEWAL),
+                cb.or(cb.equal(root.get("continuationOperation"), QuoteContinuationRequest.Operation.RENEWAL),
+                        cb.isNull(root.get("continuationOperation"))),
                 cb.equal(root.get("targetSubscriptionNumber"), subscriptionNumber),
                 cb.equal(root.get("startDate"), start),
                 root.get("status").in(QuoteStatus.DRAFT, QuoteStatus.IN_REVIEW, QuoteStatus.PENDING_APPROVAL,
                         QuoteStatus.APPROVED, QuoteStatus.SENT, QuoteStatus.ACCEPTED)),
-                PageRequest.of(0, 1)).stream().findFirst();
+                page);
+            var existing = candidates.stream()
+                    .filter(quote -> continuationOperation(quote) == QuoteContinuationRequest.Operation.RENEWAL)
+                    .findFirst();
+            if (existing.isPresent() || !candidates.hasNext()) return existing;
+            page = page.next();
+        }
+    }
+
+    /** Old writers can leave the column null after V1_12; only explicit persisted JSON identifies them. */
+    private QuoteContinuationRequest.Operation continuationOperation(Quote quote) {
+        if (quote.getContinuationOperation() != null) return quote.getContinuationOperation();
+        if (quote.getContinuationRequestJson() == null) return null;
+        try {
+            return json.readValue(quote.getContinuationRequestJson(), QuoteContinuationRequest.class).getOperation();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void recordDecision(QuoteDto draft, SubscriptionRenewalEligibleEvent event, SubscriptionScheduleView schedule,
@@ -252,7 +274,7 @@ public class QuoteContinuationService {
                 || !Objects.equals(quote.getCustomerExternalId(),request.getCustomerExternalId())
                 || !Objects.equals(quote.getCurrency(),request.getCurrency()) || !Objects.equals(quote.getObservedRevision(),request.getObservedRevision())
                 || quote.getDealType() != dealType(request.getOperation())
-                || quote.getContinuationOperation() != request.getOperation())
+                || (quote.getContinuationOperation() != null && quote.getContinuationOperation() != request.getOperation()))
             throw invalid("Continuation commercial identities have changed; author a fresh continuation");
         var target=schedules.byNumber(request.getTargetSubscriptionNumber());
         var plan=QuoteContinuationPolicy.plan(request,target);
@@ -293,6 +315,8 @@ public class QuoteContinuationService {
                     || !sameAmount(actual.getNetMonthly(),expected.getNetMonthly()) || !sameAmount(actual.getPeriodAmount(),expected.getPeriodAmount()))
                 throw invalid("Continuation initial interval differs from the validated target rates");
         }
+        // Repair only after every identity, revision, date and price check has passed.
+        if (quote.getContinuationOperation() == null) quote.setContinuationOperation(request.getOperation());
         return plan;
     }
     private boolean sameAmount(BigDecimal left,BigDecimal right) {return left != null && right != null && left.compareTo(right)==0;}
