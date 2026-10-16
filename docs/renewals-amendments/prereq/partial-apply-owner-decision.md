@@ -142,13 +142,20 @@ DRG-565, as read in Linear, asks for partial-application rules for mixed-line do
 
 ## 9. Owner record
 
-Blank until the owner writes it. This file does not fill it in.
+Recorded 2026-10-16. Sections 1 through 8 are the request merged in #626. This section records the confirmation that followed. The record is the first slice only.
 
-- Decision: A, B, or C.
-- Date:
-- APPLY_BLOCKED means no unit has committed: yes or no.
-- Rebase is a first-slice remedy: yes or no. The proposed default is no.
-- Ledger table for S4: `document_apply_ledger` as in the V1_9 paragraph, or columns on `applied_quote_acceptances` as in schema 2.6. The proposed default does not choose.
+Option A for the first slice was delegated by the owner and relayed by Projects Manager. The owner, drg, said, about 5:10 PM CT: "I delegate these decisions to you." Projects Manager confirmed OQ5 option A (#626). CPQ Decision ruled the confirmation valid about 5:11 PM CT. The ruling is the first slice only.
+
+- Decision: **A**, first slice only. Delegated by the owner and relayed by Projects Manager. Projects Manager confirmed option A. CPQ Decision ruled the confirmation valid.
+- Date: 2026-10-16. Delegation about 5:10 PM CT. Validity ruling about 5:11 PM CT.
+- What option A is: one unit per target subscription, atomic units, no automatic rollback, PARTIALLY_APPLIED when a later unit fails, APPLY_BLOCKED when no unit has committed, correcting amendment as remedy.
+- APPLY_BLOCKED means no unit has committed: yes.
+- Rebase is a first-slice remedy: no. The remedy is a correcting amendment. The proposed default left rebase out, and this record does not add it.
+- Ledger table for S4: not chosen. The proposed default does not choose between `document_apply_ledger` in the V1_9 paragraph and columns on `applied_quote_acceptances` in schema 2.6. This record does not choose either.
+
+`specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, and DRG-562/563. The owner merges.
+
+This record authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
 
 ## 10. Sources read
 
