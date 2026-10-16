@@ -186,6 +186,17 @@ class ContractHeaderBackfillIntegrationTest {
         UUID first = backfill.ensureHeaderAtCreation(id, TENANT);
         UUID second = backfill.ensureHeaderAtCreation(id, TENANT);
         assertThat(second).isEqualTo(first);
+        assertThatThrownBy(() -> backfill.ensureHeaderAtCreation(id, UUID.randomUUID()))
+                .rootCause()
+                .hasMessageContaining(ContractHeaderBackfill.LINKED_HEADER_MISMATCH);
+        String differentCustomer = UUID.randomUUID().toString();
+        jdbc.update("UPDATE subscriptions SET customer_id = ? WHERE id = ?", differentCustomer, id);
+        assertThatThrownBy(() -> backfill.ensureHeaderAtCreation(id, TENANT))
+                .rootCause()
+                .hasMessageContaining(ContractHeaderBackfill.LINKED_HEADER_MISMATCH);
+        jdbc.update("UPDATE subscriptions SET customer_id = ? WHERE id = ?", uuid, id);
+        assertThat(jdbc.queryForObject("SELECT contract_id FROM subscriptions WHERE id = ?", UUID.class, id))
+                .isEqualTo(first);
         assertThat(backfill.countEligible(TENANT)).isZero();
         assertThat(backfill.apply(TENANT)).isZero();
         Map<String, Object> header = headerFor(uuid);

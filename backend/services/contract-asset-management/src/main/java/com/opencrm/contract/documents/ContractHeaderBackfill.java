@@ -20,6 +20,7 @@ public class ContractHeaderBackfill {
     public static final String TENANT_REQUIRED = "authoritative tenant is required";
     public static final String NOT_ELIGIBLE = "subscription is not eligible for a contract header";
     public static final String NUMBER_TAKEN = "contract number already belongs to a different header";
+    public static final String LINKED_HEADER_MISMATCH = "linked contract does not match tenant and customer";
     public static final String RESTORE_FROM_BACKUP = "header backfill refuses to compensate: restore from backup";
 
     private final JdbcTemplate jdbc;
