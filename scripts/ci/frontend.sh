@@ -16,16 +16,8 @@ npx nx --version
 npx nx run-many --target=build --all --parallel=3
 npx nx run-many --target=lint --all --parallel=3
 
-TARGET_PROJECTS="crm-deals crm-leads crm-contacts crm-organizations crm-dashboard shared-models shared-data-access cpq-quotes"
-AVAILABLE_PROJECTS="$(
-  npx nx show projects --with-target=test \
-    | { grep -E "^($(echo "$TARGET_PROJECTS" | tr ' ' '|'))$" || true; } \
-    | paste -sd, -
-)"
-
-if [[ -n "${AVAILABLE_PROJECTS}" ]]; then
-  echo "Running tests for: ${AVAILABLE_PROJECTS}"
-  npx nx run-many --target=test --projects="${AVAILABLE_PROJECTS}" --parallel=3
-else
-  echo "No targeted CRM/shared projects expose a test target — skipping frontend tests"
-fi
+# Test every project that declares a test target. A hand-kept allowlist silently skipped every cpq-*
+# project except cpq-quotes, and any new project (DRG-527); --all cannot drift.
+TEST_PROJECTS="$(npx nx show projects --with-target=test | sort | paste -sd, -)"
+echo "Running tests for $(echo "${TEST_PROJECTS}" | tr ',' '\n' | grep -c .) projects: ${TEST_PROJECTS}"
+npx nx run-many --target=test --all --parallel=3

@@ -104,19 +104,19 @@ interface ItemTableRow {
               <div class="info-item">
                 <span class="label">Discount value</span>
                 <span class="value">{{
-                  bundle.discountValue != null ? bundle.discountValue : '—'
+                  bundle.discountValue ?? '—'
                 }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Min items</span>
                 <span class="value">{{
-                  bundle.minItems != null ? bundle.minItems : '—'
+                  bundle.minItems ?? '—'
                 }}</span>
               </div>
               <div class="info-item">
                 <span class="label">Max items</span>
                 <span class="value">{{
-                  bundle.maxItems != null ? bundle.maxItems : '—'
+                  bundle.maxItems ?? '—'
                 }}</span>
               </div>
               <div class="info-item full">
