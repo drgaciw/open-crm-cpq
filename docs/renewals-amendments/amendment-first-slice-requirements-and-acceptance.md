@@ -61,6 +61,9 @@ Depends on: S1, S2; DRG-562 design.
 - **AC-S3-6.** Given two drafts for one contract executing concurrently, When both execute, Then sequences are N+1 and N+2 with no gap.
 - **AC-S3-7.** Given a DRAFT, When withdrawn, Then state is WITHDRAWN (terminal), no number is consumed, and no gap appears in executed numbering.
 - **AC-S3-8.** Given action date later than today and effective date earlier than action date without a reason code, When submitted, Then V6 fails.
+- **AC-S3-9.** Given a document in DRAFT, IN_REVIEW or APPROVED, When its LifecycleChange gets a new revision, Then a new document revision exists on the same document with the same provisional number, the previous revision is closed SUPERSEDED with its digest kept, the document is DRAFT, approvals bound to the previous revision no longer count, and an event is written (OQ6).
+- **AC-S3-10.** Given a document that is EXECUTED, APPLIED, PARTIALLY_APPLIED or APPLY_BLOCKED, When a new revision is requested, Then the API returns 409 IMMUTABLE_EXECUTED, nothing changes, and an event is written (OQ6).
+- **AC-S3-11.** Given an APPROVED document, When a new revision and an execution are requested concurrently, Then exactly one commits and the other returns 409, and an executed document's recorded digest equals the digest of its executed revision (OQ6).
 
 ### S4 (RA-48 / DRG-582): Document-driven apply with multi-subscription units
 Depends on: S1..S3; DRG-562, DRG-563, DRG-565; DRG-421 for the pricebook version pin; the interim configuration pin (FR-15) removes the DRG-428 block, and DRG-428 later replaces it.
