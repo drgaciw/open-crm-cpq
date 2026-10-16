@@ -3,7 +3,9 @@ package com.opencrm.quote.quote;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.event.*;
+import com.opencrm.common.event.NonRetryableEventException;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.*;
 import com.opencrm.quote.event.QuoteEventPublisher;
@@ -13,6 +15,11 @@ import com.opencrm.security.CurrentActor;
 import org.junit.jupiter.api.*;
 import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.RestClient;
 import java.math.*;
 import java.time.LocalDate;
 import java.util.*;
@@ -29,6 +36,8 @@ class QuoteContinuationServiceTest {
     private QuoteLineItemRepository lines;
     private PricingServiceClient pricing;
     private OutboxEventPublisher outbox;
+    private JdbcTemplate jdbc;
+    private RestClient scheduleHttp;
     private QuoteContinuationService continuations;
     private QuoteService lifecycle;
     private RampPricingProperties properties;
@@ -41,11 +50,14 @@ class QuoteContinuationServiceTest {
     @BeforeEach void setup() {
         schedules=mock(SubscriptionScheduleClient.class);repository=mock(QuoteRepository.class);lines=mock(QuoteLineItemRepository.class);
         pricing=mock(PricingServiceClient.class);outbox=mock(OutboxEventPublisher.class);
+        jdbc=mock(JdbcTemplate.class);scheduleHttp=mock(RestClient.class);
+        when(jdbc.update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         properties=new RampPricingProperties();properties.setEnabled(true);
         var numbers=mock(QuoteNumberGenerator.class);when(numbers.generate()).thenReturn("Q-NEXT");
         var mapper=Mappers.getMapper(QuoteMapper.class);
         continuations=new QuoteContinuationService(schedules,repository,lines,numbers,mapper,properties,
-                new RampScheduleAttacher(properties,new RampScheduleValidator(),new RampEscalatorExpander()),json);
+                new RampScheduleAttacher(properties,new RampScheduleValidator(),new RampEscalatorExpander()),json,
+                jdbc,new CurrentActor("service:quote-service",false),scheduleHttp);
         lifecycle=new QuoteService(repository,mapper,numbers,mock(QuoteEventPublisher.class),lines,pricing,mock(ProductServiceClient.class),
                 json,outbox,new CurrentActor("service:quote-service",false),mock(RampScheduleGuard.class));
         lifecycle.setContinuationService(continuations);
@@ -146,6 +158,68 @@ class QuoteContinuationServiceTest {
                 .hasMessageContaining("one validated");
         verifyNoInteractions(pricing);
     }
+    @Test void systemRenewalDraftUsesExitRateAndRecordsTheCommercialDecision() {
+        when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
+        QuoteDto draft = continuations.draftRenewal(event, null, "event-1", null);
+        assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(draft.getStatus()).isEqualTo(QuoteStatus.DRAFT);
+        assertThat(draft.getQuoteNumber()).isEqualTo("Q-NEXT");
+        assertThat(draft.getStartDate()).isEqualTo(LocalDate.of(2030, 1, 1));
+        assertThat(draft.getEndDate()).isEqualTo(LocalDate.of(2030, 12, 31));
+        assertThat(draft.getSubscriptionEffectiveDate()).isEqualTo(LocalDate.of(2030, 1, 1));
+        assertThat(draft.getDurationInMonths()).isEqualTo(12);
+        assertThat(draft.getLineItems().getFirst().getQuantity()).isEqualTo(50);
+        assertThat(draft.getLineItems().getFirst().getUnitPrice()).isEqualByComparingTo("50.00");
+        assertThat(saved.getContinuationRequestJson()).contains("RENEWAL");
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).update(sql.capture(), eq(1L), eq("Q-NEXT"), eq(QuoteContinuationService.SYSTEM_RENEWAL_DRAFT),
+                eq("service:quote-service"), eq("QuoteContinuationPolicy"), eq("RENEWAL"), eq("RENEWAL_EXIT_RATE"),
+                eq("SUB-R3"), eq("event-1"), contains("\"upliftPercent\":\"0\""), contains("\"unitPrice\":\"50.00\""));
+        assertThat(sql.getValue()).startsWith("INSERT INTO commercial_decision_audit");
+        verifyNoInteractions(outbox);
+    }
+
+    @Test void secondEligibilityForTheSameWindowDoesNotCreateAnotherQuote() {
+        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(saved)));
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
+        continuations.draftRenewal(event, null, "event-1", null);
+        QuoteDto again = continuations.draftRenewal(event, null, "event-2", "sub-r3:2029");
+        assertThat(again.getQuoteNumber()).isEqualTo("Q-NEXT");
+        verify(repository, times(1)).save(any(Quote.class));
+        verify(jdbc, times(1)).update(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(outbox);
+    }
+
+    @Test void ambiguousSourceLineIsNotRetried() {
+        target.setLines(List.of(target.getLines().getFirst(), target.getLines().getFirst()));
+        when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        assertThatThrownBy(() -> continuations.draftRenewal(
+                new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH"),
+                null, "event-1", null))
+                .isInstanceOf(NonRetryableEventException.class)
+                .hasMessageContaining("exactly one");
+        verify(repository, never()).save(any());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test void numericSubscriptionIdReadsTheScheduleByPrimaryKey() throws Exception {
+        when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        RestClient.RequestHeadersUriSpec<?> get = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.ResponseSpec response = mock(RestClient.ResponseSpec.class);
+        doReturn(get).when(scheduleHttp).get();
+        doReturn(get).when(get).uri("/api/v1/subscriptions/{id}/ramp-schedule", "42");
+        doReturn(response).when(get).retrieve();
+        when(response.body(String.class)).thenReturn(json.writeValueAsString(ApiResponse.success(target)));
+        QuoteDto draft = continuations.draftRenewal(
+                new SubscriptionRenewalEligibleEvent("42", LocalDate.of(2029, 12, 1), "Growth", "HIGH"), null, "event-9", null);
+        assertThat(draft.getTargetSubscriptionNumber()).isEqualTo("SUB-R3");
+        assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
+        verify(schedules, atLeastOnce()).byNumber("SUB-R3");
+    }
+
     private QuoteContinuationRequest request(LocalDate effective) {
         return QuoteContinuationRequest.builder().operation(QuoteContinuationRequest.Operation.EXPANSION).targetSubscriptionNumber("SUB-R3")
                 .sourceSubscriptionLineUuid("source-line").observedRevision(7L).customerExternalId("synthetic-customer").currency("USD")
