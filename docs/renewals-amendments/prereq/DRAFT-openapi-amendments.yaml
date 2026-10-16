@@ -261,6 +261,8 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [lifecycle-changes]
       operationId: createLifecycleChangeRevision
       summary: Open a new revision from a draft edit
@@ -297,6 +299,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/LifecycleChangeId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [lifecycle-changes]
       operationId: priceLifecycleChange
       summary: Price lines through pricing-service
@@ -312,9 +316,12 @@ paths:
 
         An override sends value and reasonCode. The actor is the authenticated
         principal. The response includes approvalRequestId for
-        CONTRACT_MODIFICATION (AC-S5-4). configurationHash may be null until
-        DRG-428; productExternalId and pricebookVersion are required on every
-        priced line.
+        CONTRACT_MODIFICATION (AC-S5-4). productExternalId, pricebookVersion and
+        configurationHash are required and non-null on every priced line. The
+        interim configurationHash is the lowercase SHA-256 of the canonical
+        product id, pricebook version and sorted option codes defined by the
+        technical approach; DRG-428 later replaces that pin without making it
+        nullable.
 
         A target that is not ACTIVE fails V2. Status becomes PRICED when every
         priced line has a decision. Re-pricing the same revision replaces the
@@ -375,6 +382,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/LifecycleChangeId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [lifecycle-changes]
       operationId: submitLifecycleChange
       summary: Submit the commercial change for approval
@@ -385,8 +394,10 @@ paths:
         ACTION_NOT_SUPPORTED_IN_SLICE and leaves status unchanged (AC-S5-3).
         A target that is not ACTIVE returns rule V2 (AC-S5-6). A priced line
         missing policyDecisionId, policyId, policyVersion or pricingTraceId
-        fails V8. Product and pricebook pins must be present (V9);
-        configurationHash may be null.
+        fails V8. Product, pricebook and configuration pins must be present and
+        non-null (V9); the owner-selected interim configurationHash is required
+        until DRG-428 supplies its replacement. An absent pin returns 422 and
+        leaves the state unchanged.
 
         Repeating submit for the same revision and contentDigest is a no-op
         and returns 200 with Idempotent-Replayed true.
@@ -421,6 +432,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/LifecycleChangeId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [lifecycle-changes]
       operationId: withdrawLifecycleChange
       summary: Withdraw a lifecycle change that is not yet applied
@@ -679,6 +692,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: submitAmendment
       summary: Submit a priced draft for review
@@ -740,6 +755,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: recordAmendmentApproval
       summary: Record an approval-routing decision
@@ -787,6 +804,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: acceptAmendment
       summary: Accept click-through and execute
@@ -847,6 +866,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: sendAmendmentForSignature
       summary: Send a rendition for signature
@@ -886,6 +907,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: withdrawAmendment
       summary: Withdraw a document that has not executed
@@ -921,6 +944,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: executeAmendment
       summary: System execute for notice-only and not-required policies
@@ -959,6 +984,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [later, amendments]
       operationId: applyAmendment
       summary: Apply executed units to the ledger
@@ -982,6 +1009,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [later, amendments]
       operationId: voidAmendment
       summary: Void an executed document before apply
@@ -1000,6 +1029,8 @@ paths:
     parameters:
       - $ref: "#/components/parameters/AmendmentId"
     post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       tags: [later, amendments]
       operationId: rebaseAmendment
       summary: Re-observe revisions and open a new document revision
@@ -1141,10 +1172,12 @@ components:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
-      required: false
+      required: true
       description: |
-        Optional headless key. Stored as requestIdentifier when the body omits
-        one. Unique per tenant.
+        Required for every new mutation in this draft contract. Reuse on a
+        replay; reject a different request body for the same key. Stored as
+        requestIdentifier when the body omits one. Unique per tenant. The
+        pre-existing quote-continuation endpoints keep their current contract.
       schema:
         type: string
         maxLength: 200
@@ -1830,7 +1863,7 @@ components:
         configurationHash:
           type: string
           nullable: true
-          description: Nullable until DRG-428. Equal at apply when present (V9).
+          description: Null only on an unpriced draft. Pricing and submission require the non-null interim SHA-256 pin; equality is rechecked at apply (V9). DRG-428 later replaces the interim pin.
         unitPrice:
           nullable: true
           allOf:
@@ -1856,7 +1889,7 @@ components:
 
     PricingDecision:
       type: object
-      required: [lineId, policyDecisionId, policyId, policyVersion, pricingTraceId]
+      required: [lineId, policyDecisionId, policyId, policyVersion, pricingTraceId, productExternalId, pricebookVersion, configurationHash]
       properties:
         lineId: {type: string, format: uuid}
         policyDecisionId: {type: string}
@@ -1873,7 +1906,8 @@ components:
           $ref: "#/components/schemas/PriceAsOf"
         productExternalId: {type: string}
         pricebookVersion: {type: string}
-        configurationHash: {type: string, nullable: true}
+        configurationHash:
+          $ref: "#/components/schemas/Sha256"
         unitPrice:
           $ref: "#/components/schemas/Money"
         netAmount:
@@ -2035,6 +2069,9 @@ components:
         - endQty
         - effectiveFrom
         - applicationUnitNo
+        - productExternalId
+        - pricebookVersion
+        - configurationHash
       properties:
         id: {type: string, format: uuid}
         lineNo: {type: integer, minimum: 1}
@@ -2066,13 +2103,12 @@ components:
           $ref: "#/components/schemas/PriceAsOf"
         productExternalId:
           type: string
-          nullable: true
           description: Null until pricing pins the product (V9).
         pricebookVersion:
           type: string
-          nullable: true
           description: Null until pricing pins the pricebook (V9).
-        configurationHash: {type: string, nullable: true}
+        configurationHash:
+          $ref: "#/components/schemas/Sha256"
         unitPrice:
           nullable: true
           allOf:
@@ -2440,3 +2476,4 @@ components:
             success: {enum: [true]}
             data:
               $ref: "#/components/schemas/ContinuationPlan"
+
