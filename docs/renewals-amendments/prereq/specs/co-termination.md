@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `co-termination`. **Date:** 2026-10-16.
 
-**Source.** [DRG-554](https://linear.app/drgamtd-workspace/issue/DRG-554) (RA-20). It overlaps [DRG-461](https://linear.app/drgamtd-workspace/issue/DRG-461) (BC-07-04, amendments and co-termination). This proposal extends that item. It does not open a second co-term implementation. Scenario 4 in `../cpq-pricing-policy-sanity-check.md` is the worked illustration (example figures, not customer data).
+**Source.** [DRG-554](https://linear.app/drgamtd-workspace/issue/DRG-554) (RA-20). It overlaps [DRG-461](https://linear.app/drgamtd-workspace/issue/DRG-461) (BC-07-04, amendments and co-termination). This proposal extends that item. It does not open a second co-term implementation. Scenario 4 in `../../cpq-pricing-policy-sanity-check.md` is the worked illustration (example figures, not customer data).
 
 **Conventions.** **[S]** is taken from DRG-554 or that scenario. **[I]** is a design inference carried forward as a proposal. The mode set and the merge rules are **Owner decisions**.
 
@@ -21,7 +21,7 @@
 
 The amendment document and partial apply (`partial-apply.md`). Renewal uplift, price locks, and the ARR bridge (DRG-567, DRG-568, `arr-bridge.md`). Maintenance percent math (`maintenance.md`). DRG-461's broader amendment behavior beyond the co-term date and the merge identity. Contract-header backfill (DRG-585). Approvals (DRG-591, parked).
 
-Mid-term amendments co-term to the existing end date unless a co-term policy says otherwise (`../mid-term-amendment-policy-spec.md` V5). This slice is that policy.
+Mid-term amendments co-term to the existing end date unless a co-term policy says otherwise (`../../mid-term-amendment-policy-spec.md` V5). This slice is that policy.
 
 ### Proposed contract
 
