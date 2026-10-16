@@ -243,14 +243,16 @@ class PricingDrulesGoldenFixtureTest {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = {80})
     @DisplayName("execute records the renewal default without changing the price or writing a decision audit")
-    void executeRenewalUpliftDoesNotChangePrice() throws Exception {
+    void executeRenewalUpliftDoesNotChangePrice(Integer storedChurn) throws Exception {
         PricingAuditLogRepository auditLogRepository = mock(PricingAuditLogRepository.class);
         when(auditLogRepository.save(any(PricingAuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
         CustomerRepository customers = mock(CustomerRepository.class);
         when(customers.findByExternalIdAndDeletedFalse("CUST-1")).thenReturn(Optional.of(Customer.builder()
-                .externalId("CUST-1").name("Acme").region(CustomerRegion.NA).churnScore(80).build()));
+                .externalId("CUST-1").name("Acme").region(CustomerRegion.NA).churnScore(storedChurn).build()));
         PricingProductRepository products = mock(PricingProductRepository.class);
         when(products.findByExternalIdInAndDeletedFalse(any())).thenReturn(List.of());
         RuleSetRepository ruleSets = mock(RuleSetRepository.class);
@@ -267,7 +269,7 @@ class PricingDrulesGoldenFixtureTest {
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("dealType", "RENEWAL");
-        metadata.put("churnScore", 10);
+        metadata.put("churnScore", storedChurn == null ? 80 : 10);
         PricingResult result = service.execute(PricingContext.builder()
                 .customerExternalId("CUST-1").quoteExternalId("Q-1").region("NA").currency("USD")
                 .durationInMonths(12).metadata(metadata)
@@ -277,11 +279,18 @@ class PricingDrulesGoldenFixtureTest {
 
         assertThat(result.getLineResults().getFirst().getFinalPrice()).isEqualByComparingTo("200.00");
         assertThat(result.getLineResults().getFirst().getUnitPrice()).isEqualByComparingTo("100.00");
-        assertThat(result.getLineResults().getFirst().getMetadata().get("renewalUpliftPct")).isEqualTo("0.03");
+        assertThat(result.getLineResults().getFirst().getMetadata().get("renewalUpliftPct")).isEqualTo(storedChurn == null ? "0.08" : "0.03");
         assertThat(result.getLineResults().getFirst().getMetadata().get("renewalUpliftSource")).isEqualTo("RENEWAL_UPLIFT_POLICY");
-        assertThat(result.getLineResults().getFirst().getMetadata().get("retentionOffer")).isEqualTo("ENABLE_12M_PRICE_PROTECTION");
+        if (storedChurn == null) {
+            assertThat(result.getLineResults().getFirst().getMetadata()).doesNotContainKey("retentionOffer");
+            assertThat(result.getWaterfall().getExplanationCodes()).doesNotContain("ENABLE_12M_PRICE_PROTECTION");
+        } else {
+            assertThat(result.getLineResults().getFirst().getMetadata().get("retentionOffer"))
+                    .isEqualTo("ENABLE_12M_PRICE_PROTECTION");
+            assertThat(result.getWaterfall().getExplanationCodes()).contains("ENABLE_12M_PRICE_PROTECTION");
+        }
         assertThat(result.getWaterfall().getNetPrice()).isEqualByComparingTo("200.00");
-        assertThat(result.getWaterfall().getExplanationCodes()).contains("RENEWAL_UPLIFT_POLICY", "ENABLE_12M_PRICE_PROTECTION");
+        assertThat(result.getWaterfall().getExplanationCodes()).contains("RENEWAL_UPLIFT_POLICY");
         assertThat(result.getExplanationCodes()).contains("RENEWAL_UPLIFT_POLICY");
 
         ArgumentCaptor<PricingAuditLog> saved = ArgumentCaptor.forClass(PricingAuditLog.class);

@@ -378,10 +378,14 @@ public class PricingExecutionService {
     }
 
     private static void stampRenewalChurn(PricingContext context, Customer customer) {
-        if (!"RENEWAL".equals(exactDealType(context)) || customer == null || customer.getChurnScore() == null) return;
+        if (!"RENEWAL".equals(exactDealType(context))) return;
         Map<String, Object> metadata = new HashMap<>();
         if (context.getMetadata() != null) metadata.putAll(context.getMetadata());
-        metadata.put("churnScore", customer.getChurnScore());
+        // Absence in the authoritative row must also replace caller input.
+        metadata.remove("churnScore");
+        if (customer != null && customer.getChurnScore() != null) {
+            metadata.put("churnScore", customer.getChurnScore());
+        }
         context.setMetadata(metadata);
     }
 
