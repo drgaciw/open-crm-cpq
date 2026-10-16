@@ -1,9 +1,10 @@
-# Draft proposal: reconcile ADR-024 to ADR-027 with the amendment spine
+# Reconcile ADR-024 to ADR-027 with the amendment spine
 
-**Status:** Proposed. The project owner accepts ADRs. This draft assigns no number and leaves [ADR-024](../../adr/ADR-024-order-orchestration-context.md), [ADR-025](../../adr/ADR-025-saga-process-manager.md), [ADR-026](../../adr/ADR-026-command-messages.md) and [ADR-027](../../adr/ADR-027-compensation-and-point-of-no-return.md) Proposed.
+**Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
+**Acceptance scope:** This status-change record implements the owner approval recorded in PR #623. Pre-acceptance workflow references below do not override the Accepted status. Runtime implementation, migrations and flag rollout remain separate work; this record does not accept ADR-024 through ADR-027.
 **Date:** 2026-10-16
 **Story:** [DRG-577](https://linear.app/drgamtd-workspace/issue/DRG-577/reconcile-proposed-order-model-adr-024-to-adr-027-with-the-amendment) (RA-43), project OPEN-CRM-CPQ, team DRG.
-**Deciders:** Project owner (acceptance still pending). The ruling in this file is CPQ Decision, recorded on DRG-577 on 2026-10-16, medium confidence 0.7.
+**Deciders:** Project owner (accepted 2026-10-16). The ruling in this file is CPQ Decision, recorded on DRG-577 on 2026-10-16, medium confidence 0.7.
 **Relates to:** the amendment spine ([field schema](../amendment-entity-field-schema.md), [design spike](../amendment-document-design-spike.md), [mid-term policy spec](../mid-term-amendment-policy-spec.md), [transcript](../cpq-project-transcript.md)); [DRG-578](https://linear.app/drgamtd-workspace/issue/DRG-578/action-aware-fulfilment-decomposition-for-amendments-and-renewals); [DRG-558](https://linear.app/drgamtd-workspace/issue/DRG-558/entitlement-fulfilment-step-and-commitment-state-model-pendingactive); [DRG-580](https://linear.app/drgamtd-workspace/issue/DRG-580/s2-hash-chained-append-only-amendment-event-writer-verifier-and-audit) (S2).
 **Does not authorize:** code, schema, service, topic, registry entry, gateway route, feature flag, merge, or deploy. `opencrm.contract.subscription-source` is not introduced. ADR-024 to ADR-027 stay documentation until the owner accepts them.
 

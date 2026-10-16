@@ -1,8 +1,9 @@
-# Draft ADR: Amendment proration formula
+# ADR: Amendment proration formula
 
-**Status:** Proposed. Not accepted. The owner accepts ADRs. Until this status changes to Accepted, [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542/amendment-proration-rule-conflicts-with-continuation-formula) stays blocked.
+**Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
+**Acceptance scope:** This status-change record implements the owner approval recorded in PR #623. Pre-acceptance workflow references below do not override the Accepted status. Runtime implementation, migrations and flag rollout remain separate work; this record does not accept ADR-024 through ADR-027.
 **Date:** 2026-10-16
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted 2026-10-16).
 **Number:** none. Do not assign one in this draft. Do not copy this file into `docs/adr/` and do not add a row to `docs/adr/README.md` until the owner accepts it and assigns a number.
 **Story:** [DRG-603](https://linear.app/drgamtd-workspace/issue/DRG-603/adr-draft-proposed-single-amendment-proration-formula). This draft unblocks [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542/amendment-proration-rule-conflicts-with-continuation-formula) only after acceptance. It informs [DRG-550](https://linear.app/drgamtd-workspace/issue/DRG-550/amendment-price-policy-proration-and-credittermination-fee-policies).
 **Does not authorize:** deleting or editing rules, a Flyway migration, a pricing or continuation flag, a merge, or a deploy.
@@ -78,7 +79,7 @@ Even a matching day fraction disagrees by scale (4 versus 2). On 2028-07-01 the 
 
 `cpq-pricing-policy-sanity-check.md` scenario 2 shows the other coincidence: `16 × 500 × 92/365 = 2,016.44` equals this rule only when the delta is an annual amount and the full term is 365 days. A monthly billing period is a different denominator.
 
-## Decision (Proposed — not Accepted)
+## Decision (Accepted 2026-10-16)
 
 ### D-01 — One formula
 
