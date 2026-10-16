@@ -88,7 +88,7 @@ The per-tenant flag's granularity is OQ11, status DEFAULT PROPOSED, and it block
 
 **If the owner chooses option B:** ApplyBlocked can still mean the whole apply failed. A UnitApplied event that is durable while a sibling unit has failed would not match option B. The files read here do not say whether UnitApplied is suppressed until the whole document commits. The draft OpenAPI reserves `PARTIALLY_APPLIED` and `APPLY_BLOCKED` on `AmendmentStatus` for S4, and the `:apply` description says partial application (OQ5) is undecided and that there is no `applyStatus` field (`prereq/DRAFT-openapi-amendments.yaml`). This file does not edit that contract.
 
-**Draft reconciliation note, not a decision:** `prereq/DRAFT-adr-reconcile-adr-024-027.md` says a parked on-prem line leaves the SaaS units applied, and that partial application across units stays OQ5. Its consequences section says operators will see an applied SaaS unit while an on-prem line is still in fulfilment. That draft says it does not close OQ5. Ordering and fulfilment are out of the first slice (`renewals-amendments-dev-readiness.md`, section 6).
+**Draft reconciliation note, not a decision:** `prereq/adr-reconcile-adr-024-027.md` says a parked on-prem line leaves the SaaS units applied, and that partial application across units stays OQ5. Its consequences section says operators will see an applied SaaS unit while an on-prem line is still in fulfilment. That draft says it does not close OQ5. Ordering and fulfilment are out of the first slice (`renewals-amendments-dev-readiness.md`, section 6).
 
 ## 6. Consequences for the apply ledger (V1_9)
 
@@ -170,7 +170,7 @@ Blank until the owner writes it. This file does not fill it in.
 | `renewals-amendments-parking-lot.md` | PL-9 item 6 |
 | `renewals-amendments-dev-readiness.md` | Condition 4; section 3 placement row; section 6 out of slice |
 | `prereq/DRAFT-openapi-amendments.yaml` | `:apply` description; `AmendmentStatus` enum |
-| `prereq/DRAFT-adr-reconcile-adr-024-027.md` | Mixed-document paragraph; negative consequence; OQ5 left open |
+| `prereq/adr-reconcile-adr-024-027.md` | Mixed-document paragraph; negative consequence; OQ5 left open |
 | Linear DRG-565 | Title, description, related issues as returned by the issue read |
 
 ## 11. Unverified
@@ -180,4 +180,4 @@ Blank until the owner writes it. This file does not fill it in.
 - TMF622's `partial` order state. DRG-565 and the spike cite it as precedent. The standard text was not opened.
 - Approval-routing support for per-gate approver roles. The parking lot says that was not verified for PL-9.
 - Full bodies of DRG-563, DRG-582, DRG-551, DRG-536, and DRG-559. DRG-565's relation list was read. Those issues' descriptions were not.
-- The remainder of `DRAFT-openapi-amendments.yaml` and of `DRAFT-adr-reconcile-adr-024-027.md` beyond the passages cited above.
+- The remainder of `DRAFT-openapi-amendments.yaml` and of `adr-reconcile-adr-024-027.md` beyond the passages cited above.
