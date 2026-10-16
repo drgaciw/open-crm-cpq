@@ -104,7 +104,7 @@ From the requirements file and DRG-585 (`read`), S7 would then be:
 
 - Depends on S1 (DRG-579). DRG-585 also names OQ3 and OQ7. OQ3 is confirmed in ADR-035 (`read`). OQ7 is this decision.
 - A migration or job named V1_8: create one contract per existing subscription, set `subscriptions.contract_id`, idempotent.
-- AC-S7-1. N existing subscriptions yield N contracts, each subscription has `contract_id`, and a re-run creates no duplicates.
+- AC-S7-1. N eligible, non-deleted subscriptions yield N contracts, each subscription has `contract_id`, and a re-run creates no duplicates.
 - AC-S7-2. No AmendmentDocument rows and no outbox events.
 - AC-S7-3. A subscription created after cutover by the NEW path gets a contract header at creation.
 - AC-S7-4. Contract numbers are unique per tenant and stable.
@@ -113,6 +113,8 @@ From the requirements file and DRG-585 (`read`), S7 would then be:
 Gaps the opened texts leave for that later PR (`unverified` as designs, because no source named them):
 
 - The idempotency match key.
+- **Blocking tenant source:** `contracts.tenant_id` is a non-null UUID, while existing subscriptions and their accepted-event inputs have no tenant field. S7 must define and validate an authoritative tenant mapping or a prerequisite subscription migration before any insert. A fabricated/default tenant is forbidden.
+- **Eligibility:** only subscriptions with `is_deleted = false` are candidates, matching the V1_6 backfill. Soft-deleted subscriptions are excluded; status/date eligibility beyond that minimum remains an explicit owner decision. N below means the eligible set, not every stored row.
 - How varchar `customer_id` becomes uuid `customer_account_id`.
 - How subscription status, dates, and `term_model` are filled.
 - The pattern used to mint `contract_number` for a backfilled header. AC-S7-4 requires uniqueness per tenant and stability. The `{contract_number}-A{nnn}` format in the field schema is the amendment number, assigned at EXECUTED (`read`). It is not a header-minting rule.
@@ -157,6 +159,7 @@ Linear, read 2026-10-16: DRG-585, DRG-554, DRG-546, DRG-566.
 ## Unverified
 
 - Any `V1_8` SQL, its match key, and any execution of it.
+- The authoritative tenant mapping or prerequisite tenant migration (blocking S7).
 - A varchar-to-uuid customer mapping, and the fill rules for contract status, dates, `term_model`, and `contract_number`.
 - That DRG-554 updates `subscriptions.contract_id`.
 - That `subscriptions.quote_id` is the spike's "original quote."
