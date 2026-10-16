@@ -74,7 +74,7 @@ Each rule is testable as a pass or fail on a given input. Failure blocks the nam
 - **V10** Content digest at apply equals the digest of the executed (or approved) revision; mismatch blocks apply. [S spike 3]
 - **V11** At most one revision per amendment number reaches EXECUTED. [S spike, decision 6 proposed]
 - **V12** Units apply in dependency order (create before terminate); a unit writes all its rows or none. [S spike 4]
-- **V13** Applying the same (document id, unit no, content digest) twice is a no-op; same key with a different digest is rejected. [S spike 3]
+- **V13** The apply key is (document id, unit no), enforced uniquely. Applying it again with the same stored content digest is a no-op; reusing that key with a different digest is rejected and audited. [S spike 3]
 - **V14** Manual price overrides record actor, reason code and the overridden value, and route to approval. [I]
 
 ## 5. Audit requirements

@@ -3,7 +3,7 @@
 *open-crm-cpq, universal renewals-and-amendments. Documentation only; no code. Date: 2026-10-16. Companion: `amendment-first-slice-requirements-and-acceptance.md` (requirement and story ids), `renewals-amendments-open-questions-register.md`. Conventions: [V] verified in the repo on 2026-10-16 through the GitHub connector or in the adjacent services assessment; [S] from a project file; [I] proposal.*
 
 ## 1. Approach in one paragraph
-Build the spine in CAM as a separate contract-documents module (ADR-035 D-01, Proposed), add a thin `contracts` header, and make CAM's existing typed apply (digest, `observedRevision`, Kafka inbox, advisory lock) the single writer of applied state [V, assessment 2]. quote-service gains a minimal LifecycleChange for intent Amend, and the existing continuation endpoint becomes a facade. The legacy QuoteAccepted apply path stays alive behind a per-tenant flag until the document path is proven. Everything is expand-then-contract and additive.
+Build the spine in CAM as a separate contract-documents module (ADR-035 D-01, Accepted 2026-10-16; implementation authorized for S1 and S2 only), add a thin `contracts` header, and make CAM's existing typed apply (digest, `observedRevision`, Kafka inbox, advisory lock) the single writer of applied state [V, assessment 2]. quote-service gains a minimal LifecycleChange for intent Amend, and the existing continuation endpoint becomes a facade. The legacy QuoteAccepted apply path stays alive behind a per-tenant flag until the document path is proven. Everything is expand-then-contract and additive.
 
 ## 2. Service touch points
 | Service | Change | Stories |
@@ -21,7 +21,7 @@ Build the spine in CAM as a separate contract-documents module (ADR-035 D-01, Pr
 ## 3. Schema and migration order (CAM)
 1. **V1_7 expand** (S1): create `contracts`; add nullable `subscriptions.contract_id`; create `amendment_documents`, `amendment_document_revisions`, `amendment_document_lines`, `amendment_application_units`, `amendment_document_events`; indexes and uniqueness per schema section 4; INSERT-only grant and reject trigger on events; add nullable `amendment_document_line_id` and `revision_no` on `subscription_rate_periods` (A4).
 2. **V1_8 backfill** (S7): one contract per subscription, set `contract_id`. Idempotent. No documents, no events.
-3. **V1_9 apply ledger** (S4): new `document_apply_ledger` keyed (`document_id`, `unit_no`, `apply_key_digest`); keep `applied_quote_acceptances` unchanged for the legacy path [I] (avoids altering a UNIQUE constraint under load; resolves the DRG-563 conflict by bypass, not mutation).
+3. **V1_9 apply ledger** (S4): new `document_apply_ledger` with a unique key (`document_id`, `unit_no`) and stored `apply_key_digest`; a replay with the same digest is a no-op and a different digest is rejected and audited; keep `applied_quote_acceptances` unchanged for the legacy path [I] (avoids altering a UNIQUE constraint under load; resolves the DRG-563 conflict by bypass, not mutation).
 4. **Later contract phase** (not in slice): `contract_id` NOT NULL, retire legacy path, `retention_until` computation after OQ8.
 Rules: every migration is compatible with the previous app version; no data rewrite of existing rate periods; rollback is app-level via the flag, not down-migrations.
 
@@ -48,12 +48,12 @@ Critical path: ADR-035 > S1 > S2 > S3 > S4 > S8. S5 and S7 run in parallel after
 
 Suggested calendar (two to three engineers) [I]: Day 0 decision meeting (accept ADR-035, confirm defaults, verify OQ9). Day 1: S1 and S2 in parallel with S5 design and OpenAPI. Day 2: S3, S7. Days 3 to 5: S4, S5, S6. Days 5 to 6: S8 hardening. Starting work (not finishing) within one to two days is realistic; shipping the slice is about one working week.
 
-External dependencies: DRG-421 and DRG-428 (version pinning) are needed for V9 but a minimal pin of the pricebook version and product external id is enough for slice; configuration hash can be nullable until DRG-428 lands [I]. DRG-457 (e-sign adapter) not needed. DRG-458 enrichment later. DRG-561 equals ADR-035 acceptance. RA-43 / DRG-577 and RA-44 / DRG-578 are not on the slice path.
+External dependencies: DRG-421 and DRG-428 (version pinning) are prerequisites for the V9-dependent pricing and apply work in S4 and S5, and for live V9-dependent transitions in S3. Product external id, pricebook version and configuration hash remain mandatory, non-null pins and must be rechecked at apply. Until those dependencies supply verifiable pins, the affected work remains blocked; S1 and S2 may proceed with the non-null schema and offline fixtures. There is no nullable configuration-hash alternative in this slice. DRG-457 (e-sign adapter) not needed. DRG-458 enrichment later. DRG-561 equals ADR-035 acceptance. RA-43 / DRG-577 and RA-44 / DRG-578 are not on the slice path.
 
 ## 7. Risks and mitigations
 | # | Risk | Likelihood / impact | Mitigation |
 |---|---|---|---|
-| R1 | ADR-035 not accepted, blocks all work | Medium / High | Hold a 30 minute decision; accepted-with-conditions allowed; S5 design can start meanwhile |
+| R1 | Scope expands beyond the ADR-035 acceptance | Medium / High | ADR-035 is Accepted for S1 and S2 only; S3 to S8 require their own readiness and authorization gates |
 | R2 | Pricing-service lacks amendment modes or PolicyDecision trace (OQ9) | Medium / High | One day spike before S5; fallback is RetainContracted only with explicit unit price supplied by quote-service and flagged override |
 | R3 | Legacy apply and document apply double-apply the same acceptance | Low / High | Routing by `amendmentDocumentId` presence; inbox dedup; test AC-S4-9 and AC-S6-2 |
 | R4 | Digest canonicalization drift between quote-service and CAM | Medium / High | Shared utility in `libs/common`; golden-file contract tests |
@@ -69,8 +69,8 @@ External dependencies: DRG-421 and DRG-428 (version pinning) are needed for V9 b
 ## 8. Test strategy
 - **Unit:** one failing and one passing case per rule V1..V14 (named by id); state machine transition table test; hash computation golden vectors.
 - **Database:** migration test from V1_6 snapshot; constraint tests (unique, partial unique, trigger, grants) using Testcontainers PostgreSQL.
-- **Integration:** Kafka with Testcontainers: consume, dedup, flag routing; reuse and extend fixtures `accepted-v1/*.json`; outbox-to-audit publication.
-- **Contract:** schema compatibility for `QuoteAcceptedEvent` (old consumer reading new event and the reverse); OpenAPI contract tests between quote-service and CAM.
+- **Integration:** Kafka with Testcontainers: consume, dedup, flag routing; reuse and extend fixtures `accepted-v1/*.json`; outbox-to-audit at-least-once publication with stable event IDs and exactly one committed audit-side effect after inbox deduplication.
+- **Contract:** schema compatibility for `QuoteAcceptedEvent` in both directions: preserve the pre-extension consumer/parser contract and feed it a newly extended event to prove unknown-field tolerance; separately run the current consumer against the existing `accepted-v1/*.json` fixtures to prove new-consumer/old-event compatibility. OpenAPI contract tests between quote-service and CAM.
 - **Concurrency:** parallel executes (numbering), parallel appends (chain), duplicate apply messages.
 - **Property/replay:** replay the stream twice yields the same ledger; verifier detects injected tamper or gap.
 - **Regression:** existing `AcceptedQuoteSubscriptionServiceTest`, `QuoteAcceptedSubscriptionKafkaIntegrationTest`, `SubscriptionRatePersistenceIntegrationTest`, `ErpSyncJobTest` must pass unchanged with the flag off [V names from assessment].
