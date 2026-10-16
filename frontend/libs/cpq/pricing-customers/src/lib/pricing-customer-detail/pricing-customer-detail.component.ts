@@ -195,15 +195,13 @@ function httpErrorMessage(
                 <div class="info-item">
                   <span class="label">Churn score</span>
                   <span class="value">{{
-                    customer.churnScore != null ? customer.churnScore : '—'
+                    customer.churnScore ?? '—'
                   }}</span>
                 </div>
                 <div class="info-item">
                   <span class="label">Annual revenue</span>
                   <span class="value">{{
-                    customer.annualRevenue != null
-                      ? customer.annualRevenue
-                      : '—'
+                    customer.annualRevenue ?? '—'
                   }}</span>
                 </div>
                 <div class="info-item">

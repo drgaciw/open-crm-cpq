@@ -167,7 +167,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
               <mat-icon>check_circle</mat-icon>
               <span>
                 Execute OK — approval {{ result()!.approvalState ?? 'APPROVED' }}
-                @if (result()!.executionTimeMs != null) {
+                @if (result()!.executionTimeMs !== null && result()!.executionTimeMs !== undefined) {
                   · {{ result()!.executionTimeMs }} ms
                 }
               </span>
