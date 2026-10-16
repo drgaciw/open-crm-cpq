@@ -278,7 +278,7 @@ public final class RenewalUpliftResolver {
             }
             T value = read.read(rung);
             if (value != null) {
-                return new FieldSource<>(value, kind, blankToNull(rung.sourceId()));
+                return new FieldSource<>(value, kind, requiredSourceId(rung));
             }
         }
         return null;
@@ -298,7 +298,19 @@ public final class RenewalUpliftResolver {
         if (rules == null) {
             return null;
         }
-        return blankToNull(rules.retentionMarker());
+        String marker = blankToNull(rules.retentionMarker());
+        if (marker != null) {
+            requiredSourceId(rules);
+        }
+        return marker;
+    }
+
+    private static String requiredSourceId(RenewalUpliftRung rung) {
+        String sourceId = blankToNull(rung.sourceId());
+        if (sourceId == null) {
+            throw new IllegalArgumentException("Contributing " + rung.kind() + " rung requires a source ID");
+        }
+        return sourceId;
     }
 
     private static Pin selectPin(RenewalPriceAsOf priceAsOf, RenewalPriceAsOfPins pins) {

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Modifier;
@@ -619,6 +620,68 @@ class RenewalUpliftResolverTest {
                 account("acct", RenewalUpliftMode.UPLIFT_PCT, "-10")));
         assertUnit(result.unitPrice(), "42.8000");
         assertThat(result.percentPoints().rung()).isEqualTo(RenewalUpliftRungKind.CLAUSE);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void winningRulesPercentRequiresASourceId(String sourceId) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, null),
+                new RenewalUpliftRung(RenewalUpliftRungKind.RULES, sourceId, null, null,
+                        decimal("7"), null, null, null, null, null, null, null))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source ID");
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void winningAccountPercentRequiresASourceId(String sourceId) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, "clause", RenewalUpliftMode.UPLIFT_PCT,
+                        null, null, null, null, null, null, null, null, null),
+                new RenewalUpliftRung(RenewalUpliftRungKind.ACCOUNT, sourceId, null, null,
+                        decimal("7"), null, null, null, null, null, null, null))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source ID");
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void contributingClauseRequiresASourceId(String sourceId) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, sourceId, null, null,
+                        null, decimal("5"), null, null, null, null, null, null))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source ID");
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void contributingRetentionMarkerRequiresASourceId(String sourceId) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                new RenewalUpliftRung(RenewalUpliftRungKind.RULES, sourceId, null, null,
+                        null, null, null, null, null, null, null, "ENABLE_12M_PRICE_PROTECTION"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source ID");
+    }
+
+    @Test
+    void contributingModeRequiresASourceId() {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account(" ", RenewalUpliftMode.UPLIFT_PCT, "7"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("source ID");
+    }
+
+    @Test
+    void shadowedLowerRungDoesNotNeedASourceId() {
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, "clause", RenewalUpliftMode.UPLIFT_PCT,
+                        null, decimal("7"), null, null, null, null, null, null, null),
+                account(" ", RenewalUpliftMode.UPLIFT_PCT, "-10")));
+        assertUnit(result.unitPrice(), "42.8000");
+        assertThat(result.appliedRuleOrPolicyId()).isEqualTo("clause");
     }
 
     private static void assertUnit(BigDecimal actual, String expected) {
