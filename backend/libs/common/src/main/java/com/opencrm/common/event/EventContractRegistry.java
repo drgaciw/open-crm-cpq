@@ -1,6 +1,7 @@
 package com.opencrm.common.event;
 
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
+import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
@@ -110,6 +111,11 @@ public final class EventContractRegistry {
             "QuoteApprovalRejected", "approval-routing", KafkaTopics.QUOTE_APPROVAL_REJECTED,
             ApprovalRejectedEvent.class);
 
+    /** Minimal S2 audit publication; the later S6 lifecycle catalog remains separately gated. */
+    public static final EventContract AMENDMENT_AUDIT_RECORDED_V1 = published(
+            "AmendmentAuditRecorded", "contract-asset-management", KafkaTopics.AMENDMENT_DOCUMENT_AUDIT,
+            AmendmentAuditEvent.class);
+
     // --- Reserved: agreed, not produced. ----------------------------------------------------------------------------
 
     public static final EventContract PRICE_CALCULATED_V1 = reserved(
@@ -130,6 +136,7 @@ public final class EventContractRegistry {
 
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
+            AMENDMENT_AUDIT_RECORDED_V1,
             RAMP_APPLIED_V1,
             DISCOUNT_APPROVAL_REQUIRED_V1,
             RAMP_APPROVAL_BINDING_CHANGED_V1,

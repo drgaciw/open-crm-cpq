@@ -19,7 +19,8 @@ import java.util.UUID;
 
 /**
  * Append-only document event. The database trigger rejects UPDATE and DELETE.
- * Hash-chain writes and outbox publication are DRG-580.
+ * {@code AmendmentEventWriter} appends the hash chain and the audit outbox row.
+ * {@code recorded_at} is stamped by the database and is not part of {@code content_hash}.
  */
 @Entity
 @Table(name = "amendment_document_events", uniqueConstraints = {
