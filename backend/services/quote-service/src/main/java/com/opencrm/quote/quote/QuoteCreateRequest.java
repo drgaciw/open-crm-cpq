@@ -54,5 +54,10 @@ public class QuoteCreateRequest {
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;
 
+    /**
+     * Ignored on create. {@link QuoteContinuationService} is the only writer of the stored operation.
+     */
+    private QuoteContinuationRequest.Operation continuationOperation;
+
     private String notes;
 }

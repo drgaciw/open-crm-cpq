@@ -38,5 +38,10 @@ public class QuoteUpdateRequest {
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;
 
+    /**
+     * Ignored on update. A client value must not replace the server-authored continuation operation.
+     */
+    private QuoteContinuationRequest.Operation continuationOperation;
+
     private String notes;
 }
