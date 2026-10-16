@@ -1,6 +1,6 @@
 # Renewals and amendments: parking lot (not active, future scope)
 
-Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6), each a "[PARKED]" item.
+Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7), each a "[PARKED]" item.
 
 ## Context
 ACI's on-premise customers are largely financial institutions that will not allow usage-monitoring connectivity, so they self-report usage. Today there is no systematic way to see on-premise usage in the product. The self-report workflow idea is a manual usage-number entry plus an attestation step by a rep or customer-ops.
@@ -51,7 +51,27 @@ Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracke
 - **Revisit:** the user wants this brought up in a future conversation. Prompt the user to revisit "CRM forecasting requirements maturity review" at the next planning or renewals and amendments conversation, and when the first slice ships, whichever comes first. There is no automated reminder; this note and RA-54 / DRG-588 are the prompt.
 - **Not an active dev story.** No estimate, no code.
 
+## PL-7 Mid-term cancellation: proration and refunds (PARKED, not an active dev story)
+
+Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracked as RA-55 / DRG-589 ("[PARKED]"). Out of scope for the renewals and amendments work.
+
+- **Description:** the system may need to handle proration and refunds when a customer cancels mid-term. Today the amendment spine can record the intent but nothing computes or issues the financial consequence.
+- **Why parked / out of scope:** the first slice (S1 to S8) covers add, update and remove lines on SaaS contracts and does not compute credits or refunds. Refund and proration rules depend on billing and finance decisions that are not made, and on contract terms that vary by customer. Folding them in would grow the slice without a settled policy.
+- **Suggested review scope:**
+  1. Cancel intent: it already exists in the amendment spine as intent type Cancel. Decide what the slice does with it (record only) and what a full cancellation flow adds.
+  2. Proration of fees: method (daily, monthly, none), rounding, handling of one-time versus recurring fees, discounts and price locks.
+  3. Credit versus refund handling: when a credit memo applies versus cash refund, who approves, and currency handling (see ADR-032).
+  4. Effective date versus action date: cancellation effective immediately, at period end, or backdated; how that sets the proration window.
+  5. Billing and finance dependency: invoicing, credit memos, revenue recognition, and the system of record for refunds.
+  6. Contract terms: termination for convenience, notice periods, minimum commitments, early termination fees, non-refundable prepaid amounts.
+  7. Relation to the mid-term amendment Remove/Terminate action code: define how a line level Remove or Terminate (see `mid-term-amendment-policy-spec.md`) differs from a whole contract cancellation, and whether they share proration logic.
+- **Dependencies:** first slice shipped (S1 to S8); billing and finance decisions; contract terms model (S7 header); mid-term amendment policy spec; audit log (S2); ADR-032 for currency.
+- **Unpark condition:** the first slice has shipped and product confirms, with Finance and Legal input, that cancellation proration and refunds are in scope, and the review scope above is agreed.
+- **Not an active dev story.** No estimate, no code.
+
 ## Entry criteria to unpark
 First slice shipped; P2 policy defined; product confirms attester roles; Legal confirms the evidence retention rule (relates to OQ8).
 
 PL-6 has its own unpark condition: the user brings it up and confirms the review scope.
+
+PL-7 has its own unpark condition: see the PL-7 section above.
