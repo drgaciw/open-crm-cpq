@@ -901,6 +901,12 @@ public class QuoteService {
 
     private QuoteContinuationPolicy.Plan validateContinuation(Quote quote,List<QuoteLineItem> lines) {
         if (quote.getDealType() == DealType.NEW && quote.getTargetSubscriptionNumber() == null) return null;
+        if (quote.getDealType() != DealType.NEW && (quote.getTargetSubscriptionNumber() == null
+                || quote.getTargetSubscriptionNumber().isBlank())) {
+            throw new BusinessException(
+                    quote.getDealType() + " quote is missing a target subscription",
+                    "SUBSCRIPTION_CONTINUATION_INVALID");
+        }
         if (continuationService == null) throw new BusinessException("Typed subscription continuation validation is unavailable","SUBSCRIPTION_CONTINUATION_INVALID");
         return continuationService.validate(quote,lines);
     }

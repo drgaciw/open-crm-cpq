@@ -6,6 +6,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
 import com.opencrm.quote.event.QuoteEventPublisher;
+import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemRepository;
 import com.opencrm.security.CurrentActor;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,11 +21,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,7 +71,7 @@ class QuoteServiceCreateDealTypeTest {
                 new CurrentActor("service:quote-service", false),
                 RampScheduleTestSupport.guard(quoteLineItemRepository)
         );
-        when(quoteMapper.toEntity(any(QuoteCreateRequest.class))).thenAnswer(invocation -> {
+        lenient().when(quoteMapper.toEntity(any(QuoteCreateRequest.class))).thenAnswer(invocation -> {
             QuoteCreateRequest request = invocation.getArgument(0);
             Quote quote = new Quote();
             quote.setName(request.getName());
@@ -78,7 +82,7 @@ class QuoteServiceCreateDealTypeTest {
             }
             return quote;
         });
-        when(quoteNumberGenerator.generate()).thenReturn("Q-100");
+        lenient().when(quoteNumberGenerator.generate()).thenReturn("Q-100");
     }
 
     private void stubPersistence() {
@@ -173,6 +177,25 @@ class QuoteServiceCreateDealTypeTest {
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo("CRM_DEAL_TYPE_REQUIRED");
         verify(quoteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a bare EXISTING_BUSINESS quote stored as EXPANSION names the missing target subscription")
+    void bareExistingBusinessNamesMissingTargetSubscription() {
+        Quote quote = new Quote();
+        quote.setId(1L);
+        quote.setDealType(CrmQuoteDealTypeMapping.toQuoteDealType("EXISTING_BUSINESS"));
+        quote.setStatus(QuoteStatus.DRAFT);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(new QuoteLineItem()));
+
+        assertThat(quote.getDealType()).isEqualTo(DealType.EXPANSION);
+        assertThatThrownBy(() -> quoteService.calculate(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("EXPANSION quote is missing a target subscription")
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo("SUBSCRIPTION_CONTINUATION_INVALID");
     }
 
     @Test
