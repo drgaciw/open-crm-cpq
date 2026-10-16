@@ -18,6 +18,8 @@ Source inspected in the frontend worktree at clean product baseline `e2773ac` pl
 | Persistence/events | Contract-asset migrations end at `V1_5`. Source search found no RampScheduler, RampApplied, GetRampSchedule or rate-period table. | Reserve the next migration after checking the new base; add scheduler, apply marker, outbox contract and lag observability. |
 | Hybrid | Pricing `ProductType.HYBRID_MIGRATION_RAMP` already exists. No migration-window property, book-value/credit handling or dual-entitlement evaluation was found in inspected source. | Pricing-owned migration policy under `ramp/migration/`, integrated through PricingExecutionService. Read the enum; do not edit it. |
 
+**Update 2026-10-16 (DRG-543, docs DRG-608):** the REST and Renewal rows above are the baseline at `e2773ac` and are left as written. `Subscription.renew` and `SubscriptionService.renew` have since been removed. `POST /api/v1/subscriptions/{id}/renew` returns 410 Gone with `Deprecation: true`, `Link: </api/v1/quotes/continuations>; rel="successor-version"`, and error code `SUBSCRIPTION_RENEW_DEPRECATED`. The call leaves the subscription unchanged. Priced renewal is `POST /api/v1/quotes/continuations`, applied on acceptance by `AcceptedQuoteSubscriptionService`.
+
 ## Graph evidence and next edit gates
 
 Read-only impact results on the baseline:

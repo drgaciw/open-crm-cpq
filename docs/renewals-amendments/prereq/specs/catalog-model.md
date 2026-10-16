@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a model, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `catalog-model`. **Date:** 2026-10-16.
 
-**Source.** [DRG-576](https://linear.app/drgamtd-workspace/issue/DRG-576) (RA-42). Design inputs it names: `../amendment-document-design-spike.md` §6 (product-service supplies allowed transitions) and `../mid-term-amendment-policy-spec.md` (Upgrade, Downgrade, Swap, and version pinning).
+**Source.** [DRG-576](https://linear.app/drgamtd-workspace/issue/DRG-576) (RA-42). Design inputs it names: `../../amendment-document-design-spike.md` §6 (product-service supplies allowed transitions) and `../../mid-term-amendment-policy-spec.md` (Upgrade, Downgrade, Swap, and version pinning).
 
 **Conventions.** **[S]** is taken from DRG-576 or the code it cites. **[I]** is a design inference carried forward as a proposal. Relationship types and flag defaults are **Owner decisions**.
 
