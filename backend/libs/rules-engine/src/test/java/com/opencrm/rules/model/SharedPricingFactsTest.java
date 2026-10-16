@@ -31,11 +31,18 @@ class SharedPricingFactsTest {
                 .customer(customer)
                 .build();
 
+        quote.setString("dealType", "RENEWAL");
+        quote.setDecimal("renewalUpliftPct", new BigDecimal("0.08"));
+        quote.setBoolean("renewalUpliftSupplied", false);
+
         assertThat(quote.getDurationInMonths()).isEqualTo(12);
         assertThat(quote.getBasePrice()).isEqualByComparingTo("1000.00");
         assertThat(quote.getFinalPrice()).isEqualByComparingTo("850.00");
         assertThat(quote.getCustomer().getSegment()).isEqualTo("ENTERPRISE");
         assertThat(quote.getString("renewalEligible")).isNull();
+        assertThat(quote.getString("dealType")).isEqualTo("RENEWAL");
+        assertThat(quote.getDecimal("renewalUpliftPct")).isEqualByComparingTo("0.08");
+        assertThat(quote.getBoolean("renewalUpliftSupplied")).isFalse();
     }
 
     @Test
@@ -70,10 +77,12 @@ class SharedPricingFactsTest {
                 .segment("MID_MARKET")
                 .region("EMEA")
                 .industry("MANUFACTURING")
+                .churnScore(80)
                 .build();
 
         assertThat(customer.getSegment()).isEqualTo("MID_MARKET");
         assertThat(customer.getRegion()).isEqualTo("EMEA");
+        assertThat(customer.getChurnScore()).isEqualTo(80);
     }
 
     @Test

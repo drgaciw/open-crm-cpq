@@ -4,9 +4,12 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.pricing.ramp.migration.HybridMigrationPolicy;
 import com.opencrm.pricing.waterfall.*;
 import com.opencrm.rules.engine.*;
+import com.opencrm.rules.model.CustomerFact;
 import com.opencrm.rules.model.QuoteFact;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Interim D-06 policy. Every period is evaluated through the rules port; no placeholder margin fact is inserted. */
@@ -46,6 +49,11 @@ public final class PeriodGovernance {
             end
             """).build();
 
+    /** Classpath rule executed on calculate. The database seed is not this session. */
+    private static final RuleDefinition RENEWAL_UPLIFT = RuleDefinition.builder()
+            .id("renewal-uplift.drl").name("Renewal Uplift and Retention Offer")
+            .content(classpathRule("/rules/renewal-uplift.drl")).build();
+
     public void evaluate(PricingContext context, PricingResult result, RulesEngine engine,
                          Map<String, com.opencrm.pricing.product.PricingProduct> products,
                          List<RuleDefinition> configuredRules) {
@@ -70,6 +78,7 @@ public final class PeriodGovernance {
             safeMetadata.remove("rampGovernance");
             safeMetadata.put("rampGovernanceEvaluated", true);
             line.setMetadata(safeMetadata);
+            applyRenewalUpliftDefault(context, line, engine);
             PricingLineRequest request = context.getLineItems().get(lineIndex);
             boolean allowed = false;
             com.opencrm.pricing.product.PricingProduct product = products.get(request.getProductExternalId());
@@ -102,6 +111,8 @@ public final class PeriodGovernance {
                         .durationInMonths(context.getDurationInMonths()).currency(context.getCurrency())
                         .basePrice(result.getFinancialMetrics().getTcv())
                         .finalPrice(tcvTier ? null : result.getFinancialMetrics().getTcv()).build();
+                // RENEWAL only. Other deal types stay off this fact so amendment proration cannot NPE here.
+                if ("RENEWAL".equals(exactDealType(context))) fact.setString("dealType", "RENEWAL");
                 fact.setDecimal("discountFraction", period.getDiscountRate());
                 fact.setDecimal("tcv", result.getFinancialMetrics().getTcv());
                 fact.setDecimal("acv", result.getFinancialMetrics().getAcv());
@@ -167,6 +178,100 @@ public final class PeriodGovernance {
                 }
                 previous = period;
             }
+        }
+    }
+
+    /**
+     * Runs {@code renewal-uplift.drl} once per line. The fraction is recorded and not applied:
+     * uplift basis, caps, and policy precedence are DRG-549/567. A caller-supplied fraction or
+     * {@code renewalUpliftSupplied} wins, because this rule is only the default.
+     */
+    public void applyRenewalUpliftDefault(PricingContext context, PricingLineResult line, RulesEngine engine) {
+        if (!"RENEWAL".equals(exactDealType(context)) || line == null) return;
+        Map<String, Object> requestMetadata = context.getMetadata();
+        QuoteFact fact = QuoteFact.builder().externalId(context.getQuoteExternalId())
+                .durationInMonths(context.getDurationInMonths() == null ? 0 : context.getDurationInMonths())
+                .currency(context.getCurrency())
+                .customer(CustomerFact.builder().churnScore(churnScore(requestMetadata)).build()).build();
+        fact.setString("dealType", "RENEWAL");
+        Object suppliedPct = requestMetadata.get("renewalUpliftPct");
+        boolean supplied = suppliedPct != null || Boolean.TRUE.equals(bool(requestMetadata.get("renewalUpliftSupplied")));
+        if (suppliedPct != null) fact.setDecimal("renewalUpliftPct", toDecimal(suppliedPct));
+        if (supplied) fact.setBoolean("renewalUpliftSupplied", true);
+        RuleExecutionContext ruleContext = RuleExecutionContext.builder().engineType(RulesEngineType.DROOLS).build();
+        ruleContext.getFacts().add(fact);
+        RuleExecutionResult decision;
+        try {
+            decision = engine.execute(ruleContext, List.of(RENEWAL_UPLIFT));
+        } catch (RuntimeException ex) {
+            if (ex instanceof BusinessException business) throw business;
+            throw new BusinessException("Renewal uplift evaluation failed", "RULE_EXECUTION_ERROR");
+        }
+        if (decision == null || !decision.isSuccess()) {
+            throw new BusinessException("Renewal uplift evaluation failed", "RULE_EXECUTION_ERROR");
+        }
+        Map<String, Object> metadata = line.getMetadata() == null ? new HashMap<>() : line.getMetadata();
+        if (supplied) {
+            metadata.put("renewalUpliftSource", "CALLER");
+            if (fact.getDecimal("renewalUpliftPct") != null) {
+                metadata.put("renewalUpliftPct", fact.getDecimal("renewalUpliftPct").toPlainString());
+            }
+            line.setMetadata(metadata);
+            return;
+        }
+        BigDecimal pct = fact.getDecimal("renewalUpliftPct");
+        if (pct == null) return;
+        metadata.put("renewalUpliftPct", pct.toPlainString());
+        metadata.put("renewalUpliftSource", "RENEWAL_UPLIFT_POLICY");
+        if (fact.getString("retentionOffer") != null) metadata.put("retentionOffer", fact.getString("retentionOffer"));
+        line.setMetadata(metadata);
+    }
+
+    private static String exactDealType(PricingContext context) {
+        if (context == null || context.getMetadata() == null) return null;
+        Object value = context.getMetadata().get("dealType");
+        return value == null ? null : value.toString();
+    }
+
+    private static Integer churnScore(Map<String, Object> metadata) {
+        if (metadata == null) return null;
+        Object value = metadata.get("churnScore");
+        if (value instanceof Number number) return number.intValue();
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.valueOf(text.trim());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Boolean bool(Object value) {
+        if (value instanceof Boolean flag) return flag;
+        if (value instanceof String text) return Boolean.valueOf(text);
+        return null;
+    }
+
+    private static BigDecimal toDecimal(Object value) {
+        if (value instanceof BigDecimal decimal) return decimal;
+        if (value instanceof Number number) return new BigDecimal(number.toString());
+        if (value instanceof String text) {
+            try {
+                return new BigDecimal(text.trim());
+            } catch (NumberFormatException ex) {
+                throw new BusinessException("Renewal uplift percent is not a decimal", "INVALID_CONTEXT");
+            }
+        }
+        throw new BusinessException("Renewal uplift percent is not a decimal", "INVALID_CONTEXT");
+    }
+
+    private static String classpathRule(String path) {
+        try (var stream = PeriodGovernance.class.getResourceAsStream(path)) {
+            if (stream == null) throw new IllegalStateException("Missing " + path);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
         }
     }
 

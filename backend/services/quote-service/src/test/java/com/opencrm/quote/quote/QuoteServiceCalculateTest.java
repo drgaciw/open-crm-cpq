@@ -58,6 +58,8 @@ class QuoteServiceCalculateTest {
     private ProductServiceClient productServiceClient;
     @Mock
     private OutboxEventPublisher outboxEventPublisher;
+    @Mock
+    private QuoteContinuationService continuationService;
 
     private QuoteService quoteService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -388,6 +390,59 @@ class QuoteServiceCalculateTest {
         assertThat((BigDecimal) schedule.get(2).get("unitPrice")).isEqualByComparingTo("50");
         verify(quoteLineItemRepository).saveAll(List.of(line));
         verify(quoteRepository).save(quote);
+    }
+
+    @Test
+    @DisplayName("calculate sends the mapped quote DealType, not the CRM source name")
+    void calculateSendsMappedDealType() {
+        quoteService.setContinuationService(continuationService);
+        when(continuationService.validate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(null);
+        when(pricingServiceClient.executePricing(anyMap())).thenReturn(ApiResponse.success(
+                PricingExecuteView.builder().success(true).lineResults(List.of(
+                        PricingLineResultView.builder().productExternalId("PROD-001").lineItemType("SUBSCRIPTION").build()
+                )).build()));
+        when(quoteRepository.save(org.mockito.ArgumentMatchers.any(Quote.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(quoteMapper.toDto(org.mockito.ArgumentMatchers.any(Quote.class)))
+                .thenReturn(QuoteDto.builder().id(1L).build());
+
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("NEW_BUSINESS")).isEqualTo(DealType.NEW);
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("EXISTING_BUSINESS")).isEqualTo(DealType.AMENDMENT);
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("RENEWAL")).isEqualTo(DealType.RENEWAL);
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("UPSELL")).isEqualTo(DealType.EXPANSION);
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("CROSS_SELL")).isEqualTo(DealType.EXPANSION);
+
+        for (String crmName : List.of("NEW_BUSINESS", "EXISTING_BUSINESS", "RENEWAL", "UPSELL", "CROSS_SELL")) {
+            DealType dealType = CrmQuoteDealTypeMapping.toQuoteDealType(crmName);
+            Quote quote = draftQuote();
+            quote.setDealType(dealType);
+            when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+            when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                    .thenReturn(List.of(lineItem(quote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
+            org.mockito.Mockito.clearInvocations(pricingServiceClient);
+            quoteService.calculate(1L);
+            Map<String, Object> sent = sentPricingContext();
+            assertThat(sent.get("metadata")).isEqualTo(Map.of("dealType", dealType.name()));
+            assertThat(sent).doesNotContainKey("churnScore");
+            assertThat(dealType.name()).isNotIn("NEW_BUSINESS", "EXISTING_BUSINESS", "UPSELL", "CROSS_SELL", "EXTENSION");
+        }
+
+        Quote quote = draftQuote();
+        quote.setDealType(null);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(lineItem(quote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
+        org.mockito.Mockito.clearInvocations(pricingServiceClient);
+        quoteService.calculate(1L);
+        assertThat(sentPricingContext()).doesNotContainKey("metadata");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> sentPricingContext() {
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(pricingServiceClient).executePricing(captor.capture());
+        return captor.getValue();
     }
 
     private static Quote draftQuote() {
