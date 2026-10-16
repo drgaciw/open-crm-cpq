@@ -6,6 +6,8 @@ import com.opencrm.rules.drools.*;
 import com.opencrm.rules.engine.RuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -76,6 +78,105 @@ class PeriodGovernanceTest {
         assertThat((List<String>) governance(result).get("reasons"))
                 .anyMatch(reason -> reason.contains("required 550000 USD, scheduled 500000"));
         assertThat(result.getApprovalTier()).isEqualTo("DEAL_DESK");
+    }
+
+    @Test
+    void renewalUpliftRunsForRenewalAndDoesNotRepricePeriods() {
+        PricingResult priced = result("34", "45", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(80, null), priced, port, Map.of(), List.of());
+        assertThat(priced.getApprovalTier()).isEqualTo("SALES_VP");
+        assertThat((List<String>) governance(priced).get("reasons"))
+                .contains("RAMP_DISCOUNT_THRESHOLD").doesNotContain("RENEWAL_UPLIFT_POLICY");
+        assertThat(priced.getLineResults().getFirst().getPricedPeriods())
+                .extracting(PricedPeriod::getNetUnitPrice)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                .containsExactly(new BigDecimal("34"), new BigDecimal("45"), new BigDecimal("50"));
+        Map<String, Object> metadata = priced.getLineResults().getFirst().getMetadata();
+        assertThat(metadata.get("renewalUpliftPct")).isEqualTo("0.03");
+        assertThat(metadata.get("renewalUpliftSource")).isEqualTo("RENEWAL_UPLIFT_POLICY");
+        assertThat(metadata.get("retentionOffer")).isEqualTo("ENABLE_12M_PRICE_PROTECTION");
+    }
+
+    @Test
+    void renewalUpliftAtChurnBoundaryStaysAtEightPercent() {
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(70, null), priced, port, Map.of(), List.of());
+        Map<String, Object> metadata = priced.getLineResults().getFirst().getMetadata();
+        assertThat(metadata.get("renewalUpliftPct")).isEqualTo("0.08");
+        assertThat(metadata).doesNotContainKey("retentionOffer");
+        assertThat(priced.getApprovalState()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void renewalWithoutChurnUsesEightPercent() {
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(null, null), priced, port, Map.of(), List.of());
+        assertThat(priced.getLineResults().getFirst().getMetadata().get("renewalUpliftPct")).isEqualTo("0.08");
+    }
+
+    @Test
+    void callerSuppliedUpliftBeatsTheDefaultRule() {
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(80, Map.of("renewalUpliftPct", new BigDecimal("0.05"))),
+                priced, port, Map.of(), List.of());
+        Map<String, Object> metadata = priced.getLineResults().getFirst().getMetadata();
+        assertThat(metadata.get("renewalUpliftSource")).isEqualTo("CALLER");
+        assertThat(metadata.get("renewalUpliftPct")).isEqualTo("0.05");
+        assertThat(metadata).doesNotContainKey("retentionOffer");
+    }
+
+    @Test
+    void callerSuppliedFlagBlocksTheDefaultWithoutInventingAFraction() {
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(80, Map.of("renewalUpliftSupplied", true)),
+                priced, port, Map.of(), List.of());
+        Map<String, Object> metadata = priced.getLineResults().getFirst().getMetadata();
+        assertThat(metadata.get("renewalUpliftSource")).isEqualTo("CALLER");
+        assertThat(metadata).doesNotContainKey("renewalUpliftPct");
+        assertThat(metadata).doesNotContainKey("retentionOffer");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NEW", "AMENDMENT", "EXPANSION", "NEW_BUSINESS", "EXISTING_BUSINESS",
+            "UPSELL", "CROSS_SELL", "renewal", "EXTENSION", " RENEWAL", ""})
+    void otherDealTypesDoNotRunRenewalUplift(String dealType) {
+        PricingContext context = context();
+        context.setMetadata(Map.of("dealType", dealType, "churnScore", 80));
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(context, priced, port, Map.of(), List.of());
+        assertThat(priced.getLineResults().getFirst().getMetadata()).doesNotContainKey("renewalUpliftPct");
+        assertThat(priced.getApprovalState()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void governanceFactCarriesRenewalDealType() {
+        String probe = """
+                package com.opencrm.pricing.rules;
+                import com.opencrm.rules.model.QuoteFact;
+                rule "Probe renewal deal type"
+                when
+                    $quote: QuoteFact()
+                    eval("RENEWAL".equals($quote.getString("dealType")))
+                then
+                    $quote.setString("approvalTier", "CFO");
+                end
+                """;
+        PricingResult priced = result("50", "50", "50", 50, 50, 50);
+        new PeriodGovernance().evaluate(renewalContext(null, null), priced, port, Map.of(),
+                List.of(RuleDefinition.builder().id("probe").name("probe").content(probe).build()));
+        assertThat(priced.getApprovalTier()).isEqualTo("CFO");
+        assertThat(priced.getLineResults().getFirst().getMetadata().get("renewalUpliftSource"))
+                .isEqualTo("RENEWAL_UPLIFT_POLICY");
+    }
+
+    private PricingContext renewalContext(Integer churn, Map<String, Object> extra) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("dealType", "RENEWAL");
+        if (churn != null) metadata.put("churnScore", churn);
+        if (extra != null) metadata.putAll(extra);
+        return PricingContext.builder().quoteExternalId("1").durationInMonths(36).currency("USD")
+                .metadata(metadata)
+                .lineItems(List.of(PricingLineRequest.builder().productExternalId("P-1").build())).build();
     }
 
     private RuleDefinition rule(String filename) throws Exception {
