@@ -211,3 +211,9 @@ All three inherit spine rules V3, V8, V10, V12 and V13, which no policy may remo
 
 - OQ4 numbering: provisional at draft, final sequence at execution (last executed + 1, same transaction), `{contract_number}-A{nnn}`, no renewal reset. Rationale: avoids gaps with in-flight drafts.
 - OQ2 apply status: single status column, apply only after execution. Rationale: avoids dual-state consistency overhead under financial-grade audit; pre-signature apply is an edge case.
+
+
+## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
+- Migration order and next version: V1_7 expand (this schema), V1_8 contract header backfill, V1_9 `document_apply_ledger` (new, keyed `document_id`, `unit_no`, `apply_key_digest`), legacy `applied_quote_acceptances` untouched. Details in `amendment-technical-approach-and-dependencies.md` section 3.
+- Add nullable `amendment_document_line_id` and `revision_no` to `subscription_rate_periods` in V1_7 (A4).
+- Open items 3 to 6 of section 7 are tracked as OQ14 (hash scope, default per document), OQ15 (price-lock intent, not blocking), OQ3 (header ownership, default thin header owned by this module), OQ8 (retention, blocks go-live only) in `renewals-amendments-open-questions-register.md`.
