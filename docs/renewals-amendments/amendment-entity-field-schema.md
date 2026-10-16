@@ -45,6 +45,16 @@ Thin header, keyed so DRG-458 can enrich it. **dep OQ3**, default: create now.
 | `last_executed_seq` | int | not null | default 0; incremented in the EXECUTED transaction | A3 [I mechanism] |
 | `prior_contract_id` | uuid | null | renewal chain | research 7.2 [S] |
 
+### 2.2a Precedence flag (separate column, not part of the thin header)
+Owner resolution 2026-10-16 (audit conflict C2, OQ27): the stored precedence flag on the new contract is a **separate, indexable column** on the contract record. It is **not** part of the thin header field set approved in ADR-035 (id, number, tenant, customer reference, start, end, status, last_executed_seq, prior_contract_id), and that list is unchanged.
+
+| Field | Type | Null | Constraint | Source |
+|---|---|---|---|---|
+| `precedence_flag` | boolean (shape provisional; boolean vs rank is open in DRG-592) | not null, default false | **indexed** (index on `tenant_id`, `precedence_flag` or a partial index on true rows; exact index is a DRG-592 design detail) | owner C2 resolution [S call]; shape [I] |
+
+- Reason for a separate indexable column: it is checked on every read across ordering and fulfillment, so it must be cheap to filter and must not be derived from amendment history at read time.
+- Not in S1 (DRG-579, amend-in-place first slice). It arrives with new-contract-preferred mode (RA-58 / DRG-592), the next increment.
+
 `subscriptions.contract_id uuid null` is added (nullable during backfill, **dep OQ7**) [S spike 2].
 
 ### 2.3 AmendmentDocument (`amendment_documents`)
@@ -223,3 +233,5 @@ Source: transcript addendum "Renewals and amendments decisions audit"; backlog D
 - **Conflict.** ContractHeader (section 2.2) has `prior_contract_id` and `status` {ACTIVE, EXPIRED, TERMINATED} but no precedence field, and `rca-contract-precedence-research.md` inferred precedence is derived from the amendment chain. The call decided a **stored precedence flag on the new contract**; both contracts stay **ACTIVE** and the original stays **open as a reference** (no SUPERSEDED or closed status for the original).
 - **Not changed in v1 schema (S1, DRG-579).** First slice is amend-in-place, so S1 carries no new column. The flag shape (boolean vs rank), the link from the new contract to the original (`prior_contract_id` is the candidate) and who may change it are open and sit in DRG-592.
 - **Coterm and settings.** Customer-level coterm grouping and renewal groups (DRG-554) and renewal settings, auto-renew default off and notice period default with override (DRG-596), are not in this schema; `notice_period_days` and `term_end_action` stay clause data, settings live elsewhere.
+
+**C2 resolved 2026-10-16 (owner).** The stored precedence flag lives in its own indexable column (`precedence_flag`, section 2.2a), outside the thin header. The ADR-035 header list is not altered. See OQ27 in `renewals-amendments-open-questions-register.md`.
