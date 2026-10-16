@@ -24,6 +24,7 @@
 | OQ18 | Digest canonicalization library location | DEFAULT PROPOSED | `backend/libs/common` | S3, S5 | Architect | before S3 |
 | OQ19 | Performance targets | DEFAULT PROPOSED | See requirements non-functional section | S8 | Platform | before S8 |
 | OQ20 | Linear label naming: existing items carry both `renewals-amendments` and `Open-CRM-CPQ` | RESOLVED for new items | New items carry both | none | n/a | done |
+| OQ21 | On-premise usage justification for renewal uplifts depends on self-reported data (ACI on-prem customers, mostly financial institutions, will not allow usage-monitoring connectivity). No systematic usage view exists today | NOT BLOCKING | Parked, see `renewals-amendments-parking-lot.md` (PL-1 to PL-5); uplift justification for on-prem cannot rely on monitored usage | none (parked) | Product | before unparking |
 
 ## Summary
 Blocking development start: **OQ1** (decision) and **OQ9** (verification, only gates S5). Everything else has a default that lets the first stories start. Needed at go-live only: OQ8. The deferred items (OQ13, 15, 16) belong to later policies.

@@ -44,3 +44,6 @@ Rejection of ADR-035 in favour of quote-service ownership or a new service reset
 
 ## 6. Out of slice, tracked elsewhere
 Renewal policy (DRG-549, 567, 540, 544, 545, 555), price lock (DRG-568), true-up (DRG-569, 570), maintenance (DRG-571), conversion (DRG-573, 574), catalog relationships (DRG-576), ordering reconcile (DRG-577), fulfilment (DRG-578), history backfill (DRG-566), e-signature (DRG-457).
+
+## 7. Parking lot (not active, future scope)
+On-premise self-reported usage (manual entry, rep or customer-ops attestation, link to the P2 capacity true-up, audit trail, uplift justification) is parked. See `renewals-amendments-parking-lot.md` (PL-1 to PL-5), RA-53 / DRG-587, and OQ21. These are not active stories and do not affect the readiness verdict.

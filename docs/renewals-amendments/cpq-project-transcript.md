@@ -419,3 +419,6 @@ Dependencies set as Linear blocking relations. Comments added to existing DRG-53
 **Open questions:** register has OQ1..OQ20. Blocking: OQ1 (accept ADR-035) and OQ9 (pricing-service modes; gates S5 only). Needed before go-live: OQ8 retention N (Legal). Defaults proposed for OQ3, OQ5, OQ6, OQ7, OQ10, OQ11, OQ12, OQ14, OQ17, OQ18, OQ19.
 
 **Repo copy:** PR #599 was already merged into `main` on 2026-10-16 (17:23 UTC) before this pass. New and updated docs were committed only to branch `docs/renewals-amendments-design-2026-10-16` under `docs/renewals-amendments/`; they will not appear in PR #599 and are not on `main` until a new PR is opened (not done; needs user approval).
+
+## 2026-10-16 (later): on-prem self-reported usage parked
+Product input: ACI on-prem customers are mostly financial institutions that will not allow usage-monitoring connectivity, so they self-report usage; no systematic on-prem usage view exists. Idea: manual usage entry plus rep or customer-ops attestation. Recorded as a parking lot, not active scope: new `renewals-amendments-parking-lot.md` (PL-1 to PL-5), pointer in readiness doc section 7, OQ21 in the open-questions register (non-blocking), Notion RA-53 and Linear DRG-587, both titled "[PARKED]". Docs committed to branch docs/renewals-amendments-design-2026-10-16 only. No code.
