@@ -27,6 +27,11 @@ execution:
 ssot:
   entrypoint: scripts/ci/run-core.sh
   description: All build/test commands; Jenkins runs on PR/push; GHA when manually dispatched.
+  failure_reporting: >-
+    GHA Maven jobs (ci.yml shared-libraries, backend-unit, backend-integration; pr-check.yml;
+    main-verify.yml) run python3 scripts/ci/report-test-failures.py with if: failure(). It only prints
+    failing JUnit cases as annotations, so a failure can be named from the run summary or the
+    check-runs API without the job log; it never changes the job result.
 
 scripts_ci:
   stages:
