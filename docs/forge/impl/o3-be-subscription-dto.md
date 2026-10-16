@@ -11,6 +11,8 @@ pr: O3
 
 Wave O3 (BE only): stop leaking the `Subscription` JPA entity at the HTTP boundary. Added `SubscriptionDto` + MapStruct `SubscriptionMapper` (`componentModel = "spring"`), wired through `SubscriptionService` / `SubscriptionController`. Controllers return DTOs only. New paginated `GET /api/v1/subscriptions` with `ApiResponse.PageInfo` (same shape as `ProductAttributeController.listAttributes`). Lifecycle endpoints (`/{id}`, `/customer/{customerId}`, `/status/{status}`, activate/suspend/cancel/renew) all return `SubscriptionDto`. `activate` still calls `ErpAdapter.syncToErp`, persists ERP fields (`erpSubscriptionId` / `erpSyncStatus`), returns DTO. No FE. No gateway route edits. ADR-006 remains **Proposed** (DTO land is a prerequisite; do not Accept as if FE exists).
 
+**Update 2026-10-16 (DRG-543, docs DRG-608):** Wave O3 did return a DTO from `POST /{id}/renew`. That route now returns 410 Gone with `Deprecation: true`, `Link: </api/v1/quotes/continuations>; rel="successor-version"`, and error code `SUBSCRIPTION_RENEW_DEPRECATED`. It leaves the subscription unchanged. `Subscription.renew` and `SubscriptionService.renew` were removed. Priced renewal is `POST /api/v1/quotes/continuations`, applied on acceptance by `AcceptedQuoteSubscriptionService`. The acceptance checklist below records what this wave shipped.
+
 ## GitNexus (pre-edit)
 
 | Symbol | Risk | Upstream / confirmation |
