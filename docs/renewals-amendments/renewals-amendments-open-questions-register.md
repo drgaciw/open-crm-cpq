@@ -30,3 +30,4 @@
 
 ## Summary
 Blocking development start: **OQ1** (decision) and **OQ9** (verification, only gates S5). Everything else has a default that lets the first stories start. Needed at go-live only: OQ8. The deferred items (OQ13, 15, 16) belong to later policies.
+| OQ24 | Rules requirements across products and pricing are not reviewed. Principle: SKU to BOM composition stays dumb data; conditional logic (artifact selection by region, license type, tier) belongs in Drools at quote or order time. Pricing rules (proration, amendment modes, uplift) overlap | NOT BLOCKING | Parked, see `renewals-amendments-parking-lot.md` (PL-8, RA-56 / DRG-590); related to OQ9 | none (parked) | Product, Pricing owner | before unparking |
