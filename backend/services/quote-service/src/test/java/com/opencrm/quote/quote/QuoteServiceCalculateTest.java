@@ -408,7 +408,7 @@ class QuoteServiceCalculateTest {
                 .thenReturn(QuoteDto.builder().id(1L).build());
 
         assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("NEW_BUSINESS")).isEqualTo(DealType.NEW);
-        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("EXISTING_BUSINESS")).isEqualTo(DealType.AMENDMENT);
+        assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("EXISTING_BUSINESS")).isEqualTo(DealType.EXPANSION);
         assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("RENEWAL")).isEqualTo(DealType.RENEWAL);
         assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("UPSELL")).isEqualTo(DealType.EXPANSION);
         assertThat(CrmQuoteDealTypeMapping.toQuoteDealType("CROSS_SELL")).isEqualTo(DealType.EXPANSION);
@@ -417,6 +417,7 @@ class QuoteServiceCalculateTest {
             DealType dealType = CrmQuoteDealTypeMapping.toQuoteDealType(crmName);
             Quote quote = draftQuote();
             quote.setDealType(dealType);
+            quote.setTargetSubscriptionNumber("SUB-1");
             when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
             when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
                     .thenReturn(List.of(lineItem(quote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
@@ -428,8 +429,19 @@ class QuoteServiceCalculateTest {
             assertThat(dealType.name()).isNotIn("NEW_BUSINESS", "EXISTING_BUSINESS", "UPSELL", "CROSS_SELL", "EXTENSION");
         }
 
+        Quote amendment = draftQuote();
+        amendment.setDealType(DealType.AMENDMENT);
+        amendment.setTargetSubscriptionNumber("SUB-1");
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(amendment));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(lineItem(amendment, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
+        org.mockito.Mockito.clearInvocations(pricingServiceClient);
+        quoteService.calculate(1L);
+        assertThat(sentPricingContext().get("metadata")).isEqualTo(Map.of("dealType", "AMENDMENT"));
+
         Quote quote = draftQuote();
         quote.setDealType(null);
+        quote.setTargetSubscriptionNumber("SUB-1");
         when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
         when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
                 .thenReturn(List.of(lineItem(quote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));

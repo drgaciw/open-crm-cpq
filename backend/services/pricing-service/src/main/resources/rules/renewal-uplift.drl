@@ -4,8 +4,9 @@ import com.opencrm.rules.model.QuoteFact;
 import com.opencrm.rules.model.CustomerFact;
 import java.math.BigDecimal;
 
-// DRG-541 lowest-precedence default. DRG-549/567 own hierarchy, basis, and caps.
+// DRG-541 lowest-precedence rung. DRG-549/567 own hierarchy, basis, and caps.
 // Salience stays below ramp governance (80) and every other catalog rule.
+// 0.08 and 0.03 stay fractions. Draft ADR #609 (Proposed) would convert them to percent points if accepted.
 rule "Renewal Uplift and Retention Offer"
 salience 10
 when
