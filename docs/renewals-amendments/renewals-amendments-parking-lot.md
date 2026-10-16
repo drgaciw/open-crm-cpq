@@ -1,6 +1,6 @@
 # Renewals and amendments: parking lot (not active, future scope)
 
-Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7) and RA-56 / DRG-590 (rules requirements review, PL-8), each a "[PARKED]" item.
+Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7) and RA-56 / DRG-590 (rules requirements review, PL-8) and RA-57 / DRG-591 (approvals category, PL-9), each a "[PARKED]" item.
 
 ## Context
 ACI's on-premise customers are largely financial institutions that will not allow usage-monitoring connectivity, so they self-report usage. Today there is no systematic way to see on-premise usage in the product. The self-report workflow idea is a manual usage-number entry plus an attestation step by a rep or customer-ops.
@@ -95,6 +95,25 @@ Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracke
 - **Unpark condition:** product confirms the review scope, OQ9 is answered, and a decision is made on typed policy versus Drools for the policies above.
 - **Not an active dev story.** No estimate, no code.
 
+## PL-9 Approvals for renewals and amendments (general category) (PARKED, not an active dev story)
+
+Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracked as RA-57 / DRG-591 ("[PARKED]"). Sits with PL-6 to PL-8. To be discussed in a separate future conversation.
+
+- **Description:** a general category for all approvals around renewals and amendments. Coterming events require approval, but who approves (sales ops, the contract owner, or someone higher) is deferred. This item captures that approvals for renewals and amendments, including who signs off on coterm events, amendment processing, and any other approval gate, will be reviewed as their own topic later.
+- **Known gates so far:**
+  1. Coterm events (aligning contracts to a shared end date): approval required, approver undecided.
+  2. Amendment execution and signature policy per intent: slice default is NOT_REQUIRED, NOTICE_ONLY and CLICK_THROUGH only (OQ10); other policies are not executable in the slice. Approval thresholds that trigger `CONTRACT_MODIFICATION` for non-override amendments have a proposed default (OQ17).
+  3. Discount or uplift overrides: manual price overrides route to approval (V14, FR-18, S5).
+  4. Price-lock overrides (price-lock policy stub, OQ15).
+  5. Cancellations (PL-7): who approves cancellation, credits and refunds.
+  6. Partial application (OQ5): who approves the remedy or correcting amendment after PARTIALLY_APPLIED or APPLY_BLOCKED.
+  7. Backdating (V6, FR-17) and VOID of an executed document (OQ13): already noted elsewhere, to be folded into the review.
+- **Deferred question:** who approves each gate: sales ops, contract owner, or higher (for example finance or legal by threshold). Not decided here.
+- **Relation to existing repo capability:** approval-routing already exists and `ApprovalType` includes `CONTRACT_MODIFICATION` (see `amendment-document-design-spike.md`; ADR-035 keeps approvals in approval-routing). The slice reuses it with default thresholds. Not verified in the repo for this note: whether approval-routing supports per-gate approver roles, delegation, or a coterm-specific type. The review should check that.
+- **Dependencies:** none for the review itself. Inputs: spike approval flow, OQ5, OQ10, OQ15, OQ17, PL-7, coterm research (`coterm-renewal-quote-research.md`), approval-routing capability check.
+- **Unpark condition:** a separate conversation is scheduled for this topic and product confirms the scope. Until then the slice defaults stand.
+- **Not an active dev story.** No estimate, no code.
+
 ## Entry criteria to unpark
 First slice shipped; P2 policy defined; product confirms attester roles; Legal confirms the evidence retention rule (relates to OQ8).
 
@@ -103,3 +122,5 @@ PL-6 has its own unpark condition: the user brings it up and confirms the review
 PL-7 has its own unpark condition: see the PL-7 section above.
 
 PL-8 has its own unpark condition: see the PL-8 section above.
+
+PL-9 has its own unpark condition: see the PL-9 section above.
