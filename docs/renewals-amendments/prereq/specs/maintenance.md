@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `maintenance`. **Date:** 2026-10-16.
 
-**Sources.** [DRG-556](https://linear.app/drgamtd-workspace/issue/DRG-556) (RA-22, perpetual licence plus maintenance linkage), [DRG-571](https://linear.app/drgamtd-workspace/issue/DRG-571) (RA-37, maintenance pricing, recalculation, reinstatement). Worked numbers are illustrative Scenarios 2 and 4 in `../cpq-pricing-policy-sanity-check.md` (example figures, not customer data).
+**Sources.** [DRG-556](https://linear.app/drgamtd-workspace/issue/DRG-556) (RA-22, perpetual licence plus maintenance linkage), [DRG-571](https://linear.app/drgamtd-workspace/issue/DRG-571) (RA-37, maintenance pricing, recalculation, reinstatement). Worked numbers are illustrative Scenarios 2 and 4 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data).
 
 **Conventions.** **[S]** is taken from those issues or the files they cite. **[I]** is a design inference carried forward as a proposal. Every default below is an **Owner decision**.
 
