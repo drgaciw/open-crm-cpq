@@ -4,11 +4,16 @@ import com.opencrm.rules.model.QuoteFact;
 import com.opencrm.rules.model.CustomerFact;
 import java.math.BigDecimal;
 
+// DRG-541 lowest-precedence rung. DRG-549/567 own hierarchy, basis, and caps.
+// Salience stays below ramp governance (80) and every other catalog rule.
+// 0.08 and 0.03 stay fractions. Draft ADR #609 (Proposed) would convert them to percent points if accepted.
 rule "Renewal Uplift and Retention Offer"
-salience 530
+salience 10
 when
     $quote: QuoteFact(customer != null, $cust: customer)
     eval("RENEWAL".equals($quote.getString("dealType")))
+    eval($quote.getDecimal("renewalUpliftPct") == null)
+    eval(!Boolean.TRUE.equals($quote.getBoolean("renewalUpliftSupplied")))
 then
     BigDecimal baseUplift = new BigDecimal("0.08");
     if ($cust.getChurnScore() != null && $cust.getChurnScore() > 70) {
@@ -16,5 +21,7 @@ then
         $quote.setString("retentionOffer", "ENABLE_12M_PRICE_PROTECTION");
     }
     $quote.setDecimal("renewalUpliftPct", baseUplift);
-    $quote.setString("explanationCode", "RENEWAL_UPLIFT_POLICY");
+    if ($quote.getString("explanationCode") == null) {
+        $quote.setString("explanationCode", "RENEWAL_UPLIFT_POLICY");
+    }
 end
