@@ -1,12 +1,12 @@
 # OQ5 owner decision: partial application of an amendment
 
-**Status:** Owner-decision request. This file does not decide OQ5, does not accept the Proposed spec, and does not accept an ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
+**Status:** Option A is adopted for the first slice only, as recorded in section 9. Sections 1 through 8 preserve the original request and analysis, with current-status pointers updated after adoption. This file does not accept the Proposed spec or an ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
 
 **Date:** 2026-10-16. **Project:** OPEN-CRM-CPQ. **Backlog:** RA-31 / [DRG-565](https://linear.app/drgamtd-workspace/issue/DRG-565/partial-application-rules-for-mixed-line-amendment-documents).
 
 **Reading base:** `main` at `dd0f1a84415b37b3102ba5a46b42d397c3237d6f`. Every citation below is a file read at that commit, or the Linear issue DRG-565 read the same day. Claims not opened in this pass are marked **Unverified** in the last section.
 
-**Integration update (#622).** The reading below is pinned to `dd0f1a8`. #622 corrects the quoted spec to unit status BLOCKED, one document status, and unique business identity `(documentId, unitNo)` with a separately checked replay digest. The historical mismatch descriptions below do not reopen those corrections. OQ5 itself remains undecided. The reconciliation record moves to `adr-reconcile-adr-024-027.md` under #623; ADR-024 through ADR-027 remain Proposed.
+**Integration update (#622).** The reading below is pinned to `dd0f1a8`. #622 corrects the quoted spec to unit status BLOCKED, one document status, and unique business identity `(documentId, unitNo)` with a separately checked replay digest. The historical mismatch descriptions below do not reopen those corrections. Section 9 now records the first-slice adoption of OQ5 option A (#632). The broader Proposed spec remains unaccepted, and S4 and S6 are not authorized by that adoption. The reconciliation record moves to `adr-reconcile-adr-024-027.md` under #623; ADR-024 through ADR-027 remain Proposed.
 
 ## 1. The question
 
@@ -14,7 +14,7 @@ Should one amendment document be allowed to apply in several atomic units, so th
 
 Spike decision 5 asks it this way: "Should one document be allowed to apply in several units, with a PARTIALLY_APPLIED state?" The spike recommends yes, with atomic units and no silent rollback (`amendment-document-design-spike.md`, decisions needed, item 5).
 
-The open-questions register records the same question as **OQ5 Partial application**, status **DEFAULT PROPOSED**, blocking **S4**, needed before S4 (Day 2). The proposed default in that row is: one unit per subscription, atomic per unit, no auto rollback, document PARTIALLY_APPLIED, remedy by correcting amendment (`renewals-amendments-open-questions-register.md`).
+At the pinned reading base, the open-questions register recorded the same question as **OQ5 Partial application**, status **DEFAULT PROPOSED**, blocking **S4**, needed before S4 (Day 2). Section 9 and the current register now record first-slice adoption. The proposed default at the reading base was: one unit per subscription, atomic per unit, no auto rollback, document PARTIALLY_APPLIED, remedy by correcting amendment (`renewals-amendments-open-questions-register.md`).
 
 The Proposed spec `specs/partial-apply.md` states its own status as "Proposal only." It says it does not accept the spike's partial-apply rules, write an ADR, or authorize implementation, and that mid-term OQ5 stays open. Its open question 1 is the owner decision: allow partial apply, or apply the whole document all-or-nothing with no `PARTIALLY_APPLIED` state. It says implementation of its AC-2 through AC-13 waits on a yes.
 
@@ -22,7 +22,7 @@ ADR-035 lists this question as out of scope: "OQ5 Partial application / PARTIALL
 
 ## 2. Proposed default
 
-**Proposed default, not adopted by this file:** confirm the register's OQ5 sentence for the first slice, and use the Proposed spec's cut between the two failure states.
+**Original proposed default, now adopted for the first slice in section 9:** confirm the register's OQ5 sentence for the first slice, and use the Proposed spec's cut between the two failure states.
 
 Operational reading of that default:
 
@@ -44,7 +44,7 @@ A yes to this default adopts those seven points for the first slice. It does not
 | **B. All-or-nothing apply** | The whole document commits, or none of it does. There is no PARTIALLY_APPLIED state. The Proposed spec says that if the owner rejects partial application, the build stops at its open question 1 and AC-2 through AC-13 are not the specification. | `specs/partial-apply.md`, open question 1 |
 | **C. Leave the default unconfirmed** | OQ5 stays DEFAULT PROPOSED. S1 and S2 remain the stories ADR-035 authorizes. S4 does not treat FR-12 or AC-S4-3 as an accepted rule. | Register status values; dev-readiness condition 4; ADR-035 acceptance scope |
 
-Dev-readiness condition 4 says to confirm OQ5 before S4 starts, around Day 2 (`renewals-amendments-dev-readiness.md`). The register's status legend says DEFAULT PROPOSED means work can start on the stated default and the default is confirmed by the date given. This file asks for that confirmation. It does not record it.
+Dev-readiness condition 4 says to confirm OQ5 before S4 starts, around Day 2 (`renewals-amendments-dev-readiness.md`). The register's status legend says DEFAULT PROPOSED means work can start on the stated default and the default is confirmed by the date given. The original request asked for that confirmation; section 9 now records it for the first slice only. The other S4 dependencies, including DRG-565's prerequisite first-slice written ordering rules and acceptance conditions, remain open. S4 acceptance remains AC-S4-1 through AC-S4-9; this record adds no scenario tests.
 
 ## 4. Consequences for S4
 
@@ -142,7 +142,7 @@ DRG-565, as read in Linear, asks for partial-application rules for mixed-line do
 
 ## 9. Owner record
 
-Recorded 2026-10-16. Sections 1 through 8 are the request merged in #626. This section records the confirmation that followed. The record is the first slice only.
+Recorded 2026-10-16. Sections 1 through 8 preserve the request and analysis merged in #626, with current-status pointers reconciled after #632. This section records the confirmation that followed. The record is the first slice only.
 
 Option A for the first slice was delegated by the owner and relayed by Projects Manager. The owner, drg, said, about 5:10 PM CT: "I delegate these decisions to you." Projects Manager confirmed OQ5 option A (#626). CPQ Decision ruled the confirmation valid about 5:11 PM CT. The ruling is the first slice only.
 
@@ -153,7 +153,7 @@ Option A for the first slice was delegated by the owner and relayed by Projects 
 - Rebase is a first-slice remedy: no. The remedy is a correcting amendment. The proposed default left rebase out, and this record does not add it.
 - Ledger table for S4: not chosen. The proposed default does not choose between `document_apply_ledger` in the V1_9 paragraph and columns on `applied_quote_acceptances` in schema 2.6. This record does not choose either.
 
-`specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, and DRG-562/563. The owner merges.
+`specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and DRG-565's prerequisite first-slice written ordering rules and acceptance conditions (broader scenario work remains deferred under DRG-565). The owner merges.
 
 This record authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
 
