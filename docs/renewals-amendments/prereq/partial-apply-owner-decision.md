@@ -44,7 +44,7 @@ A yes to this default adopts those seven points for the first slice. It does not
 | **B. All-or-nothing apply** | The whole document commits, or none of it does. There is no PARTIALLY_APPLIED state. The Proposed spec says that if the owner rejects partial application, the build stops at its open question 1 and AC-2 through AC-13 are not the specification. | `specs/partial-apply.md`, open question 1 |
 | **C. Leave the default unconfirmed** | OQ5 stays DEFAULT PROPOSED. S1 and S2 remain the stories ADR-035 authorizes. S4 does not treat FR-12 or AC-S4-3 as an accepted rule. | Register status values; dev-readiness condition 4; ADR-035 acceptance scope |
 
-Dev-readiness condition 4 says to confirm OQ5 before S4 starts, around Day 2 (`renewals-amendments-dev-readiness.md`). The register's status legend says DEFAULT PROPOSED means work can start on the stated default and the default is confirmed by the date given. The original request asked for that confirmation; section 9 now records it for the first slice only. The other S4 dependencies, including the unmet DRG-565 ordering and test-scenario conditions, remain open.
+Dev-readiness condition 4 says to confirm OQ5 before S4 starts, around Day 2 (`renewals-amendments-dev-readiness.md`). The register's status legend says DEFAULT PROPOSED means work can start on the stated default and the default is confirmed by the date given. The original request asked for that confirmation; section 9 now records it for the first slice only. The other S4 dependencies, including DRG-565's prerequisite written ordering and scenario definitions, remain open. Executable validation belongs to S4 acceptance.
 
 ## 4. Consequences for S4
 
@@ -153,7 +153,7 @@ Option A for the first slice was delegated by the owner and relayed by Projects 
 - Rebase is a first-slice remedy: no. The remedy is a correcting amendment. The proposed default left rebase out, and this record does not add it.
 - Ledger table for S4: not chosen. The proposed default does not choose between `document_apply_ledger` in the V1_9 paragraph and columns on `applied_quote_acceptances` in schema 2.6. This record does not choose either.
 
-`specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and DRG-565's unmet ordering and test-scenario conditions. The owner merges.
+`specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and DRG-565's prerequisite written ordering and scenario definitions (executable validation is S4 acceptance work). The owner merges.
 
 This record authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
 
