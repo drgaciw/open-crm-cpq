@@ -144,4 +144,21 @@ public class OutboxEventPublisherTest {
         assertNull(row.getActor(), "no EventActorResolver bean: no actor");
         assertTrue(EventCorrelation.current().isEmpty(), "closing the scope restores the empty context");
     }
+    @Test
+    void publish_PreservesDurableDomainIdentityAndEnvelope() throws JsonProcessingException {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        var eventId = java.util.UUID.randomUUID();
+        try (EventCorrelation.Scope ignored = EventCorrelation.begin(null, "source-event")) {
+            outboxEventPublisher.publish("Quote", "Q-1", EventContractRegistry.QUOTE_ACCEPTED_V1,
+                    new QuoteAcceptedEvent(), eventId);
+        }
+        verify(outboxEventRepository).save(outboxEventCaptor.capture());
+        OutboxEvent row = outboxEventCaptor.getValue();
+        assertEquals(eventId.toString(), row.getUuid());
+        assertEquals(eventId.toString(), row.getCorrelationId());
+        assertEquals("source-event", row.getCausationId());
+        assertEquals(1, row.getEventVersion());
+        assertTrue(EventCorrelation.current().isEmpty());
+    }
+
 }

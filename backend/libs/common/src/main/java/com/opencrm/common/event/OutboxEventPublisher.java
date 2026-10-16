@@ -45,6 +45,14 @@ public class OutboxEventPublisher {
      */
     @Transactional
     public void publish(String aggregateType, String aggregateId, EventContract contract, Object eventPayload) {
+        publish(aggregateType, aggregateId, contract, eventPayload, UUID.randomUUID());
+    }
+
+    /** Publish with the durable domain event id, so outbox replay and the audit chain share one identity. */
+    @Transactional
+    public void publish(String aggregateType, String aggregateId, EventContract contract, Object eventPayload,
+                        UUID domainEventId) {
+        Objects.requireNonNull(domainEventId, "domainEventId");
         Objects.requireNonNull(contract, "contract");
         if (!contract.isPublished()) {
             throw new IllegalStateException("Event contract " + contract.eventType() + " v" + contract.eventVersion()
@@ -58,7 +66,7 @@ public class OutboxEventPublisher {
         }
         try {
             String payload = objectMapper.writeValueAsString(eventPayload);
-            String eventId = UUID.randomUUID().toString();
+            String eventId = domainEventId.toString();
             EventCorrelation.Context correlation = EventCorrelation.current().orElse(null);
             String correlationId = correlation != null && correlation.correlationId() != null
                     ? correlation.correlationId()
