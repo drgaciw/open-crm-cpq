@@ -2,11 +2,12 @@
 
 **Status:** Owner-decision draft. This file authorizes nothing.
 **Date:** 2026-10-16.
+**Base branch:** `main`. This draft's pull request targets `main`. When the owner merges it, this file lands on `main`. It is not merged.
 **Read from:** `main` at `dd0f1a8` (Merge pull request #615).
 
 This document asks the project owner to decide three open questions and whether four stories may start. Merging it records the questions. It does not accept a default, and it does not authorize schema, code, a feature flag, a topic, a gateway route, a deploy, or an implementation pull request.
 
-S3, S4, S5, S6, S7, and S8 stay blocked until the owner authorizes each one in a later decision. ADR-035, accepted 2026-10-16, authorizes the first-slice schema and audit stories only (S1 and S2; RA-45 / RA-46; DRG-579 / DRG-580). `amendment-technical-approach-and-dependencies.md` risk R1 says S3 to S8 require their own readiness and authorization gates.
+S3, S4, S5, S6, S7, and S8 stay blocked until the owner authorizes each one in a later decision. ADR-035's status line on this `main` is Accepted 2026-10-16, and its scope is the first-slice schema and audit stories only (S1 and S2; RA-45 / RA-46; DRG-579 / DRG-580). An ADR counts as accepted only after its status-change pull request merges. ADR-035's status-change pull request is [#600](https://github.com/drgaciw/open-crm-cpq/pull/600), merged to `main` at 2026-10-16T21:01:44Z (merge commit `307f065`). `amendment-technical-approach-and-dependencies.md` risk R1 says S3 to S8 require their own readiness and authorization gates.
 
 ## Stories this gate covers
 
@@ -135,51 +136,58 @@ Technical approach §3 and the field-schema addendum assign the next three CAM v
 - New CAM migration `V1_8` (suffix unspecified): one contract per existing subscription, set `contract_id`, idempotent, no documents, no events (technical approach §3, AC-S7-1, AC-S7-2).
 - AC-S7-3 requires the NEW subscription path to create a header at creation. The slice docs do not name that class. A search of CAM `main` Java found `subscriptions.save` in `AcceptedQuoteSubscriptionService.java` and `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/service/SubscriptionRateApplyService.java`. Which of those is the NEW path was not established by reading the methods. Treat the class list as unverified ownership.
 
-## Definition of Done
+## Definition of Done v0.2
 
-The DoD used here is the Notion page fetched for this note: [CPQ Definition of Done (DRAFT v0.1, pending owner approval)](https://app.notion.com/p/3fbf7cb4e4df81e29b65fa1ae72a27ca). Fetched 2026-10-16. Notion returned `verification.state: unverified`. The page says it is draft v0.1, pending owner approval, CPQ only, and written without inspecting repo CI. A story is Done only when all nine items are true. Items 2 and 7 are owner gates. This draft DoD is not itself accepted.
+Checklist: [CPQ Definition of Done v0.2 (APPROVED by owner 2026-10-16 4:30 PM CT)](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338). Fetched 2026-10-16. This gate uses v0.2 in place of v0.1. v0.2 keeps the nine v0.1 items and adds six. Done means every item passes. Items 2 and 7 are owner gates. A story is Done only when the owner merges it to `main` and every item passes.
 
-| # | Draft DoD item | S3 DRG-581 | S4 DRG-582 | S6 DRG-584 | S7 DRG-585 |
-|---|---|---|---|---|---|
-| 1 | Acceptance criteria met and noted on the Linear issue | AC-S3-1..8 are written. Meeting them waits on authorization. | AC-S4-1..9 written. AC-S4-3 assumes partial apply. | AC-S6-1..4 written. | AC-S7-1..4 written. |
-| 2 | PR to this repo, review, CI green, owner merges | Applies when implementation exists. Owner gate. | Same. | Same. | Same. |
-| 3 | Automated tests for new or changed behavior | State machine, V1..V14 failures, numbering. | Apply, digest replay, partial outcome, flag-off fixtures. | Both compatibility directions and a contract test per event. | Idempotent backfill, no documents, no events, header on the NEW path. |
-| 4 | Quote/pricing correctness, including edge cases | Amendment rules V1..V14 and dates (V6 is AC-S3-8). DealType mapping is not an S3 criterion in the requirements file. | Quantity, co-term, and end-date cases AC-S4-4 and AC-S4-5. | Event compatibility, not a pricing calculation. | No pricing criterion is written on S7. |
-| 5 | Migration reversible or rollback documented; existing data compatible | No migration assigned. Writes use S1 tables. | V1_9. Rollback text in technical approach §3 is the flag, not a down-migration. | No migration assigned. Additive event fields. | V1_8 rewrites subscription linkage. Flag rollback is not in the S7 criteria. See OQ7. |
-| 6 | ADRs recorded; Proposed ADRs are not treated as accepted; API or behavior changes noted | API. OpenAPI draft and ADR-024..027 stay Proposed. | Behavior of apply. Same Proposed-ADR rule. | Event contract. Same rule. | Data change noted in docs. Same rule. |
-| 7 | No feature flag enabled, nothing deployed, nothing external sent | Applies. Owner gate. | Flag-off path is AC-S4-9. Enabling the flag is outside the story. | OQ11's proposed default is per-tenant, default off. Not confirmed. Enabling it fails this item. | No flag in the S7 criteria. No deploy. |
-| 8 | Linear links the PR and follow-ups; Notion hub updated if scope changes | Applies when work exists. | Same. | Same. | Follow-ups already named: DRG-566, DRG-554. |
-| 9 | Follow-ups filed; no TODO without a ticket | Applies. | DRG-563, DRG-565, DRG-428 are already the named neighbors. | OQ11 and OQ18 if still open. | DRG-566 holds history. |
+The fetched body of that same page, edited 2026-10-16T21:30:24.794Z, still says "DRAFT v0.2, pending owner approval" and that v0.1 stays the rule until drg approves v0.2. The title says approved. Notion `verification.state` was `unverified`. This file follows the owner instruction that v0.2 replaces v0.1. It does not edit the Notion page.
 
-**Pending DoD.** The task for this note names five extras as pending DoD: Open Host Service, schema-registry events, outbox writes, commercial-decision audit, and event-replay test. They are not items on the Notion draft that was fetched. A search of `docs/` on this `main` found no "Open Host", "schema-registry", "commercial-decision", or "pending DoD". The phrase "event-replay test" appears once, in `prereq/specs/ramp-amendments.md`, as a DRG-534 acceptance item for ramp schedule fields, and that file is itself a proposal. It is not a Definition of Done entry.
+None of DRG-581, DRG-582, DRG-584, or DRG-585 is Done. The nine items below apply to each of those stories when an implementation pull request exists. This gate supplies no implementation, so those nine items are unmet for the four stories.
 
-If the owner later adds those extras to the DoD, the repo facts that sit nearest each story are:
+| # | v0.2 item | What the story text requires |
+|---|---|---|
+| 1 | Acceptance criteria, checked on the Linear issue | AC-S3-1..8, AC-S4-1..9, AC-S6-1..4, and AC-S7-1..4 are written in the requirements file. None are met by this gate. |
+| 2 | Pull request to this repo, review, CI green, owner merges to `main` | Owner gate. No implementation pull request exists for these four issues in this note. |
+| 3 | Automated tests for new or changed behavior | State machine and V-rules (S3); apply, digest replay, flag-off fixtures (S4); both compatibility directions and one contract test per event (S6); idempotent backfill with no documents and no events (S7). |
+| 4 | Quote and pricing edge cases, including DealType, date boundaries, and reconciling totals | S3 includes V6 dates (AC-S3-8). S4 includes quantity and co-term dates (AC-S4-4, AC-S4-5). DealType mapping is not an acceptance criterion of these four stories. S6 and S7 do not price. |
+| 5 | Migration reversible or rollback documented; existing data compatible | S3 and S6 have no migration assigned. S4 owns CAM `V1_9`. S7 owns CAM `V1_8`. Technical approach §3 says rollback is the flag, not a down-migration. S7's criteria do not mention a flag. |
+| 6 | ADRs recorded. An ADR is accepted only after the owner accepts it and the status-change pull request merges. API or behavior changes noted. | ADR-024 through ADR-027 stay Proposed on this `main`. The OpenAPI file stays a proposal. ADR-035 counts as accepted only because [#600](https://github.com/drgaciw/open-crm-cpq/pull/600) merged to `main`, and that acceptance is S1 and S2 only. |
+| 7 | No feature flag enabled, nothing deployed, nothing external sent | Owner gate. S6's register default (OQ11) is a per-tenant flag, default off, and that default is not confirmed. Enabling it is outside the story. |
+| 8 | Linear links the pull request and follow-ups; Notion hub updated if scope changes | Follow-ups already named: DRG-563, DRG-565, DRG-566, DRG-554. |
+| 9 | Follow-ups filed; no TODO without a ticket | DRG-566 holds history backfill. DRG-428 replaces the interim configuration pin. |
 
-- **Open Host Service.** The phrase is absent from the files read. Meaning unverified. The published HTTP surface in the docs is the S3 amendment API.
-- **Schema-registry events.** AC-S6-4 is the registration requirement. S3, S4, and S7 do not register schemas in their acceptance criteria.
-- **Outbox writes.** FR-19 assigns audit publication to S2. Technical approach control-flow step 7 says the outbox publishes after apply. AC-S7-2 forbids outbox events on the backfill. Whether S4 writes the outbox row itself, or only S2's writer does, is not split in the files.
-- **Commercial-decision audit.** FR-14 and the pricing decision trail are S5. DRG-564 is the gap for continuation pricing decisions. None of AC-S3, AC-S4, AC-S6, or AC-S7 is a commercial-decision audit criterion. S3 stores `content_digest`. S4 stores `apply_key_digest`.
-- **Event-replay test.** Technical approach §8 and AC-S8-3 say replaying the stream twice yields the same ledger. That test is S8. AC-S4-2 is duplicate-apply idempotency. AC-S6-3 is inbox dedupe of an in-flight legacy event. The ramp spec's event-replay sentence is about DRG-534, not these four stories.
+v0.2 says to mark an addition N/A, with a one-line reason, when the story does not touch events, rules, or commercial decisions. "Open Host Service" does not appear in the repo files read for this note. The page does not define that contract. The mapping uses the story text that was read.
+
+| v0.2 addition | S3 DRG-581 | S4 DRG-582 | S6 DRG-584 | S7 DRG-585 |
+|---|---|---|---|---|
+| Open Host Service | Applies. The story adds the amendment HTTP API. | N/A. Apply is an internal CAM orchestrator in the story text, not a new integration surface. | N/A. The change is event fields and in-process flag routing. | N/A. The change is a CAM migration and header creation. |
+| Schema-registry events | N/A. Registration is AC-S6-4, not an S3 criterion. | N/A. S4 emits apply results; schema registration is AC-S6-4. | Applies. AC-S6-4 requires a registered schema and a contract test per amendment event. | N/A. AC-S7-2 creates no events. |
+| Outbox writes | N/A. The audited rejection row is `amendment_document_events`. Outbox publication is FR-19, owned by S2. | Applies. Control-flow step 7 publishes through the outbox after apply. Whether S4 or S2's writer performs that write is not split in the files. | Applies. New and extended events go through the outbox, not a direct publish. | N/A. AC-S7-2 forbids outbox events. |
+| Commercial-decision audit entry | N/A. S3 stores `content_digest`. Pricing decisions are FR-14 on S5. | N/A. S4 stores `apply_key_digest` and re-checks pins. It does not write the pricing decision. | N/A. No commercial decision is in the S6 criteria. | N/A. Header rows only. No pricing decision. |
+| Event-replay test | N/A. Stream replay is AC-S8-3. | Applies. AC-S4-2 is the duplicate-apply case. Whole-stream replay stays AC-S8-3. | Applies. AC-S6-1 and AC-S6-3 cover old and new payloads and inbox dedupe. | N/A. The backfill creates no event to replay. |
+| Base branch | Applies to the implementation pull request: its base is `main`, and the merge lands on `main`. | Same. | Same. | Same. |
+
+The words "event-replay test" also appear in `prereq/specs/ramp-amendments.md` as a DRG-534 acceptance line. That file is a proposal. It is not this checklist.
 
 ## Drafts that stay Proposed
 
-Read on this `main`:
+An ADR counts as accepted only after the owner accepts it and the status-change pull request merges. Read on this `main`:
 
-- `docs/adr/ADR-024-order-orchestration-context.md`, `ADR-025-saga-process-manager.md`, `ADR-026-command-messages.md`, and `ADR-027-compensation-and-point-of-no-return.md` each say **Proposed on 2026-10-04. Not accepted.** Each says it does not authorize code. `docs/adr/README.md` catalogs them as Proposed, documentation only.
-- `docs/renewals-amendments/prereq/DRAFT-adr-reconcile-adr-024-027.md` is a separate draft. Its status line says Proposed, assigns no ADR number, and leaves ADR-024 through ADR-027 Proposed. It says partial application (OQ5) remains open.
+- `docs/adr/ADR-024-order-orchestration-context.md`, `ADR-025-saga-process-manager.md`, `ADR-026-command-messages.md`, and `ADR-027-compensation-and-point-of-no-return.md` each say **Proposed on 2026-10-04. Not accepted.** Each says it does not authorize code. `docs/adr/README.md` catalogs them as Proposed, documentation only. Their status lines on this `main` are still Proposed, so they are not accepted.
+- `docs/renewals-amendments/prereq/DRAFT-adr-reconcile-adr-024-027.md` is a separate draft. Its status line says Proposed, assigns no ADR number, and leaves ADR-024 through ADR-027 Proposed. It says partial application (OQ5) remains open. It is not a merged status change for ADR-024 through ADR-027.
 - `docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml` is a draft proposal (`x-opencrm-status: proposal`, title "DRAFT proposal"). Its header says it is not an implementation, a gateway route, or a feature flag, and that it does not authorize merging, deploying, or enabling a runtime flag. Nothing in this tree accepts that contract.
 
-S3 through S8 must not treat those drafts as accepted architecture.
+S3 through S8 must not treat those drafts as accepted architecture. ADR-035 is the exception recorded above: [#600](https://github.com/drgaciw/open-crm-cpq/pull/600) merged to `main`, and the scope of that acceptance is S1 and S2 only.
 
 ## Unverified
 
-- Notion DoD page verification state was `unverified` at fetch time. The nine items above are the page text that came back.
+- Notion DoD page `verification.state` was `unverified` at fetch time. The title and the body disagree, as recorded in the Definition of Done section. The checklist text used here is the body that was fetched.
 - Linear Backlog status for DRG-581, DRG-582, DRG-584, and DRG-585 is outside the git tree.
 - New class file names for the API, the apply orchestrator, the digest utility, and the event schema types.
 - Which CAM class is the NEW subscription path for AC-S7-3.
 - Whether S6 edits `EventContractRegistry.java` (inferred, not named).
 - Pricing-service amendment modes (OQ9). Technical approach §10 says a code search returned nothing. Not re-run for this note. OQ9 gates S5, which stays blocked.
-- The five pending-DoD phrases, except the single "event-replay test" sentence in the ramp proposal.
+- The meaning of "Open Host Service" beyond the v0.2 sentence. It is not defined in the repo files read for this note.
 - Any option for OQ6's mid-flight edge that is not quoted above. Absence from the files read is not proof that no other note exists outside `docs/renewals-amendments/` and `docs/adr/`.
 
 ## Later owner record
