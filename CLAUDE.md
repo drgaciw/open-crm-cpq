@@ -97,4 +97,4 @@ CI: **Jenkins is primary** (`Jenkinsfile`); `.github/workflows/ci.yml` is the `w
 fallback and also runs nightly on `main`; `pr-check.yml` gates pull requests and `main-verify.yml`
 re-runs the unit stage after every merge to `main` — see ADR-003 sections 7–8. The frontend stage
 (`scripts/ci/frontend.sh`) builds, lints and tests every Nx project; it runs in the full `ci.yml`
-matrix, not in the pull-request gate.
+matrix and the primary Jenkins Frontend stage. `.github/workflows/pr-check.yml` omits frontend.
