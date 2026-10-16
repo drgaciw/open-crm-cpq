@@ -70,11 +70,11 @@ Each rule is testable as a pass or fail on a given input. Failure blocks the nam
 - **V6** Action date and effective date are both present and stored separately; effective date before action date (backdating) requires an explicit backdating reason code and approval. [S rca 3; I on backdating rule]
 - **V7** Quantity semantics are declared per line (Delta, Absolute, Replace) and `start_qty + delta_qty = end_qty` holds; `end_qty >= 0`. [S research 4.3; sanity 4]
 - **V8** Every priced line carries a PolicyDecision id, policy id and version, and the pricing-service trace id; no line is priced inside quote-service or CAM. [S spike 5; rca 3]
-- **V9** Product external id, pricebook version and configuration hash are pinned at pricing and are unchanged at apply. [S spike 6.2]
+- **V9** Product external id, pricebook version and configuration hash are pinned at pricing and are unchanged at apply. Until DRG-428 supplies a configuration hash, the configuration hash is an interim non-null pin (SHA-256 of product id, pricebook version and sorted option codes). [S spike 6.2; owner decision 2026-10-16]
 - **V10** Content digest at apply equals the digest of the executed (or approved) revision; mismatch blocks apply. [S spike 3]
 - **V11** At most one revision per amendment number reaches EXECUTED. [S spike, decision 6 proposed]
 - **V12** Units apply in dependency order (create before terminate); a unit writes all its rows or none. [S spike 4]
-- **V13** Applying the same (document id, unit no, content digest) twice is a no-op; same key with a different digest is rejected. [S spike 3]
+- **V13** The apply key is (document id, unit no), enforced uniquely. Applying it again with the same stored content digest is a no-op; reusing that key with a different digest is rejected and audited. [S spike 3]
 - **V14** Manual price overrides record actor, reason code and the overridden value, and route to approval. [I]
 
 ## 5. Audit requirements
@@ -133,3 +133,19 @@ Policy-specific [I]:
 - **OQ10** Whether a mid-term downsell is permitted before a minimum commitment ends, and its credit or fee policy (RA-16).
 - **OQ11** Who may VOID an executed amendment [S spike 6.5].
 - **OQ12** Which pricing gaps block the first release: G1 (price-as-of, precedence) and G6 (one-time lines) look necessary for amendments; G2, G3, G4, G5, G7, G8 and G10 can wait for their policies [I; gaps from sanity].
+
+
+## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
+- **OQ2 and OQ4 are resolved** (apply only after EXECUTED; provisional number at DRAFT, final gapless number at EXECUTED). Section 3 note on OQ2 is superseded by those decisions.
+- **First-slice cut:** actions Add, Update, Remove only; signature policies NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH only; SaaS subscriptions only. Swap, Upgrade, Downgrade wait for RA-42 / DRG-576. See `amendment-first-slice-requirements-and-acceptance.md`.
+- Rules V1..V14 are mapped to stories and test names (rule id in the test name) in that file and in the technical approach file.
+
+## Clarification 2026-10-16 (call decisions, audit of backlog; amendment modes, legal review, pricing modes, coterm)
+Source: call decisions recorded in `cpq-project-transcript.md` addendum "Renewals and amendments decisions audit". Backlog: DRG-592 (RA-58), DRG-594 (RA-60), DRG-550 (RA-16), DRG-554 (RA-20).
+- **Amendment modes (conflict).** This spec models amend-in-place on one contract. The call decided two modes: **new contract (preferred)** and **amend in place**. In new-contract mode both contracts stay active, the new contract carries a stored precedence flag and the original stays open as a reference. First slice (SaaS only: add, update, remove lines) stays amend-in-place; new-contract mode is tracked in DRG-592 and needs a product call on timing. V-rules for new-contract mode are not yet defined.
+- **Legal review gate (gap).** No rule here says which amendments skip legal review. Decision: only changes to **pricing, term or seats** are legal-review-free; everything else needs legal review. Adding or removing a product line is outside that set unless product treats it as seats (open). Tracked in DRG-594.
+- **Pricing modes.** Amendment pricing supports **flat adjustment** and **prorated delta**; the existing stub-proration rule is the prorated delta mode. Pricing-service support still unverified (OQ9). Tracked on DRG-550.
+- **Coterm (V5).** V5 still lets amended lines co-term to the existing end date. Customer-level coterm events (blended or rates-carry-forward with carry-forward default, shared end date as new anchor, all-or-nothing per customer, optional renewal group) are a separate mechanism tracked on DRG-554; approver deferred (DRG-591).
+- **Audit and visibility.** Audit of every amendment (A1 to A8) is confirmed. Visibility is contract owner plus read-only sales ops and finance (DRG-595); not yet in this spec.
+
+**C1 resolved 2026-10-16 (owner), amendment modes.** Both modes are supported. This spec's amend-in-place model is the one built first, in the initial slice. New-contract-preferred (RA-58 / DRG-592) follows as the next increment, and the two coexist once both are in. The conflict note in the 2026-10-16 clarification above is therefore resolved as sequencing, not as a replacement. See OQ26 in `renewals-amendments-open-questions-register.md`.

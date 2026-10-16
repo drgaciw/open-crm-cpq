@@ -73,3 +73,11 @@ Spike decisions [S spike; spec 8]. OQ2 and OQ4 were resolved on 2026-10-16 [S tr
 - **OQ8 Retention (DRG-313):** each renewal moves the contract end, and so the retention clock.
 
 Dependencies: RA-15 / DRG-549, RA-33 / DRG-567 (G1), RA-07 / DRG-541 (Drools default), RA-12 / DRG-546, RA-30 / DRG-564 [S sanity 6]. Policy-specific [I]: renewal from InGrace or Expired; whether an open unapplied amendment projects into the renewal [S sanity scenario 4].
+
+## Clarification 2026-10-16 (call decisions: auto-renew, notice, kickoff, quote modes)
+Source: transcript addendum "Renewals and amendments decisions audit"; backlog DRG-596 (RA-62), DRG-593 (RA-59), DRG-554 (RA-20), DRG-555 (RA-21).
+- **Conflict with the term-end trigger above.** The stub lets a term-end auto action (Renew, RenewOnce, Evergreen, Cancel) run if no seller action and evaluates notice windows from clause fields. Decision: **auto-renew is opt-in per contract and off by default**; **clauses are notice triggers only**. No automatic renewal happens without the opt-in.
+- **Notice period:** one **global default** with a **per-contract override** (settings, not clause content).
+- **Auto-kickoff:** opt-in, **90 days before end date by default and configurable**.
+- **Renewal quote creation:** auto-generate from contract terms or start from scratch; prior-term usage is optional, opt-in context (DRG-593).
+- **Coterm:** blended or rates-carry-forward (carry-forward default); shared end date is the new anchor (extends RN1 co-term anchor); all-or-nothing per customer; optional renewal group for one consolidated renewal quote (DRG-554). Approver deferred (DRG-591).
