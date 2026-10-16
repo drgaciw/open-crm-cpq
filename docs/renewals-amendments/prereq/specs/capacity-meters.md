@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `capacity-meters`. **Date:** 2026-10-16.
 
-**Sources.** [DRG-557](https://linear.app/drgamtd-workspace/issue/DRG-557) (RA-23, meter model and TrueUp intent), [DRG-569](https://linear.app/drgamtd-workspace/issue/DRG-569) (RA-35, true-up pricing semantics), [DRG-570](https://linear.app/drgamtd-workspace/issue/DRG-570) (RA-36, provenance, dispute, frozen snapshot). Worked numbers are the illustrative Scenario 2 in `../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The amendment spike's `delta_qty = max(0, peak − entitled)` is a sketch that picks Peak with no tolerance or backdating; this proposal does not adopt that sketch as the policy.
+**Sources.** [DRG-557](https://linear.app/drgamtd-workspace/issue/DRG-557) (RA-23, meter model and TrueUp intent), [DRG-569](https://linear.app/drgamtd-workspace/issue/DRG-569) (RA-35, true-up pricing semantics), [DRG-570](https://linear.app/drgamtd-workspace/issue/DRG-570) (RA-36, provenance, dispute, frozen snapshot). Worked numbers are the illustrative Scenario 2 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The amendment spike's `delta_qty = max(0, peak − entitled)` is a sketch that picks Peak with no tolerance or backdating; this proposal does not adopt that sketch as the policy.
 
 **Conventions.** **[S]** is taken from those issues or the files they cite. **[I]** is a design inference carried forward as a proposal. Every default below is an **Owner decision**.
 
@@ -57,9 +57,9 @@ A true-up change line carries `quantitySemantics = Delta` or `Absolute`, `startQ
 
 1. Drop readings outside the window.
 2. Drop readings whose status is not `Attested` inside the frozen snapshot.
-3. Apply tolerance: a reading at or below `committed × (1 + tolerancePct)` does not count as exceedance.
-4. Aggregate the remaining readings.
-5. Excess = max(0, aggregated − committed) when `trueDown = Never`. True-down behavior for the other two values is an owner decision (below).
+3. Aggregate all remaining attested readings, including readings below the commitment. Do not filter out low readings before computing Average or P95.
+4. Compare the aggregate with `committed × (1 + tolerancePct)` (a fractional tolerance, so 0.05 means 5%). At or below this threshold, excess is zero.
+5. Above the threshold, excess = max(0, aggregated − committed) when `trueDown = Never`. Tolerance is an exceedance gate, not a deduction from billable excess. True-down behavior for the other two values is an owner decision (below).
 6. Round excess up to `packSize` when `packSize` is set.
 7. Price excess at the selected overage rate.
 8. If `backdate` is not `None`, emit the arrears amount with its own service period. The charge-line type for that arrears amount is DRG-572.
@@ -105,4 +105,4 @@ Resolution order account > agreement > line, and "contract clause beats account 
 6. **Owner decision — threshold versus cycle.** DRG-557 asks for both a threshold trigger and a true-up cycle. Whether a threshold opens a draft, a warning only, or nothing until the cycle date is unset.
 7. **Owner decision — rounding of the average and of money.** AC-3 assumes half-up to a whole core (69.8 → 70) and money to 2 decimal places. The $41.67 core-month rate is the sanity-check figure; the owner confirms the rounding stage (unit versus extended) before AC-2 is a build fixture.
 8. **Owner decision — P95 and EndOfPeriod fixtures.** The vocabulary includes both. Worked rows exist for Peak and Average only. P95 and EndOfPeriod need an owner-supplied example before they are acceptance tests.
-9. **Owner decision — where the snapshot lives.** The proposal puts the snapshot with the change that priced it. Whether contract-asset-management or quote-service persists it follows the amendment-document placement decision (spike OQ1), which this file does not close.
+9. **Owner decision — where the snapshot lives.** The proposal puts the snapshot with the change that priced it. ADR-035 settles amendment-document placement in CAM. The owner still selects the authoritative metering-snapshot store and reference; this proposal does not reopen document placement.
