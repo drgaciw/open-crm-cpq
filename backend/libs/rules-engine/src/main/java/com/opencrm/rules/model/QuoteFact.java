@@ -12,6 +12,8 @@ import java.util.Map;
 /**
  * Quote fact for rules engine evaluation in pricing-service Drools rules.
  * Bindings: {@code durationInMonths}, {@code basePrice}, {@code finalPrice}, {@code customer}.
+ * {@code renewal-uplift.drl} reads metadata {@code dealType}, {@code renewalUpliftPct},
+ * and {@code renewalUpliftSupplied}, plus {@code customer.churnScore}.
  */
 @Data
 @Builder

@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -318,14 +319,21 @@ public class PricingExecutionService {
             migrationPolicy.apply(migrationPlan, lineResults);
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
             result.setFinancialMetrics(metrics);
+            // Customer churn is authoritative. A request value cannot choose the 8% or 3% branch.
+            stampRenewalChurn(context, customer);
+            com.opencrm.pricing.ramp.PeriodGovernance renewalGovernance = new com.opencrm.pricing.ramp.PeriodGovernance();
             if (requestsRamp(context)) {
                 List<RuleDefinition> governanceRules = activeRules.stream().map(rule -> RuleDefinition.builder()
                         .id(String.valueOf(rule.getId())).name(rule.getName()).content(rule.getContent())
                         .priority(rule.getPriority()).ruleType(rule.getRuleType() == null ? null : rule.getRuleType().name())
                         .conditionGroup(rule.getConditionGroup()).actionSet(rule.getActionSet())
                         .conflictPolicy(rule.getConflictPolicy()).explanationCode(rule.getExplanationCode()).build()).toList();
-                new com.opencrm.pricing.ramp.PeriodGovernance().evaluate(
+                renewalGovernance.evaluate(
                         context, result, droolsRulesEngine, fallbackProducts, governanceRules, migrationPlan);
+            } else {
+                for (PricingLineResult lineResult : lineResults) {
+                    renewalGovernance.applyRenewalUpliftDefault(context, lineResult, droolsRulesEngine);
+                }
             }
 
             // Stamp after mutable rule/governance execution; caller or configured facts cannot mint authority.
@@ -341,8 +349,12 @@ public class PricingExecutionService {
 
             // 12. Build PricingWaterfall
             PricingWaterfall waterfall = buildWaterfall(lineResults);
+            appendRenewalExplanation(waterfall, lineResults);
             result.setWaterfall(waterfall);
             waterfall.setApprovalState(result.getApprovalState());
+            for (String code : waterfall.getExplanationCodes()) {
+                if (!result.getExplanationCodes().contains(code)) result.getExplanationCodes().add(code);
+            }
 
             long executionTime = System.currentTimeMillis() - startTime;
             result.setExecutionTimeMs(executionTime);
@@ -364,6 +376,57 @@ public class PricingExecutionService {
                     "An unexpected error occurred during pricing calculation",
                     "PRICING_EXECUTION_ERROR");
         }
+    }
+
+    private static void stampRenewalChurn(PricingContext context, Customer customer) {
+        if (!"RENEWAL".equals(exactDealType(context)) || customer == null || customer.getChurnScore() == null) return;
+        Map<String, Object> metadata = new HashMap<>();
+        if (context.getMetadata() != null) metadata.putAll(context.getMetadata());
+        metadata.put("churnScore", customer.getChurnScore());
+        context.setMetadata(metadata);
+    }
+
+    private static String exactDealType(PricingContext context) {
+        if (context.getMetadata() == null || context.getMetadata().get("dealType") == null) return null;
+        return context.getMetadata().get("dealType").toString();
+    }
+
+    private static void appendRenewalExplanation(PricingWaterfall waterfall, List<PricingLineResult> lineResults) {
+        boolean policy = false;
+        String retention = null;
+        for (PricingLineResult line : lineResults) {
+            if (line.getMetadata() == null || !"RENEWAL_UPLIFT_POLICY".equals(line.getMetadata().get("renewalUpliftSource"))) continue;
+            policy = true;
+            Object offer = line.getMetadata().get("retentionOffer");
+            if (offer != null) retention = offer.toString();
+        }
+        if (!policy) return;
+        waterfall.getExplanationCodes().add("RENEWAL_UPLIFT_POLICY");
+        if (retention != null) waterfall.getExplanationCodes().add(retention);
+    }
+
+    private static boolean renewalPolicyApplied(PricingResult result) {
+        return result.getLineResults() != null && result.getLineResults().stream().anyMatch(line -> line.getMetadata() != null
+                && "RENEWAL_UPLIFT_POLICY".equals(line.getMetadata().get("renewalUpliftSource")));
+    }
+
+    private static Map<String, Object> renewalDecision(PricingContext context, PricingResult result) {
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("rule", "Renewal Uplift and Retention Offer");
+        decision.put("explanationCode", "RENEWAL_UPLIFT_POLICY");
+        decision.put("dealType", "RENEWAL");
+        decision.put("churnScore", context.getMetadata() == null ? null : context.getMetadata().get("churnScore"));
+        decision.put("renewalUpliftPct", renewalMetadata(result, "renewalUpliftPct"));
+        decision.put("retentionOffer", renewalMetadata(result, "retentionOffer"));
+        decision.put("priceChanged", false);
+        return decision;
+    }
+
+    private static Object renewalMetadata(PricingResult result, String key) {
+        for (PricingLineResult line : result.getLineResults()) {
+            if (line.getMetadata() != null && line.getMetadata().get(key) != null) return line.getMetadata().get(key);
+        }
+        return null;
     }
 
     private static boolean requestsRamp(PricingContext context) {
@@ -461,6 +524,14 @@ public class PricingExecutionService {
         try {
             String inputSnapshot = objectMapper.writeValueAsString(context);
             String outputSnapshot = objectMapper.writeValueAsString(result);
+            // The default fraction does not change a price (basis is DRG-567). The audit row still
+            // records the decision; priceChanged stays false until a later story applies the fraction.
+            String renewalTrace = null;
+            String renewalRule = null;
+            if (renewalPolicyApplied(result)) {
+                renewalRule = "Renewal Uplift and Retention Offer";
+                renewalTrace = objectMapper.writeValueAsString(renewalDecision(context, result));
+            }
 
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
@@ -468,6 +539,8 @@ public class PricingExecutionService {
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
+                    .waterfallTrace(renewalTrace)
+                    .rulesFired(renewalRule)
                     .executionTimeMs(executionTime)
                     .build();
 
