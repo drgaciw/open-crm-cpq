@@ -258,6 +258,37 @@ class RenewalSchedulerTest {
         }
 
         @Test
+        void upgradeSeedsReceiptsForPreviouslyEmittedCompositeKeys() {
+            String schema = "renewal_receipt_upgrade";
+            var migration = org.flywaydb.core.Flyway.configure()
+                    .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .schemas(schema).defaultSchema(schema).locations("classpath:db/migration");
+            migration.target("1.7").load().migrate();
+            String url = POSTGRES.getJdbcUrl() + (POSTGRES.getJdbcUrl().contains("?") ? "&" : "?")
+                    + "currentSchema=" + schema;
+            JdbcTemplate upgrade = new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                    url, POSTGRES.getUsername(), POSTGRES.getPassword()));
+            Long id = upgrade.queryForObject("""
+                    INSERT INTO subscriptions(uuid, subscription_number, customer_id, quote_id, plan_name, start_date, end_date)
+                    VALUES(gen_random_uuid(), 'UPGRADE', 'customer', 'quote', 'plan', DATE '2026-01-01', DATE '2026-12-31')
+                    RETURNING id
+                    """, Long.class);
+            String key = id + ":2026-12-31:none";
+            upgrade.update("""
+                    INSERT INTO outbox_events(uuid, aggregate_type, aggregate_id, event_type, payload)
+                    VALUES(gen_random_uuid(), 'Subscription', ?, 'cpq.subscription.renewal.eligible', '{}')
+                    """, key);
+            migration.target(org.flywaydb.core.api.MigrationVersion.LATEST).load().migrate();
+            assertThat(upgrade.queryForObject(
+                    "SELECT count(*) FROM renewal_eligibility_publications WHERE dedupe_key = ?", Long.class, key))
+                    .isEqualTo(1L);
+            upgrade.update("DELETE FROM outbox_events WHERE aggregate_id = ?", key);
+            assertThat(upgrade.queryForObject(
+                    "SELECT count(*) FROM renewal_eligibility_publications WHERE dedupe_key = ?", Long.class, key))
+                    .isEqualTo(1L);
+        }
+
+        @Test
         void overlappingScansLeaveOneDurableReceiptAndOneOutboxRow() throws Exception {
             LocalDate end = LocalDate.now().plusMonths(7);
             LocalDate window = LocalDate.now().minusDays(1);

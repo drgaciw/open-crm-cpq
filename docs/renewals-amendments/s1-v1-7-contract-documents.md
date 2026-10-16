@@ -68,3 +68,5 @@ COMMIT;
 ## Not in this story
 
 Open Host Service, schema-registry events, outbox writes, commercial-decision audit entries and event-replay tests are not part of S1. The event table is storage only. No event is published and no commercial decision is made.
+
+V1_7_1 seeds durable renewal receipts from existing composite outbox keys before the scheduler switches stores. Legacy bare subscription ids contain no term end and cannot be safely reconstructed; historical emissions already removed from the outbox are likewise unobservable. The migration leaves those unknown histories unclaimed rather than suppress a possibly new term.

@@ -12,6 +12,11 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @Tag("unit")
 class PeriodGovernanceTest {
@@ -78,6 +83,21 @@ class PeriodGovernanceTest {
         assertThat((List<String>) governance(result).get("reasons"))
                 .anyMatch(reason -> reason.contains("required 550000 USD, scheduled 500000"));
         assertThat(result.getApprovalTier()).isEqualTo("DEAL_DESK");
+    }
+
+    @Test
+    void quoteLevelRenewalDefaultExecutesOnceForMultipleLines() {
+        DroolsRulesEngine counted = spy(port);
+        PricingLineResult first = PricingLineResult.builder().metadata(Map.of("retentionOffer", "FORGED")).build();
+        PricingLineResult second = PricingLineResult.builder().metadata(Map.of("renewalUpliftSource", "FORGED")).build();
+        new PeriodGovernance().applyRenewalUpliftDefaults(renewalContext(70, null), List.of(first, second), counted);
+        verify(counted, times(1)).execute(any(), argThat(rules -> rules.size() == 1
+                && "renewal-uplift.drl".equals(rules.getFirst().getId())));
+        for (PricingLineResult line : List.of(first, second)) {
+            assertThat(line.getMetadata().get("renewalUpliftPct")).isEqualTo("0.08");
+            assertThat(line.getMetadata().get("renewalUpliftSource")).isEqualTo("RENEWAL_UPLIFT_POLICY");
+            assertThat(line.getMetadata()).doesNotContainKey("retentionOffer");
+        }
     }
 
     @Test
