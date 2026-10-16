@@ -20,34 +20,14 @@ jobs:
           java-version: '25'
           distribution: temurin
           cache: maven
-      - name: Full Docker-backed verification
-        run: bash scripts/ci/run-core.sh backend-integration 2>&1 | tee mvn-integration.log
-      - name: Diagnostic - failing tests as annotations
-        if: failure()
+      - name: Simulated failing stage (self-test)
         run: |
-          python3 - <<'EOF'
-          import glob, xml.etree.ElementTree as ET, re
-          fails=[]
-          for f in glob.glob('backend/**/target/surefire-reports/*.xml', recursive=True)+glob.glob('backend/**/target/failsafe-reports/*.xml', recursive=True):
-              try: r=ET.parse(f).getroot()
-              except Exception: continue
-              for tc in r.iter('testcase'):
-                  for k in ('failure','error'):
-                      e=tc.find(k)
-                      if e is not None:
-                          body=(e.text or '').strip().splitlines()
-                          cause=[l.strip() for l in body if 'Caused by' in l][-2:]
-                          fails.append(f"{tc.get('classname')}#{tc.get('name')} [{k}] {(e.get('message') or '')[:300]} || {' || '.join(cause)[:500]}")
-          print(f"::notice title=diag-count::failing testcases {len(fails)}")
-          for i in range(0, min(len(fails), 72), 8):
-              msg=' ### '.join(fails[i:i+8]).replace('%','%25').replace('\r','').replace('\n',' ')
-              print(f"::error title=diag-fail-{i}::{msg[:7000]}")
-          log=open('mvn-integration.log',errors='replace').read().splitlines()
-          errs=[l for l in log if l.startswith('[ERROR]')][:60]
-          print(f"::warning title=diag-mvn-errors::{' ### '.join(errs)[:7000].replace('%','%25')}")
-          tail=log[-40:]
-          print(f"::warning title=diag-mvn-tail::{' ### '.join(tail)[:7000].replace('%','%25')}")
-          EOF
+          mkdir -p backend/demo/target/surefire-reports
+          printf '<testsuite name="d"><testcase classname="com.opencrm.demo.SelfTestIT" name="relays"><failure message="expected 1 but was 0">java.lang.AssertionError\nCaused by: org.testcontainers.ContainerLaunchException: timed out</failure></testcase></testsuite>' > backend/demo/target/surefire-reports/TEST-demo.xml
+          exit 1
+      - name: Name failing tests
+        if: failure()
+        run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
