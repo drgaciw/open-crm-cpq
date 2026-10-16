@@ -1,0 +1,18 @@
+{
+  "id": "drg-541-renewal-uplift-caller-supplied",
+  "description": "A fraction already on the fact wins. The default rule does not replace it, even for high churn.",
+  "ruleClasspath": "rules/renewal-uplift.drl",
+  "facts": {
+    "dealType": "RENEWAL",
+    "churnScore": 80,
+    "renewalUpliftPct": 0.05,
+    "finalPrice": 1000.00
+  },
+  "expected": {
+    "rulesFired": 0,
+    "renewalUpliftPct": "0.05",
+    "retentionOffer": null,
+    "explanationCode": null,
+    "finalPrice": 1000.00
+  }
+}

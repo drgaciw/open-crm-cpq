@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept the spike's partial-apply rules, write an ADR, or authorize implementation, a flag change, or a deploy. Mid-term policy OQ5 (partial application) stays open. The acceptance criteria below are the proposed rules from DRG-565. They apply only if the owner adopts partial application.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `partial-apply`. **Date:** 2026-10-16.
 
-**Source.** [DRG-565](https://linear.app/drgamtd-workspace/issue/DRG-565) (RA-31), which records the amendment-document spike §4 (`../amendment-document-design-spike.md`). TMF622's `partial` order state is cited there as precedent, not as an API to copy.
+**Source.** [DRG-565](https://linear.app/drgamtd-workspace/issue/DRG-565) (RA-31), which records the amendment-document spike §4 (`../../amendment-document-design-spike.md`). TMF622's `partial` order state is cited there as precedent, not as an API to copy.
 
 **Conventions.** **[S]** is the issue or the spike section it quotes. **[I]** is the spike's own inference, still a proposal. The choice to allow partial apply at all is an **Owner decision**.
 
@@ -19,7 +19,7 @@
 
 ### Out of this slice
 
-The commercial policies that fill the lines (`capacity-meters.md`, `conversions.md`, `maintenance.md`, `co-termination.md`). Dry-run and revert of a whole lifecycle change (DRG-551), except that this slice names rebase as the recovery when apply has already committed a unit. The ledger change that lets one document record several subscription acceptances (DRG-563, RA-29). One-time charge routing (DRG-572). SKU-mapping holds (DRG-599). Document placement (spike OQ1) and the apply point (spike OQ2) stay open; this slice says what apply does after the owner picks the point.
+The commercial policies that fill the lines (`capacity-meters.md`, `conversions.md`, `maintenance.md`, `co-termination.md`). Dry-run and revert of a whole lifecycle change (DRG-551), except that this slice names rebase as the recovery when apply has already committed a unit. The ledger change that lets one document record several subscription acceptances (DRG-563, RA-29). One-time charge routing (DRG-572). SKU-mapping holds (DRG-599). Document placement is CAM under ADR-035, and OQ2 is resolved: apply starts only after EXECUTED. Partial-application policy (OQ5) remains a proposal; S4 implementation remains gated.
 
 ### Proposed contract
 
@@ -32,10 +32,11 @@ ApplicationUnit
   dependsOnUnitNos[]
   observedRevision
   contentDigest
-  state                { PENDING | APPLIED | FAILED }
+  state                { PENDING | APPLIED | BLOCKED }
 
-AmendmentDocument.applyStatus
-  APPLIED | PARTIALLY_APPLIED | APPLY_BLOCKED
+AmendmentDocument.status
+  EXECUTED | APPLIED | PARTIALLY_APPLIED | APPLY_BLOCKED
+  (one status column; no parallel applyStatus)
 ```
 
 **Proposed rules [S spike §4], pending the owner decision:**
@@ -46,7 +47,7 @@ AmendmentDocument.applyStatus
 4. Future-dated lines are written at apply as future rate periods. Applied means recorded. In-effect is the period start.
 5. If unit N fails after an earlier unit committed, the document becomes `PARTIALLY_APPLIED`. If no unit has committed, it becomes `APPLY_BLOCKED`. The failure raises a task. The fix is a rebase (re-observe, re-price, new revision, re-approval when the price changed) or a correcting amendment.
 6. Each unit stores its own `observedRevision`. A stale revision fails that unit only.
-7. Applying the same `(documentId, unitNo, contentDigest)` twice is a no-op. The same key with a different digest is rejected.
+7. The unique business identity is `(documentId, unitNo)`. Replaying that identity with the same content digest is a no-op; a different digest for that identity is rejected and audited. The digest is replay-validation data, not part of the unique key.
 
 **Proposed grouping for the named scenarios [S spike §4]:**
 
@@ -71,7 +72,7 @@ These criteria describe the proposed rules. If the owner rejects partial applica
 8. **Stale unit.** Unit A observed revision 4 and the target is already at 5. Unit A fails, no rows of unit A are written, and the document is `APPLY_BLOCKED` if A was the only unit, or `PARTIALLY_APPLIED` if another unit already applied.
 9. **No silent rollback.** After AC-5, nothing deletes the committed entitlement unit. Recovery creates a new revision or a new correcting document.
 10. **Idempotency.** A second apply of the same document id, unit number, and content digest does not write a second ledger row. A second apply with a different digest and the same unit number is rejected.
-11. **All units applied.** When every unit reaches `APPLIED`, the document apply status is `APPLIED`.
+11. **All units applied.** When every unit reaches `APPLIED`, the document status is `APPLIED`.
 12. **Rebase price change.** A rebase that changes a priced amount produces a new revision in a pre-execution state and requires approval again. A rebase that changes only the observed revision, with the same prices and digest of commercial fields, records the new observation. Which fields sit inside the digest is the spike's content-digest rule; this slice does not redefine it.
 13. **Mixed targets.** A document with a SaaS seat change, an on-prem capacity raise, and a services fee produces three units with three target types. One signature covers all three.
 
@@ -87,7 +88,7 @@ These criteria describe the proposed rules. If the owner rejects partial applica
 | `capacity-meters.md`, DRG-557 | True-up scenario |
 | DRG-572 | ONE_TIME target for arrears, services fees, and true-up charges |
 | DRG-551 | Revert of an unapplied change. After a unit commits, recovery is rebase or a correcting amendment |
-| Spike OQ1, OQ2 | Placement of the document and whether apply waits for EXECUTED. Unit rules are the same at either apply point; the state that precedes apply is not |
+| ADR-035 and resolved OQ2 | CAM owns the document; apply waits for EXECUTED. This proposal does not reopen either decision |
 
 ## Open questions
 
