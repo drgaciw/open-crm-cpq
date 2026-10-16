@@ -9,8 +9,6 @@ import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.repository.SubscriptionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -50,8 +50,8 @@ class RenewalSchedulerTest {
 
     private SubscriptionRepository subscriptions;
     private OutboxEventPublisher publisher;
-    private EntityManager entityManager;
-    private TypedQuery<Long> countQuery;
+    private JdbcTemplate jdbc;
+    private PlatformTransactionManager transactions;
     private RenewalScheduler scheduler;
 
     @BeforeEach
@@ -59,18 +59,18 @@ class RenewalSchedulerTest {
     void setUp() {
         subscriptions = mock(SubscriptionRepository.class);
         publisher = mock(OutboxEventPublisher.class);
-        entityManager = mock(EntityManager.class);
-        countQuery = mock(TypedQuery.class);
-        when(entityManager.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
-        when(countQuery.setParameter(anyString(), any())).thenReturn(countQuery);
+        jdbc = mock(JdbcTemplate.class);
+        transactions = mock(PlatformTransactionManager.class);
+        when(transactions.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1);
         when(subscriptions.findRenewalEligible(any())).thenReturn(List.of(subscription(15L, TERM_END, WINDOW)));
-        scheduler = new RenewalScheduler(subscriptions, publisher, entityManager);
+        scheduler = new RenewalScheduler(subscriptions, publisher, jdbc, transactions);
     }
 
     @Test
     @DisplayName("two nightly runs write one outbox row keyed by subscription, term end and window")
     void secondNightSkipsTheSameTerm() {
-        when(countQuery.getSingleResult()).thenReturn(0L, 1L);
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1, 0);
 
         scheduler.checkRenewalEligibility();
         scheduler.checkRenewalEligibility();
@@ -83,9 +83,9 @@ class RenewalSchedulerTest {
     }
 
     @Test
-    @DisplayName("a row already stored for the key is not written again")
-    void existingOutboxRowIsNotRepublished() {
-        when(countQuery.getSingleResult()).thenReturn(1L);
+    @DisplayName("a durable claim already stored for the key is not published again")
+    void existingDurableClaimIsNotRepublished() {
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(0);
 
         scheduler.checkRenewalEligibility();
 
@@ -95,7 +95,7 @@ class RenewalSchedulerTest {
     @Test
     @DisplayName("a new term end is a new key and is published")
     void newTermPublishesAgain() {
-        when(countQuery.getSingleResult()).thenReturn(0L, 0L);
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1);
         LocalDate nextTerm = LocalDate.of(2028, 5, 31);
         when(subscriptions.findRenewalEligible(any()))
                 .thenReturn(List.of(subscription(15L, TERM_END, WINDOW)))
@@ -114,7 +114,7 @@ class RenewalSchedulerTest {
     @Test
     @DisplayName("a moved renewal window is a new key and is published")
     void movedWindowPublishesAgain() {
-        when(countQuery.getSingleResult()).thenReturn(0L);
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1);
         LocalDate moved = LocalDate.of(2027, 4, 1);
         when(subscriptions.findRenewalEligible(any())).thenReturn(List.of(subscription(15L, TERM_END, moved)));
 
@@ -130,7 +130,7 @@ class RenewalSchedulerTest {
     @Test
     @DisplayName("one subscription's publish failure does not skip the next")
     void publishFailureDoesNotStopTheBatch() {
-        when(countQuery.getSingleResult()).thenReturn(0L, 0L);
+        when(jdbc.update(anyString(), any(), any(), any(), any())).thenReturn(1);
         when(subscriptions.findRenewalEligible(any())).thenReturn(List.of(
                 subscription(15L, TERM_END, WINDOW),
                 subscription(16L, TERM_END, WINDOW)));
@@ -139,6 +139,8 @@ class RenewalSchedulerTest {
 
         scheduler.checkRenewalEligibility();
 
+        verify(transactions).rollback(any());
+        verify(transactions).commit(any());
         verify(publisher).publish(
                 eq(RenewalScheduler.AGGREGATE_TYPE),
                 eq("16:2027-05-31:2027-05-01"),
@@ -236,6 +238,13 @@ class RenewalSchedulerTest {
                     String.class, key))
                     .isEqualTo(EventContractRegistry.SUBSCRIPTION_RENEWAL_ELIGIBLE_V1.topic());
 
+            jdbc.update("DELETE FROM outbox_events WHERE aggregate_id = ?", key);
+            scheduler.checkRenewalEligibility();
+            assertThat(outboxCount(key)).isZero();
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM renewal_eligibility_publications WHERE dedupe_key = ?", Long.class, key))
+                    .isEqualTo(1L);
+
             LocalDate nextTerm = termEnd.plusYears(1);
             saved.setEndDate(nextTerm);
             repository.saveAndFlush(saved);
@@ -244,8 +253,28 @@ class RenewalSchedulerTest {
 
             scheduler.checkRenewalEligibility();
 
-            assertThat(outboxCount(key)).isEqualTo(1L);
+            assertThat(outboxCount(key)).isZero();
             assertThat(outboxCount(nextKey)).isEqualTo(1L);
+        }
+
+        @Test
+        void overlappingScansLeaveOneDurableReceiptAndOneOutboxRow() throws Exception {
+            LocalDate end = LocalDate.now().plusMonths(7);
+            LocalDate window = LocalDate.now().minusDays(1);
+            Subscription saved = repository.saveAndFlush(eligible("SUB-RACE-" + UUID.randomUUID(), end, window));
+            String key = SubscriptionRenewalEligibleEvent.dedupeKey(saved.getId().toString(), end, window);
+            java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+            try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                var first = pool.submit(() -> { start.await(); scheduler.checkRenewalEligibility(); return null; });
+                var second = pool.submit(() -> { start.await(); scheduler.checkRenewalEligibility(); return null; });
+                start.countDown();
+                first.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                second.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            assertThat(outboxCount(key)).isEqualTo(1L);
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM renewal_eligibility_publications WHERE dedupe_key = ?", Long.class, key))
+                    .isEqualTo(1L);
         }
 
         private static Subscription eligible(String number, LocalDate termEnd, LocalDate window) {
