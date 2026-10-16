@@ -45,6 +45,7 @@ import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Status;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.filter.annotation.TypeExcludeFilters;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -65,6 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Tag("integration")
 @ActiveProfiles("test")
+@TypeExcludeFilters(ExcludeSecurityManagementPortAppFilter.class)
 @SpringBootTest(
         classes = QuoteServiceApplication.class,
         properties = {
