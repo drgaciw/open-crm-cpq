@@ -133,3 +133,9 @@ Policy-specific [I]:
 - **OQ10** Whether a mid-term downsell is permitted before a minimum commitment ends, and its credit or fee policy (RA-16).
 - **OQ11** Who may VOID an executed amendment [S spike 6.5].
 - **OQ12** Which pricing gaps block the first release: G1 (price-as-of, precedence) and G6 (one-time lines) look necessary for amendments; G2, G3, G4, G5, G7, G8 and G10 can wait for their policies [I; gaps from sanity].
+
+
+## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
+- **OQ2 and OQ4 are resolved** (apply only after EXECUTED; provisional number at DRAFT, final gapless number at EXECUTED). Section 3 note on OQ2 is superseded by those decisions.
+- **First-slice cut:** actions Add, Update, Remove only; signature policies NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH only; SaaS subscriptions only. Swap, Upgrade, Downgrade wait for RA-42 / DRG-576. See `amendment-first-slice-requirements-and-acceptance.md`.
+- Rules V1..V14 are mapped to stories and test names (rule id in the test name) in that file and in the technical approach file.
