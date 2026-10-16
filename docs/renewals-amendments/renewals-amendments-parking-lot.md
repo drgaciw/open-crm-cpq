@@ -1,6 +1,6 @@
 # Renewals and amendments: parking lot (not active, future scope)
 
-Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7), each a "[PARKED]" item.
+Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7) and RA-56 / DRG-590 (rules requirements review, PL-8), each a "[PARKED]" item.
 
 ## Context
 ACI's on-premise customers are largely financial institutions that will not allow usage-monitoring connectivity, so they self-report usage. Today there is no systematic way to see on-premise usage in the product. The self-report workflow idea is a manual usage-number entry plus an attestation step by a rep or customer-ops.
@@ -69,9 +69,37 @@ Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracke
 - **Unpark condition:** the first slice has shipped and product confirms, with Finance and Legal input, that cancellation proration and refunds are in scope, and the review scope above is agreed.
 - **Not an active dev story.** No estimate, no code.
 
+## PL-8 Rules requirements review: products and pricing (Drools) (PARKED, not an active dev story)
+
+Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracked as RA-56 / DRG-590 ("[PARKED]"). Sits with PL-6 and PL-7.
+
+- **Description:** review the overall rules-related requirements across the product side and the pricing side, and judge how complete they are before any rules work is built. Drools is already in the ACI stack.
+- **Principle (from the discussion):** structural product mapping (sales SKU to delivery BOM composition) stays as dumb composition data. Conditional logic, meaning which delivery artifacts apply based on region, license type or customer tier, belongs in Drools and is evaluated at quote or order time. Composition data says what a SKU is made of. Rules say which parts apply in a given context.
+- **Why parked:** the first slice (S1 to S8) needs neither. Rules scope spans products and pricing and needs a deliberate review first.
+- **Suggested review scope, product side:**
+  1. SKU to delivery BOM composition model (data only, no conditions).
+  2. Delivery artifact selection rules by region, license type, customer tier; inputs, outputs, owner.
+  3. Where and when rules are evaluated (quote versus order time), and how the result is stored so it can be reproduced later.
+  4. Rule authoring, versioning, testing and ownership (product versus engineering).
+- **Suggested review scope, pricing side:**
+  1. Proration rules (see PL-7 and RA-08).
+  2. Amendment pricing modes (AmendmentPolicy, e.g. RetainContracted); see OQ9.
+  3. Renewal uplift calculations (uplift basis, cap or floor, rounding, precedence; sanity check G1, G2, G9).
+  4. Precedence between contract price protection, line override and Drools defaults.
+- **Relation to existing repo facts:**
+  - The pricing sanity check notes that the seeded Drools rules (`renewal-uplift.drl`, `amendment-proration.drl`) never execute today (RA-07), and proposes the Drools uplift as the lowest-precedence default.
+  - `QuoteContinuationPolicy` in quote-service is a typed Java policy, not a rule; it reads rates only from the accepted subscription schedule (see `amendment-document-design-spike.md`). The review should decide what stays typed code and what moves to rules.
+  - Pricing-service support for amendment modes is unverified (OQ9, blocks S5 only).
+  - Links: PL-3 (P2 true-up policy), PL-5 (usage based uplift justification), PL-7 (proration and refunds).
+- **Dependencies:** none for the review itself. Inputs: sanity check, OQ9 spike result, PL-3, PL-5, PL-7, current Drools setup in pricing-service.
+- **Unpark condition:** product confirms the review scope, OQ9 is answered, and a decision is made on typed policy versus Drools for the policies above.
+- **Not an active dev story.** No estimate, no code.
+
 ## Entry criteria to unpark
 First slice shipped; P2 policy defined; product confirms attester roles; Legal confirms the evidence retention rule (relates to OQ8).
 
 PL-6 has its own unpark condition: the user brings it up and confirms the review scope.
 
 PL-7 has its own unpark condition: see the PL-7 section above.
+
+PL-8 has its own unpark condition: see the PL-8 section above.
