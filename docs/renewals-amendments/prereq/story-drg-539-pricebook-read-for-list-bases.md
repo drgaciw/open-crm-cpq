@@ -4,9 +4,9 @@
 
 **Story:** [DRG-539](https://linear.app/drgamtd-workspace/issue/DRG-539/product-pricebook-and-configuration-services-not-in-continuation-flow). This note is the price-book read for the renewal bases `CurrentList` and `ListLessContractedDiscount`, and for the `notAboveList` cap that uses the same list.
 
-**Status:** Proposed. Not accepted. This file is not an ADR, takes no ADR number, and does not edit an Accepted ADR. Accepting this note authorizes no code and no migration. Acceptance records the read. A later implementation pull request is a separate act, and it is the only act that may add code or a Flyway file. No code, schema, Flyway file, Drools edit, flag, route, or deploy starts from this text. The owner decision is the section at the end. Until that decision, [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567/renewal-uplift-basis-caps-price-as-of-date-and-policy) keeps returning no price for these bases.
+**Status:** Proposed. Not accepted. This file is not an ADR, takes no ADR number, and does not edit an Accepted ADR. Accepting this note authorizes no code, no endpoint, and no migration. It unblocks the List bases of [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567/renewal-uplift-basis-caps-price-as-of-date-and-policy) (`CurrentList`, `ListLessContractedDiscount`, and `notAboveList`) only after the owner accepts it. Until that acceptance, those bases stay unresolved. No code, schema, Flyway file, Drools edit, flag, route, or deploy starts from this text.
 
-**Does not decide:** [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609/story-pricing-service-support-for-addupdateremove-lines-with). The design note merged in [#625](https://github.com/drgaciw/open-crm-cpq/pull/625) still says no code starts until the owner accepts that design. Merging the note is not that acceptance. This file does not adopt its continuation route, its request shape, or its price-book pin sentence.
+**Touches, and does not decide:** [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609/story-pricing-service-support-for-addupdateremove-lines-with) and OQ9, the pricing-service continuation capability in [oq9-pricing-continuation-capability.md](oq9-pricing-continuation-capability.md). This read sits in that area: a continuation price that needs a price book. The design note merged in [#625](https://github.com/drgaciw/open-crm-cpq/pull/625) still says no code starts until the owner accepts that design. Merging the note is not that acceptance. This file does not decide OQ9, and it does not adopt the DRG-609 continuation route, its request shape, or its price-book pin sentence.
 
 **ADR status used here.** Read on this `main`:
 
@@ -105,9 +105,11 @@ Consequence for scenario 1, from those rules, not from a run:
 
 `quote_line_items.list_price` at scale 2 is the selling quote's waterfall list, and on a renewal draft it is overwritten with the exit net. It is not the scale-4 pin D-01 names.
 
-### DRG-609, left undecided
+### DRG-609 and OQ9, touched and not decided
 
-The merged design (`story-drg-609-pricing-service-continuation-design.md`) sketches `pricebookVersion` as a caller pin to validate, or a resolve at `policyAsOf`. Its status paragraph says the design is not accepted. `verified by reading code` for that file. This note does not choose that sketch, and a later acceptance of DRG-609 does not by itself choose the book-selection rules below. The owner can require one resolver for both once both texts are accepted. That requirement is not decided here.
+OQ9 asks whether pricing-service can price a continuation line and return a decision identity. Its verdict on the source is that execute cannot. `verified by reading code` for `oq9-pricing-continuation-capability.md`. DRG-609 is the design note for that capability. It sketches `pricebookVersion` as a caller pin to validate, or a resolve at `policyAsOf`. Its status paragraph says the design is not accepted. `verified by reading code` for `story-drg-609-pricing-service-continuation-design.md`.
+
+This note touches that area because a list basis is a continuation price that consults the price book. It does not decide OQ9. It does not decide DRG-609. A later acceptance of DRG-609 does not by itself choose the book-selection rules below. The owner can require one resolver for both once both texts are accepted. That requirement is not decided here.
 
 ## Options
 
@@ -115,7 +117,11 @@ The merged design (`story-drg-609-pricing-service-continuation-design.md`) sketc
 
 A renewal evaluation in pricing-service calls pricebook-service over the existing service-token client. quote-service sends the product external id, the subscription currency, the price-as-of calendar date, and any region it actually has. It does not send a list amount. The response used for the basis is the book uuid, the entry uuid, the scale-4 list, the book currency, and the entry currency. The snapshot's price-book version id is the book uuid.
 
-The call is a sibling of resolve-batch, sketched as `POST /internal/v1/price-books/resolve-as-of`. Execute keeps `resolveBatch(region, productIds)`, `getListPrice`, and the product fallback. ADR-017 is Proposed, so this sketch is not an allow-list amendment. The owner confirms the path in the decision section.
+The call is a **new cross-service dependency**. Continuation today does not call pricebook-service. Execute already calls `POST /internal/v1/price-books/resolve-batch` for a new quote. The renewal read is a further HTTP call, sketched as `POST /internal/v1/price-books/resolve-as-of`. The sketch is not an endpoint. This note authorizes no endpoint. Execute keeps `resolveBatch(region, productIds)`, `getListPrice`, and the product fallback. ADR-017 is Proposed, so this sketch is not an allow-list amendment.
+
+**Failure.** A timeout or an outage of pricebook-service returns `UNRESOLVED_BASIS` and no price. The read never guesses a price: not `PricingProduct.listPrice`, not `listPriceOverride`, not zero, and not a cached list. The same result covers a connection failure and an empty or unparseable body. Today's execute client maps an unreachable price book to `PRICEBOOK_UNAVAILABLE` and a bad body to `PRICEBOOK_CLIENT_ERROR` (`RestPriceBookResolutionClient`). The renewal read does not reuse those codes as a price.
+
+**Latency and retry** are an owner fork, in the decision section. This note sets neither a timeout nor a retry.
 
 Selection, once successor books are allowed (option A1 below):
 
@@ -170,7 +176,7 @@ Trade-offs: the Accepted formula names the pinned prior list; the schedule paylo
 
 ## Recommendation
 
-**Option A with option A1.** pricing-service is the reader. pricebook-service answers an as-of resolve over HTTP. The version id is `price_books.uuid`. Successor books, with non-overlapping intervals, are how a region (and the default) moves from $50 to $52. Execute's resolve-batch and its product fallback stay as they are. A miss is `UNRESOLVED_BASIS` and no price.
+**Option A with option A1.** pricing-service is the reader. The HTTP call to pricebook-service is a new cross-service dependency on the renewal path. pricebook-service answers an as-of resolve. The version id is `price_books.uuid`. Successor books, with non-overlapping intervals, are how a region (and the default) moves from $50 to $52. Execute's resolve-batch and its product fallback stay as they are. A miss, a timeout, or an outage is `UNRESOLVED_BASIS` and no price. The result is never a guessed price.
 
 Prior list is an acceptance pin, not a second as-of read at renewal. Renewal does not recompute it from the live book, from `discount_rate`, or from `quote_line_items.list_price`. When the pin is absent or zero, `ListLessContractedDiscount` is `UNRESOLVED_BASIS`. `CurrentList`, mode `List`, and `notAboveList` do not need the prior list. They need the as-of read.
 
@@ -180,7 +186,7 @@ Product substitution and `ReconfigureFrom` stay on DRG-539. This note does not d
 
 ## What DRG-567 needs from this read
 
-The open draft [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) prices `ContractedNet` and returns `UNRESOLVED_BASIS` for the two list bases. `verified by reading the pull request`. After the owner accepts this note, a later DRG-567 slice can replace that unresolved result with a price only when this read returns a list. This note does not authorize that slice.
+The open draft [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) prices `ContractedNet` and returns `UNRESOLVED_BASIS` for the two list bases. `verified by reading the pull request`. This note unblocks those List bases only after the owner accepts it. Acceptance authorizes no code, no endpoint, and no migration. A later DRG-567 slice is a separate act.
 
 | DRG-567 field | Source, under the recommendation |
 |---|---|
@@ -195,28 +201,24 @@ The open draft [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) prices `
 
 ## Migration
 
-No migration ships with this note. No file is added under any `db/migration` directory. Accepting this note authorizes no code and no migration.
+No migration ships with this note. No file is added under any `db/migration` directory. Accepting this note authorizes no code, no endpoint, and no migration. This note assigns no Flyway version.
 
 The recommended read (option A with A1) needs no new column. Uniqueness is enforced in `PriceBookService`, not by a unique index.
 
-A later story that does add a migration settles the version in that migration pull request. This note does not reserve a number.
-
-| Later change | Version this note assigns |
+| Later change, would-be only | Version |
 |---|---|
-| Database rejection of overlapping intervals for one region, or of overlapping default books, if the owner asks for it. pricing-service remains the Flyway owner; pricebook-service stays Flyway-disabled. An exclusion constraint needs an extension this note does not name as accepted. | Next free number after `V9`, settled when the migration PR exists. |
-| Option A2, a dated price table on the single regional book, if the owner chooses A2 instead of A1. | Next free number after `V9`, settled when the migration PR exists. The two pricing changes are alternatives. A migration PR picks one. |
-| Prior-list pin on `subscription_rate_periods`, if a later story stores it (`list_unit_price DECIMAL(19,4)` null, `price_book_uuid VARCHAR(36)` null). Nullable columns, no backfill: existing rows stay null, and `ListLessContractedDiscount` stays `UNRESOLVED_BASIS` for them. | Next free number after `V1_10`, settled when the migration PR exists. |
+| Database rejection of overlapping intervals for one region, or of overlapping default books, if the owner asks for it. pricing-service remains the Flyway owner; pricebook-service stays Flyway-disabled. An exclusion constraint needs an extension this note does not name as accepted. | Next free pricing migration at build time. |
+| Option A2, a dated price table on the single regional book, if the owner chooses A2 instead of A1. | Next free pricing migration at build time. The two pricing changes are alternatives. One later migration picks one. |
+| Prior-list pin on `subscription_rate_periods`, if a later story stores it (`list_unit_price DECIMAL(19,4)` null, `price_book_uuid VARCHAR(36)` null). Nullable columns, no backfill: existing rows stay null, and `ListLessContractedDiscount` stays `UNRESOLVED_BASIS` for them. | Next free CAM migration at build time. `V1_10` is would-be only. This note does not reserve it. |
 | quote-service `list_price` | Not proposed. Latest quote migration on this `main` is `V1_12__continuation_operation.sql`. `list_price DECIMAL(19,2)` is the wrong pin. |
 
-Pricing `V9` is already claimed. [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542/amendment-proration-rule-conflicts-with-continuation-formula) open pull request [#638](https://github.com/drgaciw/open-crm-cpq/pull/638) adds `V9__disable_unedited_system_amendment_proration.sql`. `verified by reading the pull request`. This note does not use `V9`.
-
-CAM `V1_8__contract_header_backfill.sql` is the header backfill and is on this `main`. Its header reserves `V1_9` for `document_apply_ledger` (S4 / DRG-582). The technical approach, section 3, assigns `V1_9` the same way. This note does not use `V1_9` or `V1_10`.
+CAM `V1_8__contract_header_backfill.sql` is the header backfill and is on this `main`. Its header reserves `V1_9` for `document_apply_ledger` (S4 / DRG-582). The technical approach, section 3, assigns `V1_9` the same way. Those reservations belong to those stories. This note does not take them.
 
 Rollback for the recommendation, while no migration exists, is to keep the list bases at `UNRESOLVED_BASIS`. A later migration pull request documents its own rollback. Existing books, entries, quotes, and rate periods are unchanged by this file.
 
 ## Owner decision needed
 
-This note is Proposed until the owner accepts or replaces the following. Acceptance is a later status change. It is not this pull request. Accepting this note authorizes no code and no migration.
+This note is Proposed until the owner accepts or replaces the following. Acceptance is a later status change. It is not this pull request. Accepting this note authorizes no code, no endpoint, and no migration. It unblocks the List bases of DRG-567 only after the owner accepts it.
 
 1. **Reader.** pricing-service calls pricebook-service (option A). quote-service sends product, currency, price-as-of date, and region when it has one. pricing-service writes the list and `price_books.uuid` onto the snapshot. The Accepted sentence that quote-service sends the list and the version stays in that ADR; this item confirms pricing-service is what fills those two facts from the book.
 2. **Successor books (A1) rather than a new price table (A2).** Non-overlapping intervals per region, and the same rule for `is_default`. The version id is `price_books.uuid`, not the surrogate `id` and not the optimistic `version` column.
@@ -225,14 +227,15 @@ This note is Proposed until the owner accepts or replaces the following. Accepta
 5. **Inclusive interval ends,** matching `isEffective`. [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) says that draft does not decide inclusivity. `verified by reading the pull request`.
 6. **Currency match on the book and the entry.** Region is optional and never falls through to the default when the regional books miss the date. More than one matching book, or more than one entry, is `UNRESOLVED_BASIS`.
 7. **No product-list fallback and no zero** on this read. Execute's fallback stays on execute.
-8. **Prior list** comes from a pin captured at acceptance. This note does not add that column. Any later migration uses the next free number after `V1_10`, settled when the migration PR exists. Until a later story captures the pin, `ListLessContractedDiscount` is `UNRESOLVED_BASIS` on every existing rate. `CurrentList` and `notAboveList` still use the as-of read.
-9. **Sibling path** `POST /internal/v1/price-books/resolve-as-of`, service token, same `/internal` prefix as resolve-batch. resolve-batch's request and response stay as they are. ADR-017 stays Proposed and is not the authority for this path.
-10. **DRG-609 stays unaccepted.** This read is not `POST /api/v1/pricing/continuation/evaluate` and does not wait on that design.
-11. **Entry `floor_price` is not an uplift floor.**
+8. **Prior list** comes from a pin captured at acceptance. This note does not add that column. Any later CAM migration is the next free CAM migration at build time. `V1_10` is would-be only. Until a later story captures the pin, `ListLessContractedDiscount` is `UNRESOLVED_BASIS` on every existing rate. `CurrentList` and `notAboveList` still use the as-of read.
+9. **The renewal HTTP call is a new cross-service dependency.** The path name `POST /internal/v1/price-books/resolve-as-of` is a sketch. Confirming it authorizes no endpoint. resolve-batch's request and response stay as they are. A timeout or an outage returns `UNRESOLVED_BASIS` and never a guessed price.
+10. **Latency and retry (owner fork).** Before returning `UNRESOLVED_BASIS`, the client may retry a failed call, or it may return on the first timeout or outage. Connect and read limits are part of the same fork. ADR-017 stays Proposed and does not decide it.
+11. **DRG-609 and OQ9 stay undecided.** This note touches that pricing-capability area and does not decide it. This read is not `POST /api/v1/pricing/continuation/evaluate`.
+12. **Entry `floor_price` is not an uplift floor.**
 
 ## Out of scope
 
-Product-service, successor products, and configuration / `ReconfigureFrom` (the rest of DRG-539). Mode catalog (DRG-549). Rules-fraction conversion (DRG-541). The audit table (DRG-564). Escalator expansion (DRG-533). Multi-year locks (DRG-568). The DRG-609 continuation operation. ADR-017 timeouts and retries. ADR-024 through ADR-027. Any flag. Any change to `QuoteContinuationPolicy`'s zero default; that default is the gap the Accepted uplift record already names, and DRG-567 owns the change.
+Product-service, successor products, and configuration / `ReconfigureFrom` (the rest of DRG-539). Mode catalog (DRG-549). Rules-fraction conversion (DRG-541). The audit table (DRG-564). Escalator expansion (DRG-533). Multi-year locks (DRG-568). Deciding OQ9 or the DRG-609 continuation operation. ADR-017 as an accepted rule. ADR-024 through ADR-027. Any flag. Any change to `QuoteContinuationPolicy`'s zero default; that default is the gap the Accepted uplift record already names, and DRG-567 owns the change.
 
 ## Evidence index
 
@@ -240,9 +243,8 @@ Product-service, successor products, and configuration / `ReconfigureFrom` (the 
 |---|---|
 | DRG-539, DRG-567 | Linear, this pass |
 | Uplift record, Accepted | `docs/renewals-amendments/prereq/adr-renewal-uplift-basis-and-precedence.md`; #623 merged |
-| DRG-609 design, not accepted | `docs/renewals-amendments/prereq/story-drg-609-pricing-service-continuation-design.md`; #625 merged |
+| DRG-609 design, not accepted; OQ9 | `docs/renewals-amendments/prereq/story-drg-609-pricing-service-continuation-design.md`; `oq9-pricing-continuation-capability.md`; #625 merged |
 | DRG-567 ContractedNet draft | #640 body |
-| Pricing `V9` claimed by DRG-542 | #638 body (`V9__disable_unedited_system_amendment_proration.sql`) |
 | ADR-008, ADR-017, ADR-024..027 | `docs/adr/` headers and ADR-008 decision section; catalog row for ADR-017 in `docs/adr/README.md` |
 | Resolve path | `PriceBookInternalResolutionService`, `InternalPriceBookController`, `ResolveBatchRequest`, `ResolveBatchResponse`, `PriceBookRepository`, `PriceBookEntryRepository` |
 | Write rules | `PriceBookService` (`validateRegionUniqueness`, `clearCurrentDefault`, `ensureNotPublished`) |
@@ -258,6 +260,6 @@ Product-service, successor products, and configuration / `ReconfigureFrom` (the 
 - Any runtime result: HTTP JSON, which book a live resolve returns, row counts, overlapping books in a real database.
 - The Java on [#640](https://github.com/drgaciw/open-crm-cpq/pull/640). The unresolved-basis claim is the pull-request body.
 - Jackson unknown-property handling on the pricing price-book client.
-- Which integer is free after pricing `V9`, and which CAM version is free after `V1_10`. Both are settled when a migration pull request exists. This note assigns neither.
+- The next free pricing migration at build time, and the next free CAM migration at build time. This note assigns neither. `V1_10` is would-be only.
 - A subscription region stored outside `Subscription.java`. The entity that was read has none.
 - Notion `verification.state` for the DoD page.
