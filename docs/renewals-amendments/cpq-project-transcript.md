@@ -242,9 +242,11 @@ From the sanity check: all gaps G1–G10 above need policy design decisions; rec
 From the research: model is inference and needs validation against real customer data; several sources are third-party or summary-only.
 
 ## 10. In-flight / pending
-- Backlog IDs for the sanity-check gaps (G1–G10) not recorded in source files; append when known.
-- Awaiting user decision: the 8 spike decisions (see section 6); backlog items RA-27..RA-32 / DRG-561..DRG-566 are created.
-- Any further spikes, ADRs (RA-27) and research updates: append below.
+- G1–G10 backlog IDs recorded (see 2026-10-16 G1–G10 section); G9 maps to RA-30 / DRG-564.
+- Spike OQ2 (apply after EXECUTED) and OQ4 (numbering) resolved 2026-10-16. Remaining: OQ1 placement (ADR draft at `adr-035-amendment-document-placement.md`, Proposed), OQ3 Contract header enrichment vs DRG-458, OQ5 partial application, OQ6 revision model, OQ7 backfill, OQ8 retention N.
+- RA-27..RA-44 / DRG-561..DRG-578 exist in Linear/Notion. Adjacent services assessment done (supersedes deferred day-two note).
+- PR #598 (DRG-509) still open on `main` (stack base #597 merged); GitHub reports mergeable clean but **no check runs** on head `ceda2ab` as of 2026-10-16 ~11:47 CDT.
+- Any further spikes, ADRs and research updates: append below.
 
 ---
 <!-- Append new dated sections below this line. -->
@@ -359,3 +361,61 @@ Source: `/workspace/ppsc/items.json` and Notion batches under `/workspace/ppsc/`
 | G10 | RA-41 | DRG-575 | Low | ARR bridge per change line: price, quantity, cross-sell, conversion and non-renewal effects |
 
 G9 was not created as a separate Linear/Notion row in the ppsc batches; it overlaps RA-30 / DRG-564.
+
+## 2026-10-16: Adjacent services maturity assessment (supersedes "Deferred item")
+**Source files:** `/workspace/adjacent-services-maturity-assessment.md` (new); repo `drgaciw/open-crm-cpq` `main` @ `dd90501` read via GitHub connector (product-service, configuration-engine, pricebook-service, contract-asset-management, `libs/common` QuoteAcceptedEvent, `docs/adr/ADR-024` and `ADR-027`).
+**Links:** RA-42/DRG-576, RA-43/DRG-577, RA-44/DRG-578 (new); existing DRG-290, 421, 428, 429, 458, 460, 464..467, 495, 535..566, 567, 574.
+
+**Supersedes** the 2026-10-16 "Deferred item" entry and decision 6 of the design review (evaluation deferred to day two). The evaluation is now done.
+
+- **"Coding"** read as product, SKU and configuration coding (product-service plus configuration-engine and pricebook-service); no service by that name exists [I].
+- **Verdicts (new contract / renewal / amendment):** Coding Mature / Partial / Not ready; CAM Partial (SaaS Mature) / Partial / Partial; Ordering Not ready on all three; Fulfillment Partial (SaaS activation via simulated ERP) / Not ready / Not ready [V].
+- **Key facts [V]:** no order or fulfilment service exists; ADR-024..027 are Proposed (2026-10-04), not accepted, and predate the spine; ADR-024's claim that CAM ignores `dealType` is stale; `ErpAdapter` is simulated; CAM never sets EXPIRED; product-service has no product relationships and updates products in place.
+- **Readiness [I]:** only CAM is near ready, and only for SaaS. On-prem (60%) is blocked downstream of CAM. Mid-term SaaS amendments can ship without ordering or fulfilment if the seam is fixed now.
+- **Build order [I]:** seams (DRG-561, RA-43) > CAM spine (DRG-458, 562, 563, 564) > coding minimum (DRG-421, 428, RA-42, DRG-539) > mid-term policy then renewal policy > ordering skeleton > fulfilment and on-prem (DRG-460, 558, RA-44, 466, 495, 556, 557).
+- **New backlog (highest IDs checked first: RA-41/DRG-575):** RA-42/DRG-576 catalog product relationships (High); RA-43/DRG-577 reconcile ADR-024..027 with the spine (High); RA-44/DRG-578 action-aware fulfilment decomposition (Medium). Linear and Notion in sync and cross-linked.
+
+## 2026-10-16: RA-27 / DRG-561 placement ADR draft (Proposed)
+
+**Source files:** `/workspace/adr-035-amendment-document-placement.md` (new); inputs `rca-sda-amendment-placement.md`, `amendment-document-design-spike.md`, `mid-term-amendment-policy-spec.md`, `amendment-entity-field-schema.md`, `adjacent-services-maturity-assessment.md`, call decisions of 2026-10-16.
+**Links:** RA-27 / DRG-561; RA-43 / DRG-577; DRG-458; DRG-313. No new backlog items. Documentation only; not committed to the repo.
+
+Key points:
+- **Status:** Proposed. Does not authorize code.
+- **D-01:** AmendmentDocument (revisions, lines, application units, hash-chained event log) in CAM as a distinct **contract-documents** module with API `/contracts/{id}/amendments`.
+- **D-02:** Thin Contract header in CAM now; DRG-458 enriches later.
+- **D-03:** LifecycleChange, pricing-service evaluation and render requests stay in quote-service.
+- **D-04:** Extract to a separate service only for retention/CLM/multi-contract triggers.
+- **D-05 / D-06:** One document per LifecycleChange; policies add no tables; action date ≠ effective date.
+- **Rejected:** quote-service ownership (B); new service now (C); hanging documents on Proposed ADR-024 (D).
+- **Still open outside this ADR:** OQ3 field enrichment, OQ5 partial apply, OQ6 revision edges, OQ7 backfill, OQ8 retention N, render ownership detail, price-lock intent.
+
+Closes the "awaiting placement ADR draft" gap for OQ1. Acceptance of the ADR remains a human (or Jev-routed Choice) decision.
+
+## 2026-10-16: Renewals and amendments dev-readiness deep dive (first slice)
+**Source files (new):** `/workspace/renewals-amendments-dev-readiness.md`, `/workspace/amendment-first-slice-requirements-and-acceptance.md`, `/workspace/amendment-technical-approach-and-dependencies.md`, `/workspace/renewals-amendments-open-questions-register.md`. **Appended (addendum, history kept):** `mid-term-amendment-policy-spec.md`, `amendment-entity-field-schema.md`, `amendment-document-design-spike.md`, `adr-035-amendment-document-placement.md`, `adjacent-services-maturity-assessment.md`.
+**Inputs read:** the project docs above; live repo on branch `docs/renewals-amendments-design-2026-10-16` and `main` through the GitHub connector (CAM migrations V1_1..V1_6, so next is V1_7). Highest IDs re-checked before creating items: DRG-578 (Linear) and RA-44 (Notion).
+**Documentation only.** No code changes, no PRs merged, no commits to main.
+
+**Verdict:** conditionally ready. Start S1 and S2 within one to two days if ADR-035 is accepted (OQ1) and pricing-service amendment modes are verified before S5 (OQ9). Slice is about one working week for two to three engineers [I].
+
+**Slice cut:** SaaS only; Add, Update, Remove; click-through, notice-only or not-required signature; no Swap, Upgrade, Downgrade (needs RA-42), no on-prem, no ordering, no fulfilment, no history backfill.
+
+**Gap analysis highlights:** no numbered requirements or Given/When/Then criteria existed; the unique key on `applied_quote_acceptances` conflicts with multi-subscription documents (resolved by a new apply ledger, legacy untouched); no event-contract or legacy-routing plan; pricing-service support for amendment modes unverified; open decisions were scattered across four files.
+
+**New backlog (Linear team DRG, project OPEN-CRM-CPQ, labels renewals-amendments and Open-CRM-CPQ; Notion Open-CRM-CPQ Backlog):**
+| RA | DRG | Title |
+|---|---|---|
+| RA-45 | DRG-579 | S1 CAM contract-documents schema migration |
+| RA-46 | DRG-580 | S2 hash-chained event writer, verifier, audit publication |
+| RA-47 | DRG-581 | S3 amendment document API and state machine |
+| RA-48 | DRG-582 | S4 document-driven apply after EXECUTED |
+| RA-49 | DRG-583 | S5 quote-service LifecycleChange (Amend), pricing, pinning |
+| RA-50 | DRG-584 | S6 event contract and per-tenant legacy gating |
+| RA-51 | DRG-585 | S7 contract header backfill (no history) |
+| RA-52 | DRG-586 | S8 end-to-end acceptance suite |
+Dependencies set as Linear blocking relations. Comments added to existing DRG-535, DRG-561, DRG-562, DRG-563. No issue renumbered, renamed, moved or deleted.
+
+**Open questions:** register has OQ1..OQ20. Blocking: OQ1 (accept ADR-035) and OQ9 (pricing-service modes; gates S5 only). Needed before go-live: OQ8 retention N (Legal). Defaults proposed for OQ3, OQ5, OQ6, OQ7, OQ10, OQ11, OQ12, OQ14, OQ17, OQ18, OQ19.
+
+**Repo copy:** PR #599 was already merged into `main` on 2026-10-16 (17:23 UTC) before this pass. New and updated docs were committed only to branch `docs/renewals-amendments-design-2026-10-16` under `docs/renewals-amendments/`; they will not appear in PR #599 and are not on `main` until a new PR is opened (not done; needs user approval).
