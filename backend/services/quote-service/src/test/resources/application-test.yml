@@ -10,7 +10,7 @@ spring:
       compatibility-verifier:
         enabled: false
   datasource:
-    url: jdbc:tc:postgresql:16:///testdb?currentSchema=quote
+    url: jdbc:tc:postgresql:16:///testdb?TC_INITSCRIPT=db/init-test.sql&currentSchema=quote
     username: test
     password: test
   jpa:
