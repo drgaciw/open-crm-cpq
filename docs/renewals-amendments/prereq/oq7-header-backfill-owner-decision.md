@@ -11,6 +11,8 @@ Marks used below:
 | `read` | The sentence cites a file, SQL script, or Linear issue opened for this note. |
 | `unverified` | Not opened, not executed, or a combination of texts that was not run against a database. |
 
+**Integration update (#622).** S1's CAM V1_7 and its V1_7_1/V1_7_2 maintenance migrations reach main through #622. V1_8 remains reserved for the unimplemented header backfill. The inventory and source readings below describe `dd0f1a8`; this note neither executes a backfill nor decides OQ7.
+
 ## Decision requested
 
 OQ7, as framed for this confirmation, is two questions:

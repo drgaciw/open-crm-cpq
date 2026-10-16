@@ -85,7 +85,7 @@ Vendor lists in DRG-548 and DRG-552 (DealHub order types, Salesforce initiate ca
 | DRG-461 | Co-termination behavior that a Transfer or merge intent will call; see `co-termination.md` |
 | `capacity-meters.md`, `conversions.md`, `maintenance.md` | Consumers of TrueUp, Restructure, Convert, and Surrender |
 | `arr-bridge.md` | Needs `businessCategory` plus a separate disposition, because one category is not enough |
-| Mid-term policy spec §3 and §4 | Document states and V6 backdating stay open (OQ2, OQ9) and gate AC-9 |
+| Mid-term policy spec §3 and §4 | OQ2 is resolved: apply follows EXECUTED. V6 backdating policy (OQ9) remains open and gates AC-9 |
 
 Pricing of each slot stays in pricing-service. Quote-service passes the intent, the line contract, and the dates. **[I sanity §4]**
 
