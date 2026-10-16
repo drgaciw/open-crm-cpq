@@ -422,3 +422,14 @@ Dependencies set as Linear blocking relations. Comments added to existing DRG-53
 
 ## 2026-10-16 (later): on-prem self-reported usage parked
 Product input: ACI on-prem customers are mostly financial institutions that will not allow usage-monitoring connectivity, so they self-report usage; no systematic on-prem usage view exists. Idea: manual usage entry plus rep or customer-ops attestation. Recorded as a parking lot, not active scope: new `renewals-amendments-parking-lot.md` (PL-1 to PL-5), pointer in readiness doc section 7, OQ21 in the open-questions register (non-blocking), Notion RA-53 and Linear DRG-587, both titled "[PARKED]". Docs committed to branch docs/renewals-amendments-design-2026-10-16 only. No code.
+
+## 2026-10-16: date-only renew is 410 Gone (DRG-543, docs DRG-608)
+**Source files:** `SubscriptionController` renew method; this transcript §3.2, §3.3, and the §5 backlog row for RA-09. Baseline sections above are unchanged.
+**Links:** [DRG-543](https://linear.app/drgamtd-workspace/issue/DRG-543/date-only-renew-endpoint-skips-pricing), [DRG-608](https://linear.app/drgamtd-workspace/issue/DRG-608/update-docs-that-still-describe-a-live-date-only-renew), PR #608.
+
+Correction to §3.2, §3.3, and the RA-09 row in §5, which describe date-only `POST /subscriptions/{id}/renew` as a live path that skips pricing:
+
+- The route remains and returns **410 Gone**. Headers are `Deprecation: true` and `Link: </api/v1/quotes/continuations>; rel="successor-version"`. The body error code is `SUBSCRIPTION_RENEW_DEPRECATED`. The call leaves dates, rates, and price unchanged.
+- `Subscription.renew` and `SubscriptionService.renew` were removed.
+- Priced renewal is `POST /api/v1/quotes/continuations`, applied on acceptance by `AcceptedQuoteSubscriptionService` (already described in §3.1).
+- RA-09 / DRG-543 is the retirement of that path. The §5 title is the original backlog title and stays in the baseline.

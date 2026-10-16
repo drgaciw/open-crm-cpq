@@ -859,6 +859,11 @@ public class QuoteService {
         context.put("currency", quote.getCurrency());
         context.put("durationInMonths", quote.getDurationInMonths());
         context.put("subscriptionType", quote.getSubscriptionType());
+        // Quote DealType is already the CRM mapping result (CrmQuoteDealTypeMapping). Pricing
+        // matches the stored name; churn stays on the pricing customer, not this request.
+        if (quote.getDealType() != null) {
+            context.put("metadata", Map.of("dealType", quote.getDealType().name()));
+        }
         return context;
     }
 

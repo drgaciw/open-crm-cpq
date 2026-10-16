@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept escalator semantics, amend ADR-023, or authorize implementation, a flag change, or a deploy. `opencrm.pricing.ramp.enabled` stays default off. Turning it on is outside this proposal and outside ADR-023's acceptance.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `ramp-amendments`. **Date:** 2026-10-16.
 
-**Sources.** [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534) (amend a ramped contract: lock elapsed periods, edit future periods, re-govern). [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533) (open ADR: escalator compounding, base price, and rounding, amending ADR-023). Accepted constraints: `../../adr/ADR-023-price-ramp-schedule-model.md` (D-01, D-04, D-05, D-06, D-08). Related landed-scope stories that this slice does not reopen: DRG-336, DRG-338, DRG-339.
+**Sources.** [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534) (amend a ramped contract: lock elapsed periods, edit future periods, re-govern). [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533) (open ADR: escalator compounding, base price, and rounding, amending ADR-023). Accepted constraints: `../../../adr/ADR-023-price-ramp-schedule-model.md` (D-01, D-04, D-05, D-06, D-08). Related landed-scope stories that this slice does not reopen: DRG-336, DRG-338, DRG-339.
 
 **Conventions.** **[S]** is DRG-534, DRG-533, or an accepted ADR-023 decision. **[I]** is a design inference. Escalator compounding, base, and rounding are **Owner decisions** and stay open. This file does not choose them.
 
@@ -14,7 +14,7 @@
 1. An amendment of a subscription that already has explicit ramp periods. Elapsed periods are immutable. Future periods are editable. Removing a period is allowed only at the schedule end, so the remaining periods have no gap. **[S DRG-534]**
 2. Any accepted change produces a new schedule fingerprint, supersedes the prior approval, and re-runs per-period governance. The worst period decides. **[S DRG-534; ADR-023 rules-port note]**
 3. The amended schedule is emitted on the existing event contract as additive fields only. `QuoteAccepted` stays version 1. **[S DRG-534; ADR-023]**
-4. An event-replay test: a consumer that understands the new fields applies the amended schedule; a consumer that ignores unknown fields still accepts the payload. **[S DRG-534 acceptance; ADR-018]**
+4. Two compatibility tests: an old consumer accepts the amended event while ignoring additive fields, and a new consumer accepts a pre-change event lacking those fields. A separate replay test applies the amended schedule once. **[S DRG-534 acceptance; ADR-018]**
 5. A boundary with DRG-533: this slice amends **stored explicit periods**. It does not define how an annual escalator compounds, which base it uses, or how it rounds. Regenerating periods from an escalator waits on that ADR.
 
 ### Out of this slice
@@ -65,7 +65,7 @@ DRG-534's acceptance is: an amendment in year 2 cannot change year 1; a year-3 c
 4. **Delete only at the end.** `DeleteEnd` on period 3 shortens the schedule to two periods and sets the term end to the end of period 2. `DeleteEnd` on period 2 while period 3 exists is rejected. The result has no gap and no overlapping months.
 5. **Current period.** As of 2028-06-15, period 2 contains the date. Under the proposed immutable-current rule, a replace of period 2 is rejected. This criterion is in force only if the owner accepts open question 2. Until then the test is marked pending.
 6. **Whole-month boundary.** An amendment as of 2029-01-01 replaces period 3 with no day proration. An amendment as of 2028-06-15 does not invent a stub period inside period 2 unless the owner allows editing the current period.
-7. **Event v1 additive.** The emitted payload includes the amended steps and `exitArr` and keeps `eventVersion` 1. A fixture of a pre-change payload that lacks those fields still deserializes. A replay of the amended payload produces one schedule write (idempotent on subscription, line, and sequence).
+7. **Event v1 additive.** The emitted payload includes the amended steps and `exitArr` and keeps `eventVersion` 1. The old consumer accepts the new payload with unknown fields, and the new consumer deserializes a pre-change payload lacking those fields. A replay of the amended payload produces one schedule write (idempotent on subscription, line, and sequence).
 8. **Escalator inputs are not re-derived.** A schedule that was generated from an escalator is amended as explicit steps. The amendment does not re-expand the escalator, does not compound a percent, and does not change ADR-023's stored price basis. The original escalator inputs remain display-only, as D-01 already says.
 9. **Flag off.** With `opencrm.pricing.ramp.enabled=false`, an amendment request that would price a schedule is rejected with the existing ramp-not-supported outcome. This slice does not turn the flag on and does not price the schedule as a flat line.
 10. **Renewal base unchanged.** This slice does not change D-05. A later renewal still reads the exit period of the amended schedule. A fixture that amends period 3 to $55 then renews with an 8% uplift uses $55 as the exit rate only when the renewal policy asks for it. The uplift percent is not decided here.
