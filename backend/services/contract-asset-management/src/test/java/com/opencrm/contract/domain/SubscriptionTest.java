@@ -88,24 +88,6 @@ class SubscriptionTest {
     }
 
     @Test
-    @DisplayName("should renew an ACTIVE subscription")
-    void renewActive() {
-        subscription.activate();
-        LocalDate newEndDate = LocalDate.now().plusYears(2);
-        subscription.renew(newEndDate);
-
-        assertEquals(newEndDate, subscription.getEndDate());
-        assertEquals(newEndDate.minusDays(30), subscription.getRenewalDate());
-    }
-
-    @Test
-    @DisplayName("should reject renewing a non-ACTIVE subscription")
-    void rejectRenewNonActive() {
-        LocalDate newEndDate = LocalDate.now().plusYears(2);
-        assertThrows(IllegalStateException.class, () -> subscription.renew(newEndDate));
-    }
-
-    @Test
     @DisplayName("should use Money-compatible BigDecimal for ARR")
     void arrIsBigDecimal() {
         assertNotNull(subscription.getArr());

@@ -14,7 +14,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -86,14 +85,6 @@ public class SubscriptionService {
         subscription.cancel();
         Subscription saved = subscriptionRepository.save(subscription);
         log.info("Cancelled subscription: {}", saved.getSubscriptionNumber());
-        return subscriptionMapper.toDto(saved);
-    }
-
-    public SubscriptionDto renew(Long id, LocalDate newEndDate) {
-        Subscription subscription = findEntityById(id);
-        subscription.renew(newEndDate);
-        Subscription saved = subscriptionRepository.save(subscription);
-        log.info("Renewed subscription: {} until {}", saved.getSubscriptionNumber(), newEndDate);
         return subscriptionMapper.toDto(saved);
     }
 
