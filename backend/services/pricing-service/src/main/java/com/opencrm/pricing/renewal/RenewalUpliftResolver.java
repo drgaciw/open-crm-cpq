@@ -40,7 +40,13 @@ public final class RenewalUpliftResolver {
         }
 
         Map<RenewalUpliftRungKind, RenewalUpliftRung> rungs = index(request.rungs());
-        FieldSource<RenewalUpliftMode> mode = first(rungs, RenewalUpliftRung::mode, false);
+        FieldSource<RenewalUpliftMode> mode = findFirst(rungs, RenewalUpliftRung::mode, false);
+        if (mode != null) {
+            if (mode.value() != RenewalUpliftMode.UPLIFT_PCT) {
+                throw new RenewalUpliftModeOutOfSliceException(mode.value());
+            }
+            requiredSourceId(rungs.get(mode.rung()));
+        }
         FieldSource<RenewalUpliftBasis> basis = first(rungs, RenewalUpliftRung::basis, false);
         FieldSource<BigDecimal> percent = first(rungs, RenewalUpliftRung::upliftPercentPoints, true);
         FieldSource<BigDecimal> maxIncrease = first(rungs, RenewalUpliftRung::maxIncreasePct, false);
@@ -67,13 +73,6 @@ public final class RenewalUpliftResolver {
 
         if (mode == null) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_RENEWAL_MODE, null, null, null, null, null);
-        }
-        switch (mode.value()) {
-            case UPLIFT_PCT -> {
-                // priced below, after the unresolved checks
-            }
-            case SAME, LIST, UPLIFT_AMT, OVERRIDE, RENEGOTIATE ->
-                    throw new RenewalUpliftModeOutOfSliceException(mode.value());
         }
         if (percent == null) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_UPLIFT, null, null, null, null, null);
@@ -268,6 +267,17 @@ public final class RenewalUpliftResolver {
             Map<RenewalUpliftRungKind, RenewalUpliftRung> rungs,
             FieldReader<T> read,
             boolean allowRules) {
+        FieldSource<T> source = findFirst(rungs, read, allowRules);
+        if (source != null) {
+            requiredSourceId(rungs.get(source.rung()));
+        }
+        return source;
+    }
+
+    private static <T> FieldSource<T> findFirst(
+            Map<RenewalUpliftRungKind, RenewalUpliftRung> rungs,
+            FieldReader<T> read,
+            boolean allowRules) {
         for (RenewalUpliftRungKind kind : PRECEDENCE) {
             if (kind == RenewalUpliftRungKind.RULES && !allowRules) {
                 continue;
@@ -278,7 +288,7 @@ public final class RenewalUpliftResolver {
             }
             T value = read.read(rung);
             if (value != null) {
-                return new FieldSource<>(value, kind, requiredSourceId(rung));
+                return new FieldSource<>(value, kind, blankToNull(rung.sourceId()));
             }
         }
         return null;
