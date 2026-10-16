@@ -6,6 +6,8 @@
 
 **Reading base:** `main` at `dd0f1a84415b37b3102ba5a46b42d397c3237d6f`. Every citation below is a file read at that commit, or the Linear issue DRG-565 read the same day. Claims not opened in this pass are marked **Unverified** in the last section.
 
+**Integration update (#622).** The reading below is pinned to `dd0f1a8`. #622 corrects the quoted spec to unit status BLOCKED, one document status, and unique business identity `(documentId, unitNo)` with a separately checked replay digest. The historical mismatch descriptions below do not reopen those corrections. OQ5 itself remains undecided. The reconciliation record moves to `adr-reconcile-adr-024-027.md` under #623; ADR-024 through ADR-027 remain Proposed.
+
 ## 1. The question
 
 Should one amendment document be allowed to apply in several atomic units, so that a unit which has already committed stays committed when a later unit fails?

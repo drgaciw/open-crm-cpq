@@ -40,7 +40,7 @@ Renewal is a policy on the amendment spine, not a separate data model: an amendm
 | Term-end auto action (Renew, RenewOnce, Evergreen, Cancel) if no seller action | [S transcript 4.3 RenewalPolicy] |
 | Manual by seller or headless API (`initiateRenewal`-style) | [S rca 1; spec 2] |
 
-Today `RenewalScheduler` publishes an unconsumed event (RA-06 / DRG-540) nightly for the same subscription (RA-11 / DRG-545), and the date-only renew endpoint skips pricing (RA-09 / DRG-543) [S transcript 3.2]. This policy is the intended consumer [I].
+Today `RenewalScheduler` publishes an unconsumed event (RA-06 / DRG-540) nightly for the same subscription (RA-11 / DRG-545) [S transcript 3.2]. The date-only `POST /api/v1/subscriptions/{id}/renew` is retired (RA-09 / DRG-543, 2026-10-16): it returns 410 Gone with `Deprecation: true`, `Link: </api/v1/quotes/continuations>; rel="successor-version"`, and error code `SUBSCRIPTION_RENEW_DEPRECATED`. `Subscription.renew` and `SubscriptionService.renew` were removed. Priced renewal is `POST /api/v1/quotes/continuations`, applied on acceptance by `AcceptedQuoteSubscriptionService` (DRG-608). This policy is the intended consumer of the eligibility event [I].
 
 ## 4. Required inputs
 
