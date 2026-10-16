@@ -684,6 +684,19 @@ class RenewalUpliftResolverTest {
         assertThat(result.appliedRuleOrPolicyId()).isEqualTo("clause");
     }
 
+    @ParameterizedTest
+    @EnumSource(value = RenewalUpliftMode.class, mode = EnumSource.Mode.EXCLUDE, names = "UPLIFT_PCT")
+    void unsupportedModesIgnoreUnusedLowerPercentAndRetentionProvenance(RenewalUpliftMode mode) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, "clause-mode", mode,
+                        null, null, null, null, null, null, null, null, null),
+                account(" ", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                rules(" ", "8", "ENABLE_12M_PRICE_PROTECTION"))))
+                .isInstanceOf(RenewalUpliftModeOutOfSliceException.class)
+                .extracting(ex -> ((RenewalUpliftModeOutOfSliceException) ex).mode())
+                .isEqualTo(mode);
+    }
+
     private static void assertUnit(BigDecimal actual, String expected) {
         assertThat(actual).isEqualByComparingTo(expected);
         assertThat(actual.scale()).isEqualTo(4);
