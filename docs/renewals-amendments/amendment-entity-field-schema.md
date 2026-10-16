@@ -145,7 +145,7 @@ One row per ChangeLine per revision.
 | `target_type`, `target_ref` | enum, text | not null | one subscription or entitlement | spike 4 [S] |
 | `observed_commercial_revision` | bigint | not null | equals `commercial_revision` at apply | V3 [S] |
 | `applied_commercial_revision` | bigint | null | set on apply | spike 5 [S] |
-| `apply_key_digest` | char(64) | null | with (`document_id`, `unit_no`) forms the apply key | V13 [S] |
+| `apply_key_digest` | char(64) | null | stored replay value; (`document_id`, `unit_no`) is the unique apply key; different digest rejected | V13 [S] |
 | `status` | enum {PENDING, APPLIED, BLOCKED} | not null | none | spike 4 [S]; enum [I] |
 
 `applied_quote_acceptances` gains nullable `amendment_document_id` and `application_unit_no` (RA-29) [S spike 5].
@@ -187,7 +187,7 @@ Append-only is enforced by grants (INSERT only) and a trigger rejecting UPDATE a
 | Headless idempotency | unique (`tenant_id`, `request_identifier`) | T2 [I] |
 | One executed revision | partial unique `revisions(document_id) where status_at_close = 'EXECUTED'`; `executed_revision_no` write-once | V11 |
 | Gapless numbering | unique (`contract_id`, `amendment_seq`); seq assigned as `last_executed_seq + 1` under contract row lock in the EXECUTED transaction; check `amendment_seq >= 0` | A3 [I mechanism] |
-| Apply idempotency | unique (`document_id`, `unit_no`, `apply_key_digest`); same key with a different digest rejected | V13 |
+| Apply idempotency | unique (`document_id`, `unit_no`); store `apply_key_digest` as replay data, same digest is a no-op and a different digest is rejected and audited | V13 |
 | Envelope dedup | unique `signature_envelope_ref` | spike 3 |
 | Source line uniqueness | unique (`document_id`, `revision_no`, `source_accepted_line_uuid`) where not null | V4 |
 | Event chain | unique (`document_id`, `seq_no`); unique `content_hash` | A2 |
@@ -224,7 +224,7 @@ All three inherit spine rules V3, V8, V10, V12 and V13, which no policy may remo
 
 
 ## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
-- Migration order and next version: V1_7 expand (this schema), V1_8 contract header backfill, V1_9 `document_apply_ledger` (new, keyed `document_id`, `unit_no`, `apply_key_digest`), legacy `applied_quote_acceptances` untouched. Details in `amendment-technical-approach-and-dependencies.md` section 3.
+- Migration order and next version: V1_7 expand (this schema), V1_8 contract header backfill, V1_9 `document_apply_ledger` (new, unique on `document_id`, `unit_no`, with `apply_key_digest` stored and checked on replay), legacy `applied_quote_acceptances` untouched. Details in `amendment-technical-approach-and-dependencies.md` section 3.
 - Add nullable `amendment_document_line_id` and `revision_no` to `subscription_rate_periods` in V1_7 (A4).
 - Open items 3 to 6 of section 7 are tracked as OQ14 (hash scope, default per document), OQ15 (price-lock intent, not blocking), OQ3 (header ownership, default thin header owned by this module), OQ8 (retention, blocks go-live only) in `renewals-amendments-open-questions-register.md`.
 
