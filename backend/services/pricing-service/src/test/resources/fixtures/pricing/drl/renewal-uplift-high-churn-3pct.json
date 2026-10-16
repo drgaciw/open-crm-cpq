@@ -1,0 +1,17 @@
+{
+  "id": "drg-541-renewal-uplift-high-churn-3pct",
+  "description": "RENEWAL with churn above 70 uses 3% and records the 12-month price-protection offer.",
+  "ruleClasspath": "rules/renewal-uplift.drl",
+  "facts": {
+    "dealType": "RENEWAL",
+    "churnScore": 80,
+    "finalPrice": 1000.00
+  },
+  "expected": {
+    "rulesFired": 1,
+    "renewalUpliftPct": "0.03",
+    "retentionOffer": "ENABLE_12M_PRICE_PROTECTION",
+    "explanationCode": "RENEWAL_UPLIFT_POLICY",
+    "finalPrice": 1000.00
+  }
+}
