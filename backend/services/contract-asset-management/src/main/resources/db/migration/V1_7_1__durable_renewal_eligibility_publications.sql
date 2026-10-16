@@ -1,5 +1,5 @@
 -- Publication receipts deliberately outlive outbox retention and inbox cleanup.
--- V1_7 is contract documents; V1_8 and V1_9 remain reserved for backfill and apply.
+-- V1_7_1 follows contract documents without overtaking future V1_8/V1_9 migrations.
 CREATE TABLE renewal_eligibility_publications (
     dedupe_key varchar(100) PRIMARY KEY,
     subscription_id bigint NOT NULL REFERENCES subscriptions (id),
