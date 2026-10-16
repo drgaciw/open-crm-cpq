@@ -1,6 +1,6 @@
 # ADR-035 acceptance checklist and review-thread summary
 
-*open-crm-cpq. Documentation only. Date: 2026-10-16 (CT). Status of ADR-035: **Proposed. Not accepted.** This file does not accept it. Acceptance is the project owner's decision.*
+*open-crm-cpq. Documentation only. Date: 2026-10-16 (CT). Status of ADR-035: **Accepted 2026-10-16** by the project owner (drgaciw). Scope: authorizes the first-slice schema and audit stories only (S1, S2). OQ3, OQ10 and OQ12 defaults confirmed. Sections below are kept as written while the ADR was Proposed; see section 8 (Outcome).*
 
 ## 1. Repo convention (verified via GitHub connector, `main`)
 - ADRs live in `docs/adr/ADR-NNN-*.md`, with a catalog row in `docs/adr/README.md`. Status values seen: Proposed, Accepted, Superseded. Accepted rows carry a date and what the acceptance authorizes (for example ADR-032: "Accepted 2026-10-15, authorizes DRG-509 only").
@@ -66,3 +66,9 @@ Reviewer questions that need an explicit answer: (1) Is a CAM contract-documents
 - Cost: CAM grows; module boundaries must be enforced in review.
 - Needed to accept: owner decision, plus confirmation of OQ3, OQ10 and OQ12 defaults. Not needed before acceptance: OQ5 to OQ9, OQ17.
 - This PR is documentation only. Nothing here authorizes code.
+
+## 8. Outcome (2026-10-16)
+- Decision: **Accepted** by the project owner (drgaciw) on 2026-10-16. Scope: authorizes the first-slice schema and audit stories only (S1, S2).
+- Step 3 of section 6 done in docs PR #600: ADR Status set to Accepted with date and scope, `docs/adr/README.md` catalog row added (ADR-035), defaults recorded as confirmed. The ADR file stays under `docs/renewals-amendments/` and the catalog row links to it; no move and no renumbering.
+- Confirmed: OQ3 thin Contract header (id, number, tenant, customer reference, start, end, status, last_executed_seq, prior_contract_id; richer fields to DRG-458). OQ10 NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH now; E_SIGN and WET later via the DRG-457 adapter. OQ12 Add, Update, Remove only; Swap, Upgrade, Downgrade deferred to RA-42 / DRG-576.
+- Step 4: RA-27 / DRG-561 updated and OQ1 closed. S1 and S2 (RA-45 / RA-46, DRG-579 / DRG-580) may now start. They have not been started. Merging PR #600 records the acceptance on main.
