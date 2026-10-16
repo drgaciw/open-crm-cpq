@@ -234,7 +234,7 @@ export function isPriceBookPublished(
                         }}
                       </td>
                       <td>
-                        @if (row.floorPrice != null) {
+                        @if (row.floorPrice !== null && row.floorPrice !== undefined) {
                           {{
                             row.floorPrice
                               | currency: row.currency || book.currency || 'USD'
