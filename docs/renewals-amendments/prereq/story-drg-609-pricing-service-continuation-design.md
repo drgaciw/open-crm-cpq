@@ -4,9 +4,9 @@
 
 **Story:** [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609/story-pricing-service-support-for-addupdateremove-lines-with). Design note for how `pricing-service` could price Add, Update, and Remove continuation lines and return a PolicyDecision id, a policy version, and a trace id.
 
-**Status of this note:** a design proposal. It is not an ADR. It does not authorize code, a Flyway migration, a Drools edit, a flag, a route in a running service, or a merge. CPQ Lead sequences any implementation. [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583/s5-quote-service-lifecyclechange-amend-with-pricing-service-decisions) (S5) stays blocked on the capability this note describes.
+**Status of this note:** a design proposal. It is not an ADR. No code starts until the owner accepts this design. Until that acceptance, this note does not start a Flyway migration, a Drools edit, a flag, a route, or a merge. [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583/s5-quote-service-lifecyclechange-amend-with-pricing-service-decisions) (S5) stays blocked on the capability this note describes.
 
-**ADR status used below.** [DRAFT-adr-amendment-proration-formula.md](DRAFT-adr-amendment-proration-formula.md) opens with **Status: Proposed. Not accepted.** [DRAFT-adr-renewal-uplift-basis-and-precedence.md](DRAFT-adr-renewal-uplift-basis-and-precedence.md) opens with **Status: Proposed on 2026-10-16. Not accepted.** An ADR counts as accepted only after the owner accepts it and the pull request that changes that status merges. Merging the drafts while they still say Proposed does not accept them. This note does not apply either draft as an accepted formula. The checklist this pull request is scored against is [CPQ Definition of Done v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338), approved by the owner on 2026-10-16. `verified by reading the issue` for that page, fetched in this pass.
+**ADR status used below.** [DRAFT-adr-amendment-proration-formula.md](DRAFT-adr-amendment-proration-formula.md) opens with **Status: Proposed. Not accepted.** [DRAFT-adr-renewal-uplift-basis-and-precedence.md](DRAFT-adr-renewal-uplift-basis-and-precedence.md) opens with **Status: Proposed on 2026-10-16. Not accepted.** Proration and uplift are **Proposed until [#623](https://github.com/drgaciw/open-crm-cpq/pull/623) merges, then Accepted**. #623 is the ADR status-change pull request for [#605](https://github.com/drgaciw/open-crm-cpq/pull/605), [#609](https://github.com/drgaciw/open-crm-cpq/pull/609), and [#606](https://github.com/drgaciw/open-crm-cpq/pull/606). It was read in this pass: open, draft, base `main`, not merged. An ADR counts as accepted only after that status-change pull request merges. The checklist this pull request is scored against is [CPQ Definition of Done v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338), approved by the owner on 2026-10-16. `verified by reading the issue` for that page, fetched in this pass. `verified by reading the pull request` for #623.
 
 ## Verification
 
@@ -113,7 +113,7 @@ Trade-offs:
 - The uplift rule writes a fraction (`0.08` or `0.03`) and an optional retention string. It does not write a unit price.
 - Inserting `QuoteFact` changes the fact set of every execute that has active rules, including quotes that are not continuations.
 - Execute runs database `rule.content`, not the classpath file. The classpath amendment rule and the V8 rewrite of `rule-007` already differ. Driving line prices from "the DRL" would still have to name which body.
-- The full-term ratio in the classpath rule and the continuation day-stub described in the proration draft are different procedures. That draft is Proposed. Using the classpath ratio as the line price would treat the draft as accepted.
+- The full-term ratio in the classpath rule and the continuation day-stub described in the proration draft are different procedures. That draft is Proposed until #623 merges, then Accepted. Using the classpath ratio as the line price before that merge would treat the draft as accepted.
 - Decision identity is still missing after the rule fires. `rulesFired` is logged and dropped, and `PricingResult` has no policy fields.
 
 ### Option B — A separate continuation evaluation that returns decision identity
@@ -124,7 +124,7 @@ Trade-offs:
 
 - Current execute clients keep the contract that was read.
 - The line model can name Add, Update, and Remove without overloading `QuoteFact`.
-- The numeric procedure for Daily, and the renewal uplift merge, stay unbound while their ADRs are Proposed. The operation can reject an unbound method instead of inventing a formula.
+- The numeric procedure for Daily, and the renewal uplift merge, stay unbound while proration and uplift are Proposed until #623 merges, then Accepted. The operation can reject an unbound method instead of inventing a formula.
 - A second entry point has to be kept in step with execute if a later accepted ADR moves both onto one route.
 - Returning ids does not by itself create the commercial-decision audit. That store is DRG-612.
 
@@ -156,7 +156,7 @@ Trade-offs:
 
 The continuation evaluation is a new operation on pricing-service. It owns the Add, Update, and Remove line model and the decision identity on the success body. `executeInternal` keeps inserting `Customer`, `PricingContext`, and `PricingLineResult` only. `amendment-proration.drl` and `renewal-uplift.drl` stay as they are until an accepted ADR says to change them.
 
-The amount for RetainContracted plus Daily is part of AC-S5-2, and the procedure that computes it is the proration ADR once that ADR is accepted. This note does not copy either formula from the Proposed draft into a requirement. Until that status is Accepted, the operation returns no amount for a proration method and reports the method unbound. The same hold applies to renewal uplift: the uplift draft is Proposed, and the classpath rule is not a line pricer.
+The amount for RetainContracted plus Daily is part of AC-S5-2, and the procedure that computes it is the proration ADR once that ADR is accepted. This note does not copy either formula into a requirement ahead of that acceptance. Proration and uplift are Proposed until #623 merges, then Accepted. Until that merge, the operation returns no amount for a proration method and reports the method unbound. The same hold applies to renewal uplift. The classpath uplift rule is not a line pricer. No code starts until the owner accepts this design, including after #623 merges.
 
 Option A is rejected because the rules that were read do not price a change line. Option C is rejected because it leaves pricing outside pricing-service, which V8 and FR-14 forbid. Option D can be revisited after the contract has shipped once and an accepted ADR collapses the two routes. It is not the first cut, because a continuation line must not share the list-times-quantity path by accident.
 
@@ -220,7 +220,7 @@ Checks the sketch includes, taken from rules that were read:
 - `endQuantity >= 0`. V7, as read, requires `start_qty + delta_qty = end_qty` and `end_qty >= 0`. When semantics are Delta, the operation checks `startQuantity + deltaQuantity = endQuantity` and does not invent a side of the equation. Absolute uses `endQuantity` as the priced quantity and does not apply a delta.
 - Remove may send `endQuantity` 0. `QuoteContinuationRequest.quantity` is `@Positive` and cannot express that. The new operation does not reuse that constraint.
 - RetainContracted uses `contractedUnitRate` from the request. pricing-service does not read quote-service tables for that rate. The uplift draft says pricing-service stays stateless and cites ADR-008. ADR-008 was not opened in this pass. `unverified` against ADR-008.
-- `prorationMethod` other than a method whose procedure is an accepted ADR returns `procedureStatus` `UNBOUND`, no `unitRate`, and no `amount`, and still returns `policyDecisionId`, `policyId`, `policyVersion`, and `traceId` for the refusal. Daily stays `UNBOUND` while the proration draft's status is Proposed. Acceptance is the merge of a status-change pull request, which has not happened. MonthDay, None, and NextCycle are names in the technical-approach doc. AC-S5-2 does not name them. They stay `UNBOUND` in this sketch.
+- `prorationMethod` other than a method whose procedure is an accepted ADR returns `procedureStatus` `UNBOUND`, no `unitRate`, and no `amount`, and still returns `policyDecisionId`, `policyId`, `policyVersion`, and `traceId` for the refusal. Daily stays `UNBOUND` while proration is Proposed until #623 merges, then Accepted. MonthDay, None, and NextCycle are names in the technical-approach doc. AC-S5-2 does not name them. They stay `UNBOUND` in this sketch.
 - Policy selection on this operation: when `policyId` and `policyVersion` are present, that pair is the pin copied onto every line. When they are absent, selection may use the same repository method execute uses, with `policyAsOf` in place of `LocalDate.now()`. If that query returns more than one row, the operation fails with `POLICY_SELECTION_AMBIGUOUS` and prices nothing. It does not call `get(0)`. Execute's own `get(0)` behavior stays on execute. Whether more than one ACTIVE set exists anywhere is `unverified`.
 - `policyId` on the wire is text, matching the document-line columns. V8 shows rule sets have a `uuid` (`rs-default-001` on the seed set). The Java property for that column was not opened. The implementation reads the public uuid once that property is confirmed. The Long surrogate stored in `pricing_audit_log.rule_set_id` is not the document column. `unverified` until the entity field is read.
 - `policyVersion` is `RuleSet.ruleSetVersion` of the selected set.
@@ -229,7 +229,7 @@ Checks the sketch includes, taken from rules that were read:
 
 `amendMode` values List and Override are outside the AC-S5-2 path this sketch prices. AC-S5-4, which stores an override and opens a `CONTRACT_MODIFICATION` approval, is quote-service work under DRG-583.
 
-Renewal uplift inputs (basis, cap, floor, price-as-of beyond `policyAsOf`, churn score) are not on this request. The classpath uplift rule does not price a line, and the uplift ADR is Proposed.
+Renewal uplift inputs (basis, cap, floor, price-as-of beyond `policyAsOf`, churn score) are not on this request. The classpath uplift rule does not price a line. The uplift ADR is Proposed until #623 merges, then Accepted.
 
 ## Audit implications
 
@@ -276,8 +276,8 @@ Unit tests, no Drools session and no Testcontainer:
 - Update or Remove without `sourceAcceptedLineId` is rejected.
 - Delta that fails `startQuantity + deltaQuantity = endQuantity` is rejected.
 - Swap, Upgrade, and Downgrade are rejected with `ACTION_NOT_SUPPORTED_IN_SLICE`.
-- Daily, and any other proration method, returns `procedureStatus` `UNBOUND` with the four ids set and with `amount` absent, for as long as the proration ADR stays Proposed.
-- A fixture that expects `300.0000`, or a day-stub amount taken from the Proposed proration draft, is not part of this plan. Those figures would treat a Proposed ADR as accepted.
+- Daily, and any other proration method, returns `procedureStatus` `UNBOUND` with the four ids set and with `amount` absent, while proration is Proposed until #623 merges, then Accepted.
+- A fixture that expects `300.0000`, or a day-stub amount taken from the proration draft, is not part of this plan before that merge. Those figures would treat the draft as accepted.
 - Two ACTIVE rule sets and no caller pin yield `POLICY_SELECTION_AMBIGUOUS` and no priced line.
 - A caller pin (`policyId`, `policyVersion`) is echoed even when other active sets exist.
 - The success envelope's `traceId` equals the body `traceId`.
@@ -291,7 +291,7 @@ Regression on the current path, still without claiming a Drools run in this note
 
 Integration: classes named `*IntegrationTest` need Docker. A run without Docker does not execute them. This note does not ask for a new Testcontainer test until the implementation story exists. The V8 guard and `ManagedSeedOptionalInputsIntegrationTest` were not run. OQ9 records the seeded amendment expectation `1200 * 90 / 360 = 300` at scale 4. This pass did not re-open that test class. `unverified` against the test source.
 
-Contract characterization, when the route exists: a golden success document for one Add line and one Remove line contains the four ids and `procedureStatus`. It does not contain an amount while the proration ADR is Proposed.
+Contract characterization, when the route exists: a golden success document for one Add line and one Remove line contains the four ids and `procedureStatus`. It does not contain an amount while proration is Proposed until #623 merges, then Accepted.
 
 ## Scope against DoD v0.2
 
@@ -303,12 +303,12 @@ The first-slice paragraph in `amendment-first-slice-requirements-and-acceptance.
 |---|---|
 | Line model Add, Update, Remove, Delta and Absolute, and the four ids on the success body | Specified in this note. DRG-609's outcome is the note. AC-S5-2, FR-14, and V8 are the later pricing bar. |
 | RetainContracted as the AC-S5-2 mode name | Specified here. |
-| Daily amount | The slot is specified here. The arithmetic stays unbound until the proration ADR is accepted by a merged status-change pull request. Until then `procedureStatus` is `UNBOUND`. |
+| Daily amount | The slot is specified here. The arithmetic stays unbound while proration is Proposed until #623 merges, then Accepted. Until that merge `procedureStatus` is `UNBOUND`. |
 | Product, pricebook version, and the interim configuration hash | Specified on a `PRICED` line for AC-S5-2 and V9. Replacing the interim hash is DRG-428. |
 | Execute and simulate left unchanged | Specified here, so the flag-off path in the first-slice paragraph stays intact. |
 | MonthDay, None, NextCycle | Not named by AC-S5-2. Left `UNBOUND`. Not part of this note's outcome. |
 | List and Override, and `CONTRACT_MODIFICATION` approval | AC-S5-4 is DRG-583. Not part of this note's outcome. |
-| Renewal uplift basis, cap, floor, and the classpath fraction | Uplift draft is Proposed. DRG-541 is a different story. Not part of this request. |
+| Renewal uplift basis, cap, floor, and the classpath fraction | Uplift is Proposed until #623 merges, then Accepted. DRG-541 is a different story. Not part of this request. |
 | Swap, Upgrade, Downgrade priced | Out of the first slice. The sketch rejects them. |
 | Pricing PolicyDecision row, `rules_fired`, `waterfall_trace`, actor on `PricingAuditLog` | DRG-612. V1_11 records only the renewal-draft-open decision. |
 | LifecycleChange, the continuation facade, AC-S5-1, AC-S5-5, AC-S5-6 | DRG-583. |
@@ -324,8 +324,8 @@ Read in this pass. Not executed.
 | Item | Path or source |
 |---|---|
 | OQ9 finding | `docs/renewals-amendments/prereq/oq9-pricing-continuation-capability.md` |
-| Proration ADR draft, status Proposed | `docs/renewals-amendments/prereq/DRAFT-adr-amendment-proration-formula.md` (header and the two formula sections) |
-| Uplift ADR draft, status Proposed | `docs/renewals-amendments/prereq/DRAFT-adr-renewal-uplift-basis-and-precedence.md` (header and context through D-02) |
+| Proration ADR draft, Proposed until #623 merges, then Accepted | `docs/renewals-amendments/prereq/DRAFT-adr-amendment-proration-formula.md` (header and the two formula sections). Status-change pull request [#623](https://github.com/drgaciw/open-crm-cpq/pull/623) for #605. |
+| Uplift ADR draft, Proposed until #623 merges, then Accepted | `docs/renewals-amendments/prereq/DRAFT-adr-renewal-uplift-basis-and-precedence.md` (header and context through D-02). Status-change pull request #623 for #609. #623 also covers #606. |
 | Execute orchestration and audit insert | `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/PricingExecutionService.java` |
 | Audit entity | `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/PricingAuditLog.java` |
 | Controller routes | `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/PricingExecutionController.java` |
@@ -353,5 +353,4 @@ Read in this pass. Not executed.
 - The Java field behind `rule_set.uuid`.
 - How many ACTIVE rule sets a given database contains.
 - Whether quote-service ignores unknown JSON properties on `PricingResult`.
-- Whether a later status-change pull request has merged for either Proposed ADR. The draft files on `dd0f1a8` still say Proposed. A search of merged status-change pulls was not done beyond reading those files.
 - The feature-flag property key for the legacy continuation path.
