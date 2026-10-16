@@ -1,0 +1,2442 @@
+openapi: 3.0.3
+info:
+  title: Amendments and lifecycle changes (DRAFT proposal)
+  version: 0.1.0-draft
+  description: |
+    Proposal only. This file is not an implementation, a gateway route, or a
+    feature flag. It does not authorize merging, deploying, or enabling any
+    runtime flag.
+
+    HTTP contract for the contract-documents module and for quote-service
+    lifecycle changes, so DRG-537 (renewals and amendments UI), DRG-581 (S3)
+    and DRG-583 (S5) can share one shape.
+
+    Owners, from the renewals-amendments specs:
+    - quote-service owns LifecycleChange (intent, change lines, pricing calls).
+    - contract-asset-management, contract-documents module, owns ContractHeader,
+      AmendmentDocument, revisions, lines, application units and the append-only
+      event log, at `/contracts/{contractId}/amendments`.
+    - The module never writes rate periods. The CAM ledger is the only writer
+      of applied state.
+    - Cross-service links are uuid plus digest. No cross-database foreign keys.
+
+    Binding decisions already recorded (do not re-open in this draft):
+    - OQ2: one `status` column. No `applyStatus`. Apply runs only after EXECUTED.
+    - OQ4: `provisionalNumber` at DRAFT, stable across revisions. `amendmentSeq`
+      is assigned at EXECUTED as last executed sequence plus 1, in the same
+      transaction, under the contract row lock. Final number is
+      `{contractNumber}-A{seq}` zero-padded to 3 digits. A withdrawn draft
+      consumes no sequence. Numbering does not reset on renewal.
+
+    First slice (S3 and S5):
+    - LifecycleChange intent AMEND only.
+    - Change-line action codes ADD, UPDATE, REMOVE. SWAP, UPGRADE and DOWNGRADE
+      may be stored and are rejected at lifecycle submit with
+      ACTION_NOT_SUPPORTED_IN_SLICE.
+    - Quantity semantics DELTA and ABSOLUTE only.
+    - Signature policies that may reach EXECUTED: NOT_REQUIRED, NOTICE_ONLY
+      (auto-execute when approval is recorded) and CLICK_THROUGH (client
+      `:accept`). WET and E_SIGN return 422 SIGNATURE_NOT_SUPPORTED_IN_SLICE
+      and leave state unchanged.
+    - Validation V1 through V14. A failing rule leaves state unchanged and
+      appends a ValidationRejected event that names the rule id.
+    - Pricing is performed by pricing-service. Quote-service and CAM store the
+      decision; they do not recompute price.
+
+    Paths are the project REST prefix `/api/v1` plus the spike resource names.
+    JSON properties are camelCase. Enum values are SCREAMING_SNAKE, matching
+    existing Java enums such as QuoteStatus. Database columns in the field
+    schema stay snake_case; this document is the HTTP mapping.
+
+    Money is a decimal string so numeric(19,4) scale survives JSON. Digests are
+    lowercase hex SHA-256. Canonical JSON for `contentDigest` is the shared
+    digest library (S3 dependency, location still open). This proposal does not
+    define the canonicalization algorithm.
+
+    Browser calls go through the gateway (:8080) with the session cookie and
+    the ADR-004 CSRF header. Bearer calls send Authorization and no CSRF token.
+    Domain services stay stateless; this proposal adds no credential type.
+
+    Out of this slice, named so they are not implied: S4 apply, S6 event-bus
+    payload, renewal intent, price-lock segments, DRG-592 new-contract versus
+    amend-in-place as a second resource, DRG-595 role enforcement, e-sign
+    envelopes, rendition, void and rebase. Those operations are listed only
+    where the spike already names the resource, and they are marked later.
+
+  x-opencrm-status: proposal
+  x-opencrm-unblocks:
+    - DRG-537
+    - DRG-581
+    - DRG-583
+  x-opencrm-sources:
+    - docs/renewals-amendments/mid-term-amendment-policy-spec.md
+    - docs/renewals-amendments/amendment-entity-field-schema.md
+    - docs/renewals-amendments/amendment-document-design-spike.md
+    - docs/renewals-amendments/rca-sda-amendment-placement.md
+    - docs/renewals-amendments/cpq-renewals-amendments-research.md
+    - docs/renewals-amendments/renewal-policy-stub.md
+  x-opencrm-acceptance:
+    AC-S3-1: "POST /contracts/{contractId}/amendments with the same lifecycleChangeId returns one document."
+    AC-S3-2: "POST /amendments/{amendmentId}:submit moves a valid priced draft to IN_REVIEW and returns contentDigest. A failing rule returns 422, leaves status unchanged, and names the rule id."
+    AC-S3-3: "POST /amendments/{amendmentId}:accept on APPROVED plus CLICK_THROUGH returns EXECUTED and amendmentNumber {contractNumber}-A{nnn} from one transaction."
+    AC-S3-4: "POST /amendments/{amendmentId}:send-for-signature, and :accept when policy is WET or E_SIGN, return 422 SIGNATURE_NOT_SUPPORTED_IN_SLICE with status unchanged."
+    AC-S3-5: "Any mutation of an EXECUTED document returns 409 IMMUTABLE_EXECUTED and an audit event is written."
+    AC-S3-6: "Two concurrent executes of different documents on one contract receive consecutive amendmentSeq values with no gap."
+    AC-S3-7: "POST :withdraw from DRAFT leaves amendmentSeq null and does not advance the contract lastExecutedSeq."
+    AC-S3-8: "Backdating without backdatingReasonCode fails V6 (422, state unchanged)."
+    AC-S5-1: "POST /lifecycle-changes stores an AMEND change with lines, action codes, quantity semantics and observed revisions."
+    AC-S5-2: "POST :price with RETAIN_CONTRACTED and DAILY returns policyDecisionId, policyId, policyVersion, pricingTraceId and pins."
+    AC-S5-3: "POST /lifecycle-changes/{id}:submit rejects SWAP, UPGRADE or DOWNGRADE with ACTION_NOT_SUPPORTED_IN_SLICE."
+    AC-S5-4: "A price override stores actor (from the principal), reasonCode and value, and returns approvalRequestId."
+    AC-S5-5: "POST /quotes/continuations keeps the existing QuoteDto response. When the S5 facade behavior is active it also creates a LifecycleChange. This proposal does not name or enable a flag."
+    AC-S5-6: "A target subscription that is not ACTIVE is rejected with VALIDATION_REJECTED and ruleId V2."
+
+servers:
+  - url: /api/v1
+    description: Gateway prefix. quote-service and contract-asset-management are both reached through the gateway.
+
+tags:
+  - name: lifecycle-changes
+    description: quote-service commercial intent. First slice is intent AMEND. S5.
+  - name: amendments
+    description: CAM contract-documents module. Legal and evidentiary wrapper. S3.
+  - name: contracts
+    description: Thin contract header read model. Create and enrich stay with DRG-458.
+  - name: continuations
+    description: Existing quote continuation facade. Response shape stays QuoteDto. S5.
+  - name: later
+    description: Spike resource names that are not in the S3 or S5 slice.
+
+security:
+  - cookieSession: []
+  - bearerAuth: []
+
+paths:
+  /lifecycle-changes:
+    post:
+      tags: [lifecycle-changes]
+      operationId: createLifecycleChange
+      summary: Create an Amend lifecycle change
+      description: |
+        Seller or headless command. Stores intent AMEND, the lines, quantity
+        semantics and observed revisions (AC-S5-1). Does not price and does not
+        open the amendment document.
+
+        A second request with the same requestIdentifier (body or
+        Idempotency-Key) and the same body returns the original change with
+        Idempotent-Replayed true. The same key with a different body is 409
+        IDEMPOTENCY_CONFLICT.
+
+        Intent other than AMEND is rejected (INTENT_NOT_SUPPORTED_IN_SLICE).
+        A target subscription that is not ACTIVE is rejected with rule V2 and
+        no resource is stored (AC-S5-6). SWAP, UPGRADE and DOWNGRADE may be
+        stored; they fail later at submit (AC-S5-3). Any other action code is
+        rejected here with ACTION_NOT_SUPPORTED_IN_SLICE.
+      x-opencrm-slice: S5
+      x-opencrm-acceptance: [AC-S5-1, AC-S5-6]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLifecycleChangeRequest"
+            example:
+              intent: AMEND
+              initiationTrigger: MANUAL
+              actionDate: "2026-11-01"
+              contractEffectiveDate: "2026-11-01"
+              contractId: "6b1c2a10-0c3a-4b7e-9f11-2a6e0c9d4b21"
+              currencyCode: USD
+              outputMode: QUOTE
+              lines:
+                - actionCode: UPDATE
+                  quantitySemantics: DELTA
+                  targetSubscriptionId: "9c0e1f22-7a11-4d33-8b44-1e2f3a4b5c6d"
+                  sourceAcceptedLineUuid: "line-accepted-1"
+                  observedCommercialRevision: 4
+                  startQty: "10.0000"
+                  deltaQty: "5.0000"
+                  endQty: "15.0000"
+                  effectiveFrom: "2026-11-01"
+                  effectiveTo: "2027-10-31"
+                - actionCode: ADD
+                  quantitySemantics: ABSOLUTE
+                  startQty: "0.0000"
+                  deltaQty: "2.0000"
+                  endQty: "2.0000"
+                  effectiveFrom: "2026-11-01"
+                  effectiveTo: "2027-10-31"
+                  productExternalId: "sku-seat"
+      responses:
+        "201":
+          description: Lifecycle change created in DRAFT.
+          headers:
+            Location:
+              schema: {type: string}
+              description: URI of the new lifecycle change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "200":
+          $ref: "#/components/responses/IdempotentReplayLifecycleChange"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    get:
+      tags: [lifecycle-changes]
+      operationId: listLifecycleChanges
+      summary: List lifecycle changes
+      description: |
+        Review list for the start and review flow. Filters are exact matches.
+        Ordered by createdAt descending.
+      x-opencrm-slice: S5
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: contractId
+          in: query
+          schema: {type: string, format: uuid}
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleChangeStatus"
+        - name: intent
+          in: query
+          schema:
+            $ref: "#/components/schemas/LifecycleIntent"
+      responses:
+        "200":
+          description: Page of lifecycle changes. `data` is the array.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangePageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /lifecycle-changes/{lifecycleChangeId}:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    get:
+      tags: [lifecycle-changes]
+      operationId: getLifecycleChange
+      summary: Get a lifecycle change
+      description: Returns the change, its current lines, and pricing pins when present.
+      x-opencrm-slice: S5
+      responses:
+        "200":
+          description: The lifecycle change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /lifecycle-changes/{lifecycleChangeId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    get:
+      tags: [lifecycle-changes]
+      operationId: listLifecycleChangeRevisions
+      summary: List lifecycle change revisions
+      x-opencrm-slice: S5
+      responses:
+        "200":
+          description: Revisions, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleRevisionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [lifecycle-changes]
+      operationId: createLifecycleChangeRevision
+      summary: Open a new revision from a draft edit
+      description: |
+        Allowed from DRAFT, PRICED, IN_APPROVAL, APPROVED and PRESENTED.
+        The previous revision is frozen SUPERSEDED. At most one revision of
+        the linked amendment document can reach EXECUTED. A new revision of
+        an already EXECUTED document is refused with IMMUTABLE_EXECUTED
+        (AC-S3-5); the correction path is a new lifecycle change.
+      x-opencrm-slice: S5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviseLifecycleChangeRequest"
+      responses:
+        "201":
+          description: New current revision. Status returns to DRAFT. Pricing pins on the new revision are cleared.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /lifecycle-changes/{lifecycleChangeId}:price:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    post:
+      tags: [lifecycle-changes]
+      operationId: priceLifecycleChange
+      summary: Price lines through pricing-service
+      description: |
+        Calls pricing-service and stores the decision on each priced line
+        (AC-S5-2). Quote-service does not calculate the price itself.
+
+        First-slice mode used by the acceptance case is RETAIN_CONTRACTED with
+        proration DAILY. LIST, OVERRIDE, MONTH_DAY, NONE and NEXT_CYCLE are
+        accepted on the request so the policy slot can be recorded; whether
+        pricing-service can evaluate them is a prerequisite check (S5 risk),
+        not a second pricing implementation.
+
+        An override sends value and reasonCode. The actor is the authenticated
+        principal. The response includes approvalRequestId for
+        CONTRACT_MODIFICATION (AC-S5-4). configurationHash may be null until
+        DRG-428; productExternalId and pricebookVersion are required on every
+        priced line.
+
+        A target that is not ACTIVE fails V2. Status becomes PRICED when every
+        priced line has a decision. Re-pricing the same revision replaces the
+        unpinned draft decision and bumps version. Re-pricing after IN_APPROVAL
+        requires a new revision.
+      x-opencrm-slice: S5
+      x-opencrm-acceptance: [AC-S5-2, AC-S5-4, AC-S5-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceLifecycleChangeRequest"
+            example:
+              version: 1
+              lines:
+                - lineId: "11111111-1111-1111-1111-111111111111"
+                  amendMode: RETAIN_CONTRACTED
+                  prorationMethod: DAILY
+                  priceAsOf: EFFECTIVE_DATE
+      responses:
+        "200":
+          description: Lines pinned with policy decisions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /lifecycle-changes/{lifecycleChangeId}/pricing-decisions:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    get:
+      tags: [lifecycle-changes]
+      operationId: listPricingDecisions
+      summary: List stored pricing decisions for the current revision
+      x-opencrm-slice: S5
+      responses:
+        "200":
+          description: One decision per priced line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingDecisionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /lifecycle-changes/{lifecycleChangeId}:submit:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    post:
+      tags: [lifecycle-changes]
+      operationId: submitLifecycleChange
+      summary: Submit the commercial change for approval
+      description: |
+        From PRICED only. Moves status to IN_APPROVAL.
+
+        SWAP, UPGRADE or DOWNGRADE on any current line returns 422
+        ACTION_NOT_SUPPORTED_IN_SLICE and leaves status unchanged (AC-S5-3).
+        A target that is not ACTIVE returns rule V2 (AC-S5-6). A priced line
+        missing policyDecisionId, policyId, policyVersion or pricingTraceId
+        fails V8. Product and pricebook pins must be present (V9);
+        configurationHash may be null.
+
+        Repeating submit for the same revision and contentDigest is a no-op
+        and returns 200 with Idempotent-Replayed true.
+      x-opencrm-slice: S5
+      x-opencrm-acceptance: [AC-S5-3, AC-S5-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommand"
+      responses:
+        "200":
+          description: Status IN_APPROVAL, or the same state on a replay.
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /lifecycle-changes/{lifecycleChangeId}:withdraw:
+    parameters:
+      - $ref: "#/components/parameters/LifecycleChangeId"
+    post:
+      tags: [lifecycle-changes]
+      operationId: withdrawLifecycleChange
+      summary: Withdraw a lifecycle change that is not yet applied
+      description: |
+        Allowed before ORDERED or APPLIED. Status becomes WITHDRAWN. A second
+        withdraw is a no-op. Does not assign an amendment sequence.
+      x-opencrm-slice: S5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawCommand"
+      responses:
+        "200":
+          description: Status WITHDRAWN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleChangeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /contracts/{contractId}:
+    parameters:
+      - $ref: "#/components/parameters/ContractId"
+    get:
+      tags: [contracts]
+      operationId: getContract
+      summary: Read the thin contract header
+      description: |
+        Read model for the amendment screen (number, term, status,
+        lastExecutedSeq). This proposal does not define create or update.
+        Header enrichment remains DRG-458 (OQ3).
+      x-opencrm-slice: S3-read
+      responses:
+        "200":
+          description: Contract header.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /contracts/{contractId}/amendments:
+    parameters:
+      - $ref: "#/components/parameters/ContractId"
+    post:
+      tags: [amendments]
+      operationId: createAmendment
+      summary: Open a draft amendment from a lifecycle change
+      description: |
+        Idempotent on lifecycleChangeId (AC-S3-1). The first request creates
+        one AmendmentDocument in DRAFT, copies the lifecycle change keys, and
+        assigns provisionalNumber. amendmentSeq and amendmentNumber stay null.
+        The same lifecycleChangeId returns that document with 200 and
+        Idempotent-Replayed true. The same id with a different
+        lifecycleChangeRevision or a different content digest is 409
+        IDEMPOTENCY_CONFLICT. A further edit is a new revision, not a second
+        create.
+
+        Every target subscription on the change must belong to this contract
+        (V1). The document is single-contract.
+
+        requestIdentifier, when present, is unique per tenant and is the
+        headless idempotency key in addition to lifecycleChangeId.
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-1]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAmendmentRequest"
+      responses:
+        "201":
+          description: Draft created. provisionalNumber is set. amendmentSeq is null.
+          headers:
+            Location:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "200":
+          $ref: "#/components/responses/IdempotentReplayAmendment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+    get:
+      tags: [amendments]
+      operationId: listContractAmendments
+      summary: List amendment documents for a contract
+      description: |
+        Includes the original and every amendment. Ordered by provisional
+        creation time. Executed documents also sort by amendmentSeq.
+      x-opencrm-slice: S3
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AmendmentStatus"
+        - name: documentKind
+          in: query
+          schema:
+            $ref: "#/components/schemas/DocumentKind"
+      responses:
+        "200":
+          description: Page of amendment documents. Lines are not embedded on the list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentPageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [amendments]
+      operationId: getAmendment
+      summary: Get an amendment document
+      description: |
+        Header, current revision summary, and the current revision's lines.
+        Totals are the digest-bound copies. They are never recomputed here.
+      x-opencrm-slice: S3
+      responses:
+        "200":
+          description: The amendment document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [amendments]
+      operationId: listAmendmentRevisions
+      summary: List document revisions
+      description: At most one revision has statusAtClose EXECUTED.
+      x-opencrm-slice: S3
+      responses:
+        "200":
+          description: Revisions in revisionNo order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentRevisionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/lines:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [amendments]
+      operationId: listAmendmentLines
+      summary: List lines of the current revision
+      x-opencrm-slice: S3
+      parameters:
+        - name: revisionNo
+          in: query
+          description: Defaults to the current revision.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: Lines ordered by lineNo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentLineListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/application-units:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [amendments]
+      operationId: listApplicationUnits
+      summary: List atomic application units
+      description: |
+        Server-built. One unit per target subscription in the first slice.
+        dependencyOrder creates before terminates. Apply itself is S4; this
+        read exists so the review screen can show the units.
+      x-opencrm-slice: S3-read
+      responses:
+        "200":
+          description: Units ordered by dependencyOrder.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationUnitListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/events:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [amendments]
+      operationId: listAmendmentEvents
+      summary: Read the append-only event log
+      description: |
+        Ordered by seqNo. Clients cannot post events. A validation failure is
+        a ValidationRejected event whose payload names the rule id (V1-V14).
+        Hash-chain verification is S2; this read returns prevHash and contentHash.
+      x-opencrm-slice: S3
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Event page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentEventPageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}:submit:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: submitAmendment
+      summary: Submit a priced draft for review
+      description: |
+        From DRAFT only, and only when the current revision is priced and
+        contentDigest is present. Runs V1 through V14. Success moves status
+        to IN_REVIEW and returns the digest (AC-S3-2).
+
+        Any failing rule returns 422 VALIDATION_REJECTED, leaves status
+        unchanged, and appends ValidationRejected naming that rule id. V6
+        fails when contractEffectiveDate is before actionDate and
+        backdatingReasonCode is absent (AC-S3-8).
+
+        The same revision and digest submitted again is a no-op (200,
+        Idempotent-Replayed true). A digest mismatch is 409.
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-2, AC-S3-8]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAmendmentCommand"
+      responses:
+        "200":
+          description: Status IN_REVIEW, with contentDigest.
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          description: Rule failure. State unchanged. Example is V6.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                errorCode: VALIDATION_REJECTED
+                message: Validation failed
+                errors:
+                  - "V6: backdating requires a reason code"
+                violations:
+                  - ruleId: V6
+                    message: Effective date is before the action date and backdatingReasonCode is absent
+                    field: backdatingReasonCode
+                timestamp: "2026-11-01T12:00:00Z"
+
+  /amendments/{amendmentId}:record-approval:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: recordAmendmentApproval
+      summary: Record an approval-routing decision
+      description: |
+        Called when approval-routing decides CONTRACT_MODIFICATION, or when
+        the change is auto-approved under the threshold. The approval
+        threshold amount is not defined here (S5 OQ17).
+
+        APPROVED stores approvalRef and moves IN_REVIEW to APPROVED.
+        When signaturePolicy is NOT_REQUIRED or NOTICE_ONLY, the same
+        transaction continues to EXECUTED and assigns the gapless number
+        (auto-execute). CLICK_THROUGH stops at APPROVED until `:accept`.
+        WET and E_SIGN stop at APPROVED; they do not execute.
+
+        REJECTED moves to REJECTED (terminal).
+
+        A re-delivered decision for the same revision and approvalRef is a
+        no-op. Two documents executing concurrently on one contract receive
+        consecutive sequences with no gap (AC-S3-6).
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordApprovalCommand"
+      responses:
+        "200":
+          description: APPROVED, EXECUTED (auto-execute), or REJECTED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /amendments/{amendmentId}:accept:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: acceptAmendment
+      summary: Accept click-through and execute
+      description: |
+        From APPROVED, signaturePolicy CLICK_THROUGH only. One transaction
+        sets EXECUTED, executedAt, executedRevisionNo, and
+        amendmentNumber = `{contractNumber}-A{amendmentSeq}` with the
+        sequence equal to the contract lastExecutedSeq plus 1 (AC-S3-3).
+
+        WET or E_SIGN returns 422 SIGNATURE_NOT_SUPPORTED_IN_SLICE and does
+        not change status (AC-S3-4). NOTICE_ONLY and NOT_REQUIRED do not use
+        this operation; they auto-execute in `:record-approval`.
+
+        A second accept of the same executed revision is a no-op.
+        Concurrent accepts of two documents on one contract take N+1 and N+2
+        (AC-S3-6).
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-3, AC-S3-4, AC-S3-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommand"
+      responses:
+        "200":
+          description: EXECUTED, with amendmentSeq and amendmentNumber.
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+              example:
+                success: true
+                data:
+                  id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+                  contractId: "6b1c2a10-0c3a-4b7e-9f11-2a6e0c9d4b21"
+                  provisionalNumber: "C-100-P-aaaaaaaa"
+                  amendmentSeq: 3
+                  amendmentNumber: C-100-A003
+                  documentKind: AMENDMENT
+                  status: EXECUTED
+                  signaturePolicy: CLICK_THROUGH
+                  version: 4
+                timestamp: "2026-11-02T09:00:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /amendments/{amendmentId}:send-for-signature:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: sendAmendmentForSignature
+      summary: Send a rendition for signature
+      description: |
+        Not available in the first slice. WET and E_SIGN return 422
+        SIGNATURE_NOT_SUPPORTED_IN_SLICE and leave status unchanged
+        (AC-S3-4). CLICK_THROUGH, NOTICE_ONLY and NOT_REQUIRED also return
+        that code; they execute through `:accept` or `:record-approval`.
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-4]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommand"
+      responses:
+        "422":
+          description: SIGNATURE_NOT_SUPPORTED_IN_SLICE. Status unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                errorCode: SIGNATURE_NOT_SUPPORTED_IN_SLICE
+                message: Wet and e-sign envelopes are outside the first slice
+                timestamp: "2026-11-02T09:00:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /amendments/{amendmentId}:withdraw:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: withdrawAmendment
+      summary: Withdraw a document that has not executed
+      description: |
+        From DRAFT, IN_REVIEW, APPROVED or OUT_FOR_SIGNATURE. Status becomes
+        WITHDRAWN. amendmentSeq stays null, and the contract lastExecutedSeq
+        is unchanged (AC-S3-7). A second withdraw is a no-op. EXECUTED and
+        later states return 409 IMMUTABLE_EXECUTED (AC-S3-5) or
+        ILLEGAL_TRANSITION when the state is terminal and was never executed.
+      x-opencrm-slice: S3
+      x-opencrm-acceptance: [AC-S3-5, AC-S3-7]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawCommand"
+      responses:
+        "200":
+          description: WITHDRAWN. amendmentSeq is null.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /amendments/{amendmentId}:execute:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [amendments]
+      operationId: executeAmendment
+      summary: System execute for notice-only and not-required policies
+      description: |
+        Internal counterpart of the auto-execute branch on `:record-approval`.
+        Allowed from APPROVED when signaturePolicy is NOTICE_ONLY or
+        NOT_REQUIRED. Assigns the gapless amendmentSeq in the contract-row
+        transaction (AC-S3-6). Idempotent for the same executed revision.
+        Other policies return 422 SIGNATURE_NOT_SUPPORTED_IN_SLICE or
+        ILLEGAL_TRANSITION, with status unchanged.
+      x-opencrm-slice: S3
+      x-opencrm-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionedCommand"
+      responses:
+        "200":
+          description: EXECUTED.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmendmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /amendments/{amendmentId}:apply:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [later, amendments]
+      operationId: applyAmendment
+      summary: Apply executed units to the ledger
+      description: |
+        Not in the S3 or S5 slice. S4 applies units only after EXECUTED.
+        There is no applyStatus field. Partial application (OQ5) is undecided;
+        the status enum still contains APPLIED, PARTIALLY_APPLIED and
+        APPLY_BLOCKED so the later slice has a place to land. Spine rules
+        V3, V10, V12 and V13 apply at that time. CAM remains the only writer
+        of rate periods.
+      x-opencrm-slice: later
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /amendments/{amendmentId}:void:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [later, amendments]
+      operationId: voidAmendment
+      summary: Void an executed document before apply
+      description: |
+        Not in this slice. Who may void is open (policy OQ11). After apply,
+        the correction is a new amendment, not a void. EXECUTED records are
+        not updated in place (A1).
+      x-opencrm-slice: later
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}:rebase:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    post:
+      tags: [later, amendments]
+      operationId: rebaseAmendment
+      summary: Re-observe revisions and open a new document revision
+      description: Later slice. Used when apply is blocked on a stale commercial revision. Not part of S3 or S5.
+      x-opencrm-slice: later
+      responses:
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/rendition:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [later, amendments]
+      operationId: getAmendmentRendition
+      summary: Read rendition metadata
+      description: Later. Rendering stays in document-generation. The document stores template pins and renditionDigest only.
+      x-opencrm-slice: later
+      responses:
+        "200":
+          description: Rendition pins, when a later slice has rendered one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenditionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /amendments/{amendmentId}/attachments:
+    parameters:
+      - $ref: "#/components/parameters/AmendmentId"
+    get:
+      tags: [later, amendments]
+      operationId: listAmendmentAttachments
+      summary: List amendment attachments
+      description: Later. Signed copies are immutable once EXECUTED (A1).
+      x-opencrm-slice: later
+      responses:
+        "200":
+          description: Attachment metadata. Bytes are not inline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /quotes/continuations:
+    post:
+      tags: [continuations]
+      operationId: authorContinuation
+      summary: Existing continuation author endpoint, as a facade
+      description: |
+        This path and its response already exist
+        (`QuoteContinuationController`, `ApiResponse` of `QuoteDto`). S5 keeps
+        that response shape (AC-S5-5).
+
+        When the S5 facade behavior is active, operation AMENDMENT also
+        creates a LifecycleChange with intent AMEND and returns its id only
+        in the response header X-Lifecycle-Change-Id. The body stays QuoteDto.
+        RENEWAL, EXPANSION and EXTENSION keep today's authoring behavior until
+        those intents are in a later slice. This proposal does not name or
+        enable the switch that turns the facade on.
+      x-opencrm-slice: S5
+      x-opencrm-acceptance: [AC-S5-5]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteContinuationRequest"
+      responses:
+        "201":
+          description: Continuation draft. Body is the existing QuoteDto envelope.
+          headers:
+            X-Lifecycle-Change-Id:
+              schema: {type: string, format: uuid}
+              description: Present only when the facade created a LifecycleChange. Absent otherwise.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+  /quotes/continuations/preview:
+    post:
+      tags: [continuations]
+      operationId: previewContinuation
+      summary: Existing continuation preview
+      description: |
+        Unchanged. Returns the existing Plan. Preview does not create a
+        LifecycleChange and does not open an amendment document.
+      x-opencrm-slice: S5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteContinuationRequest"
+      responses:
+        "200":
+          description: Existing preview plan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContinuationPlanResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+
+components:
+  securitySchemes:
+    cookieSession:
+      type: apiKey
+      in: cookie
+      name: SESSION
+      description: |
+        Browser session at the gateway (ADR-016). Unsafe methods from the
+        browser also send the CSRF header X-XSRF-TOKEN, echoing the XSRF-TOKEN
+        cookie (ADR-004). The cookie name SESSION is the gateway session
+        cookie; clients do not forge it.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Agent and service lane. No CSRF header.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Optional headless key. Stored as requestIdentifier when the body omits
+        one. Unique per tenant.
+      schema:
+        type: string
+        maxLength: 200
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+    Size:
+      name: size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 20}
+    ContractId:
+      name: contractId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AmendmentId:
+      name: amendmentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    LifecycleChangeId:
+      name: lifecycleChangeId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+
+  headers:
+    IdempotentReplayed:
+      description: true when this call returned the resource from an earlier identical command.
+      schema: {type: boolean}
+
+  responses:
+    Unauthorized:
+      description: Missing or rejected gateway authentication.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: No resource for this id in the caller tenant.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            errorCode: NOT_FOUND
+            message: Resource not found
+            timestamp: "2026-11-01T12:00:00Z"
+    Conflict:
+      description: |
+        VERSION_CONFLICT when `version` is stale. IDEMPOTENCY_CONFLICT when
+        the same key is reused with a different body. IMMUTABLE_EXECUTED when
+        a command would change an executed document (AC-S3-5); the service
+        also appends an audit event. ILLEGAL_TRANSITION when the state machine
+        forbids the command.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unprocessable:
+      description: |
+        Domain rejection with the resource left unchanged when it already
+        exists. errorCode is one of VALIDATION_REJECTED,
+        ACTION_NOT_SUPPORTED_IN_SLICE, SIGNATURE_NOT_SUPPORTED_IN_SLICE, or
+        INTENT_NOT_SUPPORTED_IN_SLICE. VALIDATION_REJECTED includes violations
+        with the rule id.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    IdempotentReplayLifecycleChange:
+      description: Existing lifecycle change for this request identifier.
+      headers:
+        Idempotent-Replayed:
+          $ref: "#/components/headers/IdempotentReplayed"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LifecycleChangeResponse"
+    IdempotentReplayAmendment:
+      description: Existing amendment for this lifecycleChangeId.
+      headers:
+        Idempotent-Replayed:
+          $ref: "#/components/headers/IdempotentReplayed"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AmendmentResponse"
+
+  schemas:
+    Money:
+      type: string
+      description: Decimal numeric(19,4), transported as a string.
+      pattern: '^-?\d{1,15}(\.\d{1,4})?$'
+      example: "15.0000"
+    Sha256:
+      type: string
+      description: Lowercase hex SHA-256.
+      pattern: '^[a-f0-9]{64}$'
+    CurrencyCode:
+      type: string
+      minLength: 3
+      maxLength: 3
+      example: USD
+
+    PageInfo:
+      type: object
+      required: [page, size, totalElements, totalPages, hasNext, hasPrevious]
+      properties:
+        page: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1}
+        totalElements: {type: integer, minimum: 0}
+        totalPages: {type: integer, minimum: 0}
+        hasNext: {type: boolean}
+        hasPrevious: {type: boolean}
+
+    ApiEnvelope:
+      type: object
+      required: [success, timestamp]
+      description: |
+        Platform `ApiResponse` envelope. `violations` is additive for rule
+        failures so clients can read the rule id without parsing `errors`.
+      properties:
+        success: {type: boolean}
+        message: {type: string, nullable: true}
+        errorCode: {type: string, nullable: true}
+        traceId: {type: string, nullable: true}
+        errors:
+          type: array
+          nullable: true
+          items: {type: string}
+        violations:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/RuleViolation"
+        pagination:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PageInfo"
+        timestamp: {type: string, format: date-time}
+
+    ErrorResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          required: [success, errorCode, message]
+          properties:
+            success: {type: boolean, enum: [false]}
+            errorCode:
+              $ref: "#/components/schemas/ErrorCode"
+
+    ErrorCode:
+      type: string
+      description: |
+        Codes named by S3 or S5 are SIGNATURE_NOT_SUPPORTED_IN_SLICE and
+        ACTION_NOT_SUPPORTED_IN_SLICE. The others are the proposal's names for
+        the acceptance outcomes those stories describe.
+      enum:
+        - VALIDATION_REJECTED
+        - ACTION_NOT_SUPPORTED_IN_SLICE
+        - SIGNATURE_NOT_SUPPORTED_IN_SLICE
+        - INTENT_NOT_SUPPORTED_IN_SLICE
+        - IMMUTABLE_EXECUTED
+        - IDEMPOTENCY_CONFLICT
+        - VERSION_CONFLICT
+        - ILLEGAL_TRANSITION
+        - NOT_FOUND
+        - UNAUTHORIZED
+
+    RuleId:
+      type: string
+      description: Mid-term policy rule V1-V14. Renewal rules RN1-RN5 are not evaluated in this slice.
+      enum: [V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14]
+
+    RuleViolation:
+      type: object
+      required: [ruleId, message]
+      properties:
+        ruleId:
+          $ref: "#/components/schemas/RuleId"
+        message: {type: string}
+        field: {type: string, nullable: true}
+
+    LifecycleIntent:
+      type: string
+      description: Research 7.2. Create accepts AMEND only in this slice.
+      enum: [RENEW, AMEND, CANCEL, RESTRUCTURE, TRANSFER, SUSPEND, RESUME, TRUE_UP, CONVERT]
+
+    InitiationTrigger:
+      type: string
+      description: Create accepts MANUAL and API in this slice. The others are renewal or later triggers.
+      enum: [MANUAL, LEAD_TIME, TERM_END_AUTO, THRESHOLD, TRUE_UP_CYCLE, END_OF_LIFE, API]
+
+    OutputMode:
+      type: string
+      enum: [QUOTE, DIRECT_ORDER]
+
+    LifecycleChangeStatus:
+      type: string
+      description: |
+        Research 7.3, plus WITHDRAWN for the seller withdraw command.
+        First-slice transitions: DRAFT, PRICED (after :price), IN_APPROVAL
+        (after :submit), WITHDRAWN. APPROVED and later follow the amendment
+        document; this proposal does not make quote-service the legal record.
+      enum:
+        - DRAFT
+        - PRICED
+        - IN_APPROVAL
+        - APPROVED
+        - PRESENTED
+        - ACCEPTED
+        - REJECTED
+        - EXPIRED
+        - SUPERSEDED
+        - ORDERED
+        - APPLIED
+        - REVERTED
+        - WITHDRAWN
+
+    ActionCode:
+      type: string
+      description: |
+        Slice stores ADD, UPDATE and REMOVE. SWAP, UPGRADE and DOWNGRADE may
+        be stored and fail at lifecycle submit. Other values are rejected at
+        create.
+      enum:
+        - ADD
+        - UPDATE
+        - REMOVE
+        - NO_CHANGE
+        - RENEW
+        - UPGRADE
+        - DOWNGRADE
+        - SWAP
+        - CONVERT_METRIC
+        - SUSPEND
+        - RESUME
+        - TERMINATE
+
+    QuantitySemantics:
+      type: string
+      description: First slice accepts DELTA and ABSOLUTE. REPLACE is a later value and is not in this enum yet.
+      enum: [DELTA, ABSOLUTE]
+
+    BusinessCategory:
+      type: string
+      enum:
+        - INITIAL_SALE
+        - RENEWAL
+        - UPSELL
+        - DOWNSELL
+        - CROSS_SELL
+        - UPGRADE
+        - DOWNGRADE
+        - SWAP
+        - CANCELLATION
+        - TERMS_AND_CONDITIONS
+        - TRANSFER
+        - TRUE_UP
+
+    ApplyTargetType:
+      type: string
+      enum: [SUBSCRIPTION, ENTITLEMENT, ONE_TIME, NONE]
+
+    ChargeType:
+      type: string
+      enum: [RECURRING, ONE_TIME, USAGE]
+
+    PriceAsOf:
+      type: string
+      description: Default on price is EFFECTIVE_DATE when the line omits it.
+      enum: [ACTION_DATE, EFFECTIVE_DATE, LINE_START]
+
+    AmendMode:
+      type: string
+      enum: [RETAIN_CONTRACTED, LIST, OVERRIDE]
+
+    ProrationMethod:
+      type: string
+      enum: [DAILY, MONTH_DAY, NONE, NEXT_CYCLE]
+
+    PolicySlot:
+      type: string
+      description: First slice writes AMENDMENT. Other slots belong to later policies.
+      enum: [AMENDMENT, RENEWAL, PRICE_LOCK, TRUE_UP, MAINTENANCE, CONVERSION]
+
+    AmendmentStatus:
+      type: string
+      description: |
+        Spec section 3, single status column. applyStatus does not exist.
+        First-slice commands use DRAFT, IN_REVIEW, APPROVED, EXECUTED,
+        REJECTED and WITHDRAWN. APPLIED, PARTIALLY_APPLIED and APPLY_BLOCKED
+        are reserved for S4. OUT_FOR_SIGNATURE, EXPIRED, SUPERSEDED and VOID
+        are reserved for later signature, expiry, restatement and void.
+      enum:
+        - DRAFT
+        - IN_REVIEW
+        - APPROVED
+        - OUT_FOR_SIGNATURE
+        - EXECUTED
+        - APPLIED
+        - PARTIALLY_APPLIED
+        - APPLY_BLOCKED
+        - REJECTED
+        - WITHDRAWN
+        - EXPIRED
+        - SUPERSEDED
+        - VOID
+
+    DocumentKind:
+      type: string
+      description: Server-derived from intent in this slice (AMEND becomes AMENDMENT). Client override is later.
+      enum:
+        - ORIGINAL
+        - AMENDMENT
+        - RENEWAL
+        - AMENDED_AND_RESTATED
+        - TRUE_UP_NOTICE
+        - TERMINATION
+        - RESTRUCTURE
+        - BACKFILLED
+
+    SignaturePolicy:
+      type: string
+      description: |
+        EXECUTED in this slice: NOT_REQUIRED and NOTICE_ONLY auto-execute from
+        approval; CLICK_THROUGH executes on :accept. WET and E_SIGN can be
+        stored and cannot be sent for signature.
+      enum: [WET, E_SIGN, CLICK_THROUGH, NOTICE_ONLY, NOT_REQUIRED]
+
+    TermModel:
+      type: string
+      enum: [TERMED, EVERGREEN, PERPETUAL]
+
+    ContractStatus:
+      type: string
+      enum: [ACTIVE, EXPIRED, TERMINATED]
+
+    RevisionCloseStatus:
+      type: string
+      enum: [OPEN, SUPERSEDED, EXECUTED, REJECTED, WITHDRAWN, EXPIRED]
+
+    UnitStatus:
+      type: string
+      enum: [PENDING, APPLIED, BLOCKED]
+
+    EvidenceClass:
+      type: string
+      enum: [STANDARD, LEGACY]
+
+    ActorType:
+      type: string
+      enum: [USER, SYSTEM, SERVICE]
+
+    EventType:
+      type: string
+      description: |
+        Values written to the document event log. Bus payload field names are
+        S6 (DRG-584), not this HTTP contract.
+      enum:
+        - AMENDMENT_DRAFTED
+        - AMENDMENT_SUBMITTED
+        - AMENDMENT_APPROVED
+        - AMENDMENT_SENT_FOR_SIGNATURE
+        - AMENDMENT_EXECUTED
+        - AMENDMENT_UNIT_APPLIED
+        - AMENDMENT_APPLIED
+        - AMENDMENT_APPLY_BLOCKED
+        - AMENDMENT_WITHDRAWN
+        - AMENDMENT_SUPERSEDED
+        - AMENDMENT_VOIDED
+        - VALIDATION_REJECTED
+
+    CreateLifecycleChangeRequest:
+      type: object
+      required:
+        - intent
+        - initiationTrigger
+        - actionDate
+        - contractEffectiveDate
+        - contractId
+        - currencyCode
+        - lines
+      properties:
+        intent:
+          type: string
+          enum: [AMEND]
+        initiationTrigger:
+          type: string
+          enum: [MANUAL, API]
+        requestIdentifier: {type: string, maxLength: 200, nullable: true}
+        actionDate: {type: string, format: date}
+        contractEffectiveDate: {type: string, format: date}
+        serviceActivationDate: {type: string, format: date, nullable: true}
+        customerAcceptanceDate: {type: string, format: date, nullable: true}
+        backdatingReasonCode:
+          type: string
+          nullable: true
+          description: Required when contractEffectiveDate is before actionDate (V6).
+        contractId: {type: string, format: uuid}
+        currencyCode:
+          $ref: "#/components/schemas/CurrencyCode"
+        outputMode:
+          allOf:
+            - $ref: "#/components/schemas/OutputMode"
+          default: QUOTE
+        dryRun:
+          type: boolean
+          default: false
+          description: A dry run is not persisted and has no amendment document.
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChangeLineWrite"
+
+    ChangeLineWrite:
+      type: object
+      required:
+        - actionCode
+        - quantitySemantics
+        - startQty
+        - deltaQty
+        - endQty
+        - effectiveFrom
+      properties:
+        actionCode:
+          type: string
+          enum: [ADD, UPDATE, REMOVE, SWAP, UPGRADE, DOWNGRADE]
+        quantitySemantics:
+          $ref: "#/components/schemas/QuantitySemantics"
+        businessCategory:
+          allOf:
+            - $ref: "#/components/schemas/BusinessCategory"
+          description: |
+            Optional. When omitted the server sets UPSELL for ADD and for
+            UPDATE with a positive delta, DOWNSELL for UPDATE with a negative
+            delta, and CANCELLATION for REMOVE. This default is a proposal.
+        targetSubscriptionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Required for UPDATE and REMOVE. Optional for ADD of a new subscription on the contract.
+        sourceAcceptedLineUuid:
+          type: string
+          nullable: true
+          description: Required for UPDATE and REMOVE. Must be ACCEPTED_PRICED (V4).
+        observedCommercialRevision:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: Required when targetSubscriptionId is set (V3).
+        startQty:
+          $ref: "#/components/schemas/Money"
+        deltaQty:
+          $ref: "#/components/schemas/Money"
+        endQty:
+          $ref: "#/components/schemas/Money"
+        metric: {type: string, nullable: true}
+        effectiveFrom: {type: string, format: date}
+        effectiveTo:
+          type: string
+          format: date
+          nullable: true
+          description: Required for a termed contract. The amendment policy co-terms this to the contract end.
+        productExternalId:
+          type: string
+          nullable: true
+          description: Required on ADD before price. On UPDATE and REMOVE the server pins the source product if omitted.
+        chargeType:
+          allOf:
+            - $ref: "#/components/schemas/ChargeType"
+          default: RECURRING
+
+    ReviseLifecycleChangeRequest:
+      type: object
+      required: [version, lines]
+      properties:
+        version: {type: integer, minimum: 0}
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChangeLineWrite"
+        actionDate: {type: string, format: date}
+        contractEffectiveDate: {type: string, format: date}
+        backdatingReasonCode: {type: string, nullable: true}
+
+    PriceLifecycleChangeRequest:
+      type: object
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 0}
+        lines:
+          type: array
+          description: Optional per-line mode. Omitted lines use RETAIN_CONTRACTED, DAILY, EFFECTIVE_DATE, policy slot AMENDMENT.
+          items:
+            $ref: "#/components/schemas/PriceLineRequest"
+
+    PriceLineRequest:
+      type: object
+      required: [lineId]
+      properties:
+        lineId: {type: string, format: uuid}
+        amendMode:
+          $ref: "#/components/schemas/AmendMode"
+        prorationMethod:
+          $ref: "#/components/schemas/ProrationMethod"
+        priceAsOf:
+          $ref: "#/components/schemas/PriceAsOf"
+        policySlot:
+          type: string
+          enum: [AMENDMENT]
+        override:
+          $ref: "#/components/schemas/PriceOverrideWrite"
+
+    PriceOverrideWrite:
+      type: object
+      required: [value, reasonCode]
+      description: Actor is taken from the principal, not from this body (AC-S5-4, V14).
+      properties:
+        value:
+          $ref: "#/components/schemas/Money"
+        reasonCode: {type: string, minLength: 1}
+
+    VersionedCommand:
+      type: object
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 0}
+
+    WithdrawCommand:
+      allOf:
+        - $ref: "#/components/schemas/VersionedCommand"
+        - type: object
+          properties:
+            reasonCode: {type: string, nullable: true}
+
+    SubmitAmendmentCommand:
+      allOf:
+        - $ref: "#/components/schemas/VersionedCommand"
+        - type: object
+          properties:
+            contentDigest:
+              allOf:
+                - $ref: "#/components/schemas/Sha256"
+              description: When sent, must equal the current revision digest.
+
+    CreateAmendmentRequest:
+      type: object
+      required: [lifecycleChangeId, lifecycleChangeRevision, signaturePolicy]
+      properties:
+        lifecycleChangeId: {type: string, format: uuid}
+        lifecycleChangeRevision: {type: integer, minimum: 1}
+        requestIdentifier: {type: string, maxLength: 200, nullable: true}
+        signaturePolicy:
+          $ref: "#/components/schemas/SignaturePolicy"
+        coTermDate:
+          type: string
+          format: date
+          nullable: true
+          description: Defaults to the contract end date.
+
+    RecordApprovalCommand:
+      type: object
+      required: [version, decision, approvalRef]
+      properties:
+        version: {type: integer, minimum: 0}
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED]
+        approvalRef: {type: string, minLength: 1}
+        autoApproved:
+          type: boolean
+          default: false
+
+    LifecycleChange:
+      type: object
+      required:
+        - id
+        - intent
+        - initiationTrigger
+        - status
+        - revision
+        - version
+        - actionDate
+        - contractEffectiveDate
+        - contractId
+        - currencyCode
+        - lines
+        - createdAt
+      properties:
+        id: {type: string, format: uuid}
+        intent:
+          $ref: "#/components/schemas/LifecycleIntent"
+        initiationTrigger:
+          $ref: "#/components/schemas/InitiationTrigger"
+        requestIdentifier: {type: string, nullable: true}
+        status:
+          $ref: "#/components/schemas/LifecycleChangeStatus"
+        revision: {type: integer, minimum: 1}
+        version: {type: integer, minimum: 0}
+        actionDate: {type: string, format: date}
+        contractEffectiveDate: {type: string, format: date}
+        serviceActivationDate: {type: string, format: date, nullable: true}
+        customerAcceptanceDate: {type: string, format: date, nullable: true}
+        backdatingReasonCode: {type: string, nullable: true}
+        contractId: {type: string, format: uuid}
+        currencyCode:
+          $ref: "#/components/schemas/CurrencyCode"
+        outputMode:
+          $ref: "#/components/schemas/OutputMode"
+        contentDigest:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+        amendmentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set once the CAM document exists. Link by value.
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeLine"
+        createdAt: {type: string, format: date-time}
+        createdBy: {type: string}
+
+    ChangeLine:
+      type: object
+      required: [lineId, actionCode, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom]
+      properties:
+        lineId: {type: string, format: uuid}
+        lineNo: {type: integer, minimum: 1}
+        actionCode:
+          $ref: "#/components/schemas/ActionCode"
+        quantitySemantics:
+          $ref: "#/components/schemas/QuantitySemantics"
+        businessCategory:
+          $ref: "#/components/schemas/BusinessCategory"
+        applyTargetType:
+          $ref: "#/components/schemas/ApplyTargetType"
+        targetSubscriptionId: {type: string, format: uuid, nullable: true}
+        sourceAcceptedLineUuid: {type: string, nullable: true}
+        observedCommercialRevision: {type: integer, format: int64, nullable: true}
+        startQty:
+          $ref: "#/components/schemas/Money"
+        deltaQty:
+          $ref: "#/components/schemas/Money"
+        endQty:
+          $ref: "#/components/schemas/Money"
+        metric: {type: string, nullable: true}
+        effectiveFrom: {type: string, format: date}
+        effectiveTo: {type: string, format: date, nullable: true}
+        chargeType:
+          $ref: "#/components/schemas/ChargeType"
+        priceAsOf:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PriceAsOf"
+        policySlot:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PolicySlot"
+        amendMode:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/AmendMode"
+        prorationMethod:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ProrationMethod"
+        policyDecisionId: {type: string, nullable: true}
+        policyId: {type: string, nullable: true}
+        policyVersion: {type: string, nullable: true}
+        pricingTraceId: {type: string, nullable: true}
+        productExternalId: {type: string, nullable: true}
+        pricebookVersion: {type: string, nullable: true}
+        configurationHash:
+          type: string
+          nullable: true
+          description: Nullable until DRG-428. Equal at apply when present (V9).
+        unitPrice:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Money"
+        netAmount:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Money"
+        override:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PriceOverride"
+        approvalRequestId: {type: string, nullable: true}
+
+    PriceOverride:
+      type: object
+      required: [value, reasonCode, actor]
+      properties:
+        value:
+          $ref: "#/components/schemas/Money"
+        reasonCode: {type: string}
+        actor: {type: string, description: Authenticated principal. Not client-supplied.}
+
+    PricingDecision:
+      type: object
+      required: [lineId, policyDecisionId, policyId, policyVersion, pricingTraceId]
+      properties:
+        lineId: {type: string, format: uuid}
+        policyDecisionId: {type: string}
+        policyId: {type: string}
+        policyVersion: {type: string}
+        pricingTraceId: {type: string}
+        policySlot:
+          $ref: "#/components/schemas/PolicySlot"
+        amendMode:
+          $ref: "#/components/schemas/AmendMode"
+        prorationMethod:
+          $ref: "#/components/schemas/ProrationMethod"
+        priceAsOf:
+          $ref: "#/components/schemas/PriceAsOf"
+        productExternalId: {type: string}
+        pricebookVersion: {type: string}
+        configurationHash: {type: string, nullable: true}
+        unitPrice:
+          $ref: "#/components/schemas/Money"
+        netAmount:
+          $ref: "#/components/schemas/Money"
+        inputsSnapshotRef: {type: string, nullable: true}
+
+    LifecycleRevision:
+      type: object
+      required: [revision, status]
+      properties:
+        revision: {type: integer, minimum: 1}
+        status:
+          $ref: "#/components/schemas/LifecycleChangeStatus"
+        contentDigest:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+        frozenAt: {type: string, format: date-time, nullable: true}
+
+    ContractHeader:
+      type: object
+      required: [id, contractNumber, customerAccountId, termModel, startDate, status, lastExecutedSeq]
+      properties:
+        id: {type: string, format: uuid}
+        contractNumber: {type: string}
+        customerAccountId: {type: string, format: uuid}
+        termModel:
+          $ref: "#/components/schemas/TermModel"
+        startDate: {type: string, format: date}
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          description: Null when termModel is EVERGREEN.
+        governingAgreementRef: {type: string, nullable: true}
+        status:
+          $ref: "#/components/schemas/ContractStatus"
+        lastExecutedSeq:
+          type: integer
+          minimum: 0
+          description: Advanced only in the EXECUTED transaction. A withdrawn draft does not change it.
+        priorContractId: {type: string, format: uuid, nullable: true}
+
+    AmendmentDocument:
+      type: object
+      required:
+        - id
+        - contractId
+        - lifecycleChangeId
+        - lifecycleChangeRevision
+        - intent
+        - provisionalNumber
+        - documentKind
+        - status
+        - currentRevisionNo
+        - signaturePolicy
+        - actionDate
+        - contractEffectiveDate
+        - currencyCode
+        - contentDigest
+        - evidenceClass
+        - version
+      description: |
+        No applyStatus property. amendmentSeq and amendmentNumber are null
+        until EXECUTED. provisionalNumber is an opaque server string, stable
+        across revisions, and is not the final amendment number. Its character
+        pattern is intentionally not specified.
+      properties:
+        id: {type: string, format: uuid}
+        contractId: {type: string, format: uuid}
+        lifecycleChangeId: {type: string, format: uuid}
+        lifecycleChangeRevision: {type: integer, minimum: 1}
+        intent:
+          $ref: "#/components/schemas/LifecycleIntent"
+        initiationTrigger:
+          $ref: "#/components/schemas/InitiationTrigger"
+        requestIdentifier: {type: string, nullable: true}
+        provisionalNumber: {type: string}
+        amendmentSeq:
+          type: integer
+          minimum: 0
+          nullable: true
+        amendmentNumber:
+          type: string
+          nullable: true
+          description: "{contractNumber}-A{seq} with seq zero-padded to 3. Null until EXECUTED."
+        documentKind:
+          $ref: "#/components/schemas/DocumentKind"
+        status:
+          $ref: "#/components/schemas/AmendmentStatus"
+        currentRevisionNo: {type: integer, minimum: 1}
+        executedRevisionNo: {type: integer, minimum: 1, nullable: true}
+        signaturePolicy:
+          $ref: "#/components/schemas/SignaturePolicy"
+        approvalRef: {type: string, nullable: true}
+        signatureEnvelopeRef: {type: string, nullable: true}
+        actionDate: {type: string, format: date}
+        contractEffectiveDate: {type: string, format: date}
+        serviceActivationDate: {type: string, format: date, nullable: true}
+        customerAcceptanceDate: {type: string, format: date, nullable: true}
+        backdatingReasonCode: {type: string, nullable: true}
+        coTermDate: {type: string, format: date, nullable: true}
+        currencyCode:
+          $ref: "#/components/schemas/CurrencyCode"
+        tcvDelta:
+          $ref: "#/components/schemas/Money"
+        arrDelta:
+          $ref: "#/components/schemas/Money"
+        oneTimeTotal:
+          $ref: "#/components/schemas/Money"
+        creditTotal:
+          $ref: "#/components/schemas/Money"
+        contentDigest:
+          $ref: "#/components/schemas/Sha256"
+        renditionDigest:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+        signedCopySha256:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+        templateId: {type: string, nullable: true}
+        templateVersion: {type: string, nullable: true}
+        supersedesDocumentId: {type: string, format: uuid, nullable: true}
+        supersededByDocumentId: {type: string, format: uuid, nullable: true}
+        voidsDocumentId: {type: string, format: uuid, nullable: true}
+        evidenceClass:
+          $ref: "#/components/schemas/EvidenceClass"
+        retentionUntil:
+          type: string
+          format: date
+          nullable: true
+          description: Not computed in this slice (OQ8).
+        legalHold: {type: boolean}
+        expiresAt: {type: string, format: date-time, nullable: true}
+        executedAt: {type: string, format: date-time, nullable: true}
+        appliedAt: {type: string, format: date-time, nullable: true}
+        version: {type: integer, minimum: 0}
+        lines:
+          type: array
+          minItems: 1
+          description: Present on GET by id (current revision). Omitted on list items.
+          items:
+            $ref: "#/components/schemas/AmendmentLine"
+        createdAt: {type: string, format: date-time}
+        createdBy: {type: string}
+
+    AmendmentLine:
+      type: object
+      required:
+        - id
+        - lineNo
+        - changeLineRef
+        - actionCode
+        - quantitySemantics
+        - startQty
+        - deltaQty
+        - endQty
+        - effectiveFrom
+        - applicationUnitNo
+      properties:
+        id: {type: string, format: uuid}
+        lineNo: {type: integer, minimum: 1}
+        revisionNo: {type: integer, minimum: 1}
+        changeLineRef: {type: string, format: uuid}
+        actionCode:
+          $ref: "#/components/schemas/ActionCode"
+        businessCategory:
+          $ref: "#/components/schemas/BusinessCategory"
+        applyTargetType:
+          $ref: "#/components/schemas/ApplyTargetType"
+        targetSubscriptionId: {type: string, format: uuid, nullable: true}
+        sourceAcceptedLineUuid: {type: string, nullable: true}
+        resultAcceptedLineUuid: {type: string, nullable: true}
+        quantitySemantics:
+          $ref: "#/components/schemas/QuantitySemantics"
+        startQty:
+          $ref: "#/components/schemas/Money"
+        deltaQty:
+          $ref: "#/components/schemas/Money"
+        endQty:
+          $ref: "#/components/schemas/Money"
+        metric: {type: string, nullable: true}
+        effectiveFrom: {type: string, format: date}
+        effectiveTo: {type: string, format: date, nullable: true}
+        chargeType:
+          $ref: "#/components/schemas/ChargeType"
+        priceAsOf:
+          $ref: "#/components/schemas/PriceAsOf"
+        productExternalId:
+          type: string
+          nullable: true
+          description: Null until pricing pins the product (V9).
+        pricebookVersion:
+          type: string
+          nullable: true
+          description: Null until pricing pins the pricebook (V9).
+        configurationHash: {type: string, nullable: true}
+        unitPrice:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Money"
+        netAmount:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Money"
+        policySlot:
+          $ref: "#/components/schemas/PolicySlot"
+        policyId: {type: string, nullable: true}
+        policyVersion: {type: string, nullable: true}
+        policyDecisionId: {type: string, nullable: true}
+        pricingTraceId: {type: string, nullable: true}
+        applicationUnitNo: {type: integer, minimum: 1}
+        override:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PriceOverride"
+
+    AmendmentRevision:
+      type: object
+      required: [revisionNo, lifecycleChangeRevision, targetQuoteId, contentDigest, statusAtClose]
+      properties:
+        revisionNo: {type: integer, minimum: 1}
+        lifecycleChangeRevision: {type: integer, minimum: 1}
+        targetQuoteId:
+          type: string
+          format: uuid
+          description: Quote opened for this revision. Allocated by quote-service when the revision is created.
+        contentDigest:
+          $ref: "#/components/schemas/Sha256"
+        inputsSnapshotRef: {type: string}
+        statusAtClose:
+          $ref: "#/components/schemas/RevisionCloseStatus"
+        frozenAt: {type: string, format: date-time, nullable: true}
+
+    ApplicationUnit:
+      type: object
+      required: [unitNo, dependencyOrder, targetType, targetRef, observedCommercialRevision, status]
+      properties:
+        unitNo: {type: integer, minimum: 1}
+        dependencyOrder: {type: integer, minimum: 0}
+        targetType:
+          $ref: "#/components/schemas/ApplyTargetType"
+        targetRef: {type: string}
+        observedCommercialRevision: {type: integer, format: int64}
+        appliedCommercialRevision: {type: integer, format: int64, nullable: true}
+        applyKeyDigest:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+        status:
+          $ref: "#/components/schemas/UnitStatus"
+
+    AmendmentEvent:
+      type: object
+      required: [eventId, documentId, seqNo, eventType, occurredAt, recordedAt, prevHash, contentHash, correlationId]
+      properties:
+        eventId: {type: string, format: uuid}
+        documentId: {type: string, format: uuid}
+        seqNo: {type: integer, format: int64, minimum: 1}
+        eventType:
+          $ref: "#/components/schemas/EventType"
+        fromStatus:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/AmendmentStatus"
+        toStatus:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/AmendmentStatus"
+        revisionNo: {type: integer, nullable: true}
+        unitNo: {type: integer, nullable: true}
+        ruleId:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RuleId"
+          description: Set on VALIDATION_REJECTED.
+        actorId: {type: string}
+        actorType:
+          $ref: "#/components/schemas/ActorType"
+        actorRole: {type: string, nullable: true}
+        occurredAt: {type: string, format: date-time}
+        recordedAt: {type: string, format: date-time}
+        reasonCode: {type: string, nullable: true}
+        payloadDigest:
+          $ref: "#/components/schemas/Sha256"
+        payloadRef: {type: string, nullable: true}
+        prevHash:
+          $ref: "#/components/schemas/Sha256"
+        contentHash:
+          $ref: "#/components/schemas/Sha256"
+        correlationId: {type: string}
+
+    Rendition:
+      type: object
+      properties:
+        templateId: {type: string, nullable: true}
+        templateVersion: {type: string, nullable: true}
+        renditionDigest:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Sha256"
+
+    Attachment:
+      type: object
+      required: [kind, sha256]
+      properties:
+        kind:
+          type: string
+          enum: [RENDITION, SIGNED_COPY, CUSTOMER_PO, METER_REPORT, SUPPORTING]
+        storageUri: {type: string}
+        sha256:
+          $ref: "#/components/schemas/Sha256"
+        uploadedBy: {type: string}
+        uploadedAt: {type: string, format: date-time}
+
+    QuoteContinuationRequest:
+      type: object
+      description: Existing quote-service body. Field names match QuoteContinuationRequest.
+      required:
+        - operation
+        - targetSubscriptionNumber
+        - sourceSubscriptionLineUuid
+        - observedRevision
+        - customerExternalId
+        - currency
+        - quantity
+      properties:
+        operation:
+          type: string
+          enum: [AMENDMENT, EXPANSION, RENEWAL, EXTENSION]
+        targetSubscriptionNumber: {type: string}
+        sourceSubscriptionLineUuid: {type: string}
+        observedRevision: {type: integer, format: int64, minimum: 0}
+        customerExternalId: {type: string}
+        currency: {type: string}
+        quantity: {type: integer, minimum: 1}
+        effectiveDate: {type: string, format: date, nullable: true}
+        termMonths: {type: integer, minimum: 1, nullable: true}
+        upliftPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        name: {type: string, nullable: true}
+
+    QuoteDto:
+      type: object
+      description: |
+        Existing quote response fields. Nested ramp governance and line items
+        stay as they are today; this proposal does not add required properties.
+      properties:
+        id: {type: integer, format: int64}
+        uuid: {type: string}
+        quoteNumber: {type: string}
+        name: {type: string}
+        description: {type: string, nullable: true}
+        customerExternalId: {type: string}
+        dealExternalId: {type: string, nullable: true}
+        status:
+          type: string
+          enum: [DRAFT, IN_REVIEW, PENDING_APPROVAL, APPROVED, SENT, ACCEPTED, EXPIRED, CANCELLED, REJECTED]
+        dealType:
+          type: string
+          enum: [NEW, AMENDMENT, RENEWAL, EXPANSION]
+        subscriptionType: {type: string, nullable: true}
+        currency: {type: string}
+        region: {type: string, nullable: true}
+        durationInMonths: {type: integer}
+        startDate: {type: string, format: date, nullable: true}
+        endDate: {type: string, format: date, nullable: true}
+        targetSubscriptionNumber: {type: string, nullable: true}
+        observedRevision: {type: integer, format: int64, nullable: true}
+        subscriptionEffectiveDate: {type: string, format: date, nullable: true}
+        subtotal: {type: number, nullable: true}
+        totalDiscount: {type: number, nullable: true}
+        totalTax: {type: number, nullable: true}
+        totalAmount: {type: number, nullable: true}
+        arr: {type: number, nullable: true}
+        tcv: {type: number, nullable: true}
+        acv: {type: number, nullable: true}
+        exitArr: {type: number, nullable: true}
+        rampScheduleStale: {type: boolean}
+        rampGovernance:
+          type: object
+          additionalProperties: true
+          nullable: true
+        approvalState:
+          type: string
+          enum: [NONE, PENDING, APPROVED, REJECTED]
+        approvalTier: {type: string, nullable: true}
+        notes: {type: string, nullable: true}
+        lineItems:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            description: Existing QuoteLineItemDto. Unchanged.
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        createdBy: {type: string}
+        updatedBy: {type: string}
+        version: {type: integer, format: int64}
+
+    ContinuationPlan:
+      type: object
+      description: Existing QuoteContinuationPolicy.Plan. Preview only.
+      properties:
+        startDate: {type: string, format: date}
+        endDate: {type: string, format: date}
+        termMonths: {type: integer}
+        periods:
+          type: array
+          items:
+            type: object
+            properties:
+              sequence: {type: integer}
+              startMonth: {type: integer}
+              months: {type: integer}
+              quantity: {type: integer}
+              unitPrice: {type: number}
+        initialProration:
+          type: object
+          nullable: true
+          additionalProperties: true
+        tcv: {type: number}
+
+    LifecycleChangeResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/LifecycleChange"
+    LifecycleChangePageResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LifecycleChange"
+    LifecycleRevisionListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LifecycleRevision"
+    PricingDecisionListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingDecision"
+    ContractResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/ContractHeader"
+    AmendmentResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/AmendmentDocument"
+    AmendmentPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AmendmentDocument"
+    AmendmentRevisionListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AmendmentRevision"
+    AmendmentLineListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AmendmentLine"
+    ApplicationUnitListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/ApplicationUnit"
+    AmendmentEventPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AmendmentEvent"
+    RenditionResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/Rendition"
+    AttachmentListResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Attachment"
+    QuoteResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/QuoteDto"
+    ContinuationPlanResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            success: {enum: [true]}
+            data:
+              $ref: "#/components/schemas/ContinuationPlan"
