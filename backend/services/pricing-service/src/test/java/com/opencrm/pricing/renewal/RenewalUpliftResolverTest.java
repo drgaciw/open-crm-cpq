@@ -546,6 +546,50 @@ class RenewalUpliftResolverTest {
         assertThat(RenewalUpliftResolver.class.getAnnotations()).isEmpty();
     }
 
+    @Test
+    void selectedDateAndVersionAreRequiredEvenWithoutAListCap() {
+        RenewalPriceAsOfPins[] incomplete = {
+                null,
+                new RenewalPriceAsOfPins(ACTION, "a", null, null, "e", null, LINE_START, "l", null),
+                new RenewalPriceAsOfPins(ACTION, "a", null, EFFECTIVE, null, null, LINE_START, "l", null),
+                new RenewalPriceAsOfPins(ACTION, "a", null, EFFECTIVE, " ", null, LINE_START, "l", null)
+        };
+        for (RenewalPriceAsOfPins pins : incomplete) {
+            RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, pins,
+                    account("acct", RenewalUpliftMode.UPLIFT_PCT, "7")));
+            assertThat(result.resolution()).isEqualTo(RenewalUpliftResolution.UNRESOLVED_BASIS);
+            assertThat(result.unitPrice()).isNull();
+            assertThat(result.extendedAmount()).isNull();
+        }
+        RenewalPriceAsOfPins noList = new RenewalPriceAsOfPins(
+                ACTION, "a", null, EFFECTIVE, "e", null, LINE_START, "l", null);
+        assertUnit(resolver.resolve(request("40", "1", 12, noList,
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"))).unitPrice(), "42.8000");
+    }
+
+    @Test
+    void equalNormalizedCapsRecordTheLowerExactConstraint() {
+        RenewalPriceAsOfPins pins = new RenewalPriceAsOfPins(
+                ACTION, "a", new BigDecimal("52"), EFFECTIVE, "e", new BigDecimal("41.33331"),
+                LINE_START, "l", new BigDecimal("52"));
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, pins,
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                clause("clause", null, null, "3.333475", Boolean.TRUE, null, null, null)));
+        assertUnit(result.unitPrice(), "41.3333");
+        assertThat(result.capBound().exact()).isEqualByComparingTo("41.33331");
+        assertThat(result.capApplied().exact()).isEqualByComparingTo("41.33331");
+    }
+
+    @Test
+    void equalNormalizedFloorsRecordTheHigherExactConstraint() {
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "3"),
+                clause("clause", null, null, null, null, Boolean.FALSE, "3.333275", "41.33339")));
+        assertUnit(result.unitPrice(), "41.3334");
+        assertThat(result.floorBound().exact()).isEqualByComparingTo("41.33339");
+        assertThat(result.floorApplied().exact()).isEqualByComparingTo("41.33339");
+    }
+
     private static void assertUnit(BigDecimal actual, String expected) {
         assertThat(actual).isEqualByComparingTo(expected);
         assertThat(actual.scale()).isEqualTo(4);

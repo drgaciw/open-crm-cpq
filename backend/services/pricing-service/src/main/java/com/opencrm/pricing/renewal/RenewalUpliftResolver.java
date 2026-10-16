@@ -84,7 +84,8 @@ public final class RenewalUpliftResolver {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_BASIS, null, null, null, null, null);
         }
         boolean listRequired = Boolean.TRUE.equals(merged.notAboveList().value());
-        if (listRequired && (pin.listUnit() == null || pin.versionId() == null)) {
+        if (pin.date() == null || pin.versionId() == null
+                || (listRequired && pin.listUnit() == null)) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_BASIS, null, null, null, null, null);
         }
 
@@ -207,14 +208,18 @@ public final class RenewalUpliftResolver {
     }
 
     private static Side lower(Side current, Side candidate) {
-        if (current == null || candidate.normalized().compareTo(current.normalized()) < 0) {
+        if (current == null || candidate.normalized().compareTo(current.normalized()) < 0
+                || (candidate.normalized().compareTo(current.normalized()) == 0
+                    && candidate.exact().compareTo(current.exact()) < 0)) {
             return candidate;
         }
         return current;
     }
 
     private static Side higher(Side current, Side candidate) {
-        if (current == null || candidate.normalized().compareTo(current.normalized()) > 0) {
+        if (current == null || candidate.normalized().compareTo(current.normalized()) > 0
+                || (candidate.normalized().compareTo(current.normalized()) == 0
+                    && candidate.exact().compareTo(current.exact()) > 0)) {
             return candidate;
         }
         return current;
