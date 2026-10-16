@@ -163,7 +163,7 @@ class QuoteContinuationServiceTest {
     }
     @Test void systemRenewalDraftUsesExitRateAndRecordsTheCommercialDecision() {
         when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
-        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null);
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
         QuoteDto draft = continuations.draftRenewal(event, null, "event-1", null);
         assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
         assertThat(draft.getStatus()).isEqualTo(QuoteStatus.DRAFT);
@@ -214,11 +214,24 @@ class QuoteContinuationServiceTest {
         assertThat(saved.getContinuationRequestJson()).contains("RENEWAL").doesNotContain("EXTENSION");
     }
 
+    @Test void responseDistinguishesExtensionFromRenewal() {
+        QuoteContinuationRequest extension = request(LocalDate.of(2030, 1, 1));
+        extension.setOperation(QuoteContinuationRequest.Operation.EXTENSION);
+        QuoteDto extensionDraft = continuations.author(extension);
+        QuoteContinuationRequest renewal = request(LocalDate.of(2030, 1, 1));
+        renewal.setOperation(QuoteContinuationRequest.Operation.RENEWAL);
+        QuoteDto renewalDraft = continuations.author(renewal);
+        assertThat(extensionDraft.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(renewalDraft.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(extensionDraft.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.EXTENSION);
+        assertThat(renewalDraft.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.RENEWAL);
+    }
+
     @Test void secondEligibilityForTheSameWindowDoesNotCreateAnotherQuote() {
         when(repository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(saved)));
-        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null);
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
         continuations.draftRenewal(event, null, "event-1", null);
         QuoteDto again = continuations.draftRenewal(event, null, "event-2", "sub-r3:2029");
         assertThat(again.getQuoteNumber()).isEqualTo("Q-NEXT");
@@ -231,7 +244,7 @@ class QuoteContinuationServiceTest {
         target.setLines(List.of(target.getLines().getFirst(), target.getLines().getFirst()));
         when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
         assertThatThrownBy(() -> continuations.draftRenewal(
-                new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null),
+                new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH"),
                 null, "event-1", null))
                 .isInstanceOf(NonRetryableEventException.class)
                 .hasMessageContaining("exactly one");
@@ -248,7 +261,7 @@ class QuoteContinuationServiceTest {
         doReturn(response).when(get).retrieve();
         when(response.body(String.class)).thenReturn(json.writeValueAsString(ApiResponse.success(target)));
         QuoteDto draft = continuations.draftRenewal(
-                new SubscriptionRenewalEligibleEvent("42", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null), null, "event-9", null);
+                new SubscriptionRenewalEligibleEvent("42", LocalDate.of(2029, 12, 1), "Growth", "HIGH"), null, "event-9", null);
         assertThat(draft.getTargetSubscriptionNumber()).isEqualTo("SUB-R3");
         assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
         verify(schedules, atLeastOnce()).byNumber("SUB-R3");
