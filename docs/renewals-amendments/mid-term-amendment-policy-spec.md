@@ -70,7 +70,7 @@ Each rule is testable as a pass or fail on a given input. Failure blocks the nam
 - **V6** Action date and effective date are both present and stored separately; effective date before action date (backdating) requires an explicit backdating reason code and approval. [S rca 3; I on backdating rule]
 - **V7** Quantity semantics are declared per line (Delta, Absolute, Replace) and `start_qty + delta_qty = end_qty` holds; `end_qty >= 0`. [S research 4.3; sanity 4]
 - **V8** Every priced line carries a PolicyDecision id, policy id and version, and the pricing-service trace id; no line is priced inside quote-service or CAM. [S spike 5; rca 3]
-- **V9** Product external id, pricebook version and configuration hash are pinned at pricing and are unchanged at apply. [S spike 6.2]
+- **V9** Product external id, pricebook version and configuration hash are pinned at pricing and are unchanged at apply. Until DRG-428 supplies a configuration hash, the configuration hash is an interim non-null pin (SHA-256 of product id, pricebook version and sorted option codes). [S spike 6.2; owner decision 2026-10-16]
 - **V10** Content digest at apply equals the digest of the executed (or approved) revision; mismatch blocks apply. [S spike 3]
 - **V11** At most one revision per amendment number reaches EXECUTED. [S spike, decision 6 proposed]
 - **V12** Units apply in dependency order (create before terminate); a unit writes all its rows or none. [S spike 4]

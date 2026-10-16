@@ -24,7 +24,7 @@
 | FR-12 | Mixed outcomes: a unit failure marks the unit BLOCKED and the document PARTIALLY_APPLIED or APPLY_BLOCKED; already applied units are not rolled back; a correcting amendment is the remedy. | spike decision 5, OQ5 default [I] | S4 |
 | FR-13 | quote-service exposes `lifecycle-changes` (create, revise, submit, withdraw) for intent Amend; the existing continuation endpoint becomes a facade for Amend. | spike 6.6 [S] | S5 |
 | FR-14 | Every priced line carries PolicyDecision id, policy id and version and pricing-service trace id; no pricing occurs in CAM or quote-service. | V8, A5 [S] | S5 |
-| FR-15 | Product external id, pricebook version and configuration hash are pinned at pricing and re-checked at apply. | V9, spike 6.2 [S] | S5, S4 |
+| FR-15 | Product external id, pricebook version and configuration hash are pinned at pricing and re-checked at apply. The configuration hash is an interim non-null pin (SHA-256 of product external id, pricebook version and sorted option codes) until DRG-428 replaces it. | V9, spike 6.2 [S] | S5, S4 |
 | FR-16 | `QuoteAcceptedEvent` gains `amendmentDocumentId` and per-line `applicationUnitNo`; CAM routes document-bearing events to the new path and legacy events to the existing path behind a per-tenant feature flag. | spike 6.6, 6.4 [S] | S6 |
 | FR-17 | Action date and effective date are stored separately; backdating needs reason code and approval. | V6 [S] | S3, S5 |
 | FR-18 | Manual price overrides record actor, reason code, overridden value and route to approval (`CONTRACT_MODIFICATION`). | V14 [I] | S5 |
@@ -63,7 +63,7 @@ Depends on: S1, S2; DRG-562 design.
 - **AC-S3-8.** Given action date later than today and effective date earlier than action date without a reason code, When submitted, Then V6 fails.
 
 ### S4 (RA-48 / DRG-582): Document-driven apply with multi-subscription units
-Depends on: S1..S3; DRG-562, DRG-563, DRG-565; DRG-421 and DRG-428 for mandatory V9 pins.
+Depends on: S1..S3; DRG-562, DRG-563, DRG-565; DRG-421 for the pricebook version pin; the interim configuration pin (FR-15) removes the DRG-428 block, and DRG-428 later replaces it.
 - **AC-S4-1.** Given an EXECUTED document with units for subscriptions A and B, When apply runs, Then both units write their rate periods and the document is APPLIED.
 - **AC-S4-2.** Given the same apply message delivered twice, When processed, Then the second is a no-op (V13); given the same key with a different digest, Then it is rejected and audited.
 - **AC-S4-3.** Given unit 1 succeeds and unit 2 fails V3 (`observedRevision` stale), When apply completes, Then unit 1 stays applied, unit 2 is BLOCKED, document is PARTIALLY_APPLIED, no rollback of unit 1, and an event records the cause.
@@ -75,9 +75,9 @@ Depends on: S1..S3; DRG-562, DRG-563, DRG-565; DRG-421 and DRG-428 for mandatory
 - **AC-S4-9.** Given a legacy QuoteAccepted AMENDMENT event, When the flag is off for the tenant, Then the existing path behaves exactly as before (existing `AcceptedQuoteSubscriptionServiceTest` fixtures pass unchanged).
 
 ### S5 (RA-49 / DRG-583): quote-service LifecycleChange (Amend) and pricing integration
-Depends on: S3 contract; pricing-service amendment modes (OQ9 verify); DRG-421 and DRG-428 for mandatory non-null product, pricebook and configuration pins.
+Depends on: S3 contract; pricing-service amendment modes (OQ9 verify); DRG-421 for the pricebook version pin; configuration pin is the interim non-null hash (FR-15), replaced by DRG-428 later.
 - **AC-S5-1.** Given an ACTIVE contract, When a seller creates a LifecycleChange with intent Amend and two ChangeLines, Then it is stored with action codes, quantity semantics and the observed revision of each target.
-- **AC-S5-2.** Given a ChangeLine with AmendmentPolicy RetainContracted and proration Daily, When priced, Then the line has PolicyDecision id, policy id and version, trace id and pinned product, pricebook and configuration data (V8, V9).
+- **AC-S5-2.** Given a ChangeLine with AmendmentPolicy RetainContracted and proration Daily, When priced, Then the line has PolicyDecision id, policy id and version, trace id and pinned product, pricebook and configuration data (V8, V9), where the configuration pin is the interim non-null hash until DRG-428 replaces it; the same option set in any order yields the same pin.
 - **AC-S5-3.** Given a Swap, Upgrade or Downgrade line, When submitted, Then rejected with `ACTION_NOT_SUPPORTED_IN_SLICE`.
 - **AC-S5-4.** Given a price override, When saved, Then actor, reason and overridden value are stored and an approval request of type CONTRACT_MODIFICATION is created.
 - **AC-S5-5.** Given the legacy continuation endpoint is called for an amendment with the flag on, When processed, Then it creates a LifecycleChange and returns the same response shape as before.
