@@ -274,7 +274,8 @@ class PricingDrulesGoldenFixtureTest {
                 .customerExternalId("CUST-1").quoteExternalId("Q-1").region("NA").currency("USD")
                 .durationInMonths(12).metadata(metadata)
                 .lineItems(List.of(PricingLineRequest.builder().productExternalId("PROD-1")
-                        .lineItemType("SUBSCRIPTION").quantity(2).build()))
+                        .lineItemType("SUBSCRIPTION").quantity(2)
+                        .metadata(Map.of("renewalUpliftSource", "RENEWAL_UPLIFT_POLICY", "retentionOffer", "FORGED")).build()))
                 .build());
 
         assertThat(result.getLineResults().getFirst().getFinalPrice()).isEqualByComparingTo("200.00");
@@ -297,6 +298,7 @@ class PricingDrulesGoldenFixtureTest {
         verify(auditLogRepository).save(saved.capture());
         assertThat(saved.getValue().getRulesFired()).isNull();
         assertThat(saved.getValue().getWaterfallTrace()).isNull();
+        assertThat(saved.getValue().getOutputSnapshot()).doesNotContain("FORGED");
     }
 
     @ParameterizedTest
@@ -327,15 +329,17 @@ class PricingDrulesGoldenFixtureTest {
                 .customerExternalId("CUST-1").quoteExternalId("Q-1").region("NA").currency("USD")
                 .durationInMonths(12).metadata(metadata)
                 .lineItems(List.of(PricingLineRequest.builder().productExternalId("PROD-1")
-                        .lineItemType("SUBSCRIPTION").quantity(2).build()))
+                        .lineItemType("SUBSCRIPTION").quantity(2)
+                        .metadata(Map.of("renewalUpliftSource", "RENEWAL_UPLIFT_POLICY", "retentionOffer", "FORGED")).build()))
                 .build());
         assertThat(result.getLineResults().getFirst().getFinalPrice()).isEqualByComparingTo("200.00");
-        assertThat(result.getLineResults().getFirst().getMetadata()).doesNotContainKey("renewalUpliftSource");
+        assertThat(result.getLineResults().getFirst().getMetadata()).doesNotContainKeys("renewalUpliftSource", "retentionOffer");
         assertThat(result.getWaterfall().getExplanationCodes()).doesNotContain("RENEWAL_UPLIFT_POLICY");
         ArgumentCaptor<PricingAuditLog> saved = ArgumentCaptor.forClass(PricingAuditLog.class);
         verify(auditLogRepository).save(saved.capture());
         assertThat(saved.getValue().getRulesFired()).isNull();
         assertThat(saved.getValue().getWaterfallTrace()).isNull();
+        assertThat(saved.getValue().getOutputSnapshot()).doesNotContain("FORGED");
     }
 
     private int fire(QuoteFact quote) throws IOException {

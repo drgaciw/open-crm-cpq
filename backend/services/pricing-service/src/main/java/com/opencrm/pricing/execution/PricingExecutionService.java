@@ -330,9 +330,7 @@ public class PricingExecutionService {
                 renewalGovernance.evaluate(
                         context, result, droolsRulesEngine, fallbackProducts, governanceRules, migrationPlan);
             } else {
-                for (PricingLineResult lineResult : lineResults) {
-                    renewalGovernance.applyRenewalUpliftDefault(context, lineResult, droolsRulesEngine);
-                }
+                renewalGovernance.applyRenewalUpliftDefaults(context, lineResults, droolsRulesEngine);
             }
 
             // Stamp after mutable rule/governance execution; caller or configured facts cannot mint authority.

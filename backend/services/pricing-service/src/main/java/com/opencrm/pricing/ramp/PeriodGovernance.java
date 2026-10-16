@@ -70,6 +70,7 @@ public final class PeriodGovernance {
         policies.add(POLICY);
         boolean tcvTier = policies.stream().anyMatch(rule -> rule.getContent() != null
                 && rule.getContent().contains("getDecimal(\"tcv\")"));
+        applyRenewalUpliftDefaults(context, result.getLineResults(), engine);
         for (int lineIndex = 0; lineIndex < result.getLineResults().size(); lineIndex++) {
             PricingLineResult line = result.getLineResults().get(lineIndex);
             List<PricedPeriod> periods = line.getPricedPeriods();
@@ -78,7 +79,6 @@ public final class PeriodGovernance {
             safeMetadata.remove("rampGovernance");
             safeMetadata.put("rampGovernanceEvaluated", true);
             line.setMetadata(safeMetadata);
-            applyRenewalUpliftDefault(context, line, engine);
             PricingLineRequest request = context.getLineItems().get(lineIndex);
             boolean allowed = false;
             com.opencrm.pricing.product.PricingProduct product = products.get(request.getProductExternalId());
@@ -182,12 +182,34 @@ public final class PeriodGovernance {
     }
 
     /**
-     * Runs {@code renewal-uplift.drl} once per line. The fraction is recorded and not applied:
+     * Runs the quote-level {@code renewal-uplift.drl} once and copies its decision to all lines. The fraction is recorded and not applied:
      * uplift basis, caps, and policy precedence are DRG-549/567. A caller-supplied fraction or
      * {@code renewalUpliftSupplied} wins, because this rule is only the default.
      */
+    public void applyRenewalUpliftDefaults(PricingContext context, List<PricingLineResult> lines, RulesEngine engine) {
+        if (lines == null || lines.isEmpty()) return;
+        PricingLineResult decision = PricingLineResult.builder().metadata(new HashMap<>()).build();
+        applyRenewalUpliftDefault(context, decision, engine);
+        for (PricingLineResult line : lines) {
+            if (line == null) continue;
+            Map<String, Object> metadata = cleanRenewalMetadata(line.getMetadata());
+            metadata.putAll(decision.getMetadata());
+            line.setMetadata(metadata);
+        }
+    }
+
+    private static Map<String, Object> cleanRenewalMetadata(Map<String, Object> source) {
+        Map<String, Object> metadata = source == null ? new HashMap<>() : new HashMap<>(source);
+        metadata.remove("renewalUpliftSource");
+        metadata.remove("renewalUpliftPct");
+        metadata.remove("retentionOffer");
+        return metadata;
+    }
+
     public void applyRenewalUpliftDefault(PricingContext context, PricingLineResult line, RulesEngine engine) {
-        if (!"RENEWAL".equals(exactDealType(context)) || line == null) return;
+        if (line == null) return;
+        line.setMetadata(cleanRenewalMetadata(line.getMetadata()));
+        if (!"RENEWAL".equals(exactDealType(context))) return;
         Map<String, Object> requestMetadata = context.getMetadata();
         QuoteFact fact = QuoteFact.builder().externalId(context.getQuoteExternalId())
                 .durationInMonths(context.getDurationInMonths() == null ? 0 : context.getDurationInMonths())
