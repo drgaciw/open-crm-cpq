@@ -11,6 +11,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -83,12 +85,32 @@ public class SubscriptionController {
         return ApiResponse.success(subscription, "Subscription cancelled");
     }
 
+    /**
+     * Date-only renewal is retired (DRG-543). The route remains and responds 410 Gone.
+     * It does not extend end dates, write rate periods, or reprice.
+     * Successor: {@code POST /api/v1/quotes/continuations}, applied on acceptance by
+     * {@code AcceptedQuoteSubscriptionService}.
+     * Rollback: restore this method and {@code Subscription.renew} from the parent commit.
+     * No schema change.
+     */
+    @Deprecated(since = "2026-10-16", forRemoval = true)
     @PostMapping("/{id}/renew")
-    @Operation(summary = "Renew an active subscription")
-    public ApiResponse<SubscriptionDto> renew(
+    @Operation(
+            summary = "Renew an active subscription",
+            deprecated = true,
+            description = "Deprecated (DRG-543). Does not change the subscription. "
+                    + "Author a priced continuation at POST /api/v1/quotes/continuations.")
+    public ResponseEntity<ApiResponse<Void>> renew(
             @PathVariable Long id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate newEndDate) {
-        SubscriptionDto subscription = subscriptionService.renew(id, newEndDate);
-        return ApiResponse.success(subscription, "Subscription renewed");
+        String message = "POST /api/v1/subscriptions/" + id
+                + "/renew?newEndDate=" + newEndDate
+                + " is deprecated and does not change the subscription. "
+                + "Renew through an accepted quote continuation: POST /api/v1/quotes/continuations. DRG-543.";
+        ApiResponse<Void> body = ApiResponse.error(message, "SUBSCRIPTION_RENEW_DEPRECATED", null);
+        return ResponseEntity.status(HttpStatus.GONE)
+                .header("Deprecation", "true")
+                .header("Link", "</api/v1/quotes/continuations>; rel=\"successor-version\"")
+                .body(body);
     }
 }

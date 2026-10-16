@@ -7,6 +7,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.dto.SubscriptionDto;
 import com.opencrm.contract.service.SubscriptionService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,10 +35,11 @@ import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -161,16 +163,12 @@ class SubscriptionControllerTest {
     }
 
     @Test
-    @DisplayName("suspend / cancel / renew return DTOs")
+    @DisplayName("suspend / cancel return DTOs")
     void lifecycleEndpointsReturnDto() throws Exception {
         when(subscriptionService.suspend(1L)).thenReturn(sampleDto.toBuilder()
                 .status(SubscriptionStatus.SUSPENDED).build());
         when(subscriptionService.cancel(1L)).thenReturn(sampleDto.toBuilder()
                 .status(SubscriptionStatus.CANCELLED).build());
-        when(subscriptionService.renew(eq(1L), any(LocalDate.class))).thenReturn(sampleDto.toBuilder()
-                .status(SubscriptionStatus.ACTIVE)
-                .endDate(LocalDate.of(2028, 1, 1))
-                .build());
 
         mockMvc.perform(post("/api/v1/subscriptions/1/suspend"))
                 .andExpect(status().isOk())
@@ -180,11 +178,35 @@ class SubscriptionControllerTest {
         mockMvc.perform(post("/api/v1/subscriptions/1/cancel"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
 
+    @Test
+    @DisplayName("POST /{id}/renew is deprecated and does not renew")
+    void dateOnlyRenewIsGone() throws Exception {
         mockMvc.perform(post("/api/v1/subscriptions/1/renew")
-                        .param("newEndDate", "2028-01-01"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.endDate").value("2028-01-01"));
+                        .param("newEndDate", "2028-01-01")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isGone())
+                .andExpect(header().string("Deprecation", "true"))
+                .andExpect(header().string("Link", Matchers.containsString("/api/v1/quotes/continuations")))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("SUBSCRIPTION_RENEW_DEPRECATED"))
+                .andExpect(jsonPath("$.message", Matchers.containsString("DRG-543")))
+                .andExpect(jsonPath("$.message", Matchers.containsString("2028-01-01")))
+                .andExpect(jsonPath("$.message", Matchers.containsString("/api/v1/quotes/continuations")))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verifyNoInteractions(subscriptionService);
+    }
+
+    @Test
+    @DisplayName("POST /{id}/renew still requires newEndDate")
+    void dateOnlyRenewRequiresEndDate() throws Exception {
+        mockMvc.perform(post("/api/v1/subscriptions/1/renew")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(subscriptionService);
     }
 
     @Test
