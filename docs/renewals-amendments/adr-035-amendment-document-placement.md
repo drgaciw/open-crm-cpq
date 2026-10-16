@@ -1,8 +1,8 @@
 # ADR-035: Placement and ownership of the amendment document entity
 
-**Status:** Proposed on 2026-10-16. Not accepted.
+**Status:** Accepted on 2026-10-16. Scope: authorizes the first-slice schema and audit stories only (S1, S2).
 **Date:** 2026-10-16
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drgaciw), approved 2026-10-16.
 **Backlog:** RA-27 / [DRG-561](https://linear.app/drgamtd-workspace/issue/DRG-561/adr-placement-and-ownership-of-the-amendment-document-entity). Notion Open-CRM-CPQ Backlog RA-27.
 **Relates to:** RA-28..RA-32 / DRG-562..DRG-566; DRG-458 (thin Contract header); DRG-313 (retention); RA-43 / DRG-577 (reconcile ADR-024..027 with the spine); ADR-008, ADR-010, ADR-018, ADR-024..027.
 **Does not authorize:** any code, schema migration, service, topic or gateway route. Each needs its own PR after this ADR is accepted. Design and documentation only until then.
@@ -111,5 +111,15 @@ Document signed/executed time is not the change effective date. Every applied pe
 - Repo facts cited in those files from `drgaciw/open-crm-cpq` `main` @ `dd90501` (GitHub connector reads).
 
 
-## Addendum 2026-10-16 (dev-readiness pass; status unchanged: Proposed)
+## Addendum 2026-10-16 (dev-readiness pass; written while status was Proposed)
 This ADR is the single hard blocker to starting the first slice (OQ1 in `renewals-amendments-open-questions-register.md`). Implementation stories that depend on acceptance: RA-45..RA-52 / DRG-579..DRG-586. Practical notes from the readiness review: next CAM migration version is V1_7 (verified); document-driven applies use a new apply ledger rather than altering `applied_quote_acceptances` (see `amendment-technical-approach-and-dependencies.md` section 3). Acceptance may be conditional on OQ3, OQ10 and OQ12 defaults. No text above was changed.
+
+## Acceptance 2026-10-16
+The project owner (drgaciw) accepted this ADR on 2026-10-16 (Fri). Scope: this acceptance authorizes the first-slice schema and audit stories only (S1, S2; RA-45 / RA-46, DRG-579 / DRG-580). It does not authorize later stories, which still need their own gates. The Decision text above is unchanged. Recorded by the docs PR #600; merging that PR records the acceptance on main.
+
+Confirmed defaults:
+- **OQ3, header scope:** thin Contract header now with id, number, tenant, customer reference, start, end, status, last_executed_seq and prior_contract_id. Richer fields are deferred to DRG-458 (contract enrichment).
+- **OQ10, signature policy:** NOT_REQUIRED, NOTICE_ONLY and CLICK_THROUGH ship now. E_SIGN and WET come later through the DRG-457 e-sign adapter.
+- **OQ12, action codes:** Add, Update and Remove only. Swap, Upgrade and Downgrade are deferred to RA-42 / DRG-576 (product relationships in the catalog).
+
+Still open and not part of this acceptance: OQ9 (pricing-service amendment modes, gates S5 only), OQ8 (retention, Legal), hash chain key management.

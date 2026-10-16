@@ -4,18 +4,18 @@
 
 | ID | Question | Status | Proposed default and rationale | Blocks | Owner | Needed by |
 |---|---|---|---|---|---|---|
-| OQ1 | Accept ADR-035 (document in CAM contract-documents module, thin header, LifecycleChange stays in quote-service)? | **BLOCKS DEV** | Accept as written | S1 and everything after | Architect or user, Jev-routed Choice | Day 0 |
+| OQ1 | Accept ADR-035 (document in CAM contract-documents module, thin header, LifecycleChange stays in quote-service)? | **ACCEPTED 2026-10-16** | Accepted by the project owner 2026-10-16. Authorizes the first-slice schema and audit stories only (S1, S2). | none now (S1, S2 may start; not started) | Architect or user, Jev-routed Choice | Day 0 |
 | OQ2 | Apply point | RESOLVED 2026-10-16 | Apply only after EXECUTED, single status column | none | n/a | done |
-| OQ3 | Contract header enrichment vs DRG-458 | DEFAULT PROPOSED | Thin header now (id, number, tenant, customer ref, start, end, status, last_executed_seq, prior_contract_id), names aligned to DRG-458 | S1 | Architect | Day 0 |
+| OQ3 | Contract header enrichment vs DRG-458 | **CONFIRMED 2026-10-16** | Thin header now (id, number, tenant, customer ref, start, end, status, last_executed_seq, prior_contract_id), names aligned to DRG-458 (confirmed by the project owner) | S1 | Architect | Day 0 |
 | OQ4 | Numbering | RESOLVED 2026-10-16 | Provisional at DRAFT, final at EXECUTED, no renewal reset | none | n/a | done |
 | OQ5 | Partial application | DEFAULT PROPOSED | One unit per subscription, atomic per unit, no auto rollback, document PARTIALLY_APPLIED, remedy by correcting amendment | S4 | Product plus architect | before S4 (Day 2) |
 | OQ6 | Revision model | DEFAULT PROPOSED | New revision under the same amendment number; one EXECUTED revision (V11); drafts only edit | S3 | Architect | before S3 |
 | OQ7 | Backfill scope | DEFAULT PROPOSED for slice | Slice: contract header only (S7), no synthetic history. History backfill stays DRG-566 | S7 history only | Product | before DRG-566 |
 | OQ8 | Retention N years, legal hold, disposal | NOT BLOCKING dev; **blocks production go-live** | Column `retention_until` nullable; assume contract end + 7 years as placeholder, not used | go-live | Legal | before go-live |
 | OQ9 | Does pricing-service support AmendmentPolicy modes and PolicyDecision trace ids? Unverified | **BLOCKS S5 until verified** | One day read-only spike; fallback RetainContracted with override flag | S5 | Pricing owner | Day 1 |
-| OQ10 | Which signature policies ship in slice? | DEFAULT PROPOSED | NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH only; DRG-457 adapter later | S3 | Product | Day 0 |
+| OQ10 | Which signature policies ship in slice? | **CONFIRMED 2026-10-16** | NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH only; DRG-457 adapter later (confirmed by the project owner) | S3 | Product | Day 0 |
 | OQ11 | Legacy path rollout flag granularity | DEFAULT PROPOSED | Per tenant flag, default off, on for internal tenant first | S6 | Platform | before S6 |
-| OQ12 | Slice action codes | DEFAULT PROPOSED | Add, Update, Remove only; Swap, Upgrade, Downgrade wait for RA-42 / DRG-576 | S5 | Product | Day 0 |
+| OQ12 | Slice action codes | **CONFIRMED 2026-10-16** | Add, Update, Remove only; Swap, Upgrade, Downgrade wait for RA-42 / DRG-576 (confirmed by the project owner) | S5 | Product | Day 0 |
 | OQ13 | Who may VOID an executed document | NOT BLOCKING | Out of slice; role `contract-admin` plus Legal reason, proposal only | later | Legal, product | before VOID story |
 | OQ14 | Hash chain scope | DEFAULT PROPOSED | Per document chain; periodic per-contract anchor deferred | S2 | Architect | before S2 |
 | OQ15 | Price-lock intent: own intent vs Amend | NOT BLOCKING | Decide with RA-34 | later | Product | before DRG-568 |
@@ -31,4 +31,4 @@
 | OQ25 | Approvals for renewals and amendments are a general category to review separately. Coterming events need approval but the approver (sales ops, contract owner, or higher) is deferred; also covers amendment processing and other approval gates | NOT BLOCKING | Parked, see `renewals-amendments-parking-lot.md` (PL-9, RA-57 / DRG-591); slice defaults (OQ10, OQ17) stand | none (parked) | Product, Finance | before unparking |
 
 ## Summary
-Blocking development start: **OQ1** (decision) and **OQ9** (verification, only gates S5). Everything else has a default that lets the first stories start. Needed at go-live only: OQ8. The deferred items (OQ13, 15, 16) belong to later policies.
+Update 2026-10-16: OQ1 accepted and OQ3, OQ10, OQ12 confirmed by the project owner. Remaining gate: **OQ9** (verification, only gates S5). Everything else has a default that lets the first stories start. Needed at go-live only: OQ8. The deferred items (OQ13, 15, 16) belong to later policies.
