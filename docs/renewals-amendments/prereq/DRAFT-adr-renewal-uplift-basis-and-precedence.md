@@ -75,12 +75,14 @@ Floor:
 
 Among floors, the higher bound is the floor. Among caps, the lower bound is the cap. Order:
 
-1. Compute the candidate from D-01.
-2. Round the candidate half-up to scale 4 (D-05 of this proposal).
-3. For `List`, `UpliftPct`, and `UpliftAmt`, clamp down to the cap, then raise to the floor. The snapshot records `capApplied` and `floorApplied` with the bound that moved the number.
-4. `Same` stays on the exit net. A cap ceiling below that exit net is `PRICE_PROTECTION_CONFLICT`. A clause that wants the price down at list sets mode `List`, or sets `notBelowExitNet` to false.
-5. `Override` is an explicit number. Clamping it would publish a unit the seller did not enter. A candidate outside the cap or the floor is `PRICE_PROTECTION_CONFLICT` and no price is stored.
-6. When the floor is above the cap, the result is `PRICE_PROTECTION_CONFLICT` for every mode.
+1. Compute the candidate and each monetary constraint using decimal arithmetic before unit-scale rounding.
+2. Normalize every cap to scale 4 with `RoundingMode.FLOOR`, and every floor to scale 4 with `RoundingMode.CEILING`. This keeps the stored unit at or below each exact maximum and at or above each exact minimum. Combine the normalized bounds: the cap is their minimum and the floor their maximum.
+3. If the normalized floor is above the normalized cap, return `PRICE_PROTECTION_CONFLICT` for every mode, before selecting a price. This includes an exact interval that contains no representable scale-4 unit.
+4. Round the candidate half-up to scale 4 (D-05). For `List`, `UpliftPct`, and `UpliftAmt`, clamp down to the normalized cap, then raise to the normalized floor. The snapshot records `capApplied` and `floorApplied` with both the exact bound and its normalized bound.
+5. `Same` stays on the stored scale-4 exit net. If that unit is outside either normalized bound, return `PRICE_PROTECTION_CONFLICT`. A clause that wants the price down at list sets mode `List`, or sets `notBelowExitNet` to false.
+6. `Override` is an explicit number, normalized half-up to scale 4 under D-05. Clamping it would publish a unit the seller did not enter. If the normalized candidate is outside the normalized cap or floor, return `PRICE_PROTECTION_CONFLICT` and store no price. Record the entered and normalized values in the snapshot.
+
+No rounding after clamping may move the unit outside these bounds. For example, exit net `40.0000` and `maxIncreasePct = 3.3333` give an exact cap of `41.33332`, normalized down to `41.3333`. The same exact amount as a floor normalizes up to `41.3334`. With both constraints, no scale-4 unit satisfies the interval, so the result is `PRICE_PROTECTION_CONFLICT`. These are boundary acceptance cases for a later implementation.
 
 The rules rung's `ENABLE_12M_PRICE_PROTECTION` string is a retention marker. It is not a cap, a floor, or a lock. DRG-568 decides whether a marker becomes a time-bounded lock. A contract clause that sets a cap is the price protection that wins.
 
@@ -110,11 +112,11 @@ quote-service sends the rungs unmerged. pricing-service merges them. The snapsho
 
 ### D-05 — Rounding of the single renewal unit
 
-**The renewal unit price is half-up at scale 4. The extended amount is half-up at scale 2. Per-step rounding inside an escalator is DRG-533's decision, and this proposal does not make it.**
+**The candidate renewal unit price is half-up at scale 4, then validated or clamped against the directionally normalized scale-4 bounds in D-02. The final unit always has scale 4. The extended amount is half-up at scale 2. Per-step rounding inside an escalator is DRG-533's decision, and this proposal does not make it.**
 
 Scale 4 on the unit is ADR-023 D-02. The unit here is the monthly net unit price. Scale 2 on the amount is the same decision: monthly amount is unit times quantity, and the flat period amount is that monthly amount times the term months, half-up at scale 2, via `BigDecimal`. Today's continuation path rounds the unit itself to scale 2. On acceptance, the renewal unit follows scale 4 so the next term's exit rate is the number this decision stored. The illustrative 7% on $40 is $42.8000 either way.
 
-The sanity check's three-year variant ($42.80, then $45.80, then $49.01 with per-year rounding, versus $49.00 with no intermediate rounding) is a per-step question. DRG-533 owns it, together with the compound-versus-cumulative choice and the currency precision of the generator. This decision's scale 4 is one rounding of one candidate. It does not license expanding later years.
+The sanity check's three-year variant ($42.80, then $45.80, then $49.01 with per-year rounding, versus $49.00 with no intermediate rounding) is a per-step question. DRG-533 owns it, together with the compound-versus-cumulative choice and the currency precision of the generator. This decision's scale 4 rounds one candidate and normalizes its constraints as D-02 specifies. It does not license expanding later years.
 
 ### D-06 — What a later escalator is allowed to assume
 
@@ -161,15 +163,15 @@ The other three figures are what a different basis or a missing account percent 
 | Setup | Unit | ARR at 200 seats |
 | --- | --- | --- |
 | Resolved: account 7% on `ContractedNet` | 42.8000 | 102,720.00 |
-| Basis forced to `ListLessContractedDiscount` (fraction 0.20, list 52) | 41.6000 | 99,840.00 |
-| Basis forced to `CurrentList` | 52.0000 | 124,800.00 |
+| Basis forced to `ListLessContractedDiscount` (fraction 0.20, list 52), account 7% retained | 44.5120 | 106,828.80 |
+| Basis forced to `CurrentList`, account 7% retained | 55.6400 | 133,536.00 |
 | No account percent, rules rung at churn above 70, percent points `3` on `ContractedNet` | 41.2000 | 98,880.00 |
 
 With the account percent present, the rules rung's `3` does not replace `7`.
 
 A clause that sets only `maxIncreasePct` of `5` leaves the account mode and the 7% in place, then caps the unit at `40 × 1.05 = 42.0000` and records `capApplied`. ARR is $100,800.00. A line override of 7%, or an override unit of $44, does not beat that clause. The $44 override is `PRICE_PROTECTION_CONFLICT`.
 
-`ActionDate` would pin the pre-change list of $50. The resolved `ContractedNet` price stays $42.8000. `CurrentList` would become $50, and `ListLessContractedDiscount` would become $40. The default `EffectiveDate` is what makes the $52 book the one list bases use.
+`ActionDate` would pin the pre-change list of $50. The resolved `ContractedNet` price stays $42.8000. With the same `UpliftPct` mode and 7%, `CurrentList` would yield $53.5000 (`50 × 1.07`), and `ListLessContractedDiscount` would yield $42.8000 (`50 × 0.80 × 1.07`). The default `EffectiveDate` is what makes the $52 book the one list bases use.
 
 A 36-month escalator at 7% is not given a year-2 or year-3 price here. The first period, if the term were priced under this decision, would still be $42.8000, and that figure is the start price DRG-533 would receive. The sanity check's $45.80 and $49.01 stay illustrations of why per-step rounding has to be decided there.
 
