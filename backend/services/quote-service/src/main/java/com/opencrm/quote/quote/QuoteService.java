@@ -472,6 +472,7 @@ public class QuoteService {
                 .observedRevision(original.getObservedRevision())
                 .subscriptionEffectiveDate(original.getSubscriptionEffectiveDate())
                 .continuationRequestJson(original.getContinuationRequestJson())
+                .continuationOperation(original.getContinuationOperation())
                 .notes(original.getNotes())
                 .rampScheduleStale(original.isRampScheduleStale())
                 .build();

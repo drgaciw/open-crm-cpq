@@ -70,7 +70,10 @@ class QuoteContinuationServiceTest {
     }
     @Test void namedSeatSourceRetainsActualKindThroughAuthorCalculateAndAccept() {
         var draft=continuations.author(request(LocalDate.of(2028,7,1)));
-        assertThat(draft.getDealType()).isEqualTo(DealType.EXPANSION);assertThat(draft.getLineItems().getFirst().getLineItemType()).isEqualTo("SAAS_SEAT_NAMED");
+        assertThat(draft.getDealType()).isEqualTo(DealType.EXPANSION);
+        assertThat(draft.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.EXPANSION);
+        assertThat(saved.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.EXPANSION);
+        assertThat(draft.getLineItems().getFirst().getLineItemType()).isEqualTo("SAAS_SEAT_NAMED");
         var priced=lifecycle.calculate(1L);assertThat(priced.getTcv()).isEqualByComparingTo("17400");
         assertThat(priced.getLineItems().getFirst().getSourceSubscriptionLineUuid()).isEqualTo("source-line");
         assertThat(((Map<?,?>)((List<?>)requests.getFirst().get("lineItems")).getFirst()).get("lineItemType")).isEqualTo("SAAS_SEAT_NAMED");
@@ -160,7 +163,7 @@ class QuoteContinuationServiceTest {
     }
     @Test void systemRenewalDraftUsesExitRateAndRecordsTheCommercialDecision() {
         when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
-        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null);
         QuoteDto draft = continuations.draftRenewal(event, null, "event-1", null);
         assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
         assertThat(draft.getStatus()).isEqualTo(QuoteStatus.DRAFT);
@@ -172,6 +175,8 @@ class QuoteContinuationServiceTest {
         assertThat(draft.getLineItems().getFirst().getQuantity()).isEqualTo(50);
         assertThat(draft.getLineItems().getFirst().getUnitPrice()).isEqualByComparingTo("50.00");
         assertThat(saved.getContinuationRequestJson()).contains("RENEWAL");
+        assertThat(saved.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.RENEWAL);
+        assertThat(draft.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.RENEWAL);
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).update(sql.capture(), eq(1L), eq("Q-NEXT"), eq(QuoteContinuationService.SYSTEM_RENEWAL_DRAFT),
                 eq("service:quote-service"), eq("QuoteContinuationPolicy"), eq("RENEWAL"), eq("RENEWAL_EXIT_RATE"),
@@ -180,11 +185,40 @@ class QuoteContinuationServiceTest {
         verifyNoInteractions(outbox);
     }
 
+    @Test void extensionStoresRenewalDealTypeAndExtensionOperation() {
+        QuoteContinuationRequest extension = request(LocalDate.of(2030, 1, 1));
+        extension.setOperation(QuoteContinuationRequest.Operation.EXTENSION);
+        QuoteDto draft = continuations.author(extension);
+        assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(draft.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.EXTENSION);
+        assertThat(saved.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(saved.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.EXTENSION);
+        assertThat(saved.getContinuationRequestJson()).contains("EXTENSION");
+        assertThatCode(() -> continuations.validate(saved, saved.getLineItems())).doesNotThrowAnyException();
+        saved.setContinuationOperation(QuoteContinuationRequest.Operation.RENEWAL);
+        assertThatThrownBy(() -> continuations.validate(saved, saved.getLineItems()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("commercial identities");
+        saved.setContinuationOperation(null);
+        assertThatThrownBy(() -> continuations.validate(saved, saved.getLineItems()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("commercial identities");
+    }
+
+    @Test void renewalOperationStaysDistinctFromExtension() {
+        QuoteContinuationRequest renewal = request(LocalDate.of(2030, 1, 1));
+        renewal.setOperation(QuoteContinuationRequest.Operation.RENEWAL);
+        continuations.author(renewal);
+        assertThat(saved.getDealType()).isEqualTo(DealType.RENEWAL);
+        assertThat(saved.getContinuationOperation()).isEqualTo(QuoteContinuationRequest.Operation.RENEWAL);
+        assertThat(saved.getContinuationRequestJson()).contains("RENEWAL").doesNotContain("EXTENSION");
+    }
+
     @Test void secondEligibilityForTheSameWindowDoesNotCreateAnotherQuote() {
         when(repository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(saved)));
-        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH");
+        SubscriptionRenewalEligibleEvent event = new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null);
         continuations.draftRenewal(event, null, "event-1", null);
         QuoteDto again = continuations.draftRenewal(event, null, "event-2", "sub-r3:2029");
         assertThat(again.getQuoteNumber()).isEqualTo("Q-NEXT");
@@ -197,7 +231,7 @@ class QuoteContinuationServiceTest {
         target.setLines(List.of(target.getLines().getFirst(), target.getLines().getFirst()));
         when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
         assertThatThrownBy(() -> continuations.draftRenewal(
-                new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH"),
+                new SubscriptionRenewalEligibleEvent("SUB-R3", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null),
                 null, "event-1", null))
                 .isInstanceOf(NonRetryableEventException.class)
                 .hasMessageContaining("exactly one");
@@ -214,7 +248,7 @@ class QuoteContinuationServiceTest {
         doReturn(response).when(get).retrieve();
         when(response.body(String.class)).thenReturn(json.writeValueAsString(ApiResponse.success(target)));
         QuoteDto draft = continuations.draftRenewal(
-                new SubscriptionRenewalEligibleEvent("42", LocalDate.of(2029, 12, 1), "Growth", "HIGH"), null, "event-9", null);
+                new SubscriptionRenewalEligibleEvent("42", LocalDate.of(2029, 12, 1), "Growth", "HIGH", null), null, "event-9", null);
         assertThat(draft.getTargetSubscriptionNumber()).isEqualTo("SUB-R3");
         assertThat(draft.getDealType()).isEqualTo(DealType.RENEWAL);
         verify(schedules, atLeastOnce()).byNumber("SUB-R3");
