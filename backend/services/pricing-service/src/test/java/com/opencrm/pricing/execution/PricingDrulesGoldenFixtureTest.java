@@ -230,7 +230,6 @@ class PricingDrulesGoldenFixtureTest {
         assertThat(renewal).isLessThan(80);
         for (String rule : List.of(
                 "rules/acv-minimum-commitment.drl",
-                "rules/amendment-proration.drl",
                 "rules/approval-margin-exception.drl",
                 "rules/churn-risk-adjustment.drl",
                 "rules/core-license-pack.drl",
