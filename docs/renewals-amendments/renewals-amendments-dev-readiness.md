@@ -47,3 +47,6 @@ Renewal policy (DRG-549, 567, 540, 544, 545, 555), price lock (DRG-568), true-up
 
 ## 7. Parking lot (not active, future scope)
 On-premise self-reported usage (manual entry, rep or customer-ops attestation, link to the P2 capacity true-up, audit trail, uplift justification) is parked. See `renewals-amendments-parking-lot.md` (PL-1 to PL-5), RA-53 / DRG-587, and OQ21. These are not active stories and do not affect the readiness verdict.
+
+## Addendum 2026-10-16 (call decisions audited against the backlog)
+The first-slice verdict is unchanged: SaaS only, amend-in-place, add, update and remove lines (S1 to S8, DRG-579 to DRG-586). Decisions from the call that fall **outside** the first slice and now have backlog items: new-contract mode with stored precedence flag (DRG-592), renewal quote modes and usage context (DRG-593), legal-review-free change classes (DRG-594), visibility (DRG-595), renewal automation settings (DRG-596), separate queues (DRG-597), phased migration (DRG-598), amendment SKU mapping table (DRG-599), CRM re-forecast on amendment save (DRG-600). Product questions that touch the first slice: (1) whether new-contract mode (preferred) must be in slice 1; (2) whether SaaS Add and Remove lines need legal review under the pricing, term, seats rule (DRG-594); (3) pricing-service support for flat adjustment and prorated delta (OQ9, DRG-550).

@@ -217,3 +217,9 @@ All three inherit spine rules V3, V8, V10, V12 and V13, which no policy may remo
 - Migration order and next version: V1_7 expand (this schema), V1_8 contract header backfill, V1_9 `document_apply_ledger` (new, keyed `document_id`, `unit_no`, `apply_key_digest`), legacy `applied_quote_acceptances` untouched. Details in `amendment-technical-approach-and-dependencies.md` section 3.
 - Add nullable `amendment_document_line_id` and `revision_no` to `subscription_rate_periods` in V1_7 (A4).
 - Open items 3 to 6 of section 7 are tracked as OQ14 (hash scope, default per document), OQ15 (price-lock intent, not blocking), OQ3 (header ownership, default thin header owned by this module), OQ8 (retention, blocks go-live only) in `renewals-amendments-open-questions-register.md`.
+
+## Clarification 2026-10-16 (call decisions: precedence flag and original contract)
+Source: transcript addendum "Renewals and amendments decisions audit"; backlog DRG-592 (RA-58).
+- **Conflict.** ContractHeader (section 2.2) has `prior_contract_id` and `status` {ACTIVE, EXPIRED, TERMINATED} but no precedence field, and `rca-contract-precedence-research.md` inferred precedence is derived from the amendment chain. The call decided a **stored precedence flag on the new contract**; both contracts stay **ACTIVE** and the original stays **open as a reference** (no SUPERSEDED or closed status for the original).
+- **Not changed in v1 schema (S1, DRG-579).** First slice is amend-in-place, so S1 carries no new column. The flag shape (boolean vs rank), the link from the new contract to the original (`prior_contract_id` is the candidate) and who may change it are open and sit in DRG-592.
+- **Coterm and settings.** Customer-level coterm grouping and renewal groups (DRG-554) and renewal settings, auto-renew default off and notice period default with override (DRG-596), are not in this schema; `notice_period_days` and `term_end_action` stay clause data, settings live elsewhere.
