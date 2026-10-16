@@ -95,6 +95,6 @@ These need the full stack running and are **not** wired into CI.
 
 CI: **Jenkins is primary** (`Jenkinsfile`); `.github/workflows/ci.yml` is the `workflow_dispatch`
 fallback and also runs nightly on `main`; `pr-check.yml` gates pull requests and `main-verify.yml`
-re-runs the unit stage after every merge to `main` — see ADR-003 sections 7–8. The GHA frontend job
-selects projects through a grep allowlist, so a new Nx project is silently skipped unless that list
-is updated.
+re-runs the unit stage after every merge to `main` — see ADR-003 sections 7–8. The frontend stage
+(`scripts/ci/frontend.sh`) builds, lints and tests every Nx project; it runs in the full `ci.yml`
+matrix, not in the pull-request gate.

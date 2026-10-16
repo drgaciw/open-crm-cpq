@@ -144,7 +144,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
               <div class="info-item">
                 <span class="label">Version</span>
                 <span class="value">{{
-                  ruleSet.ruleSetVersion != null ? ruleSet.ruleSetVersion : '—'
+                  ruleSet.ruleSetVersion ?? '—'
                 }}</span>
               </div>
               <div class="info-item">
@@ -210,7 +210,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
                     <tr>
                       <td>{{ row.name }}</td>
                       <td>{{ row.ruleType }}</td>
-                      <td>{{ row.priority != null ? row.priority : '—' }}</td>
+                      <td>{{ row.priority ?? '—' }}</td>
                       <td>{{ row.status }}</td>
                       <td class="actions-col">
                         <button
