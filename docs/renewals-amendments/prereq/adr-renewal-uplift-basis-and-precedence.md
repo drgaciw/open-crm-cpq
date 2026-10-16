@@ -1,8 +1,9 @@
 # Renewal uplift basis, cap and floor, price-as-of date, and precedence
 
 **Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
+**Acceptance scope:** This status-change record implements the owner approval recorded in PR #623. Pre-acceptance workflow references below do not override the Accepted status. Runtime implementation, migrations and flag rollout remain separate work; this record does not accept ADR-024 through ADR-027.
 **Date:** 2026-10-16
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted 2026-10-16).
 **Number:** none. This file is a draft proposal under `docs/renewals-amendments/prereq/`. It is not an entry in `docs/adr/` and it does not take a number.
 **Unblocks:** [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567/renewal-uplift-basis-caps-price-as-of-date-and-policy) (RA-33, gap G1), once the owner accepts this text. Until then the text is the decision DRG-567 implements against, and that implementation stays unmerged.
 **Informs:** [DRG-541](https://linear.app/drgamtd-workspace/issue/DRG-541/renewal-uplift-drools-rule-never-executes) (where the seeded uplift rule sits), [DRG-549](https://linear.app/drgamtd-workspace/issue/DRG-549/renewal-pricing-policy-hierarchy-same-list-uplift-percent-uplift) (the mode walk uses this order).
