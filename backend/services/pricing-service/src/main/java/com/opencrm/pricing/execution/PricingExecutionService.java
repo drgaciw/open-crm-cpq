@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -405,30 +404,6 @@ public class PricingExecutionService {
         if (retention != null) waterfall.getExplanationCodes().add(retention);
     }
 
-    private static boolean renewalPolicyApplied(PricingResult result) {
-        return result.getLineResults() != null && result.getLineResults().stream().anyMatch(line -> line.getMetadata() != null
-                && "RENEWAL_UPLIFT_POLICY".equals(line.getMetadata().get("renewalUpliftSource")));
-    }
-
-    private static Map<String, Object> renewalDecision(PricingContext context, PricingResult result) {
-        Map<String, Object> decision = new LinkedHashMap<>();
-        decision.put("rule", "Renewal Uplift and Retention Offer");
-        decision.put("explanationCode", "RENEWAL_UPLIFT_POLICY");
-        decision.put("dealType", "RENEWAL");
-        decision.put("churnScore", context.getMetadata() == null ? null : context.getMetadata().get("churnScore"));
-        decision.put("renewalUpliftPct", renewalMetadata(result, "renewalUpliftPct"));
-        decision.put("retentionOffer", renewalMetadata(result, "retentionOffer"));
-        decision.put("priceChanged", false);
-        return decision;
-    }
-
-    private static Object renewalMetadata(PricingResult result, String key) {
-        for (PricingLineResult line : result.getLineResults()) {
-            if (line.getMetadata() != null && line.getMetadata().get(key) != null) return line.getMetadata().get(key);
-        }
-        return null;
-    }
-
     private static boolean requestsRamp(PricingContext context) {
         return context.getLineItems().stream().anyMatch(PricingExecutionService::hasSchedule);
     }
@@ -524,14 +499,6 @@ public class PricingExecutionService {
         try {
             String inputSnapshot = objectMapper.writeValueAsString(context);
             String outputSnapshot = objectMapper.writeValueAsString(result);
-            // The default fraction does not change a price (basis is DRG-567). The audit row still
-            // records the decision; priceChanged stays false until a later story applies the fraction.
-            String renewalTrace = null;
-            String renewalRule = null;
-            if (renewalPolicyApplied(result)) {
-                renewalRule = "Renewal Uplift and Retention Offer";
-                renewalTrace = objectMapper.writeValueAsString(renewalDecision(context, result));
-            }
 
             PricingAuditLog auditLog = PricingAuditLog.builder()
                     .quoteExternalId(context.getQuoteExternalId())
@@ -539,8 +506,6 @@ public class PricingExecutionService {
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
-                    .waterfallTrace(renewalTrace)
-                    .rulesFired(renewalRule)
                     .executionTimeMs(executionTime)
                     .build();
 

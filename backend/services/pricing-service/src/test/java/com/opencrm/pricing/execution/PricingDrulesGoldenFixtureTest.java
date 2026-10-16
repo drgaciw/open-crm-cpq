@@ -244,8 +244,8 @@ class PricingDrulesGoldenFixtureTest {
     }
 
     @Test
-    @DisplayName("execute records the renewal default without changing the price")
-    void executeRenewalUpliftDoesNotChangePriceAndAuditsTheDecision() throws Exception {
+    @DisplayName("execute records the renewal default without changing the price or writing a decision audit")
+    void executeRenewalUpliftDoesNotChangePrice() throws Exception {
         PricingAuditLogRepository auditLogRepository = mock(PricingAuditLogRepository.class);
         when(auditLogRepository.save(any(PricingAuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -286,16 +286,14 @@ class PricingDrulesGoldenFixtureTest {
 
         ArgumentCaptor<PricingAuditLog> saved = ArgumentCaptor.forClass(PricingAuditLog.class);
         verify(auditLogRepository).save(saved.capture());
-        assertThat(saved.getValue().getRulesFired()).isEqualTo("Renewal Uplift and Retention Offer");
-        assertThat(saved.getValue().getWaterfallTrace()).contains("\"priceChanged\":false").contains("0.03").contains("80");
-        assertThat(saved.getValue().getInputSnapshot()).contains("RENEWAL").contains("80");
-        assertThat(saved.getValue().getOutputSnapshot()).contains("RENEWAL_UPLIFT_POLICY");
+        assertThat(saved.getValue().getRulesFired()).isNull();
+        assertThat(saved.getValue().getWaterfallTrace()).isNull();
     }
 
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"NEW", "AMENDMENT", "EXPANSION", "NEW_BUSINESS", "renewal"})
-    @DisplayName("execute does not audit a renewal decision for other deal types")
+    @DisplayName("execute does not run renewal uplift for other deal types")
     void executeIgnoresNonRenewalDealTypes(String dealType) {
         PricingAuditLogRepository auditLogRepository = mock(PricingAuditLogRepository.class);
         when(auditLogRepository.save(any(PricingAuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
