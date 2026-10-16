@@ -133,24 +133,35 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("suspend / cancel / renew return DTOs and update state")
+    @DisplayName("suspend / cancel return DTOs and update state")
     void lifecycleReturnsDto() {
         pendingSubscription.activate();
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
         when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
         when(subscriptionMapper.toDto(any(Subscription.class))).thenAnswer(inv -> dto(inv.getArgument(0)));
 
+        LocalDate endBefore = pendingSubscription.getEndDate();
+        LocalDate renewalBefore = pendingSubscription.getRenewalDate();
+
         SubscriptionDto suspended = subscriptionService.suspend(1L);
         assertEquals(SubscriptionStatus.SUSPENDED, suspended.getStatus());
+        assertEquals(endBefore, pendingSubscription.getEndDate());
+        assertEquals(renewalBefore, pendingSubscription.getRenewalDate());
 
         pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
-        LocalDate newEnd = LocalDate.now().plusYears(2);
-        SubscriptionDto renewed = subscriptionService.renew(1L, newEnd);
-        assertEquals(newEnd, renewed.getEndDate());
-        assertEquals(newEnd.minusDays(30), renewed.getRenewalDate());
-
         SubscriptionDto cancelled = subscriptionService.cancel(1L);
         assertEquals(SubscriptionStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(endBefore, pendingSubscription.getEndDate());
+        assertEquals(renewalBefore, pendingSubscription.getRenewalDate());
+    }
+
+    @Test
+    @DisplayName("date-only renew is removed from the service and the entity")
+    void dateOnlyRenewIsRemoved() {
+        assertThrows(NoSuchMethodException.class,
+                () -> SubscriptionService.class.getDeclaredMethod("renew", Long.class, LocalDate.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> Subscription.class.getDeclaredMethod("renew", LocalDate.class));
     }
 
     @Test

@@ -101,12 +101,4 @@ public class Subscription extends BaseEntity {
         }
         this.status = SubscriptionStatus.CANCELLED;
     }
-    
-    public void renew(LocalDate newEndDate) {
-        if (status != SubscriptionStatus.ACTIVE) {
-            throw new IllegalStateException("Can only renew ACTIVE subscriptions");
-        }
-        this.endDate = newEndDate;
-        this.renewalDate = newEndDate.minusDays(30); // 30 days before end
-    }
 }
