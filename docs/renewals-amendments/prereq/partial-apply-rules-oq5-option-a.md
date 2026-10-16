@@ -6,6 +6,14 @@
 
 This note does not accept `specs/partial-apply.md`. It does not authorize S4 (DRG-582) or S6. It does not add a migration, a flag, a topic, a gateway route, or an apply ledger. It does not edit an ADR, the open-questions register, or `partial-apply-owner-decision.md`.
 
+## Decision condition
+
+1. Create-before-terminate (who writes `dependsOnUnitNos`) is **UNMET**. It waits on S4's apply path (DRG-582).
+2. The three test scenarios (restructure, true-up, future-dated lines) are **UNMET**. They wait on S4's apply path (DRG-582).
+3. Nothing in this note accepts `specs/partial-apply.md`.
+
+[#626](https://github.com/drgaciw/open-crm-cpq/pull/626) is merged on `main` as the owner-decision frame. GitHub records `mergedAt` `2026-10-16T22:03:29Z`; the merge commit `3b1e78f5` is dated 2026-10-16 17:03:28 -0500 (5:03 PM CT). Section 9 of `partial-apply-owner-decision.md` and the OQ5 register row still do not record the owner's delegated option A decision. This note does not edit them. Both were read on `origin/main` after `fd6421e4`: section 9 is still the blank owner record, and the register row is still `DEFAULT PROPOSED`.
+
 ## 1. What is adopted
 
 The owner instruction for this change adopts option A, the proposed default in `partial-apply-owner-decision.md` section 2. On this base, that file's header still says the file does not decide OQ5, and its section 9 owner record is still blank. This note does not edit that file. The register row for OQ5 on this base still says `DEFAULT PROPOSED`. This note does not edit the register.
