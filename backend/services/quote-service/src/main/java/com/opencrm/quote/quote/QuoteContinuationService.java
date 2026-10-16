@@ -1,18 +1,29 @@
 package com.opencrm.quote.quote;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opencrm.common.dto.ApiResponse;
+import com.opencrm.common.event.NonRetryableEventException;
+import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.quote.client.*;
 import com.opencrm.quote.lineitem.*;
 import com.opencrm.quote.ramp.*;
-import lombok.RequiredArgsConstructor;
+import com.opencrm.security.CurrentActor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 
 /** Service-owned target validation and reachable continuation authoring; no mutation of the subscription here. */
-@Service @RequiredArgsConstructor
+@Service
 public class QuoteContinuationService {
     private final SubscriptionScheduleClient schedules;
     private final QuoteRepository quotes;
@@ -22,6 +33,36 @@ public class QuoteContinuationService {
     private final RampPricingProperties properties;
     private final RampScheduleAttacher attacher;
     private final ObjectMapper json;
+    private final JdbcTemplate jdbc;
+    private final CurrentActor actor;
+    private final RestClient scheduleHttp;
+
+    public QuoteContinuationService(SubscriptionScheduleClient schedules, QuoteRepository quotes,
+                                    QuoteLineItemRepository lines, QuoteNumberGenerator numbers, QuoteMapper mapper,
+                                    RampPricingProperties properties, RampScheduleAttacher attacher, ObjectMapper json,
+                                    JdbcTemplate jdbc, CurrentActor actor,
+                                    @Qualifier("subscriptionScheduleRestClient") RestClient scheduleHttp) {
+        this.schedules = schedules;
+        this.quotes = quotes;
+        this.lines = lines;
+        this.numbers = numbers;
+        this.mapper = mapper;
+        this.properties = properties;
+        this.attacher = attacher;
+        this.json = json;
+        this.jdbc = jdbc;
+        this.actor = actor;
+        this.scheduleHttp = scheduleHttp;
+    }
+
+    /** Append-only commercial decision for a draft this service opened from renewal eligibility. */
+    static final String SYSTEM_RENEWAL_DRAFT = "SYSTEM_RENEWAL_DRAFT";
+    private static final String RENEWAL_EXIT_RATE = "RENEWAL_EXIT_RATE";
+    private static final String AUDIT_INSERT = """
+            INSERT INTO commercial_decision_audit (
+                quote_id, quote_number, decision_kind, decided_by, policy_id, operation, mode,
+                subscription_id, event_id, inputs_json, outputs_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
 
     @Transactional(readOnly=true)
     public QuoteContinuationPolicy.Plan preview(QuoteContinuationRequest request) {
@@ -59,6 +100,139 @@ public class QuoteContinuationService {
         }
         line=lines.save(line);quote.getLineItems().add(line);
         return mapper.toDto(quote);
+    }
+
+    /**
+     * Opens one draft RENEWAL continuation for an eligibility event. Exit quantity and exit unit rate, zero uplift,
+     * twelve months, starting the day after the target's inclusive end. {@code renewalDate} on the event is the
+     * notice date, not the quote start. A live renewal quote for that window is returned unchanged.
+     *
+     * <p>No draft-quote event is published: the registry has no such contract, and this change does not add one.
+     * The commercial decision is the {@code commercial_decision_audit} row written in this transaction.
+     */
+    @Transactional
+    public QuoteDto draftRenewal(SubscriptionRenewalEligibleEvent event, String subscriptionNumber, String eventId,
+                                 String dedupeKey) {
+        if (event == null || event.getSubscriptionId() == null || event.getSubscriptionId().isBlank())
+            throw new NonRetryableEventException("Renewal eligibility event lacks subscriptionId");
+        SubscriptionScheduleView schedule = scheduleFor(event, subscriptionNumber);
+        SubscriptionScheduleView.Line source = renewalSource(schedule);
+        int quantity = exitQuantity(source);
+        QuoteContinuationRequest request = QuoteContinuationRequest.builder()
+                .operation(QuoteContinuationRequest.Operation.RENEWAL)
+                .targetSubscriptionNumber(schedule.getSubscriptionNumber())
+                .sourceSubscriptionLineUuid(source.getAcceptedLineUuid())
+                .observedRevision(schedule.getCommercialRevision())
+                .customerExternalId(schedule.getCustomerId())
+                .currency(schedule.getCurrencyCode())
+                .quantity(quantity)
+                .build();
+        QuoteContinuationPolicy.Plan plan = QuoteContinuationPolicy.plan(request, schedule);
+        Optional<Quote> existing = liveRenewal(schedule.getSubscriptionNumber(), plan.startDate());
+        if (existing.isPresent()) return mapper.toDto(existing.get());
+        QuoteDto draft = author(request);
+        if (draft.getId() == null) throw new IllegalStateException("Renewal draft was not persisted");
+        recordDecision(draft, event, schedule, source, plan, eventId, dedupeKey, quantity);
+        return draft;
+    }
+
+    private SubscriptionScheduleView scheduleFor(SubscriptionRenewalEligibleEvent event, String subscriptionNumber) {
+        if (subscriptionNumber != null && !subscriptionNumber.isBlank()) return schedules.byNumber(subscriptionNumber);
+        String id = event.getSubscriptionId().trim();
+        if (id.chars().allMatch(Character::isDigit)) return readById(id);
+        return schedules.byNumber(id);
+    }
+
+    /** RenewalScheduler publishes the numeric primary key. The internal schedule route is by number only. */
+    private SubscriptionScheduleView readById(String id) {
+        try {
+            String raw = scheduleHttp.get().uri("/api/v1/subscriptions/{id}/ramp-schedule", id).retrieve().body(String.class);
+            ApiResponse<SubscriptionScheduleView> response = json.readValue(raw, new TypeReference<>() {});
+            if (response == null || !response.isSuccess() || response.getData() == null)
+                throw new NonRetryableEventException("Subscription " + id + " has no ramp schedule");
+            return response.getData();
+        } catch (NonRetryableEventException ex) {
+            throw ex;
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().is4xxClientError())
+                throw new NonRetryableEventException("Subscription " + id + " schedule was rejected: " + ex.getStatusCode(), ex);
+            throw unavailable();
+        } catch (Exception ex) {
+            throw unavailable();
+        }
+    }
+
+    private SubscriptionScheduleView.Line renewalSource(SubscriptionScheduleView schedule) {
+        List<SubscriptionScheduleView.Line> matches = schedule.getLines() == null ? List.of() : schedule.getLines().stream()
+                .filter(Objects::nonNull)
+                .filter(line -> "ACCEPTED_PRICED".equals(line.getProvenance()))
+                .filter(line -> line.getPeriods() != null && line.getPeriods().stream().anyMatch(period -> period != null && !period.isRetired()))
+                .filter(line -> AcceptedRampSnapshots.recurring(QuoteLineItem.builder().lineItemType(line.getLineItemType())
+                        .productType(line.getProductType()).billingFrequency(line.getBillingFrequency()).build()))
+                .toList();
+        if (matches.size() != 1)
+            throw new NonRetryableEventException("Renewal draft needs exactly one accepted recurring source line; found " + matches.size());
+        return matches.getFirst();
+    }
+
+    private int exitQuantity(SubscriptionScheduleView.Line source) {
+        List<SubscriptionScheduleView.Period> open = source.getPeriods().stream().filter(period -> period != null && !period.isRetired())
+                .sorted(Comparator.comparing(SubscriptionScheduleView.Period::getEndDate, Comparator.nullsLast(Comparator.naturalOrder()))).toList();
+        Integer quantity = open.isEmpty() ? null : open.getLast().getQuantity();
+        if (quantity == null || quantity < 1)
+            throw new NonRetryableEventException("Renewal draft source has no positive exit quantity");
+        return quantity;
+    }
+
+    private Optional<Quote> liveRenewal(String subscriptionNumber, LocalDate start) {
+        return quotes.findAll((root, query, cb) -> cb.and(
+                cb.isFalse(root.get("deleted")),
+                cb.equal(root.get("dealType"), DealType.RENEWAL),
+                cb.equal(root.get("targetSubscriptionNumber"), subscriptionNumber),
+                cb.equal(root.get("startDate"), start),
+                root.get("status").in(QuoteStatus.DRAFT, QuoteStatus.IN_REVIEW, QuoteStatus.PENDING_APPROVAL,
+                        QuoteStatus.APPROVED, QuoteStatus.SENT, QuoteStatus.ACCEPTED)),
+                PageRequest.of(0, 1)).stream().findFirst();
+    }
+
+    private void recordDecision(QuoteDto draft, SubscriptionRenewalEligibleEvent event, SubscriptionScheduleView schedule,
+                                SubscriptionScheduleView.Line source, QuoteContinuationPolicy.Plan plan, String eventId,
+                                String dedupeKey, int quantity) {
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("subscriptionId", event.getSubscriptionId());
+        inputs.put("renewalDate", event.getRenewalDate() == null ? null : event.getRenewalDate().toString());
+        inputs.put("currentPlan", event.getCurrentPlan());
+        inputs.put("usageBand", event.getUsageBand());
+        inputs.put("subscriptionNumber", schedule.getSubscriptionNumber());
+        inputs.put("observedRevision", schedule.getCommercialRevision());
+        inputs.put("sourceSubscriptionLineUuid", source.getAcceptedLineUuid());
+        inputs.put("exitQuantity", quantity);
+        inputs.put("exitUnitPrice", plan.periods().getFirst().unitPrice().toPlainString());
+        inputs.put("customerExternalId", schedule.getCustomerId());
+        inputs.put("currency", schedule.getCurrencyCode());
+        inputs.put("eventId", eventId);
+        inputs.put("dedupeKey", dedupeKey);
+        inputs.put("upliftPercent", "0");
+        inputs.put("termMonths", plan.termMonths());
+        Map<String, Object> outputs = new LinkedHashMap<>();
+        outputs.put("quoteId", draft.getId());
+        outputs.put("quoteNumber", draft.getQuoteNumber());
+        outputs.put("dealType", DealType.RENEWAL.name());
+        outputs.put("status", QuoteStatus.DRAFT.name());
+        outputs.put("startDate", plan.startDate().toString());
+        outputs.put("endDate", plan.endDate().toString());
+        outputs.put("termMonths", plan.termMonths());
+        outputs.put("quantity", quantity);
+        outputs.put("unitPrice", plan.periods().getFirst().unitPrice().toPlainString());
+        int inserted = jdbc.update(AUDIT_INSERT, draft.getId(), draft.getQuoteNumber(), SYSTEM_RENEWAL_DRAFT, actor.self(),
+                "QuoteContinuationPolicy", QuoteContinuationRequest.Operation.RENEWAL.name(), RENEWAL_EXIT_RATE,
+                event.getSubscriptionId(), eventId, write(inputs), write(outputs));
+        if (inserted != 1) throw new IllegalStateException("Renewal commercial decision was not recorded");
+    }
+
+    private BusinessException unavailable() {
+        return new BusinessException("Cannot read the target subscription schedule; retry or choose a valid target",
+                HttpStatus.BAD_GATEWAY, "SUBSCRIPTION_SCHEDULE_UNAVAILABLE");
     }
 
     /** Reload target at calculate/accept; retained source identity never authorizes replacement except AMENDMENT. */
