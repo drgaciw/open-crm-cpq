@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -323,12 +324,13 @@ class RenewalUpliftResolverTest {
     }
 
     @Test
-    void defaultFloorRaisesANegativePercentToTheExitNet() {
+    void defaultExitNetFloorIsRecorded() {
         RenewalUpliftResult result = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
-                account("acct", RenewalUpliftMode.UPLIFT_PCT, "-10")));
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7")));
 
-        assertUnit(result.unitPrice(), "40.0000");
-        assertThat(result.floorApplied().normalized()).isEqualByComparingTo("40.0000");
+        assertUnit(result.unitPrice(), "42.8000");
+        assertThat(result.floorBound().normalized()).isEqualByComparingTo("40.0000");
+        assertThat(result.floorApplied()).isNull();
         assertThat(result.notBelowExitNet().fromDefault()).isTrue();
     }
 
@@ -336,22 +338,23 @@ class RenewalUpliftResolverTest {
     void clauseFloorBeatsAnAccountOptOut() {
         RenewalUpliftResult result = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
                 new RenewalUpliftRung(RenewalUpliftRungKind.ACCOUNT, "acct", RenewalUpliftMode.UPLIFT_PCT, null,
-                        new BigDecimal("-10"), null, null, Boolean.FALSE, null, null, null, null),
+                        new BigDecimal("7"), null, null, Boolean.FALSE, null, null, null, null),
                 clause("clause-protect", null, null, null, null, Boolean.TRUE, null, null)));
 
-        assertUnit(result.unitPrice(), "40.0000");
+        assertUnit(result.unitPrice(), "42.8000");
         assertThat(result.notBelowExitNet().rung()).isEqualTo(RenewalUpliftRungKind.CLAUSE);
         assertThat(result.notBelowExitNet().value()).isTrue();
-        assertThat(result.floorApplied()).isNotNull();
+        assertThat(result.floorBound().normalized()).isEqualByComparingTo("40.0000");
+        assertThat(result.floorApplied()).isNull();
     }
 
     @Test
-    void accountOptOutLetsTheUnitFallBelowTheExitNet() {
+    void accountOptOutRemovesTheExitNetFloor() {
         RenewalUpliftResult result = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
                 new RenewalUpliftRung(RenewalUpliftRungKind.ACCOUNT, "acct", RenewalUpliftMode.UPLIFT_PCT, null,
-                        new BigDecimal("-10"), null, null, Boolean.FALSE, null, null, null, null)));
+                        new BigDecimal("7"), null, null, Boolean.FALSE, null, null, null, null)));
 
-        assertUnit(result.unitPrice(), "36.0000");
+        assertUnit(result.unitPrice(), "42.8000");
         assertThat(result.floorApplied()).isNull();
         assertThat(result.floorBound()).isNull();
         assertThat(result.notBelowExitNet().value()).isFalse();
@@ -588,6 +591,34 @@ class RenewalUpliftResolverTest {
         assertUnit(result.unitPrice(), "41.3334");
         assertThat(result.floorBound().exact()).isEqualByComparingTo("41.33339");
         assertThat(result.floorApplied().exact()).isEqualByComparingTo("41.33339");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-0.0001", "-10", "-100.0001", "100.0001", "101"})
+    void mergedPercentOutsideZeroThroughOneHundredIsRejected(String percent) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.ACCOUNT, "acct", RenewalUpliftMode.UPLIFT_PCT,
+                        null, decimal(percent), null, null, Boolean.FALSE, null, null, null, null))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 0 and 100");
+    }
+
+    @Test
+    void oneHundredPercentIsAnInclusiveValidBoundary() {
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "100.0000")));
+        assertUnit(result.unitPrice(), "80.0000");
+        assertThat(result.extendedAmount()).isEqualByComparingTo("960.00");
+    }
+
+    @Test
+    void onlyTheWinningMergedPercentControlsTheRangeCheck() {
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, "clause", null, null,
+                        decimal("7"), null, null, null, null, null, null, null),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "-10")));
+        assertUnit(result.unitPrice(), "42.8000");
+        assertThat(result.percentPoints().rung()).isEqualTo(RenewalUpliftRungKind.CLAUSE);
     }
 
     private static void assertUnit(BigDecimal actual, String expected) {

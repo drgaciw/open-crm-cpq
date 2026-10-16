@@ -78,6 +78,9 @@ public final class RenewalUpliftResolver {
         if (percent == null) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_UPLIFT, null, null, null, null, null);
         }
+        if (percent.value().signum() < 0 || percent.value().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("Renewal uplift percent points must be between 0 and 100");
+        }
         if (merged.basis().value() != RenewalUpliftBasis.CONTRACTED_NET
                 || request.exitNet() == null
                 || request.exitNet().signum() < 0) {
