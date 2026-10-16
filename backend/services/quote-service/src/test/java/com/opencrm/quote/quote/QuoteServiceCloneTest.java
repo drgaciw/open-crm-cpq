@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +75,7 @@ class QuoteServiceCloneTest {
     @DisplayName("clone copies N non-deleted lines with new ids and commercial snapshot")
     void cloneCopiesLinesWithNewIds() {
         Quote original = sourceQuote();
+        original.setContinuationOperation(QuoteContinuationRequest.Operation.EXTENSION);
         QuoteLineItem line1 = sourceLine(original, 10L, "PROD-A", 0,
                 new BigDecimal("100.00"), new BigDecimal("90.00"),
                 new BigDecimal("0.1000"), new BigDecimal("10.00"),
@@ -140,6 +142,12 @@ class QuoteServiceCloneTest {
         assertThat(persisted.get(1).getPricingWaterfallJson()).isNull();
         assertThat(persisted.get(0).getMetadata()).isEqualTo("{\"tier\":\"gold\"}");
         assertThat(persisted.get(0).getQuote().getId()).isEqualTo(99L);
+
+        ArgumentCaptor<Quote> savedQuote = ArgumentCaptor.forClass(Quote.class);
+        verify(quoteRepository, times(2)).save(savedQuote.capture());
+        assertThat(savedQuote.getAllValues().getFirst().getQuoteNumber()).isEqualTo("Q-COPY-1");
+        assertThat(savedQuote.getAllValues().getFirst().getContinuationOperation())
+                .isEqualTo(QuoteContinuationRequest.Operation.EXTENSION);
 
         verify(eventPublisher, never()).publishQuoteAccepted(any());
         verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());

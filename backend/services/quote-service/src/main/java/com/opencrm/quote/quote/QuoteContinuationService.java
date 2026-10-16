@@ -79,7 +79,8 @@ public class QuoteContinuationService {
         var effective=request.getEffectiveDate() == null ? plan.startDate() : request.getEffectiveDate();
         Quote quote=Quote.builder().name(request.getName() == null ? request.getOperation()+" "+target.getSubscriptionNumber() : request.getName())
                 .quoteNumber(numbers.generate()).customerExternalId(target.getCustomerId()).currency(target.getCurrencyCode())
-                .dealType(dealType(request.getOperation())).targetSubscriptionNumber(target.getSubscriptionNumber())
+                .dealType(dealType(request.getOperation())).continuationOperation(request.getOperation())
+                .targetSubscriptionNumber(target.getSubscriptionNumber())
                 .observedRevision(target.getCommercialRevision()).subscriptionEffectiveDate(effective)
                 .durationInMonths(plan.termMonths()).startDate(plan.startDate()).endDate(plan.endDate())
                 .continuationRequestJson(write(request)).rampScheduleStale(true).build();
@@ -250,7 +251,9 @@ public class QuoteContinuationService {
         if (!Objects.equals(quote.getTargetSubscriptionNumber(),request.getTargetSubscriptionNumber())
                 || !Objects.equals(quote.getCustomerExternalId(),request.getCustomerExternalId())
                 || !Objects.equals(quote.getCurrency(),request.getCurrency()) || !Objects.equals(quote.getObservedRevision(),request.getObservedRevision())
-                || quote.getDealType() != dealType(request.getOperation())) throw invalid("Continuation commercial identities have changed; author a fresh continuation");
+                || quote.getDealType() != dealType(request.getOperation())
+                || quote.getContinuationOperation() != request.getOperation())
+            throw invalid("Continuation commercial identities have changed; author a fresh continuation");
         var target=schedules.byNumber(request.getTargetSubscriptionNumber());
         var plan=QuoteContinuationPolicy.plan(request,target);
         var source=QuoteContinuationPolicy.source(request,target);

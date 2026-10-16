@@ -37,6 +37,8 @@ public class QuoteDto {
     private String targetSubscriptionNumber;
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;
+    /** Null on quotes that are not typed continuations. EXTENSION stays {@link DealType#RENEWAL}. */
+    private QuoteContinuationRequest.Operation continuationOperation;
     private BigDecimal subtotal;
     private BigDecimal totalDiscount;
     private BigDecimal totalTax;
