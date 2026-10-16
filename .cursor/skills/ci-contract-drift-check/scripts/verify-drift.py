@@ -90,6 +90,68 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
     return errors
 
 
+def main_gate_errors(repo: Path, contract: str) -> list[str]:
+    """Validate the post-merge gate declared under github_main_gate (ADR-003 section 8)."""
+    m = re.search(r"^github_main_gate:\s*\n\s+workflow:\s*(\S+)", contract, re.MULTILINE)
+    if not m:
+        return []
+    rel = m.group(1)
+    path = repo / rel
+    if not path.is_file():
+        return [f"github_main_gate workflow {rel} is missing"]
+    text = load_text(path)
+    errors: list[str] = []
+    if not re.search(r"^\s+push:\s*\n\s+branches:\s*\[\s*main\s*\]", text, re.MULTILINE):
+        errors.append(f"{rel} must trigger on push to main")
+    if re.search(r"^\s+pull_request:", text, re.MULTILINE):
+        errors.append(f"{rel} must not trigger on pull_request (pr-check.yml owns that)")
+    if not gha_has_run_core(text, "backend-unit"):
+        errors.append(f"{rel} missing run-core.sh backend-unit")
+    if "verify-drift.py" not in text:
+        errors.append(f"{rel} must run verify-drift.py")
+    if gha_has_ai_assist(text):
+        errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    return errors
+
+
+def mapping_body(text: str, key: str, indent: int = 0) -> str:
+    """Read a block mapping in the repository's indented YAML format, without dependencies."""
+    lines = text.splitlines()
+    pattern = rf"^{' ' * indent}['\"]?{re.escape(key)}['\"]?:\s*(?:#.*)?$"
+    for index, line in enumerate(lines):
+        if not re.match(pattern, line):
+            continue
+        body: list[str] = []
+        for child in lines[index + 1:]:
+            if child.strip() and not child.lstrip().startswith("#"):
+                if len(child) - len(child.lstrip(" ")) <= indent:
+                    break
+            body.append(child)
+        return "\n".join(body)
+    return ""
+
+
+def nightly_schedule_errors(contract: str, gha: str) -> list[str]:
+    """Require the declared nightly cron on the workflow's actual on.schedule trigger."""
+    actions = mapping_body(contract, "github_actions")
+    trigger = mapping_body(actions, "trigger", 2)
+    declared = re.search(r"^    schedule_cron:\s*([^\n]+)", trigger, re.MULTILINE)
+    if not declared:
+        return []
+
+    def cron_value(value: str) -> str:
+        return value.split("#", 1)[0].strip().strip("'\"")
+
+    expected = cron_value(declared.group(1))
+    schedule = mapping_body(mapping_body(gha, "on"), "schedule", 2)
+    actual = [cron_value(value) for value in re.findall(
+        r"^    -\s+cron:\s*([^\n]+)", schedule, re.MULTILINE
+    )]
+    if not expected or actual != [expected]:
+        return [f"GHA ci.yml schedule cron {actual} != contract {[expected]}"]
+    return []
+
+
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -172,6 +234,8 @@ def main() -> int:
         errors.append("GHA workflow must not reference ai-assist (Jenkins-only per ADR-003)")
 
     errors.extend(pr_gate_errors(repo, contract))
+    errors.extend(main_gate_errors(repo, contract))
+    errors.extend(nightly_schedule_errors(contract, gha))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")

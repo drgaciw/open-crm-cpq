@@ -1,9 +1,13 @@
-# Manual fallback only — primary CI runs in Jenkins (see docs/ci-jenkins-cutover.md).
-# Automatic push/PR triggers are intentionally disabled (Option B cutover).
+# Manual fallback plus a nightly run of the full matrix on main — primary CI runs in Jenkins
+# (see docs/ci-jenkins-cutover.md). Push/PR triggers stay disabled (Option B cutover); the nightly
+# schedule exists because no Jenkins instance is reachable, so integration and frontend stages
+# otherwise never run (ADR-003 section 8, amendment 2026-10-16).
 name: CI (manual fallback)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
 
 permissions:
   contents: read
