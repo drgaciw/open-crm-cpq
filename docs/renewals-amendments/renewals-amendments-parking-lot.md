@@ -1,6 +1,6 @@
 # Renewals and amendments: parking lot (not active, future scope)
 
-Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7) and RA-56 / DRG-590 (rules requirements review, PL-8) and RA-57 / DRG-591 (approvals category, PL-9), each a "[PARKED]" item.
+Status: **PARKED. None of the items below is an active development story.** They are not in the first slice (S1 to S8), have no estimate, and must not be started without a new decision. Recorded 2026-10-16 from a product discussion. Tracked as RA-53 / DRG-587 (on-prem usage, PL-1 to PL-5) and RA-54 / DRG-588 (forecasting review, PL-6) and RA-55 / DRG-589 (mid-term cancellation, PL-7) and RA-56 / DRG-590 (rules requirements review, PL-8) and RA-57 / DRG-591 (approvals category, PL-9; skeleton RA-67 / DRG-601), each a "[PARKED]" item.
 
 ## Context
 ACI's on-premise customers are largely financial institutions that will not allow usage-monitoring connectivity, so they self-report usage. Today there is no systematic way to see on-premise usage in the product. The self-report workflow idea is a manual usage-number entry plus an attestation step by a rep or customer-ops.
@@ -112,6 +112,7 @@ Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracke
 - **Relation to existing repo capability:** approval-routing already exists and `ApprovalType` includes `CONTRACT_MODIFICATION` (see `amendment-document-design-spike.md`; ADR-035 keeps approvals in approval-routing). The slice reuses it with default thresholds. Not verified in the repo for this note: whether approval-routing supports per-gate approver roles, delegation, or a coterm-specific type. The review should check that.
 - **Dependencies:** none for the review itself. Inputs: spike approval flow, OQ5, OQ10, OQ15, OQ17, PL-7, coterm research (`coterm-renewal-quote-research.md`), approval-routing capability check.
 - **Unpark condition:** a separate conversation is scheduled for this topic and product confirms the scope. Until then the slice defaults stand.
+- **Starting point (skeleton, not decided):** `approval-requirements-skeleton.md` is the generic, configuration-driven skeleton to open the separate approvals conversation with. It covers the approver model, triggers, chains, thresholds, escalation, lifecycle interaction and a rule-set data model, and leaves every approver and threshold undecided. Tracked as RA-67 / DRG-601 ("[PARKED]"), alongside RA-57 / DRG-591.
 - **Not an active dev story.** No estimate, no code.
 
 ## Entry criteria to unpark
