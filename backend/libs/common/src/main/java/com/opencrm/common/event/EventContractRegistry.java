@@ -125,6 +125,9 @@ public final class EventContractRegistry {
     public static final EventContract APPROVAL_OUTCOME_COMPLETED_V1 = reserved(
             "ApprovalOutcomeCompleted", "approval-routing", KafkaTopics.APPROVAL_OUTCOME_COMPLETED, null);
 
+    public static final EventContract RULE_SET_PUBLISHED_V1 = reserved(
+            "RuleSetPublished", "pricing-service", KafkaTopics.RULE_SET_PUBLISHED, null);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             RAMP_APPLIED_V1,
@@ -139,7 +142,8 @@ public final class EventContractRegistry {
             PRICE_CALCULATED_V1,
             CONTRACT_EXECUTED_V1,
             APPROVAL_STEP_DECIDED_V1,
-            APPROVAL_OUTCOME_COMPLETED_V1);
+            APPROVAL_OUTCOME_COMPLETED_V1,
+            RULE_SET_PUBLISHED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

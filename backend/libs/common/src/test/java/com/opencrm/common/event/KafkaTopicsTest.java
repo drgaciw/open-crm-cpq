@@ -41,6 +41,7 @@ class KafkaTopicsTest {
         assertThat(KafkaTopics.SUBSCRIPTION_RENEWAL_ELIGIBLE).isEqualTo("cpq.subscription.renewal.eligible");
         assertThat(KafkaTopics.CONFIGURATION_COMMITTED).isEqualTo("cpq.configuration.committed");
         assertThat(KafkaTopics.BUNDLE_STRUCTURE_CHANGED).isEqualTo("cpq.product.bundle.structure.changed");
+        assertThat(KafkaTopics.RULE_SET_PUBLISHED).isEqualTo("cpq.pricing.ruleset.published");
         assertThat(KafkaTopics.CONTRACT_EXECUTED).isEqualTo("cpq.contract.executed");
     }
 }
