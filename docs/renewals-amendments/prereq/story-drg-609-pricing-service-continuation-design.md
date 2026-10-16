@@ -187,8 +187,8 @@ request
     productExternalId
     sourceAcceptedLineId     required for Update and Remove; omitted for Add
     contractedUnitRate       optional summary; never the sole source of Daily pricing
-    sourceBillingAnchorDate  required for RetainContracted Update/Remove
-    sourceTermStart, sourceTermEnd  required inclusive subscription boundaries
+    billingAnchorDate        required for every Daily line, including Add
+    subscriptionTermStart, subscriptionTermEnd  required inclusive boundaries for every Daily line
     acceptedRatePeriods[]    complete priced source schedule, ordered and non-overlapping
       acceptedLineId, sequence, startDate, endDate, billingAnchorDate
       quantity, netUnitRate, billingFrequency, provenance, sourceRevision
@@ -234,6 +234,7 @@ Checks the sketch includes, taken from rules that were read:
 - `policyId` on the wire is text, matching the document-line columns. V8 shows rule sets have a `uuid` (`rs-default-001` on the seed set). The Java property for that column was not opened. The implementation reads the public uuid once that property is confirmed. The Long surrogate stored in `pricing_audit_log.rule_set_id` is not the document column. `unverified` until the entity field is read.
 - `policyVersion` is `RuleSet.ruleSetVersion` of the selected set.
 - `policyDecisionId` is a new UUID string per line. It is not `PricingAuditLog.uuid`. That uuid is one row per execute, and simulate does not insert a row. It is also not the `commercial_decision_audit.id` written for `SYSTEM_RENEWAL_DRAFT`, which is one row per renewal draft and carries no pricing trace.
+- A new Add line supplies the target subscription term and billing anchor even when no source line exists. Its rate must come from an authoritative agreement/product policy or pricebook resolution. RetainContracted with no eligible agreement rate is UNBOUND/UNRESOLVED_BASIS, never a caller-selected rate or silent list fallback.
 - `selectedOptionCodes` and configuration evidence are explicit inputs even for Add, which has no source line. Resolve/validate the pricebook version and compute the FR-15 SHA-256 pin over product id, that version and sorted option codes. Validate the configuration evidence; never invent a hash from product id alone. The empty set is explicit, not missing input.
 - `inputsDigest` is computed over the canonical line inputs (action, semantics, quantities, product, source line, contracted rate, effective date, complete accepted rate schedule and source revision, billing anchors and term boundaries, sorted option codes and configuration evidence, pricebook version, amend mode, proration method, policy id, policy version). The digest is returned so a later audit row can store the same value. Writing that row is DRG-612.
 
