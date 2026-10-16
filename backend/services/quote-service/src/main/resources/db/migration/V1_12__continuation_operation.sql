@@ -7,8 +7,12 @@
 --   ALTER TABLE quotes DROP CONSTRAINT IF EXISTS chk_quotes_continuation_operation;
 --   ALTER TABLE quotes DROP COLUMN IF EXISTS continuation_operation;
 --
--- Reversible for every row this migration backfills: the operation remains inside
--- continuation_request_json, so dropping the column does not discard it.
+-- V1_12 adds a backfilled column. Dropping it is safe only if nothing reads it; otherwise restore
+-- from backup. quote-service reads continuation_operation (authoring, validate, clone, and the
+-- quote response). Do not drop the column while that code is deployed.
+--
+-- For rows this migration backfills, the operation also remains inside continuation_request_json.
+-- Dropping the column does not discard that JSON copy, but a reader of the column still breaks.
 -- Limit: a quote with no continuation_request_json, blank JSON, unreadable JSON, or an operation
 -- other than AMENDMENT | EXPANSION | RENEWAL | EXTENSION stays NULL. Those rows were already
 -- indistinguishable. A later writer that sets continuation_operation without updating
