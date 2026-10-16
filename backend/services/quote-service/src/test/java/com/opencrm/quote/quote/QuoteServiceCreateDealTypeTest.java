@@ -12,9 +12,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -87,27 +93,38 @@ class QuoteServiceCreateDealTypeTest {
         });
     }
 
-    @Test
-    @DisplayName("an opportunity UPSELL is stored as quote EXPANSION")
-    void mapsCrmTypeOntoTheCreatedQuote() {
-        stubPersistence();
-        QuoteDto created = quoteService.create(QuoteCreateRequest.builder()
-                .name("Expand seats")
-                .customerExternalId("cust-1")
-                .dealExternalId("deal-1")
-                .crmDealType("UPSELL")
-                .build());
+    static Stream<Arguments> tableRows() {
+        return CrmQuoteDealTypeMapping.rows().entrySet().stream()
+                .map(row -> Arguments.of(row.getKey(), row.getValue()));
+    }
 
-        assertThat(created.getDealType()).isEqualTo(DealType.EXPANSION);
+    @ParameterizedTest(name = "{0} -> {1}")
+    @MethodSource("tableRows")
+    @DisplayName("create stores each table row, including EXISTING_BUSINESS as EXPANSION")
+    void mapsEachTableRowOntoTheCreatedQuote(String crmDealType, DealType expected) {
+        stubPersistence();
+        QuoteDto created = quoteService.create(baseRequest().crmDealType(crmDealType).build());
+
+        assertThat(created.getDealType()).isEqualTo(expected);
         ArgumentCaptor<Quote> saved = ArgumentCaptor.forClass(Quote.class);
         verify(quoteRepository).save(saved.capture());
-        assertThat(saved.getValue().getDealType()).isEqualTo(DealType.EXPANSION);
+        assertThat(saved.getValue().getDealType()).isEqualTo(expected);
         assertThat(saved.getValue().getDealExternalId()).isEqualTo("deal-1");
     }
 
+    @ParameterizedTest
+    @NullSource
+    @DisplayName("a null crmDealType is missing and keeps the documented default NEW")
+    void nullCrmDealTypeDefaultsToNew(String crmDealType) {
+        stubPersistence();
+        QuoteDto created = quoteService.create(baseRequest().crmDealType(crmDealType).build());
+
+        assertThat(created.getDealType()).isEqualTo(DealType.NEW);
+    }
+
     @Test
-    @DisplayName("omitting both types keeps the documented default NEW")
-    void defaultsToNewWhenNoTypeIsSupplied() {
+    @DisplayName("omitting crmDealType keeps the documented default NEW")
+    void missingCrmDealTypeDefaultsToNew() {
         stubPersistence();
         QuoteDto created = quoteService.create(baseRequest().build());
 
@@ -155,6 +172,16 @@ class QuoteServiceCreateDealTypeTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo("CRM_DEAL_TYPE_REQUIRED");
+        verify(quoteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("an unknown CRM value fails loudly and saves nothing")
+    void rejectsUnknownCrmType() {
+        assertThatThrownBy(() -> quoteService.create(baseRequest().crmDealType("NOT_A_DEAL_TYPE").build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo("CRM_DEAL_TYPE_UNMAPPED");
         verify(quoteRepository, never()).save(any());
     }
 
