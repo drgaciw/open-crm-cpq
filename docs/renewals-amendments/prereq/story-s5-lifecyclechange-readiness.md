@@ -1,6 +1,8 @@
 # S5 readiness: quote-service LifecycleChange (DRG-583)
 
-*open-crm-cpq. Documentation only. Date: 2026-10-16. Base: `main` at `dd0f1a8`. Story: RA-49 / [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583/s5-quote-service-lifecyclechange-amend-with-pricing-service-decisions) (Backlog when read). This note records a boundary and a wait-list. It authorizes no code, schema, topic, gateway route, or flag.*
+*open-crm-cpq. Documentation only. Date: 2026-10-16. Story: RA-49 / [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583/s5-quote-service-lifecyclechange-amend-with-pricing-service-decisions) (Backlog when read). This note records a boundary and a wait-list. It authorizes no code, schema, topic, gateway route, or flag.*
+
+**Base branch is `main`.** Draft PR #619 targets `main` (`baseRefName` read from GitHub). This note lands on `main` when the owner merges it. The file is not on `main` at `dd0f1a8` while the PR stays draft. #613 merged to `docs/renewals-amendments-design-2026-10-16`. #614 merged to `cursor/crm-quote-dealtype-mapping-6410`. Neither of those merges landed on `main`.
 
 **Verdict.** S5 is not ready to implement. [ADR-035](../adr-035-amendment-document-placement.md) does not authorize it. Pricing for Add, Update, and Remove lines with a PolicyDecision id, policy version, and trace id is absent on the reading in the OQ9 note, and [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609/story-pricing-service-support-for-addupdateremove-lines-with) is the story that gap waits on.
 
@@ -16,6 +18,8 @@ Nothing in this note was executed. No Maven run, no Drools session, no HTTP call
 ## 1. Authorization
 
 **S5 is not authorized by ADR-035.** The acceptance paragraph authorizes the first-slice schema and audit stories only: S1 and S2 (RA-45 / RA-46, DRG-579 / DRG-580). It says later stories still need their own gates. The Decision text is unchanged. Read: ADR-035, "Acceptance 2026-10-16".
+
+An ADR counts as accepted only after the owner accepts it and the status-change PR merges. That is DoD v0.2 item 6, read from the approved Notion page. ADR-035 on `main` is Accepted. Its status-change PR is #600, merged to `main` (merge commit `307f065`).
 
 The same limit is recorded in:
 
@@ -47,7 +51,7 @@ Two documents on `main` define the boundary this story has to keep.
 | Flag on plus `amendmentDocumentId`: document path, and the legacy apply does not run. Flag off: legacy path | AC-S6-2 | S6 |
 | Flag routing lives in `QuoteAcceptedEventConsumer` | Technical approach §2, CAM row | S1, S2, S3, S4, S6, S7 (the row lists those stories; it does not list S5) |
 
-quote-service's row in the same table does list LifecycleChange, the `lifecycle-changes` API, the facade on `QuoteContinuationController`, pricing client calls, pinning, and QuoteAccepted emission with `amendmentDocumentId` under stories S5 and S6. FR-16 places the event fields and the CAM route on S6. This note does not merge those two assignments into one owner. **Pending DoD** if a single owning story is required.
+quote-service's row in the same table does list LifecycleChange, the `lifecycle-changes` API, the facade on `QuoteContinuationController`, pricing client calls, pinning, and QuoteAccepted emission with `amendmentDocumentId` under stories S5 and S6. FR-16 places the event fields and the CAM route on S6. Both assignments stay as written. This note does not choose a single owner.
 
 AC-S5-5 is a different surface: the legacy continuation endpoint, with the flag on, creates a LifecycleChange and keeps the previous response shape. The requirements file does not name the flag key. The draft OpenAPI on `main` says the same thing and then says the proposal does not name or enable that switch (`docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml`, info description and `POST /quotes/continuations`, read). OQ11's per-tenant flag is the CAM apply flag. Whether AC-S5-5's "flag" is that same flag is **unverified**.
 
@@ -160,7 +164,7 @@ Ordering and fulfilment stay out (technical approach §2). document-generation s
 |---|---|---|
 | OQ1 | Accepted. Authorizes S1 and S2 only. | S5 has no ADR gate of its own yet. |
 | OQ9 (register) | BLOCKS S5 until verified. Fallback text is RetainContracted with an override flag. | Superseded as a *finding* by the OQ9 file and by DRG-609, which say the capability is absent and S5 stays blocked until the pricing story lands. The register row itself was not edited by those later files. The row and the finding disagree on whether a fallback lets S5 start. This note follows DRG-609 plus V8: the fallback does not satisfy AC-S5-2. |
-| OQ9 (spec §8) | "Backdating limits and approval thresholds (V6)." | Different question, same id. Spec clarification later uses "OQ9" again for pricing-service support (DRG-550). Naming collision. **Pending DoD** which id a test or a ticket should quote. |
+| OQ9 (spec §8) | "Backdating limits and approval thresholds (V6)." | Different question, same id. Spec clarification later uses "OQ9" again for pricing-service support (DRG-550). The register and the spec use one id for two questions. |
 | OQ11 | DEFAULT PROPOSED. Per-tenant flag, default off, internal tenant first. Blocks S6. | Apply-path flag. Not specified as the AC-S5-5 switch. |
 | OQ12 | Confirmed. Add, Update, Remove only. | AC-S5-3. |
 | OQ17 | DEFAULT PROPOSED. Approval for overrides, backdating, or ARR delta above a Finance threshold. Needed before S5 ends. | AC-S5-4 can name `CONTRACT_MODIFICATION`. The non-override threshold is still a default. |
@@ -173,39 +177,42 @@ Ordering and fulfilment stay out (technical approach §2). document-generation s
 
 Register summary dated 2026-10-16 says the remaining gate is OQ9 and that it only gates S5. That sentence predates the OQ9 file's verdict and DRG-609. It is not a clearance to start S5.
 
-## 7. Definition of done
+## 7. Definition of done (v0.2)
 
-The only story DoD on `main` is requirements §3 (read):
+Approved rule, read 2026-10-16: [CPQ Definition of Done v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338) (owner drg, 4:30 PM CT). It replaces v0.1. Done means every item passes. Items 2 and 7 are owner gates. A story is Done only when the owner merges it to `main` and every item passes. The six additions are N/A, with a one-line reason, when the change does not touch events, rules, or commercial decisions.
 
-> Ready: dependencies met, open question defaults accepted (register), contract test fixtures drafted. Done: acceptance criteria automated, migration reviewed for expand-contract, docs updated, no change to legacy path behaviour when flag is off, audit events visible.
+This table scores draft PR #619, the readiness note. It does not score an S5 implementation. DRG-583 is not Done.
 
-Applied to S5:
+Requirements §3 on `main` still says: ready when dependencies are met, open-question defaults are accepted, and contract fixtures are drafted; done when acceptance criteria are automated, the migration is reviewed for expand-contract, docs are updated, the legacy path is unchanged with the flag off, and audit events are visible. That sentence is not v0.2. v0.2 is the checklist below.
 
-| Clause | Applies to S5? | Now |
-|---|---|---|
-| Ready: dependencies met | Yes | Not met. ADR-035 does not authorize S5. DRG-609 blocks the pricing acceptance criteria. DRG-605 and DRG-602 were still blockers when read. S3 contract is a draft proposal. |
-| Ready: open-question defaults accepted | Yes | OQ12 is confirmed. OQ9 is not accepted as a capability. OQ17 and OQ18 are defaults, not confirmed. |
-| Ready: contract test fixtures drafted | Yes | The draft OpenAPI is a proposal, not an accepted fixture suite. No S5 fixture files were opened. **Unverified** whether any exist. |
-| Done: acceptance criteria automated | Yes | AC-S5-1..AC-S5-6 are not automated by this note. AC-S5-2 cannot go green before DRG-609. |
-| Done: migration reviewed for expand-contract | Yes, if S5 adds stored state | Technical approach §3 lists CAM migrations V1_7, V1_8, V1_9 only. No quote-service migration is named. A review cannot be checked against a file that is not specified. |
-| Done: docs updated | Yes | This note is the readiness record. It is not the story's implementation doc. |
-| Done: no change to legacy path behaviour when the flag is off | Yes | Current consumer always applies. AC-S4-9 and AC-S6-2 are the written tests. AC-S5-5 changes behavior only when its switch is on, and that switch is unnamed. Flag off must keep `POST /api/v1/quotes/continuations` and the CAM apply path as they are. |
-| Done: audit events visible | Yes, for outcomes S5 owns | Override approval (FR-18, V14) and audited validation failures (FR-07) are the written ones. CAM outbox to the audit trail is FR-19 / S2. |
+### v0.1 items (unchanged in v0.2)
 
-Anything past that paragraph is **pending DoD**. That includes, and is not limited to:
+| # | Item | Result | Reason |
+|---|---|---|---|
+| 1 | Acceptance criteria checked on the Linear issue | N/A | This note does not implement or verify AC-S5-1 through AC-S5-6. |
+| 2 | PR to drgaciw/open-crm-cpq, reviewed, CI green, owner merges | N/A | Owner gate. #619 links DRG-583 and is still a draft; the owner has not merged it. |
+| 3 | Automated tests for Java or Angular behavior | N/A | This change is one markdown file and changes no Java or Angular behavior. |
+| 4 | Edge-case tests for renewals, amendments, ramps, escalators, DealType, dates, and totals | N/A | This change adds no quote or pricing behavior to test. |
+| 5 | Reversible schema or a documented rollback, and a compatibility check | N/A | This change adds no schema and no migration. |
+| 6 | ADRs accepted only after owner acceptance and a merged status change; API or behavior changes noted | pass | No new ADR. ADR-035 counts as accepted because status-change PR #600 merged to `main`. This note is the boundary doc. |
+| 7 | No flag enabled, nothing deployed, nothing sent externally | pass | Owner gate for later implementation. This change enables no flag, deploys nothing, and sends nothing external. |
+| 8 | Linear links the PR, has no open blockers, and Notion is updated if sequencing changed | N/A | DRG-583 stays Backlog and is still blocked by DRG-609, DRG-605, and DRG-602. This note does not change the Notion hub. |
+| 9 | Follow-ups have DRG issues; no TODO without a ticket | pass | This note adds no TODO. The pricing gap is already DRG-609. |
 
-- Choosing one flag key for AC-S5-5 versus OQ11.
-- Resolving the OQ9 id collision between the register and spec §8.
-- p95 apply latency and other non-functional targets (requirements non-functional paragraph; OQ19; story S8).
-- Metrics, alerts, and the runbook in technical approach §9.
-- Golden-file digest tests (risk R4) beyond "acceptance criteria automated".
-- A quote-service table design, expand-contract rules for that table, or a feature-flag rollout percentage.
-- Browser UAT. The project UAT scripts are not part of this story's written DoD.
-- Treating DRG-609's design note, or this file, as owner acceptance.
+### v0.2 additions
+
+| # | Item | Result | Reason |
+|---|---|---|---|
+| 1 | Open Host Service | N/A | This change adds or changes no integration surface. |
+| 2 | Schema-registry events | N/A | This change adds or changes no event. |
+| 3 | Outbox writes | N/A | This change writes no outbox row and publishes no event. |
+| 4 | Commercial-decision audit | N/A | This change writes no commercial decision. |
+| 5 | Event-replay test | N/A | This change produces no event, so it adds no replay test. |
+| 6 | Base branch stated, and the work lands on `main` | pass | PR #619 base is `main`, so this note lands on `main` when the owner merges. #613 and #614 merged to other branches. |
 
 ## 8. Sources and limits
 
-Read for this note: ADR-035; `docs/adr/README.md` catalog row; technical approach; requirements and acceptance; open-questions register; mid-term spec sections cited in section 5; OQ9 capability note; the OpenAPI sections cited in section 5; the Java files in section 5; Linear DRG-583, DRG-609, DRG-602, DRG-605, DRG-581, DRG-582.
+Read for this note: ADR-035; `docs/adr/README.md` catalog row; technical approach; requirements and acceptance; open-questions register; mid-term spec sections cited in section 5; OQ9 capability note; the OpenAPI sections cited in section 5; the Java files in section 5; Linear DRG-583, DRG-609, DRG-602, DRG-605, DRG-581, DRG-582; Notion [DoD v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338); GitHub PR metadata for #600, #613, #614, and #619.
 
 Not read, so **unverified**: pricing-service Java (the OQ9 note is the reading); product-service, configuration-engine, and pricebook-service; the remainder of `DRAFT-openapi-amendments.yaml`; `AcceptedQuoteSubscriptionService` beyond the operation allow-list; approval-routing call sites; DRG-552 and DRG-553 bodies; whether Linear blocking relations changed after `dd0f1a8`.
 
