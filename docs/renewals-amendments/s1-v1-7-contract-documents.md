@@ -11,7 +11,7 @@ CAM Flyway **V1_7** (`V1_7__contract_documents.sql`) adds the thin contract head
 - Uniqueness from the field schema section 4, including one EXECUTED revision per document and unique `(contract_id, amendment_seq)`.
 - Append-only `amendment_document_events`: role `cam_app` has SELECT and INSERT only, and triggers reject UPDATE, DELETE and TRUNCATE for every role, including the table owner.
 - `recorded_at` is overwritten by the database on insert.
-- Write-once guards on `executed_revision_no`, `executed_at`, `amendment_seq` and `amendment_number`. Frozen revisions and their lines cannot be updated or deleted. V1_11 also rejects adding or moving lines into a frozen revision and locks the revision during a line mutation.
+- Write-once guards on `executed_revision_no`, `executed_at`, `amendment_seq` and `amendment_number`. Frozen revisions and their lines cannot be updated or deleted. V1_7_2 also rejects adding or moving lines into a frozen revision and locks the revision during a line mutation.
 
 `applied_quote_acceptances` is unchanged. There is no `apply_status` column and no `document_apply_ledger`.
 
@@ -21,7 +21,7 @@ Stored enum tokens are the Java enum names (`AMEND`, `NOT_REQUIRED`, `TERMS_AND_
 
 ## Rollback
 
-V1_7 is expand-only. Flyway has no down migration. The previous application ignores the new tables and the new nullable columns. Roll back only while the new tables are empty (S1 has no writer). If any document row exists, restore from backup instead of dropping tables.
+V1_7 is expand-only. Flyway has no down migration. The previous application ignores the new tables and the new nullable columns. Roll back only while every new table, including `renewal_eligibility_publications`, is empty. Renewal publication can populate receipts even while the relay is off. If any document or publication-receipt row exists, restore from backup instead of dropping tables.
 
 Run in the CAM schema (`contract` unless `DB_SCHEMA` says otherwise):
 
@@ -40,13 +40,14 @@ ALTER TABLE IF EXISTS amendment_documents
 DROP TABLE IF EXISTS amendment_document_revisions;
 DROP TABLE IF EXISTS amendment_documents;
 ALTER TABLE IF EXISTS subscriptions DROP COLUMN IF EXISTS contract_id;
+DROP TABLE IF EXISTS renewal_eligibility_publications;
 DROP TABLE IF EXISTS contracts;
 DROP FUNCTION IF EXISTS reject_amendment_document_event_mutation();
 DROP FUNCTION IF EXISTS stamp_amendment_document_event_recorded_at();
 DROP FUNCTION IF EXISTS reject_amendment_document_write_once();
 DROP FUNCTION IF EXISTS reject_frozen_amendment_revision_mutation();
 DROP FUNCTION IF EXISTS reject_frozen_amendment_line_mutation();
-DELETE FROM flyway_schema_history WHERE version IN ('1.7', '1.11');
+DELETE FROM flyway_schema_history WHERE version IN ('1.7', '1.7.1', '1.7.2');
 COMMIT;
 ```
 
