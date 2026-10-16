@@ -1885,7 +1885,7 @@ components:
         value:
           $ref: "#/components/schemas/Money"
         reasonCode: {type: string}
-        actor: {type: string, description: Authenticated principal. Not client-supplied.}
+        actor: {type: string, readOnly: true, description: Authenticated principal. Not client-supplied.}
 
     PricingDecision:
       type: object
