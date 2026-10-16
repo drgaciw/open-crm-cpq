@@ -114,6 +114,44 @@ def main_gate_errors(repo: Path, contract: str) -> list[str]:
     return errors
 
 
+def mapping_body(text: str, key: str, indent: int = 0) -> str:
+    """Read a block mapping in the repository's indented YAML format, without dependencies."""
+    lines = text.splitlines()
+    pattern = rf"^{' ' * indent}['\"]?{re.escape(key)}['\"]?:\s*(?:#.*)?$"
+    for index, line in enumerate(lines):
+        if not re.match(pattern, line):
+            continue
+        body: list[str] = []
+        for child in lines[index + 1:]:
+            if child.strip() and not child.lstrip().startswith("#"):
+                if len(child) - len(child.lstrip(" ")) <= indent:
+                    break
+            body.append(child)
+        return "\n".join(body)
+    return ""
+
+
+def nightly_schedule_errors(contract: str, gha: str) -> list[str]:
+    """Require the declared nightly cron on the workflow's actual on.schedule trigger."""
+    actions = mapping_body(contract, "github_actions")
+    trigger = mapping_body(actions, "trigger", 2)
+    declared = re.search(r"^    schedule_cron:\s*([^\n]+)", trigger, re.MULTILINE)
+    if not declared:
+        return []
+
+    def cron_value(value: str) -> str:
+        return value.split("#", 1)[0].strip().strip("'\"")
+
+    expected = cron_value(declared.group(1))
+    schedule = mapping_body(mapping_body(gha, "on"), "schedule", 2)
+    actual = [cron_value(value) for value in re.findall(
+        r"^    -\s+cron:\s*([^\n]+)", schedule, re.MULTILINE
+    )]
+    if not expected or actual != [expected]:
+        return [f"GHA ci.yml schedule cron {actual} != contract {[expected]}"]
+    return []
+
+
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -197,6 +235,7 @@ def main() -> int:
 
     errors.extend(pr_gate_errors(repo, contract))
     errors.extend(main_gate_errors(repo, contract))
+    errors.extend(nightly_schedule_errors(contract, gha))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")

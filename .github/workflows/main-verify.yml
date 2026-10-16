@@ -7,6 +7,7 @@
 #
 # Bursts of merges cancel earlier runs: only the newest head of main is verified, which costs one
 # run per burst instead of one per merge. If it fails, bisect the burst it covered.
+# Concurrency is scoped by ref so a manual feature-branch or tag run cannot cancel main.
 #
 # The full matrix (integration, frontend, cpq_beta, security audit) runs nightly from ci.yml.
 name: Main verify
@@ -20,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: main-verify
+  group: main-verify-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
