@@ -1,0 +1,49 @@
+# Post-merge gate on main (ADR-003 section 8, amendment 2026-10-16).
+#
+# Every pull request is checked on its own head by pr-check.yml, but nothing checked the head that
+# results when several pull requests merge in a row. On 2026-10-16 two individually green pull
+# requests (#612, #615) merged and main stopped compiling (DRG-613). This workflow runs the same
+# Docker-free stage on every push to main, so the combined head gets a result.
+#
+# Bursts of merges cancel earlier runs: only the newest head of main is verified, which costs one
+# run per burst instead of one per merge. If it fails, bisect the burst it covered.
+#
+# The full matrix (integration, frontend, cpq_beta, security audit) runs nightly from ci.yml.
+name: Main verify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-verify
+  cancel-in-progress: true
+
+jobs:
+  backend-unit:
+    name: Backend Unit (main)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: CI contract drift check
+        run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+      - name: Fast unit verification
+        run: bash scripts/ci/run-core.sh backend-unit
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-verify-unit-test-reports
+          path: backend/**/target/surefire-reports/*.xml
+          if-no-files-found: ignore
+          retention-days: 7

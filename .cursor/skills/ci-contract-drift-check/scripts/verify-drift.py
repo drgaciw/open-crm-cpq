@@ -90,6 +90,30 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
     return errors
 
 
+def main_gate_errors(repo: Path, contract: str) -> list[str]:
+    """Validate the post-merge gate declared under github_main_gate (ADR-003 section 8)."""
+    m = re.search(r"^github_main_gate:\s*\n\s+workflow:\s*(\S+)", contract, re.MULTILINE)
+    if not m:
+        return []
+    rel = m.group(1)
+    path = repo / rel
+    if not path.is_file():
+        return [f"github_main_gate workflow {rel} is missing"]
+    text = load_text(path)
+    errors: list[str] = []
+    if not re.search(r"^\s+push:\s*\n\s+branches:\s*\[\s*main\s*\]", text, re.MULTILINE):
+        errors.append(f"{rel} must trigger on push to main")
+    if re.search(r"^\s+pull_request:", text, re.MULTILINE):
+        errors.append(f"{rel} must not trigger on pull_request (pr-check.yml owns that)")
+    if not gha_has_run_core(text, "backend-unit"):
+        errors.append(f"{rel} missing run-core.sh backend-unit")
+    if "verify-drift.py" not in text:
+        errors.append(f"{rel} must run verify-drift.py")
+    if gha_has_ai_assist(text):
+        errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    return errors
+
+
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -172,6 +196,7 @@ def main() -> int:
         errors.append("GHA workflow must not reference ai-assist (Jenkins-only per ADR-003)")
 
     errors.extend(pr_gate_errors(repo, contract))
+    errors.extend(main_gate_errors(repo, contract))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")
