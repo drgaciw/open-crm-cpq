@@ -4,7 +4,7 @@
 
 **Story:** [DRG-539](https://linear.app/drgamtd-workspace/issue/DRG-539/product-pricebook-and-configuration-services-not-in-continuation-flow). This note is the price-book read for the renewal bases `CurrentList` and `ListLessContractedDiscount`, and for the `notAboveList` cap that uses the same list.
 
-**Status:** Proposed. Not accepted. This file is not an ADR, takes no ADR number, and does not edit an Accepted ADR. No code, schema, Flyway file, Drools edit, flag, route, or deploy starts from this text. The owner decision is the section at the end. Until that decision, [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567/renewal-uplift-basis-caps-price-as-of-date-and-policy) keeps returning no price for these bases.
+**Status:** Proposed. Not accepted. This file is not an ADR, takes no ADR number, and does not edit an Accepted ADR. Accepting this note authorizes no code and no migration. Acceptance records the read. A later implementation pull request is a separate act, and it is the only act that may add code or a Flyway file. No code, schema, Flyway file, Drools edit, flag, route, or deploy starts from this text. The owner decision is the section at the end. Until that decision, [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567/renewal-uplift-basis-caps-price-as-of-date-and-policy) keeps returning no price for these bases.
 
 **Does not decide:** [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609/story-pricing-service-support-for-addupdateremove-lines-with). The design note merged in [#625](https://github.com/drgaciw/open-crm-cpq/pull/625) still says no code starts until the owner accepts that design. Merging the note is not that acceptance. This file does not adopt its continuation route, its request shape, or its price-book pin sentence.
 
@@ -195,23 +195,28 @@ The open draft [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) prices `
 
 ## Migration
 
-No migration ships with this note. No file is added under any `db/migration` directory.
+No migration ships with this note. No file is added under any `db/migration` directory. Accepting this note authorizes no code and no migration.
 
-| Would-be file | When it would exist | Why it is not created |
-|---|---|---|
-| None | Option A + A1, the recommendation | Uniqueness is enforced in `PriceBookService`, not by a unique index. Allowing a non-overlapping second book does not need a new column. |
-| `backend/services/pricing-service/src/main/resources/db/migration/V9__price_book_region_interval_exclusion.sql` | Only if the owner wants the database to reject overlapping intervals for one region, and overlapping default books | Next integer after `V8__guard_managed_seed_optional_inputs.sql`. No `V9__` file is on this `main`. pricing-service is the Flyway owner; pricebook-service stays Flyway-disabled. An exclusion constraint needs an extension this note does not name as accepted. |
-| `backend/services/pricing-service/src/main/resources/db/migration/V9__price_book_entry_intervals.sql` | Only if the owner chooses option A2 instead of A1 | Same version number, alternative contents. One of these two `V9` names can exist later. This note creates neither. |
-| `backend/services/contract-asset-management/src/main/resources/db/migration/V1_10__rate_period_list_unit.sql` | Only if a later story stores the prior-list pin on `subscription_rate_periods` (`list_unit_price DECIMAL(19,4)` null, `price_book_uuid VARCHAR(36)` null) | `V1_8__contract_header_backfill.sql` is the header backfill and is on this `main`. Its header reserves `V1_9` for `document_apply_ledger` (S4 / DRG-582). The technical approach, section 3, assigns `V1_9` the same way. `V1_10` is the next CAM version this tree does not reserve. Nullable columns, no backfill: existing rows stay null, and `ListLessContractedDiscount` stays `UNRESOLVED_BASIS` for them. |
-| quote-service `V1_13` | Not proposed | Latest quote migration on this `main` is `V1_12__continuation_operation.sql`. `list_price DECIMAL(19,2)` is the wrong pin. |
+The recommended read (option A with A1) needs no new column. Uniqueness is enforced in `PriceBookService`, not by a unique index.
 
-Whether an unmerged branch already claims pricing `V9` or CAM `V1_10` was not checked. `unverified`.
+A later story that does add a migration settles the version in that migration pull request. This note does not reserve a number.
 
-Rollback for the recommendation, while no migration exists, is to keep the list bases at `UNRESOLVED_BASIS`. A later `V9` or `V1_10` would document its own rollback in that story. Existing books, entries, quotes, and rate periods are unchanged by this file.
+| Later change | Version this note assigns |
+|---|---|
+| Database rejection of overlapping intervals for one region, or of overlapping default books, if the owner asks for it. pricing-service remains the Flyway owner; pricebook-service stays Flyway-disabled. An exclusion constraint needs an extension this note does not name as accepted. | Next free number after `V9`, settled when the migration PR exists. |
+| Option A2, a dated price table on the single regional book, if the owner chooses A2 instead of A1. | Next free number after `V9`, settled when the migration PR exists. The two pricing changes are alternatives. A migration PR picks one. |
+| Prior-list pin on `subscription_rate_periods`, if a later story stores it (`list_unit_price DECIMAL(19,4)` null, `price_book_uuid VARCHAR(36)` null). Nullable columns, no backfill: existing rows stay null, and `ListLessContractedDiscount` stays `UNRESOLVED_BASIS` for them. | Next free number after `V1_10`, settled when the migration PR exists. |
+| quote-service `list_price` | Not proposed. Latest quote migration on this `main` is `V1_12__continuation_operation.sql`. `list_price DECIMAL(19,2)` is the wrong pin. |
+
+Pricing `V9` is already claimed. [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542/amendment-proration-rule-conflicts-with-continuation-formula) open pull request [#638](https://github.com/drgaciw/open-crm-cpq/pull/638) adds `V9__disable_unedited_system_amendment_proration.sql`. `verified by reading the pull request`. This note does not use `V9`.
+
+CAM `V1_8__contract_header_backfill.sql` is the header backfill and is on this `main`. Its header reserves `V1_9` for `document_apply_ledger` (S4 / DRG-582). The technical approach, section 3, assigns `V1_9` the same way. This note does not use `V1_9` or `V1_10`.
+
+Rollback for the recommendation, while no migration exists, is to keep the list bases at `UNRESOLVED_BASIS`. A later migration pull request documents its own rollback. Existing books, entries, quotes, and rate periods are unchanged by this file.
 
 ## Owner decision needed
 
-This note is Proposed until the owner accepts or replaces the following. Acceptance is a later status change. It is not this pull request.
+This note is Proposed until the owner accepts or replaces the following. Acceptance is a later status change. It is not this pull request. Accepting this note authorizes no code and no migration.
 
 1. **Reader.** pricing-service calls pricebook-service (option A). quote-service sends product, currency, price-as-of date, and region when it has one. pricing-service writes the list and `price_books.uuid` onto the snapshot. The Accepted sentence that quote-service sends the list and the version stays in that ADR; this item confirms pricing-service is what fills those two facts from the book.
 2. **Successor books (A1) rather than a new price table (A2).** Non-overlapping intervals per region, and the same rule for `is_default`. The version id is `price_books.uuid`, not the surrogate `id` and not the optimistic `version` column.
@@ -220,7 +225,7 @@ This note is Proposed until the owner accepts or replaces the following. Accepta
 5. **Inclusive interval ends,** matching `isEffective`. [#640](https://github.com/drgaciw/open-crm-cpq/pull/640) says that draft does not decide inclusivity. `verified by reading the pull request`.
 6. **Currency match on the book and the entry.** Region is optional and never falls through to the default when the regional books miss the date. More than one matching book, or more than one entry, is `UNRESOLVED_BASIS`.
 7. **No product-list fallback and no zero** on this read. Execute's fallback stays on execute.
-8. **Prior list** comes from a pin captured at acceptance. This note does not add `V1_10`. Until a later story captures it, `ListLessContractedDiscount` is `UNRESOLVED_BASIS` on every existing rate. `CurrentList` and `notAboveList` still use the as-of read.
+8. **Prior list** comes from a pin captured at acceptance. This note does not add that column. Any later migration uses the next free number after `V1_10`, settled when the migration PR exists. Until a later story captures the pin, `ListLessContractedDiscount` is `UNRESOLVED_BASIS` on every existing rate. `CurrentList` and `notAboveList` still use the as-of read.
 9. **Sibling path** `POST /internal/v1/price-books/resolve-as-of`, service token, same `/internal` prefix as resolve-batch. resolve-batch's request and response stay as they are. ADR-017 stays Proposed and is not the authority for this path.
 10. **DRG-609 stays unaccepted.** This read is not `POST /api/v1/pricing/continuation/evaluate` and does not wait on that design.
 11. **Entry `floor_price` is not an uplift floor.**
@@ -237,6 +242,7 @@ Product-service, successor products, and configuration / `ReconfigureFrom` (the 
 | Uplift record, Accepted | `docs/renewals-amendments/prereq/adr-renewal-uplift-basis-and-precedence.md`; #623 merged |
 | DRG-609 design, not accepted | `docs/renewals-amendments/prereq/story-drg-609-pricing-service-continuation-design.md`; #625 merged |
 | DRG-567 ContractedNet draft | #640 body |
+| Pricing `V9` claimed by DRG-542 | #638 body (`V9__disable_unedited_system_amendment_proration.sql`) |
 | ADR-008, ADR-017, ADR-024..027 | `docs/adr/` headers and ADR-008 decision section; catalog row for ADR-017 in `docs/adr/README.md` |
 | Resolve path | `PriceBookInternalResolutionService`, `InternalPriceBookController`, `ResolveBatchRequest`, `ResolveBatchResponse`, `PriceBookRepository`, `PriceBookEntryRepository` |
 | Write rules | `PriceBookService` (`validateRegionUniqueness`, `clearCurrentDefault`, `ensureNotPublished`) |
@@ -252,6 +258,6 @@ Product-service, successor products, and configuration / `ReconfigureFrom` (the 
 - Any runtime result: HTTP JSON, which book a live resolve returns, row counts, overlapping books in a real database.
 - The Java on [#640](https://github.com/drgaciw/open-crm-cpq/pull/640). The unresolved-basis claim is the pull-request body.
 - Jackson unknown-property handling on the pricing price-book client.
-- Whether an open branch has already taken pricing `V9` or CAM `V1_10`.
+- Which integer is free after pricing `V9`, and which CAM version is free after `V1_10`. Both are settled when a migration pull request exists. This note assigns neither.
 - A subscription region stored outside `Subscription.java`. The entity that was read has none.
 - Notion `verification.state` for the DoD page.
