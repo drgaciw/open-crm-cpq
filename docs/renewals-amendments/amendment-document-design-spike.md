@@ -437,3 +437,7 @@ Audit is first class, so the document must answer four questions: **what changed
 | RA-30 / DRG-564 | https://linear.app/drgamtd-workspace/issue/DRG-564 | https://app.notion.com/p/3fbf7cb4e4df8160afadfa10cb5f8d18 |
 | RA-31 / DRG-565 | https://linear.app/drgamtd-workspace/issue/DRG-565 | https://app.notion.com/p/3fbf7cb4e4df815580e1fbac607d006e |
 | RA-32 / DRG-566 | https://linear.app/drgamtd-workspace/issue/DRG-566 | https://app.notion.com/p/3fbf7cb4e4df812aa54ee13081ec340f |
+
+
+## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
+Status of the eight decisions at the top: 1 placement is ADR-035 (Accepted 2026-10-16; authorizes S1 schema and S2 audit work only); 2 apply trigger resolved (EXECUTED); 3 thin header default (OQ3); 4 numbering resolved; 5 partial application default in OQ5; 6 revision model default in OQ6; 7 backfill reduced to header only for the first slice (OQ7, history stays DRG-566); 8 retention open, blocks go-live only (OQ8). See `renewals-amendments-open-questions-register.md`.
