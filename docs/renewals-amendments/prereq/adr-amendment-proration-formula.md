@@ -1,6 +1,6 @@
 # Draft ADR: Amendment proration formula
 
-**Status:** Proposed. Not accepted. The owner accepts ADRs. Until this status changes to Accepted, [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542/amendment-proration-rule-conflicts-with-continuation-formula) stays blocked.
+**Status:** Accepted 2026-10-16 (owner approval in chat, 4:26 PM CT)
 **Date:** 2026-10-16
 **Deciders:** Project owner (pending).
 **Number:** none. Do not assign one in this draft. Do not copy this file into `docs/adr/` and do not add a row to `docs/adr/README.md` until the owner accepts it and assigns a number.
