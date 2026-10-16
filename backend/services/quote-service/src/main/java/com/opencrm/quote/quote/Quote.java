@@ -87,6 +87,14 @@ public class Quote extends BaseEntity {
     @Column(name = "continuation_request_json", columnDefinition = "TEXT")
     private String continuationRequestJson;
 
+    /**
+     * Typed continuation operation. EXTENSION and RENEWAL both persist as {@link DealType#RENEWAL};
+     * this column is what keeps them distinguishable.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "continuation_operation", length = 32)
+    private QuoteContinuationRequest.Operation continuationOperation;
+
     @Column(name = "subtotal", precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal subtotal = BigDecimal.ZERO;
