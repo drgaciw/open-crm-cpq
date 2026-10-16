@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -163,6 +164,25 @@ class QuoteServiceCloneTest {
         assertThat(dto.getTotalDiscount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(dto.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(quoteLineItemRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("clone copies continuation operation")
+    void cloneCopiesContinuationOperation() {
+        Quote original = sourceQuote();
+        original.setContinuationOperation(QuoteContinuationRequest.Operation.EXTENSION);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(original));
+        when(quoteNumberGenerator.generate()).thenReturn("Q-COPY-OP");
+        stubQuoteSaves(99L);
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of());
+        when(quoteMapper.toDto(any(Quote.class))).thenAnswer(inv -> toDtoAnswer(inv.getArgument(0)));
+
+        quoteService.clone(1L);
+
+        ArgumentCaptor<Quote> savedQuote = ArgumentCaptor.forClass(Quote.class);
+        verify(quoteRepository, atLeastOnce()).save(savedQuote.capture());
+        assertThat(savedQuote.getAllValues()).extracting(Quote::getContinuationOperation)
+                .containsOnly(QuoteContinuationRequest.Operation.EXTENSION);
     }
 
     @Test
