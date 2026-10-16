@@ -697,6 +697,66 @@ class RenewalUpliftResolverTest {
                 .isEqualTo(mode);
     }
 
+    @Test
+    void aPricedPeriodRequiresQuantityAndTermMonths() {
+        List<RenewalUpliftRung> rungs = List.of(account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"));
+        for (RenewalUpliftRequest request : List.of(
+                new RenewalUpliftRequest("USD", decimal("40"), null, 12, scenarioPins(), rungs),
+                new RenewalUpliftRequest("USD", decimal("40"), decimal("1"), null, scenarioPins(), rungs),
+                new RenewalUpliftRequest("USD", decimal("40"), null, null, scenarioPins(), rungs))) {
+            assertThatThrownBy(() -> resolver.resolve(request))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("required");
+        }
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void aPricedPeriodRequiresCurrency(String currency) {
+        assertThatThrownBy(() -> resolver.resolve(new RenewalUpliftRequest(currency,
+                decimal("40"), decimal("1"), 12, scenarioPins(),
+                List.of(account("acct", RenewalUpliftMode.UPLIFT_PCT, "7")))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Currency is required");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void termMonthsMustBePositive(int months) {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", months, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void zeroQuantityStillProducesACompleteZeroAmount() {
+        RenewalUpliftResult result = resolver.resolve(request("40", "0", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7")));
+        assertThat(result.resolution()).isEqualTo(RenewalUpliftResolution.PRICED);
+        assertThat(result.extendedAmount()).isEqualByComparingTo("0.00");
+        assertThat(result.extendedAmount().scale()).isEqualTo(2);
+        assertThat(result.flatPeriodCount()).isEqualTo(1);
+    }
+
+    @Test
+    void aNegativeListCapIsAnUnresolvedBasis() {
+        RenewalPriceAsOfPins pins = new RenewalPriceAsOfPins(
+                ACTION, "a", decimal("-1"), EFFECTIVE, "e", decimal("-1"), LINE_START, "l", decimal("-1"));
+        RenewalUpliftResult result = resolver.resolve(request("40", "1", 12, pins,
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                clause("clause", null, null, null, Boolean.TRUE, Boolean.FALSE, null, null)));
+        assertThat(result.resolution()).isEqualTo(RenewalUpliftResolution.UNRESOLVED_BASIS);
+        assertThat(result.unitPrice()).isNull();
+        assertThat(result.extendedAmount()).isNull();
+    }
+
+    @Test
+    void aNegativeProtectionCapCannotPublishANegativePrice() {
+        assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
+                account("acct", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                clause("clause", null, null, "-110", null, Boolean.FALSE, null, null))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cannot be negative");
+    }
+
     private static void assertUnit(BigDecimal actual, String expected) {
         assertThat(actual).isEqualByComparingTo(expected);
         assertThat(actual.scale()).isEqualTo(4);

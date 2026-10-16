@@ -32,11 +32,20 @@ public final class RenewalUpliftResolver {
         if (request == null) {
             throw new IllegalArgumentException("Renewal uplift request is required");
         }
-        if (request.quantity() != null && request.quantity().signum() < 0) {
+        if (request.currency() == null || request.currency().isBlank()) {
+            throw new IllegalArgumentException("Currency is required");
+        }
+        if (request.quantity() == null) {
+            throw new IllegalArgumentException("Quantity is required");
+        }
+        if (request.termMonths() == null) {
+            throw new IllegalArgumentException("Term months are required");
+        }
+        if (request.quantity().signum() < 0) {
             throw new IllegalArgumentException("Quantity cannot be negative");
         }
-        if (request.termMonths() != null && request.termMonths() < 1) {
-            throw new IllegalArgumentException("Term months must be at least 1 when supplied");
+        if (request.termMonths() < 1) {
+            throw new IllegalArgumentException("Term months must be at least 1");
         }
 
         Map<RenewalUpliftRungKind, RenewalUpliftRung> rungs = index(request.rungs());
@@ -87,7 +96,7 @@ public final class RenewalUpliftResolver {
         }
         boolean listRequired = Boolean.TRUE.equals(merged.notAboveList().value());
         if (pin.date() == null || pin.versionId() == null
-                || (listRequired && pin.listUnit() == null)) {
+                || (listRequired && (pin.listUnit() == null || pin.listUnit().signum() < 0))) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_BASIS, null, null, null, null, null);
         }
 
@@ -108,6 +117,9 @@ public final class RenewalUpliftResolver {
         if (floor != null && unit.compareTo(floor.normalized()) < 0) {
             unit = floor.normalized();
             floorApplied = bound(floor);
+        }
+        if (unit.signum() < 0) {
+            throw new IllegalArgumentException("Renewal unit price cannot be negative");
         }
         return finish(merged, pin, RenewalUpliftResolution.PRICED, bound(cap), bound(floor), capApplied, floorApplied, unit);
     }
@@ -136,9 +148,7 @@ public final class RenewalUpliftResolver {
         Integer periods = null;
         if (unitPrice != null) {
             periods = 1;
-            if (request.quantity() != null && request.termMonths() != null) {
-                extended = extend(unitPrice, request.quantity(), request.termMonths());
-            }
+            extended = extend(unitPrice, request.quantity(), request.termMonths());
         }
         return new RenewalUpliftResult(
                 resolution,
