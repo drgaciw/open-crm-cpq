@@ -1,6 +1,6 @@
 # OQ6 owner decision: amendment revision when a LifecycleChange is superseded mid-flight
 
-**Status:** OQ6 decision record, 2026-10-16. Delegated by the owner and relayed by Projects Manager. OQ18 is **PROPOSED, pending the owner**. Sections 1–9 are the request written while OQ6 was open. Section 10 is the record. Where they differ, section 10 governs. This file does not accept a Proposed spec and does not edit an Accepted ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy. S3 / DRG-581 launches only after the owner merges this record.
+**Status:** OQ6 decision record, 2026-10-16. OQ6 was decided under delegation by CPQ Decision and relayed by Projects Manager. It is not the owner's personal choice. OQ18 stays **Proposed** until the owner confirms it. S3 cannot start building the digest library before that confirmation. Sections 1–9 are the request written while OQ6 was open. Section 10 is the record. Where they differ, section 10 governs. This file does not accept a Proposed spec and does not edit an Accepted ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy. S3 / DRG-581 launches only after the owner merges this record, and still cannot start the digest library before the owner confirms OQ18.
 
 **Date:** 2026-10-16. **Project:** OPEN-CRM-CPQ. **Backlog:** S3 is RA-47 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581/s3-amendment-document-api-and-state-machine-draft-to-executed-gapless). S4 is RA-48 / [DRG-582](https://linear.app/drgamtd-workspace/issue/DRG-582/s4-document-driven-apply-after-executed-with-multi-subscription).
 
@@ -166,11 +166,11 @@ DRG-581, as read in Linear, asks for the API and the state machine from draft to
 
 Recorded 2026-10-16. Sections 1 through 9 are the request. This section records the rulings that followed. The scope of those rulings was flagged as somewhat ambiguous.
 
-Both rulings were delegated by the owner and relayed by Projects Manager. The owner, drg, said, at 5:10 PM CT: "I delegate these decisions to you." The owner, drg, said, at 5:52 PM CT: "Proceed." Projects Manager confirmed the rulings. CPQ Decision ruled them. This section does not say the owner personally chose either ruling.
+OQ6 was decided under delegation by CPQ Decision and relayed by Projects Manager. It is not the owner's personal choice. The delegation words, quoted so the grant is on the record, are these: the owner, drg, said, at 5:10 PM CT: "I delegate these decisions to you." The owner, drg, said, at 5:52 PM CT: "Proceed." Projects Manager relayed the ruling. The scope was flagged as somewhat ambiguous.
 
 ### OQ6 — adopted
 
-- Decision: the text below. Delegated by the owner and relayed by Projects Manager. Projects Manager confirmed it. CPQ Decision ruled it.
+- Decision: the text below. Decided under delegation by CPQ Decision and relayed by Projects Manager. Not the owner's personal choice.
 - Date: 2026-10-16. Delegation at 5:10 PM CT. Proceed at 5:52 PM CT.
 - **Before execution.** Superseding a LifecycleChange creates a new revision under the same document number. The old revision is frozen as `SUPERSEDED`. The new revision returns to status `DRAFT`. Pricing pins are cleared. Approvals and signatures are void.
 - **After `EXECUTED`.** No new revision. The refusal is `IMMUTABLE_EXECUTED`. The remedy is a new lifecycle change or a correcting amendment.
@@ -181,14 +181,14 @@ Two S3 acceptance tests belong to this ruling. They are not implemented in this 
 1. **Supersede before execution.** Given a document that has not reached `EXECUTED`, when its LifecycleChange is superseded, then a new revision exists under the same document number, the old revision is frozen `SUPERSEDED`, the new revision is `DRAFT`, pricing pins on the new revision are cleared, and approvals and signatures are void.
 2. **No revision after `EXECUTED`, and at most one `EXECUTED`.** Given a revision that has closed `EXECUTED`, when a further revision of that LifecycleChange is requested, then no new revision is stored and the result is `IMMUTABLE_EXECUTED`. A second `EXECUTED` revision of that document is rejected.
 
-S3 / DRG-581 launches only after the owner merges this record. This draft does not launch it.
+S3 / DRG-581 launches only after the owner merges this record. This draft does not launch it. S3 cannot start building the digest library before the owner confirms OQ18.
 
-### OQ18 — proposed, pending the owner
+### OQ18 — Proposed until the owner confirms it
 
-- Decision: **PROPOSED, pending the owner**. Not adopted.
-- Date: 2026-10-16. Same delegation and Proceed quotes as OQ6. Projects Manager confirmed the rulings. CPQ Decision ruled them. The scope was flagged as somewhat ambiguous.
-- Proposal: the canonical digest library is in `backend/libs/common`, built once in S3.
-- This proposal does not adopt that library, does not build it, and does not move the build onto S6.
+- Decision: **Proposed until the owner confirms it**. Not adopted.
+- Date: 2026-10-16. The same delegation quotes are on the record above. They do not confirm OQ18.
+- Proposal, still unconfirmed: the canonical digest library is in `backend/libs/common`, built once in S3.
+- S3 cannot start building the digest library before the owner confirms OQ18. This proposal does not build the library and does not move the build onto S6.
 
 ### Not decided and not authorized by this record
 
