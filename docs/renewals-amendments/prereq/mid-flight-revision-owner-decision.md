@@ -1,12 +1,12 @@
 # OQ6 owner decision: amendment revision when a LifecycleChange is superseded mid-flight
 
-**Status:** OPEN. Awaiting the owner. This file does not decide OQ6, does not accept a Proposed spec, and does not accept an ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy. It does not authorize S3, S4, or S6.
+**Status:** OQ6 decision record, 2026-10-16. Delegated by the owner and relayed by Projects Manager. OQ18 is **PROPOSED, pending the owner**. Sections 1–9 are the request written while OQ6 was open. Section 10 is the record. Where they differ, section 10 governs. This file does not accept a Proposed spec and does not edit an Accepted ADR. It authorizes no code, schema, migration, flag, topic, gateway route, or deploy. S3 / DRG-581 launches only after the owner merges this record.
 
 **Date:** 2026-10-16. **Project:** OPEN-CRM-CPQ. **Backlog:** S3 is RA-47 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581/s3-amendment-document-api-and-state-machine-draft-to-executed-gapless). S4 is RA-48 / [DRG-582](https://linear.app/drgamtd-workspace/issue/DRG-582/s4-document-driven-apply-after-executed-with-multi-subscription).
 
 **Reading base:** `main` at `e3ee211b4d748c9a5421becaec37d629fedf174d`. Citations below are files read at that commit, or Linear issues DRG-581 and DRG-582 read the same day. Claims not opened in this pass are marked **Unverified**.
 
-**Register.** The OQ6 row is left as it stands on this `main`: status **DEFAULT PROPOSED**. This file does not edit `renewals-amendments-open-questions-register.md`.
+**Register.** The OQ6 and OQ18 rows of `renewals-amendments-open-questions-register.md` are updated to match section 10. No other register row is edited.
 
 **What this frame is.** [PR #621](https://github.com/drgaciw/open-crm-cpq/pull/621) merged the S3–S8 authorization gate (`prereq/story-s3-s4-authorization-gate.md`). That note names OQ6 and says no file it read contains a menu titled for the mid-flight edge. The labels A–D below are this frame's grouping of behaviors that are already written. They are not a menu copied from the gate, the spike, or the register.
 
@@ -148,6 +148,8 @@ Option C writes the ledger once, for the only revision. Option D leaves the ledg
 
 ## 9. What stays open even if the owner confirms the default
 
+Section 10 is the record. It supersedes this list where they differ. Item 1's effect is ruled there: approvals and signatures are void. Item 8 is recorded there as a proposal, not an adoption. Item 9's launch of DRG-581 waits on the owner merging this record.
+
 1. Whether header `approval_ref` is cleared when the document returns to `DRAFT` (section 2, after the seven points).
 2. Which command and which service insert the new document revision. The OpenAPI revise path is tagged S5. S3 lists a read of revisions.
 3. What happens to `PENDING` application units, which are not revision-scoped, when a pre-execution revision is superseded.
@@ -160,25 +162,54 @@ Option C writes the ledger once, for the only revision. Option D leaves the ledg
 
 DRG-581, as read in Linear, asks for the API and the state machine from draft to executed, including the OQ6 dependency. This file does not mark DRG-581 done and does not move it.
 
-## 10. Owner decision needed
+## 10. Decision record
 
-Blank until the owner writes it. This file does not fill it in. Filling it in a later change is the decision. This section, left blank, keeps OQ6 **OPEN**.
+Recorded 2026-10-16. Sections 1 through 9 are the request. This section records the rulings that followed. The scope of those rulings was flagged as somewhat ambiguous.
 
-- Decision: A, B, C, or D.
-- Date:
-- The cut is `EXECUTED`: a new LifecycleChange revision opens a document revision only before that close. Yes or no. The proposed default is yes.
-- After `EXECUTED`, the correction is a new LifecycleChange id and a new document. Yes or no. The proposed default is yes.
-- Rebase is a first-slice answer to this edge. Yes or no. The proposed default is no.
-- Header `approval_ref` is cleared on the new pre-execution revision. Yes or no. The proposed default does not choose.
-- Authorize DRG-581 (S3) in that later record. This file is not that authorization.
-- Authorize DRG-582 (S4) in that later record. This file is not that authorization.
+Both rulings were delegated by the owner and relayed by Projects Manager. The owner, drg, said, at 5:10 PM CT: "I delegate these decisions to you." The owner, drg, said, at 5:52 PM CT: "Proceed." Projects Manager confirmed the rulings. CPQ Decision ruled them. This section does not say the owner personally chose either ruling.
+
+### OQ6 — adopted
+
+- Decision: the text below. Delegated by the owner and relayed by Projects Manager. Projects Manager confirmed it. CPQ Decision ruled it.
+- Date: 2026-10-16. Delegation at 5:10 PM CT. Proceed at 5:52 PM CT.
+- **Before execution.** Superseding a LifecycleChange creates a new revision under the same document number. The old revision is frozen as `SUPERSEDED`. The new revision returns to status `DRAFT`. Pricing pins are cleared. Approvals and signatures are void.
+- **After `EXECUTED`.** No new revision. The refusal is `IMMUTABLE_EXECUTED`. The remedy is a new lifecycle change or a correcting amendment.
+- At most one revision may be `EXECUTED`.
+
+Two S3 acceptance tests belong to this ruling. They are not implemented in this pull request. S3 automates them after the owner merges this record.
+
+1. **Supersede before execution.** Given a document that has not reached `EXECUTED`, when its LifecycleChange is superseded, then a new revision exists under the same document number, the old revision is frozen `SUPERSEDED`, the new revision is `DRAFT`, pricing pins on the new revision are cleared, and approvals and signatures are void.
+2. **No revision after `EXECUTED`, and at most one `EXECUTED`.** Given a revision that has closed `EXECUTED`, when a further revision of that LifecycleChange is requested, then no new revision is stored and the result is `IMMUTABLE_EXECUTED`. A second `EXECUTED` revision of that document is rejected.
+
+S3 / DRG-581 launches only after the owner merges this record. This draft does not launch it.
+
+### OQ18 — proposed, pending the owner
+
+- Decision: **PROPOSED, pending the owner**. Not adopted.
+- Date: 2026-10-16. Same delegation and Proceed quotes as OQ6. Projects Manager confirmed the rulings. CPQ Decision ruled them. The scope was flagged as somewhat ambiguous.
+- Proposal: the canonical digest library is in `backend/libs/common`, built once in S3.
+- This proposal does not adopt that library, does not build it, and does not move the build onto S6.
+
+### Not decided and not authorized by this record
+
+- The DRG-609 design.
+- S6.
+- ADR-017, and ADR-024 through ADR-027. No Accepted ADR is edited.
+- DRG-533 acceptance.
+- S4 / DRG-582.
+- The manual S7 backfill.
+- No spec is accepted, including `prereq/DRAFT-openapi-amendments.yaml` and `prereq/specs/partial-apply.md`.
+
+The OQ5 register row still says S4 waits on OQ6. That row is not edited. This record does not authorize S4.
+
+This record authorizes no code, schema, migration, flag, topic, gateway route, or deploy. The owner merges.
 
 ## 11. Sources read
 
 | Source | Used for |
 |---|---|
 | `prereq/story-s3-s4-authorization-gate.md` | OQ6 section; the statement that no titled menu was found; S3/S4 blocked; V1_9 assignment as the gate recorded it; AC-S6-4 event list; OQ18 timing |
-| `renewals-amendments-open-questions-register.md` | OQ6 row, left unchanged; OQ5 cell as adopted on this `main`; OQ16; OQ18 |
+| `renewals-amendments-open-questions-register.md` | OQ6 and OQ18 rows, updated to match section 10; OQ5 cell left as adopted on this `main`, including its "waits on OQ6" sentence; OQ16 |
 | `adr-035-amendment-document-placement.md` | Open-question wording; acceptance scope S1 and S2 |
 | `adr-035-acceptance-checklist.md` | OQ6 before S3 |
 | `amendment-document-design-spike.md` | Decision 6; revision immutability; state table including both `SUPERSEDED` rows; §4 rule 5 rebase; §6.6 event names |
