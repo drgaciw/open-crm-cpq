@@ -85,9 +85,7 @@ public class QuoteService {
         Quote quote = quoteMapper.toEntity(request);
         quote.setQuoteNumber(quoteNumberGenerator.generate());
 
-        if (request.getDealType() == null) {
-            quote.setDealType(DealType.NEW);
-        }
+        applyOpportunityDealType(request, quote);
         if (request.getDurationInMonths() == null) {
             quote.setDurationInMonths(12);
         }
@@ -96,6 +94,31 @@ public class QuoteService {
         log.info("Created quote: {}", saved.getQuoteNumber());
 
         return quoteMapper.toDto(saved);
+    }
+
+    /**
+     * Opportunity-to-quote handoff for deal type.
+     *
+     * <p>A CRM type is translated by {@link CrmQuoteDealTypeMapping}. Unknown CRM values fail.
+     * When the request also carries a quote {@link DealType} that disagrees with the table, creation
+     * fails ({@code CRM_DEAL_TYPE_CONFLICT}). When the CRM type is omitted, an explicit quote type is
+     * kept; if that is omitted too, the documented default is {@link DealType#NEW}.
+     */
+    private void applyOpportunityDealType(QuoteCreateRequest request, Quote quote) {
+        if (request.getCrmDealType() != null) {
+            DealType mapped = CrmQuoteDealTypeMapping.toQuoteDealType(request.getCrmDealType());
+            if (request.getDealType() != null && request.getDealType() != mapped) {
+                throw new BusinessException(
+                        "Quote deal type " + request.getDealType()
+                                + " conflicts with CRM deal type mapping to " + mapped,
+                        "CRM_DEAL_TYPE_CONFLICT");
+            }
+            quote.setDealType(mapped);
+            return;
+        }
+        if (request.getDealType() == null) {
+            quote.setDealType(DealType.NEW);
+        }
     }
 
     @Transactional(readOnly = true)
