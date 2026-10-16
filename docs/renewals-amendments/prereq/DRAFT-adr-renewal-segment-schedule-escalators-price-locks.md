@@ -1,15 +1,17 @@
 # DRAFT ADR: Renewal segment schedule, multi-year escalators, and time-bounded price locks
 
-**Status:** Proposed on 2026-10-16. Not accepted.
+**Status:** Proposed on 2026-10-16. This file is Proposed. It is not an accepted ADR, and no link in this file presents it as one.
 **Date:** 2026-10-16
-**Deciders:** none. The recommendation below is a proposal. The project owner decides it.
+**Deciders:** none. Each recommendation below is a proposal. The project owner decides it.
 **Number:** none. This file stays under `docs/renewals-amendments/prereq/` with a `DRAFT-` prefix. It is not an entry in `docs/adr/` and it does not take a number. Do not add a row to `docs/adr/README.md` from this draft.
 **Story:** [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending) (escalator base, compounding, rounding; an addendum to ADR-023). Linear status when read: Backlog.
-**Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the owner accepts and a status-change PR merges.
+**Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.
 **Informs:** [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no) (the generator that expands a term and an escalator), [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534/ramp-amendments-lock-elapsed-periods-amend-future-periods-re-govern-on) (amendments of stored periods).
 **Reads, and does not edit:** Accepted [ADR-023](../../adr/ADR-023-price-ramp-schedule-model.md) D-01, D-02, D-04, D-05, D-06, D-07. Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-01 through D-07, including D-06. Accepted [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md).
 **Does not accept:** ADR-017, ADR-024, ADR-025, ADR-026, or ADR-027. Each of those files on this tree says Proposed on 2026-10-04 and not accepted. This draft does not change their status. It does not accept `prereq/specs/ramp-amendments.md`, `price-lock-policy-stub.md`, `DRAFT-openapi-amendments.yaml`, or the pricing-policy sanity check.
-**Does not authorize:** code, a schema change, a Drools edit, a flag, a route, a deploy, or a merge. `opencrm.pricing.ramp.enabled` stays default off. No `opencrm.jev.*.enabled` flag is turned on. Later renewal periods stay unpriced while this file is Proposed.
+**Code:** Nothing in this file authorizes code. It authorizes no schema change, Drools edit, flag, route, deploy, or merge. `opencrm.pricing.ramp.enabled` stays default off. No `opencrm.jev.*.enabled` flag is turned on. Later renewal periods stay unpriced while this file is Proposed.
+
+This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Until that separate pull request merges, DRG-568 stays blocked. This file is not that status change.
 
 ---
 
@@ -43,7 +45,7 @@ The arithmetic in the next section was recomputed with `Decimal` half-up in this
 
 ## Decision
 
-Proposed. Nothing in this section amends an Accepted ADR. Acceptance is a later status-change pull request, after the owner answers the section "Owner decision needed".
+Proposed. Nothing in this section amends another ADR. Nothing in this section authorizes code. A later status-change pull request, after the owner answers "Owner decision needed", is a separate change from this file.
 
 ### D-01 — Where a renewal escalator starts
 
@@ -67,15 +69,37 @@ The landed expander has no flag. It always compounds on the prior unit. That beh
 
 **Each expanded unit is half-up at scale 4. Each extended amount is half-up at scale 2. The scale-4 unit is what the next period compounds from, and what the next renewal will read as its exit net.**
 
-Scale 4 is ADR-023 D-02 and the accepted uplift record's D-05. Applying it per step to the scenario-1 start price:
+Scale 4 is ADR-023 D-02 and the accepted uplift record's D-05. Fork 2 in "Owner decision needed" is the scale-4 versus scale-2 choice, and that fork affects money rounding. The products below were recomputed with decimal half-up in this pass.
 
-| Step | Exact product | Stored unit (scale 4, half-up) | Period amount at 200 seats × 12 months (scale 2) |
-| --- | --- | --- | --- |
-| Year 1, the uplift unit, not a further percent | 40 × 1.07 = 42.8 | 42.8000 | 102,720.00 |
-| Year 2 | 42.8000 × 1.07 = 45.796 | 45.7960 | 109,910.40 |
-| Year 3 | 45.7960 × 1.07 = 49.00172 | 49.0017 | 117,604.08 |
+Recommended scale (unit scale 4, amount scale 2), 200 seats, 12 months each year:
 
-TCV is 330,234.48. The sanity-check and DRG-568 figure of 42.80 / 45.80 / 49.01 and TCV 330,264.00 is the same chain rounded half-up to scale 2 at each step (45.796 → 45.80, then 45.80 × 1.07 = 49.006 → 49.01). Rounding only the final unit of an unrounded `40 × 1.07³` (= 49.00172) to scale 2 yields 49.00. Those two results stay illustrations. This proposal does not adopt them, because they would store a different exit rate from the scale the accepted records already fixed for the single unit.
+```text
+Year 1 unit     = round4(40 × 1.07)           = round4(42.80)     = 42.8000
+Year 1 monthly  = round2(42.8000 × 200)       = 8,560.00
+Year 1 amount   = round2(8,560.00 × 12)       = 102,720.00
+Year 2 unit     = round4(42.8000 × 1.07)      = round4(45.796)    = 45.7960
+Year 2 monthly  = round2(45.7960 × 200)       = 9,159.20
+Year 2 amount   = round2(9,159.20 × 12)       = 109,910.40
+Year 3 unit     = round4(45.7960 × 1.07)      = round4(49.00172)  = 49.0017
+Year 3 monthly  = round2(49.0017 × 200)       = 9,800.34
+Year 3 amount   = round2(9,800.34 × 12)       = 117,604.08
+TCV             = 102,720.00 + 109,910.40 + 117,604.08 = 330,234.48
+```
+
+The scale-2 illustration, the same chain rounded half-up to scale 2 at each unit, is a different amount of money:
+
+```text
+Year 1 unit     = round2(40 × 1.07)           = 42.80
+Year 1 amount   = round2(round2(42.80 × 200) × 12) = 102,720.00
+Year 2 unit     = round2(42.80 × 1.07)        = round2(45.796) = 45.80
+Year 2 amount   = round2(round2(45.80 × 200) × 12) = 109,920.00
+Year 3 unit     = round2(45.80 × 1.07)        = round2(49.006) = 49.01
+Year 3 amount   = round2(round2(49.01 × 200) × 12) = 117,624.00
+TCV             = 102,720.00 + 109,920.00 + 117,624.00 = 330,264.00
+Difference      = 330,264.00 − 330,234.48 = 29.52
+```
+
+Rounding only the final unit of an unrounded `40 × 1.07³` (= 49.00172) to scale 2 yields 49.00. The scale-2 series and the single final rounding stay illustrations. The recommendation stores the scale-4 units above.
 
 The expander's own 1.1125% case (2.0000 → 2.0223) is this same per-step scale-4 half-up. A renewal uses that rule. It does not round the unit to scale 2 the way `QuoteContinuationPolicy.money` does today.
 
@@ -100,7 +124,19 @@ The 14-month AI Assist illustration is not this expansion. 14 divided by 12 leav
 | Lock | 2026-11-01 through 2027-03-31 | 5 | lock, absolute 20 | 20.0000 |
 | After the lock | 2027-04-01 through 2027-12-31 | 9 | `UpliftPct` 7 on the locked unit | 21.4000 |
 
-50 × 20 × 5 + 50 × 21.40 × 9 = 14,630.00. At scale 4, 20 × 1.07 is 21.4000, so this particular illustration does not distinguish D-03 from scale-2 rounding. The post-lock segment applies the percent once to the locked unit. It does not compound across the lock, and it does not open a second compounding rule.
+The lock total, recomputed in this pass:
+
+```text
+Post-lock unit  = round4(20 × 1.07) = round4(21.40) = 21.4000
+                  round2(20 × 1.07) = 21.40
+Lock monthly    = round2(20.0000 × 50) = 1,000.00
+Lock amount     = round2(1,000.00 × 5) = 5,000.00
+Post-lock monthly = round2(21.4000 × 50) = 1,070.00
+Post-lock amount  = round2(1,070.00 × 9) = 9,630.00
+Line total      = 5,000.00 + 9,630.00 = 14,630.00
+```
+
+Scale 4 and scale 2 store the same post-lock unit here, so this illustration does not show the money-rounding fork. The 36-month example does. The post-lock segment applies the percent once to the locked unit. It does not compound across the lock, and it does not open a second compounding rule.
 
 Both illustration boundaries fall on whole months from a term start of 2026-11-01. ADR-023 D-04 and the accepted proration record charge a whole-month boundary with no day stub. The day-stub in `QuoteContinuationPolicy` remains the amendment and expansion formula. A renewal does not call it.
 
@@ -120,7 +156,7 @@ DRG-526 (read 2026-10-16, status In Progress) owns effective-dated cost and says
 
 **`ENABLE_12M_PRICE_PROTECTION` remains the retention marker the accepted uplift record describes. A time-bounded lock is an explicit segment with dates. This draft does not turn the marker into a lock.**
 
-The accepted record assigns that choice to DRG-568. DRG-568 can make it only after this procedure is accepted, and only in its own implementation. A contract cap is still the price protection that wins, as that record's D-02 says.
+The uplift record assigns that choice to DRG-568. DRG-568 could make it only after the owner accepts this file and the status-change PR merges, and only in DRG-568's own change. Nothing in this file authorizes that code. A contract cap is still the price protection that wins, as that record's D-02 says.
 
 ## Options considered
 
@@ -137,7 +173,7 @@ The accepted record assigns that choice to DRG-568. DRG-568 can make it only aft
 | Rounding | Full-precision compound, round the final unit once | Year 3 at scale 2 is 49.00. Intermediate units are not stable stored prices, so a cap check and the next period have no scale-4 absolute to read. | Rejected |
 | Lock shape | **Explicit segments `{from, to, mode, value}`; post-lock percent applies once to the locked unit (recommended)** | Scenario 4 is 5 months at 20.0000 and 9 months at 21.4000, total 14,630.00. The equal-block expander is not on this path. | Recommended |
 | Lock shape | Encode the lock as `everyMonths` on `RampEscalatorExpander` | 14 months with a 12-month step is `RAMP_TERM_MISMATCH`. Equal blocks cannot be 5 and 9. | Rejected |
-| Lock vs marker | **Keep `ENABLE_12M_PRICE_PROTECTION` as a marker (recommended)** | Agrees with the accepted uplift record. DRG-568 may still decide that a marker becomes a dated segment, after this draft is accepted. | Recommended |
+| Lock vs marker | **Keep `ENABLE_12M_PRICE_PROTECTION` as a marker (recommended)** | Agrees with the uplift record. A later DRG-568 change could still propose a dated segment, only after the owner accepts this file and the status-change PR merges. | Recommended |
 | Named-seat tier | **Renewal segment nets skip a second named-seat subtraction (recommended)** | Stops 200 seats taking another 7% off a unit that is already net. | Recommended |
 | Named-seat tier | Run `RampPeriodPricer` unchanged on renewal absolutes | For `SAAS_SEAT_NAMED` at quantity ≥ 100, the net falls by the tier. Continuation does not do this today. | Rejected |
 | Off-boundary lock end | Day-stub from the proration record | The proration record prices amendments and expansions. No renewal splitter exists. | Deferred. Owner decision |
@@ -145,26 +181,26 @@ The accepted record assigns that choice to DRG-568. DRG-568 can make it only aft
 
 ## Consequences
 
-- After the owner accepts this text and a status-change pull request merges, D-06 of the uplift record is satisfied for compounding, base, and per-step rounding. Later periods may then be priced from the stored absolutes. Until that merge, the priced renewal remains the one flat period ADR-023 D-05 and the uplift record require. Escalator inputs may be copied as intent. They are not expanded.
-- DRG-568 implements the segment list, the lock dates, and the multi-line renewal. It uses D-01 through D-06. It does not choose another compound rule or another unit scale.
+- This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Until that merge, the priced renewal remains the one flat period ADR-023 D-05 and the uplift record require. Escalator inputs may be copied as intent. They are not expanded. Nothing in this file authorizes code.
+- DRG-568 is the story that would implement the segment list, the lock dates, and the multi-line renewal, using D-01 through D-06, and it would not choose another compound rule or another unit scale. That implementation is not authorized here.
 - DRG-532's generator, when it is built, takes `compound`, the period-1 unit, the percent or amount, and `everyMonths`, and emits the equal-block segments in D-04. It refuses a term the step length does not divide.
-- DRG-534 amends stored absolute periods. Regenerating them from the percent waits on this acceptance, and the amendment story still owns elapsed-period locking. This draft does not accept `prereq/specs/ramp-amendments.md`.
-- The commercial difference between the recommended scale and the illustration is 29.52 of TCV on the 200-seat, 36-month example (330,264.00 versus 330,234.48). A seller who has been shown 45.80 and 49.01 is looking at the scale-2 option, which remains an owner choice.
+- DRG-534 would amend stored absolute periods. Regenerating them from the percent waits until the owner accepts this file and the status-change PR merges. The amendment story still owns elapsed-period locking. This draft does not accept `prereq/specs/ramp-amendments.md`, and nothing here authorizes that code.
+- Fork 2 affects money rounding. On the 200-seat, 36-month example the scale-2 illustration is 330,264.00 and the scale-4 recommendation is 330,234.48. The difference is 29.52. A seller who has been shown 45.80 and 49.01 is looking at the scale-2 option. The default in the owner table is scale 4.
 - `QuoteContinuationPolicy` rounding the renewal unit to scale 2, and `draftRenewal` writing `"0"`, stay as they are. This draft does not change them.
 - ADR-023 is not edited. ADR-017 and ADR-024 through ADR-027 stay Proposed.
 
 ## Risks
 
-- Accepting scale 4 while DRG-568's issue text cites 45.80 / 49.01 / 330,264 will look like a wrong implementation if the writer follows the issue text instead of this procedure. The control is the worked table in D-03, and the owner fork in the next section.
+- Choosing the scale-4 default while DRG-568's issue text cites 45.80 / 49.01 / 330,264 will look like a wrong implementation if a later writer follows the issue text instead of this procedure. The control is the worked arithmetic in D-03, and fork 2, which affects money rounding.
 - `compound = true` prices a growing series. A contract written to the RCA note in DRG-533 (stated 5% means 5% of the original base unless the year-3 cell is entered as 10.25%) will be overpriced if the flag stays at the default. The control is the stored `compound` flag on the snapshot DRG-568 writes.
 - Calling `RampEscalatorExpander` for the 14-month lock throws `RAMP_TERM_MISMATCH` and prices nothing. The control is D-04: locks are explicit segments.
 - Sending a finished renewal net through `RampPeriodPricer` on `SAAS_SEAT_NAMED` takes the named-seat tier off again. The control is D-05.
 - Expanding later periods before the status-change pull request merges contradicts the accepted uplift record's D-06.
-- Treating this Proposed file, the price-lock stub, or the ramp-amendment proposal as accepted would let an implementation merge against text the owner has not adopted.
+- Treating this Proposed file, the price-lock stub, or the ramp-amendment proposal as an authorization to code would let an implementation merge against text the owner has not adopted. This file stays Proposed.
 
 ## What DRG-568 needs from this draft
 
-DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator and the AI Assist lock are not expressible, and that it depends on DRG-533. After acceptance, DRG-568 has these inputs and no others from this file:
+DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator and the AI Assist lock are not expressible, and that it depends on DRG-533. This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code. The inputs below are what that later story would use:
 
 1. Period 1 is the uplift record's unit (42.8000 in the example). Later percent steps use D-02 and D-03.
 2. Under the recommendation, the 36-month series is 42.8000, 45.7960, 49.0017, TCV 330,234.48, not 42.80 / 45.80 / 49.01, unless the owner replaces D-03 with scale 2.
@@ -177,21 +213,23 @@ DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator an
 
 ## Owner decision needed
 
-This file is Proposed. The recommendations are not in force. The owner decides each row. A status-change pull request is what records the answers and sets Status to Accepted. That pull request is a separate change. This draft does not set it.
+This file is Proposed. The seven recommendations are not in force. Each row has one recommendation and one default. The owner may keep the default or replace it. This file does not record that choice. Nothing in this file authorizes code.
 
-| # | Question | Recommendation in this draft |
-| --- | --- | --- |
-| 1 | Default for "N% a year" | `compound = true` (prior stored unit). `compound = false` remains the percent-of-period-1 procedure. |
-| 2 | Per-step unit scale | Scale 4 half-up. Amounts scale 2. This does not reproduce 45.80 / 49.01. |
-| 3 | Post-lock price | One application of the segment's percent or amount to the locked unit. `List`, `Same`, and `Override` stay explicit modes. |
-| 4 | Unequal segments | Explicit `{from, to, mode, value}` only. The equal-block expander does not build them. |
-| 5 | Named-seat tier on a renewal net | Do not apply it a second time. |
-| 6 | Lock end that is not a month boundary | Out of DRG-568's first slice. The amendment day-stub is not reused for it here. |
-| 7 | Retention marker | Stays a marker. DRG-568 may propose a dated segment later, after acceptance. |
+This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges.
 
-Until those answers are accepted and the status-change pull request merges, D-06 of the uplift record stands: later periods do not grow.
+| # | Fork | Recommendation | Default |
+| --- | --- | --- | --- |
+| 1 | What "N% a year" means | Compound each later percent on the prior stored unit, and keep percent-of-period-1 available as `compound = false`. | `compound = true` |
+| 2 | Unit scale versus the scale-2 illustration. **This fork affects money rounding.** | Store each unit half-up at scale 4 and each amount half-up at scale 2, which prices the 36-month example at 330,234.48 rather than 330,264.00. | Scale 4 on the unit, scale 2 on the amount |
+| 3 | Price of the segment after a lock | Apply that segment's percent or amount once to the locked unit, and keep `List`, `Same`, and `Override` as explicit modes. | One uplift of the locked unit |
+| 4 | Segments whose lengths differ | Author them as an explicit `{from, to, mode, value}` list, and leave the equal-block expander off that path. | Explicit segments only |
+| 5 | Named-seat tier on a renewal net | Skip a second named-seat subtraction on a unit the renewal procedure already netted. | No second named-seat tier |
+| 6 | A lock that ends off a month boundary | Leave that end out of DRG-568's first slice, and leave the amendment day-stub on the amendment path. | Month-boundary locks only |
+| 7 | The retention marker | Leave `ENABLE_12M_PRICE_PROTECTION` as a marker, and leave any dated segment to a later DRG-568 change. | Marker, not a lock |
 
-**Unblocks: DRG-568 only after the owner accepts and a status-change PR merges.**
+Until the owner accepts this file and the status-change PR merges, D-06 of the uplift record stands: later periods do not grow.
+
+**Unblocks: DRG-568 only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.**
 
 ## Out of scope
 
