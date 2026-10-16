@@ -4,6 +4,8 @@
 
 Accepted
 
+**Amendment 2026-10-16 (Proposed; accepted when the owner merges it):** a post-merge gate on `main`, `.github/workflows/main-verify.yml`, and a nightly scheduled run of the full `ci.yml` matrix (Decision section 8). Push and pull-request triggers on `ci.yml` stay disabled.
+
 **Amended 2026-09-28:** GitHub Actions now also runs one pull-request gate, `.github/workflows/pr-check.yml` (Decision section 7). `ci.yml` is unchanged and stays manual.
 
 **Verified 2026-08-31:** `.github/workflows/ci.yml` is `on: workflow_dispatch` only (no push/PR; no `ai-assist`). `Jenkinsfile` gates advisory stages on `AI_CI_ENABLED`. `docs/ci-contract.yaml` forbids adding ai-assist to GHA without amending this ADR. Matches decision.
@@ -55,7 +57,7 @@ Environment variables: `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_ENDPOINT`, `LLM_MODEL
 
 ### 6. AI assist platform scope
 
-**`ci.yml` does not run automatically on push/PR** (Option B cutover). The manual workflow retains SSOT stages for emergency use. The only automatic GitHub Actions workflow is the pull-request gate in section 7. Advisory LLM stages exist only in `Jenkinsfile` when `AI_CI_ENABLED=true`.
+**`ci.yml` does not run automatically on push/PR** (Option B cutover). The manual workflow retains SSOT stages for emergency use. The automatic GitHub Actions workflows are the pull-request gate in section 7 and, from the section 8 amendment, the post-merge gate and the nightly `ci.yml` schedule. Advisory LLM stages exist only in `Jenkinsfile` when `AI_CI_ENABLED=true`.
 
 Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when `scm-token` is configured.
 
@@ -77,6 +79,25 @@ Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when
 
 **Limit.** The repository is private and its plan does not offer branch protection or rulesets (the API answers 403), so the check cannot be made *required* on GitHub. Until the plan changes or the repository is public, the rule is procedural: merge only when **Backend Unit (PR gate)** is green (`gh pr checks <n> --watch`).
 
+### 8. Post-merge gate and nightly full run (amendment 2026-10-16, Proposed)
+
+**Why.** Section 7 checks each pull request on its own head. Nothing checks the head of `main` that results when several pull requests merge in quick succession. On 2026-10-16, #612 and #615 were each green and merged minutes apart, and `main` stopped compiling (DRG-613). Later the same evening eight pull requests merged within eight minutes with no run on the combined head. Separately, Jenkins is still unreachable, so the integration (Testcontainers), frontend and `cpq_beta` stages had not run anywhere since the May billing block. That block is gone: a manual `ci.yml` dispatch on 2026-10-16 acquired GitHub-hosted runners for every job (issue #238).
+
+**What.**
+
+- `.github/workflows/main-verify.yml` runs on `push` to `main` (and `workflow_dispatch`), with one job, **Backend Unit (main)**: `verify-drift.py` plus `bash scripts/ci/run-core.sh backend-unit`, the same Docker-free stage as the pull-request gate. A single concurrency group with `cancel-in-progress` means a burst of merges is verified once, on its newest head.
+- `ci.yml` gains a nightly `schedule` (02:17 UTC) in addition to `workflow_dispatch`, so the full matrix runs on `main` once a day.
+
+**Boundaries.**
+
+- Both workflows call the SSOT entrypoint only, hold no build logic, no LLM stage and no secrets.
+- `ci.yml` still has no `push` or `pull_request` trigger; `verify-drift.py` keeps enforcing that, and now also validates `main-verify.yml` against `github_main_gate` in [docs/ci-contract.yaml](../ci-contract.yaml).
+- Jenkins remains the primary CI. When a Jenkins instance is reachable, the nightly schedule can be removed again; `main-verify.yml` stays as the fast post-merge signal.
+
+**Cost.** One unit run per merge burst plus one full matrix run per day, on top of the existing per-pull-request runs.
+
+**Procedure.** A red **Backend Unit (main)** or nightly run is treated like a broken build: the next merge to `main` is the fix or a revert.
+
 Machine-readable stage names, job `needs`, and Jenkins stage mapping: **[docs/ci-contract.yaml](../ci-contract.yaml)**.
 
 ## Consequences
@@ -91,5 +112,6 @@ Machine-readable stage names, job `needs`, and Jenkins stage mapping: **[docs/ci
 - `Jenkinsfile`
 - `.github/workflows/ci.yml`
 - `.github/workflows/pr-check.yml`
+- `.github/workflows/main-verify.yml`
 - `docs/plans/jenkins-ai-ci-plan-summary.md`
 - `docs/phase0/phase0-ai-stack-decision.md`

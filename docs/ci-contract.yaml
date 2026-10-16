@@ -1,10 +1,11 @@
-# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback plus one pull-request gate.
+# Machine-readable CI contract — Jenkins primary CI; GHA manual fallback with a nightly schedule,
+# one pull-request gate and one post-merge gate on main.
 # Human docs: docs/ci-jenkins-cutover.md, infra/jenkins/README.md, docs/adr/ADR-003-ci-llm-integration.md
-# When changing Jenkinsfile, .github/workflows/ci.yml, or scripts/ci/*, update this file in the same PR.
+# When changing Jenkinsfile, .github/workflows/*, or scripts/ci/*, update this file in the same PR.
 
 schema_version: "1"
 repository: open-crm-cpq
-last_reviewed: "2026-09-28"
+last_reviewed: "2026-10-16"
 
 # JDK2 toolchain pins (GHA + Jenkins Maven/Node). Jenkins WAR stays on lts-jdk21.
 toolchain:
@@ -19,6 +20,8 @@ execution:
   primary: jenkins
   fallback: github_actions_manual
   pr_gate: github_actions_pr_check
+  main_gate: github_actions_main_verify
+  nightly: github_actions_ci_schedule
   github_status_context: jenkins/opencrm-cpq-ci
 
 ssot:
@@ -108,9 +111,10 @@ ai_assist:
 
 github_actions:
   workflow: .github/workflows/ci.yml
-  role: manual_fallback_only
+  role: manual_fallback_and_nightly
   trigger:
     workflow_dispatch: true
+    schedule_cron: "17 2 * * *"   # nightly full matrix on main (ADR-003 section 8)
     push_branches: []
     pull_request_branches: []
   concurrency: null
@@ -147,7 +151,8 @@ github_actions:
       - shared-libraries
       - backend-unit
 
-# The only automatic GHA workflow (ADR-003 section 7, 2026-09-28). ci.yml above stays manual.
+# Automatic GHA workflows: this pull-request gate (ADR-003 section 7, 2026-09-28) and the post-merge
+# gate below (section 8, 2026-10-16). ci.yml above has no push/pull_request trigger.
 github_pr_gate:
   workflow: .github/workflows/pr-check.yml
   role: pull_request_gate
@@ -164,6 +169,24 @@ github_pr_gate:
     Same Docker-free stage as Jenkins Backend Unit, so the security-baseline and event-contract
     fitness tests run on every pull request. The repository is private and its plan offers no
     branch protection, so merging on a green check is procedural (gh pr checks --watch).
+
+# Post-merge gate on main (ADR-003 section 8, 2026-10-16). Verifies the combined head after merges.
+github_main_gate:
+  workflow: .github/workflows/main-verify.yml
+  role: post_merge_gate
+  trigger:
+    push_branches: [main]
+    workflow_dispatch: true
+  concurrency: main-verify (cancel-in-progress; newest head of a merge burst is verified)
+  job: backend-unit
+  job_name: Backend Unit (main)
+  runs:
+    - python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
+    - bash scripts/ci/run-core.sh backend-unit
+  ai_assist: false
+  notes: >-
+    Same Docker-free stage as the pull-request gate. Must trigger on push to main only, never on
+    pull_request. A red run means the merge burst it covered broke main: fix or revert next.
 
 jenkins:
   file: Jenkinsfile
@@ -206,7 +229,7 @@ drift_prevention:
     - Change scripts/ci stage scripts and run-core.sh case arms together.
     - Update this file when adding/removing Jenkins stages or GHA manual jobs.
     - Do not re-enable push/pull_request triggers on ci.yml without updating docs/ci-jenkins-cutover.md.
-    - The only automatic GHA workflow is pr-check.yml (github_pr_gate); it must call run-core.sh backend-unit and must not reference ai-assist.
+    - The automatic GHA workflows are pr-check.yml (github_pr_gate, pull_request only), main-verify.yml (github_main_gate, push to main only) and the nightly schedule on ci.yml; the two gates must call run-core.sh backend-unit and verify-drift.py, and none may reference ai-assist.
     - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
     - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.
