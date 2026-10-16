@@ -85,7 +85,7 @@ Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when
 
 **What.**
 
-- `.github/workflows/main-verify.yml` runs on `push` to `main` (and `workflow_dispatch`), with one job, **Backend Unit (main)**: `verify-drift.py` plus `bash scripts/ci/run-core.sh backend-unit`, the same Docker-free stage as the pull-request gate. A single concurrency group with `cancel-in-progress` means a burst of merges is verified once, on its newest head.
+- `.github/workflows/main-verify.yml` runs on `push` to `main` (and `workflow_dispatch`), with one job, **Backend Unit (main)**: `verify-drift.py` plus `bash scripts/ci/run-core.sh backend-unit`, the same Docker-free stage as the pull-request gate. Concurrency is scoped by ref with `cancel-in-progress`, so a burst of merges is verified on its newest head and a manual branch or tag run cannot cancel main verification.
 - `ci.yml` gains a nightly `schedule` (02:17 UTC) in addition to `workflow_dispatch`, so the full matrix runs on `main` once a day.
 
 **Boundaries.**

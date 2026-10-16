@@ -177,7 +177,7 @@ github_main_gate:
   trigger:
     push_branches: [main]
     workflow_dispatch: true
-  concurrency: main-verify (cancel-in-progress; newest head of a merge burst is verified)
+  concurrency: main-verify-${{ github.ref }} (cancel-in-progress per ref; non-main dispatches cannot cancel main)
   job: backend-unit
   job_name: Backend Unit (main)
   runs:
@@ -229,6 +229,7 @@ drift_prevention:
     - Change scripts/ci stage scripts and run-core.sh case arms together.
     - Update this file when adding/removing Jenkins stages or GHA manual jobs.
     - Do not re-enable push/pull_request triggers on ci.yml without updating docs/ci-jenkins-cutover.md.
+    - ci.yml on.schedule cron must match github_actions.trigger.schedule_cron.
     - The automatic GHA workflows are pr-check.yml (github_pr_gate, pull_request only), main-verify.yml (github_main_gate, push to main only) and the nightly schedule on ci.yml; the two gates must call run-core.sh backend-unit and verify-drift.py, and none may reference ai-assist.
     - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
