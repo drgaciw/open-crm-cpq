@@ -142,11 +142,11 @@ DRG-565, as read in Linear, asks for partial-application rules for mixed-line do
 
 ## 9. Owner record
 
-Recorded 2026-10-16. Sections 1 through 8 are the request merged in #626. This section records the decision that followed. The record is the first slice only.
+Recorded 2026-10-16. Sections 1 through 8 are the request merged in #626. This section records the confirmation that followed. The record is the first slice only.
 
-The project owner, drg, relayed by Projects Manager, said, about 5:10 PM CT: "I delegate these decisions to you." Projects Manager confirmed OQ5 option A (#626). CPQ Decision ruled that delegated confirmation valid about 5:11 PM CT. The ruling is the first slice only.
+Option A for the first slice was delegated by the owner and relayed by Projects Manager. The owner, drg, said, about 5:10 PM CT: "I delegate these decisions to you." Projects Manager confirmed OQ5 option A (#626). CPQ Decision ruled the confirmation valid about 5:11 PM CT. The ruling is the first slice only.
 
-- Decision: **A**. Adopted for the first slice only.
+- Decision: **A**, first slice only. Delegated by the owner and relayed by Projects Manager. Projects Manager confirmed option A. CPQ Decision ruled the confirmation valid.
 - Date: 2026-10-16. Delegation about 5:10 PM CT. Validity ruling about 5:11 PM CT.
 - What option A is: one unit per target subscription, atomic units, no automatic rollback, PARTIALLY_APPLIED when a later unit fails, APPLY_BLOCKED when no unit has committed, correcting amendment as remedy.
 - APPLY_BLOCKED means no unit has committed: yes.
