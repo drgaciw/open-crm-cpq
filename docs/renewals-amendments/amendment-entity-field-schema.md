@@ -45,6 +45,16 @@ Thin header, keyed so DRG-458 can enrich it. **dep OQ3**, default: create now.
 | `last_executed_seq` | int | not null | default 0; incremented in the EXECUTED transaction | A3 [I mechanism] |
 | `prior_contract_id` | uuid | null | renewal chain | research 7.2 [S] |
 
+### 2.2a Precedence flag (separate column, not part of the thin header)
+Owner resolution 2026-10-16 (audit conflict C2, OQ27): the stored precedence flag on the new contract is a **separate, indexable column** on the contract record. It is **not** part of the thin header field set approved in ADR-035 (id, number, tenant, customer reference, start, end, status, last_executed_seq, prior_contract_id), and that list is unchanged.
+
+| Field | Type | Null | Constraint | Source |
+|---|---|---|---|---|
+| `precedence_flag` | boolean (shape provisional; boolean vs rank is open in DRG-592) | not null, default false | **indexed** (index on `tenant_id`, `precedence_flag` or a partial index on true rows; exact index is a DRG-592 design detail) | owner C2 resolution [S call]; shape [I] |
+
+- Reason for a separate indexable column: it is checked on every read across ordering and fulfillment, so it must be cheap to filter and must not be derived from amendment history at read time.
+- Not in S1 (DRG-579, amend-in-place first slice). It arrives with new-contract-preferred mode (RA-58 / DRG-592), the next increment.
+
 `subscriptions.contract_id uuid null` is added (nullable during backfill, **dep OQ7**) [S spike 2].
 
 ### 2.3 AmendmentDocument (`amendment_documents`)
@@ -116,7 +126,7 @@ One row per ChangeLine per revision.
 | `effective_from`, `effective_to` | date | not null; `effective_to` null for perpetual | V5; `effective_to` changed only via term hook | V5, spec 7 [S] |
 | `charge_type` | enum {Recurring, OneTime, Usage} | not null | default Recurring | sanity G6 [S] |
 | `price_as_of` | enum {ActionDate, EffectiveDate, LineStart} | not null | default EffectiveDate [I] | sanity G1 [S] |
-| `product_external_id`, `pricebook_version`, `configuration_hash` | text | not null | pinned at pricing; equal at apply | V9 [S] |
+| `product_external_id`, `pricebook_version`, `configuration_hash` | text | not null | pinned at pricing; equal at apply. `configuration_hash` is an INTERIM pin: SHA-256 hex of `product_external_id`, `pricebook_version` and sorted option codes; DRG-428 replaces it, column stays not null | V9 [S]; owner decision B 2026-10-16 |
 | `unit_price`, `net_amount` | numeric(19,4) | null for NONE lines | from pricing service only | V8 [S] |
 | `policy_slot` | enum {Amendment, Renewal, PriceLock, TrueUp, Maintenance, Conversion} | not null | pricing hook | spec 7 [S] |
 | `policy_id`, `policy_version`, `policy_decision_id`, `pricing_trace_id` | text | not null when priced | V8 | V8, A5 [S] |
@@ -135,7 +145,7 @@ One row per ChangeLine per revision.
 | `target_type`, `target_ref` | enum, text | not null | one subscription or entitlement | spike 4 [S] |
 | `observed_commercial_revision` | bigint | not null | equals `commercial_revision` at apply | V3 [S] |
 | `applied_commercial_revision` | bigint | null | set on apply | spike 5 [S] |
-| `apply_key_digest` | char(64) | null | with (`document_id`, `unit_no`) forms the apply key | V13 [S] |
+| `apply_key_digest` | char(64) | null | stored replay value; (`document_id`, `unit_no`) is the unique apply key; different digest rejected | V13 [S] |
 | `status` | enum {PENDING, APPLIED, BLOCKED} | not null | none | spike 4 [S]; enum [I] |
 
 `applied_quote_acceptances` gains nullable `amendment_document_id` and `application_unit_no` (RA-29) [S spike 5].
@@ -177,7 +187,7 @@ Append-only is enforced by grants (INSERT only) and a trigger rejecting UPDATE a
 | Headless idempotency | unique (`tenant_id`, `request_identifier`) | T2 [I] |
 | One executed revision | partial unique `revisions(document_id) where status_at_close = 'EXECUTED'`; `executed_revision_no` write-once | V11 |
 | Gapless numbering | unique (`contract_id`, `amendment_seq`); seq assigned as `last_executed_seq + 1` under contract row lock in the EXECUTED transaction; check `amendment_seq >= 0` | A3 [I mechanism] |
-| Apply idempotency | unique (`document_id`, `unit_no`, `apply_key_digest`); same key with a different digest rejected | V13 |
+| Apply idempotency | unique (`document_id`, `unit_no`); store `apply_key_digest` as replay data, same digest is a no-op and a different digest is rejected and audited | V13 |
 | Envelope dedup | unique `signature_envelope_ref` | spike 3 |
 | Source line uniqueness | unique (`document_id`, `revision_no`, `source_accepted_line_uuid`) where not null | V4 |
 | Event chain | unique (`document_id`, `seq_no`); unique `content_hash` | A2 |
@@ -211,3 +221,17 @@ All three inherit spine rules V3, V8, V10, V12 and V13, which no policy may remo
 
 - OQ4 numbering: provisional at draft, final sequence at execution (last executed + 1, same transaction), `{contract_number}-A{nnn}`, no renewal reset. Rationale: avoids gaps with in-flight drafts.
 - OQ2 apply status: single status column, apply only after execution. Rationale: avoids dual-state consistency overhead under financial-grade audit; pre-signature apply is an edge case.
+
+
+## Addendum 2026-10-16 (dev-readiness pass; nothing above changed)
+- Migration order and next version: V1_7 expand (this schema), V1_8 contract header backfill, V1_9 `document_apply_ledger` (new, unique on `document_id`, `unit_no`, with `apply_key_digest` stored and checked on replay), legacy `applied_quote_acceptances` untouched. Details in `amendment-technical-approach-and-dependencies.md` section 3.
+- Add nullable `amendment_document_line_id` and `revision_no` to `subscription_rate_periods` in V1_7 (A4).
+- Open items 3 to 6 of section 7 are tracked as OQ14 (hash scope, default per document), OQ15 (price-lock intent, not blocking), OQ3 (header ownership, default thin header owned by this module), OQ8 (retention, blocks go-live only) in `renewals-amendments-open-questions-register.md`.
+
+## Clarification 2026-10-16 (call decisions: precedence flag and original contract)
+Source: transcript addendum "Renewals and amendments decisions audit"; backlog DRG-592 (RA-58).
+- **Conflict.** ContractHeader (section 2.2) has `prior_contract_id` and `status` {ACTIVE, EXPIRED, TERMINATED} but no precedence field, and `rca-contract-precedence-research.md` inferred precedence is derived from the amendment chain. The call decided a **stored precedence flag on the new contract**; both contracts stay **ACTIVE** and the original stays **open as a reference** (no SUPERSEDED or closed status for the original).
+- **Not changed in v1 schema (S1, DRG-579).** First slice is amend-in-place, so S1 carries no new column. The flag shape (boolean vs rank), the link from the new contract to the original (`prior_contract_id` is the candidate) and who may change it are open and sit in DRG-592.
+- **Coterm and settings.** Customer-level coterm grouping and renewal groups (DRG-554) and renewal settings, auto-renew default off and notice period default with override (DRG-596), are not in this schema; `notice_period_days` and `term_end_action` stay clause data, settings live elsewhere.
+
+**C2 resolved 2026-10-16 (owner).** The stored precedence flag lives in its own indexable column (`precedence_flag`, section 2.2a), outside the thin header. The ADR-035 header list is not altered. See OQ27 in `renewals-amendments-open-questions-register.md`.
