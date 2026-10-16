@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `conversions`. **Date:** 2026-10-16.
 
-**Sources.** [DRG-559](https://linear.app/drgamtd-workspace/issue/DRG-559) (RA-25, restructure in one lifecycle change), [DRG-573](https://linear.app/drgamtd-workspace/issue/DRG-573) (RA-39, conversion pricing), [DRG-574](https://linear.app/drgamtd-workspace/issue/DRG-574) (RA-40, perpetual surrender and revocation). Worked numbers are the illustrative Scenario 3 in `../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). DRG-341 is a related hybrid-ramp credit, not a duplicate of this policy.
+**Sources.** [DRG-559](https://linear.app/drgamtd-workspace/issue/DRG-559) (RA-25, restructure in one lifecycle change), [DRG-573](https://linear.app/drgamtd-workspace/issue/DRG-573) (RA-39, conversion pricing), [DRG-574](https://linear.app/drgamtd-workspace/issue/DRG-574) (RA-40, perpetual surrender and revocation). Worked numbers are the illustrative Scenario 3 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). DRG-341 is a related hybrid-ramp credit, not a duplicate of this policy.
 
 **Conventions.** **[S]** is taken from those issues or the files they cite. **[I]** is a design inference carried forward as a proposal. Every default below is an **Owner decision**.
 

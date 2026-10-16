@@ -138,6 +138,8 @@ Always: -r /home/username01/Projects/open-crm-cpq --file <path>
 | JAVA_HOME | `/home/username01/.local/share/mise/installs/java/21.0.2` | — |
 | ADR-006 | Remains **Proposed** until this lands; then note in O4 — do not Accept “leak gone” until merged | Accept ADR-006 in the Java PR as if FE exists |
 
+**Update 2026-10-16 (DRG-543, docs DRG-608):** Wave O kept `POST /{id}/renew` as a DTO lifecycle route. That route now returns 410 Gone (`SUBSCRIPTION_RENEW_DEPRECATED`, `Deprecation: true`, successor `Link` to `POST /api/v1/quotes/continuations`). `Subscription.renew` and `SubscriptionService.renew` were removed. Priced renewal is an accepted quote continuation (`AcceptedQuoteSubscriptionService`). The scope row above is the wave decision and is left as written.
+
 ---
 
 ## 3. PR DAG (max safe parallelism)

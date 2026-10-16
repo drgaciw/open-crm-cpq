@@ -3,7 +3,7 @@
 **Status:** Proposal only. This file does not accept a reporting model, write an ADR, or authorize implementation, a flag change, or a deploy. DRG-575 is priority Low: reporting accuracy, after pricing is correct.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `arr-bridge`. **Date:** 2026-10-16.
 
-**Source.** [DRG-575](https://linear.app/drgamtd-workspace/issue/DRG-575) (RA-41). Worked numbers are illustrative Scenarios 3 and 4 in `../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The single `businessCategory` this bridge decomposes is specified in `lifecycle-intents.md` (DRG-552).
+**Source.** [DRG-575](https://linear.app/drgamtd-workspace/issue/DRG-575) (RA-41). Worked numbers are illustrative Scenarios 3 and 4 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The single `businessCategory` this bridge decomposes is specified in `lifecycle-intents.md` (DRG-552).
 
 **Conventions.** **[S]** is the issue or the sanity-check arithmetic. **[I]** is a design inference carried forward as a proposal. Component definitions that the issue leaves unnamed are **Owner decisions**.
 
