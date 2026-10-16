@@ -38,7 +38,7 @@ public final class KafkaTopics {
     public static final String APPROVAL_OUTCOME_COMPLETED = "cpq.approval.outcome.completed";
 
     // Contract/Asset Events
-    public static final String AMENDMENT_DOCUMENT_AUDIT = "cam.amendment-document.audit";
+    public static final String AMENDMENT_DOCUMENT_AUDIT = "cpq.amendment.document.audit";
     public static final String SUBSCRIPTION_RAMP_APPLIED = "cpq.subscription.ramp.applied";
     public static final String SUBSCRIPTION_RENEWAL_ELIGIBLE = "cpq.subscription.renewal.eligible";
     public static final String CONTRACT_EXECUTED = "cpq.contract.executed";
