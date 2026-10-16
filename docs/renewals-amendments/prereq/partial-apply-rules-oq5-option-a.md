@@ -4,6 +4,8 @@
 
 **Reading base:** `main` at `fd6421e414dc443d3730b870b0e0c4d4a3be693e`. That commit is a descendant of `a825641bd`. Citations below were read at that commit, or from Linear DRG-565 and the Notion RA-31 page on 2026-10-16. Claims not opened in this pass are marked **unverified**.
 
+**Integration update (#632).** Section 9 of `partial-apply-owner-decision.md` and the OQ5 register row now record option A as adopted for the first slice only. The observations below about a blank owner record and `DEFAULT PROPOSED` describe the pinned reading base, before #632. Adoption does not complete DRG-565: the ordering and three test-scenario conditions below remain unmet. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and DRG-565; this note does not authorize it.
+
 This note does not accept `specs/partial-apply.md`. It does not authorize S4 (DRG-582) or S6. It does not add a migration, a flag, a topic, a gateway route, or an apply ledger. It does not edit an ADR, the open-questions register, or `partial-apply-owner-decision.md`.
 
 ## Decision condition
@@ -12,7 +14,7 @@ This note does not accept `specs/partial-apply.md`. It does not authorize S4 (DR
 2. The three test scenarios (restructure, true-up, future-dated lines) are **UNMET**. They wait on S4's apply path (DRG-582).
 3. Nothing in this note accepts `specs/partial-apply.md`.
 
-[#626](https://github.com/drgaciw/open-crm-cpq/pull/626) is merged on `main` as the owner-decision frame. GitHub records `mergedAt` `2026-10-16T22:03:29Z`; the merge commit `3b1e78f5` is dated 2026-10-16 17:03:28 -0500 (5:03 PM CT). Section 9 of `partial-apply-owner-decision.md` and the OQ5 register row still do not record the owner's delegated option A decision. This note does not edit them. Both were read on `origin/main` after `fd6421e4`: section 9 is still the blank owner record, and the register row is still `DEFAULT PROPOSED`.
+[#626](https://github.com/drgaciw/open-crm-cpq/pull/626) is merged on `main` as the owner-decision frame. GitHub records `mergedAt` `2026-10-16T22:03:29Z`; the merge commit `3b1e78f5` is dated 2026-10-16 17:03:28 -0500 (5:03 PM CT). At the pinned reading base, section 9 of `partial-apply-owner-decision.md` and the OQ5 register row did not record the owner's delegated option A decision. This note does not edit them. Both were read on `origin/main` at `fd6421e4`: section 9 was the blank owner record, and the register row was `DEFAULT PROPOSED`. #632 subsequently recorded adoption in both places.
 
 ## 1. What is adopted
 
@@ -107,4 +109,4 @@ These stay open. They are the list in `partial-apply-owner-decision.md` section 
 - The full body of DRG-582. Its title was read. The S4 assignment of V1_9 was read in `amendment-technical-approach-and-dependencies.md` section 3.
 - `AcceptedQuoteSubscriptionService` and `applied_quote_acceptances`. Not opened.
 - Backend Unit. No code changed, so no Backend Unit run. Run id: N/A.
-- Whether any later commit on `main` filled section 9 of the owner-decision file after `fd6421e4`. The file was read at that commit.
+- Other changes after the pinned reading base, except the canonical adoption record in #632 identified in the integration update.
