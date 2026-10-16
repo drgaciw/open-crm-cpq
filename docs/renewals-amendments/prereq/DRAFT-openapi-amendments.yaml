@@ -1121,8 +1121,12 @@ paths:
                 $ref: "#/components/schemas/QuoteResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/ContinuationBadRequest"
+        "409":
+          $ref: "#/components/responses/ContinuationConflict"
         "422":
-          $ref: "#/components/responses/Unprocessable"
+          $ref: "#/components/responses/ContinuationValidationFailure"
 
   /quotes/continuations/preview:
     post:
@@ -1148,8 +1152,12 @@ paths:
                 $ref: "#/components/schemas/ContinuationPlanResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/ContinuationBadRequest"
+        "409":
+          $ref: "#/components/responses/ContinuationConflict"
         "422":
-          $ref: "#/components/responses/Unprocessable"
+          $ref: "#/components/responses/ContinuationValidationFailure"
 
 components:
   securitySchemes:
@@ -1239,6 +1247,27 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    ContinuationBadRequest:
+      description: |
+        Existing continuation service validation returns SUBSCRIPTION_CONTINUATION_INVALID.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ExistingContinuationErrorResponse"
+    ContinuationValidationFailure:
+      description: |
+        Existing quote-service bean validation returns 422 VALIDATION_ERROR;
+        constraint validation returns 422 CONSTRAINT_VIOLATION.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ExistingContinuationErrorResponse"
+    ContinuationConflict:
+      description: Existing planner domain rejection, SUBSCRIPTION_CONTINUATION_INVALID.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ExistingContinuationErrorResponse"
     Unprocessable:
       description: |
         Domain rejection with the resource left unchanged when it already
@@ -1332,6 +1361,20 @@ components:
             errorCode:
               $ref: "#/components/schemas/ErrorCode"
 
+    ExistingContinuationErrorResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          required: [success, errorCode, message]
+          properties:
+            success: {type: boolean, enum: [false]}
+            errorCode:
+              type: string
+              description: |
+                Existing quote-service codes are retained. Planner and service
+                domain failures use SUBSCRIPTION_CONTINUATION_INVALID; bean
+                validation uses VALIDATION_ERROR. Other existing service codes
+                remain possible and are not restricted to the new slice enum.
     ErrorCode:
       type: string
       description: |
@@ -1544,6 +1587,7 @@ components:
         - AMENDMENT_DRAFTED
         - AMENDMENT_SUBMITTED
         - AMENDMENT_APPROVED
+        - AMENDMENT_REJECTED
         - AMENDMENT_SENT_FOR_SIGNATURE
         - AMENDMENT_EXECUTED
         - AMENDMENT_UNIT_APPLIED
@@ -1748,12 +1792,23 @@ components:
     RecordApprovalCommand:
       type: object
       required: [version, decision, approvalRef]
+      oneOf:
+        - properties:
+            decision: {type: string, enum: [APPROVED]}
+        - required: [reasonCode]
+          properties:
+            decision: {type: string, enum: [REJECTED]}
       properties:
         version: {type: integer, minimum: 0}
         decision:
           type: string
           enum: [APPROVED, REJECTED]
         approvalRef: {type: string, minLength: 1}
+        reasonCode:
+          type: string
+          minLength: 1
+          pattern: '\S'
+          description: Required for REJECTED; persisted as the AMENDMENT_REJECTED event reason.
         autoApproved:
           type: boolean
           default: false
@@ -2166,7 +2221,7 @@ components:
 
     AmendmentEvent:
       type: object
-      required: [eventId, documentId, seqNo, eventType, occurredAt, recordedAt, prevHash, contentHash, correlationId]
+      required: [eventId, documentId, seqNo, eventType, actorId, actorType, actorRole, occurredAt, recordedAt, payloadDigest, payloadRef, prevHash, contentHash, correlationId]
       properties:
         eventId: {type: string, format: uuid}
         documentId: {type: string, format: uuid}
@@ -2191,13 +2246,13 @@ components:
         actorId: {type: string}
         actorType:
           $ref: "#/components/schemas/ActorType"
-        actorRole: {type: string, nullable: true}
+        actorRole: {type: string, minLength: 1}
         occurredAt: {type: string, format: date-time}
         recordedAt: {type: string, format: date-time}
         reasonCode: {type: string, nullable: true}
         payloadDigest:
           $ref: "#/components/schemas/Sha256"
-        payloadRef: {type: string, nullable: true}
+        payloadRef: {type: string, minLength: 1}
         prevHash:
           $ref: "#/components/schemas/Sha256"
         contentHash:

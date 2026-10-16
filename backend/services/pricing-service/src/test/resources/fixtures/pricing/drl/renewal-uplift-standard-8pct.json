@@ -1,0 +1,17 @@
+{
+  "id": "drg-541-renewal-uplift-standard-8pct",
+  "description": "RENEWAL with churn at the boundary (70) keeps the 8% default and does not offer retention.",
+  "ruleClasspath": "rules/renewal-uplift.drl",
+  "facts": {
+    "dealType": "RENEWAL",
+    "churnScore": 70,
+    "finalPrice": 1000.00
+  },
+  "expected": {
+    "rulesFired": 1,
+    "renewalUpliftPct": "0.08",
+    "retentionOffer": null,
+    "explanationCode": "RENEWAL_UPLIFT_POLICY",
+    "finalPrice": 1000.00
+  }
+}
