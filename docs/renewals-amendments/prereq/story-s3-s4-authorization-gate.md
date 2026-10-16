@@ -171,15 +171,16 @@ v0.2 says to mark an addition N/A, with a one-line reason, when the story does n
 
 The words "event-replay test" also appear in `prereq/specs/ramp-amendments.md` as a DRG-534 acceptance line. That file is a proposal. It is not this checklist.
 
-## Drafts that stay Proposed
+## Architecture status after the prerequisite acceptance
 
 An ADR counts as accepted only after the owner accepts it and the status-change pull request merges. Read on this `main`:
 
 - `docs/adr/ADR-024-order-orchestration-context.md`, `ADR-025-saga-process-manager.md`, `ADR-026-command-messages.md`, and `ADR-027-compensation-and-point-of-no-return.md` each say **Proposed on 2026-10-04. Not accepted.** Each says it does not authorize code. `docs/adr/README.md` catalogs them as Proposed, documentation only. Their status lines on this `main` are still Proposed, so they are not accepted.
-- `docs/renewals-amendments/prereq/DRAFT-adr-reconcile-adr-024-027.md` is a separate draft. Its status line says Proposed, assigns no ADR number, and leaves ADR-024 through ADR-027 Proposed. It says partial application (OQ5) remains open. It is not a merged status change for ADR-024 through ADR-027.
+- [adr-reconcile-adr-024-027.md](adr-reconcile-adr-024-027.md) is Accepted by the owner approval recorded in #623, with no ADR number assigned. It narrows the amendment/fulfilment boundary but does not accept ADR-024 through ADR-027 or decide OQ5. Those four ADRs remain Proposed.
+- [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md) and [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) are also Accepted by #623. They are policy records; implementation, escalator semantics under DRG-533, and runtime rollout remain separate.
 - `docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml` is a draft proposal (`x-opencrm-status: proposal`, title "DRAFT proposal"). Its header says it is not an implementation, a gateway route, or a feature flag, and that it does not authorize merging, deploying, or enabling a runtime flag. Nothing in this tree accepts that contract.
 
-S3 through S8 must not treat those drafts as accepted architecture. ADR-035 is the exception recorded above: [#600](https://github.com/drgaciw/open-crm-cpq/pull/600) merged to `main`, and the scope of that acceptance is S1 and S2 only.
+S3 through S8 may cite the three Accepted prerequisite records within their stated scopes, while ADR-024 through ADR-027 and the OpenAPI contract remain Proposed. These acceptances do not authorize S3–S8 implementation. ADR-035's implementation authorization remains the exception recorded above: [#600](https://github.com/drgaciw/open-crm-cpq/pull/600) merged to `main`, and the scope of that acceptance is S1 and S2 only.
 
 ## Unverified
 
