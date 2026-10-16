@@ -33,6 +33,12 @@ public class SubscriptionRenewalEligibleEvent {
      */
     private String dedupeKey;
 
+    /** Source compatibility for v1 callers that do not yet supply the additive dedupe key. */
+    public SubscriptionRenewalEligibleEvent(String subscriptionId, LocalDate renewalDate,
+                                            String currentPlan, String usageBand) {
+        this(subscriptionId, renewalDate, currentPlan, usageBand, null);
+    }
+
     /** Outbox {@code aggregate_id} length. A longer key would be truncated by the column and could collide. */
     public static final int DEDUPE_KEY_MAX_LENGTH = 100;
 

@@ -220,7 +220,7 @@ Behaviour this proposal assumes those stories will implement together with the e
 | DRG-564 (RA-30) | PolicyDecision trail and input snapshot that RN3 and AC-RN-25 rely on |
 | DRG-554 (RA-20) | Co-term anchor that AC-RN-03 defers to |
 | DRG-541 (RA-07) | Renewal uplift Drools rule currently does not execute; auto-generate has no price until a pricing-service decision exists |
-| DRG-543 (RA-09) | Date-only renew path skips pricing and cannot satisfy RN3 |
+| DRG-543 (RA-09) | Done 2026-10-16. `POST /api/v1/subscriptions/{id}/renew` returns 410 Gone (`Deprecation: true`, successor `Link` to `POST /api/v1/quotes/continuations`, error `SUBSCRIPTION_RENEW_DEPRECATED`). `Subscription.renew` and `SubscriptionService.renew` are removed. RN3 is recorded on the priced continuation, applied on acceptance by `AcceptedQuoteSubscriptionService` (DRG-608) |
 | Amendment spine (DRG-579 and the first-slice stories) | LifecycleChange, AmendmentDocument kind `RENEWAL`, apply-after-EXECUTED, numbering that does not reset on renewal [S transcript, resolved OQ2 and OQ4] |
 | DRG-458 / schema OQ3 | Thin contract header. Settings may ship as a sibling row before the header is enriched [I] |
 | DRG-561 (RA-27) | Placement ADR is Done. This proposal does not reopen where the document lives. The scheduler that publishes eligibility stays the CAM `RenewalScheduler` until an implementation story moves it |
