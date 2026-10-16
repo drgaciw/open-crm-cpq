@@ -174,6 +174,14 @@ BEGIN
         RAISE EXCEPTION 'subscription is not eligible for a contract header' USING ERRCODE = '23514';
     END IF;
     IF sub.contract_id IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM contracts c
+            WHERE c.id = sub.contract_id
+              AND c.tenant_id = p_tenant_id
+              AND c.customer_account_id = contract_header_customer_uuid(sub.customer_id)
+        ) THEN
+            RAISE EXCEPTION 'linked contract does not match tenant and customer' USING ERRCODE = '23514';
+        END IF;
         RETURN sub.contract_id;
     END IF;
 
