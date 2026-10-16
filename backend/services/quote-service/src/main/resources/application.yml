@@ -39,6 +39,11 @@ spring:
       time-to-live: 600000
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: quote-service-renewal
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -95,6 +100,10 @@ approvals:
 # transport is a no-op, so nothing is sent. JEV_API_KEY deliberately has an empty default so
 # the service boots without it; a blank key forces the no-op transport.
 opencrm:
+  kafka:
+    # ADR-018 D6 inbox for the renewal consumer. The ramp gate below stays false; this only creates the claim table's writer.
+    inbox:
+      enabled: true
   jev:
     enabled: ${JEV_ENABLED:false}
     transport: ${JEV_TRANSPORT:noop}
