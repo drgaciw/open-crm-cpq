@@ -2331,47 +2331,68 @@ components:
         currencyCode:
           $ref: "#/components/schemas/CurrencyCode"
         tcvDelta:
-          nullable: true
-          description: |
-            Proposed, unaccepted: null on the current unpriced revision;
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
             replaced by successful pricing before submit or execute. Never
+
             copied from a prior revision. Requires a later storage migration.
-          allOf:
-            - $ref: "#/components/schemas/Money"
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
         arrDelta:
-          nullable: true
-          description: |
-            Proposed, unaccepted: null on the current unpriced revision;
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
             replaced by successful pricing before submit or execute. Never
+
             copied from a prior revision. Requires a later storage migration.
-          allOf:
-            - $ref: "#/components/schemas/Money"
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
         oneTimeTotal:
-          nullable: true
-          description: |
-            Proposed, unaccepted: null on the current unpriced revision;
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
             replaced by successful pricing before submit or execute. Never
+
             copied from a prior revision. Requires a later storage migration.
-          allOf:
-            - $ref: "#/components/schemas/Money"
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
         creditTotal:
-          nullable: true
-          description: |
-            Proposed, unaccepted: null on the current unpriced revision;
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
             replaced by successful pricing before submit or execute. Never
+
             copied from a prior revision. Requires a later storage migration.
-          allOf:
-            - $ref: "#/components/schemas/Money"
-        contentDigest:
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          description: |
-            Proposed default (DRG-616, not accepted, not a migration): null on
+        contentDigest:
+          type: string
+          description: 'Proposed default (DRG-616, not accepted, not a migration): null on
+
             an unpriced draft, including a revision opened by supersession,
+
             until a later submit stores the digest. The field schema on main
+
             still says content_digest is not null. OQ18 stays Proposed, so
+
             this file does not define canonicalization.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         renditionDigest:
           nullable: true
           allOf:
@@ -2464,21 +2485,28 @@ components:
             pins the pricebook (V9). The field schema on main still says not
             null.
         configurationHash:
-          nullable: true
-          description: |
-            Same Proposed default. Null on an unpriced revision. When present,
+          type: string
+          description: 'Same Proposed default. Null on an unpriced revision. When present,
+
             the interim pin is lowercase SHA-256. DRG-428 later replaces that
+
             pin. The field schema on main still says the column is not null.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         unitPrice:
+          type: string
+          description: Decimal numeric(19,4), transported as a string.
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          allOf:
-            - $ref: "#/components/schemas/Money"
         netAmount:
+          type: string
+          description: Decimal numeric(19,4), transported as a string.
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          allOf:
-            - $ref: "#/components/schemas/Money"
         policySlot:
           $ref: "#/components/schemas/PolicySlot"
         policyId: {type: string, nullable: true}
@@ -2502,14 +2530,18 @@ components:
           format: uuid
           description: Quote opened for this revision. The proposed CAM write requires the caller to send it.
         contentDigest:
-          nullable: true
-          description: |
-            Proposed default (DRG-616, not accepted, not a migration): null
+          type: string
+          description: 'Proposed default (DRG-616, not accepted, not a migration): null
+
             while this revision is an unpriced DRAFT. The superseded revision
+
             keeps its digest. The field schema on main still says not null.
+
             OQ18 stays Proposed.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         inputsSnapshotRef: {type: string}
         statusAtClose:
           $ref: "#/components/schemas/RevisionCloseStatus"
