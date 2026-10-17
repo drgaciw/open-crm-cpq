@@ -473,15 +473,15 @@ class ContractDocumentsSchemaIntegrationTest {
         put(columns, "amendment_documents", "YES integer", "amendment_seq", "executed_revision_no");
         put(columns, "amendment_documents", "NO character varying",
                 "intent", "initiation_trigger", "provisional_number", "document_kind", "status", "signature_policy",
-                "currency_code", "content_digest", "evidence_class", "created_by");
+                "currency_code", "evidence_class", "created_by");
         put(columns, "amendment_documents", "YES character varying",
                 "request_identifier", "amendment_number", "approval_ref", "signature_envelope_ref",
-                "backdating_reason_code", "rendition_digest", "signed_copy_sha256", "template_id", "template_version",
-                "updated_by");
+                "backdating_reason_code", "content_digest", "rendition_digest", "signed_copy_sha256", "template_id",
+                "template_version", "updated_by");
         put(columns, "amendment_documents", "NO date", "action_date", "contract_effective_date");
         put(columns, "amendment_documents", "YES date",
                 "service_activation_date", "customer_acceptance_date", "co_term_date", "retention_until");
-        put(columns, "amendment_documents", "NO numeric", "tcv_delta", "arr_delta", "one_time_total", "credit_total");
+        put(columns, "amendment_documents", "YES numeric", "tcv_delta", "arr_delta", "one_time_total", "credit_total");
         put(columns, "amendment_documents", "NO boolean", "legal_hold", "is_deleted");
         put(columns, "amendment_documents", "YES timestamp with time zone", "expires_at", "executed_at", "applied_at", "updated_at");
         put(columns, "amendment_documents", "NO timestamp with time zone", "created_at");
@@ -490,8 +490,8 @@ class ContractDocumentsSchemaIntegrationTest {
         put(columns, "amendment_document_revisions", "NO integer",
                 "revision_no", "lifecycle_change_revision", "version");
         put(columns, "amendment_document_revisions", "NO character varying",
-                "content_digest", "inputs_snapshot_ref", "status_at_close", "created_by");
-        put(columns, "amendment_document_revisions", "YES character varying", "updated_by");
+                "inputs_snapshot_ref", "status_at_close", "created_by");
+        put(columns, "amendment_document_revisions", "YES character varying", "content_digest", "updated_by");
         put(columns, "amendment_document_revisions", "YES timestamp with time zone", "frozen_at", "updated_at");
         put(columns, "amendment_document_revisions", "NO timestamp with time zone", "created_at");
 
@@ -510,9 +510,9 @@ class ContractDocumentsSchemaIntegrationTest {
         put(columns, "amendment_document_lines", "NO integer", "revision_no", "line_no", "application_unit_no", "version");
         put(columns, "amendment_document_lines", "NO character varying",
                 "action_code", "business_category", "apply_target_type", "quantity_semantics", "charge_type",
-                "price_as_of", "product_external_id", "pricebook_version", "configuration_hash", "policy_slot",
-                "created_by");
+                "price_as_of", "policy_slot", "created_by");
         put(columns, "amendment_document_lines", "YES character varying",
+                "product_external_id", "pricebook_version", "configuration_hash",
                 "source_accepted_line_uuid", "result_accepted_line_uuid", "metric", "policy_id", "policy_version",
                 "policy_decision_id", "pricing_trace_id", "override_reason_code", "override_actor", "updated_by");
         put(columns, "amendment_document_lines", "NO numeric", "start_qty", "delta_qty", "end_qty");

@@ -46,7 +46,9 @@ class AmendmentAuthorizationGapTest {
         String adr = Files.readString(repositoryFile("docs/adr/ADR-016-identity-authentication-service-trust.md"));
         int catalogAt = adr.indexOf("Entra app roles are ");
         assertThat(catalogAt).isNotNegative();
-        String catalog = adr.substring(catalogAt, adr.indexOf('.', catalogAt));
+        int catalogEnd = adr.indexOf("and `Admin`", catalogAt);
+        assertThat(catalogEnd).isGreaterThan(catalogAt);
+        String catalog = adr.substring(catalogAt, catalogEnd + "and `Admin`".length());
         assertThat(catalog).contains("CPQ.User", "DealDesk", "SalesVP", "CFO", "Admin");
         assertThat(catalog).doesNotContain("`" + role + "`");
 

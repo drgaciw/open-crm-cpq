@@ -130,6 +130,35 @@ class AmendmentStateMachineTest {
     }
 
     @Test
+    void everyOtherTransitionFromEveryStateIsRefused() {
+        for (AmendmentDocumentStatus status : AmendmentDocumentStatus.values()) {
+            boolean preExecution = status == AmendmentDocumentStatus.DRAFT
+                    || status == AmendmentDocumentStatus.IN_REVIEW
+                    || status == AmendmentDocumentStatus.APPROVED;
+            assertAllowed(AmendmentStateMachine.revise(status), preExecution);
+            assertAllowed(AmendmentStateMachine.submit(status), status == AmendmentDocumentStatus.DRAFT);
+            assertAllowed(AmendmentStateMachine.withdraw(status), preExecution);
+            assertAllowed(AmendmentStateMachine.price(status), status == AmendmentDocumentStatus.DRAFT);
+            assertAllowed(AmendmentStateMachine.rejectReview(status), status == AmendmentDocumentStatus.IN_REVIEW);
+            assertThat(AmendmentStateMachine.sendForSignature(status).allowed()).isFalse();
+            for (SignaturePolicy policy : SignaturePolicy.values()) {
+                boolean executeAllowed = status == AmendmentDocumentStatus.APPROVED
+                        && policy != SignaturePolicy.WET && policy != SignaturePolicy.E_SIGN;
+                assertAllowed(AmendmentStateMachine.execute(status, policy), executeAllowed);
+                assertAllowed(AmendmentStateMachine.approve(status, policy), status == AmendmentDocumentStatus.IN_REVIEW);
+            }
+        }
+    }
+
+    private static void assertAllowed(Transition transition, boolean allowed) {
+        assertThat(transition.allowed()).isEqualTo(allowed);
+        if (!allowed) {
+            assertThat(transition.errorCode()).isNotBlank();
+            assertThat(transition.httpStatus()).isIn(409, 422);
+        }
+    }
+
+    @Test
     void rejectReviewIsTerminal() {
         assertThat(AmendmentStateMachine.rejectReview(AmendmentDocumentStatus.IN_REVIEW).status())
                 .isEqualTo(AmendmentDocumentStatus.REJECTED);

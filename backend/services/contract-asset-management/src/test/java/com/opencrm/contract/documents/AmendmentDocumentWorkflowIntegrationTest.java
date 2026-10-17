@@ -21,9 +21,11 @@ import com.opencrm.contract.repository.documents.AmendmentDocumentRepository;
 import com.opencrm.contract.repository.documents.ContractHeaderRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -59,7 +61,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @Tag("integration")
 @Testcontainers
-@AutoConfigureMockMvc
 @SpringBootTest(classes = ContractAssetManagementApplication.class, properties = {
         "spring.profiles.active=test",
         "spring.kafka.listener.auto-startup=false",
@@ -92,9 +93,15 @@ class AmendmentDocumentWorkflowIntegrationTest {
     @Autowired AmendmentDocumentEventRepository events;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
-    @Autowired MockMvc mvc;
+    @Autowired WebApplicationContext web;
 
+    private MockMvc mvc;
     private final AtomicInteger keys = new AtomicInteger();
+
+    @BeforeEach
+    void http() {
+        mvc = MockMvcBuilders.webAppContextSetup(web).build();
+    }
 
     @Test
     void acS3_1_sameLifecycleChangeCreatesOneDocumentAndReplays() throws Exception {
@@ -335,6 +342,17 @@ class AmendmentDocumentWorkflowIntegrationTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    @Test
+    void crossTenantReadIsNotFound() {
+        Fixture fixture = fixture(SignaturePolicy.NOT_REQUIRED);
+        AmendmentView draft = documents.create(fixture.contract.getId(), create(fixture), context(fixture, "tenant-create"));
+        CommandContext other = new CommandContext(UUID.randomUUID(), "s5-caller", "tenant-read",
+                "seller-1", ActorType.USER, "seller", "corr-tenant");
+        assertThatThrownBy(() -> documents.getForTenant(draft.id(), other))
+                .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
+        assertThat(documents.getForTenant(draft.id(), context(fixture, "tenant-ok")).id()).isEqualTo(draft.id());
     }
 
     @Test
