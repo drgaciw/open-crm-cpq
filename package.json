@@ -2,6 +2,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.68",
     "@anthropic-ai/claude-code": "^2.1.68",
+    "ai": "^7.0.107",
     "cloudflare-wrangler-dev": "^1.0.3"
   }
 }
