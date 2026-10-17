@@ -22,7 +22,7 @@ Comments on all three issues: none.
 
 ## How to read a fork
 
-Each fork has options, a recommendation, and a default. Every default in this file is Proposed, unaccepted, owner decision required. The recommendation is the option this frame would use. The default is the value that applies only if the owner later accepts the frame and leaves that fork unset. The owner-decision table at the end lists every fork.
+Each fork has options, a recommendation, and a default. Every default in this file is Proposed, unaccepted, owner decision required. The recommendation is the option this frame would use. A default applies only after the owner adopts it as policy; acceptance of the documentation alone does not adopt it. The owner-decision table at the end lists every fork.
 
 `specs/capacity-meters.md` is a separate proposal. It leaves these knobs unset and says no default is proposed as accepted. This frame does not edit that file and does not accept it. Where a Proposed default below names a knob that file left open, the owner is choosing the frame, not that spec.
 

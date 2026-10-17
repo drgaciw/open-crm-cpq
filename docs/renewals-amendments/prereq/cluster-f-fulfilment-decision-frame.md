@@ -58,7 +58,7 @@ This frame does not change `opencrm.erp-sync.enabled` and does not add a migrati
 
 DRG-578 and DRG-558 are one boundary. DRG-578 asks which fulfilment operation a change line selects. DRG-558 asks which commitment names might describe a line that is waiting on fulfilment. The Accepted reconcile is input text for that boundary. This frame does not scaffold a service.
 
-Linear still lists [DRG-577](https://linear.app/drgamtd-workspace/issue/DRG-577/reconcile-proposed-order-model-adr-024-to-adr-027-with-the-amendment) as `blockedBy` for both issues. DRG-577 is Done. Its reconcile record says specification of DRG-578 and DRG-558 is design work, not an authorization to scaffold `order-service`. This frame is that specification. Its status is Proposed, unaccepted, owner decision required.
+Linear still lists [DRG-577](https://linear.app/drgamtd-workspace/issue/DRG-577/reconcile-proposed-order-model-adr-024-to-adr-027-with-the-amendment) as `blockedBy` for both issues. DRG-577 is Done. Its reconcile record says specification of DRG-578 and DRG-558 is design work, not an authorization to scaffold `order-service`. This frame is that specification and is accepted as documentation. Its individual forks remain Proposed, unaccepted, owner decision required.
 
 ### Fork C1 — What this frame ships
 
@@ -101,7 +101,7 @@ No transport is decided. DRG-466 stays a dependency for any later orchestrator. 
 
 **Recommendation:** A. **Default:** A. **Alternatives:** B. **Status of this default:** Proposed, unaccepted, owner decision required. B would reopen the Accepted proration ADR. This frame does not.
 
-Shared consequence of C1–C4: while this frame is Proposed, unaccepted, owner decision required, it unblocks no implementation story. Owner confirmation of a default would still authorize no code, migration, flag, or deploy.
+Shared consequence of C1–C4: this accepted documentation frame unblocks no implementation story. The individual defaults remain Proposed, unaccepted, owner decision required. Owner confirmation of a default would still authorize no code, migration, flag, or deploy.
 
 ## DRG-578 — Action-aware fulfilment decomposition
 
@@ -254,7 +254,7 @@ Operation names under that proposal, for on-prem lines only: `PROVISION`, `MODIF
 
 ### What it unblocks
 
-While this frame is Proposed, unaccepted, owner decision required, DRG-578 unblocks nothing.
+Acceptance of this documentation frame does not unblock DRG-578 implementation. Its individual forks remain Proposed, unaccepted, owner decision required.
 
 Owner confirmation would still authorize no code, migration, flag, or deploy. It would not decide an event or a transport. It would not start DRG-465, DRG-466, DRG-460, DRG-495, DRG-574, DRG-556, DRG-557, S3, or S6. Any service, schema, or topic still waits on a separate acceptance of ADR-024 through ADR-027.
 
@@ -387,7 +387,7 @@ Under that proposal the eight names are unsettled candidates for a later on-prem
 
 ### What it unblocks
 
-While this frame is Proposed, unaccepted, owner decision required, DRG-558 unblocks nothing.
+Acceptance of this documentation frame does not unblock DRG-558 implementation. Its individual forks remain Proposed, unaccepted, owner decision required.
 
 Owner confirmation would still authorize no code, migration, flag, or deploy, would settle no commitment state by itself, and would decide no event and no transport. It would not start DRG-429, DRG-460, DRG-466, DRG-574, DRG-547, the conversions spec, S3, or S6.
 
