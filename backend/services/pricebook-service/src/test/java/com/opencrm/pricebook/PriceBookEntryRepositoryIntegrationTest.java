@@ -50,7 +50,8 @@ class PriceBookEntryRepositoryIntegrationTest {
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withCreateContainerCmdModifier(command -> command.getHostConfig().withMemory(256L * 1024 * 1024));
+            .withCreateContainerCmdModifier(command -> command.getHostConfig().withMemory(256L * 1024 * 1024))
+            .withInitScript("db/init-test.sql");
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
