@@ -1,6 +1,11 @@
 # Cluster C — true-up and meters: decision frame
 
-**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+**Status:** Decisions adopted under owner delegation on 2026-10-17; effective on merge of the [delegated decision record](delegated-renewals-amendments-decisions-2026-10-17.md). Implementation remains separately gated.
+
+**Current authority:** The linked record assigns a disposition to every fork in this frame and supplies overriding contracts. All proposal labels, owner-confirmation requests, defaults and open-question wording below are the historical pre-decision frame at `285ffef8e08274600090d8ba077a0c92f489c062`. They are retained as rationale/alternatives, not additional current owner gates. Evidence and implementation claims retain their original dates and limits.
+
+## Historical decision frame
+
 
 **Original proposal scope (before acceptance):** Not an ADR. This file takes no number and is not copied into `docs/adr/`. Landing it on `main` records the frame. It does not accept any default in it. Acceptance is a later owner act that changes this status line. DRG-569, DRG-570, and DRG-557 stay In Review until the owner merges. They are not Done on merge of a docs frame while code is open.
 

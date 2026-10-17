@@ -1,5 +1,7 @@
 # First slice: requirements and acceptance criteria
 
+**Delegated decisions (2026-10-17):** The prior documentation-acceptance note below is historical. The delegated record now adopts the specified policy/contract choices and five criteria; implementation remains separately gated. See the [decision record](prereq/delegated-renewals-amendments-decisions-2026-10-17.md).
+
 **Documentation acceptance (2026-10-17):** The additions and corrections in PRs #653 and #661 are [accepted as documentation](prereq/documentation-acceptance-2026-10-17.md). Individual proposed criteria and unresolved contract decisions retain the statuses stated below; no implementation story is authorized.
 
 *open-crm-cpq, universal renewals-and-amendments. Documentation only. Date: 2026-10-16. Companion files: `renewals-amendments-dev-readiness.md`, `amendment-technical-approach-and-dependencies.md`, `renewals-amendments-open-questions-register.md`.*
@@ -8,7 +10,7 @@
 
 **Conventions.** [S] sourced from a project file; [I] proposal made here and subject to review. Rule ids V1..V14 and A1..A8 are from `mid-term-amendment-policy-spec.md`. Story ids are new: S1..S8 map to RA-45..RA-52 and DRG-579..DRG-586.
 
-**OQ6 reconciliation (2026-10-17, DRG-616).** The canonical record is `prereq/oq6-revision-model-owner-decision.md` as merged by #642. Its pre-execution revision rule, executed immutability, and terminal-state rule are recorded under delegation. The CAM write API, cleared-pin storage, local concurrency protocol, supersession event contract, and S5/S8 delivery contract remain proposals. AC-S3-9 through AC-S3-11, AC-S5-7, and AC-S8-6 below are explicitly Proposed, not adopted as complete contracts; their behavioral overlap with OQ6 does not adopt their extra details. See `prereq/story-drg-616-oq6-design-contract-gaps.md`. OQ18 remains Proposed and gates digest-library work only. No story is authorized here.
+**Current OQ6/DRG-616 reconciliation (2026-10-17).** [Delegated decisions](prereq/delegated-renewals-amendments-decisions-2026-10-17.md) adopt the CAM command, nullable unpriced storage, immutable envelope/digest contract, local concurrency and S5/S8 durable-delivery criteria. OQ18 is confirmed under delegation. AC-S3-9..11, AC-S5-7 and AC-S8-6 below are adopted requirements against those contracts. DTO/schema completion and test evidence remain required; no story is authorized by requirements adoption.
 
 ## 1. Numbered requirements
 
@@ -65,9 +67,9 @@ Depends on: S1, S2; DRG-562 design.
 - **AC-S3-6.** Given two drafts for one contract executing concurrently, When both execute, Then sequences are N+1 and N+2 with no gap.
 - **AC-S3-7.** Given a DRAFT, When withdrawn, Then state is WITHDRAWN (terminal), no number is consumed, and no gap appears in executed numbering.
 - **AC-S3-8.** Given action date later than today and effective date earlier than action date without a reason code, When submitted, Then V6 fails.
-- **AC-S3-9 (Proposed, not adopted).** Given a CAM document in DRAFT, IN_REVIEW or APPROVED, When CAM accepts a revision command against its expected document row version, Then a new document revision exists on the same document with the same provisional number, the previous revision is closed SUPERSEDED with its digest kept, the document is DRAFT, approvals and product, pricebook, configuration and policy-decision pins bound to the previous digest are invalidated, the new revision cannot submit or execute until repriced and reapproved as required, and an event is written in the CAM transaction (OQ6).
-- **AC-S3-10 (Proposed, not adopted).** Given a CAM document that is EXECUTED, APPLIED, PARTIALLY_APPLIED or APPLY_BLOCKED, When CAM receives a revision command, Then it returns 409 IMMUTABLE_EXECUTED, the document and revision digest are unchanged, and a rejection event is written. REJECTED and WITHDRAWN are also terminal: revision commands return 409 without reopening them or changing their stored digest (OQ6).
-- **AC-S3-11 (Proposed, not adopted).** Given an APPROVED CAM document, When revision and execution commands target the same expected document row version concurrently, Then exactly one revision-or-execution state transition commits within CAM and the other returns 409, and an executed document's recorded digest equals the digest of its executed revision. This guarantee is local to CAM; the LifecycleChange integration is tested under S5 and S8 (OQ6).
+- **AC-S3-9 (Adopted under delegation 2026-10-17).** Given a CAM document in DRAFT, IN_REVIEW or APPROVED, When CAM accepts a revision command against its expected document row version, Then a new document revision exists on the same document with the same provisional number, the previous revision is closed SUPERSEDED with its digest kept, the document is DRAFT, approvals and product, pricebook, configuration and policy-decision pins bound to the previous digest are invalidated, the new revision cannot submit or execute until repriced and reapproved as required, and an event is written in the CAM transaction (OQ6).
+- **AC-S3-10 (Adopted under delegation 2026-10-17).** Given a CAM document that is EXECUTED, APPLIED, PARTIALLY_APPLIED or APPLY_BLOCKED, When CAM receives a revision command, Then it returns 409 IMMUTABLE_EXECUTED, the document and revision digest are unchanged, and a rejection event is written. REJECTED and WITHDRAWN are also terminal: revision commands return 409 without reopening them or changing their stored digest (OQ6).
+- **AC-S3-11 (Adopted under delegation 2026-10-17).** Given an APPROVED CAM document, When revision and execution commands target the same expected document row version concurrently, Then exactly one revision-or-execution state transition commits within CAM and the other returns 409, and an executed document's recorded digest equals the digest of its executed revision. This guarantee is local to CAM; the LifecycleChange integration is tested under S5 and S8 (OQ6).
 
 ### S4 (RA-48 / DRG-582): Document-driven apply with multi-subscription units
 Depends on: S1..S3; DRG-562, DRG-563, DRG-565; DRG-421 for the pricebook version pin; the interim configuration pin (FR-15) removes the DRG-428 block, and DRG-428 later replaces it.
@@ -90,7 +92,7 @@ Depends on: S3 contract; pricing-service amendment modes (OQ9 verify); DRG-421 f
 - **AC-S5-5.** Given the legacy continuation endpoint is called for an amendment with the flag on, When processed, Then it creates a LifecycleChange and returns the same response shape as before.
 - **AC-S5-6.** Given a target subscription not ACTIVE, When created, Then V2 rejects it.
 
-- **AC-S5-7 (Proposed, not adopted).** Given a LifecycleChange revision request, When quote-service invokes the CAM revision contract, Then completion is reported only after a matching CAM revision is confirmed; rejection or an interrupted call cannot leave an operation reported complete with an unmatched revision. S5 must specify durable correlation, retry/idempotency and reconciliation for that service boundary before implementing this flow (OQ6).
+- **AC-S5-7 (Adopted under delegation 2026-10-17).** Given a LifecycleChange revision request, When quote-service invokes the CAM revision contract, Then completion is reported only after a matching CAM revision is confirmed; rejection or an interrupted call cannot leave an operation reported complete with an unmatched revision. S5 uses D-IDEMPOTENCY and D-DELIVERY in [the decision record](prereq/delegated-renewals-amendments-decisions-2026-10-17.md#cam-transactions-and-delivery), with completed DTOs and verified reconciliation before release.
 
 ### S6 (RA-50 / DRG-584): Event contract and legacy gating
 Depends on: S3, S4.
@@ -113,7 +115,7 @@ Depends on: S3..S6.
 - **AC-S8-3.** Given a replay of the whole event stream, When processed twice, Then the final ledger state is identical.
 - **AC-S8-4.** Given the V1..V14 rules, Then each has at least one failing-input test named after the rule id.
 - **AC-S8-5.** Given the CI pipeline, Then the suite runs on every PR touching CAM or quote-service amendment code.
-- **AC-S8-6 (Proposed, not adopted).** Given the S5 LifecycleChange revision flow, When revision races execution and calls or acknowledgements are interrupted, Then integration tests verify the CAM winner, the executed digest, and eventual confirmed or rejected source-operation state under S5's delivery protocol; no unmatched source revision is reported complete. This is cross-service coverage, beyond S3's CAM-local race test (OQ6).
+- **AC-S8-6 (Adopted under delegation 2026-10-17).** Given the S5 LifecycleChange revision flow, When revision races execution and calls or acknowledgements are interrupted, Then integration tests verify the CAM winner, the executed digest, and eventual confirmed or rejected source-operation state under S5's delivery protocol; no unmatched source revision is reported complete. This is cross-service coverage, beyond S3's CAM-local race test (OQ6).
 
 ## 3. Definition of ready and done for each story
 Ready: dependencies met, open question defaults accepted (register), contract test fixtures drafted. Done: acceptance criteria automated, migration reviewed for expand-contract, docs updated, no change to legacy path behaviour when flag is off, audit events visible.

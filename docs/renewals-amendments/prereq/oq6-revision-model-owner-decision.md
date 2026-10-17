@@ -1,6 +1,16 @@
-# OQ6 decision record and OQ18 proposal: revisions superseded mid-flight, and digest-library timing
+# OQ6 revision rule and confirmed OQ18 digest ownership
 
-**Status:** OQ6 was decided under delegation by CPQ Decision and relayed by Projects Manager; it is not the owner's personal choice. OQ18 remains **Proposed until the owner confirms it**. OQ6 is recorded for the first slice, but this record authorizes no code, schema, migration, flag, topic, gateway route, deploy, or story. S3 / DRG-581 requires separate owner authorization. OQ18 confirmation is required before building the proposed digest library, not authorization to start S3.
+**Status:** OQ6 remains adopted under delegation; its boundary contracts and OQ18 are decided under the owner's renewed delegation on 2026-10-17. See [the delegated record](delegated-renewals-amendments-decisions-2026-10-17.md). No implementation story is authorized here.
+
+## Current decision
+
+The pre-execution revision rule, stable provisional number, terminal refusal, executed immutability and at-most-one executed revision remain as recorded below. The [CAM contracts](delegated-renewals-amendments-decisions-2026-10-17.md#cam-transactions-and-delivery) now select the CAM API/version/idempotency behavior, audit types, local concurrency criterion and durable S5 delivery. The [storage/digest contract](delegated-renewals-amendments-decisions-2026-10-17.md#storage-and-digests) now selects nullable unpriced values, a CAM-owned immutable envelope store and genuine close-time hashing. AC-S3-9..11, AC-S5-7 and AC-S8-6 are adopted criteria, with execution evidence still required.
+
+OQ18 is confirmed under delegation: one shared utility in `backend/libs/common`, delivered with S3, reused without forks by S5/S6, using the versioned commercial envelope and canonicalization contract in the linked record. The old owner-confirmation gate is satisfied by this decision. S3's separate implementation-authorization gate remains.
+
+## Historical 2026-10-16 ruling and then-open questions
+
+The material below preserves the original reading, delegation evidence and rationale. References to unconfirmed OQ18 or open boundary contracts describe that earlier state and are superseded by the current decision above.
 
 **Date:** 2026-10-16. **Project:** OPEN-CRM-CPQ. **Stories:** S3 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) (requires separate owner authorization), S4 / [DRG-582](https://linear.app/drgamtd-workspace/issue/DRG-582) (waits on S3 and its other prerequisites).
 

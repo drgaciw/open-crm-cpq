@@ -3,6 +3,12 @@ info:
   title: Amendments and lifecycle changes (DRAFT proposal)
   version: 0.1.1-draft
   description: |
+    Decision update 2026-10-17: delegated-renewals-amendments-decisions-2026-10-17.md
+    adopts the indexed design decisions, OQ18 and CAM transaction/delivery rules.
+    This OpenAPI remains a draft interface artifact: the new priced-state command,
+    closed commercial-envelope DTO and receipt/reconciliation schemas still require
+    completion against that record before implementation release or code generation.
+
     Documentation accepted by the owner on 2026-10-17; see
     documentation-acceptance-2026-10-17.md for scope. Individual default and
     implementation-contract decisions remain subject to the gates below.
@@ -11,9 +17,9 @@ info:
     feature flag. It does not authorize merging, deploying, or enabling any
     runtime flag.
 
-    Status of every default in this file: Proposed, unaccepted, owner decision
-    required. This file is not an input to code generation and it defines no
-    contract test.
+    Historical proposal labels below retain the pre-decision interface sketch.
+    The delegated record governs adopted choices; other paths remain proposals.
+    This file is not an input to code generation and defines no executed test.
 
     HTTP contract for the contract-documents module and for quote-service
     lifecycle changes, so DRG-537 (renewals and amendments UI), DRG-581 (S3)
@@ -58,18 +64,18 @@ info:
 
     Money is a decimal string so numeric(19,4) scale survives JSON. Digests are
     lowercase hex SHA-256. Canonical JSON for `contentDigest` is the shared
-    digest library (S3 dependency, location still open). This proposal does not
-    define the canonicalization algorithm. OQ18 remains Proposed. This file
-    does not confirm OQ18 and does not authorize building that library.
+    digest library in backend/libs/common, delivered with S3 under confirmed OQ18.
+    CAM-COMMERCIAL-1 is defined in the delegated decision record. This file
+    does not authorize implementation or change the existing S2 event-chain format.
 
-    DRG-616 records three contracts. Each default is Proposed, unaccepted,
-    owner decision required.
-    POST /amendments/{amendmentId}/revisions is the proposed CAM revision
+    DRG-616 decisions are adopted under the delegated record. Pre-decision
+    proposal wording below is historical; DTO/schema completion remains required.
+    POST /amendments/{amendmentId}/revisions is the adopted CAM revision
     write. It follows the OQ6 ruling recorded in pull request #642: before
     execution, a new revision under the same document number, the old revision
     frozen SUPERSEDED, the new revision DRAFT, pricing pins cleared, approvals
     and signatures void; after EXECUTED, no new revision; at most one EXECUTED
-    revision. Nullable pins and a local supersession log name are Proposed
+    revision. Nullable pins and local supersession/refusal audit names are adopted
     defaults in story-drg-616-oq6-design-contract-gaps.md. Accepting this file
     authorizes no code, migration, or deploy. S6 is not authorized. ADR-017
     and ADR-024 through ADR-027 are not accepted here. The DRG-609 design is
@@ -302,7 +308,8 @@ paths:
         This operation is the quote-service revision. It is not the CAM write,
         and it does not insert amendment_document_revisions. The CAM command
         is POST /amendments/{amendmentId}/revisions. That command is a
-        proposal (DRG-616) and is not accepted.
+        design adopted by the delegated record; its schema completion and
+        implementation authorization remain separate gates.
       x-opencrm-slice: S5
       requestBody:
         required: true
@@ -631,7 +638,7 @@ paths:
       summary: List document revisions
       description: |
         At most one revision has statusAtClose EXECUTED.
-        The proposed write on this path is not accepted.
+        The POST design is adopted by the delegated record; schema completion remains due.
       x-opencrm-slice: S3
       responses:
         "200":
@@ -649,137 +656,92 @@ paths:
         - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: openAmendmentRevision
-      summary: Open a new document revision before execution (proposal)
+      summary: Open a new document revision before execution (adopted design, draft schema)
       description: |
-        Proposal only. Status: Proposed. Not accepted. This operation does
-        not authorize S3, S5, S6, a migration, a flag, a topic, or a deploy.
-        OQ18 stays Proposed. ADR-017 and ADR-024 through ADR-027 stay
-        Proposed. The DRG-609 design is not accepted. S3 / DRG-581 needs a
-        separate owner authorization. S6 is not authorized.
+        Design adopted under owner delegation on 2026-10-17 in
+        delegated-renewals-amendments-decisions-2026-10-17.md. D-REVISION,
+        D-STORAGE, D-SNAPSHOT, D-DIGEST, D-RACE, D-IDEMPOTENCY and D-DELIVERY
+        govern this operation. OQ18 is confirmed. Implementation authorization,
+        closed DTO/schema completion, fixtures and execution evidence remain due.
+        ADR-017 and ADR-024 through ADR-027 and the separate DRG-609 design are
+        not accepted wholesale. S3/S5/S6 implementation is not authorized here.
 
-        CAM owns this command. S5 would call it after a separate authorization
-        of that story. Draft criterion AC-S5-7 is a proposal in the
-        requirements file. This operation does not adopt it.
+        CAM owns this command. Before execution, DRAFT, IN_REVIEW and APPROVED
+        may open a new revision under the same provisionalNumber. CAM freezes
+        the previous revision SUPERSEDED and its immutable commercial envelope;
+        the new revision is OPEN and the document returns to DRAFT. Approvals
+        and signatures are void. New prices/pins, all four current totals and
+        the current contentDigest are null. Priced historical values and actual
+        historical nulls are preserved. A never-submitted old draft obtains a
+        genuine close digest before freezing; a prior digest is never replaced
+        with a hash under a different format. Shared CAM-COMMERCIAL-1 hashing
+        and durable CAM envelope storage are selected by the delegated record.
 
-        The behavior follows the OQ6 ruling recorded in #642. That ruling is
-        not re-decided here. Before execution (document status DRAFT,
-        IN_REVIEW, or APPROVED), the command opens a new revision under the
-        same document number. The old revision is frozen with statusAtClose
-        SUPERSEDED and keeps its content digest. The new revision is DRAFT
-        (statusAtClose OPEN). Pricing pins on the new revision are cleared.
-        Approvals and signatures are void: approvalRef and
-        signatureEnvelopeRef are null. After EXECUTED, including APPLIED,
-        PARTIALLY_APPLIED, and APPLY_BLOCKED, no new revision is stored. At
-        most one revision may be EXECUTED. REJECTED and WITHDRAWN stay
-        terminal. Document status SUPERSEDED is a different, later
-        restatement event and is not this command. OUT_FOR_SIGNATURE is not
-        reachable in the slice; the command returns 409 and does not void an
-        envelope.
+        The request supplies version, source LifecycleChange revision,
+        targetQuoteId, source inputsSnapshotRef, resolved actionDate,
+        contractEffectiveDate, explicit nullable backdatingReasonCode and full
+        commercial lines with applicationUnitNo. Required structural hooks are
+        businessCategory, applyTargetType, chargeType, priceAsOf and policySlot.
+        Source first-slice defaults EFFECTIVE_DATE, AMENDMENT, SUBSCRIPTION and
+        RECURRING and Cluster E L4 category derivation are adopted choices.
+        S5 must materialize these before the call; unresolved inputs reject the
+        handoff. Existing supported explicit price-as-of choices remain valid.
+        No source operation is reported complete before a matching CAM receipt.
+        The command accepts no price or pricing pins from the caller.
 
-        Request. actionDate, contractEffectiveDate and backdatingReasonCode
-        carry the resolved new commercial header, after quote-service has
-        applied its revision patch. Before any replacement, CAM must archive
-        the previous revision's complete commercial evidence in an immutable
-        revision-bound envelope and bind that envelope through the previous
-        revision's inputs_snapshot_ref. It contains the prior actionDate,
-        contractEffectiveDate, serviceActivationDate, customerAcceptanceDate,
-        backdatingReasonCode, coTermDate, currency, all four totals, lines,
-        pins/trace and every other commercial field covered by its digest,
-        plus the original input-snapshot reference. An unfrozen OPEN row may
-        acquire this envelope reference in the freeze transaction; once
-        frozen its reference and envelope never change. Each envelope is
-        retained independently of current header values. Archive/binding
-        failure aborts the revision transaction. A later write to an OPEN
-        revision creates a new immutable envelope and only replaces that
-        OPEN row's reference; it never overwrites an older envelope. The
-        durable snapshot-store contract still requires separate acceptance;
-        digest-library work also waits on owner confirmation of OQ18.
-        S3/S5 stays blocked without those accepted prerequisites.
-        CAM then replaces those header values in the
-        same transaction that opens the revision; a null backdatingReasonCode
-        explicitly clears the old reason. It validates the revised dates,
-        including backdating rules, and digests the revised header on submit.
-        Header fields not exposed by ReviseLifecycleChangeRequest stay
-        unchanged. No date is silently taken from the previous revision.
-        Each line explicitly supplies businessCategory, applyTargetType,
-        chargeType, priceAsOf and policySlot; CAM invents no database default
-        for these NOT NULL commercial fields. S5 materializes the values on
-        its ChangeLine revision response before the CAM call, even when
-        unpriced. Proposed first-slice source defaults are priceAsOf
-        EFFECTIVE_DATE, policySlot AMENDMENT, applyTargetType SUBSCRIPTION,
-        and chargeType RECURRING; explicit supported price-as-of choices are
-        retained. businessCategory is resolved under the separately accepted
-        action/category policy; missing or unresolved category refuses the
-        handoff rather than making CAM invent one. No incomplete source
-        operation is reported complete. These are proposal rules, not runtime
-        behavior or acceptance of the Cluster E defaults. Existing
-        source/target and action/category constraints still apply.
+        Before replacing a header, CAM archives all previous commercial header
+        fields/dates/reasons, currency and totals, complete lines, identities,
+        pricing/policy/trace evidence, original input reference and every other
+        commercial digest input in its immutable envelope store. The revision's
+        inputs_snapshot_ref binds that CAM envelope; the original source input
+        reference remains inside the envelope. An OPEN reference may move to a
+        new immutable envelope; frozen references/payloads cannot change.
+        Archive or validation failure aborts the entire revision transaction.
+        Old NOT NULL storage requires the adopted additive V1_10+ migration;
+        no migration is delivered or executed by this schema.
 
-        version is the amendment document row version the caller read.
-        lifecycleChangeRevision is the superseding LifecycleChange
-        revision and is unique per document. targetQuoteId and
-        inputsSnapshotRef are required because those columns are not null on
-        main. lines carry commercial structure only. The server stores
-        product, pricebook, configuration, and policy-decision pins as null
-        on the new revision and ignores any price sent by a client. The
-        persisted shape of a cleared pin is the Proposed default in
-        story-drg-616-oq6-design-contract-gaps.md (nullable while unpriced,
-        with frozen values preserved). That default is not a migration. The field
-        schema has a proposal addendum only. Freezing a never-submitted
-        unpriced draft still needs an accepted digest-at-close contract;
-        the null open digest does not resolve that storage gap.
+        Serialize the command with submit, execution and priced-result writes
+        under the document row lock. Operations needing the contract row lock
+        use contract-then-document order. Validate expected version under lock;
+        freeze/insert/header/audit/receipt changes commit atomically. Competing
+        revision and execution against one version have exactly one winner.
+        409 VERSION_CONFLICT is the stale-version result; retry observing an
+        executed/apply state returns IMMUTABLE_EXECUTED. Executed revisions are
+        immutable. REJECTED, WITHDRAWN, VOID and other unsupported terminal
+        states return ILLEGAL_TRANSITION. OUT_FOR_SIGNATURE cannot revise in
+        this slice. Existing validation failures return VALIDATION_REJECTED.
 
-        Idempotency. The same Idempotency-Key and the same body returns 200
-        with Idempotent-Replayed true and does not open a second revision.
-        The same key with a different body returns 409 IDEMPOTENCY_CONFLICT.
-        A later command whose lifecycleChangeRevision already has a revision
-        returns 200 when the body matches that revision, and 409
-        IDEMPOTENCY_CONFLICT when it does not.
+        Idempotency uses a tenant/caller/operation-scoped Idempotency-Key plus
+        the document/source-LifecycleChange/source-revision/operation natural
+        identity. Persist the canonical request digest and committed semantic
+        receipt atomically. Identical replay returns 200 and Idempotent-Replayed
+        true, even if the expected row version has since advanced; receipt lookup
+        precedes stale-version checks. A key/natural identity reused with different
+        content returns 409 IDEMPOTENCY_CONFLICT. No duplicate revision or success
+        audit is written. New success is 201 with the post-commit version.
 
-        Errors leave the document, its revisions, and its digests unchanged:
-        - 409 VERSION_CONFLICT when version is stale. A concurrent execute
-          that commits first makes the revision command lose. A retry that
-          then observes an executed document returns 409 IMMUTABLE_EXECUTED.
-        - 409 IMMUTABLE_EXECUTED when status is EXECUTED, APPLIED,
-          PARTIALLY_APPLIED, or APPLY_BLOCKED, or when any revision is
-          already EXECUTED.
-        - 409 ILLEGAL_TRANSITION when status is REJECTED, WITHDRAWN,
-          OUT_FOR_SIGNATURE, EXPIRED, SUPERSEDED, or VOID.
-        - 422 VALIDATION_REJECTED when lifecycleChangeRevision is not the
-          next revision for this document, or the lifecycle change does not
-          belong to this document.
+        Future pricing installation is a separately adopted CAM command:
+        POST /api/v1/amendments/{amendmentId}/revisions/{revision}/pricing.
+        D-PRICED-WRITE defines its expected version/source revision, complete
+        line/totals/pin/trace payload, immutable pricing-evidence validation,
+        atomic installation, idempotent replay and stale-result refusal. It
+        accepts only the current OPEN revision of a DRAFT document. Its OpenAPI
+        operation/DTO and receipt schemas remain to be completed; the design is
+        decided, not delivered. LifecycleChange :price updates quote-service only
+        and cannot stand in for this CAM command. Submit/execute require valid
+        current totals, required pins, decision evidence and digest binding.
 
-        On 201, status is DRAFT, provisionalNumber is unchanged, amendmentSeq
-        and amendmentNumber stay null, current contentDigest is null until a
-        later submit, the previous revision stays frozen with its digest, and
-        version is the post-commit document row version. Current tcvDelta,
-        arrDelta, oneTimeTotal and creditTotal are null while unpriced, never
-        copied from the superseded header and never filled with placeholder
-        zeroes. Desired later behavior, not a completed delivery contract: a
-        successful pricing synchronization would atomically replace all four
-        totals with newly calculated values for this revision, together with
-        its pins and trace. No CAM priced-state synchronization write or
-        delivery event is defined in this draft. The LifecycleChange :price
-        operation is quote-service state only and does not perform that CAM
-        write; this revisions command accepts no prices or pins either.
-        S3/S5 implementation remains blocked until a separate accepted
-        contract specifies that CAM write/delivery, expected document version
-        and revision, all totals/pins/trace, idempotency, and stale-result
-        refusal. No endpoint is inferred or authorized here. Submit and execute require those totals to
-        be non-null and current. This is an unaccepted nullability proposal
-        requiring a later migration; the existing NOT NULL storage cannot
-        implement it unchanged. Frozen revision snapshots remain unchanged.
-        Each line carries applicationUnitNo. This proposal does not create or retarget
-        application units.
-
-        The same transaction appends one local document-log row. The Proposed
-        default type name on success is AMENDMENT_SUPERSEDED. That name is
-        not an accepted bus schema, topic, or outbox contract. S6 schema
-        registration and contract tests are out of this proposal. A 409
-        IMMUTABLE_EXECUTED or terminal 409 also appends a local audit row.
-        The refusal type name is not chosen in this proposal.
+        Success appends local AMENDMENT_SUPERSEDED and retains the existing S2
+        hash-chain/audit-outbox obligation. Refusal audit uses the selected local
+        AMENDMENT_REVISION_REJECTED type in a separate successful audit transaction
+        after releasing failed business locks; no rejected commercial transition
+        commits. These are local audit types, not new S6 domain-event schemas.
+        D-DELIVERY requires durable source operation state, same-payload retries,
+        receipt reconciliation and confirmed/rejected outcomes after interrupted
+        calls. AC-S3-9..11, AC-S5-7 and AC-S8-6 are adopted criteria against these
+        contracts; no unexecuted test is represented as passed.
       x-opencrm-slice: S3
-      x-opencrm-status: proposal
+      x-opencrm-status: adopted-design-schema-incomplete
       requestBody:
         required: true
         content:
@@ -1787,11 +1749,11 @@ components:
       type: string
       description: |
         Values written to the document event log. Bus payload field names are
-        S6 (DRG-584), not this HTTP contract. AMENDMENT_SUPERSEDED is a
-        Proposed local-log name for a pre-execution supersede (DRG-616). It
-        is not an accepted bus schema, not a schema-registry entry, and not
-        an S6 contract test. S6 is not authorized. Payload, topic, and outbox
-        registration are not chosen here.
+        S6 (DRG-584), not this HTTP contract. AMENDMENT_SUPERSEDED and
+        AMENDMENT_REVISION_REJECTED are adopted local audit types under the
+        delegated record. Existing S2 audit-outbox staging remains required.
+        No new S6 domain-event payload, schema, topic or contract test is
+        selected here. S6 implementation is not authorized.
       enum:
         - AMENDMENT_DRAFTED
         - AMENDMENT_SUBMITTED
@@ -1804,6 +1766,7 @@ components:
         - AMENDMENT_APPLY_BLOCKED
         - AMENDMENT_WITHDRAWN
         - AMENDMENT_SUPERSEDED
+        - AMENDMENT_REVISION_REJECTED
         - AMENDMENT_VOIDED
         - VALIDATION_REJECTED
 
@@ -2196,7 +2159,7 @@ components:
             - $ref: "#/components/schemas/PriceAsOf"
           default: EFFECTIVE_DATE
           description: |
-            Proposed first-slice source default. S5 materializes this non-null
+            Adopted first-slice source default. S5 materializes this non-null
             hook on create/revise before calling CAM, including while unpriced.
             This is not a pricing pin and is not cleared by supersession.
         policySlot:
@@ -2204,7 +2167,7 @@ components:
             - $ref: "#/components/schemas/PolicySlot"
           default: AMENDMENT
           description: |
-            Proposed first-slice source default. S5 materializes this non-null
+            Adopted first-slice source default. S5 materializes this non-null
             hook on create/revise before calling CAM, including while unpriced.
             This is not a pricing pin and is not cleared by supersession.
         amendMode:
@@ -2379,7 +2342,7 @@ components:
           $ref: "#/components/schemas/CurrencyCode"
         tcvDelta:
           type: string
-          description: 'Proposed, unaccepted: null on the current unpriced revision;
+          description: 'Adopted design: null on the current unpriced revision;
 
             replaced by successful pricing before submit or execute. Never
 
@@ -2391,7 +2354,7 @@ components:
           nullable: true
         arrDelta:
           type: string
-          description: 'Proposed, unaccepted: null on the current unpriced revision;
+          description: 'Adopted design: null on the current unpriced revision;
 
             replaced by successful pricing before submit or execute. Never
 
@@ -2403,7 +2366,7 @@ components:
           nullable: true
         oneTimeTotal:
           type: string
-          description: 'Proposed, unaccepted: null on the current unpriced revision;
+          description: 'Adopted design: null on the current unpriced revision;
 
             replaced by successful pricing before submit or execute. Never
 
@@ -2415,7 +2378,7 @@ components:
           nullable: true
         creditTotal:
           type: string
-          description: 'Proposed, unaccepted: null on the current unpriced revision;
+          description: 'Adopted design: null on the current unpriced revision;
 
             replaced by successful pricing before submit or execute. Never
 
@@ -2427,17 +2390,12 @@ components:
           nullable: true
         contentDigest:
           type: string
-          description: 'Proposed default (DRG-616, not accepted, not a migration): null on
-
-            an unpriced draft, including a revision opened by supersession,
-
-            until a later submit stores the digest. The field schema on main
-
-            still says content_digest is not null. OQ18 stays Proposed, so
-
-            this file does not define canonicalization.
-
-            '
+          description: >-
+            Adopted design: null on the current unpriced OPEN revision until submit.
+            Every frozen revision has a genuine close digest; old frozen evidence
+            retains its original digest format. Confirmed OQ18 and CAM-COMMERCIAL-1
+            are defined in the delegated decision record. Storage migration and
+            schema completion remain separately gated.
           pattern: ^[a-f0-9]{64}$
           nullable: true
         renditionDigest:
@@ -2520,24 +2478,24 @@ components:
           type: string
           nullable: true
           description: |
-            Proposed default (DRG-616, not accepted, not a migration): null on
+            Adopted design (DRG-616; migration separately gated): null on
             an unpriced revision, including a revision opened by supersession.
             V9 still requires a non-null pin before submit and at apply. The
-            field schema on main still says this column is not null.
+            existing V1_7 storage is NOT NULL until the separately gated migration.
         pricebookVersion:
           type: string
           nullable: true
           description: |
-            Same Proposed default as productExternalId. Null until pricing
-            pins the pricebook (V9). The field schema on main still says not
-            null.
+            Same adopted nullability as productExternalId. Null until pricing
+            pins the pricebook (V9). Existing V1_7 storage is NOT NULL until
+            the separately gated migration.
         configurationHash:
           type: string
-          description: 'Same Proposed default. Null on an unpriced revision. When present,
+          description: 'Same adopted nullability. Null on an unpriced revision. When present,
 
             the interim pin is lowercase SHA-256. DRG-428 later replaces that
 
-            pin. The field schema on main still says the column is not null.
+            pin. Existing V1_7 storage remains NOT NULL until migration.
 
             '
           pattern: ^[a-f0-9]{64}$
@@ -2578,15 +2536,11 @@ components:
           description: Quote opened for this revision. The proposed CAM write requires the caller to send it.
         contentDigest:
           type: string
-          description: 'Proposed default (DRG-616, not accepted, not a migration): null
-
-            while this revision is an unpriced DRAFT. The superseded revision
-
-            keeps its digest. The field schema on main still says not null.
-
-            OQ18 stays Proposed.
-
-            '
+          description: >-
+            Adopted design: null while this is the current unpriced OPEN revision.
+            Closing an unpriced revision computes a genuine digest of its immutable
+            null-bearing commercial envelope; a previously priced digest is retained.
+            Confirmed OQ18 supplies the shared versioned canonicalization contract.
           pattern: ^[a-f0-9]{64}$
           nullable: true
         inputsSnapshotRef: {type: string}
