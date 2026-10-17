@@ -65,5 +65,8 @@
       "Bash(./mvnw.cmd:*)",
       "Bash(mvnw.cmd:*)"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "autojev"
+  ]
 }

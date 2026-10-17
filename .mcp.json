@@ -6,6 +6,10 @@
       "headers": {
         "Authorization": "Bearer ${AUTOJEV_API_KEY}"
       }
+    },
+    "hindsight": {
+      "type": "http",
+      "url": "http://localhost:8888/mcp/open-crm-cpq"
     }
   }
 }
