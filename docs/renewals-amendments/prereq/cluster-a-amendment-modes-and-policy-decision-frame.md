@@ -56,7 +56,7 @@ Every row is Proposed, unaccepted, owner decision required. The default is the r
 | Fork | Story | Default | Alternatives |
 |---|---|---|---|
 | 592-F1 Flag shape | DRG-592 | Boolean `precedence_flag` | Integer rank across overlapping contracts; a customer-level `prevailing_contract_id` and no boolean column |
-| 592-F2 Who may change the flag | DRG-592 | Follows the quoted #642 OQ6 text: before execution, a new revision on the same document returns to `DRAFT` and voids approvals; after `EXECUTED`, the document is immutable and the remedy is a new correcting amendment document | A product or admin in-place flip with an audit event; a sales flip with no new amendment |
+| 592-F2 Who may change the flag | DRG-592 | Initial winner is established at executed apply; a later correcting amendment transfers the contract-level winner atomically, with an audit row and historical document snapshots preserved | A product or admin in-place flip with an audit event; a sales flip with no new amendment |
 | 592-F3 Overlap for pricing and visibility | DRG-592 | Precedence-true contract is the pricing source; both contracts stay visible; two true flags fail closed | Visibility split off to DRG-595 while the flag still wins pricing; each reader picks its own contract. Entitlement resolution is pending the DRG-609 design (not accepted) and is not in this default |
 | 592-F4 Original at its own end date | DRG-592 | Stays `ACTIVE` as a reference until its own end date, then `EXPIRED` | Stays `ACTIVE` with no expiry; set to `TERMINATED` when the new contract is created |
 | 592-F5 Where the mode is stored | DRG-592 | A column on the amendment document, added in a later increment, not in S1 | Infer the mode from whether a new `contracts` row was inserted; store the mode only on the LifecycleChange |
@@ -76,7 +76,7 @@ Every row is Proposed, unaccepted, owner decision required. The default is the r
 | 594-F5 First-slice timing | DRG-594 | The gate is a later increment; S1–S8 keep the current signature cut | The gate is required before S3 starts |
 | 599-F1 Where the mapping lives | DRG-599 | Business policy, owner option, not adopted: one effective-dated catalog relationship; dispute status points at that version | A separate amendment SKU mapping table; both a catalog row and a commercial overlay |
 | 599-F2 Dispute status and resolver | DRG-599 | `Active`, `Contested`, `Resolved`; product resolves; sales may open and may not clear | Add `Rejected`; sales clears the hold |
-| 599-F3 Where the hold bites | DRG-599 | Whole document, before `IN_REVIEW` and again before apply | Apply only; per-line partial apply |
+| 599-F3 Where the hold bites | DRG-599 | Whole document, before `IN_REVIEW`, immediately before `EXECUTED`, and again before apply | Apply only; per-line partial apply |
 | 599-F4 Which lines need a mapping | DRG-599 | Only when source SKU and target SKU differ | Every line, including same-SKU edits |
 | 599-F5 Pin versus live row | DRG-599 | Pin the relationship version on the line at pricing | Read the live row at apply |
 | 550-F1 Price mode | DRG-550 | `RetainContracted`, `List`, and `Override`, with `RetainContracted` when the mode is omitted | `RetainContracted` only; a fourth flat-adjustment mode |
@@ -118,19 +118,19 @@ An amendment needs two modes. New-contract mode creates a new contract, both sta
 
 **Recommendation:** A. OQ27 names one indexable column, `precedence_flag`, outside the thin header (`read` register).
 
-**Default:** Proposed, unaccepted, owner decision required. Boolean `precedence_flag`, not null, default false (option A). Amend-in-place leaves it false. New-contract mode sets it true on the new contract only. Alternatives written out: an integer rank that orders every overlapping active contract (option B); a single `prevailing_contract_id` on the customer and no boolean column (option C).
+**Default:** Proposed, unaccepted, owner decision required. Boolean `precedence_flag`, not null, default false (option A). Amend-in-place leaves it false. New-contract mode establishes the initial true flag on the new contract only at executed commercial apply; later changes use the audited transfer in 592-F2. Alternatives written out: an integer rank that orders every overlapping active contract (option B); a single `prevailing_contract_id` on the customer and no boolean column (option C).
 
 **592-F2. Who may change the flag.**
 
 | Option | Meaning |
 |---|---|
-| A. Write-once, on the #642 path | Set when the new contract is created. A later change follows the quoted OQ6 text: same-document revision before execution; a new correcting document after `EXECUTED`. |
+| A. Audited winner transfer, on the #642 path | Establish the initial winner at executed commercial apply. A later executed correcting document atomically clears the old contract-level flag and sets the new winner; historical executed documents are unchanged. |
 | B. Product or admin flip | A privileged actor updates the column and writes an audit event. |
 | C. Sales flip | The seller changes precedence with no new amendment. |
 
 **Recommendation:** A.
 
-**Default:** Proposed, unaccepted, owner decision required. Write-once at creation of the new contract (option A), and a later change follows the merged #642 text rather than an in-place edit. Before execution: "A new revision of the LifecycleChange opens a new document revision on the same document, with the same `provisionalNumber` (OQ4). The previous revision closes with `status_at_close = SUPERSEDED` and keeps its content digest. The document returns to `DRAFT`. Approvals and signatures are void". After execution: "The document is immutable. A new revision is refused with 409 `IMMUTABLE_EXECUTED`" and "The remedy is a new LifecycleChange that produces a new, correcting amendment document, the same remedy OQ5 option A adopted for a blocked unit." Alternatives written out: a product or admin in-place flip with an audit event (option B); a sales flip with no new amendment (option C). Options B and C are not the default because they change precedence without that #642 path. Who may draft the later amendment stays on parked [DRG-591](https://linear.app/drgamtd-workspace/issue/DRG-591) (`read` OQ25 in the register).
+**Default:** Proposed, unaccepted, owner decision required. Establish the initial contract-level winner only at executed commercial apply (option A). A later change uses the #642 revision path before execution or a new correcting document after execution. At apply of that correcting document, CAM locks the affected precedence chain in one transaction, verifies the expected current winner, clears its contract-level flag, sets the replacement winner, and appends an audit record linking old winner, new winner, actor and correcting document. A stale winner or two competing transfers rejects the whole transfer; it cannot leave two true flags. Previously executed documents and their pinned precedence evidence are immutable and are not rewritten. The clear/set operation changes current contract authority, not an executed document. This mechanism is itself a proposal, requires separate owner acceptance and implementation authorization, and is not supplied by OQ6 alone. Alternatives: a privileged in-place product/admin flip (B); a sales flip with no correcting document (C). Approval roles stay on parked DRG-591.
 
 **592-F3. Overlapping active contracts.**
 
@@ -487,13 +487,13 @@ Upgrade, swap, and replacement need a mapping from a SKU on the original contrac
 
 | Option | Meaning |
 |---|---|
-| A. Before `IN_REVIEW` and before apply | The whole document waits. |
+| A. Before `IN_REVIEW`, immediately before `EXECUTED`, and before apply | Recheck the dispute status of the pinned mapping version at all three gates; the whole document waits when contested. |
 | B. Apply only | The document can execute while contested. |
 | C. Per line | Contested lines are partial-apply units. |
 
 **Recommendation:** A. The DRG-599 description says the amendment cannot proceed to execution or apply while any line uses a contested mapping (Linear read).
 
-**Default:** Proposed, unaccepted, owner decision required. Business policy; stays an option for the owner and is not adopted. The whole document waits before `IN_REVIEW` and again before apply (option A). Alternatives written out: the hold is apply-only (option B); contested lines become partial-apply units and other lines apply (option C). S3 and S4 are not authorized to implement the hold. S3 text is the #642 quotation. S4 is not authorized (`read` register OQ5).
+**Default:** Proposed, unaccepted, owner decision required. Business policy; stays an option for the owner and is not adopted. The whole document waits before `IN_REVIEW`, immediately before the transition to `EXECUTED`, and again before apply (option A). Each gate rechecks dispute status for the pinned mapping version; a contest raised during review blocks execution. The execution check must be serialized with dispute changes so a concurrent contest cannot pass a stale check. Alternatives written out: the hold is apply-only (option B); contested lines become partial-apply units and other lines apply (option C). S3 and S4 are not authorized to implement the hold. S3 text is the #642 quotation. S4 is not authorized (`read` register OQ5).
 
 **599-F4. Which lines need a mapping.**
 

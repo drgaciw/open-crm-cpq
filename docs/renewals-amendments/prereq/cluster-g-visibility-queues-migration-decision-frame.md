@@ -4,7 +4,7 @@
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Base:** `main` at `0d71251d`. **File:** this note only.
 
-**Stories:** [DRG-595](https://linear.app/drgamtd-workspace/issue/DRG-595) (RA-61), [DRG-597](https://linear.app/drgamtd-workspace/issue/DRG-597) (RA-63), [DRG-598](https://linear.app/drgamtd-workspace/issue/DRG-598) (RA-64). Read on 2026-10-17 with relations. Comments on all three were empty. Linear status of each, when read, was Backlog. This note does not move a ticket. Tickets stay In Review until the owner merges.
+**Stories:** [DRG-595](https://linear.app/drgamtd-workspace/issue/DRG-595) (RA-61), [DRG-597](https://linear.app/drgamtd-workspace/issue/DRG-597) (RA-63), [DRG-598](https://linear.app/drgamtd-workspace/issue/DRG-598) (RA-64). Read on 2026-10-17 with relations. Comments on all three were empty. Linear status of each at the recorded read was Backlog. This note performs no issue-status update and does not claim the tickets are currently In Review. The intended review workflow is to move them to In Review, then retain that state until the owner merge; whether that transition occurred must be verified separately.
 
 Each default below names its alternatives beside the default, and each default says Proposed, unaccepted, owner decision required.
 

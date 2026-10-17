@@ -672,8 +672,47 @@ paths:
         reachable in the slice; the command returns 409 and does not void an
         envelope.
 
-        Request. version is the amendment document row version the caller
-        read. lifecycleChangeRevision is the superseding LifecycleChange
+        Request. actionDate, contractEffectiveDate and backdatingReasonCode
+        carry the resolved new commercial header, after quote-service has
+        applied its revision patch. Before any replacement, CAM must archive
+        the previous revision's complete commercial evidence in an immutable
+        revision-bound envelope and bind that envelope through the previous
+        revision's inputs_snapshot_ref. It contains the prior actionDate,
+        contractEffectiveDate, serviceActivationDate, customerAcceptanceDate,
+        backdatingReasonCode, coTermDate, currency, all four totals, lines,
+        pins/trace and every other commercial field covered by its digest,
+        plus the original input-snapshot reference. An unfrozen OPEN row may
+        acquire this envelope reference in the freeze transaction; once
+        frozen its reference and envelope never change. Each envelope is
+        retained independently of current header values. Archive/binding
+        failure aborts the revision transaction. A later write to an OPEN
+        revision creates a new immutable envelope and only replaces that
+        OPEN row's reference; it never overwrites an older envelope. The
+        durable snapshot-store contract still requires separate acceptance;
+        digest-library work also waits on owner confirmation of OQ18.
+        S3/S5 stays blocked without those accepted prerequisites.
+        CAM then replaces those header values in the
+        same transaction that opens the revision; a null backdatingReasonCode
+        explicitly clears the old reason. It validates the revised dates,
+        including backdating rules, and digests the revised header on submit.
+        Header fields not exposed by ReviseLifecycleChangeRequest stay
+        unchanged. No date is silently taken from the previous revision.
+        Each line explicitly supplies businessCategory, applyTargetType,
+        chargeType, priceAsOf and policySlot; CAM invents no database default
+        for these NOT NULL commercial fields. S5 materializes the values on
+        its ChangeLine revision response before the CAM call, even when
+        unpriced. Proposed first-slice source defaults are priceAsOf
+        EFFECTIVE_DATE, policySlot AMENDMENT, applyTargetType SUBSCRIPTION,
+        and chargeType RECURRING; explicit supported price-as-of choices are
+        retained. businessCategory is resolved under the separately accepted
+        action/category policy; missing or unresolved category refuses the
+        handoff rather than making CAM invent one. No incomplete source
+        operation is reported complete. These are proposal rules, not runtime
+        behavior or acceptance of the Cluster E defaults. Existing
+        source/target and action/category constraints still apply.
+
+        version is the amendment document row version the caller read.
+        lifecycleChangeRevision is the superseding LifecycleChange
         revision and is unique per document. targetQuoteId and
         inputsSnapshotRef are required because those columns are not null on
         main. lines carry commercial structure only. The server stores
@@ -709,8 +748,24 @@ paths:
         On 201, status is DRAFT, provisionalNumber is unchanged, amendmentSeq
         and amendmentNumber stay null, current contentDigest is null until a
         later submit, the previous revision stays frozen with its digest, and
-        version is the post-commit document row version. Each line carries
-        applicationUnitNo. This proposal does not create or retarget
+        version is the post-commit document row version. Current tcvDelta,
+        arrDelta, oneTimeTotal and creditTotal are null while unpriced, never
+        copied from the superseded header and never filled with placeholder
+        zeroes. Desired later behavior, not a completed delivery contract: a
+        successful pricing synchronization would atomically replace all four
+        totals with newly calculated values for this revision, together with
+        its pins and trace. No CAM priced-state synchronization write or
+        delivery event is defined in this draft. The LifecycleChange :price
+        operation is quote-service state only and does not perform that CAM
+        write; this revisions command accepts no prices or pins either.
+        S3/S5 implementation remains blocked until a separate accepted
+        contract specifies that CAM write/delivery, expected document version
+        and revision, all totals/pins/trace, idempotency, and stale-result
+        refusal. No endpoint is inferred or authorized here. Submit and execute require those totals to
+        be non-null and current. This is an unaccepted nullability proposal
+        requiring a later migration; the existing NOT NULL storage cannot
+        implement it unchanged. Frozen revision snapshots remain unchanged.
+        Each line carries applicationUnitNo. This proposal does not create or retarget
         application units.
 
         The same transaction appends one local document-log row. The Proposed
@@ -1915,7 +1970,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/VersionedCommand"
         - type: object
-          required: [lifecycleChangeRevision, targetQuoteId, inputsSnapshotRef, lines]
+          required: [lifecycleChangeRevision, targetQuoteId, inputsSnapshotRef, actionDate, contractEffectiveDate, backdatingReasonCode, lines]
           properties:
             lifecycleChangeRevision:
               type: integer
@@ -1939,6 +1994,15 @@ components:
                 because inputs_snapshot_ref is not null on main. Proposed.
                 Not a column change. Pins inside the snapshot are not copied
                 onto the new lines.
+            actionDate: {type: string, format: date}
+            contractEffectiveDate: {type: string, format: date}
+            backdatingReasonCode:
+              type: string
+              nullable: true
+              description: |
+                Required property with the resolved new header value. Null
+                explicitly clears the old reason. Backdating still requires
+                a non-null reason and the existing validation/approval gates.
             lines:
               type: array
               minItems: 1
@@ -1950,11 +2014,19 @@ components:
       description: |
         Commercial structure only. The server stores product, pricebook,
         configuration, and policy-decision pins as null on the new revision.
-      required: [changeLineRef, actionCode, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom, applicationUnitNo]
+      required: [changeLineRef, actionCode, businessCategory, applyTargetType, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom, chargeType, priceAsOf, policySlot, applicationUnitNo]
       properties:
         changeLineRef: {type: string, format: uuid}
         actionCode:
           $ref: "#/components/schemas/ActionCode"
+        businessCategory:
+          $ref: "#/components/schemas/BusinessCategory"
+        applyTargetType:
+          $ref: "#/components/schemas/ApplyTargetType"
+        priceAsOf:
+          $ref: "#/components/schemas/PriceAsOf"
+        policySlot:
+          $ref: "#/components/schemas/PolicySlot"
         quantitySemantics:
           $ref: "#/components/schemas/QuantitySemantics"
         startQty:
@@ -2089,7 +2161,7 @@ components:
 
     ChangeLine:
       type: object
-      required: [lineId, actionCode, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom]
+      required: [lineId, actionCode, businessCategory, applyTargetType, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom, chargeType, priceAsOf, policySlot]
       properties:
         lineId: {type: string, format: uuid}
         lineNo: {type: integer, minimum: 1}
@@ -2116,13 +2188,21 @@ components:
         chargeType:
           $ref: "#/components/schemas/ChargeType"
         priceAsOf:
-          nullable: true
           allOf:
             - $ref: "#/components/schemas/PriceAsOf"
+          default: EFFECTIVE_DATE
+          description: |
+            Proposed first-slice source default. S5 materializes this non-null
+            hook on create/revise before calling CAM, including while unpriced.
+            This is not a pricing pin and is not cleared by supersession.
         policySlot:
-          nullable: true
           allOf:
             - $ref: "#/components/schemas/PolicySlot"
+          default: AMENDMENT
+          description: |
+            Proposed first-slice source default. S5 materializes this non-null
+            hook on create/revise before calling CAM, including while unpriced.
+            This is not a pricing pin and is not cleared by supersession.
         amendMode:
           nullable: true
           allOf:
@@ -2244,6 +2324,10 @@ components:
         - actionDate
         - contractEffectiveDate
         - currencyCode
+        - tcvDelta
+        - arrDelta
+        - oneTimeTotal
+        - creditTotal
         - contentDigest
         - evidenceClass
         - version
@@ -2290,23 +2374,68 @@ components:
         currencyCode:
           $ref: "#/components/schemas/CurrencyCode"
         tcvDelta:
-          $ref: "#/components/schemas/Money"
-        arrDelta:
-          $ref: "#/components/schemas/Money"
-        oneTimeTotal:
-          $ref: "#/components/schemas/Money"
-        creditTotal:
-          $ref: "#/components/schemas/Money"
-        contentDigest:
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
+            replaced by successful pricing before submit or execute. Never
+
+            copied from a prior revision. Requires a later storage migration.
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          description: |
-            Proposed default (DRG-616, not accepted, not a migration): null on
+        arrDelta:
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
+            replaced by successful pricing before submit or execute. Never
+
+            copied from a prior revision. Requires a later storage migration.
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
+        oneTimeTotal:
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
+            replaced by successful pricing before submit or execute. Never
+
+            copied from a prior revision. Requires a later storage migration.
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
+        creditTotal:
+          type: string
+          description: 'Proposed, unaccepted: null on the current unpriced revision;
+
+            replaced by successful pricing before submit or execute. Never
+
+            copied from a prior revision. Requires a later storage migration.
+
+            '
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
+          nullable: true
+        contentDigest:
+          type: string
+          description: 'Proposed default (DRG-616, not accepted, not a migration): null on
+
             an unpriced draft, including a revision opened by supersession,
+
             until a later submit stores the digest. The field schema on main
+
             still says content_digest is not null. OQ18 stays Proposed, so
+
             this file does not define canonicalization.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         renditionDigest:
           nullable: true
           allOf:
@@ -2399,21 +2528,28 @@ components:
             pins the pricebook (V9). The field schema on main still says not
             null.
         configurationHash:
-          nullable: true
-          description: |
-            Same Proposed default. Null on an unpriced revision. When present,
+          type: string
+          description: 'Same Proposed default. Null on an unpriced revision. When present,
+
             the interim pin is lowercase SHA-256. DRG-428 later replaces that
+
             pin. The field schema on main still says the column is not null.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         unitPrice:
+          type: string
+          description: Decimal numeric(19,4), transported as a string.
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          allOf:
-            - $ref: "#/components/schemas/Money"
         netAmount:
+          type: string
+          description: Decimal numeric(19,4), transported as a string.
+          pattern: ^-?\d{1,15}(\.\d{1,4})?$
+          example: '15.0000'
           nullable: true
-          allOf:
-            - $ref: "#/components/schemas/Money"
         policySlot:
           $ref: "#/components/schemas/PolicySlot"
         policyId: {type: string, nullable: true}
@@ -2437,14 +2573,18 @@ components:
           format: uuid
           description: Quote opened for this revision. The proposed CAM write requires the caller to send it.
         contentDigest:
-          nullable: true
-          description: |
-            Proposed default (DRG-616, not accepted, not a migration): null
+          type: string
+          description: 'Proposed default (DRG-616, not accepted, not a migration): null
+
             while this revision is an unpriced DRAFT. The superseded revision
+
             keeps its digest. The field schema on main still says not null.
+
             OQ18 stays Proposed.
-          allOf:
-            - $ref: "#/components/schemas/Sha256"
+
+            '
+          pattern: ^[a-f0-9]{64}$
+          nullable: true
         inputsSnapshotRef: {type: string}
         statusAtClose:
           $ref: "#/components/schemas/RevisionCloseStatus"

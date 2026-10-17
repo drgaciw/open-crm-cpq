@@ -62,7 +62,7 @@ Every row is **Proposed, unaccepted, owner decision required.** The default is t
 | L5 | Per-intent action allow-list | A. No new database constraint. The only pair a future first-slice submit allows is `AMEND` with `ADD`, `UPDATE`, or `REMOVE` | B. Record a matrix for later enforcement and do not enforce it now. C. Add a SQL trigger from intent to action (migration) |
 | L6 | Source line required | A. Leave `chk_amendment_line_source_required` as written | B. Extend it to `TERMINATE`, `SUSPEND`, `RESUME`, `RENEW`, and `CONVERT_METRIC` (migration). C. Drop the check (migration) |
 | L7 | Category for a conversion line | A. Write no conversion line in the first slice. No new token. DRG-573 chooses later | B. Store conversion lines as category `SWAP` until DRG-573. C. Add category `CONVERSION` (migration) |
-| D1 | Price lookup date versus proration effective date | A. `price_as_of` selects the rate lookup date only. Proration starts at the amendment effective date (`contract_effective_date` in the future first slice). Future first-slice writer sets `EFFECTIVE_DATE` | B. Always look up rates as of `action_date`. C. Always look up rates as of `customer_acceptance_date`. D. Change the proration formula |
+| D1 | Price lookup date versus proration effective date | A. `price_as_of` selects the rate lookup date only. Proration starts at the amendment effective date (`contract_effective_date` in the future first slice). Future first-slice writer sets `EFFECTIVE_DATE` | B. Always look up rates as of `action_date`. C. Look up rates as of a required non-null `customer_acceptance_date`; missing means no price. D. Change the proration formula |
 | D2 | Service activation and customer acceptance | A. Both columns stay nullable and are not proration inputs | B. Require both on every document (migration). C. Require both only when `signature_policy` is `WET` or `E_SIGN` |
 | D3 | Backdating | A. Keep `chk_amendment_document_backdating`. Approval thresholds stay on S3 | B. Extend the check to `service_activation_date` and `customer_acceptance_date` (migration). C. Forbid backdating and drop the reason-code escape (migration) |
 | D4 | Header dates versus the line service period | A. Header keeps the four dates. Line keeps `effective_from` / `effective_to`. Future first-slice lines set `effective_from` equal to `contract_effective_date` | B. Copy all four trigger dates onto every line (migration). C. Drop the header dates and keep only line dates (migration) |
@@ -252,7 +252,7 @@ Recommendation: **A**.
 
 ### Owner decision needed
 
-Confirm E1 through E7, or replace a default. Any choice other than A on E1, E4, E5, or E6 changes `chk_amendment_document_intent` in a new migration. This frame does not authorize that migration.
+Confirm E1 through E7, or replace a default. E1-B/C, E4-C, E5-B, and E6-B change the intent check and need a new schema migration. E4-B maps existing intent/slot tokens, E5-C is a historical-quote data backfill, and E6-C uses the existing `RENEW` token; none of those three changes the intent check. This frame does not authorize that migration.
 
 ### Dependencies
 
@@ -419,7 +419,7 @@ Recommendation: **A**.
 
 ### Owner decision needed
 
-Confirm L1 through L7. L4's derivation table is the commercial choice inside default A. Any option other than A on L1, L3, L5, L6, or L7 is a migration.
+Confirm L1 through L7. L4's derivation table is the commercial choice inside default A. L1-B/C, L3-B/C, L5-C, L6-B/C, and L7-C require schema work. L5-B is a documentation matrix and L7-B uses the existing `SWAP` category; neither requires a schema migration.
 
 ### Dependencies
 
@@ -466,7 +466,7 @@ The formula stays the Accepted day-stub in `QuoteContinuationPolicy` (ADR D-01, 
 |---|---|
 | A | Rate lookup uses `contract_effective_date` for `EFFECTIVE_DATE`, `action_date` for `ACTION_DATE`, and line `effective_from` for `LINE_START`. Proration still begins at the amendment effective date; the proposed first-slice mapping is `contract_effective_date`, matching line `effective_from`. |
 | B | Always use `action_date` for rate lookup; retain the amendment effective date for proration. |
-| C | Always use `customer_acceptance_date` for rate lookup; retain the amendment effective date for proration. |
+| C | Use `customer_acceptance_date` for rate lookup only when that date is non-null; otherwise produce no price until it is supplied. No fallback to today or the action date. The amendment effective date remains the proration input. |
 | D | Change the proration formula. |
 
 Recommendation: **A**.
@@ -477,7 +477,7 @@ Recommendation: **A**.
 
 | Option | Meaning |
 |---|---|
-| A | Both columns stay nullable (`V1_7__contract_documents.sql` lines 66–67). They are not proration inputs. A future first-slice submit does not require them. |
+| A | Both columns stay nullable (`V1_7__contract_documents.sql` lines 66–67). They are not proration inputs. A future first-slice submit does not generally require them; D1-C, if later selected, requires a non-null `customer_acceptance_date` before rate lookup and refuses to price without it. |
 | B | Both are required on every document. |
 | C | Required only when `signature_policy` is `WET` or `E_SIGN`. Those policies are out of the confirmed slice (ADR-035 acceptance, OQ10, read; `SignaturePolicy.java` javadoc, DRG-457). |
 

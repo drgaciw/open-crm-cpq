@@ -71,7 +71,7 @@ S1 stored the charge-type column. It did not decide retroactive service periods.
 
 These rows illustrate Fork 3 option A only. That option is Proposed, unaccepted, owner decision required. Fork 3 option B, the alternative, refuses the row. The rows are not fixtures to implement, and they are not an acceptance of the sanity check's measurement choices.
 
-**Scenario 2, back-maintenance, separate from the capacity update.** The update line remains Update, Delta +16, on the perpetual commitment. The forward maintenance stub of $2,016.44 stays with the Accepted proration record and with `specs/maintenance.md`. This frame does not recompute it.
+**Scenario 2, back-maintenance, separate from the capacity update.** The update line remains Update, Delta +16, on the perpetual commitment. The $2,016.44 forward-maintenance illustration is not established as the Accepted billing-period stub. Its maintenance/true-up input and period decision stays with `specs/maintenance.md`; this frame neither selects its annual denominator nor recomputes it.
 
 | Field | Back-maintenance line, only if Fork 3 option A is later chosen |
 |---|---|
@@ -197,7 +197,7 @@ This frame does not reopen that destination class, and it does not turn the clas
 
 | Option | What the owner would be choosing |
 |---|---|
-| **A. Credits stay in `ConversionPolicy` until a line is required** | If a later decision says billing must show the credit, the line is `ONE_TIME` with a negative net amount, the service window the policy names, and the target agreement. No `CREDIT` value. That later showing is a receiver decision under Fork 6, not this fork. |
+| **A. Credits stay in `ConversionPolicy` until a line is required** | If a later decision says billing must show the credit, the line is `ONE_TIME` with a negative net amount and the target agreement. No service window is inferred from `ConversionPolicy`: its current proposal has credit basis, cap, application, transfer and expiry fields, but no service-period fields. A later owner decision must define any required credit service window, especially for trade-in, before mapping it; if a window is supplied it must satisfy Forks 2 and 3. No `CREDIT` value. That later showing is a receiver decision under Fork 6, not this fork. |
 | **B. `chargeType = CREDIT`** | Fork 1 option C. |
 | **C. Negative amounts forbidden** | A credit cannot be a document line. It lives only inside the conversion policy. |
 
@@ -233,7 +233,7 @@ Every row is Proposed, unaccepted, owner decision required. Picking a row, or pi
 
 ## 9. Proration
 
-The Accepted proration record is `prereq/adr-amendment-proration-formula.md` (Accepted 2026-10-16). It covers the day-stub of an amendment or expansion inside the current billing period. Scenario 2's forward maintenance amount is that kind of charge. This frame does not reopen the formula, the rounding, the component that computes the stub, or the Drools rule.
+The Accepted proration record is `prereq/adr-amendment-proration-formula.md` (Accepted 2026-10-16). It covers the day-stub of an amendment or expansion inside the current billing period. Scenario 2's $2,016.44 illustration uses an annual `92/365` fraction; the Accepted record explicitly describes its coincidence with the rejected full-term ratio. It does not establish that annual amount as the accepted billing-period stub. The maintenance/true-up policy must settle its billing period and input quantities before the accepted formula can be applied; this note chooses no annual denominator. This frame does not reopen the formula, the rounding, the component that computes the stub, or the Drools rule.
 
 A OneTime amount for a past window is Fork 3. It is not that stub. Fork 3 is Proposed, unaccepted, owner decision required.
 
@@ -245,7 +245,7 @@ A OneTime amount for a past window is Fork 3. It is not that stub. Fork 3 is Pro
 
 Proposed additions, and only these, if that later edit happens:
 
-1. On the proposed `ChangeLine` contract, add optional `chargeType` (`RECURRING | ONE_TIME | USAGE`), optional `servicePeriodStart`, optional `servicePeriodEnd`, and optional `effectiveDate`. Omitted `chargeType` means `RECURRING`. Omitted `effectiveDate` means the change's `contractEffective`. `actionDate`, `serviceActivation`, and `customerAcceptance` stay on the change. `entitlementEndDate` stays in `specs/conversions.md`. This bullet follows Forks 1, 2, and 4. It is not applied.
+1. On the proposed `ChangeLine` contract, add optional `chargeType` (`RECURRING | ONE_TIME | USAGE`), optional `servicePeriodStart`, optional `servicePeriodEnd`, and optional `effectiveDate`. Under Fork 2 option A, the two service-period fields are either both absent or both present, and `servicePeriodEnd >= servicePeriodStart`; orphaned and inverted windows are invalid. Omitted `chargeType` means `RECURRING`. Omitted `effectiveDate` means the change's `contractEffective`. `actionDate`, `serviceActivation`, and `customerAcceptance` stay on the change. `entitlementEndDate` stays in `specs/conversions.md`. This bullet follows Forks 1, 2, and 4. It is not applied.
 2. Do not add a rule that a service window may start before the line effective date unless the owner has picked Fork 3. If the owner picks Fork 3 option A, the sentence is: a start before the line effective date is valid only when `chargeType` is `ONE_TIME`. If the owner picks Fork 3 option B, the sentence is the alternative: a service window that starts before the line effective date is invalid for every charge type, including `ONE_TIME`. If the owner picks Fork 3 option C, the sentence is: any charge type may start before the line effective date. None of those three sentences is in `specs/lifecycle-intents.md`. This addendum does not apply any of them.
 3. Add one sentence to open question 6: the owner confirms Fork 4, that a line effective date may override `contractEffective`, and that this does not move the other three dates onto the line. Not applied.
 4. State that the backdating predicate (trigger date before `actionDate`) is unchanged. A `ONE_TIME` service window before the line effective date is Fork 3, not that predicate. Not applied.
