@@ -6,19 +6,15 @@
 
 ## Owner statement
 
-On 2026-10-17 at 7:37 AM CT the owner said, as relayed by Projects Manager:
-
-> Yes: S3 (DRG-581) is authorized and I accept the DRG-609 pricing design.
-
-This pass did not open a chat log, email, or Linear comment that contains that sentence. **Unverified** against a stored message. It is recorded as relayed for this pull request.
+On 2026-10-17, as relayed by PM, 7:37 AM CT, the owner said: Yes: S3 (DRG-581) is authorized and I accept the DRG-609 pricing design.
 
 The owner's merge of this PR is the confirming act.
 
 ## Effect
 
-The quoted sentence records an authorization of S3 ([DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581)) and acceptance of the DRG-609 pricing design. Merging this pull request confirms that acceptance. This acceptance authorizes no code, migration, flag, or deploy.
+That sentence, as relayed by PM, records an authorization of S3 ([DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581)) and acceptance of the DRG-609 pricing design. Merging this pull request confirms that acceptance. This acceptance authorizes no code, migration, flag, or deploy.
 
-DRG-609 accepted does not unblock S5 / [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583) code by itself. S5 code also needs S3 merged and S4 done, meaning DRG-562 / DRG-563 and the V1_9 ledger.
+DRG-609 accepted does not by itself unblock S5 code. S5 code stays blocked until S3 is merged, S4 is done (DRG-562/563 plus the V1_9 ledger) and this record has merged, and it still needs separate authorization.
 
 S6, S8, flags, deploys, [DRG-614](https://linear.app/drgamtd-workspace/issue/DRG-614), and the S7 backfill apply stay held.
 
@@ -59,7 +55,7 @@ Anything touching conversion price or entitlements follows the accepted design o
 
 The S5 note's opening verdict says S5 is not ready to implement, and that pricing for Add, Update, and Remove lines with a PolicyDecision id, policy version, and trace id waits on DRG-609. Section "3. What S5 can do before DRG-609, and what waits" says DRG-583 stays blocked until that gap is scoped and delivered. Accepting the design is not that delivery.
 
-Section "4. Dependencies on S3 and S4" says S5's written dependency is the S3 contract, not a finished S3 implementation, and that S4 does not block S5 on the requirements "Depends on" line. That section names DRG-562, DRG-563, and the CAM `V1_9` `document_apply_ledger` as S4's own dependencies and migration. **Unverified** as a statement already written in the S5 gate: section 4 does not say S5 code waits on S3 merged and on S4 done. The S5 limit in "Effect" is the boundary of this acceptance. This file does not rewrite the S5 note.
+Section "4. Dependencies on S3 and S4" says S5's written dependency is the S3 contract, not a finished S3 implementation, and that S4 does not block S5 on the requirements "Depends on" line. That section names DRG-562, DRG-563, and the CAM `V1_9` `document_apply_ledger` as S4's own dependencies and migration. Section 4 does not itself state the Effect sentence. That sentence is the CPQ Decision ruling for this record. This file does not rewrite the S5 note.
 
 Section "1. Authorization" says ADR-035 does not authorize S5, and that S3 to S8 require their own readiness and authorization gates.
 
@@ -67,7 +63,7 @@ Section "1. Authorization" says ADR-035 does not authorize S5, and that S3 to S8
 
 - DRG-614, read on Linear on 2026-10-17: title "Ramp R1 rollout readiness: non-prod enablement, Entra login, UAT and reconciliation", status Backlog. No file on `main` at `63e6ec8d` names DRG-614. This acceptance does not release it. The issue body was not read. **Unverified** beyond title and status.
 - S7 backfill apply, read in [s7-v1-8-header-backfill.md](../s7-v1-8-header-backfill.md) (`docs/renewals-amendments/s7-v1-8-header-backfill.md`): the data backfill is a manual owner step, and running `contract_header_backfill_apply` against a real environment is an owner decision. This acceptance does not run it.
-- DRG-581 was Todo and DRG-583 was Todo when read on Linear on 2026-10-17. This pull request does not change those statuses. The quoted S3 authorization is recorded here and still starts no code.
+- DRG-581 was Todo and DRG-583 was Todo when read on Linear on 2026-10-17. This pull request does not change those statuses. The relayed S3 authorization is recorded here and still starts no code.
 - [#623](https://github.com/drgaciw/open-crm-cpq/pull/623) ("docs: accept three renewals prerequisite ADRs") is merged to `main` (merged 2026-10-16). "Recommended option" and "API and contract sketch" say proration and uplift are Proposed until #623 merges, then Accepted. This record does not copy either formula and does not treat that merge as permission to implement an amount.
 - Whether a narrow contract inside the #663 delegation overlaps a sentence of the DRG-609 note was not compared line by line. **Unverified** as a complete non-overlap. The sentence that was read says the DRG-609 proposal is not accepted wholesale.
 
