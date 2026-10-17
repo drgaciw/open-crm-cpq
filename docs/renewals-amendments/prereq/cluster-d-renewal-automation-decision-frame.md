@@ -92,7 +92,7 @@ The publication window, the receipt, the unregistered consumer, and the flat 12-
 
 | Option | Behavior |
 |---|---|
-| A | Keep `renewalDate = end − 30 days` as the CAM publication window and the receipt key's window component. `lead_time_days` (stored 90) is a second clock. It opens a draft only when kickoff is on (DRG-596). The consumer, when it is later allowed to run, applies that clock to events that were published at 30 days. |
+| A | Keep `renewalDate = end − 30 days` as the CAM publication window and the receipt key's window component. `lead_time_days` (stored 90) is a second clock. It opens a draft only when kickoff is on (DRG-596). The 30-day event cannot trigger a draft 90 days before end. A separately authorized trigger that runs by the configured lead date is still required; this option supplies no such trigger. |
 | B | Change `RenewalScheduler` so the first publication is `lead_time_days` before end, and stop using 30. |
 | C | Treat 30 as the lead time and ignore the 90-day call decision. |
 
@@ -100,7 +100,7 @@ The publication window, the receipt, the unregistered consumer, and the flat 12-
 
 **Default.** Proposed, unaccepted, owner decision required. Option A: keep `renewalDate = end − 30 days` as the publication window, and keep `lead_time_days` 90 as a second clock. No scheduler edit follows from this frame. Alternatives beside this default: B, change `RenewalScheduler` so the first publication is `lead_time_days` before end and stop using 30; C, treat 30 as the lead time and ignore the 90-day call decision. The renewal outbox relay stays disabled under every alternative.
 
-**Owner decision.** Confirm that 30 and 90 stay different clocks. B is an implementation change this frame does not authorize. C contradicts DRG-596.
+**Owner decision.** Confirm that 30 and 90 stay different clocks. The 90-day kickoff remains an unresolved delivery gap while first publication is at 30 days; evaluating a 90-day predicate on that late event cannot recover the missed kickoff. A later accepted design must provide an earlier trigger or select option B. This frame authorizes neither implementation. C contradicts DRG-596.
 
 ### Fork RN-C — Evergreen null end versus a perpetual line (spec OQ-RN-5)
 
@@ -281,7 +281,7 @@ No settings table and no global notice number exist in code. The spike's clause 
 
 **Default.** Proposed, unaccepted, owner decision required. Option A: a future consumer applies the Proposed spec §1.7 matrix, and `draftRenewal` stays unreachable while the ramp flag is false. No flag changes. The renewal outbox relay stays disabled. DRG-611's quote-side migration is not started, so there is still no quote-service marker beyond the inbox claim the unregistered listener would use. Alternatives beside this default: B, treat `draftRenewal` as the DRG-596 consumer and register it, so every delivered eligibility event opens the single-line draft, including contracts that have not opted in; C, delete the consumer until the settings row exists.
 
-**Owner decision.** Confirm that registering the listener is a later change, after the settings row exists, and that it must implement the matrix rather than call `draftRenewal` unconditionally. B would renew the "eligibility never opens a draft" gap in the wrong direction: it would open drafts for every published subscription.
+**Owner decision.** Confirm that registering the listener is a later change, after the settings row exists and an earlier kickoff trigger is accepted (RN-B), and that it must implement the matrix rather than call `draftRenewal` unconditionally. B would renew the "eligibility never opens a draft" gap in the wrong direction: it would open drafts for every published subscription.
 
 ### Dependencies
 
@@ -312,7 +312,7 @@ Every fork. Each default is Proposed, unaccepted, owner decision required. The a
 | Fork | Owner decides | Default (Proposed, unaccepted, owner decision required) | Alternatives beside the default |
 |---|---|---|---|
 | RN-A | When a term-end action may run | A. Store Renew, RenewOnce, Evergreen, Cancel. Run them only when `auto_renew` is true. While it is false, no action runs. | B. Run the action when the seller has not acted. C. Drop the enum; a boolean renews or lapses. |
-| RN-B | Lead time versus the 30-day publication window | A. Keep `renewalDate = end − 30 days` as the publication window. Keep `lead_time_days` 90 as a second clock. No scheduler edit. The renewal outbox relay stays disabled. | B. Publish first at `lead_time_days` and stop using 30. C. Treat 30 as the lead time and ignore the 90-day call decision. |
+| RN-B | Lead time versus the 30-day publication window | A. Keep `renewalDate = end − 30 days` as the publication window. Keep `lead_time_days` 90 as a second clock. The 30-day event cannot meet that kickoff; an earlier trigger remains unresolved. No scheduler edit. The renewal outbox relay stays disabled. | B. Publish first at `lead_time_days` and stop using 30. C. Treat 30 as the lead time and ignore the 90-day call decision. |
 | RN-C | Evergreen null end versus a perpetual line (OQ-RN-5) | A. Header `term_model = Evergreen` and a null `end_date` are the distinguisher. No schema change. Evergreen does not execute while `auto_renew` is false. | B. Require a non-null sentinel end or a line-level flag. C. Remove Evergreen from the enum until the schema question is closed. |
 | RN-D | Unattended path to EXECUTED (OQ-RN-3) | C. No unattended renewal reaches `EXECUTED` until Legal picks a signature policy and S3 is separately authorized. | A. `NOTICE_ONLY`, apply after `EXECUTED`. B. `NOT_REQUIRED`, same apply point. |
 | QM-A | Who chooses the creation mode | A. The rep chooses at manual or API create. Kickoff uses auto-generate. Start from scratch is never the job's mode. No create API is added. | B. Eligibility always starts from scratch. C. Auto-generate is the only mode. |
