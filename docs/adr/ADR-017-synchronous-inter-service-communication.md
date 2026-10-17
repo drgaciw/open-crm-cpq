@@ -1,8 +1,8 @@
 # ADR-017: Synchronous inter-service communication
 
-**Status:** Proposed on 2026-10-04. Not accepted. The number was reserved by the [2026-09-22 ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (§3, "ADR-017").
+**Status:** Accepted on 2026-10-17. The project owner told, as relayed by the Projects Manager bot on 2026-10-17 at 7:31 AM CT, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644); authorized opening their status-change PRs". The owner's merge of this PR is the confirming act and the status takes effect on merge. This supersedes the "retain their existing statuses" wording of PRs #662 and #663 only for ADR-017. The number was reserved by the [2026-09-22 ADR review](../forge/39-adr-gitnexus-review-2026-09-22.md) (§3, "ADR-017").
 **Date:** 2026-10-04
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted).
 **Relates to:** [ADR-016](ADR-016-identity-authentication-service-trust.md) (identity and service trust — not re-decided here), [ADR-009](ADR-009-gateway-edge-only.md) (gateway edge-only), [ADR-026](ADR-026-command-messages.md) (commands are not HTTP), [ADR-024](ADR-024-order-orchestration-context.md) (order-service has no synchronous edges at start), ADR-020 and ADR-022 (reserved).
 **Does not authorize:** any code or configuration change. Each item under Rollout is its own PR.
 
