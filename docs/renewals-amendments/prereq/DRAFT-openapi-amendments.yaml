@@ -3,6 +3,10 @@ info:
   title: Amendments and lifecycle changes (DRAFT proposal)
   version: 0.1.1-draft
   description: |
+    Documentation accepted by the owner on 2026-10-17; see
+    documentation-acceptance-2026-10-17.md for scope. Individual default and
+    implementation-contract decisions remain subject to the gates below.
+
     Proposal only. This file is not an implementation, a gateway route, or a
     feature flag. It does not authorize merging, deploying, or enabling any
     runtime flag.

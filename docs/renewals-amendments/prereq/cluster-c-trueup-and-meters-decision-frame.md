@@ -1,6 +1,8 @@
 # Cluster C — true-up and meters: decision frame
 
-**Status:** Proposed, unaccepted, owner decision required. Not an ADR. This file takes no number and is not copied into `docs/adr/`. Landing it on `main` records the frame. It does not accept any default in it. Acceptance is a later owner act that changes this status line. DRG-569, DRG-570, and DRG-557 stay In Review until the owner merges. They are not Done on merge of a docs frame while code is open.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** Not an ADR. This file takes no number and is not copied into `docs/adr/`. Landing it on `main` records the frame. It does not accept any default in it. Acceptance is a later owner act that changes this status line. DRG-569, DRG-570, and DRG-557 stay In Review until the owner merges. They are not Done on merge of a docs frame while code is open.
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Cluster:** capacity meters and true-up (DRG-607 checklist row `capacity-meters`).
 
@@ -20,7 +22,7 @@ Comments on all three issues: none.
 
 ## How to read a fork
 
-Each fork has options, a recommendation, and a default. Every default in this file is Proposed, unaccepted, owner decision required. The recommendation is the option this frame would use. The default is the value that applies only if the owner later accepts the frame and leaves that fork unset. The owner-decision table at the end lists every fork.
+Each fork has options, a recommendation, and a default. Every default in this file is Proposed, unaccepted, owner decision required. The recommendation is the option this frame would use. A default applies only after the owner adopts it as policy; acceptance of the documentation alone does not adopt it. The owner-decision table at the end lists every fork.
 
 `specs/capacity-meters.md` is a separate proposal. It leaves these knobs unset and says no default is proposed as accepted. This frame does not edit that file and does not accept it. Where a Proposed default below names a knob that file left open, the owner is choosing the frame, not that spec.
 
