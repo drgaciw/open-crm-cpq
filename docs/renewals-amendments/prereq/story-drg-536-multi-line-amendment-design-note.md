@@ -2,7 +2,7 @@
 
 **Status:** Proposed, unaccepted, owner decision required.
 
-**Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Reading base:** `main` at `285ffef8` (merge of [#662](https://github.com/drgaciw/open-crm-cpq/pull/662)).
+**Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Reading base:** `main` at `285ffef8` (merge of [#662](https://github.com/drgaciw/open-crm-cpq/pull/662)). [#663](https://github.com/drgaciw/open-crm-cpq/pull/663) was read on `origin/main` at `63e6ec8d` and is not a file in this branch.
 
 **Story:** [DRG-536](https://linear.app/drgamtd-workspace/issue/DRG-536) (RA-02). Title when read on Linear on 2026-10-17: "No multi-line amendment support". Priority: High. Status when read: Backlog. Labels: `renewals-amendments`, `Open-CRM-CPQ`. Comments were not read. **Unverified.**
 
@@ -30,13 +30,13 @@ No database was queried. Whether Flyway has applied any migration in an environm
 | ADR-035 | Accepted for placement and for S1 and S2 only. `read` status line of [adr-035-amendment-document-placement.md](../adr-035-amendment-document-placement.md). Later stories keep their own gates. |
 | ADR-017 and ADR-024 through ADR-027 | **Proposed.** `read` catalog rows in [docs/adr/README.md](../../adr/README.md). They are not prerequisites. This note chooses no transport, saga, command topic, or compensation path. |
 | Proration | **Accepted.** `read` [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md) status line "Accepted 2026-10-16" and number line "none". The formula is not restated and is not reopened. |
-| OQ5 option A | Unchanged. `read` the OQ5 row of [renewals-amendments-open-questions-register.md](../renewals-amendments-open-questions-register.md) and [partial-apply-rules-oq5-option-a.md](partial-apply-rules-oq5-option-a.md). `specs/partial-apply.md` stays not accepted. |
+| OQ5 | The merged record is quoted below from [partial-apply-owner-decision.md](partial-apply-owner-decision.md) section 9. This note does not restate it. |
 | OQ7 thin contract | Unchanged. `read` [s7-v1-8-header-backfill.md](../s7-v1-8-header-backfill.md) and the header comment of [V1_8__contract_header_backfill.sql](../../../backend/services/contract-asset-management/src/main/resources/db/migration/V1_8__contract_header_backfill.sql). The register cell for OQ7 still says `DEFAULT PROPOSED for slice` (`read`). This note does not edit that cell and does not regroup. |
 | OQ6 | Quoted below from [oq6-revision-model-owner-decision.md](oq6-revision-model-owner-decision.md). Not paraphrased. |
 | DRG-609 | [story-drg-609-pricing-service-continuation-design.md](story-drg-609-pricing-service-continuation-design.md) is a design proposal (`read` its status role in Cluster A and Cluster E). It is not accepted. Entitlements and conversion price in this note are pending that design. |
 | Uplift precedence | Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-04 (`read`): contract clause, then line, then agreement, then account, then the rules default. This note does not reopen D-04. |
 | Migration numbers | CAM files present (`read` directory): `V1_7__contract_documents.sql`, `V1_7_1__durable_renewal_eligibility_publications.sql`, `V1_7_2__freeze_amendment_line_membership.sql`, `V1_8__contract_header_backfill.sql`. `V1_9` is reserved for S4 `document_apply_ledger` as the gate doc designs it (`read` [story-s3-s4-authorization-gate.md](story-s3-s4-authorization-gate.md) S4 row and the V1_8 header comment). No `V1_9` file and no `V1_10` file are in that directory. Any future migration is `V1_10` or higher, the next free version at build time, with a rollback statement. Never `V1_7_3`. This note writes no migration. |
-| S3 and S6 | S3 / DRG-581 is not started. S6 is not authorized (`read` OQ5 row). This note defines no event type, topic, registry entry, or outbox contract. |
+| S3 and S6 | S3 / DRG-581 stays unreleased. The S3 draft scope read on `origin/main` at `63e6ec8d` is quoted in the consistency section. S6 is not authorized. Audit shape is the 536-F10 default only. |
 
 [#648](https://github.com/drgaciw/open-crm-cpq/pull/648) through [#660](https://github.com/drgaciw/open-crm-cpq/pull/660) are the frames named in the acceptance record. Where this note touches true-up, renewal automation, on-prem conversion, fulfilment, visibility, S3 reconciliation, renewal pricing, product eligibility, one-time charges, OQ6 gaps, or the ARR bridge, it cites that frame and leaves its Proposed default in place.
 
@@ -57,11 +57,46 @@ Source file on `main`: [oq6-revision-model-owner-decision.md](oq6-revision-model
 > - It does not authorize S3, S4, S5, S6, S7 or S8. S3 / DRG-581 needs separate owner authorization.
 > - It does not change OQ5 (adopted for the first slice), OQ7 (still `DEFAULT PROPOSED` in the register) or any ADR status.
 
+On `origin/main` at `63e6ec8d` the same file opens with a current decision. That text was read there. It is copied here. The historical status quoted above remains in the file under "Historical 2026-10-16 ruling and then-open questions".
+
+> **Status:** OQ6 remains adopted under delegation; its boundary contracts and OQ18 are decided under the owner's renewed delegation on 2026-10-17. See [the delegated record](delegated-renewals-amendments-decisions-2026-10-17.md). No implementation story is authorized here.
+
+> The pre-execution revision rule, stable provisional number, terminal refusal, executed immutability and at-most-one executed revision remain as recorded below. The [CAM contracts](delegated-renewals-amendments-decisions-2026-10-17.md#cam-transactions-and-delivery) now select the CAM API/version/idempotency behavior, audit types, local concurrency criterion and durable S5 delivery. The [storage/digest contract](delegated-renewals-amendments-decisions-2026-10-17.md#storage-and-digests) now selects nullable unpriced values, a CAM-owned immutable envelope store and genuine close-time hashing. AC-S3-9..11, AC-S5-7 and AC-S8-6 are adopted criteria, with execution evidence still required.
+
+> OQ18 is confirmed under delegation: one shared utility in `backend/libs/common`, delivered with S3, reused without forks by S5/S6, using the versioned commercial envelope and canonicalization contract in the linked record. The old owner-confirmation gate is satisfied by this decision. S3's separate implementation-authorization gate remains.
+
+> The material below preserves the original reading, delegation evidence and rationale. References to unconfirmed OQ18 or open boundary contracts describe that earlier state and are superseded by the current decision above.
+
+Fork 536-C8 records that the historical OQ18 sentence and this current decision are both in that file.
+
+## OQ5, quoted exactly
+
+Source file: `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`, section 9, "Owner record". The lines below are copied from that section. They are not a restatement.
+
+> ## 9. Owner record
+>
+> Recorded 2026-10-16. Sections 1 through 8 preserve the request and analysis merged in #626, with current-status pointers reconciled after #632. This section records the confirmation that followed. The record is the first slice only.
+>
+> Option A for the first slice was delegated by the owner and relayed by Projects Manager. The owner, drg, said, about 5:10 PM CT: "I delegate these decisions to you." Projects Manager confirmed OQ5 option A (#626). CPQ Decision ruled the confirmation valid about 5:11 PM CT. The ruling is the first slice only.
+>
+> - Decision: **A**, first slice only. Delegated by the owner and relayed by Projects Manager. Projects Manager confirmed option A. CPQ Decision ruled the confirmation valid.
+> - Date: 2026-10-16. Delegation about 5:10 PM CT. Validity ruling about 5:11 PM CT.
+> - What option A is: one unit per target subscription, atomic units, no automatic rollback, PARTIALLY_APPLIED when a later unit fails, APPLY_BLOCKED when no unit has committed, correcting amendment as remedy.
+> - APPLY_BLOCKED means no unit has committed: yes.
+> - Rebase is a first-slice remedy: no. The remedy is a correcting amendment. The proposed default left rebase out, and this record does not add it.
+> - Ledger table for S4: not chosen. The proposed default does not choose between `document_apply_ledger` in the V1_9 paragraph and columns on `applied_quote_acceptances` in schema 2.6. This record does not choose either.
+>
+> `specs/partial-apply.md` is NOT accepted. S6 is NOT authorized. S4 / DRG-582 is not authorized by this edit. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and DRG-565's prerequisite first-slice written ordering rules and acceptance conditions (broader scenario work remains deferred under DRG-565). The owner merges.
+>
+> This record authorizes no code, schema, migration, flag, topic, gateway route, or deploy.
+
+536-F8 uses that quotation as its default. It does not replace the quotation with a summary.
+
 ## Problem
 
 Linear DRG-536, read 2026-10-17, says a continuation supports one recurring source line, and a real amendment changes several lines at once (add, remove, change quantity). The suggested next step on the issue is a multi-line continuation request and per-line source mapping. That step is answered here as a design. The Java type is not changed.
 
-Cluster E already records the split (`read`): quote continuation authoring writes one line, and `amendment_document_lines` can store many lines. Cluster A already records that a document has one amendment mode, that lines may carry their own price mode, and that a mixed edit is judged on the whole document. This note says how those two frames sit on one amendment: several lines, one document mode, per-line action and price modes, a line order that is not the apply order, a failure that is either the whole price or an OQ5 unit, and totals and audit that cover every line of the revision.
+Cluster E already records the split (`read`): quote continuation authoring writes one line, and `amendment_document_lines` can store many lines. Cluster A already records that a document has one amendment mode, that lines may carry their own price mode, and that a mixed edit is judged on the whole document. This note records Proposed defaults for how those frames sit on one amendment: several lines, one document mode, per-line action and price modes, and a line order that is not the apply order. Apply failure is the quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`. Audit is the 536-F10 default only, and the alternatives sit beside that default.
 
 ## Already on main
 
@@ -98,13 +133,22 @@ Every row is Proposed, unaccepted, owner decision required. The default is the r
 | 536-F3 | How modes sit on that one amendment | One document amendment mode. Lines may mix first-slice actions and per-line price modes. Co-term is one document mode. Follow Cluster A and Cluster E; do not reopen them | One action code for the whole document; one price mode for the whole document; store the amendment mode only on the LifecycleChange |
 | 536-F4 | Source and repeated products | Keep `uq_amendment_line_source`. Two `ADD` lines may name the same product | Refuse two `ADD` lines with the same product; allow two lines to name the same source |
 | 536-F5 | What `line_no` orders | Seller order inside the revision, for display and for the digest. Not the apply order | `line_no` is the apply order; catalog order, gaps allowed |
-| 536-F6 | How lines become units, and who orders units | OQ5 option A unchanged: one unit per target subscription. Who writes `dependency_order` stays the unmet DRG-565 item | One unit per line; the whole document is one unit even across subscriptions; this note adopts create-before-terminate |
+| 536-F6 | How lines become units | The quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`. This row does not restate it. The DRG-565 writer is the GAP below, not this default | One unit per line; one unit for the whole document across subscriptions |
 | 536-F7 | A line fails while pricing or validating | The whole revision stays unpriced. No partial price and no dropped line | Price the lines that succeeded and omit the rest; copy the previous revision's totals onto the new revision |
-| 536-F8 | A unit fails at apply | OQ5 option A unchanged. Inside a unit, all lines commit or the unit writes nothing. The remedy is a new correcting document | Roll back units that already committed; mark one line `BLOCKED` inside a committed unit; rebase the same document |
+| 536-F8 | A unit fails at apply | The quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`. This row does not restate it | Roll back units that already committed; mark one line inside a committed unit; rebase the same document |
 | 536-F9 | Header totals | One snapshot of the whole current revision, written when pricing succeeds, not recomputed at apply. No line-level ARR bridge | Recompute the four totals at apply from committed units only; add per-line bridge columns in this note |
-| 536-F10 | Audit grain | One hash-chained document event per transition. The digest covers the revision. No new event contract | One event per line; a new multi-line event type |
+| 536-F10 | Audit grain | Audit is one existing document event, with no new event contract | One event per line; a new multi-line event type with a topic and a registry entry |
 | 536-F11 | Which subscriptions a line may name | Only a subscription whose `contract_id` is the document's `contract_id`. OQ7 is not regrouped | Lines may name subscriptions on other contracts; one continuation per subscription even when they share a contract |
 | 536-F12 | Uplift when a later line uses it | Each such line follows Accepted D-04 on its own: clause, then line, then agreement, then account, then the rules default. A first-slice submit still does not send `RENEW` | One uplift percent for every line on the document; a different precedence stack |
+| 536-C1 | Digest line order versus #663 D-DIGEST | Leave the conflict open. 536-F5 names `line_no`. #663 sorts lines by `changeLineRef` | Apply #663 to this story; keep 536-F5 and do not apply D-DIGEST here |
+| 536-C2 | CAM revision command versus S3 draft scope | Leave the conflict open. Historical OQ6 rule 3 leaves the command undecided. #663 D-REVISION and the S3 row name a command | Apply D-REVISION to this story; keep the historical open command |
+| 536-C3 | Unpriced totals versus D-STORAGE and the S3 migration cell | Leave the conflict open. 536-F7 does not approve storage. #663 D-STORAGE and the S3 row assign null totals at `V1_10` or higher | Apply D-STORAGE to this story; keep 536-F7's "not approved here" |
+| 536-C4 | ARR bridge storage versus #663 Pricing and ARR | Leave the conflict open. 536-F9 adds no bridge columns. #663 stores a pricing-service bridge and does not overload `arr_delta` | Apply the #663 bridge store to this story; keep 536-F9 |
+| 536-C5 | Later-scope ONE_TIME and per-line effective date versus #663 DRG-572 | Leave the conflict open. 536-F2 and 536-F3 keep the first-slice header dates and exclude a one-time line. #663 adopts the DRG-572 recommendations as later scope and does not widen the first slice | Apply the later-scope line shape inside this story; keep the first-slice exclusion |
+| 536-C6 | Create-before-terminate versus this note | Leave the conflict open. #663 says separate commercial units follow create-before-terminate. This note does not adopt that sentence. The writer remains the GAP | Apply the #663 order sentence to every multi-line document; leave ordering unstated in this note |
+| 536-C7 | Local audit type names versus 536-F10 | Leave the conflict open. 536-F10's default is one existing document event and no new event contract. #663 D-RACE names `AMENDMENT_SUPERSEDED` and `AMENDMENT_REVISION_REJECTED` and adopts no new S6 topic | Use those local audit type names on the existing document event; keep 536-F10 with no added type name |
+| 536-C8 | Historical OQ18 sentence versus the current OQ6 header | Leave the conflict open. The historical quote says OQ18 remains Proposed. The current header on `origin/main` confirms OQ18 | Follow the current confirmation; follow only the historical sentence |
+| 536-C9 | "Not adopted" class list and mapping versus #663 | Leave the conflict open. 536-F3 says the class list and the mapping stay not adopted. #663 adopts those baseline choices and says that label does not limit adoption | Apply the adopted classification and mapping to a multi-line document; keep the "not adopted" sentence |
 
 ---
 
@@ -185,30 +229,25 @@ Modes are not one field. Cluster A and Cluster E already split them. This fork s
 
 The landed check is `line_no >= 1` plus the unique triple (`read`). It does not require a gapless sequence. Gapless numbering is this proposal, not a constraint in `V1_7__contract_documents.sql`.
 
-A frozen revision cannot gain, lose, or rewrite a line (`read` `V1_7_2__freeze_amendment_line_membership.sql`). A change of membership before execution follows quoted OQ6 rule 1, and a change after execution follows quoted OQ6 rule 2. This note does not choose the CAM command. Quoted OQ6 rule 3 leaves that command open.
+A frozen revision cannot gain, lose, or rewrite a line (`read` `V1_7_2__freeze_amendment_line_membership.sql`). A change of membership before execution follows quoted historical OQ6 rule 1, and a change after execution follows quoted historical OQ6 rule 2. Historical rule 3 says the CAM command is not decided in that record. The current OQ6 header and #663 D-REVISION say otherwise. That conflict is 536-C2. It is not closed here.
 
 **Recommendation:** A.
 
 **Default:** Proposed, unaccepted, owner decision required. `line_no` orders the revision for display and for the digest, and it is not the apply order (option A). Alternatives written out: `line_no` is the apply order (option B); catalog order with gaps allowed (option C).
 
-## 536-F6 — Units and apply order
+## 536-F6 — Units
 
-OQ5 option A is unchanged. The adopted points, as the register row and [partial-apply-rules-oq5-option-a.md](partial-apply-rules-oq5-option-a.md) record them (`read`): one unit per target subscription; a unit is atomic; no automatic rollback; `PARTIALLY_APPLIED` when a later unit fails after at least one unit has committed; `APPLY_BLOCKED` when no unit has committed; the remedy is a correcting amendment; signature stays all-or-nothing.
-
-[partial-apply-rules-oq5-option-a.md](partial-apply-rules-oq5-option-a.md) also records (`read`) that the written create-before-terminate rule, including who writes `dependsOnUnitNos`, is **UNMET**. The landed column is `dependency_order`, not an array named `dependsOnUnitNos` (`read` `V1_7__contract_documents.sql`). The field-schema cell says `dependency_order` "creates before terminates" (`read` [amendment-entity-field-schema.md](../amendment-entity-field-schema.md) §2.6). That cell does not close the unmet rule. This note does not close it either.
-
-Cluster B [#652](https://github.com/drgaciw/open-crm-cpq/pull/652) DRG-559's proposed default remains one Restructure change whose apply shape is three named units, create before terminate, not built (`read` that frame's owner-decision row). This note does not build that shape and does not move it into the first slice. Cluster F [#655](https://github.com/drgaciw/open-crm-cpq/pull/655) leaves revoke submission timing open (`read` fork F9). This note does not choose it. Cluster C [#648](https://github.com/drgaciw/open-crm-cpq/pull/648) leaves true-up-plus-arrears apply deferred (`read` its DRG-565 dependency row). This note does not specify a true-up unit.
+The grouping rule is the quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`. This section does not restate that section. Who would write `dependency_order` is the GAP. It is not an option in the table below. Create-before-terminate, as #663 states it, is 536-C6.
 
 | Option | Meaning |
 |---|---|
-| A | Lines that share one target subscription are one unit. Units apply in stored `dependency_order`. The writer of that integer stays open. |
+| A | Use the quoted section 9 for how lines become units. |
 | B | Each line is its own unit. |
 | C | Every line on the document is one unit, including lines that name different subscriptions. |
-| D | This note adopts create-before-terminate and names the writer. |
 
 **Recommendation:** A.
 
-**Default:** Proposed, unaccepted, owner decision required. One unit per target subscription, atomic, in stored `dependency_order`, writer still unmet (option A). Alternatives written out: one unit per line (option B); one unit for the whole document across subscriptions (option C); this note adopts create-before-terminate (option D). First-slice lines use `apply_target_type = SUBSCRIPTION`. `ENTITLEMENT` and `ONE_TIME` stay storable and are not a first-slice submit. Entitlement resolution is pending the DRG-609 design (not accepted). A one-time line stays not allowed yet under DRG-572 fork 5. S4 is not authorized to enforce the order. `V1_9` is not written.
+**Default:** Proposed, unaccepted, owner decision required. Use the quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md` (option A). Alternatives written out: one unit per line (option B); one unit for the whole document across subscriptions (option C). First-slice lines use `apply_target_type = SUBSCRIPTION`. `ENTITLEMENT` resolution is pending the DRG-609 design (not accepted). Whether a later-scope `ONE_TIME` line belongs on this document is 536-C5. S4 is not authorized. `V1_9` is not written.
 
 ## 536-F7 — Partial failure before execution
 
@@ -224,24 +263,22 @@ Option A matches Cluster A 594-F4 and 599-F3: the document waits as a whole. It 
 
 **Recommendation:** A, with storage of the unpriced revision left on #657 option (a).
 
-**Default:** Proposed, unaccepted, owner decision required. A pricing or validation failure leaves the whole revision unpriced (option A). Alternatives written out: keep the lines that priced and drop the rest (option B); copy the previous totals forward (option C). No migration is written. Any later migration that stores the nulls is `V1_10` or higher, next free at build time, and its rollback stops while any affected row remains null and does not invent amounts. `V1_9` stays reserved. Never `V1_7_3`.
+**Default:** Proposed, unaccepted, owner decision required. A pricing or validation failure leaves the whole revision unpriced (option A). Alternatives written out: keep the lines that priced and drop the rest (option B); copy the previous totals forward (option C). No migration is written. Any later migration that stores the nulls is `V1_10` or higher, next free at build time, and its rollback stops while any affected row remains null and does not invent amounts. `V1_9` stays reserved. Never `V1_7_3`. Whether that storage is already the adopted D-STORAGE contract is 536-C3.
 
 ## 536-F8 — Partial failure at apply
 
 | Option | Meaning |
 |---|---|
-| A | OQ5 option A, unchanged. Lines in one unit commit together or the unit writes nothing. Committed units stay committed. The fix is a new LifecycleChange and a new document. |
+| A | The quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`. |
 | B | A failed later unit rolls back units that already committed. |
 | C | One line inside a committed unit is `BLOCKED` and the other lines of that unit stay applied. |
 | D | Rebase: a new revision of the same executed document. |
 
-Quoted OQ6 rule 2 is the post-execution rule. Option A uses that quoted remedy. Option D would revise a document that quoted rule 2 keeps immutable.
-
-Under 536-F11 and the adopted OQ7 rule, a first-slice document names one contract and, after that thin-contract shape, one subscription. One subscription is one unit. That unit either commits (`APPLIED`) or writes nothing (`APPLY_BLOCKED`). `PARTIALLY_APPLIED` stays the OQ5 outcome for a document that later has two target subscriptions. This note does not create that second subscription.
+Quoted historical OQ6 rule 2 is the post-execution rule. Option D would revise a document after execution. 536-F11 names which subscriptions a line may use. It does not restate section 9.
 
 **Recommendation:** A.
 
-**Default:** Proposed, unaccepted, owner decision required. Apply failure follows OQ5 option A, and a unit does not commit a subset of its lines (option A). Alternatives written out: roll back committed units (option B); block one line inside a committed unit (option C); rebase the executed document (option D). S4 and S6 stay unauthorized. No apply is run.
+**Default:** Proposed, unaccepted, owner decision required. Apply failure is the quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md` (option A). Alternatives written out: roll back units that already committed (option B); mark one line inside a committed unit (option C); rebase the executed document (option D). S4 and S6 stay unauthorized. No apply is run.
 
 ## 536-F9 — Totals
 
@@ -257,21 +294,23 @@ Quoted OQ6 rule 2 says the document is immutable in every apply state, including
 
 **Recommendation:** A.
 
-**Default:** Proposed, unaccepted, owner decision required. The four header totals are one digest-bound snapshot of the priced revision, not recomputed at apply (option A). Alternatives written out: recompute them at apply from committed units (option B); add per-line bridge columns in this note (option C). Option C would be a migration at `V1_10` or higher and is not written. DRG-575 remains the bridge frame.
+**Default:** Proposed, unaccepted, owner decision required. The four header totals are one digest-bound snapshot of the priced revision, not recomputed at apply (option A). Alternatives written out: recompute them at apply from committed units (option B); add per-line bridge columns in this note (option C). Option C would be a migration at `V1_10` or higher and is not written. DRG-575 remains the bridge frame. Whether #663's stored bridge replaces this default is 536-C4.
 
 ## 536-F10 — Audit
 
+This default is only the sentence in option A. It is not a settled audit contract. 536-C7 records the #663 local audit type names beside it.
+
 | Option | Meaning |
 |---|---|
-| A | One append-only document event per transition, written by the existing `AmendmentEventWriter`. `payload_digest` covers the revision: header, every line, and the four totals. `unit_no` may name a unit on an apply outcome because the column exists. No new `event_type` list. |
+| A | Audit is one existing document event, with no new event contract. |
 | B | One event per line. |
 | C | A new event type for multi-line apply, with a topic and a registry entry. |
 
-[DRG-564](story-drg-564-policy-decision-audit-trail.md) remains a proposed per-line PolicyDecision note (`read` its status: Proposed, not accepted). This note does not accept it. The line columns `policy_id`, `policy_version`, `policy_decision_id`, and `pricing_trace_id` stay as `V1_7__contract_documents.sql` defined them (`read`). Quoted OQ6 text: the delegated ruling does not choose a supersession event type, payload, schema, topic, or outbox contract. S6 is not authorized.
+[DRG-564](story-drg-564-policy-decision-audit-trail.md) remains a proposed per-line PolicyDecision note (`read` its status: Proposed, not accepted). This note does not accept it. The line columns `policy_id`, `policy_version`, `policy_decision_id`, and `pricing_trace_id` stay as `V1_7__contract_documents.sql` defined them (`read`). The historical OQ6 quotation says the delegated ruling does not choose a supersession event type. S6 is not authorized. The current OQ6 header names audit types; that conflict is 536-C7.
 
 **Recommendation:** A.
 
-**Default:** Proposed, unaccepted, owner decision required. One document event per transition, digest over the whole revision, no new event contract (option A). Alternatives written out: one event per line (option B); a new multi-line event type with a topic and a registry entry (option C). Option C is S6 work and is not authorized.
+**Default:** Proposed, unaccepted, owner decision required. Audit is one existing document event, with no new event contract (option A). Alternatives written out beside that default: one event per line (option B); a new multi-line event type with a topic and a registry entry (option C). Option C is S6 work and is not authorized.
 
 ## 536-F11 — One contract
 
@@ -303,6 +342,62 @@ The Accepted uplift record D-04 (`read`) takes each field from the first rung th
 
 **Default:** Proposed, unaccepted, owner decision required. Per-line D-04 precedence, clause then line then agreement then account then rules, and no first-slice `RENEW` submit (option A). Alternatives written out: one document-level uplift percent (option B); a different precedence stack (option C). Option C would reopen an Accepted record. This note does not adopt it. No price is calculated.
 
+## GAP — who writes unit order
+
+This is a gap. It is not a fork and not a decision.
+
+[partial-apply-rules-oq5-option-a.md](partial-apply-rules-oq5-option-a.md) records (`read`) that the written create-before-terminate rule, including who writes `dependsOnUnitNos`, is **UNMET**. [partial-apply-owner-decision.md](partial-apply-owner-decision.md) section 8 item 1 (`read`) says: "Who writes `dependsOnUnitNos`: the seller, or the system from action codes (spec open question 3). AC-3 states create-before-terminate for the restructure grouping." The landed column is `dependency_order integer NOT NULL` (`read` `V1_7__contract_documents.sql`). The field-schema cell says that column "creates before terminates" (`read` [amendment-entity-field-schema.md](../amendment-entity-field-schema.md) §2.6). That cell does not name a writer. #663's sentence "Separate commercial application units follow create-before-terminate" does not name a writer. No writer is chosen here.
+
+## Consistency with #663 and the S3 draft scope
+
+Read on `origin/main` at `63e6ec8d`: [delegated-renewals-amendments-decisions-2026-10-17.md](delegated-renewals-amendments-decisions-2026-10-17.md) and the S3 row of [story-s3-s4-authorization-gate.md](story-s3-s4-authorization-gate.md). This branch does not contain those edits. The sentences below are copied from that commit.
+
+S3 draft scope, table row:
+
+> | S3 | RA-47 | [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) | Amendment document API/state machine plus adopted concurrency and digest criteria. | Next free V1_10+ for full unpriced nullability, immutable envelopes/receipts; rollback guards required. V1_9 remains S4. |
+
+The same gate's new header says policy and contract choices are adopted under delegation and that S3–S8 are not released. This note does not release S3.
+
+Contracts copied from the #663 record where this note disagrees:
+
+> **D-STORAGE.** Adopt nullable pricing pins (`product_external_id`, `pricebook_version`, `configuration_hash`), both document/revision `content_digest` columns, and current-header `tcv_delta`, `arr_delta`, `one_time_total`, `credit_total` while unpriced. Clear old policy-decision identities, trace and approval/signature references on the new revision as required by OQ6. A priced revision requires all required pins, valid decision evidence and all computed totals. Submit and execute reject missing/stale pricing; real computed zero is distinct from unknown null. Old snapshots preserve actual nulls and amounts. A future additive CAM migration uses the next free V1_10 or later; V1_9 stays reserved for S4 and existing migrations are immutable. Rollback to NOT NULL refuses while any affected row is null and never fabricates values.
+
+> Its format id is `CAM-COMMERCIAL-1`: a closed commercial DTO, explicit nullable fields, money/quantities represented as normalized decimal **strings** (plain notation, no redundant trailing fractional zeroes, negative zero becomes `0`), canonical UUID/date spellings, stable sorting of line arrays by unique `changeLineRef` and unit arrays by unit number, then [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785) and SHA-256 of its UTF-8 bytes, lower-case hex.
+
+> **D-REVISION.** Adopt DRG-616 defaults 1–9, 11 and 13 and the complete commercial request described by the frame. CAM owns `POST /api/v1/amendments/{amendmentId}/revisions`, expected row `version`, complete new commercial lines without prices/pins, caller `targetQuoteId`, source `inputsSnapshotRef` and `applicationUnitNo`. Resolved header dates/reason and structural hooks are mandatory as in the draft. First-slice categories use Cluster E L4's exact derivation. New success is 201; identical replay is 200. No cross-service table reads and no header-only partial revision. Terminals REJECTED, WITHDRAWN and VOID refuse with `ILLEGAL_TRANSITION`; executed/apply states refuse with `IMMUTABLE_EXECUTED`. OUT_FOR_SIGNATURE stays unsupported and returns 409 for revision; WET/E_SIGN execution retains the existing 422 slice rejection. No VOID mutation is introduced in the slice.
+
+> Success `AMENDMENT_SUPERSEDED` and refusal `AMENDMENT_REVISION_REJECTED` are local audit types. Existing S2 hash-chain and audit outbox obligations remain; “local” never means suppressing its outbox. No new S6 domain-event topic/schema is adopted here.
+
+> Pricing-service computes ARR bridge values for the current revision and returns them with the audited pricing decision. Quote-service/CAM store the result and never recompute it.
+
+> No business category or document arr_delta definition is overloaded.
+
+> Choose DRG-572 recommendations for a separate optional pair `servicePeriodStart/servicePeriodEnd`, both absent or both present and end not before start. Allow a service period starting before effective date only for ONE_TIME; other charge types retain their effective-date validation. Optional per-line effectiveDate falls back to contractEffectiveDate; trigger dates remain on the header. Use ADD + ONE_TIME for a non-commitment charge. These are later-scope features and do not widen the AMEND/ADD-UPDATE-REMOVE first-slice commercial scope.
+
+> Separate commercial application units follow create-before-terminate; operational revocation additionally requires the fulfilment evidence below.
+
+> Pre-decision labels such as “not adopted”, “owner option” and “owner decision required” in those baseline choices describe their old status; they do not limit this adoption.
+
+These sentences agree with this note where the note already keeps one thin contract, `V1_9` reserved for S4, no backfill, no apply, S3 and S6 unreleased, first-slice `AMEND` with `ADD`, `UPDATE`, and `REMOVE`, `NoCredit`, `NoFee`, and the Accepted proration record unopened. The rows below are the disagreements. Each default is Proposed, unaccepted, owner decision required. None of them applies #663 to this story and none of them deletes the earlier sentence.
+
+**536-C1. Default:** Proposed, unaccepted, owner decision required. Leave the digest-order conflict open. Alternatives written out: sort lines by unique `changeLineRef` as D-DIGEST states; keep 536-F5, which lists lines in `line_no` order.
+
+**536-C2. Default:** Proposed, unaccepted, owner decision required. Leave the CAM-command conflict open. Alternatives written out: use the D-REVISION route and the S3 draft scope quoted above; keep historical OQ6 rule 3, which does not decide the command.
+
+**536-C3. Default:** Proposed, unaccepted, owner decision required. Leave the unpriced-storage conflict open. Alternatives written out: use D-STORAGE and the S3 migration cell quoted above; keep 536-F7, which does not approve that storage.
+
+**536-C4. Default:** Proposed, unaccepted, owner decision required. Leave the ARR-bridge conflict open. Alternatives written out: store the pricing-service bridge as the Pricing and ARR paragraphs state, without overloading `arr_delta`; keep 536-F9, which adds no bridge columns.
+
+**536-C5. Default:** Proposed, unaccepted, owner decision required. Leave the later-scope line-shape conflict open. Alternatives written out: carry the DRG-572 later-scope fields quoted above on a multi-line amendment; keep the first-slice exclusion in 536-F2 and 536-F3.
+
+**536-C6. Default:** Proposed, unaccepted, owner decision required. Leave the create-before-terminate conflict open. Alternatives written out: follow the quoted #663 sentence for separate commercial units; leave that order unstated in this note. The writer of `dependency_order` stays the GAP. It is not an alternative in this fork.
+
+**536-C7. Default:** Proposed, unaccepted, owner decision required. Leave the audit-type conflict open. Alternatives written out beside the 536-F10 default: name `AMENDMENT_SUPERSEDED` and `AMENDMENT_REVISION_REJECTED` on the existing document event, which is the D-RACE sentence and is not a new S6 topic; keep "Audit is one existing document event, with no new event contract" with no added type name.
+
+**536-C8. Default:** Proposed, unaccepted, owner decision required. Leave the OQ18-status conflict open. Alternatives written out: follow the current OQ6 header, which confirms OQ18; follow only the historical sentence that OQ18 remains Proposed.
+
+**536-C9. Default:** Proposed, unaccepted, owner decision required. Leave the classification and mapping conflict open. Alternatives written out: apply the adopted Cluster A class list and mapping to a multi-line document; keep 536-F3's sentence that they stay not adopted.
+
 ---
 
 ## What an owner decision on this note still does not do
@@ -316,11 +411,11 @@ A decision on any row:
 - does not authorize S6;
 - leaves ADR-017 and ADR-024 through ADR-027 Proposed, and does not use them as prerequisites;
 - leaves the proration record Accepted and does not restate it;
-- leaves OQ5 option A and the OQ7 thin contract unchanged;
+- does not restate the quoted section 9 of `docs/renewals-amendments/prereq/partial-apply-owner-decision.md`, and leaves the OQ7 thin contract unchanged;
 - does not run a backfill and does not run apply;
 - does not accept the DRG-609 design and does not specify entitlements or conversion price;
 - does not accept DRG-564, `specs/partial-apply.md`, or `specs/lifecycle-intents.md`;
-- does not close DRG-565's unmet ordering rule;
+- does not decide the GAP (who writes `dependency_order` / `dependsOnUnitNos`);
 - writes no migration. `V1_9` stays reserved for `document_apply_ledger`. Any future migration is `V1_10` or higher, next free at build time, with a rollback statement that stops while any affected row remains null and never fabricates values. Never `V1_7_3`.
 
 The ticket stays In Review until the owner merges.
