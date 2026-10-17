@@ -96,11 +96,19 @@ class RenewalResolveControllerTest {
     }
 
     @Test
-    void missingExitNetAndOutOfSliceModesAre422() throws Exception {
-        mvc.perform(post(RenewalResolveController.PATH)
+    void missingExitNetIs422AndDoesNotInventAPrice() throws Exception {
+        MvcResult result = mvc.perform(post(RenewalResolveController.PATH)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(fixture().replace("\"exitNet\": 40.0000", "\"exitNet\": null")))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andReturn();
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("unitPrice");
+    }
+
+    @Test
+    void outOfSliceModesAre422() throws Exception {
         for (String mode : List.of("LIST", "UPLIFT_AMT", "OVERRIDE", "RENEGOTIATE")) {
             mvc.perform(post(RenewalResolveController.PATH)
                             .contentType(MediaType.APPLICATION_JSON)
