@@ -6,7 +6,6 @@ import com.opencrm.contract.dto.RenewalPolicyRecordDto;
 import com.opencrm.contract.service.RenewalPolicyRecordService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -20,7 +19,7 @@ import java.util.UUID;
 
 /**
  * Read-only internal policy lookup. Tenant comes from the verified token {@code tid} claim.
- * There is no write mapping. {@code Internal.Invoke} is the existing service authority.
+ * There is no write mapping. {@code /internal/**} already requires {@code Internal.Invoke}.
  */
 @RestController
 public class RenewalPolicyController {
@@ -34,7 +33,6 @@ public class RenewalPolicyController {
     }
 
     @GetMapping(PATH)
-    @PreAuthorize("hasAuthority('ROLE_INTERNAL_INVOKE')")
     public ApiResponse<List<RenewalPolicyRecordDto>> read(
             @RequestParam(required = false) UUID accountId,
             @RequestParam(required = false) UUID agreementId,
