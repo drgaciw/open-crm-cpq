@@ -1,5 +1,7 @@
 # Amendment entity: field schema
 
+**Documentation acceptance (2026-10-17):** The additions and corrections in PRs #653 and #661 are [accepted as documentation](prereq/documentation-acceptance-2026-10-17.md). Individual proposed criteria and unresolved contract decisions retain the statuses stated below; no implementation story is authorized.
+
 *open-crm-cpq (drgaciw/open-crm-cpq), universal renewals-and-amendments project. Documentation only; no code changes. Date: 2026-10-16.*
 
 **Binding target:** `mid-term-amendment-policy-spec.md` (V1 to V14, A1 to A8, six extension points, lifecycle states). **Conventions:** **[S]** = field or rule named in a project file (*spec*, *spike*, *rca*, *sanity*, *research*); **[I]** = inference or proposal made here. "OQn" = the spec's open questions; OQ1 to OQ8 are the eight undecided spike decisions. Where a field depends on one, the row says **dep OQn** and gives the default, which follows the spike recommendation unless noted. Types are logical (PostgreSQL-style), not a migration.

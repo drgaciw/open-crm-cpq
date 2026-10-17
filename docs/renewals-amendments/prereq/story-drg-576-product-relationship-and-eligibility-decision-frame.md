@@ -1,6 +1,6 @@
 # DRG-576 — Product relationship and lifecycle eligibility (decision frame)
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Date:** 2026-10-17
 **Base:** `main` at `0d71251d` (merge of [#647](https://github.com/drgaciw/open-crm-cpq/pull/647)). Ticket evidence was recorded at `dd90501`. `git diff --stat dd90501..0d71251d` for `backend/services/product-service/src/main/java/com/opencrm/product` is empty. The re-read below is of `0d71251d`.

@@ -1,6 +1,6 @@
 # DRG-575 — ARR bridge per change line: decision frame
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Base:** `main` at `0d71251d`.
 

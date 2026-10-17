@@ -2,7 +2,9 @@
 
 *open-crm-cpq (drgaciw/open-crm-cpq). Documentation only. New file. Date: 2026-10-17.*
 
-**Status:** Proposed, unaccepted, owner decision required. This file is a decision frame. Merging it records the forks, the recommendation, and the default. It does not adopt a default, and it does not change any ADR status. DRG-555, DRG-593, and DRG-596 stay In Review until the owner merges.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** This file is a decision frame. Merging it records the forks, the recommendation, and the default. It does not adopt a default, and it does not change any ADR status. DRG-555, DRG-593, and DRG-596 stay In Review until the owner merges.
 
 **The renewal outbox relay stays disabled.** `opencrm.outbox.relay.enabled` stays false (`OutboxProperties` default). This file does not enable the relay, does not register a new publisher, and does not turn the quote-side listener on.
 

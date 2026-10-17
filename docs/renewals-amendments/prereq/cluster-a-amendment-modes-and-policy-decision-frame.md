@@ -1,6 +1,6 @@
 # Cluster A — Amendment modes and commercial policy (decision frame)
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Date:** 2026-10-17
 **Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642), merged 2026-10-17T07:40:40Z).
