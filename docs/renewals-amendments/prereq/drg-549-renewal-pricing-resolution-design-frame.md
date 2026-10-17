@@ -6,7 +6,7 @@
 
 **Story:** [DRG-549](https://linear.app/drgamtd-workspace/issue/DRG-549/renewal-pricing-policy-hierarchy-same-list-uplift-percent-uplift) (RA-15). This file is the design frame for how a renewal price is resolved. It is not an ADR, takes no number, and is not copied into `docs/adr/`.
 
-**Accepting this authorizes no code, migration or deploy.** It authorizes no Flyway file, no Drools edit, no flag, no route, and no merge. Pricing flags stay as they are. No real customer data is read or written. DRG-549 stays In Review until the owner merges.
+**Accepting this authorizes no code, migration or deploy.** It authorizes no Flyway file, no Drools edit, no flag, no route, and no merge. Pricing flags stay as they are. No real customer data is read or written. DRG-549 stays In Review until the owner merges. The later code-slice allowlist is a draft, not approved. A merge of #658 does not release the code slice.
 
 **Reads, and does not amend:** Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) (Accepted 2026-10-16). Precedence below cites that record. This frame does not restate it as a second rule.
 
@@ -33,8 +33,8 @@ Every open fork is in this table. The Accepted precedence record is not a fork; 
 
 | Fork | Default | Alternatives |
 |---|---|---|
-| Where account, agreement, and line renewal policy inputs live | Proposed, unaccepted, owner decision required. No durable home is chosen. The first slice, if the owner later accepts one, sends the five rungs as caller-supplied facts on the recommended endpoint. This frame adds no column and no migration. | (1) Columns on `Organization`, `ContractHeader`, and the subscription line, in a later migration this frame does not authorize. (2) A `RenewalPricingPolicy` document referenced by the `policy_id` and `policy_version` tokens `AmendmentDocumentLine` already stores. (3) Policy rows owned inside pricing-service. |
-| How quote-service reaches the merge | Proposed, unaccepted, owner decision required. A versioned, idempotent, read-only HTTP endpoint on pricing-service, with no persistence. The contract is a sketch. It is not coded. | (1) Leave `RenewalUpliftResolver` as it is: a stateless non-bean with no production caller. (2) A Spring bean inside pricing-service and still no quote-service caller. (3) A shared library so quote-service calls the resolver in process. The Accepted record rules that alternative out: pricing-service is the only component that merges the rungs. |
+| Where account, agreement, and line renewal policy inputs live | Proposed, unaccepted, owner decision required. CAM, using the CAM default shape in the policy-input section. crm-service and pricing-service are the other options. This frame adds no column and no migration. | crm-service, using that option's default shape. pricing-service, using that option's default shape. Each option's own alternatives are in the policy-input section. |
+| How quote-service reaches the merge | Proposed, unaccepted, owner decision required. No transport is decided. | (Option, not a decision) A versioned, idempotent, read-only HTTP endpoint with no persistence, carrying the DoD v0.2 Open Host Service block below. Not coded. (1) Leave `RenewalUpliftResolver` uncalled. (2) A Spring bean inside pricing-service and still no quote-service caller. (3) A shared library. The Accepted record rules (3) out: pricing-service is the only component that merges the rungs. |
 | `LIST` in the first slice | Proposed, unaccepted, owner decision required. `LIST` is out of the first slice. Merged note [#645](https://github.com/drgaciw/open-crm-cpq/pull/645) is the gate, and that note stays Proposed. | (1) Include `LIST` only after the owner accepts the DRG-539 note. (2) Include `LIST` in the first slice with no price-book read. This frame does not offer (2) as a price. |
 | First-slice modes | Proposed, unaccepted, owner decision required. `UPLIFT_PCT` plus `SAME` only. | (1) `UPLIFT_PCT` only, which is what the resolver prices today. (2) Add `UPLIFT_AMT`. (3) Add `OVERRIDE`. (4) Add `RENEGOTIATE`. (5) Add `LIST` (see the `LIST` row). |
 | `SAME` semantics | Proposed, unaccepted, owner decision required. Carry prior price. This is the only mode called uncontroversial. It is still a default. | (1) Carry prior list. (2) Carry the term-average rate. (3) Treat a null caller percent as zero, which is what `QuoteContinuationPolicy` does on the renewal branch today. |
@@ -44,7 +44,7 @@ Every open fork is in this table. The Accepted precedence record is not a fork; 
 | Later-year expansion (DRG-568 leak guard) | Proposed, unaccepted, owner decision required. Keep one flat period. The resolver does not expand escalator years. A later slice does not touch `RampEscalatorExpander` or price-lock fields. `retentionMarker` stays opaque. [#644](https://github.com/drgaciw/open-crm-cpq/pull/644) is Proposed. | (1) Expand later years inside the resolver. (2) Call `RampEscalatorExpander` from the renewal path. (3) Treat `retentionMarker` as a price lock. |
 | Where the later orchestration lives | Proposed, unaccepted, owner decision required. `QuoteContinuationService`. `QuoteContinuationPolicy` stays static and pure. | (1) Put the pricing HTTP call inside `QuoteContinuationPolicy`. (2) Add a third orchestrator and leave both current types unchanged. |
 | List price at as-of | Proposed, unaccepted, owner decision required. Treat it as a gap. `ProductServiceClient` is not the source. `LIST` stays out of the first slice. The price-book read stays the DRG-539 note. | (1) Add a list-price-at-as-of method to `ProductServiceClient`. (2) Have quote-service call pricebook-service itself. |
-| Later code-slice file allowlist | Proposed, unaccepted, owner decision required. The allowlist in the last section, labelled draft, not approved. It contains no migration. | (1) Resolver plus a new controller only. (2) The same allowlist plus a Flyway migration. This frame does not authorize (2). |
+| Later code-slice file allowlist | Proposed, unaccepted, owner decision required. The allowlist below is a draft, not approved. A merge of #658 does not release the code slice. It contains no migration. | (1) Resolver plus a new controller only. (2) The same allowlist plus a Flyway migration. This frame does not authorize (2). |
 
 ## Precedence
 
@@ -74,11 +74,29 @@ On this `main` there is no read path for account, agreement, or line renewal pol
 
 **Unverified:** crm-service and contract-asset-management SQL migrations were not opened, and full tree listings of those services were truncated. A text search of those two service trees for `renewalPricing`, `RenewalPricing`, `upliftPercent`, and `renewal_method` returned no matches. That search is not a migration review. Whether a migration adds a renewal column that these entities do not map is `unverified`.
 
-This gap is why the home of the inputs is an owner decision and not a finding.
+This gap is an owner decision. The options are CAM, crm-service, or pricing-service. None is a finding. This frame adds no column and no migration. Until a read path exists, a later resolve call still receives the five rungs as caller-supplied facts. That transport is not a fourth home.
 
-**Default:** Proposed, unaccepted, owner decision required. No durable home is chosen. Caller-supplied rungs are the input shape the Accepted record already requires pricing-service to receive. This frame does not invent columns.
+**Default:** Proposed, unaccepted, owner decision required. CAM, using the CAM default shape below.
 
-**Alternatives:** the three homes in the owner-decision table (entity columns, a policy document behind the existing tokens, or rows inside pricing-service).
+**Alternatives:** crm-service, using the crm-service default shape below. pricing-service, using the pricing-service default shape below.
+
+### Option: CAM
+
+**Default:** Proposed, unaccepted, owner decision required. The agreement method lives on the CAM contract header, and the line override lives on the CAM document line beside the `policy_slot`, `policy_id`, and `policy_version` tokens already stored there. The account rung is not a new `Organization` column. CAM keeps the `customer_account_id` it already stores and holds the account method on the contract.
+
+**Alternatives:** (1) CAM stores only those tokens, and the method body lives in a new CAM policy document. (2) Renewal columns are added on `ContractHeader` only, with no separate line override. (3) CAM also owns an account-policy row keyed by `customer_account_id`. No alternative is a migration in this frame.
+
+### Option: crm-service
+
+**Default:** Proposed, unaccepted, owner decision required. The account method lives on `Organization` in crm-service. Agreement and line methods stay outside crm-service.
+
+**Alternatives:** (1) A new crm-service policy entity keyed by organization, with no renewal columns on `Organization`. (2) crm-service stores the account, agreement, and line methods, even though the agreement header is a CAM type. (3) crm-service exposes a read and stores nothing new. No read of that kind exists in the files opened above, and this alternative does not create one.
+
+### Option: pricing-service
+
+**Default:** Proposed, unaccepted, owner decision required. pricing-service stays the merge and does not become the policy store. It keeps receiving unmerged rungs. The Accepted record already says pricing-service does not read another service's database.
+
+**Alternatives:** (1) The pricing schema gains policy rows for account, agreement, and line, and the resolver reads them. That alternative is persistence, and it is not this frame. (2) pricing-service stores only a merged snapshot. That store is DRG-564, which this frame does not accept. (3) A shared library so another service merges in process. The Accepted record rules that alternative out.
 
 ## Endpoint, not a library
 
@@ -97,13 +115,15 @@ What is on `main`, `verified by reading code`:
 
 `QuoteContinuationPolicy` still prices the live renewal path: one period, exit net times the caller percent, and a null percent becomes zero (`QuoteContinuationPolicy.java`, the renewal branch). That path does not call the resolver. `verified by reading code`.
 
-**Default:** Proposed, unaccepted, owner decision required. Recommend an HTTP endpoint on pricing-service. Not coded.
+**Default:** Proposed, unaccepted, owner decision required. No transport is decided.
+
+**Option, not a decision:** Proposed, unaccepted, owner decision required. An HTTP endpoint on pricing-service. The option carries the DoD v0.2 Open Host Service block below: versioned, idempotent, read-only, no persistence. Not coded. Selecting this option is a later owner act. This frame does not select it.
 
 **Alternatives:** leave the resolver uncalled; register it as a Spring bean that quote-service still cannot call; a shared library, which the Accepted record rules out.
 
-### Open Host Service (recommendation only)
+### Option: DoD v0.2 Open Host Service block (not a decision)
 
-This block is the DoD v0.2 Open Host Service shape for the recommendation. It is a sketch. This file does not add the route. Accepting this file does not add it.
+This block is an option. It is not a decision. Proposed, unaccepted, owner decision required. It is the Open Host Service shape attached to the HTTP option above. Versioned, idempotent, read-only, no persistence. This file does not add the route. A merge of #658 does not add it.
 
 | Property | Sketch |
 |---|---|
@@ -116,7 +136,7 @@ This block is the DoD v0.2 Open Host Service shape for the recommendation. It is
 
 Schema-registry, outbox, commercial-decision audit, and event replay stay N/A on this sketch: the sketch emits no event and writes no decision. DRG-564 owns the audit store. This frame does not accept that note and does not start it.
 
-`PricingServiceClient` (`backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java`) currently posts to `/api/v1/pricing/execute` and `/api/v1/pricing/simulate` and parses `ApiResponse<PricingExecuteView>`. It has no renewal method. A later slice would add the call there. Not in this file.
+`PricingServiceClient` (`backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java`) currently posts to `/api/v1/pricing/execute` and `/api/v1/pricing/simulate` and parses `ApiResponse<PricingExecuteView>`. It has no renewal method. A call from that client exists only if the owner later accepts the HTTP option. Not in this file.
 
 ## `LIST` is out of the first slice
 
@@ -162,15 +182,17 @@ D-06 of the Accepted uplift record already says a multi-year escalator does not 
 
 ## Later code-slice allowlist (draft, not approved)
 
-**Default:** Proposed, unaccepted, owner decision required. The list below is the proposed allowlist for a later code slice. It is draft, not approved. Accepting this frame does not authorize any file in it.
+The allowlist is a draft, not approved. A merge of #658 does not release the code slice. Merging this pull request adds this document only. It does not authorize the files below, a controller, a client call, a migration, a flag, or a deploy.
+
+**Default:** Proposed, unaccepted, owner decision required. The list below is the draft allowlist for a later code slice. It is not approved. A merge of #658 does not release it.
 
 | File | Later slice |
 |---|---|
 | `backend/services/pricing-service/src/main/java/com/opencrm/pricing/renewal/RenewalUpliftResolver.java` and the types in that package the resolver already uses | Edit the resolver so the accepted first-slice modes resolve. Today that is `UPLIFT_PCT` only. |
-| A new controller in `backend/services/pricing-service/src/main/java/com/opencrm/pricing/renewal/` | The Open Host Service sketch. Class name is not fixed here. |
-| `backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java` | Call the new route. |
+| A new controller in `backend/services/pricing-service/src/main/java/com/opencrm/pricing/renewal/` | Only if the owner later accepts the HTTP option. The Open Host Service block on that option is not a decision. Class name is not fixed here. |
+| `backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java` | Call the new route only if the owner later accepts the HTTP option. |
 | A new view DTO in `backend/services/quote-service/src/main/java/com/opencrm/quote/client/`, beside `PricingExecuteView.java` | Parse the renewal response. Class name is not fixed here. |
-| `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteContinuationService.java` | Orchestration: load the schedule, call the endpoint, then call the policy. |
+| `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteContinuationService.java` | Orchestration, if a later slice is separately authorized: load the schedule, call pricing-service only when the HTTP option is accepted, then call the policy. |
 | `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteContinuationPolicy.java` | Stay static and pure. `plan` is static, the class has no instance fields, and it does not call another service. `verified by reading code`. |
 | `backend/services/quote-service/src/test/java/com/opencrm/quote/quote/QuoteContinuationPolicyTest.java` | Tests for the policy change. The file is already on `main`. Its current assertions were not re-run. |
 | A new `RenewalPricingPolicy` at `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/RenewalPricingPolicy.java` | The mode value the service passes. The type does not exist today. |
@@ -183,11 +205,11 @@ Out of the allowlist: `RampEscalatorExpander`, price-lock fields, `ProductServic
 
 ## Scope against DoD v0.2
 
-[CPQ Definition of Done v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338) is the approved rule. This table scores this design frame. It does not score a later implementation. The Open Host Service sketch above is a recommendation. This change adds no integration surface, so the item is N/A here.
+[CPQ Definition of Done v0.2](https://app.notion.com/p/3fbf7cb4e4df8156a5bfe5c6c61d4338) is the approved rule. This table scores this design frame. It does not score a later implementation. The Open Host Service block above is an option, not a decision. This change adds no integration surface, so the item is N/A here.
 
 | Item | Result | Reason |
 |---|---|---|
-| Open Host Service | N/A | This change adds or changes no integration surface. The endpoint above is a sketch and is not coded. |
+| Open Host Service | N/A | This change adds or changes no integration surface. The endpoint block above is an option, not a decision, and it is not coded. |
 | Schema-registry events | N/A | This change adds or changes no event. |
 | Outbox writes | N/A | This change writes no outbox row and publishes no event. |
 | Commercial-decision audit | N/A | This change writes no commercial decision. |
@@ -228,7 +250,9 @@ Read in this pass. Not executed.
 
 ## What this does not do
 
-- It does not authorize code, a migration, a flag, a route, or a deploy.
+- It does not authorize code, a migration, a flag, a route, or a deploy. The allowlist is a draft, not approved. A merge of #658 does not release the code slice.
+- It does not decide the HTTP transport. The DoD v0.2 Open Host Service block (versioned, idempotent, read-only, no persistence) is an option, not a decision.
+- It does not decide a read path. The policy-input home is an owner decision among CAM, crm-service, and pricing-service.
 - It does not edit DRG-549, the Accepted uplift record, ADR-017, or ADR-024 through ADR-027.
 - It does not turn a pricing flag on, and it does not read or write real customer data.
 - It does not price `SAME`. The resolver on `main` throws for every mode other than `UPLIFT_PCT`.
