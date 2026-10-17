@@ -33,6 +33,7 @@
         <module>services/approval-routing</module>
         <module>services/document-generation</module>
         <module>services/contract-asset-management</module>
+        <module>services/order-management</module>
     </modules>
 
     <properties>
