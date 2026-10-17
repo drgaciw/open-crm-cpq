@@ -1,5 +1,7 @@
 # S5 readiness: quote-service LifecycleChange (DRG-583)
 
+**Delegated decisions (2026-10-17):** The pricing writer/audit handoff, CAM priced-state command, shared digest and durable operation reconciliation are decided under delegation. S5 remains unready until its closed DTO/contracts and implementations are delivered, verified and separately authorized. Earlier unconfirmed/open-choice wording below is historical. See the [decision record](delegated-renewals-amendments-decisions-2026-10-17.md).
+
 *open-crm-cpq. Documentation only. Date: 2026-10-16. Story: RA-49 / [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583/s5-quote-service-lifecyclechange-amend-with-pricing-service-decisions) (Backlog when read). This note records a boundary and a wait-list. It authorizes no code, schema, topic, gateway route, or flag.*
 
 **Base branch is `main`.** Draft PR #619 targets `main` (`baseRefName` read from GitHub). This note lands on `main` when the owner merges it. The file is not on `main` at `dd0f1a8` while the PR stays draft. #613 merged to `docs/renewals-amendments-design-2026-10-16`. #614 merged to `cursor/crm-quote-dealtype-mapping-6410`. Neither of those merges landed on `main`.
@@ -113,7 +115,7 @@ What S5 takes from S3:
 - Idempotent document create on `lifecycle_change_id` (FR-05, AC-S3-1). Technical approach §5 step 3: quote-service calls CAM to create the document, lines copied by value with digest.
 - Shared validation FR-07 (V1..V14) at the named transitions. S3 submit is one of those transitions (AC-S3-2).
 - Shared dates FR-17 / V6 (AC-S3-8 fails backdating without a reason code).
-- OQ18 remains Proposed until owner confirmation: the unconfirmed location is `backend/libs/common`, built once in S3 and reusable by S5/S6. Confirmation gates digest-library work only; it neither authorizes nor blocks all S3 work.
+- OQ18 is confirmed under delegation: `backend/libs/common`, delivered with S3 and reusable by S5/S6 under the [versioned digest contract](delegated-renewals-amendments-decisions-2026-10-17.md#storage-and-digests). Implementation authorization and fixtures remain required.
 - OQ6 is recorded under delegation in `oq6-revision-model-owner-decision.md` (#642). S3 still needs separate authorization. The CAM write, cleared-pin representation, supersession event, local concurrency, and S5/S8 delivery contracts remain proposals (DRG-616).
 
 `docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml` is on `main` at `dd0f1a8`. The header that was read says proposal only: not an implementation, not a gateway route, not a feature flag, and it does not authorize merging, deploying, or enabling a runtime flag. `x-opencrm-status` is `proposal`. It names quote-service as owner of LifecycleChange and CAM contract-documents as owner of the amendment document. Paths read for this note: `/lifecycle-changes` and the continuation facade. The rest of the 2479-line file was not read. **Unverified** beyond the sections cited. DRG-605 was In Review and still listed as blocking DRG-583 and DRG-581 when the issue was read. Whether that relation changed after the file reached `main` was not re-read. **Unverified.**
@@ -168,7 +170,7 @@ Ordering and fulfilment stay out (technical approach §2). document-generation s
 | OQ11 | DEFAULT PROPOSED. Per-tenant flag, default off, internal tenant first. Blocks S6. | Apply-path flag. Not specified as the AC-S5-5 switch. |
 | OQ12 | Confirmed. Add, Update, Remove only. | AC-S5-3. |
 | OQ17 | DEFAULT PROPOSED. Approval for overrides, backdating, or ARR delta above a Finance threshold. Needed before S5 ends. | AC-S5-4 can name `CONTRACT_MODIFICATION`. The non-override threshold is still a default. |
-| OQ18 | Proposed until owner confirmation. Unconfirmed: `backend/libs/common`, delivered in S3, reusable by S5/S6. | Gates building the digest library only. S5 may reuse it once accepted and delivered. Does not authorize S3 or S6. |
+| OQ18 | Confirmed under delegation 2026-10-17: shared backend/libs/common utility delivered with S3. | S5 reuses the delivered format and fixtures; no remaining owner-confirmation gate, and no story authorization. |
 | OQ5 | DEFAULT PROPOSED. Blocks S4, not S5. | S5 must not invent partial-apply behavior. |
 | Render home | ADR-035 open questions. | Out of slice. Request stays in quote-service when a later ticket builds it. |
 | Hash chain key management | ADR-035 acceptance: still open. | S2. Not S5. |

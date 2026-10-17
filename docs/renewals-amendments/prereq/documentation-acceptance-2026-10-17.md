@@ -1,5 +1,7 @@
 # Documentation acceptance — 2026-10-17
 
+**Delegated decisions (2026-10-17):** This record preserves the earlier documentation-only acceptance. The later explicit owner delegation now adopts the indexed policy/design choices, including OQ18. Earlier statements below that leave those forks open describe the earlier acceptance only; story authorization remains separate. See the [decision record](delegated-renewals-amendments-decisions-2026-10-17.md).
+
 **Status:** Accepted as documentation by the project owner on 2026-10-17.
 
 The owner wrote **“I accept the documentation proposals”** after the processing and merge of PRs #648–#661. This record captures that acceptance against `main` at `7352d4227c33f75bc7eadb5f9ba5ce589596f572`, the merge of [closeout #661](https://github.com/drgaciw/open-crm-cpq/pull/661).

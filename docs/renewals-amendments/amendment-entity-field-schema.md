@@ -1,5 +1,7 @@
 # Amendment entity: field schema
 
+**Delegated decisions (2026-10-17):** The DRG-616 addendum is adopted as design under delegation, with explicit snapshot/digest contracts. The earlier documentation-only acceptance is superseded for those decisions. No schema migration is executed. See the [decision record](prereq/delegated-renewals-amendments-decisions-2026-10-17.md).
+
 **Documentation acceptance (2026-10-17):** The additions and corrections in PRs #653 and #661 are [accepted as documentation](prereq/documentation-acceptance-2026-10-17.md). Individual proposed criteria and unresolved contract decisions retain the statuses stated below; no implementation story is authorized.
 
 *open-crm-cpq (drgaciw/open-crm-cpq), universal renewals-and-amendments project. Documentation only; no code changes. Date: 2026-10-16.*
@@ -238,7 +240,11 @@ Source: transcript addendum "Renewals and amendments decisions audit"; backlog D
 
 **C2 resolved 2026-10-16 (owner).** The stored precedence flag lives in its own indexable column (`precedence_flag`, section 2.2a), outside the thin header. The ADR-035 header list is not altered. See OQ27 in `renewals-amendments-open-questions-register.md`.
 
-## PROPOSED addendum (DRG-616, 2026-10-17)
+## Adopted DRG-616 storage direction (2026-10-17)
+
+The [delegated storage/digest contract](prereq/delegated-renewals-amendments-decisions-2026-10-17.md#storage-and-digests) adopts the full nullable scope, CAM-owned immutable canonical envelope storage, genuine digest-at-close for unpriced supersession, shared OQ18 utility and guarded V1_10+ migration/rollback. Frozen actual nulls remain evidence. The migration and closed storage DTO/schema are not implemented here. The paragraphs below retain the pre-decision alternatives and are historical, including their then-unconfirmed OQ18 wording.
+
+### Historical proposed addendum (DRG-616)
 
 **Status:** Proposed, unaccepted, owner decision required.
 
