@@ -108,19 +108,19 @@ public class AmendmentDocument extends DocumentAuditedEntity {
     @Column(name = "currency_code", nullable = false, length = 3)
     private String currencyCode;
 
-    @Column(name = "tcv_delta", nullable = false, precision = 19, scale = 4)
+    @Column(name = "tcv_delta", precision = 19, scale = 4)
     private BigDecimal tcvDelta;
 
-    @Column(name = "arr_delta", nullable = false, precision = 19, scale = 4)
+    @Column(name = "arr_delta", precision = 19, scale = 4)
     private BigDecimal arrDelta;
 
-    @Column(name = "one_time_total", nullable = false, precision = 19, scale = 4)
+    @Column(name = "one_time_total", precision = 19, scale = 4)
     private BigDecimal oneTimeTotal;
 
-    @Column(name = "credit_total", nullable = false, precision = 19, scale = 4)
+    @Column(name = "credit_total", precision = 19, scale = 4)
     private BigDecimal creditTotal;
 
-    @Column(name = "content_digest", nullable = false, length = 64)
+    @Column(name = "content_digest", length = 64)
     private String contentDigest;
 
     @Column(name = "rendition_digest", length = 64)

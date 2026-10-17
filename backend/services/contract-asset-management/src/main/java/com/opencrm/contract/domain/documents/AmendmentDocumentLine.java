@@ -96,13 +96,13 @@ public class AmendmentDocumentLine extends DocumentAuditedEntity {
     @Column(name = "price_as_of", nullable = false, length = 40)
     private PriceAsOf priceAsOf;
 
-    @Column(name = "product_external_id", nullable = false, length = 255)
+    @Column(name = "product_external_id", length = 255)
     private String productExternalId;
 
-    @Column(name = "pricebook_version", nullable = false, length = 64)
+    @Column(name = "pricebook_version", length = 64)
     private String pricebookVersion;
 
-    @Column(name = "configuration_hash", nullable = false, length = 64)
+    @Column(name = "configuration_hash", length = 64)
     private String configurationHash;
 
     @Column(name = "unit_price", precision = 19, scale = 4)

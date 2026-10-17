@@ -42,7 +42,7 @@ public class AmendmentDocumentRevision extends DocumentAuditedEntity {
     @Column(name = "target_quote_id", nullable = false)
     private UUID targetQuoteId;
 
-    @Column(name = "content_digest", nullable = false, length = 64)
+    @Column(name = "content_digest", length = 64)
     private String contentDigest;
 
     @Column(name = "inputs_snapshot_ref", nullable = false, length = 1024)
