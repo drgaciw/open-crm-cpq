@@ -62,7 +62,7 @@ Every row is **Proposed, unaccepted, owner decision required.** The default is t
 | L5 | Per-intent action allow-list | A. No new database constraint. The only pair a future first-slice submit allows is `AMEND` with `ADD`, `UPDATE`, or `REMOVE` | B. Record a matrix for later enforcement and do not enforce it now. C. Add a SQL trigger from intent to action (migration) |
 | L6 | Source line required | A. Leave `chk_amendment_line_source_required` as written | B. Extend it to `TERMINATE`, `SUSPEND`, `RESUME`, `RENEW`, and `CONVERT_METRIC` (migration). C. Drop the check (migration) |
 | L7 | Category for a conversion line | A. Write no conversion line in the first slice. No new token. DRG-573 chooses later | B. Store conversion lines as category `SWAP` until DRG-573. C. Add category `CONVERSION` (migration) |
-| D1 | Which date fills the Accepted proration formula | A. `price_as_of` selects the input: `EFFECTIVE_DATE` → `contract_effective_date`, `ACTION_DATE` → `action_date`, `LINE_START` → line `effective_from`. Future first-slice writer sets `EFFECTIVE_DATE` | B. Always price from `action_date`. C. Always price from `customer_acceptance_date`. D. Change the proration formula |
+| D1 | Price lookup date versus proration effective date | A. `price_as_of` selects the rate lookup date only. Proration starts at the amendment effective date (`contract_effective_date` in the future first slice). Future first-slice writer sets `EFFECTIVE_DATE` | B. Always look up rates as of `action_date`. C. Always look up rates as of `customer_acceptance_date`. D. Change the proration formula |
 | D2 | Service activation and customer acceptance | A. Both columns stay nullable and are not proration inputs | B. Require both on every document (migration). C. Require both only when `signature_policy` is `WET` or `E_SIGN` |
 | D3 | Backdating | A. Keep `chk_amendment_document_backdating`. Approval thresholds stay on S3 | B. Extend the check to `service_activation_date` and `customer_acceptance_date` (migration). C. Forbid backdating and drop the reason-code escape (migration) |
 | D4 | Header dates versus the line service period | A. Header keeps the four dates. Line keeps `effective_from` / `effective_to`. Future first-slice lines set `effective_from` equal to `contract_effective_date` | B. Copy all four trigger dates onto every line (migration). C. Drop the header dates and keep only line dates (migration) |
@@ -441,7 +441,7 @@ S5's AC-S5-1 and AC-S5-3 have a stored vocabulary and a confirmed executable sub
 
 The research gap says the product has effective-dated rate periods and no distinct action date versus effective dates. The suggested next step is to add `actionDate`, `contractEffective`, `serviceActivation`, and `customerAcceptance` to the change record and to rate periods, because proration, backdating, and ARR need them.
 
-The document row already has those four dates (`V1_7__contract_documents.sql` lines 64–67). The line already has its own service period (lines 232–233 and 277). Rate periods already have their own bounds (`V1_6__subscription_rate_schedule.sql` lines 21–39) and a trace to the line (`V1_7__contract_documents.sql` lines 357–359). The quote continuation request still has a single `effectiveDate` (`QuoteContinuationRequest.java` line 18) and no action-date field (file read). The Accepted proration formula already consumes an effective date (`QuoteContinuationPolicy.java` line 78; ADR D-01). This frame chooses which stored date that input is. It leaves the formula alone.
+The document row already has those four dates (`V1_7__contract_documents.sql` lines 64–67). The line already has its own service period (lines 232–233 and 277). Rate periods already have their own bounds (`V1_6__subscription_rate_schedule.sql` lines 21–39) and a trace to the line (`V1_7__contract_documents.sql` lines 357–359). The quote continuation request still has a single `effectiveDate` (`QuoteContinuationRequest.java` line 18) and no action-date field (file read). The Accepted proration formula already consumes an effective date (`QuoteContinuationPolicy.java` line 78; ADR D-01). This frame proposes the future mapping of that effective-date input to `contract_effective_date`. The independent price lookup date must not move the service start or the billing-period stub.
 
 Two different "OQ9" names exist. The register's OQ9 (read) is whether pricing-service supports amendment policy modes, and it blocks S5. The mid-term spec's OQ9 (`docs/renewals-amendments/mid-term-amendment-policy-spec.md`, read) is backdating limits and approval thresholds for V6. This section uses the mid-term meaning only when it says V6.
 
@@ -458,20 +458,20 @@ Two different "OQ9" names exist. The register's OQ9 (read) is whether pricing-se
 
 ### Options
 
-**Fork D1 — Which date fills the Accepted proration formula.**
+**Fork D1 — Price lookup date versus proration effective date.**
 
-The formula stays the Accepted day-stub in `QuoteContinuationPolicy` (ADR D-01, read). This fork only names the input.
+The formula stays the Accepted day-stub in `QuoteContinuationPolicy` (ADR D-01, read), beginning at the amendment effective date. `price_as_of` records which date pricing used to select a rate; it does not replace the amendment effective date or move the stub. The default proposes their future mapping and keeps those roles separate.
 
 | Option | Meaning |
 |---|---|
-| A | `price_as_of = EFFECTIVE_DATE` means the formula's effective date is `contract_effective_date`. `ACTION_DATE` means `action_date`. `LINE_START` means the line's `effective_from`. |
-| B | Always price from `action_date`. |
-| C | Always price from `customer_acceptance_date`. |
+| A | Rate lookup uses `contract_effective_date` for `EFFECTIVE_DATE`, `action_date` for `ACTION_DATE`, and line `effective_from` for `LINE_START`. Proration still begins at the amendment effective date; the proposed first-slice mapping is `contract_effective_date`, matching line `effective_from`. |
+| B | Always use `action_date` for rate lookup; retain the amendment effective date for proration. |
+| C | Always use `customer_acceptance_date` for rate lookup; retain the amendment effective date for proration. |
 | D | Change the proration formula. |
 
 Recommendation: **A**.
 
-**Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, always price from `action_date`; C, always price from `customer_acceptance_date`; D, change the proration formula. A future first-slice writer, if S5 is separately authorized, sets `price_as_of = EFFECTIVE_DATE` on every line it prices. Option D reopens an Accepted ADR. This frame does not adopt D.
+**Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, always look up rates as of `action_date`; C, always look up rates as of `customer_acceptance_date`; D, change the proration formula. A rate lookup override does not alter the proration effective date. A future first-slice writer, if S5 is separately authorized, sets `price_as_of = EFFECTIVE_DATE` on every line it prices. Option D reopens an Accepted ADR. This frame does not adopt D.
 
 **Fork D2 — Service activation and customer acceptance.**
 
@@ -538,7 +538,7 @@ Recommendation: **A**.
 
 ### Owner decision needed
 
-Confirm D1 through D6. D1 is the commercial choice (which date prices). D3's approval thresholds stay on S3 and are not decided here. Any option other than A on D3, D4, or D6 is a migration. Option D on D1 reopens the Accepted proration ADR.
+Confirm D1 through D6. D1 is the commercial choice of rate lookup date, with the amendment effective date retained for proration. D3's approval thresholds stay on S3 and are not decided here. Any option other than A on D3, D4, or D6 is a migration. Option D on D1 reopens the Accepted proration ADR.
 
 ### Dependencies
 
@@ -546,7 +546,7 @@ Accepted proration ADR (input only; `adr-amendment-proration-formula.md` D-01). 
 
 ### What it unblocks
 
-A later S5 or S3 story can read the date columns in `V1_7__contract_documents.sql` and can name `contract_effective_date` as the proration input when `price_as_of` is `EFFECTIVE_DATE`, without reopening the formula. It does not unblock a quote-request change, a rate-period migration, a backdating approval flow, retroactive one-time periods, or ARR reporting.
+A later S5 or S3 story can read the date columns in `V1_7__contract_documents.sql` and can name `contract_effective_date` as the proposed first-slice proration input independently of the rate lookup date, without reopening the formula. It does not unblock a quote-request change, a rate-period migration, a backdating approval flow, retroactive one-time periods, or ARR reporting.
 
 ---
 
