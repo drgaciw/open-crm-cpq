@@ -17,6 +17,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +33,28 @@ class ServiceSchemaIsolationIntegrationTest {
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("opencrm");
 
+    /** Flyway versions applied to schema contract. Count is this list, not a floor. */
+    private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
+            "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10");
+
+    /** Every base table in schema contract, including the two created by V1_10. */
+    private static final List<String> CONTRACT_TABLES = List.of(
+            "amendment_application_units",
+            "amendment_commercial_envelopes",
+            "amendment_document_events",
+            "amendment_document_lines",
+            "amendment_document_revisions",
+            "amendment_documents",
+            "amendment_operation_receipts",
+            "applied_quote_acceptances",
+            "contracts",
+            "flyway_schema_history",
+            "outbox_events",
+            "processed_events",
+            "renewal_eligibility_publications",
+            "subscription_rate_periods",
+            "subscriptions");
+
     // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
     // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
     private static final List<Service> SERVICES = List.of(
@@ -40,8 +64,10 @@ class ServiceSchemaIsolationIntegrationTest {
             new Service("approval-routing", "approval", "approval_requests", 9),
             new Service("document-generation", "document", "document_generation_jobs", 4),
             // V1_1 to V1_5 as above, V1_6 rate schedule, V1_7 contract documents, V1_7_1 renewal receipts,
-            // V1_7_2 frozen line membership, V1_8 header backfill functions
-            new Service("contract-asset-management", "contract", "subscriptions", 10));
+            // V1_7_2 frozen line membership, V1_8 header backfill functions,
+            // V1_10 unpriced revision storage (S3). That file is one Flyway version and creates two tables.
+            // V1_9 stays reserved for the S4 apply ledger and is not in the directory.
+            new Service("contract-asset-management", "contract", "subscriptions", CONTRACT_MIGRATION_VERSIONS.size()));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {
@@ -71,6 +97,9 @@ class ServiceSchemaIsolationIntegrationTest {
                         "SELECT count(*) FROM flyway_schema_history WHERE success AND type = 'SQL'")) {
                     assertThat(result.next()).isTrue();
                     assertThat(result.getInt(1)).isEqualTo(service.migrations());
+                }
+                if ("contract".equals(service.schema())) {
+                    assertContractInventory(statement);
                 }
             }
         }
@@ -120,6 +149,27 @@ class ServiceSchemaIsolationIntegrationTest {
             assertThatThrownBy(() -> flyway(service, config).migrate())
                     .isInstanceOf(FlywayException.class).hasMessageContaining("non-empty");
         }
+    }
+
+    private static void assertContractInventory(Statement statement) throws Exception {
+        List<String> versions = new ArrayList<>();
+        try (var result = statement.executeQuery(
+                "SELECT version FROM flyway_schema_history WHERE success AND type = 'SQL' ORDER BY installed_rank")) {
+            while (result.next()) {
+                versions.add(result.getString(1));
+            }
+        }
+        assertThat(versions).containsExactlyElementsOf(CONTRACT_MIGRATION_VERSIONS);
+        assertThat(versions).doesNotContain("1.9");
+        List<String> tables = new ArrayList<>();
+        try (var result = statement.executeQuery(
+                "SELECT table_name FROM information_schema.tables "
+                        + "WHERE table_schema = 'contract' AND table_type = 'BASE TABLE' ORDER BY table_name")) {
+            while (result.next()) {
+                tables.add(result.getString(1));
+            }
+        }
+        assertThat(tables).containsExactlyElementsOf(CONTRACT_TABLES);
     }
 
     private static void createDatabase(String name) throws Exception {
