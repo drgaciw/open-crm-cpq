@@ -8,7 +8,7 @@
 
 **Relations read the same day:** [DRG-552](https://linear.app/drgamtd-workspace/issue/DRG-552) (related), [DRG-607](https://linear.app/drgamtd-workspace/issue/DRG-607) (related), [DRG-600](https://linear.app/drgamtd-workspace/issue/DRG-600) (related). Not re-fetched after that read.
 
-Accepting this note authorizes no code, migration, flag or deploy. DRG-575 stays In Review until the owner merges. DRG-600 stays blocked and out of scope. This file does not make DRG-575 Done.
+Accepting this note authorizes no code, migration, flag or deploy. The recorded DRG-575 read was Backlog; the intended move to In Review belongs to the issue owner and is not performed or claimed by this note. DRG-600 stays blocked and out of scope. This file does not make DRG-575 Done.
 
 ## How to read this frame
 
@@ -27,7 +27,7 @@ Boundaries that stay as they are:
 - OQ7's thin contract is unchanged. Read: [s7-v1-8-header-backfill.md](../s7-v1-8-header-backfill.md) ("Adopted default, first slice only") and the header comment of `backend/services/contract-asset-management/src/main/resources/db/migration/V1_8__contract_header_backfill.sql`: one thin contract per existing subscription, no synthetic amendment history, no retroactive events. The register row for OQ7 still says **DEFAULT PROPOSED** for the slice (read). This note does not edit that row and does not regroup contracts.
 - S3 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) is not authorized. Read: the OQ6 row of the register. S6 is not authorized. Read: the OQ5 row and section 9 of the partial-apply record. This frame defines no event type, topic, registry entry, or outbox contract, and it does not start S3.
 - The [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609) design in [story-drg-609-pricing-service-continuation-design.md](story-drg-609-pricing-service-continuation-design.md) is a design proposal. Read: its status paragraph. It is not an ADR and it is not accepted. Pricing amounts and the SaaS conversion price in this note are pending that design. This frame does not amend that design and does not specify a pricing call. ADR-017 is not the authority for one.
-- [DRG-600](https://linear.app/drgamtd-workspace/issue/DRG-600) (automatic CRM re-forecast) stays blocked and out of scope. Linear status when read on 2026-10-17: Backlog. The issue text says the capability is outside S1–S8 and needs a new integration event. This frame does not design that event, does not push a forecast, and does not report the bridge to CRM. DRG-575 stays In Review until the owner merges.
+- [DRG-600](https://linear.app/drgamtd-workspace/issue/DRG-600) (automatic CRM re-forecast) stays blocked and out of scope. Linear status when read on 2026-10-17: Backlog. The issue text says the capability is outside S1–S8 and needs a new integration event. This frame does not design that event, does not push a forecast, and does not report the bridge to CRM. The recorded DRG-575 read was Backlog; the intended move to In Review belongs to the issue owner and is not performed or claimed by this note.
 
 ## Problem
 
@@ -120,14 +120,15 @@ Cluster A is draft PR [#650](https://github.com/drgaciw/open-crm-cpq/pull/650). 
 
 ## Owner-decision table
 
-Every row is **Proposed, unaccepted, owner decision required.** The default is the choice this note would use if the owner later adopts it. Alternatives are written in the same row. None of them is accepted by this file. No row adds a column, a migration, a flag, or a deploy. Fork T1 does not decide the writer: "computed at pricing time on a future pricing response" is an option, and it implies a pricing-service contract change that needs its own owner decision. Forks D2 and H1 are business-policy forks. DRG-575 stays In Review. DRG-600 stays blocked and out of scope.
+Every row is **Proposed, unaccepted, owner decision required.** The default is the choice this note would use if the owner later adopts it. Alternatives are written in the same row. None of them is accepted by this file. No row adds a column, a migration, a flag, or a deploy. Fork T1 does not decide the writer: "computed at pricing time on a future pricing response" is an option, and it implies a pricing-service contract change that needs its own owner decision. Forks D2 and H1 are business-policy forks. This note does not change DRG-575's recorded workflow status. DRG-600 stays blocked and out of scope.
 
 | Fork | Question | Recommendation | Default | Alternatives |
 |---|---|---|---|---|
 | D1 | Disposition vocabulary | A. The ticket's three values, as their own field | Proposed, unaccepted, owner decision required. `renewalDisposition` is `Renew`, `NonRenew`, or `Replace`. It is not `quantity_semantics` `REPLACE` and not a new category | B. Only `Renew` and `NonRenew`. C. Store the dropped line as action `REMOVE`. D. Add category `NON_RENEWAL` (migration; contradicts Cluster E L4) |
 | D2 | Business policy — NonRenew treatment | A. Stays an option for the owner. A renewal-time disposition with no credit and no termination fee from this field | Proposed, unaccepted, owner decision required. Business policy. `NonRenew` is not action `REMOVE`. This disposition writes no credit and no termination fee. Cluster A 550-F2 and 594-F1 stay as they are. This row does not adopt the policy | B. `NonRenew` still runs the Remove credit and termination-fee policies. C. `NonRenew` is action `REMOVE` with credit policy `NoCredit` |
 | H1 | Business policy — churn treatment | A. Stays an option for the owner. Removed ARR on a `NonRenew` line is `churn`. A conversion is not also `churn` | Proposed, unaccepted, owner decision required. Business policy. Removed ARR on a `NonRenew` line is the `churn` component. A conversion movement stays on `conversion` and is not also stored as `churn` (fork C1). Scenario 4's −$3,000 label is that label and is not recomputed. This row does not adopt the policy | B. A non-renewal is not reported as churn. C. The ended side of a conversion is `churn`, and the new line is new business. D. Every negative ARR movement, including a downsell, is `churn` |
-| D3 | What `Replace` means | A. The commercial relationship continues, so the line is not churn plus a new logo | Proposed, unaccepted, owner decision required. `Replace` is the disposition when a successor SKU continues the relationship. The money bucket is F3. This default does not enable a first-slice action | B. `Replace` is `NonRenew` of the old SKU plus `crossSell` of the new SKU. C. Leave `Replace` out of this decision until DRG-576 |
+| D3 | What `Replace` means | A. The commercial relationship continues, so the line is not churn plus a new logo | Proposed, unaccepted, owner decision required. `Replace` is the disposition when a successor SKU continues the relationship. The money classification is the new R1 fork, not the fixed Scenario 4 list in F3. This default does not enable a first-slice action | B. `Replace` is `NonRenew` of the old SKU plus `crossSell` of the new SKU. C. Leave `Replace` out of this decision until DRG-576 |
+| R1 | Money classification for Replace | A. Leave uncomputed until accepted | Proposed, unaccepted, owner decision required. No implicit bucket from F3; classification and any quantity/unit map remain open | B. Comparable ARR delta entirely in priceEffect. C. Accepted mapped price/quantity split (F4). Both preserve zero churn/crossSell for the continued relationship. |
 | D4 | When the disposition is null | A. Null off a renewal; on a renewal a dropped line is `NonRenew` | Proposed, unaccepted, owner decision required. Null when the line is not on a renewal change. On a renewal, a line that continues is `Renew` or `Replace`, and a line that is not renewed is `NonRenew`. A conversion line stays null | B. Required on every line. C. Null means "not renewed" |
 | C1 | How a conversion stays out of churn plus new business | A. One component holds the movement | Proposed, unaccepted, owner decision required. The arriving line stores the movement on `conversion` only. Source lines store `churn` 0 and `crossSell` 0. The new amount is not also stored as new business. The price of that movement is pending DRG-609 (not accepted) | B. Ended on-prem ARR is `churn` and the new SaaS ARR is new business. C. Maintenance is `churn` and the SaaS line is `conversion` |
 | C2 | Which figure `conversion` holds | A. Leave the figure unset | Proposed, unaccepted, owner decision required. This frame does not choose a figure. Cluster B and the unaccepted DRG-609 design own the price. The sanity check's illustrative parity ARR, year-1 net, and maintenance ARR are not selected and not recomputed | B. The new line's parity ARR. C. Year-1 net after credits. D. The delta of new ARR against prior maintenance ARR |
@@ -138,9 +139,9 @@ Every row is **Proposed, unaccepted, owner decision required.** The default is t
 | F5 | Cross-sell money versus the one category | A. The bridge distinguishes the money; the category stays singular | Proposed, unaccepted, owner decision required. ARR of a product the customer did not hold is `crossSell`. A quantity change on a held SKU is `qtyEffect`. The line still has one `business_category`, including whatever Cluster E L4 would store. This fork does not change L4 | B. `crossSell` is allowed only when the category is already `CROSS_SELL`. C. A quantity increase on a held SKU is `crossSell` |
 | F6 | List-reprice visibility | A. Do not name a flag in this frame | Proposed, unaccepted, owner decision required. The sanity check says List mode dropping a prior discount needs a visible marker. The marker's name is not in DRG-575. This frame names no field. The money stays `priceEffect` under F3 | B. Add a named boolean on the line (name still an owner choice, and a migration). C. Encode the dropped discount only as category text |
 | F7 | Document rollup versus the line bridge | A. The bridge is per line. `arr_delta` stays the document column it already is | Proposed, unaccepted, owner decision required. Components are stored per line when a later story writes them. `amendment_documents.arr_delta` in `V1_7__contract_documents.sql` is not redefined as their sum. This frame adds no document rollup | B. Persist a document-level sum of each component. C. Treat `arr_delta` as that sum |
-| T1 | Where the bridge is computed | Not a decision of this note. "Computed at pricing time on a future pricing response" is an option only | Proposed, unaccepted, owner decision required. Option, not a decision: computed at pricing time on a future pricing response. That option implies a pricing-service contract change, because the pricing response would carry the bridge. That contract change needs its own owner decision. This note does not make it and does not accept the DRG-609 design. DRG-575 stays In Review. DRG-600 stays blocked and out of scope | B. A later reporting or CRM job (DRG-600), which stays blocked and out of scope. C. Quote-service computes the bridge after prices return. D. The seller types the components. E. Leave the bridge uncomputed until that separate pricing-service contract decision |
+| T1 | Where the bridge is computed | Not a decision of this note. "Computed at pricing time on a future pricing response" is an option only | Proposed, unaccepted, owner decision required. Option, not a decision: computed at pricing time on a future pricing response. That option implies a pricing-service contract change, because the pricing response would carry the bridge. That contract change needs its own owner decision. This note does not make it and does not accept the DRG-609 design. This note does not change DRG-575's recorded workflow status. DRG-600 stays blocked and out of scope | B. A later reporting or CRM job (DRG-600), which stays blocked and out of scope. C. Quote-service computes the bridge after prices return. D. The seller types the components. E. Leave the bridge uncomputed until that separate pricing-service contract decision |
 | T2 | Reprice and a manual override | A. Only if the owner later chooses the T1 option: the pricing response replaces the bridge on the new revision | Proposed, unaccepted, owner decision required. Quote-service does not recompute the bridge. This row does not decide T1. If the owner later chooses the pricing-time option, a reprice writes the new revision's bridge and leaves the previous revision's bridge as it was. That option implies a pricing-service contract change that needs its own owner decision. A manual override is outside this default | B. Quote-service recomputes on every read. C. A manual override recomputes in the same edit. D. A manual override marks the bridge stale and does not recompute |
-| T3 | An unpriced draft | A. Null until a pricing response writes the bridge | Proposed, unaccepted, owner decision required. A line with no pricing trace has a null bridge. Zeros are not written to stand in for "not priced" | B. Write zeros on every draft. C. Omit the object and also omit `renewalDisposition` until execute |
+| T3 | An unpriced draft | A. Null until the selected writer completes a valid bridge for the current revision | Proposed, unaccepted, owner decision required. An uncomputed bridge is null until the T1-selected writer completes valid computation for the current revision. Zeros never stand in for "not computed"; this rule is independent of whether a pricing response is the writer | B. Write zeros on every draft. C. Omit the object and also omit `renewalDisposition` until execute |
 
 ## Forks
 
@@ -190,13 +191,25 @@ Recommendation: **A**, as an option for the owner. Proposed, unaccepted, owner d
 
 | Option | Meaning |
 |---|---|
-| A | `Replace` means the commercial relationship continues. The movement is not churn plus a new logo. Which component holds a price difference is F3, and F3's default uses `priceEffect` when the owner treats the relationship as continued. |
+| A | `Replace` means the commercial relationship continues. The movement is not churn plus a new logo. The money classification is R1 below. F3 only maps the fixed Scenario 4 labels and does not define a Replace case. |
 | B | The old SKU is `NonRenew` (`churn`) and the new SKU is `crossSell`. |
 | C | `Replace` waits for DRG-576. This decision does not include it. |
 
 Recommendation: **A**.
 
 **Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, `NonRenew` plus `crossSell`; C, defer `Replace` to DRG-576. DRG-576's body was not re-read. **Unverified.** This default does not add an action code and does not authorize a first-slice `RENEW` submit.
+
+### R1 — Money classification for a continuing successor SKU
+
+This is a separate unresolved fork. D3-A means the commercial relationship continues; it does not by itself classify the ARR difference.
+
+| Option | Meaning |
+|---|---|
+| A | Leave the Replace bridge uncomputed until an owner accepts its classification and any quantity/unit mapping needed for comparable ARR. |
+| B | Classify the entire comparable annualized ARR delta as `priceEffect`, with `churn` and `crossSell` zero for the continued relationship. This loses any quantity split. |
+| C | Split `priceEffect` and `qtyEffect` using a separately accepted quantity/unit map and split order (F4), with `churn` and `crossSell` zero. |
+
+**Recommendation and default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, all comparable delta in priceEffect; C, an accepted mapped price/quantity split. F3 supplies neither rule. No Replace rollup is produced under A, and this note chooses no successor price or mapping.
 
 ### D4 — When the field is null
 
@@ -356,7 +369,7 @@ The DRG-609 design note, read, describes how pricing-service could price Add, Up
 
 This note does not pick A. Proposed, unaccepted, owner decision required.
 
-**Default:** Proposed, unaccepted, owner decision required. Option, not a decision: computed at pricing time on a future pricing response. Alternatives: B, a later CRM or reporting job, and DRG-600 stays blocked and out of scope; C, quote-service as a second calculation; D, seller entry; E, leave the bridge uncomputed until the pricing-service contract has its own owner decision. No flag is turned on. No route is added. ADR-017 does not authorize a call. DRG-575 stays In Review.
+**Default:** Proposed, unaccepted, owner decision required. Option, not a decision: computed at pricing time on a future pricing response. Alternatives: B, a later CRM or reporting job, and DRG-600 stays blocked and out of scope; C, quote-service as a second calculation; D, seller entry; E, leave the bridge uncomputed until the pricing-service contract has its own owner decision. No flag is turned on. No route is added. ADR-017 does not authorize a call. This note does not change DRG-575's recorded workflow status.
 
 ### T2 — Reprice and override
 
@@ -371,27 +384,27 @@ Recommendation: **A**.
 
 **Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, recompute on read; C, an override recomputes immediately; D, an override marks the bridge stale. This default describes a reprice only if the owner later chooses the T1 option. T1 is an option, not a decision, and it implies a pricing-service contract change that needs its own owner decision. OQ6's revision rule, as the register records it, clears pricing pins when a pre-execution revision is superseded. This fork does not change OQ6 and does not start S3. The register's OQ6 row was read. The OQ6 decision file was not re-opened. **Unverified** beyond the register row.
 
-### T3 — Unpriced draft
+### T3 — Uncomputed bridge, independent of writer
 
 | Option | Meaning |
 |---|---|
-| A | Null bridge until a pricing response writes one. |
+| A | Null bridge until the T1-selected writer completes a valid computation for this revision, whether pricing, reporting, quote-service or another accepted writer. T1-E leaves it null. |
 | B | Zeros on every new draft. |
 | C | The field is absent until execute, and so is `renewalDisposition`. |
 
 Recommendation: **A**.
 
-**Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, zeros; C, both fields absent until execute. Zeros would read as a computed bridge of no movement. "A pricing response writes one" is the T1 option, not a decision, and that option implies a pricing-service contract change that needs its own owner decision. This default does not reject or accept a document. S3 is not authorized.
+**Default:** A. Proposed, unaccepted, owner decision required. Alternatives: B, zeros; C, both fields absent until execute. Zeros would read as a computed bridge of no movement. The selected writer is still the T1 owner decision. If T1-A is chosen, the pricing response supplies it; B/C/D may supply it under their own accepted contracts, and E keeps it null. Absence of a pricing response does not invalidate another accepted writer's completed bridge. This default does not reject or accept a document. S3 is not authorized.
 
 ## Ticket status
 
-DRG-575 stays In Review until the owner merges. This note does not make it Done.
+The recorded DRG-575 read was Backlog; the intended move to In Review belongs to the issue owner and is not performed or claimed by this note. This note does not make it Done.
 
 DRG-600 stays blocked and out of scope. This note does not design a CRM re-forecast, a reporting push, or an integration event.
 
 ## What an owner decision would still not start
 
-An owner choice among these forks is input to a later story. Accepting this note authorizes no code, migration, flag or deploy. DRG-575 stays In Review. DRG-600 stays blocked and out of scope.
+An owner choice among these forks is input to a later story. Accepting this note authorizes no code, migration, flag or deploy. This note does not change DRG-575's recorded workflow status. DRG-600 stays blocked and out of scope.
 
 It does not:
 
