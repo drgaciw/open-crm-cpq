@@ -1,6 +1,14 @@
 spring:
   application:
     name: ai-service
+  # The API-key Spring AI client does not use Azure 5.8's Boot 3 credential bootstrap.
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
   threads:
     virtual:
       enabled: true
