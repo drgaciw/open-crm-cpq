@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class PriceBookOutboxWiringTest {
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withInitScript("db/init-test.sql");
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
