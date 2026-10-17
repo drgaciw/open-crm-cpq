@@ -180,7 +180,7 @@ The D-R5 row says Downgrade → `MODIFY` → "REVOKE or cap at the effective dat
 
 | Option | Content |
 |---|---|
-| A | A later specification may assume `REVOKE` and `REGENERATE` are non-compensatable, which the reconcile text permits. The source sentence is Proposed ADR-027 D-02. Assuming the class does not accept ADR-027. `PROVISION`, `MODIFY`, `SUSPEND`, `RESUME`, and reserved `EXTEND` are not given a class in this frame. |
+| A | A later specification may assume `REVOKE` and `REGENERATE` are non-compensatable, which the reconcile text permits. The explicit classification is in Accepted `adr-reconcile-adr-024-027.md` D-R5: "`REVOKE` and `REGENERATE` are non-compensatable" and "DRG-578 may assume that classification." ADR-027 D-02 defines the generic dispatch point of no return; it does not name those operations. Using the Accepted classification does not accept ADR-027. `PROVISION`, `MODIFY`, `SUSPEND`, `RESUME`, and reserved `EXTEND` are not given a class in this frame. |
 | B | Every request has a compensation. That is DRG-466's acceptance text. DRG-466 stays a dependency. This option does not decide an event or a transport. |
 | C | Accept ADR-027 as part of this frame. |
 
@@ -190,11 +190,11 @@ The D-R5 row says Downgrade → `MODIFY` → "REVOKE or cap at the effective dat
 
 | Option | Content |
 |---|---|
-| A | No fulfilment request is dispatched under this option. Units that have already committed stay committed (OQ5 option A). SaaS units on the same document are unchanged. No commitment state is assigned. The waiting label, if any, waits on fork S1. |
+| A | No fulfilment request is dispatched for the unmapped line. When the missing mapping prevents its unit from committing, that unit is `BLOCKED`; the document is `APPLY_BLOCKED` if no unit committed, or `PARTIALLY_APPLIED` if an earlier unit committed (OQ5 option A). Already committed units, including SaaS units, remain applied. These are unit/document outcomes, not commitment states; no S1 commitment state is assigned. |
 | B | The whole document is blocked, including committed SaaS units. |
 | C | Dispatch `PROVISION` for an unmapped product. |
 
-**Recommendation:** A. **Default:** A. **Alternatives:** B, C. **Status of this default:** Proposed, unaccepted, owner decision required. DRG-465 says an unmapped product blocks the order. A narrows that block so it does not undo a committed unit, and it assigns no commitment state. B conflicts with OQ5 option A. C hides a missing rule.
+**Recommendation:** A. **Default:** A. **Alternatives:** B, C. **Status of this default:** Proposed, unaccepted, owner decision required. DRG-465 says an unmapped product blocks the order. A retains the failed unit and document outcomes while preserving committed units; it assigns no commitment state. A failure discovered only after that same unit committed must preserve the committed fact and use the later correcting-change path in C3, rather than rewrite the unit as never applied. B conflicts with OQ5 option A. C hides a missing rule.
 
 #### F7 — Where evidence goes
 
@@ -406,7 +406,7 @@ Every row is Proposed, unaccepted, owner decision required. The owner confirms o
 | F3 Downgrade | A. Quantity-only caps; SKU replacement waits on DRG-576 | B Whole-entitlement `REVOKE`. C No Downgrade emitter at all | Proposed, unaccepted, owner decision required |
 | F4 Decomposition key | A. `(licenseModel, action_code)`; relationship type optional | B Relationship type required now. C `DealType` selects the operation | Proposed, unaccepted, owner decision required |
 | F5 Compensatability | A. Assume `REVOKE` and `REGENERATE` non-compensatable without accepting ADR-027 | B Every request compensated (DRG-466; event and transport not decided). C Accept ADR-027 here | Proposed, unaccepted, owner decision required |
-| F6 Unmapped on-prem line | A. No dispatch; no commitment state assigned | B Block the whole document. C Dispatch `PROVISION` anyway | Proposed, unaccepted, owner decision required |
+| F6 Unmapped on-prem line | A. No dispatch; uncommitted failed unit `BLOCKED`; document `APPLY_BLOCKED` or `PARTIALLY_APPLIED` under OQ5; committed units preserved; no commitment state assigned | B Block the whole document. C Dispatch `PROVISION` anyway | Proposed, unaccepted, owner decision required |
 | F7 Evidence | A. CAM would write commercial state; no command added | B Fulfilment component writes status | Proposed, unaccepted, owner decision required |
 | F8 Revocation outside conversions | A. One `REVOKE`; DRG-574 would call it only after its own acceptance | B A second revocation mechanism. C Specify the DRG-574 payload here | Proposed, unaccepted, owner decision required |
 | F9 When `REVOKE` is submitted | A. Leave partial-apply question 4 open | B Same step as `PROVISION`. C Delay recording until the window ends | Proposed, unaccepted, owner decision required |
