@@ -196,7 +196,7 @@ Entitlement resolution under every option is pending the DRG-609 design (not acc
 
 ### What it unblocks
 
-An owner decision on 592-F1 through 592-F6 is the input to a later schema increment. It does not start S3, authorize S6, or change `V1_7__contract_documents.sql`. DRG-607 can cite this frame. The frame stays Proposed, unaccepted, owner decision required.
+An owner decision on 592-F1 through 592-F6 is the input to a later schema increment. It does not start S3, authorize S6, or change `V1_7__contract_documents.sql`. DRG-607 can cite this accepted documentation frame. The individual forks stay Proposed, unaccepted, owner decision required.
 
 ---
 
