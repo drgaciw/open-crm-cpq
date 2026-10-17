@@ -137,6 +137,12 @@ The adopted rule uses 409 `IMMUTABLE_EXECUTED` after execution. It says CAM retu
 
 `OUT_FOR_SIGNATURE` follows the adopted rule: the slice does not void an envelope, and the command returns 409.
 
+### Required commercial state on the proposed CAM request
+
+The request carries resolved `actionDate`, `contractEffectiveDate`, and `backdatingReasonCode` (the property is required, and its value may be null to clear it). S5 resolves its optional source patch before calling CAM. CAM replaces those header values in the same revision transaction, validates the revised backdating state, and uses that header for the later digest. Other header fields that the source revision API cannot edit stay unchanged.
+
+Each line also requires `businessCategory`, `applyTargetType`, `chargeType`, `priceAsOf`, and `policySlot`, matching the NOT NULL commercial columns with no SQL defaults. These are line structure and hooks, not the pricing pins that are cleared. Existing action, category, source-line and target constraints still apply. No price is accepted from the caller and no undocumented server defaults are invented. All of this remains Proposed, unaccepted, owner decision required.
+
 ### What the draft OpenAPI now proposes
 
 `POST /amendments/{amendmentId}/revisions` (`openAmendmentRevision`) is marked `x-opencrm-status: proposal`. Success is 201: same `provisionalNumber`, document status `DRAFT`, previous revision `statusAtClose` `SUPERSEDED` with its digest kept, new revision `OPEN`, pins cleared, `approvalRef` and `signatureEnvelopeRef` null, `contentDigest` null until a later submit, `amendmentSeq` still null. Replay is 200. The quote-service POST description now says it is not this command.
@@ -194,6 +200,12 @@ The OpenAPI draft records default A on `AmendmentLine`: the three fields are nul
 ### What this unblocks for S3
 
 After the owner resolves that storage gap, accepts default A for pins and for the digest, and separately authorizes DRG-581, S3 can persist the unpriced revision the adopted rule describes. The column change, if accepted, is a new migration in that build. Its number is the next free at build time. This note does not authorize that build or that migration.
+
+### Unpriced current totals
+
+**Proposed default, unaccepted, owner decision required:** set current-header `tcvDelta`, `arrDelta`, `oneTimeTotal`, and `creditTotal` to null when opening an unpriced revision. Preserve the previous frozen revision's evidence. A successful later pricing operation atomically replaces every total with that revision's computed value, pins and trace. Submit and execute require current non-null totals. The OpenAPI response exposes the four fields as required but nullable. The schema addendum records the matching future nullability change; no migration is implemented here.
+
+**Alternative:** an explicit validity state, under its own accepted contract, that prevents stale totals from being used as current. Copying old totals or filling zeroes without validity is not a representation of an unpriced revision. The existing V1_7 NOT NULL columns cannot implement the null default unchanged. This is another S3 design prerequisite, not implementation authorization.
 
 ## Gap 3 — Supersession event
 
@@ -272,6 +284,7 @@ These criteria are proposed ACs, not adopted. The requirements now mark each one
 | 13 | Pin migration, only if default 9 is later accepted | New migration in the S3 build. Number is the next free at build time. Rollback is in the schema addendum. | Proposed, unaccepted, owner decision required | No migration. Reuse V1_7. That alternative is rejected: V1_7 is the existing expand. Reuse V1_9. That alternative is rejected: V1_9 is reserved for S4. This note assigns no number. |
 | 14 | OQ18 digest library | Unconfirmed | Proposed, unaccepted, owner decision required | Confirm `backend/libs/common`, built in S3. Place the library somewhere else. |
 | 15 | S3 / DRG-581 | Not authorized by this note | Separate owner act | Authorize DRG-581. Leave it unstarted. |
+| 16 | Unpriced current totals | Null until successful pricing atomically replaces all four totals; requires a later accepted migration | Proposed, unaccepted, owner decision required | Explicit totals-validity state under a separate accepted contract. No placeholder zeroes or stale prior totals. |
 
 ## What this note does not do
 
