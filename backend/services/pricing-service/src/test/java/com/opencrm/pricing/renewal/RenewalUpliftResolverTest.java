@@ -514,8 +514,73 @@ class RenewalUpliftResolverTest {
         assertThat(result.retentionMarker()).isEqualTo("ENABLE_12M_PRICE_PROTECTION");
     }
 
+    @Test
+    void sameModeReturnsTheRequestExitNetAtUnitScaleWithOneFlatPeriod() {
+        RenewalUpliftResult result = resolver.resolve(request("40.0000", "200", 12, scenarioPins(),
+                account("acct-same", RenewalUpliftMode.SAME, null)));
+
+        assertThat(result.resolution()).isEqualTo(RenewalUpliftResolution.PRICED);
+        assertUnit(result.unitPrice(), "40.0000");
+        assertThat(result.extendedAmount()).isEqualByComparingTo("96000.00");
+        assertThat(result.flatPeriodCount()).isEqualTo(1);
+        assertThat(result.appliedRuleOrPolicyId()).isEqualTo("acct-same");
+        assertThat(result.rulesSuppliedPercent()).isFalse();
+        assertThat(result.exitNet()).isEqualByComparingTo("40.0000");
+    }
+
+    @Test
+    void sameModeIgnoresPercentAndDoesNotInventAPriceWhenExitNetIsMissing() {
+        RenewalUpliftResult priced = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
+                account("acct-same", RenewalUpliftMode.SAME, "7")));
+        assertThat(priced.resolution()).isEqualTo(RenewalUpliftResolution.PRICED);
+        assertUnit(priced.unitPrice(), "40.0000");
+
+        RenewalUpliftResult missing = resolver.resolve(new RenewalUpliftRequest(
+                "USD", null, decimal("1"), 12, scenarioPins(),
+                List.of(account("acct-same", RenewalUpliftMode.SAME, null))));
+        assertThat(missing.resolution()).isEqualTo(RenewalUpliftResolution.UNRESOLVED_BASIS);
+        assertThat(missing.unitPrice()).isNull();
+        assertThat(missing.basisAmount()).isNull();
+
+        RenewalUpliftResult negative = resolver.resolve(request("-1", "1", 12, scenarioPins(),
+                account("acct-same", RenewalUpliftMode.SAME, null)));
+        assertThat(negative.resolution()).isEqualTo(RenewalUpliftResolution.UNRESOLVED_BASIS);
+        assertThat(negative.unitPrice()).isNull();
+    }
+
+    @Test
+    void lineSameBeatsAccountUpliftAndClauseSameBeatsLineUplift() {
+        RenewalUpliftResult lineWins = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
+                rung(RenewalUpliftRungKind.LINE, "line-same", RenewalUpliftMode.SAME, null),
+                account("acct-uplift-7", RenewalUpliftMode.UPLIFT_PCT, "7")));
+        assertThat(lineWins.resolution()).isEqualTo(RenewalUpliftResolution.PRICED);
+        assertUnit(lineWins.unitPrice(), "40.0000");
+        assertThat(lineWins.mode().rung()).isEqualTo(RenewalUpliftRungKind.LINE);
+
+        RenewalUpliftResult clauseWins = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
+                rung(RenewalUpliftRungKind.CLAUSE, "clause-same", RenewalUpliftMode.SAME, null),
+                rung(RenewalUpliftRungKind.LINE, "line-uplift", RenewalUpliftMode.UPLIFT_PCT, "7"),
+                rung(RenewalUpliftRungKind.AGREEMENT, "agr-uplift", RenewalUpliftMode.UPLIFT_PCT, "3")));
+        assertUnit(clauseWins.unitPrice(), "40.0000");
+        assertThat(clauseWins.mode().rung()).isEqualTo(RenewalUpliftRungKind.CLAUSE);
+        assertThat(clauseWins.rulesSuppliedPercent()).isFalse();
+    }
+
+    @Test
+    void sameOutsideANormalizedCapIsAConflictAndIsNotClamped() {
+        RenewalUpliftResult result = resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
+                new RenewalUpliftRung(RenewalUpliftRungKind.LINE, "line-same", RenewalUpliftMode.SAME,
+                        null, null, decimal("-1"), null, Boolean.FALSE, null, null, null, null)));
+
+        assertThat(result.resolution()).isEqualTo(RenewalUpliftResolution.PRICE_PROTECTION_CONFLICT);
+        assertThat(result.unitPrice()).isNull();
+        assertThat(result.capApplied()).isNull();
+        assertThat(result.floorApplied()).isNull();
+        assertThat(result.flatPeriodCount()).isNull();
+    }
+
     @ParameterizedTest
-    @EnumSource(value = RenewalUpliftMode.class, mode = EnumSource.Mode.EXCLUDE, names = "UPLIFT_PCT")
+    @EnumSource(value = RenewalUpliftMode.class, mode = EnumSource.Mode.EXCLUDE, names = {"UPLIFT_PCT", "SAME"})
     void otherModesAreOutsideThisSlice(RenewalUpliftMode mode) {
         assertThatThrownBy(() -> resolver.resolve(request("40.0000", "1", 12, scenarioPins(),
                 account("acct", mode, "7"))))
@@ -685,7 +750,7 @@ class RenewalUpliftResolverTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = RenewalUpliftMode.class, mode = EnumSource.Mode.EXCLUDE, names = "UPLIFT_PCT")
+    @EnumSource(value = RenewalUpliftMode.class, mode = EnumSource.Mode.EXCLUDE, names = {"UPLIFT_PCT", "SAME"})
     void unsupportedModesIgnoreUnusedLowerPercentAndRetentionProvenance(RenewalUpliftMode mode) {
         assertThatThrownBy(() -> resolver.resolve(request("40", "1", 12, scenarioPins(),
                 new RenewalUpliftRung(RenewalUpliftRungKind.CLAUSE, "clause-mode", mode,
@@ -772,6 +837,11 @@ class RenewalUpliftResolverTest {
                 ACTION, "pb-50", new BigDecimal("50.0000"),
                 EFFECTIVE, "pb-52", new BigDecimal("52.0000"),
                 LINE_START, "pb-dec", new BigDecimal("60.0000"));
+    }
+
+    private static RenewalUpliftRung rung(RenewalUpliftRungKind kind, String id, RenewalUpliftMode mode, String percent) {
+        return new RenewalUpliftRung(kind, id, mode, null, decimal(percent),
+                null, null, null, null, null, null, null);
     }
 
     private static RenewalUpliftRung account(String id, RenewalUpliftMode mode, String percent) {
