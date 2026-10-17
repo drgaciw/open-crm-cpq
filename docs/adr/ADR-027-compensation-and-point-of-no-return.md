@@ -1,8 +1,8 @@
 # ADR-027: Compensation, point of no return and exception handling
 
-**Status:** Proposed on 2026-10-04. Not accepted.
+**Status:** Accepted on 2026-10-17. The project owner told, as relayed by the Projects Manager bot on 2026-10-17 at 7:31 AM CT, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644); authorized opening their status-change PRs". The owner's merge of this PR is the confirming act and the status takes effect on merge. This supersedes the "retain their existing statuses" wording of PRs #662 and #663 only for ADR-027.
 **Date:** 2026-10-04
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted).
 **Relates to:** [ADR-025](ADR-025-saga-process-manager.md) (process managers), [ADR-024](ADR-024-order-orchestration-context.md) (order lifecycle and change orders), [ADR-026](ADR-026-command-messages.md) (commands), [ADR-016](ADR-016-identity-authentication-service-trust.md) (actor), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (DLT tooling). Backlog: SAGA-02, SAGA-03, BC-08-03, BC-08-04, BC-15-03.
 **Does not authorize:** any code.
 
