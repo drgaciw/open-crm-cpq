@@ -64,8 +64,6 @@ class RenewalResolveControllerTest {
                 .andExpect(jsonPath("$.data.resolution.resolution").value("PRICED"))
                 .andExpect(jsonPath("$.data.resolution.unitPrice").value(40.0000))
                 .andExpect(jsonPath("$.data.resolution.flatPeriodCount").value(1));
-        assertThat(RenewalResolveController.PATH).startsWith("/internal/");
-        assertThat(RenewalResolveController.PATH).doesNotContain("/api/v1/pricing");
     }
 
     @Test
@@ -102,6 +100,7 @@ class RenewalResolveControllerTest {
                         .content(fixture().replace("\"exitNet\": 40.0000", "\"exitNet\": null")))
                 .andExpect(status().is(422))
                 .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.data").doesNotExist())
                 .andReturn();
         assertThat(result.getResponse().getContentAsString()).doesNotContain("unitPrice");

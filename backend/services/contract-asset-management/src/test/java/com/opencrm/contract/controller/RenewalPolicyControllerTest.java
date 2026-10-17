@@ -140,13 +140,13 @@ class RenewalPolicyControllerTest {
                 null, null, null, "marker-tenant-a", asOf.minusDays(1), null, null);
     }
 
+    /** Returns every tenant's rows for the scope. The GET must still hide tenant A. */
     private static final class MemoryStore implements RenewalPolicyRecords {
         private final List<RenewalPolicyRecord> rows = new ArrayList<>();
 
         @Override
         public List<RenewalPolicyRecord> findScoped(UUID tenantId, RenewalPolicyScopeKind scopeKind, UUID scopeRef) {
             return rows.stream()
-                    .filter(row -> tenantId.equals(row.getTenantId()))
                     .filter(row -> row.getScopeKind() == scopeKind && scopeRef.equals(row.getScopeRef()))
                     .toList();
         }
