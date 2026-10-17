@@ -1,14 +1,14 @@
 # Cluster B — on-prem to SaaS and maintenance: decision frame
 
-**Status:** Proposed. This note records options, a recommendation, and a default for each fork. Merging it leaves every fork Proposed. It does not accept a policy, an ADR, a spec, or a story.
+**Status:** Proposed, unaccepted, owner decision required. This note records options, a recommendation, and a default for each fork. Merging it leaves every fork Proposed, unaccepted, owner decision required. It does not accept a policy, an ADR, a spec, or a story. DRG-573, DRG-574, DRG-556, DRG-559, and DRG-571 stay In Review until the owner merges. They are not Done on merge of this docs frame while code is open.
 **Date:** 2026-10-17.
 **Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642)).
 **Project:** OPEN-CRM-CPQ. Linear team DRG.
 **File role:** one cluster note and one section per ticket. New file only.
 
-**Authorizes:** nothing. Accepting this note authorizes no code, migration, flag, topic, gateway route, or deploy. S6 (RA-50 / [DRG-584](https://linear.app/drgamtd-workspace/issue/DRG-584)) stays unauthorized. S3 (RA-47 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581)) stays unstarted: [#642](https://github.com/drgaciw/open-crm-cpq/pull/642) merged on 2026-10-17 and recorded OQ6, and the OQ6 record still requires separate owner authorization before DRG-581 starts (`oq6-revision-model-owner-decision.md`). The [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609) continuation design stays unaccepted (`story-drg-609-pricing-service-continuation-design.md`).
+**Authorizes:** nothing. No flag or deploy is involved. Accepting this note authorizes no code, migration, flag, topic, gateway route, or deploy. S6 (RA-50 / [DRG-584](https://linear.app/drgamtd-workspace/issue/DRG-584)) stays unauthorized. Where this note relies on OQ6, the merged [#642](https://github.com/drgaciw/open-crm-cpq/pull/642) text is quoted in the cluster note. The [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609) continuation design stays unaccepted (`story-drg-609-pricing-service-continuation-design.md`).
 
-**How to read a default.** The default is the proposed fallback named so a later story has one starting point. It is in force only after the owner confirms that fork. Until then the default prices nothing and changes no schema.
+**How to read a default.** Every default in this file is Proposed, unaccepted, owner decision required. The alternatives sit beside that default. A default prices nothing and changes no schema until the owner decides that fork.
 
 **Illustrative figures.** Scenario 2, 3, and 4 amounts in `../cpq-pricing-policy-sanity-check.md` are example numbers. This note does not adopt 2.5×, 20%, 184/365, or 92/365 as a default.
 
@@ -42,7 +42,7 @@ Closed on `main`, and left closed here:
 - Renewal uplift basis, cap, as-of date, precedence, and unit rounding are the Accepted record in `adr-renewal-uplift-basis-and-precedence.md`. This note does not amend that record.
 - [ADR-035](../adr-035-amendment-document-placement.md) is Accepted for the first-slice schema and audit stories only (S1, S2).
 - OQ5 option A is adopted for the first slice only (`partial-apply-owner-decision.md`). `specs/partial-apply.md` stays unaccepted. S4 and S6 stay unauthorized.
-- OQ6 is recorded for the first slice (`oq6-revision-model-owner-decision.md`, [#642](https://github.com/drgaciw/open-crm-cpq/pull/642)). That record does not start S3.
+- OQ6 reliance is the merged #642 text, quoted here and not paraphrased. From `oq6-revision-model-owner-decision.md` on `main` at merge `3ee3ca0f`: "OQ6 is recorded for the first slice, but this record authorizes no code, schema, migration, flag, topic, gateway route, deploy, or story. S3 / DRG-581 requires separate owner authorization." From the same file, section 5: "It does not authorize S3, S4, S5, S6, S7 or S8. S3 / DRG-581 needs separate owner authorization." From the #642 pull request body, quoted with its emphasis marks: "**S3 / DRG-581 launches only after the owner merges this record.** This draft does not launch it. Even after that merge, S3 cannot start building the digest library before the owner confirms OQ18."
 
 Still Proposed, and not assumed here:
 
@@ -74,21 +74,20 @@ A conversion from perpetual cores plus maintenance to a SaaS metric needs its ow
 
 ### Options, recommendation, and default
 
-Every row is Proposed.
+Every default below is Proposed, unaccepted, owner decision required. Alternatives are written beside the default. Unused-prepaid day count is not a fork: the Accepted proration record already assigns an unused-days credit to DRG-550, and this note does not compute `184/365`.
 
-| Fork | Options | Recommendation | Default |
-|---|---|---|---|
-| Price basis | `SpendParity(multiple)`; `TargetListLessDiscount`; `Override` | `SpendParity` is the named basis for the first customer-facing conversion. The other two stay selectable rungs. | `SpendParity`. The multiple is a required input. A missing multiple leaves the line unresolved. 2.5 is not filled in. |
-| What rounding holds fixed | Hold the rounded unit and let ARR drift; hold the target ARR and let the unit carry the fraction | Hold the rounded unit and store the drift, because the Accepted proration snapshot and the continuation plan both store a unit and derive amounts. | Hold the unit at scale 2 half-up, matching `QuoteContinuationPolicy.money` and the Accepted proration snapshot. ARR is derived. This default does not amend uplift D-05 (renewal unit scale 4) and does not reopen proration. |
-| Credit rows | Unused prepaid only; trade-in only; both; a second copy of the 30% book credit | One credit list that can name `UnusedPrepaid`, `TradeInPctOfBook`, and `Fixed`. The phased 30% credit stays `MigrationCreditPolicy`. | The list is empty until a rung adds a row. Rows are not combined by silence. `MigrationBookPct` is not reimplemented here. |
-| Application target | `FirstInvoice`; `Spread`; `DecliningLine` | `FirstInvoice` when the source maintenance line ends and there is no hybrid pair. `DecliningLine` when `HybridMigrationPolicy` accepts the pair. | `FirstInvoice` for that big-bang shape. `DecliningLine` for a landed hybrid pair. `Spread` is available and is not the default. |
-| Where the quantity map lives | On `ConversionPolicy`; on a catalogue `ProductRelationship`; a pin to a catalogue version | The catalogue row is the source of truth when DRG-576 is confirmed. The priced line stores the version pin. | A conversion line stores a map version pin. No pin leaves the line unresolved. `specs/catalog-model.md` stays a proposal. |
-| Map rounding and minimum | `Down`, `Nearest`, `Up`; a minimum quantity | `Nearest`, half-up to a whole quantity, minimum 1, so an uneven ratio cannot yield zero. | `Nearest`, minimum 1. Scenario 3's 80 × 2 = 160 does not exercise this default. |
-| Credit transfer and expiry | Target agreement only; remainder may return to the source; remainder lives until a named expiry | Consumption is on the target agreement. The source agreement is stored and is not reduced again. | Each row stores source agreement and target agreement. Unused remainder expires at the end of the row's application window. `FirstInvoice` means that invoice. |
-| Price-lock length | A `priceLockMonths` value on this policy; leave length to the price-lock story | The field may exist. The length belongs to DRG-568 and `price-lock-policy-stub.md`. | No lock. The field is unset. An unset lock does not suppress the Accepted renewal uplift. |
-| `ConvertMetric` beside this policy | Fold metric-only changes into `ConversionPolicy`; keep `ConvertMetric` as its own intent | Keep `ConvertMetric` as its own intent. | A metric change that stays on the same licence model does not use `ConversionPolicy`. |
-| Parity ramp | One multiple for the term; a list of year multiples | The ramp is optional and explicit. | `parityRamp` is empty. One multiple covers the term. |
-| Unused-prepaid day count | *(closed)* | The Accepted proration ADR already chooses the day-stub and assigns an unused-days credit to DRG-550. | This policy does not compute `184/365`. An `UnusedPrepaid` row, when a rung adds one, carries an explicit money amount, or it calls the Accepted day-stub where that stub applies to a recurring billing period. DRG-550 remains the home of the credit policy. |
+| Fork | Recommendation | Default, with alternatives beside it |
+|---|---|---|
+| Price basis | `SpendParity` is the named basis for the first customer-facing conversion. | Proposed, unaccepted, owner decision required. Default: `SpendParity`, multiple required, missing multiple leaves the line unresolved, 2.5 is not filled in. Alternatives: `TargetListLessDiscount`; `Override`. |
+| What rounding holds fixed | Hold the rounded unit and store the drift, because the Accepted proration snapshot and the continuation plan both store a unit and derive amounts. | Proposed, unaccepted, owner decision required. Default: hold the unit at scale 2 half-up, matching `QuoteContinuationPolicy.money` and the Accepted proration snapshot; ARR is derived. This default does not amend uplift D-05 and does not reopen proration. Alternatives: hold the target ARR and let the unit carry the fraction. |
+| Credit rows | One credit list that can name `UnusedPrepaid`, `TradeInPctOfBook`, and `Fixed`. The phased 30% credit stays `MigrationCreditPolicy`. | Proposed, unaccepted, owner decision required. Default: the list is empty until a rung adds a row; rows combine only when each row is present; `MigrationBookPct` stays in `MigrationCreditPolicy`. Alternatives: unused prepaid only; trade-in only; both combined by silence; a second copy of the 30% book credit. |
+| Application target | `FirstInvoice` when the source maintenance line ends and there is no hybrid pair. `DecliningLine` when `HybridMigrationPolicy` accepts the pair. | Proposed, unaccepted, owner decision required. Default: `FirstInvoice` for that big-bang shape; `DecliningLine` for a landed hybrid pair. Alternatives: `Spread`; using `DecliningLine` on a big-bang quote whose declining line has ended; using `FirstInvoice` on a landed hybrid pair. |
+| Where the quantity map lives | The catalogue row is the source of truth when DRG-576 is confirmed. The priced line stores the version pin. | Proposed, unaccepted, owner decision required. Default: the priced line stores a map version pin; no pin leaves the line unresolved. `specs/catalog-model.md` stays a proposal. Alternatives: the map lives only on `ConversionPolicy`; the map lives only on a catalogue `ProductRelationship` with no pin on the line. |
+| Map rounding and minimum | `Nearest`, half-up to a whole quantity, minimum 1, so an uneven ratio cannot yield zero. | Proposed, unaccepted, owner decision required. Default: `Nearest`, minimum 1. Scenario 3's 80 × 2 = 160 does not exercise this default. Alternatives: `Down`; `Up`; a minimum other than 1, including no minimum. |
+| Credit transfer and expiry | Consumption is on the target agreement. The source agreement is stored and is not reduced again. | Proposed, unaccepted, owner decision required. Default: each row stores source agreement and target agreement; unused remainder expires at the end of the row's application window; `FirstInvoice` means that invoice. Alternatives: remainder may return to the source; remainder lives until a named expiry later than that window. |
+| Price-lock length | The field may exist. The length belongs to DRG-568 and `price-lock-policy-stub.md`. | Proposed, unaccepted, owner decision required. Default: no lock; the field is unset; an unset lock does not suppress the Accepted renewal uplift. Alternatives: a `priceLockMonths` value chosen on this policy. |
+| `ConvertMetric` beside this policy | Keep `ConvertMetric` as its own intent. | Proposed, unaccepted, owner decision required. Default: a metric change that stays on the same licence model does not use `ConversionPolicy`. Alternatives: fold metric-only changes into `ConversionPolicy`. |
+| Parity ramp | The ramp is optional and explicit. | Proposed, unaccepted, owner decision required. Default: `parityRamp` is empty; one multiple covers the term. Alternatives: a list of year multiples. |
 
 ### Owner decision needed
 
@@ -132,20 +131,20 @@ A perpetual licence does not end by the subscription states Terminated or Expire
 - ADR-024 through ADR-027 remain Proposed. The Accepted reconciliation says on-prem fulfilment can be specified and does not authorize order-service. Revocation does not assume ADR-024's action list.
 - Accepted proration prices a forward stub. It does not end an entitlement.
 - `specs/lifecycle-intents.md` lists `Surrender` as a proposal. `specs/conversions.md` proposes status `Surrendered`. Both files stay proposals.
-- OQ6, recorded by #642, governs document revisions around `EXECUTED`. It does not define entitlement end.
+- OQ6 reliance quotes the merged #642 text in the cluster note. That text is about document revisions. Entitlement end is a fork in this section.
 
 ### Options, recommendation, and default
 
-Every row is Proposed.
+Every default below is Proposed, unaccepted, owner decision required. Alternatives are written beside the default.
 
-| Fork | Options | Recommendation | Default |
-|---|---|---|---|
-| Action on the perpetual line | New action `Surrender`; reuse `Terminate`; reuse `Cancel` | `Surrender` is its own action. | `Surrender`. `Terminate` is the action on the maintenance line's commercial end. |
-| Commitment status | New status `Surrendered`; reuse `Terminated`; reuse `Expired`; reuse `Superseded` from the DRG-558 list | `Surrendered` is distinct from `Terminated` and from `Expired`. | `Surrendered`. DRG-558's proposed list is unchanged until that story absorbs this status. |
-| Entitlement end | One shared end date; a per-line `entitlementEndDate` | The perpetual line stores `entitlementEndDate` separately from the maintenance commercial end. | `entitlementEndDate` is its own line field. Action date, contract effective, service activation, and customer acceptance stay change-level dates. This default does not add a fifth change-level trigger. |
-| Dual-use length | A silent six months from Scenario 3; the landed 1–12 month hybrid cap for every conversion; an explicit date; dual use forbidden on a big-bang conversion | The date is explicit on the line. The 12-month cap stays on the landed hybrid pair. | A surrender line with no `entitlementEndDate` is refused. Six months is not filled in. The hybrid constructor's 12-month cap applies when the quote is a hybrid pair. |
-| When revocation is requested | At pricing time; at maintenance end; a fulfilment request after entitlement end; key revoke inside CPQ | A fulfilment request after `entitlementEndDate`, for DRG-558 to consume. CPQ does not revoke keys. | The change records line id, `entitlementEndDate`, and `convertedFromLineIds`. Quote-service and pricing-service do not call a licence server. S6 is not authorized to carry the request as an event. ADR-024 through ADR-027 are not assumed. |
-| Status during the window | Perpetual stays entitled until `entitlementEndDate` while SaaS is active; perpetual moves to a pending-end state when SaaS starts | Both entitlements stay active until the entitlement end. | Status becomes `Surrendered` at `entitlementEndDate`. SaaS start does not surrender the perpetual line. |
+| Fork | Recommendation | Default, with alternatives beside it |
+|---|---|---|
+| Action on the perpetual line | `Surrender` is its own action. | Proposed, unaccepted, owner decision required. Default: `Surrender`. `Terminate` is the action on the maintenance line's commercial end. Alternatives: reuse `Terminate` on the perpetual line; reuse `Cancel` on the perpetual line. |
+| Commitment status | `Surrendered` is distinct from `Terminated` and from `Expired`. | Proposed, unaccepted, owner decision required. Default: `Surrendered`. DRG-558's proposed list is unchanged until that story absorbs this status. Alternatives: reuse `Terminated`; reuse `Expired`; reuse `Superseded` from the DRG-558 list. |
+| Entitlement end | The perpetual line stores `entitlementEndDate` separately from the maintenance commercial end. | Proposed, unaccepted, owner decision required. Default: `entitlementEndDate` is its own line field. Action date, contract effective, service activation, and customer acceptance stay change-level dates. This default does not add a fifth change-level trigger. Alternatives: one shared end date for commercial end and entitlement end. |
+| Dual-use length | The date is explicit on the line. The 12-month cap stays on the landed hybrid pair. | Proposed, unaccepted, owner decision required. Default: a surrender line with no `entitlementEndDate` is refused; six months is not filled in; the hybrid constructor's 12-month cap applies when the quote is a hybrid pair. Alternatives: a silent six months from Scenario 3; the landed 1–12 month hybrid cap on every conversion; dual use forbidden on a big-bang conversion. |
+| When revocation is requested | A fulfilment request after `entitlementEndDate`, for DRG-558 to consume. CPQ does not revoke keys. | Proposed, unaccepted, owner decision required. Default: the change records line id, `entitlementEndDate`, and `convertedFromLineIds`. Quote-service and pricing-service do not call a licence server. S6 is not authorized to carry the request as an event. ADR-024 through ADR-027 stay Proposed. Alternatives: request revocation at pricing time; request it at maintenance end; revoke the key inside CPQ. |
+| Status during the window | Both entitlements stay active until the entitlement end. | Proposed, unaccepted, owner decision required. Default: status becomes `Surrendered` at `entitlementEndDate`. SaaS start leaves the perpetual line entitled. Alternatives: perpetual moves to a pending-end state when SaaS starts. |
 
 ### Owner decision needed
 
@@ -188,15 +187,15 @@ Sold lines today are recurring subscription lines. A perpetual licence with a se
 
 ### Options, recommendation, and default
 
-Every row is Proposed.
+Every default below is Proposed, unaccepted, owner decision required. Alternatives are written beside the default.
 
-| Fork | Options | Recommendation | Default |
-|---|---|---|---|
-| Where the licence model lives | A `licenseModel` on the sold line (`Perpetual`, `TermLicense`, `Maintenance`, `Subscription`); catalog `ProductType` alone; a separate agreement type | `licenseModel` on the sold line. Catalog type stays the product classification. | Those four values. `isPermanent` is true only when `licenseModel` is `Perpetual`. Any other combination is refused. A SaaS line is `Subscription`. |
-| How maintenance finds its licence | `relatedPerpetualLineId` on the maintenance line; a catalogue `MAINTENANCE_FOR` row alone; both | The sold line stores the instance id. A catalogue row, when DRG-576 is confirmed, authorizes the SKU pair and does not compute the percent. | `relatedPerpetualLineId` is required when `licenseModel` is `Maintenance`. A missing id refuses the line. `specs/catalog-model.md` stays a proposal. |
-| What a renewal may do | Renew maintenance only; renew the perpetual line as well; treat a version-date refresh as a renewal | Renew the maintenance line. Renew a term-licence line when that is what was sold. | The perpetual line may appear as `NoChange`. A commercial `Renew` of a `Perpetual` line is refused. A commercial `Remove` of that line is refused. This default matches the commercial rule RN5 states, and it does not accept `renewal-policy-spec.md`. |
-| Quantity match | Maintenance quantity equals the perpetual quantity; a subset of cores is allowed | The linked maintenance quantity equals the perpetual quantity. | A mismatch is refused. A subset rule is absent until the owner adds one. |
-| Version-date refresh | A fulfilment action on the perpetual line; a maintenance entitlement; left out of this decision | Left out. DRG-558 owns fulfilment actions. | No commercial action on the perpetual line performs a version-date refresh. |
+| Fork | Recommendation | Default, with alternatives beside it |
+|---|---|---|
+| Where the licence model lives | `licenseModel` on the sold line. Catalog type stays the product classification. | Proposed, unaccepted, owner decision required. Default: `Perpetual`, `TermLicense`, `Maintenance`, `Subscription`. `isPermanent` is true only when `licenseModel` is `Perpetual`. Any other combination is refused. A SaaS line is `Subscription`. Alternatives: catalog `ProductType` alone; a separate agreement type. |
+| How maintenance finds its licence | The sold line stores the instance id. A catalogue row, when DRG-576 is confirmed, authorizes the SKU pair and does not compute the percent. | Proposed, unaccepted, owner decision required. Default: `relatedPerpetualLineId` is required when `licenseModel` is `Maintenance`. A missing id refuses the line. `specs/catalog-model.md` stays a proposal. Alternatives: a catalogue `MAINTENANCE_FOR` row alone; both the instance id and `MAINTENANCE_FOR`, with the catalogue row required before the instance id is accepted. |
+| What a renewal may do | Renew the maintenance line. Renew a term-licence line when that is what was sold. | Proposed, unaccepted, owner decision required. Default: the perpetual line may appear as `NoChange`. A commercial `Renew` of a `Perpetual` line is refused. A commercial `Remove` of that line is refused. This default matches the commercial rule RN5 states, and it does not accept `renewal-policy-spec.md`. Alternatives: renew the perpetual line as well; treat a version-date refresh as a renewal. |
+| Quantity match | The linked maintenance quantity equals the perpetual quantity. | Proposed, unaccepted, owner decision required. Default: a mismatch is refused. A subset rule is absent until the owner adds one. Alternatives: a subset of cores is allowed. |
+| Version-date refresh | Left out. DRG-558 owns fulfilment actions. | Proposed, unaccepted, owner decision required. Default: no commercial action on the perpetual line performs a version-date refresh. Alternatives: a fulfilment action on the perpetual line; a maintenance entitlement. |
 
 ### Owner decision needed
 
@@ -233,20 +232,20 @@ There is no single lifecycle change that ends perpetual maintenance, surrenders 
 - `applied_quote_acceptances` has `accepted_quote_id` unique and a single `subscription_id` (`backend/services/contract-asset-management/src/main/resources/db/migration/V1_6__subscription_rate_schedule.sql`). DRG-563 (Backlog) records that one acceptance cannot span the new SaaS subscription and the maintenance subscription.
 - ADR-035 is Accepted for S1 and S2 only. The amendment document lives in contract-asset-management. That acceptance does not authorize a Restructure API.
 - OQ5 option A is adopted for the first slice: one unit per target subscription, no automatic rollback, correcting amendment as the remedy (`partial-apply-owner-decision.md`). Restructure test scenarios stay deferred (`partial-apply-rules-oq5-option-a.md`). `specs/partial-apply.md` stays unaccepted. S4 stays unauthorized.
-- OQ6 is recorded (#642). S3 still needs its own authorization (`oq6-revision-model-owner-decision.md`).
+- OQ6 reliance quotes the merged #642 text in the cluster note, including "S3 / DRG-581 requires separate owner authorization."
 - `specs/lifecycle-intents.md` and `specs/conversions.md` propose intent `Restructure` and `priorAgreementId`. Both stay proposals.
 
 ### Options, recommendation, and default
 
-Every row is Proposed.
+Every default below is Proposed, unaccepted, owner decision required. Alternatives are written beside the default.
 
-| Fork | Options | Recommendation | Default |
-|---|---|---|---|
-| How many commercial changes | One `Restructure` lifecycle change; two quotes plus a manual credit; a new contract that cancels the old one as a separate flow | One `Restructure` intent. | One change. It is a new intent. It is not continuation `AMENDMENT` or `EXPANSION`, because those keep one source line and the accepted unit rate. |
-| Agreement shape | New agreement with `priorAgreementId`; amend the source agreement in place; merge into an existing SaaS agreement | New agreement, `priorAgreementId` required. | `priorAgreementId` points at the source agreement. In-place amend is a different intent. Merge stays with DRG-554 (`specs/co-termination.md`), which is a proposal. |
-| Lines inside the change | Terminate maintenance, surrender perpetual, add SaaS; add SaaS only; only the landed hybrid pair | The three lines, in one change. | Maintenance `Terminate`, perpetual `Surrender`, SaaS `Add` with absolute quantity. The landed hybrid pair stays a hybrid quote and is not rewritten into this intent. |
-| Which credit policy | An unnamed credit; a ref to the DRG-573 policy; only `MigrationCreditPolicy` | `creditPolicyRef` points at the conversion policy. | A `Restructure` with no conversion-policy version is unresolved and is not priced. The 30% hybrid credit stays on the hybrid pair. |
-| Apply shape | All-or-nothing across agreements; separate units under the adopted OQ5 first slice | Name three units (create SaaS, end maintenance, revoke entitlement), create before terminate, remedy by a correcting amendment. | The three units are named. They are not built. This default adds no S4 acceptance criterion. DRG-563's single-subscription ledger remains the gap. S3 and S4 stay unauthorized. |
+| Fork | Recommendation | Default, with alternatives beside it |
+|---|---|---|
+| How many commercial changes | One `Restructure` intent. | Proposed, unaccepted, owner decision required. Default: one change, as a new intent. Continuation `AMENDMENT` and `EXPANSION` keep one source line and the accepted unit rate, so they are the other shapes. Alternatives: two quotes plus a manual credit; a new contract that cancels the old one as a separate flow. |
+| Agreement shape | New agreement, `priorAgreementId` required. | Proposed, unaccepted, owner decision required. Default: `priorAgreementId` points at the source agreement. Alternatives: amend the source agreement in place; merge into an existing SaaS agreement (DRG-554, `specs/co-termination.md`, still a proposal). |
+| Lines inside the change | The three lines, in one change. | Proposed, unaccepted, owner decision required. Default: maintenance `Terminate`, perpetual `Surrender`, SaaS `Add` with absolute quantity. The landed hybrid pair stays a hybrid quote. Alternatives: add SaaS only; only the landed hybrid pair. |
+| Which credit policy | `creditPolicyRef` points at the conversion policy. | Proposed, unaccepted, owner decision required. Default: a `Restructure` with no conversion-policy version is unresolved and is not priced. The 30% hybrid credit stays on the hybrid pair. Alternatives: an unnamed credit; only `MigrationCreditPolicy`. |
+| Apply shape | Name three units (create SaaS, end maintenance, revoke entitlement), create before terminate, remedy by a correcting amendment. | Proposed, unaccepted, owner decision required. Default: the three units are named and are not built. This default adds no S4 acceptance criterion. DRG-563's single-subscription ledger remains the gap. S3 and S4 stay unauthorized under the #642 quotations in the cluster note. Alternatives: all-or-nothing across agreements. |
 
 ### Owner decision needed
 
@@ -264,7 +263,7 @@ Confirm one `Restructure` change, a new agreement with `priorAgreementId`, the t
 | DRG-565 | OQ5 option A is adopted for the first slice. Broader restructure scenarios stay deferred. S4 stays unauthorized. |
 | DRG-341 | Related credit and window. Not a substitute for this intent. |
 | ADR-035 | Authorizes S1 and S2 only. |
-| S3 / DRG-581 | #642 merged. S3 still requires separate owner authorization. This note does not start it. |
+| S3 / DRG-581 | The merged #642 text quoted in the cluster note says "S3 / DRG-581 requires separate owner authorization" and "this record authorizes no code, schema, migration, flag, topic, gateway route, deploy, or story." This note does not start S3. |
 | S6 / DRG-584 | Unauthorized. |
 
 ### What it unblocks
@@ -290,17 +289,16 @@ Maintenance is sold as a percent of the related licence (the sanity check uses 2
 
 ### Options, recommendation, and default
 
-Every row is Proposed. The forward-stub row is closed because proration is already Accepted.
+Every default below is Proposed, unaccepted, owner decision required. Alternatives are written beside the default. The forward partial period is not a fork: when the maintenance line is recurring and has a billing anchor, the Accepted day-stub applies. This note does not compute `92/365` and adds no `Daily` option.
 
-| Fork | Options | Recommendation | Default |
-|---|---|---|---|
-| Basis | Percent of licence net; percent of licence list; a flat amount | Percent of the related licence net, with list as an explicit rung. | `LicenceNet`. The percent is required. A missing percent leaves the line unresolved. 20% is not filled in. |
-| Recalc when the licence quantity or net changes | Yes; No | Yes, so a true-up does not leave maintenance on the old quantity. | `recalcOnLicenceChange = Yes`. A rung may set No, and then the stored annual amount is kept. |
-| Uplift field | Reuse the Accepted renewal uplift percent; a separate maintenance uplift percent | A separate percent on the maintenance policy. SaaS lines in the same change still use the Accepted renewal precedence. | The maintenance line has its own `upliftPct`. If that percent is unset, the line is unresolved. The continuation zero is not applied. This default does not amend uplift D-01. |
-| Precedence for the maintenance fields | The Accepted D-04 rung order; a maintenance-only stack | Use the D-04 order for these fields. | Clause, then line, then agreement, then account, then rules default. Unset fields fall through. The basis enum of D-01 stays the renewal-unit enum. |
-| Reinstatement | Include lapse reinstatement in this decision; leave it off | Leave it off. The three knobs have no safe silent value. | Reinstatement is off. `backMaintenance`, `feePct`, and `maxLapseMonths` stay unset. A lapsed line is not auto-reinstated. A later yes still needs DRG-572 for the one-time charge. |
-| Forward partial period | *(closed)* | The Accepted day-stub applies when the maintenance line is recurring and has a billing anchor. | This policy does not compute `92/365`. It calls the Accepted formula for that partial billing period. It adds no `Daily` option. |
-| Quantity used when recalc is Yes | The linked perpetual quantity (DRG-556 default); a separately entered maintenance quantity | Follow the linked perpetual quantity. | The recomputed quantity equals the perpetual quantity. That depends on the DRG-556 equal-quantity default. |
+| Fork | Recommendation | Default, with alternatives beside it |
+|---|---|---|
+| Basis | Percent of the related licence net, with list as an explicit rung. | Proposed, unaccepted, owner decision required. Default: `LicenceNet`. The percent is required. A missing percent leaves the line unresolved. 20% is not filled in. Alternatives: percent of licence list; a flat amount. |
+| Recalc when the licence quantity or net changes | Yes, so a true-up does not leave maintenance on the old quantity. | Proposed, unaccepted, owner decision required. Default: `recalcOnLicenceChange = Yes`. A rung may set No, and then the stored annual amount is kept. Alternatives: No. |
+| Uplift field | A separate percent on the maintenance policy. SaaS lines in the same change still use the Accepted renewal precedence. | Proposed, unaccepted, owner decision required. Default: the maintenance line has its own `upliftPct`. If that percent is unset, the line is unresolved. The continuation zero is not applied. This default does not amend uplift D-01. Alternatives: reuse the Accepted renewal uplift percent. |
+| Precedence for the maintenance fields | Use the D-04 order for these fields. | Proposed, unaccepted, owner decision required. Default: clause, then line, then agreement, then account, then rules default. Unset fields fall through. The basis enum of D-01 stays the renewal-unit enum. Alternatives: a maintenance-only stack. |
+| Reinstatement | Leave it off. The three knobs have no safe silent value. | Proposed, unaccepted, owner decision required. Default: reinstatement is off. `backMaintenance`, `feePct`, and `maxLapseMonths` stay unset. A lapsed line is not auto-reinstated. A later yes still needs DRG-572 for the one-time charge. Alternatives: include lapse reinstatement in this decision, which still needs those three knobs set by the owner. |
+| Quantity used when recalc is Yes | Follow the linked perpetual quantity. | Proposed, unaccepted, owner decision required. Default: the recomputed quantity equals the perpetual quantity. That depends on the DRG-556 equal-quantity default, which is itself Proposed, unaccepted, owner decision required. Alternatives: a separately entered maintenance quantity. |
 
 ### Owner decision needed
 
@@ -322,11 +320,50 @@ Confirm percent of licence net with a required percent, recalc default Yes, a se
 
 An owner confirmation lets a later maintenance-pricing story use these defaults as its fixture rules, including Scenario 4's split between a maintenance percent and a SaaS uplift once the owner sets the two percents. Confirmation does not seed 20% or 5%. It does not start the true-up policy, DRG-572, the DRG-609 route, or S3.
 
+## Owner-decision table
+
+Every row is a fork. Every default is Proposed, unaccepted, owner decision required. Alternatives sit in the same row as that default. Unused-prepaid day count and the maintenance forward stub are absent because they stay on the Accepted proration record.
+
+| Ticket | Fork | Default | Alternatives beside that default |
+|---|---|---|---|
+| DRG-573 | Price basis | Proposed, unaccepted, owner decision required. `SpendParity`; multiple required; 2.5 is not filled in. | `TargetListLessDiscount`; `Override`. |
+| DRG-573 | What rounding holds fixed | Proposed, unaccepted, owner decision required. Hold the unit at scale 2 half-up and derive ARR. | Hold the target ARR and let the unit carry the fraction. |
+| DRG-573 | Credit rows | Proposed, unaccepted, owner decision required. Empty list until a rung adds a row. `MigrationBookPct` stays in `MigrationCreditPolicy`. | Unused prepaid only; trade-in only; both combined by silence; a second copy of the 30% book credit. |
+| DRG-573 | Application target | Proposed, unaccepted, owner decision required. `FirstInvoice` for a big-bang shape; `DecliningLine` for a landed hybrid pair. | `Spread`; `DecliningLine` on a big-bang quote; `FirstInvoice` on a landed hybrid pair. |
+| DRG-573 | Where the quantity map lives | Proposed, unaccepted, owner decision required. Priced line stores a map version pin; no pin leaves the line unresolved. | Map only on `ConversionPolicy`; map only on a catalogue `ProductRelationship` with no line pin. |
+| DRG-573 | Map rounding and minimum | Proposed, unaccepted, owner decision required. `Nearest`, minimum 1. | `Down`; `Up`; a minimum other than 1, including no minimum. |
+| DRG-573 | Credit transfer and expiry | Proposed, unaccepted, owner decision required. Target agreement consumes the credit; remainder expires at the end of the application window. | Remainder may return to the source; remainder lives until a later named expiry. |
+| DRG-573 | Price-lock length | Proposed, unaccepted, owner decision required. No lock. The field is unset. | A `priceLockMonths` value chosen on this policy. |
+| DRG-573 | `ConvertMetric` beside this policy | Proposed, unaccepted, owner decision required. `ConvertMetric` stays its own intent. | Fold metric-only changes into `ConversionPolicy`. |
+| DRG-573 | Parity ramp | Proposed, unaccepted, owner decision required. `parityRamp` empty; one multiple covers the term. | A list of year multiples. |
+| DRG-574 | Action on the perpetual line | Proposed, unaccepted, owner decision required. `Surrender`. | Reuse `Terminate`; reuse `Cancel`. |
+| DRG-574 | Commitment status | Proposed, unaccepted, owner decision required. `Surrendered`. | Reuse `Terminated`; reuse `Expired`; reuse `Superseded`. |
+| DRG-574 | Entitlement end | Proposed, unaccepted, owner decision required. Per-line `entitlementEndDate`. | One shared end date. |
+| DRG-574 | Dual-use length | Proposed, unaccepted, owner decision required. Explicit `entitlementEndDate`; a missing date is refused. | Silent six months; the 1–12 month hybrid cap on every conversion; dual use forbidden on a big-bang conversion. |
+| DRG-574 | When revocation is requested | Proposed, unaccepted, owner decision required. Fulfilment request after `entitlementEndDate`. | At pricing time; at maintenance end; key revoke inside CPQ. |
+| DRG-574 | Status during the window | Proposed, unaccepted, owner decision required. `Surrendered` at `entitlementEndDate`. SaaS start leaves the perpetual line entitled. | Pending-end state when SaaS starts. |
+| DRG-556 | Where the licence model lives | Proposed, unaccepted, owner decision required. `licenseModel` `Perpetual`, `TermLicense`, `Maintenance`, `Subscription`. `isPermanent` only for `Perpetual`. | Catalog `ProductType` alone; a separate agreement type. |
+| DRG-556 | How maintenance finds its licence | Proposed, unaccepted, owner decision required. `relatedPerpetualLineId` required on a maintenance line. | Catalogue `MAINTENANCE_FOR` alone; both, with the catalogue row required first. |
+| DRG-556 | What a renewal may do | Proposed, unaccepted, owner decision required. Renew maintenance (and a term licence when that was sold). Perpetual line may be `NoChange`. | Renew the perpetual line as well; treat a version-date refresh as a renewal. |
+| DRG-556 | Quantity match | Proposed, unaccepted, owner decision required. Quantities must match. A mismatch is refused. | A subset of cores is allowed. |
+| DRG-556 | Version-date refresh | Proposed, unaccepted, owner decision required. Left out of this decision. | A fulfilment action on the perpetual line; a maintenance entitlement. |
+| DRG-559 | How many commercial changes | Proposed, unaccepted, owner decision required. One `Restructure` change. | Two quotes plus a manual credit; a new contract that cancels the old one as a separate flow. |
+| DRG-559 | Agreement shape | Proposed, unaccepted, owner decision required. New agreement with `priorAgreementId`. | Amend the source agreement in place; merge into an existing SaaS agreement. |
+| DRG-559 | Lines inside the change | Proposed, unaccepted, owner decision required. Maintenance `Terminate`, perpetual `Surrender`, SaaS `Add`. | Add SaaS only; only the landed hybrid pair. |
+| DRG-559 | Which credit policy | Proposed, unaccepted, owner decision required. `creditPolicyRef` to the conversion policy; missing version is unresolved. | An unnamed credit; only `MigrationCreditPolicy`. |
+| DRG-559 | Apply shape | Proposed, unaccepted, owner decision required. Three named units, create before terminate, not built. | All-or-nothing across agreements. |
+| DRG-571 | Basis | Proposed, unaccepted, owner decision required. `LicenceNet`; percent required; 20% is not filled in. | Percent of licence list; a flat amount. |
+| DRG-571 | Recalc when the licence quantity or net changes | Proposed, unaccepted, owner decision required. `recalcOnLicenceChange = Yes`. | No. |
+| DRG-571 | Uplift field | Proposed, unaccepted, owner decision required. Separate maintenance `upliftPct`; unset stays unresolved. | Reuse the Accepted renewal uplift percent. |
+| DRG-571 | Precedence for the maintenance fields | Proposed, unaccepted, owner decision required. Clause, then line, then agreement, then account, then rules default. | A maintenance-only stack. |
+| DRG-571 | Reinstatement | Proposed, unaccepted, owner decision required. Off. The three knobs stay unset. | Include lapse reinstatement in this decision. |
+| DRG-571 | Quantity used when recalc is Yes | Proposed, unaccepted, owner decision required. Equals the linked perpetual quantity. | A separately entered maintenance quantity. |
+
 ## What this frame leaves untouched
 
 - The Accepted proration formula and the Accepted renewal uplift record.
 - ADR-017 and ADR-024 through ADR-027, which remain Proposed.
-- S3 / DRG-581, which #642 did not start.
+- S3 / DRG-581. The merged #642 text quoted in the cluster note says the record authorizes no story and that S3 / DRG-581 requires separate owner authorization.
 - S6 / DRG-584, which stays unauthorized.
 - The DRG-609 design, which stays unaccepted.
 - `specs/conversions.md`, `specs/maintenance.md`, `specs/lifecycle-intents.md`, `specs/catalog-model.md`, `specs/partial-apply.md`, and `renewal-policy-spec.md`, which stay proposals.
