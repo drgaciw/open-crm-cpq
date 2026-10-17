@@ -35,10 +35,13 @@ class ServiceSchemaIsolationIntegrationTest {
     // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
     private static final List<Service> SERVICES = List.of(
             new Service("configuration-engine", "configuration", "configuration_sessions", 4),
-            // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope, V1_7 SKIPPED
-            new Service("approval-routing", "approval", "approval_requests", 7),
+            // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope, V1_7 SKIPPED,
+            // V1_8 superseded status, V1_9 ramp approval binding
+            new Service("approval-routing", "approval", "approval_requests", 9),
             new Service("document-generation", "document", "document_generation_jobs", 4),
-            new Service("contract-asset-management", "contract", "subscriptions", 5));
+            // V1_1 to V1_5 as above, V1_6 rate schedule, V1_7 contract documents, V1_7_1 renewal receipts,
+            // V1_7_2 frozen line membership, V1_8 header backfill functions
+            new Service("contract-asset-management", "contract", "subscriptions", 10));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {
