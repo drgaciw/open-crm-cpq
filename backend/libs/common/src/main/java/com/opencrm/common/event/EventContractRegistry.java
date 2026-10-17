@@ -78,6 +78,11 @@ public final class EventContractRegistry {
             "DiscountApprovalRequired", "pricing-service", KafkaTopics.DISCOUNT_APPROVAL_REQUIRED,
             DiscountApprovalRequiredEvent.class);
 
+    /** Quote owns its schedule binding; pricing keeps sole ownership of the legacy discount event (ADR-018 D9). */
+    public static final EventContract RAMP_APPROVAL_BINDING_CHANGED_V1 = published(
+            "RampApprovalBindingChanged", "quote-service", KafkaTopics.RAMP_APPROVAL_BINDING_CHANGED,
+            DiscountApprovalRequiredEvent.class);
+
     public static final EventContract PRODUCT_RETIRED_V1 = published(
             "ProductRetired", "product-service", KafkaTopics.PRODUCT_STATUS_RETIRED, ProductRetiredEvent.class);
 
@@ -118,6 +123,7 @@ public final class EventContractRegistry {
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             DISCOUNT_APPROVAL_REQUIRED_V1,
+            RAMP_APPROVAL_BINDING_CHANGED_V1,
             PRODUCT_RETIRED_V1,
             PRODUCT_UPDATED_V1,
             BUNDLE_STRUCTURE_CHANGED_V1,

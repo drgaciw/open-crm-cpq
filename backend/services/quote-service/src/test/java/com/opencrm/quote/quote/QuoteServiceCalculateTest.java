@@ -75,7 +75,7 @@ class QuoteServiceCalculateTest {
                 objectMapper,
                 outboxEventPublisher,
                 new CurrentActor("service:quote-service", false),
-                RampScheduleTestSupport.guard(quoteLineItemRepository)
+                RampScheduleTestSupport.guard(quoteLineItemRepository, outboxEventPublisher)
         );
     }
 
@@ -314,7 +314,7 @@ class QuoteServiceCalculateTest {
                                 .discountRate(new BigDecimal("0.2000"))
                                 .discountAmount(new BigDecimal("500.00"))
                                 .finalPrice(new BigDecimal("2000.00"))
-                                .pricedPeriods(periods)
+                                .metadata(Map.of("rampGovernanceEvaluated", true)).pricedPeriods(periods)
                                 .build()))
                 .financialMetrics(PricingFinancialMetricsView.builder()
                         .arr(new BigDecimal("24000.00"))
@@ -400,6 +400,82 @@ class QuoteServiceCalculateTest {
                 .build();
         quote.setId(1L);
         return quote;
+    }
+
+    @Test
+    void acceptedQuoteCannotBeRepriced() {
+        Quote quote = draftQuote();
+        quote.setStatus(QuoteStatus.ACCEPTED);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        assertThatThrownBy(() -> quoteService.calculate(1L)).isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("QUOTE_NOT_EDITABLE");
+        org.mockito.Mockito.verifyNoInteractions(pricingServiceClient, quoteLineItemRepository, outboxEventPublisher);
+    }
+
+    @Test
+    void rampRepricingClearsStalePersistsPeriodsAndPublishesOnlyChangedBindings() {
+        Quote quote = draftQuote(); quote.setDurationInMonths(36); quote.setRampScheduleStale(true);
+        QuoteLineItem line = lineItem(quote, "PROD-SEAT", "SUBSCRIPTION", 50, new BigDecimal("50"));
+        line.setId(5L); line.setBillingFrequency("MONTHLY"); line.setRampSteps(new ArrayList<>());
+        line.getRampSteps().add(absoluteStep(line, 1, 1, "34"));
+        line.getRampSteps().add(absoluteStep(line, 2, 13, "45"));
+        line.getRampSteps().add(absoluteStep(line, 3, 25, "50"));
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of(line));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(quoteMapper.toDto(quote)).thenReturn(QuoteDto.builder().id(1L).build());
+        PricingLineResultView priced = PricingLineResultView.builder().productExternalId("PROD-SEAT").lineItemType("SUBSCRIPTION")
+                .quantity(50).listPrice(new BigDecimal("50")).unitPrice(new BigDecimal("34"))
+                .finalPrice(new BigDecimal("1700")).discountRate(new BigDecimal("0.32"))
+                .discountAmount(new BigDecimal("800"))
+                .pricedPeriods(List.of(period(1, 1, "34", "1700", "20400"),
+                        period(2, 13, "45", "2250", "27000"), period(3, 25, "50", "2500", "30000")))
+                .metadata(Map.of("rampGovernanceEvaluated", true, "rampGovernance", Map.of("governingPeriod", 1, "discountPercent", 32,
+                        "stepDown", false, "reasons", List.of("RAMP_DISCOUNT_THRESHOLD"), "approvalTier", "SALES_VP"))).build();
+        PricingExecuteView response = PricingExecuteView.builder().success(true).approvalState("PENDING").approvalTier("SALES_VP")
+                .lineResults(List.of(priced)).financialMetrics(PricingFinancialMetricsView.builder()
+                        .tcv(new BigDecimal("77400")).acv(new BigDecimal("25800")).arr(new BigDecimal("20400"))
+                        .exitArr(new BigDecimal("30000")).build()).build();
+        when(pricingServiceClient.executePricing(anyMap())).thenReturn(ApiResponse.success(response));
+        Map<String, Object> serverMetadata = priced.getMetadata();
+        priced.setMetadata(Map.of());
+        assertThatThrownBy(() -> quoteService.calculate(1L)).isInstanceOf(com.opencrm.quote.ramp.RampScheduleException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("RAMP_NOT_SUPPORTED");
+        org.mockito.Mockito.verify(quoteRepository, org.mockito.Mockito.never()).save(quote);
+        assertThat(quote.isRampScheduleStale()).isTrue();
+        priced.setMetadata(serverMetadata);
+        quoteService.calculate(1L);
+        String first = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote);
+        assertThat(quote.isRampScheduleStale()).isFalse();
+        assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.pricedPeriods(line)).hasSize(3);
+        assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote).getGoverningPeriod()).isEqualTo(1);
+        quoteService.calculate(1L);
+        org.mockito.Mockito.verify(outboxEventPublisher, org.mockito.Mockito.times(1))
+                .publish(org.mockito.ArgumentMatchers.eq("Quote"), org.mockito.ArgumentMatchers.eq("1"),
+                        org.mockito.ArgumentMatchers.eq(com.opencrm.common.event.EventContractRegistry.RAMP_APPROVAL_BINDING_CHANGED_V1),
+                        org.mockito.ArgumentMatchers.any(com.opencrm.common.event.dto.DiscountApprovalRequiredEvent.class));
+        line.getRampSteps().get(1).setUnitPrice(new BigDecimal("40"));
+        quote.setRampScheduleStale(true);
+        quoteService.calculate(1L);
+        assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote)).isNotEqualTo(first);
+        org.mockito.Mockito.verify(outboxEventPublisher, org.mockito.Mockito.times(2))
+                .publish(org.mockito.ArgumentMatchers.eq("Quote"), org.mockito.ArgumentMatchers.eq("1"),
+                        org.mockito.ArgumentMatchers.eq(com.opencrm.common.event.EventContractRegistry.RAMP_APPROVAL_BINDING_CHANGED_V1),
+                        org.mockito.ArgumentMatchers.any(com.opencrm.common.event.dto.DiscountApprovalRequiredEvent.class));
+        priced.setMetadata(Map.of("rampGovernanceEvaluated", true)); response.setApprovalState("APPROVED"); response.setApprovalTier(null);
+        line.getRampSteps().getFirst().setUnitPrice(new BigDecimal("50"));
+        line.getRampSteps().get(1).setUnitPrice(new BigDecimal("50"));
+        quoteService.calculate(1L);
+        var events = org.mockito.ArgumentCaptor.forClass(com.opencrm.common.event.dto.DiscountApprovalRequiredEvent.class);
+        org.mockito.Mockito.verify(outboxEventPublisher, org.mockito.Mockito.times(3))
+                .publish(org.mockito.ArgumentMatchers.eq("Quote"), org.mockito.ArgumentMatchers.eq("1"),
+                        org.mockito.ArgumentMatchers.eq(com.opencrm.common.event.EventContractRegistry.RAMP_APPROVAL_BINDING_CHANGED_V1), events.capture());
+        assertThat(events.getValue().getApprovalRequired()).isFalse();
+        line.getRampSteps().clear();
+        priced.setPricedPeriods(null);
+        quoteService.calculate(1L);
+        assertThat(line.getPricingWaterfallJson()).isNull();
+        assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote)).isNull();
     }
 
     private static QuoteLineItem lineItem(
