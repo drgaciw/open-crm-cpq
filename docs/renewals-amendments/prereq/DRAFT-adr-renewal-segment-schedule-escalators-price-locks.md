@@ -13,6 +13,22 @@
 
 This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Until that separate pull request merges, DRG-568 stays blocked. This file is not that status change.
 
+## Owner adoption record
+
+Relayed, and to be confirmed by the status-change pull request. This file stays Proposed. It is accepted only after the status-change PR merges; DRG-568 stays blocked until then.
+
+Owner (drg) said at 7:31 AM CT 2026-10-17, as relayed by Projects Manager, that he accepts ADR-017, ADR-024 to 027 and DRG-533 (#644) and authorized the status-change PRs.
+
+That sentence is a relay. The confirming act is the owner's merge of the status-change pull request. This edit is not that pull request, and it does not copy the status line from the open status-change draft [#669](https://github.com/drgaciw/open-crm-cpq/pull/669).
+
+[#663](https://github.com/drgaciw/open-crm-cpq/pull/663), in [delegated-renewals-amendments-decisions-2026-10-17.md](delegated-renewals-amendments-decisions-2026-10-17.md), says ADR-017, ADR-024 to ADR-027, and the DRG-533 proposal are not accepted wholesale. The 7:31 AM CT relay is later than that sentence. Until the status-change pull request merges, the status line at the top of this file stays Proposed, and D-06 of the accepted uplift record still holds: later periods do not grow.
+
+The relay names ADR-017 and ADR-024 to ADR-027. This file does not change their status. On this tree each of those ADRs still says Proposed on 2026-10-04. A status change for any of them is its own pull request.
+
+Number stays none. [docs/adr/README.md](../../adr/README.md) ends at ADR-035. The repo does not assign the next number to this draft. Do not add a catalog row from this edit.
+
+[Definition of Done v0.3](https://app.notion.com/p/3fcf7cb4e4df8133860dcc8613c620eb) items 6 and 23: the options and the scale-4 default are already in "Owner decision needed"; the owner words and the time are the relay above. An ADR counts as accepted only after the owner accepts it and the status-change pull request merges. This file stays Proposed until that merge.
+
 ---
 
 ## Context
@@ -231,6 +247,38 @@ Until the owner accepts this file and the status-change PR merges, D-06 of the u
 
 **Unblocks: DRG-568 only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.**
 
+## Edge-case tests for DRG-532, DRG-568, and DRG-534
+
+[Definition of Done v0.3](https://app.notion.com/p/3fcf7cb4e4df8133860dcc8613c620eb) item 4. This is the list those stories test. It does not change D-03. The rounding default merged in [#644](https://github.com/drgaciw/open-crm-cpq/pull/644) stays scale 4, half-up, compounding on the stored unit. On the 36-month 7% example that default stores year 3 as 49.0017.
+
+A 2026-10-16 escalator-semantics draft recommended carrying each period forward at currency precision and cited the per-step 2 dp series ($49.01), and it left the unrounded $49.00 figure as an open question. That draft conflicts with D-03. It is background. It is not adopted here.
+
+| Case | Stories | What the test asserts |
+| --- | --- | --- |
+| Rounding, scale-4 default | DRG-532, DRG-568 | Year-3 unit is 49.0017 (`round4(45.7960 × 1.07)`). Amounts stay scale 2. The 200-seat illustration totals 330,234.48. |
+| Rounding, 2 dp per step | DRG-568 | Alternative, not the default. Per-step half-up at 2 dp yields $49.01, and the same illustration totals 330,264.00. Fork 2. |
+| Rounding, unrounded compound, then 2 dp once | DRG-568 | Alternative, not the default. `40 × 1.07³` (= 49.00172) rounded half-up to 2 dp is $49.00. D-03 rejects this as the stored series. |
+| Date boundary belongs to the new segment | DRG-532, DRG-568 | Segment `k` starts at `termStart.plusMonths(startMonth − 1)`. A term that starts on the 31st does not drift. |
+| Month-boundary lock | DRG-568 | 2026-11-01 through 2027-03-31 at 20.0000, then 2027-04-01 through 2027-12-31 at 21.4000. Line total 14,630.00 at 50 seats. |
+| Lock end off a month boundary | DRG-568 | Out of the first slice (fork 6). The test shows the case is refused or left unpriced, not day-prorated. |
+| Negative escalator | DRG-532 | A negative start price or a negative amount is `RAMP_NEGATIVE_VALUE`. A price cut is an explicit `Override` or a basis change. |
+| Zero escalator | DRG-532, DRG-568 | A zero percent, and a null continuation uplift (the policy treats null as zero), stores every period at the period-1 unit. |
+| Proration on a whole-month renewal boundary | DRG-568 | No day stub. ADR-023 D-04 and the accepted proration record charge that boundary as a whole month. |
+| Proration on an amendment or expansion | DRG-534 | The day-stub in the accepted proration record. A renewal escalator does not call that formula. |
+| Elapsed-period lock | DRG-534 | Elapsed periods stay immutable. An amendment regenerates only future periods, from the last elapsed stored absolute. |
+| Renewal uplift applied once | DRG-568 | Period 1 is the single unit the accepted uplift record already computed. The escalator does not apply that percent again. After a lock, the post-lock percent applies once to the locked unit. |
+| CRM DealType handoff | DRG-532, DRG-534, DRG-568 | See the next section. `EXISTING_BUSINESS` becomes `EXPANSION`. `AMENDMENT` is reached only by typed continuation. |
+
+Totals in each rounding row reconcile to the units that row stores. The default row is the scale-4 series. The two 2 dp rows are fixtures for fork 2, not a second default.
+
+## DealType handling
+
+CRM `EXISTING_BUSINESS` maps to quote `EXPANSION`. That row is a bot decision of 2026-10-16 under owner delegation, validated by CPQ Decision at confidence 0.7, and it is reversible: the single flip is `Source.EXISTING_BUSINESS`. The landed record is [crm-quote-dealtype-mapping.md](../crm-quote-dealtype-mapping.md) (DRG-538) and `CrmQuoteDealTypeMapping`.
+
+`AMENDMENT` is not a CRM mapping target. It is reachable only through typed continuation (`QuoteContinuationRequest.Operation.AMENDMENT`), the only path that may replace a source line.
+
+This draft does not change that map. A renewal escalator runs on a `RENEWAL` continuation. An amendment of stored ramp periods (DRG-534) runs on typed `AMENDMENT`. An `EXISTING_BUSINESS` CRM deal does not become an amendment through this file.
+
 ## Out of scope
 
 One-action authoring of equal blocks (DRG-532). Elapsed-period locking on an amendment (DRG-534). Renewal mode inheritance beyond what the accepted uplift record already fixed (DRG-549). Price-book retrieval (DRG-539). The audit table (DRG-564). Cost ingestion (DRG-526). True-up, maintenance percent, conversion, and amendment proration. Any subscriptions user interface. Any flag. Any edit to an Accepted ADR. Accepting ADR-017 or ADR-024 through ADR-027.
@@ -245,6 +293,7 @@ One-action authoring of equal blocks (DRG-532). Elapsed-period locking on an ame
 - Day proration for a lock that ends off a month boundary. No renewal segment splitter was found in `QuoteContinuationPolicy` or `RampEscalatorExpander`.
 - GitNexus impact on this draft. No GitNexus runner is present on this VM (`.gitnexus/run.cjs` is absent). Impact is UNKNOWN.
 - Notion DoD page `verification.state` was `unverified` at fetch (2026-10-16). The page body that was fetched says v0.2 is approved. This draft does not edit that page.
+- Definition of Done v0.3, fetched 2026-10-17. `verification.state` was `unverified`. The page body says the owner approved v0.3 at 7:42 AM CT on 2026-10-17. Items 4, 6, and 23 are the ones this follow-up records. The page was not edited.
 
 ## References
 
@@ -259,4 +308,6 @@ One-action authoring of equal blocks (DRG-532). Elapsed-period locking on an ame
 - [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-05 and D-06.
 - [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md) — day-stub for amendments and expansions.
 - `docs/renewals-amendments/cpq-pricing-policy-sanity-check.md` — scenarios 1 and 4.
-- [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending), [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal), [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no), [DRG-526](https://linear.app/drgamtd-workspace/issue/DRG-526/bc-03-13-cost-basis-ownership-and-ingestion-from-erp-p-2).
+- [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending), [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal), [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no), [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534/ramp-amendments-lock-elapsed-periods-amend-future-periods-re-govern-on), [DRG-526](https://linear.app/drgamtd-workspace/issue/DRG-526/bc-03-13-cost-basis-ownership-and-ingestion-from-erp-p-2).
+- [crm-quote-dealtype-mapping.md](../crm-quote-dealtype-mapping.md) — CRM `EXISTING_BUSINESS` to quote `EXPANSION`; `AMENDMENT` only by typed continuation.
+- [Definition of Done v0.3](https://app.notion.com/p/3fcf7cb4e4df8133860dcc8613c620eb) items 4, 6, and 23.
