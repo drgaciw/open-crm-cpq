@@ -113,8 +113,8 @@ What S5 takes from S3:
 - Idempotent document create on `lifecycle_change_id` (FR-05, AC-S3-1). Technical approach §5 step 3: quote-service calls CAM to create the document, lines copied by value with digest.
 - Shared validation FR-07 (V1..V14) at the named transitions. S3 submit is one of those transitions (AC-S3-2).
 - Shared dates FR-17 / V6 (AC-S3-8 fails backdating without a reason code).
-- Digest location OQ18, default `backend/libs/common`, status DEFAULT PROPOSED, blocks S3 and S5, needed before S3.
-- Revision default OQ6, status DEFAULT PROPOSED, blocks S3.
+- OQ18 remains Proposed until owner confirmation: the unconfirmed location is `backend/libs/common`, built once in S3 and reusable by S5/S6. Confirmation gates digest-library work only; it neither authorizes nor blocks all S3 work.
+- OQ6 is recorded under delegation in `oq6-revision-model-owner-decision.md` (#642). S3 still needs separate authorization. The CAM write, cleared-pin representation, supersession event, local concurrency, and S5/S8 delivery contracts remain proposals (DRG-616).
 
 `docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml` is on `main` at `dd0f1a8`. The header that was read says proposal only: not an implementation, not a gateway route, not a feature flag, and it does not authorize merging, deploying, or enabling a runtime flag. `x-opencrm-status` is `proposal`. It names quote-service as owner of LifecycleChange and CAM contract-documents as owner of the amendment document. Paths read for this note: `/lifecycle-changes` and the continuation facade. The rest of the 2479-line file was not read. **Unverified** beyond the sections cited. DRG-605 was In Review and still listed as blocking DRG-583 and DRG-581 when the issue was read. Whether that relation changed after the file reached `main` was not re-read. **Unverified.**
 
@@ -168,7 +168,7 @@ Ordering and fulfilment stay out (technical approach §2). document-generation s
 | OQ11 | DEFAULT PROPOSED. Per-tenant flag, default off, internal tenant first. Blocks S6. | Apply-path flag. Not specified as the AC-S5-5 switch. |
 | OQ12 | Confirmed. Add, Update, Remove only. | AC-S5-3. |
 | OQ17 | DEFAULT PROPOSED. Approval for overrides, backdating, or ARR delta above a Finance threshold. Needed before S5 ends. | AC-S5-4 can name `CONTRACT_MODIFICATION`. The non-override threshold is still a default. |
-| OQ18 | DEFAULT PROPOSED. Digest utility in `backend/libs/common`. Before S3. | S5's digest on the document call (technical approach §5 step 3) uses that utility. Not accepted. |
+| OQ18 | Proposed until owner confirmation. Unconfirmed: `backend/libs/common`, delivered in S3, reusable by S5/S6. | Gates building the digest library only. S5 may reuse it once accepted and delivered. Does not authorize S3 or S6. |
 | OQ5 | DEFAULT PROPOSED. Blocks S4, not S5. | S5 must not invent partial-apply behavior. |
 | Render home | ADR-035 open questions. | Out of slice. Request stays in quote-service when a later ticket builds it. |
 | Hash chain key management | ADR-035 acceptance: still open. | S2. Not S5. |

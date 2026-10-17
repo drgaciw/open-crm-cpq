@@ -680,9 +680,11 @@ paths:
         product, pricebook, configuration, and policy-decision pins as null
         on the new revision and ignores any price sent by a client. The
         persisted shape of a cleared pin is the Proposed default in
-        story-drg-616-oq6-design-contract-gaps.md (nullable columns on the
-        open revision only). That default is not a migration. The field
-        schema file is unchanged.
+        story-drg-616-oq6-design-contract-gaps.md (nullable while unpriced,
+        with frozen values preserved). That default is not a migration. The field
+        schema has a proposal addendum only. Freezing a never-submitted
+        unpriced draft still needs an accepted digest-at-close contract;
+        the null open digest does not resolve that storage gap.
 
         Idempotency. The same Idempotency-Key and the same body returns 200
         with Idempotent-Replayed true and does not open a second revision.
@@ -2778,4 +2780,3 @@ components:
             success: {enum: [true]}
             data:
               $ref: "#/components/schemas/ContinuationPlan"
-
