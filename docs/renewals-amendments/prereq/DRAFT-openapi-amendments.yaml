@@ -724,9 +724,17 @@ paths:
         version is the post-commit document row version. Current tcvDelta,
         arrDelta, oneTimeTotal and creditTotal are null while unpriced, never
         copied from the superseded header and never filled with placeholder
-        zeroes. A later successful pricing operation atomically replaces all
-        four totals with newly calculated values for this revision, together
-        with its pins and trace. Submit and execute require those totals to
+        zeroes. Desired later behavior, not a completed delivery contract: a
+        successful pricing synchronization would atomically replace all four
+        totals with newly calculated values for this revision, together with
+        its pins and trace. No CAM priced-state synchronization write or
+        delivery event is defined in this draft. The LifecycleChange :price
+        operation is quote-service state only and does not perform that CAM
+        write; this revisions command accepts no prices or pins either.
+        S3/S5 implementation remains blocked until a separate accepted
+        contract specifies that CAM write/delivery, expected document version
+        and revision, all totals/pins/trace, idempotency, and stale-result
+        refusal. No endpoint is inferred or authorized here. Submit and execute require those totals to
         be non-null and current. This is an unaccepted nullability proposal
         requiring a later migration; the existing NOT NULL storage cannot
         implement it unchanged. Frozen revision snapshots remain unchanged.

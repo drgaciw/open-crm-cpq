@@ -44,7 +44,7 @@ Draft PR #653 (body read; the branch was not checked out) proposes nullable pins
 
 | Option | What it would mean | Status |
 |---|---|---|
-| (a) | Nullable pins, plus a new CAM migration at `V1_10` or higher. The number is the next free version at build time. The migration carries a rollback statement. `V1_9` stays reserved for the S4 apply ledger. `V1_7_3` is forbidden: it sorts below `V1_8` (Flyway versions `1.7.3` < `1.8`), and `spring.flyway` in `backend/services/contract-asset-management/src/main/resources/application.yml` (read) does not set `out-of-order`. Flyway's default rejects an out-of-order version. A live Flyway run was not executed for this note. | Proposed, unaccepted, owner decision required |
+| (a) | Nullable product/pricebook/configuration pins, both document and revision `content_digest` columns, and all four current document totals (`tcv_delta`, `arr_delta`, `one_time_total`, `credit_total`), plus a new CAM migration at `V1_10` or higher. The number is the next free version at build time. The migration carries a rollback statement that stops while any affected row remains null and never fabricates historical values. `V1_9` stays reserved for the S4 apply ledger. `V1_7_3` is forbidden: it sorts below `V1_8` (Flyway versions `1.7.3` < `1.8`), and `spring.flyway` in `backend/services/contract-asset-management/src/main/resources/application.yml` (read) does not set `out-of-order`. Flyway's default rejects an out-of-order version. A live Flyway run was not executed for this note. | Proposed, unaccepted, owner decision required |
 | (b) | A sentinel digest with no defined meaning. Flag: **UNDEFINED**. No accepted document defines that sentinel. | Proposed, unaccepted, owner decision required |
 | (c) | Require priced revisions only. This conflicts with adopted OQ6, which immediately opens an unpriced DRAFT with pins cleared. It is not a compatible no-migration implementation: choosing it would require an explicit amendment of OQ6 and a redesigned supersession flow, neither authorized here. | Proposed, unaccepted, owner decision required |
 
@@ -53,6 +53,10 @@ Draft PR #653 (body read; the branch was not checked out) proposes nullable pins
 **Alternatives beside that default:** option (b), flagged UNDEFINED; option (c), priced revisions only.
 
 No outcome. The owner chooses. This note does not add a migration. Recommending default (a) is NOT a migration approval.
+
+**Complete nullability scope.** The proposed unpriced representation also clears `amendment_documents.tcv_delta`, `arr_delta`, `one_time_total`, and `credit_total`, all NOT NULL on the reading base. Option (a) includes those four columns, the two digest columns, and the three pricing-pin columns together. A pin-only migration cannot implement that representation. No migration is approved or written here.
+
+**Remaining priced-state delivery gap.** The draft OpenAPI has no CAM synchronization write/event that restores the repriced totals, pins, and trace. Quote-service's `:price` does not perform a CAM write. S3 and S5 remain blocked until an accepted contract specifies the revision/version binding, full payload, atomic CAM update, replay and stale-result refusal. This frame records the missing contract, not a complete supersession/reprice flow.
 
 ## 2. OQ18, or a CAM-local interim digest
 
@@ -103,7 +107,7 @@ OQ6 section 4's two S3 tests, quoted exactly. They are criteria only. The record
 
 | # | Question | Recommended default | Status | Alternatives |
 |---|---|---|---|---|
-| 1 | Unpriced storage | Option (a): nullable pins plus a new CAM migration, `V1_10` or higher, next free at build time, with a rollback statement. `V1_9` stays reserved for S4. Never `V1_7_3`. Recommending default (a) is NOT a migration approval. | Proposed, unaccepted, owner decision required | (b) UNDEFINED sentinel digest. (c) Priced revisions only: conflicts with adopted OQ6 and requires its explicit amendment plus redesign; not a compatible no-migration option. |
+| 1 | Unpriced storage | Option (a): nullable pins, both digest columns, and all four current totals, plus a new CAM migration, `V1_10` or higher, next free at build time, with a rollback statement. `V1_9` stays reserved for S4. Never `V1_7_3`. Recommending default (a) is NOT a migration approval. | Proposed, unaccepted, owner decision required | (b) UNDEFINED sentinel digest. (c) Priced revisions only: conflicts with adopted OQ6 and requires its explicit amendment plus redesign; not a compatible no-migration option. |
 | 2 | OQ18 or interim digest | CAM-local interim digest function inside contract-asset-management, only if the owner approves it. | Proposed, unaccepted, owner decision required | Wait for owner confirmation of OQ18. Do not build the `backend/libs/common` library in S3 before that confirmation. |
 | 3 | S3 authorization | S3 stays UNAUTHORIZED. S3 / DRG-581 stays unlaunched. A merge of #657 is NOT S3 authorization. Separate owner authorization is still required. | Proposed, unaccepted, owner decision required | A later owner record that explicitly authorizes DRG-581. |
 | 4 | Order versus #653 | S3 waits on draft PR #653 or rebases over it. DRG-616 must be merged first. | Proposed, unaccepted, owner decision required | Start an S3 slice on current `main` and reconcile the OpenAPI draft afterwards. |
@@ -131,7 +135,7 @@ New classes in package `com.opencrm.contract.documents`:
 
 Additive edits to existing entities. Those entities already live in `com.opencrm.contract.domain.documents` (directory listing read), including `AmendmentDocument`, `AmendmentDocumentRevision`, `AmendmentDocumentLine`, and `AmendmentDocumentStatus`.
 
-Optional migration `V1_10` or higher only if option (a) is accepted. The number is the next free version at build time. The file includes a rollback statement. This note does not write that file.
+Optional migration `V1_10` or higher only if option (a) is accepted, covering the three pricing-pin columns, both `content_digest` columns, and the four current document total columns. Its rollback must stop while any affected row remains null; it must not fabricate historical pins, digests, or amounts. The number is the next free version at build time. The file includes a rollback statement. This note does not write that file.
 
 Tests under `src/test/java/com/opencrm/contract/documents/` for AC-S3-1 through AC-S3-8, plus the two OQ6 tests quoted in section 4. The concurrent-execute test for gapless numbering is AC-S3-6 (`amendment-first-slice-requirements-and-acceptance.md`, read): two drafts for one contract execute as sequences N+1 and N+2 with no gap.
 
