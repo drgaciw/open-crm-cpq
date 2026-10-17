@@ -235,3 +235,15 @@ Source: transcript addendum "Renewals and amendments decisions audit"; backlog D
 - **Coterm and settings.** Customer-level coterm grouping and renewal groups (DRG-554) and renewal settings, auto-renew default off and notice period default with override (DRG-596), are not in this schema; `notice_period_days` and `term_end_action` stay clause data, settings live elsewhere.
 
 **C2 resolved 2026-10-16 (owner).** The stored precedence flag lives in its own indexable column (`precedence_flag`, section 2.2a), outside the thin header. The ADR-035 header list is not altered. See OQ27 in `renewals-amendments-open-questions-register.md`.
+
+## PROPOSED addendum (DRG-616, 2026-10-17)
+
+**Status:** Proposed, unaccepted, owner decision required.
+
+This addendum describes a change. It does not apply it. Nothing above this heading is rewritten. The §2.5 pin row still says `product_external_id`, `pricebook_version`, and `configuration_hash` are not null. No migration is in this file. No flag. No deploy. No code generation. No contract test.
+
+**Default:** nullable pins on the open revision only. **Status:** Proposed, unaccepted, owner decision required. **Alternatives:** an invalidation flag, with the three columns staying not null and keeping the old values; staging columns that are nullable and are promoted into the not-null columns at price. While a document revision is the open unpriced revision, those three columns would allow null. A frozen revision keeps the pins it had when it froze, and those stored values stay not null. Submit and apply still require non-null pins (V9). Policy-decision columns stay as §2.5 already writes them: not null when priced.
+
+**Migration.** No V1_7 migration. The 2026-10-16 dev-readiness addendum still assigns V1_7 to the expand of this schema and to the rate-period line id. V1_9 stays reserved for S4 (`document_apply_ledger`). This addendum assigns no migration number. If the owner later accepts the default, the S3 build adds a new migration. Its number is the next free at build time.
+
+**Rollback.** That future migration would drop NOT NULL on the three pin columns for new open revisions. Rollback is the reverse change: restore NOT NULL. It runs only after every open revision has non-null pins. A frozen revision is already not null and is not rewritten. If any open revision is still null, rollback stops and does not delete the revision.

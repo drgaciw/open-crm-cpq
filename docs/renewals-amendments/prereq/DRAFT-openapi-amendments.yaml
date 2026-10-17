@@ -7,6 +7,10 @@ info:
     feature flag. It does not authorize merging, deploying, or enabling any
     runtime flag.
 
+    Status of every default in this file: Proposed, unaccepted, owner decision
+    required. This file is not an input to code generation and it defines no
+    contract test.
+
     HTTP contract for the contract-documents module and for quote-service
     lifecycle changes, so DRG-537 (renewals and amendments UI), DRG-581 (S3)
     and DRG-583 (S5) can share one shape.
@@ -54,7 +58,8 @@ info:
     define the canonicalization algorithm. OQ18 remains Proposed. This file
     does not confirm OQ18 and does not authorize building that library.
 
-    DRG-616 records three Proposed contracts. They are not accepted.
+    DRG-616 records three contracts. Each default is Proposed, unaccepted,
+    owner decision required.
     POST /amendments/{amendmentId}/revisions is the proposed CAM revision
     write. It follows the OQ6 ruling recorded in pull request #642: before
     execution, a new revision under the same document number, the old revision
