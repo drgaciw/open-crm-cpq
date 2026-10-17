@@ -66,7 +66,7 @@ Every fork is listed. The recommendation is the proposed default. Each default i
 | F-595-7 | DRG-595 | When does the owner check arrive relative to S3? | A It is a named prerequisite. This note does not start S3. B Accepting this note starts S3. C S3 ships the read-only access first and skips the owner check. | A | Option A. Alternatives beside this default: B accepting this note starts S3; C read-only access ships first. Proposed, unaccepted, owner decision required. |
 | F-597-1 | DRG-597 | Where does queue membership live? | A A filter on the shared spine. Assignment and due date, if stored, are a side row keyed by `lifecycle_change_id`. B Two tables that copy the document. C One undifferentiated list. | A | Option A. Alternatives beside this default: B two copying tables; C one undifferentiated list. Proposed, unaccepted, owner decision required. |
 | F-597-2 | DRG-597 | Which intents are in which queue? | A Renewal queue is `RENEW` only. Amendment queue is `AMEND` only. Other intents wait. B Renewal queue also includes EXTENSION because `DealType` stores it as RENEWAL. C The amendment queue includes every intent other than `RENEW`. | A | Option A. Alternatives beside this default: B renewal queue also includes EXTENSION; C every non-`RENEW` intent is an amendment-queue row. Proposed, unaccepted, owner decision required. |
-| F-597-3 | DRG-597 | Who may assign and set a due date? | A The people the ticket calls sales ops may assign and set a due date. The people it calls finance may not. The contract owner may assign on owned contracts. B Only the owner may assign. C Assignment waits for DRG-591. | A | Option A. Alternatives beside this default: B only the owner assigns; C assignment waits for DRG-591. Proposed, unaccepted, owner decision required. |
+| F-597-3 | DRG-597 | Who may assign and set a due date? | A Sales ops may assign under a separately accepted write permission, expanding the read-only scope. B Only the owner may assign and set due dates on owned contracts. C Assignment waits for DRG-591. | B | Option B. Alternatives beside this default: A explicitly grant sales ops write access; C assignment waits for DRG-591. Proposed, unaccepted, owner decision required. |
 | F-597-4 | DRG-597 | Is there an SLA duration? | A An optional due date only. B Ninety days before end date, taken from the renewal stub. C No due date in this frame. | A | Option A. Alternatives beside this default: B end date minus 90 days; C no due date. Proposed, unaccepted, owner decision required. |
 | F-597-5 | DRG-597 | What HTTP surface do the queues use? | A Two filters on the draft list `GET /api/v1/lifecycle-changes`. No new route. B New `/queues/renewals` and `/queues/amendments` resources in this note. C The quotes list filtered by deal type. | A | Option A. Alternatives beside this default: B new queue resources in this note; C the quotes list filtered by deal type. Proposed, unaccepted, owner decision required. |
 | F-598-1 | DRG-598 | What is a phase? Business-policy fork. Authorizes no backfill. | A A written manifest of subscription ids. It is not a call to `contract_header_backfill_apply`. B One owner call of that function is the phase. C This note edits V1_8 to take an end-date window. | A | Option A. Alternatives beside this default: B one owner call of `contract_header_backfill_apply` is the phase; C this note edits V1_8. This default authorizes no backfill and no run against real data. `contract_header_backfill_apply` stays an owner step. Proposed, unaccepted, owner decision required. |
@@ -247,13 +247,13 @@ Call decision 2026-10-16 (#13): renewals and amendments are two work queues, wit
 
 **F-597-3. Assignment.**
 
-- Option A. The people the ticket calls sales ops may assign either queue and may set the due date. The people it calls finance may not. The contract owner may assign on contracts they own under F-595-1. Assignment is not an edit, submit, approve, or execute. Those names are not app roles in the files cited under DRG-595.
-- Option B. Assignment is an act, so only the owner may assign.
+- Option A. Sales ops may assign and set due dates only under a separately accepted write permission. This expands DRG-595's read-only scope; storing assignment in a side row does not make it a read. The ticket names are not app roles in the cited files.
+- Option B. Only the contract owner may assign and set due dates on contracts they own under F-595-1. Sales ops and finance remain read-only. The service holding the assignment row enforces tenant and owner checks.
 - Option C. No assignment until DRG-591 is unparked.
 
-**Recommendation.** Option A. The ticket's read-only list is edit, submit, approve, and execute. Assignment is a queue fact. Approve stays on DRG-591.
+**Recommendation.** Option B. Assignment and due-date updates are writes, so this preserves the call's read-only policy. Approve stays on DRG-591.
 
-**Default.** Option A. Alternatives beside this default: B only the owner may assign; C no assignment until DRG-591 is unparked. Proposed, unaccepted, owner decision required.
+**Default.** Option B. Alternatives beside this default: A explicitly grant sales ops write access; C no assignment until DRG-591 is unparked. Proposed, unaccepted, owner decision required.
 
 **F-597-4. SLA.**
 
