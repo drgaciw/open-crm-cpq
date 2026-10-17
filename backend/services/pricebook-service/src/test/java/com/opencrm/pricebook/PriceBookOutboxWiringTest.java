@@ -20,7 +20,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("integration")
 @Testcontainers
-@SpringBootTest(properties = {
+// Name the application explicitly: an implicit lookup also finds PriceBookEntryRepositoryIntegrationTest's
+// nested @SpringBootConfiguration in this package and fails with "Found multiple @SpringBootConfiguration".
+@SpringBootTest(classes = PriceBookServiceApplication.class, properties = {
     "spring.jpa.hibernate.ddl-auto=create-drop",
     "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
     "spring.flyway.enabled=false"
