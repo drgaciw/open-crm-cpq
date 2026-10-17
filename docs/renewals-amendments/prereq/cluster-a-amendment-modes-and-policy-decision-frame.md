@@ -1,181 +1,243 @@
 # Cluster A — Amendment modes and commercial policy (decision frame)
 
-**Status:** Proposed. This note is not an ADR. No fork below is accepted. Recording a recommendation and a default does not accept either one.
+**Status:** Proposed, unaccepted, owner decision required.
+
 **Date:** 2026-10-17
-**Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642)).
+**Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642), merged 2026-10-17T07:40:40Z).
 **Project:** OPEN-CRM-CPQ, Linear team DRG, milestone Renewals & Amendments.
 **Stories:** [DRG-592](https://linear.app/drgamtd-workspace/issue/DRG-592) (RA-58), [DRG-554](https://linear.app/drgamtd-workspace/issue/DRG-554) (RA-20), [DRG-594](https://linear.app/drgamtd-workspace/issue/DRG-594) (RA-60), [DRG-599](https://linear.app/drgamtd-workspace/issue/DRG-599) (RA-65), [DRG-550](https://linear.app/drgamtd-workspace/issue/DRG-550) (RA-16).
 
-**This note authorizes no code, schema migration, job, data rewrite, feature flag, topic, gateway route, or deploy.** Accepting this note would still authorize none of those. S3 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) is not started. S6 / [DRG-584](https://linear.app/drgamtd-workspace/issue/DRG-584) is not authorized. The [DRG-609](https://linear.app/drgamtd-workspace/issue/DRG-609) pricing-service design is not accepted.
+**This note authorizes no code, schema migration, job, data rewrite, feature flag, topic, gateway route, or deploy.** No flag is enabled. Nothing is deployed. Tickets stay In Review until the owner merges.
 
-Descriptions and relations for the five stories were read on 2026-10-17. Each description is a policy or design gap. None asks this change to ship an implementation, so none is skipped.
+Descriptions and relations for the five stories were read on Linear on 2026-10-17. Each description is a policy or design gap. None was skipped. Linear status in this note is that read. It is not a git fact.
+
+## How a claim is marked
+
+| Mark | Meaning |
+|---|---|
+| `read` | The file or migration named in the same sentence was opened on this `main`. |
+| `unverified` | Not opened, not executed, or not queried. A search that found no row is stated as a search, not as a live database result. |
+
+No database was queried. Whether Flyway has applied any migration in an environment is `unverified`.
 
 ## Standing constraints
 
-These apply to every section.
-
-| Constraint | Where it stands on this `main` |
+| Constraint | Record on this `main` |
 |---|---|
-| ADR-035 is Accepted for S1 and S2 only | [`adr-035-amendment-document-placement.md`](../adr-035-amendment-document-placement.md). Acceptance authorizes the first-slice schema and audit stories (S1 / DRG-579, S2 / DRG-580). Later stories need their own gates. |
-| ADR-017 and ADR-024 through ADR-027 stay Proposed | [`docs/adr/ADR-017-synchronous-inter-service-communication.md`](../../adr/ADR-017-synchronous-inter-service-communication.md), [`ADR-024`](../../adr/ADR-024-order-orchestration-context.md), [`ADR-025`](../../adr/ADR-025-saga-process-manager.md), [`ADR-026`](../../adr/ADR-026-command-messages.md), [`ADR-027`](../../adr/ADR-027-compensation-and-point-of-no-return.md). The reconcile record [`adr-reconcile-adr-024-027.md`](adr-reconcile-adr-024-027.md) is a separate status-change. Its own header says that record does not accept ADR-024 through ADR-027. This note does not treat those four ADRs, or ADR-017, as accepted. |
-| Proration formula stays the Accepted day-stub | [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md), Accepted 2026-10-16, D-01 and D-02. This note does not reopen the formula, the rejected full-term ratio, or the DRG-542 delete list. |
-| S6 is not authorized | [`partial-apply-owner-decision.md`](partial-apply-owner-decision.md) records that S6 is not authorized. ADR-035 does not authorize it. |
-| S3 is not started | [#642](https://github.com/drgaciw/open-crm-cpq/pull/642) merged to `main` at 2026-10-17T07:40:40Z. That merge records OQ6 under delegation and leaves OQ18 Proposed ([`oq6-revision-model-owner-decision.md`](oq6-revision-model-owner-decision.md)). DRG-581 remains Todo and says that merge authorizes no S3 work. Design-contract gaps stay on [DRG-616](https://linear.app/drgamtd-workspace/issue/DRG-616). |
-| DRG-609 design is not accepted | [`story-drg-609-pricing-service-continuation-design.md`](story-drg-609-pricing-service-continuation-design.md) is a design proposal. It is not an ADR. S5 / [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583) stays blocked on that capability. |
-| OQ7 thin default stays | [`s7-v1-8-header-backfill.md`](../s7-v1-8-header-backfill.md): one thin contract per existing subscription. No synthetic history. The backfill does not regroup. Regrouping is the DRG-554 follow-up in section 2. |
-| First slice stays amend-in-place | SaaS only; action codes Add, Update, Remove; signature policies `NOT_REQUIRED`, `NOTICE_ONLY`, `CLICK_THROUGH`. [`amendment-first-slice-requirements-and-acceptance.md`](../amendment-first-slice-requirements-and-acceptance.md). OQ26 in [`renewals-amendments-open-questions-register.md`](../renewals-amendments-open-questions-register.md). |
+| ADR-035 acceptance scope is S1 and S2 | `read` [`docs/renewals-amendments/adr-035-amendment-document-placement.md`](../adr-035-amendment-document-placement.md) status line and "Acceptance 2026-10-16". Later stories need their own gates. |
+| ADR-017 and ADR-024 through ADR-027 stay Proposed | `read` [`docs/adr/ADR-017-synchronous-inter-service-communication.md`](../../adr/ADR-017-synchronous-inter-service-communication.md), [`ADR-024-order-orchestration-context.md`](../../adr/ADR-024-order-orchestration-context.md), [`ADR-025-saga-process-manager.md`](../../adr/ADR-025-saga-process-manager.md), [`ADR-026-command-messages.md`](../../adr/ADR-026-command-messages.md), [`ADR-027-compensation-and-point-of-no-return.md`](../../adr/ADR-027-compensation-and-point-of-no-return.md). `read` [`docs/renewals-amendments/prereq/adr-reconcile-adr-024-027.md`](adr-reconcile-adr-024-027.md) header: that record does not accept ADR-024 through ADR-027. |
+| Proration stays in the Accepted ADR | `read` header only of [`docs/renewals-amendments/prereq/adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) (**Status:** Accepted 2026-10-16). This note does not restate the formula. DRG-550 cites that path and does not reopen the ADR. |
+| S6 is not authorized | `read` [`docs/renewals-amendments/prereq/partial-apply-owner-decision.md`](partial-apply-owner-decision.md) and OQ5 in [`docs/renewals-amendments/renewals-amendments-open-questions-register.md`](../renewals-amendments-open-questions-register.md): S6 is not authorized. ADR-035 does not authorize S6. |
+| S3 is not started | Merged #642 text, quoted below. [DRG-616](https://linear.app/drgamtd-workspace/issue/DRG-616) is named on the DRG-581 issue (Linear read 2026-10-17). |
+| DRG-609 design is not accepted | `read` [`docs/renewals-amendments/prereq/story-drg-609-pricing-service-continuation-design.md`](story-drg-609-pricing-service-continuation-design.md): the note is a design proposal and is not an ADR. |
+| Entitlements and conversion price | Pending the DRG-609 design (not accepted). This note does not specify them. |
+| OQ7 one-contract-per-subscription wording | `read` comment in [`V1_8__contract_header_backfill.sql`](../../../backend/services/contract-asset-management/src/main/resources/db/migration/V1_8__contract_header_backfill.sql) and [`docs/renewals-amendments/s7-v1-8-header-backfill.md`](../s7-v1-8-header-backfill.md). The register row is still `DEFAULT PROPOSED`. #642 says so, quoted below. This note does not change that wording and does not regroup. |
+| First-slice action and signature cut | `read` OQ12 and OQ10 in the register; `read` slice definition in [`docs/renewals-amendments/amendment-first-slice-requirements-and-acceptance.md`](../amendment-first-slice-requirements-and-acceptance.md). |
 
-Cluster proposals under `prereq/specs/` (`co-termination.md`, `catalog-model.md`, `lifecycle-intents.md`, `partial-apply.md`) stay proposals. This note does not accept them.
+Cluster files [`specs/co-termination.md`](specs/co-termination.md), [`specs/catalog-model.md`](specs/catalog-model.md), [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md), and [`specs/partial-apply.md`](specs/partial-apply.md) stay proposals (`read` status lines). This note does not accept them.
+
+### Merged #642 text this note relies on
+
+Source file on `main`: [`docs/renewals-amendments/prereq/oq6-revision-model-owner-decision.md`](oq6-revision-model-owner-decision.md). The paragraphs below are copied from that file.
+
+> **Status:** OQ6 was decided under delegation by CPQ Decision and relayed by Projects Manager; it is not the owner's personal choice. OQ18 remains **Proposed until the owner confirms it**. OQ6 is recorded for the first slice, but this record authorizes no code, schema, migration, flag, topic, gateway route, deploy, or story. S3 / DRG-581 requires separate owner authorization. OQ18 confirmation is required before building the proposed digest library, not authorization to start S3.
+
+> 1. **Before execution (`DRAFT`, `IN_REVIEW`, `APPROVED`).** A new revision of the LifecycleChange opens a new document revision on the same document, with the same `provisionalNumber` (OQ4). The previous revision closes with `status_at_close = SUPERSEDED` and keeps its content digest. The document returns to `DRAFT`. Approvals and signatures are void; pricing pins from the previous revision do not carry over, and the new revision must be priced and submitted again. The persisted representation of an unpriced revision is not decided here.
+
+> 2. **Executed, in any apply state (`EXECUTED`, `APPLIED`, `PARTIALLY_APPLIED`, `APPLY_BLOCKED`).** The document is immutable. A new revision is refused with 409 `IMMUTABLE_EXECUTED` and an audit event, which is AC-S3-5 applied to revisions. "Executed but not yet applied" gets no special path. The remedy is a new LifecycleChange that produces a new, correcting amendment document, the same remedy OQ5 option A adopted for a blocked unit.
+
+> - It does not authorize S3, S4, S5, S6, S7 or S8. S3 / DRG-581 needs separate owner authorization.
+> - It does not change OQ5 (adopted for the first slice), OQ7 (still `DEFAULT PROPOSED` in the register) or any ADR status.
+
+## Owner-decision table
+
+Every row is Proposed, unaccepted, owner decision required. The default is the recommendation. The alternatives are the other options in that fork.
+
+| Fork | Story | Default | Alternatives |
+|---|---|---|---|
+| 592-F1 Flag shape | DRG-592 | Boolean `precedence_flag` | Integer rank across overlapping contracts; a customer-level `prevailing_contract_id` and no boolean column |
+| 592-F2 Who may change the flag | DRG-592 | Write-once at creation; a later change is a new executed amendment | A product or admin in-place flip with an audit event; a sales flip with no new amendment |
+| 592-F3 Overlap for pricing and visibility | DRG-592 | Precedence-true contract is the pricing source; both contracts stay visible; two true flags fail closed | Visibility split off to DRG-595 while the flag still wins pricing; each reader picks its own contract. Entitlement resolution is pending the DRG-609 design (not accepted) and is not in this default |
+| 592-F4 Original at its own end date | DRG-592 | Stays `ACTIVE` as a reference until its own end date, then `EXPIRED` | Stays `ACTIVE` with no expiry; set to `TERMINATED` when the new contract is created |
+| 592-F5 Where the mode is stored | DRG-592 | A column on the amendment document, added in a later increment, not in S1 | Infer the mode from whether a new `contracts` row was inserted; store the mode only on the LifecycleChange |
+| 592-F6 Which contract owns the document | DRG-592 | The new contract owns the one document; `prior_contract_id` points at the original | The original owns the document; both contracts get a copy |
+| 554-F1 Co-term mode set | DRG-554 | DRG-554's four modes plus `AlignToDate` | The four modes only (`LatestEnd`, `EarliestEnd`, `None`, `AlignToAgreement`); a second customer-level coterm engine |
+| 554-F2 Missing policy | DRG-554 | Single-agreement amendment keeps V5; a multi-agreement change with no mode is refused | Missing policy means `None`; missing policy means `AlignToAgreement` |
+| 554-F3 Which lines move | DRG-554 | Only lines in the change | Every line on the target agreements |
+| 554-F4 Shortening | DRG-554 | The date may move earlier; this policy writes no credit | Co-term itself emits a credit; shortening is forbidden. Conversion price for that credit is pending the DRG-609 design (not accepted) |
+| 554-F5 Lengthening past the governing end | DRG-554 | Mid-term co-term refuses an end after the governing contract end | Allowed as a mid-term amendment; allowed only when the mode is `AlignToDate` |
+| 554-F6 Merge versus co-term, OQ7 regrouping | DRG-554 | Headers stay one contract per subscription; a later merge intent is a separate Proposed follow-up and is not run | Co-term only, never regroup; regroup by creating a DRG-592 new contract and leaving backfilled headers in place |
+| 554-F7 Source after merge | DRG-554 | Source stays active as a reference until a later executed close | Source is cancelled when the survivor pointer is written; source row is deleted |
+| 554-F8 Home versus DRG-461 | DRG-554 | DRG-461 stays the capability item; this note is the policy frame | DRG-554 replaces DRG-461 |
+| 594-F1 Seats versus Add and Remove | DRG-594 | A same-SKU quantity `UPDATE` is seats; `ADD` of a SKU and `REMOVE` of a product line require review | Same-SKU Add and Remove count as seats; any quantity change, including a new SKU, is free |
+| 594-F2 Where the gate sits | DRG-594 | A guard on `DRAFT` to `IN_REVIEW`, no new state | A new `LEGAL_REVIEW` state; the document may enter `IN_REVIEW` and stops before `APPROVED` |
+| 594-F3 Override | DRG-594 | A named legal role may override, and until that role is named the guard refuses; sales cannot override | No override ever; the seller may override |
+| 594-F4 Mixed edits | DRG-594 | One edit outside the free set makes the whole document require review; free header fields are price and term | Per-line skip; governing agreement and clauses are free as well |
+| 594-F5 First-slice timing | DRG-594 | The gate is a later increment; S1–S8 keep the current signature cut | The gate is required before S3 starts |
+| 599-F1 Where the mapping lives | DRG-599 | One effective-dated catalog relationship; dispute status points at that version | A separate amendment SKU mapping table; both a catalog row and a commercial overlay |
+| 599-F2 Dispute status and resolver | DRG-599 | `Active`, `Contested`, `Resolved`; product resolves; sales may open and may not clear | Add `Rejected`; sales clears the hold |
+| 599-F3 Where the hold bites | DRG-599 | Whole document, before `IN_REVIEW` and again before apply | Apply only; per-line partial apply |
+| 599-F4 Which lines need a mapping | DRG-599 | Only when source SKU and target SKU differ | Every line, including same-SKU edits |
+| 599-F5 Pin versus live row | DRG-599 | Pin the relationship version on the line at pricing | Read the live row at apply |
+| 550-F1 Price mode | DRG-550 | `RetainContracted`, `List`, and `Override`, with `RetainContracted` when the mode is omitted | `RetainContracted` only; a fourth flat-adjustment mode |
+| 550-F2 Credit policy | DRG-550 | `NoCredit` | `ProratedUnused`; `FullRemaining`; the seller must pick on every line and there is no tenant default. Any conversion price is pending the DRG-609 design (not accepted) |
+| 550-F3 Termination fee | DRG-550 | `NoFee` | A flat amount; a percent of remaining contract value; a cut-off window |
+| 550-F4 Where the three policies are stored | DRG-550 | Tenant default plus a per-line override, snapshotted when priced | One set of policies for the whole document; pricing-service owns the store, which is pending the DRG-609 design (not accepted) |
+
+Proration is not a row. DRG-550 cites [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) and does not decide it.
 
 ---
 
 ## 1. DRG-592 — Amendment modes
 
-**Issue:** [DRG-592](https://linear.app/drgamtd-workspace/issue/DRG-592) (RA-58), High, Backlog. Relations read: DRG-586, DRG-535, DRG-561, DRG-579, DRG-581, DRG-607.
+**Issue:** [DRG-592](https://linear.app/drgamtd-workspace/issue/DRG-592) (RA-58). Linear read 2026-10-17: High, Backlog. Relations read: DRG-586, DRG-535, DRG-561, DRG-579, DRG-581, DRG-607.
 
 ### Problem
 
-An amendment needs two modes. New-contract mode is the preferred mode: it creates a new contract, both contracts stay `ACTIVE`, a stored precedence flag on the new contract says it takes precedence, and the original stays open as a reference. Amend-in-place changes the existing contract. The first slice builds amend-in-place only. The open design is the flag shape, who may change it, how overlapping active contracts resolve for pricing, entitlement, and visibility, and what happens to the original at its own end date.
+An amendment needs two modes. New-contract mode creates a new contract, both stay `ACTIVE`, a stored precedence flag on the new contract says it takes precedence, and the original stays open as a reference. Amend-in-place changes the existing contract. The first slice builds amend-in-place only. Still open: flag shape, who may change it, how overlapping active contracts resolve, and what happens to the original at its own end date. Entitlement resolution is pending the DRG-609 design (not accepted).
 
-### Settled on main
+### Already on main
 
-- **Sequencing.** OQ26 is resolved: both modes are supported. Amend-in-place ships in S1–S8. New-contract mode is the next increment (DRG-592), not slice 1. Once both exist they coexist. Register row OQ26; clarification in [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) (2026-10-16, C1) and [`renewals-amendments-dev-readiness.md`](../renewals-amendments-dev-readiness.md).
-- **Flag placement.** OQ27 is resolved: `precedence_flag` is a separate indexable column on the contract record. It is not part of the ADR-035 thin header (id, number, tenant, customer reference, start, end, status, `last_executed_seq`, `prior_contract_id`). Register row OQ27; [`amendment-entity-field-schema.md`](../amendment-entity-field-schema.md) section 2.2a.
-- **S1 schema has no flag and no mode.** [`V1_7__contract_documents.sql`](../../../backend/services/contract-asset-management/src/main/resources/db/migration/V1_7__contract_documents.sql) creates `contracts` with `prior_contract_id` and `status` in `ACTIVE`, `EXPIRED`, `TERMINATED`. The migration comment says there is no `precedence_flag`. There is no amendment-mode column on `amendment_documents`. Companion: [`s1-v1-7-contract-documents.md`](../s1-v1-7-contract-documents.md).
-- **S2 chain can carry a later precedence audit, and this note does not add an event.** S2 / DRG-580 appends hash-chained `amendment_document_events` (`seq_no`, `prev_hash`, `content_hash`) in the caller transaction: `AmendmentEventWriter`, table defined in the same V1_7 migration. ADR-035 authorizes that audit story. A precedence-change event type is not registered. S6 is not authorized to register one.
-- **Apply stays after EXECUTED.** OQ2 is resolved. ADR-035 and the first-slice requirements keep a single `status`. New-contract mode does not move the apply gate.
-- **Field-schema shape is provisional.** Section 2.2a sketches `precedence_flag` as boolean, not null, default false, and says boolean versus rank is open on DRG-592. That sketch is not a landed column.
+- **Sequencing is a register row, not a column.** `read` OQ26 in [`renewals-amendments-open-questions-register.md`](../renewals-amendments-open-questions-register.md): both modes, amend-in-place in S1–S8, new-contract mode as the next increment. The same sequencing is in [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) (clarification 2026-10-16, C1) and [`renewals-amendments-dev-readiness.md`](../renewals-amendments-dev-readiness.md). `cpq-project-transcript.md` was not re-opened this pass (`unverified` as a second source).
+- **Flag placement is a register row, not a migration.** `read` OQ27 in the same register, and section 2.2a of [`amendment-entity-field-schema.md`](../amendment-entity-field-schema.md). The field schema sketches a boolean. That sketch is not a landed column.
+- **S1 migration has `prior_contract_id` and no precedence column.** `read` [`V1_7__contract_documents.sql`](../../../backend/services/contract-asset-management/src/main/resources/db/migration/V1_7__contract_documents.sql) `CREATE TABLE contracts`: `prior_contract_id uuid`, `chk_contracts_status` allows `ACTIVE`, `EXPIRED`, `TERMINATED`. The migration comment says "no precedence_flag (DRG-592)". A search of `backend/services/contract-asset-management/src/main/resources/db/migration` for `amendment_mode` and `precedence_flag` found `precedence_flag` only in that comment. Companion: [`s1-v1-7-contract-documents.md`](../s1-v1-7-contract-documents.md).
+- **Document ownership column.** `read` the same migration, `CREATE TABLE amendment_documents`: `contract_id uuid NOT NULL REFERENCES contracts (id)`. One document has one `contract_id`.
+- **Event table columns, not a precedence event type.** `read` the same migration, `CREATE TABLE amendment_document_events`: `seq_no`, `prev_hash`, `content_hash`, `event_type varchar(80) NOT NULL`. No check constraint enumerates `event_type`. Schema-registry registration of a precedence event was not opened (`unverified`).
+- **S2 writer class.** `read` [`AmendmentEventWriter.java`](../../../backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/events/AmendmentEventWriter.java) class comment: it appends one hash-chained event and its audit outbox row in the caller's transaction. The writer was not executed (`unverified` as runtime).
+- **Apply after EXECUTED is a document decision.** `read` OQ2 in the register (RESOLVED 2026-10-16, apply only after EXECUTED, single status column) and the ADR-035 context sentence that records the same resolution. A search of the CAM migration directory found `apply_status` only in the `V1_7__contract_documents.sql` comment that says there is no `apply_status`. A live database catalog was not queried (`unverified`).
 
 ### Forks
 
-**F1. Flag shape.**
+**592-F1. Flag shape.**
 
 | Option | Meaning |
 |---|---|
-| A. Boolean | `precedence_flag` true means this contract takes precedence over the contract named by `prior_contract_id`. |
-| B. Rank | An integer rank orders every overlapping active contract for the same customer. |
-| C. Exclusive winner pointer | A single `prevailing_contract_id` lives on the customer, and the boolean column is not added. |
+| A. Boolean | `precedence_flag` true means this contract takes precedence over `prior_contract_id`. |
+| B. Rank | An integer orders every overlapping active contract for the same customer. |
+| C. Exclusive winner pointer | `prevailing_contract_id` on the customer. No boolean column. |
 
-**Recommendation:** A. OQ27 already names one indexable column, `precedence_flag`, outside the thin header. Rank is only needed if more than two contracts must be ordered against each other. A customer-level pointer duplicates `prior_contract_id` and is not the column OQ27 named.
+**Recommendation:** A. OQ27 names one indexable column, `precedence_flag`, outside the thin header (`read` register).
 
-**Default:** boolean, not null, default false. Amend-in-place leaves it false. New-contract mode sets it true on the new contract only. False on every contract means the single active contract is the commercial source, which is the first-slice case.
+**Default:** Proposed, unaccepted, owner decision required. Boolean `precedence_flag`, not null, default false (option A). Amend-in-place leaves it false. New-contract mode sets it true on the new contract only. Alternatives written out: an integer rank that orders every overlapping active contract (option B); a single `prevailing_contract_id` on the customer and no boolean column (option C).
 
-**F2. Who may change the flag.**
+**592-F2. Who may change the flag.**
 
 | Option | Meaning |
 |---|---|
 | A. Write-once | Set when the new contract is created. A later change is a new executed amendment. |
 | B. Product or admin flip | A privileged actor updates the column and writes an audit event. |
-| C. Sales flip | The seller changes precedence without a new amendment. |
+| C. Sales flip | The seller changes precedence with no new amendment. |
 
-**Recommendation:** A. Precedence is a commercial fact. A silent flip changes which contract pricing and entitlement read.
+**Recommendation:** A.
 
-**Default:** write-once at creation of the new contract. A change goes through a new amendment document that reaches `EXECUTED`. The S2 chain records that document. No actor flips the column in place. Who may draft that later amendment stays with the parked approval category [DRG-591](https://linear.app/drgamtd-workspace/issue/DRG-591).
+**Default:** Proposed, unaccepted, owner decision required. Write-once at creation of the new contract (option A). A later change is a new amendment document that reaches `EXECUTED`. Alternatives written out: a product or admin in-place flip with an audit event (option B); a sales flip with no new amendment (option C). Who may draft the later amendment stays on parked [DRG-591](https://linear.app/drgamtd-workspace/issue/DRG-591) (`read` OQ25 in the register).
 
-**F3. How overlapping active contracts resolve.**
-
-| Option | Meaning |
-|---|---|
-| A. One rule for pricing, entitlement, and visibility | The contract with `precedence_flag` true is the commercial source. Both contracts stay visible. |
-| B. Flag wins for pricing and entitlement; visibility is a separate policy | Visibility stays on [DRG-595](https://linear.app/drgamtd-workspace/issue/DRG-595). |
-| C. Reader-specific rules | Pricing, entitlement, and visibility each pick a contract by their own rule. |
-
-**Recommendation:** A for pricing and entitlement, with both contracts visible as reference. Two true flags on one `prior_contract_id` chain is a failed read, not a silent pick.
-
-**Default:** pricing and entitlement read the precedence-true contract. The original stays readable as reference. Zero true flags and one active contract: that contract is the source. Two true flags: the read fails closed. DRG-595 still owns who may see a contract. This note does not set that visibility policy.
-
-**F4. Original contract at its own end date.**
+**592-F3. Overlapping active contracts.**
 
 | Option | Meaning |
 |---|---|
-| A. Follows its own end date | The amendment does not close it. `status` becomes `EXPIRED` when that end date passes. The row remains a reference. |
-| B. Stays `ACTIVE` indefinitely | The original never expires. |
-| C. Terminated at new-contract creation | The amendment closes the original. |
+| A. One commercial rule, both visible | The precedence-true contract is the pricing source. Both stay visible. |
+| B. Flag for pricing; visibility elsewhere | Visibility stays on DRG-595. |
+| C. Reader-specific rules | Pricing, entitlement, and visibility each pick a contract. |
 
-**Recommendation:** A. The call record already says the original is not closed by the amendment. The S1 check constraint already has `EXPIRED`. Option C contradicts the call record.
+Entitlement resolution under every option is pending the DRG-609 design (not accepted). This fork does not decide it.
 
-**Default:** new-contract creation leaves the original `ACTIVE` and open as a reference. Its own end date moves it to `EXPIRED` through the existing status set. No new status value. No amendment-driven `TERMINATED`.
+**Recommendation:** A for pricing and visibility of the contract row. Two true flags on one `prior_contract_id` chain fail closed.
 
-**F5. Where the mode is stored.**
+**Default:** Proposed, unaccepted, owner decision required. Pricing reads the precedence-true contract; both contracts stay visible; two true flags fail closed (option A). Zero true flags and one active contract: that contract is the pricing source. Alternatives written out: the flag wins pricing and DRG-595 owns visibility (option B); pricing, entitlement, and visibility each use their own rule (option C). Entitlement resolution is pending the DRG-609 design (not accepted) and is not part of this default. DRG-595 is named from [`renewals-amendments-dev-readiness.md`](../renewals-amendments-dev-readiness.md) (`read`). The DRG-595 issue body was not re-opened this pass (`unverified`).
+
+**592-F4. Original contract at its own end date.**
+
+| Option | Meaning |
+|---|---|
+| A. Follows its own end date | The amendment does not close it. `status` can become `EXPIRED`. The row stays a reference. |
+| B. Stays `ACTIVE` | No expiry. |
+| C. Terminated at creation | The new-contract amendment sets the original to `TERMINATED`. |
+
+**Recommendation:** A. `read` field-schema clarification 2026-10-16: the original stays open as a reference. `read` `chk_contracts_status` in `V1_7__contract_documents.sql`.
+
+**Default:** Proposed, unaccepted, owner decision required. New-contract creation leaves the original `ACTIVE` and open as a reference; its own end date is the path to `EXPIRED` (option A). Alternatives written out: the original stays `ACTIVE` with no expiry (option B); the amendment sets the original to `TERMINATED` at creation (option C). No new status value is in this default. A job that flips `EXPIRED` was not found in `V1_7__contract_documents.sql` or `V1_8__contract_header_backfill.sql` (`unverified` as a scheduler outside those files).
+
+**592-F5. Where the mode is stored.**
 
 | Option | Meaning |
 |---|---|
 | A. Column on the amendment document | `amendment_mode` is `NEW_CONTRACT` or `AMEND_IN_PLACE`. |
-| B. Inferred | Mode is inferred from whether a new `contracts` row was inserted. |
-| C. LifecycleChange only | Quote-service stores the mode and CAM does not. |
+| B. Inferred | Mode is inferred from an insert into `contracts`. |
+| C. LifecycleChange only | Quote-service stores the mode. CAM does not. |
 
-**Recommendation:** A. ADR-035 places the document in CAM. The mode is a fact of that document. Inference breaks the moment a backfill or a merge also inserts a contract.
+**Recommendation:** A. `read` ADR-035 D-01: the document lives in CAM.
 
-**Default:** the column arrives with the DRG-592 increment, not with S1. Until that increment, every document is amend-in-place. The first-slice API, which S3 has not started, does not gain this field from this note.
+**Default:** Proposed, unaccepted, owner decision required. The column is a later increment, not S1 (option A). Until that increment, documents are amend-in-place because OQ26 says so (`read` register), not because a mode column exists. Alternatives written out: infer the mode from whether a new `contracts` row was inserted (option B); store the mode only on the LifecycleChange (option C). S3 is not started. The #642 text quoted above says S3 / DRG-581 requires separate owner authorization.
 
-**F6. Which contract owns the amendment document.**
+**592-F6. Which contract owns the document.**
 
 | Option | Meaning |
 |---|---|
-| A. The new contract owns the document | `amendment_documents.contract_id` is the new contract. `prior_contract_id` points at the original. |
-| B. The original owns the document | The new contract is only a result row. |
-| C. Both own a copy | Two documents, one per contract. |
+| A. The new contract | `amendment_documents.contract_id` is the new contract. `prior_contract_id` points at the original. |
+| B. The original | The new contract is only a result row. |
+| C. Both | Two documents. |
 
-**Recommendation:** A. Numbering is per contract (`{contract_number}-A{nnn}` at `EXECUTED`). One document has one `contract_id` in V1_7.
+**Recommendation:** A. `read` `contract_id` on `amendment_documents` in `V1_7__contract_documents.sql`. `read` OQ4 in the register: final number at EXECUTED, format recorded in ADR-035 context as `{contract_number}-A{nnn}`.
 
-**Default:** one document on the new contract, `prior_contract_id` set, no second document on the original.
-
-### Owner decision needed
-
-Confirm or replace defaults F1–F6. OQ26 and OQ27 stay as already resolved on `main`. The decision that is still open is the flag shape, the writer, overlap resolution, the original's end-date behavior, and the document link.
+**Default:** Proposed, unaccepted, owner decision required. One document on the new contract, `prior_contract_id` set, no second document on the original (option A). Alternatives written out: the original owns the document and the new contract is only a result row (option B); each contract gets its own copy (option C).
 
 ### Dependencies
 
 | Dependency | Why it is named |
 |---|---|
-| S1 / DRG-579, V1_7 | Header and `prior_contract_id` exist. The flag column does not. |
-| S2 / DRG-580 | Audit chain exists. A precedence event type does not. |
-| ADR-035 | Placement and the thin-header list stay. This increment adds a column beside that list. |
-| DRG-581 (S3) | Mode on the document API waits until S3 is separately authorized. This note does not authorize it. |
-| DRG-554 | Regrouping of OQ7 headers is a merge follow-up, not a second new-contract design. See section 2. |
-| DRG-591 | Who may draft a later precedence-changing amendment. Parked. |
+| `V1_7__contract_documents.sql` (DRG-579) | Header and `prior_contract_id` exist. `precedence_flag` does not. |
+| `AmendmentEventWriter.java` (DRG-580) | Hash-chain append exists in source. A precedence `event_type` is not enumerated. |
+| ADR-035 | Thin-header list stays. A later column sits beside that list. |
+| DRG-581 (S3) | Not started. Quoted #642 text: "S3 / DRG-581 requires separate owner authorization." |
+| DRG-554 | OQ7 regrouping is section 2, not a second new-contract design. |
+| DRG-591 | Parked approvals. `read` OQ25. |
+| DRG-609 | Entitlements in 592-F3. Design not accepted. |
 
 ### What it unblocks
 
-An owner confirmation of F1–F6 unblocks a later schema increment for `precedence_flag` and `amendment_mode`, and the V-rules for new-contract mode that the mid-term spec says are undefined. It does not unblock S3, S6, or a change to the S1 header. DRG-607 (per-cluster specs) can cite this frame. It cannot treat the frame as accepted.
+An owner decision on 592-F1 through 592-F6 is the input to a later schema increment. It does not start S3, authorize S6, or change `V1_7__contract_documents.sql`. DRG-607 can cite this frame. The frame stays Proposed, unaccepted, owner decision required.
 
 ---
 
 ## 2. DRG-554 — Co-termination, agreement merge, and the OQ7 regrouping follow-up
 
-**Issue:** [DRG-554](https://linear.app/drgamtd-workspace/issue/DRG-554) (RA-20), Medium, Backlog. Relations read: DRG-591, DRG-461, DRG-607, DRG-585, DRG-547.
+**Issue:** [DRG-554](https://linear.app/drgamtd-workspace/issue/DRG-554) (RA-20). Linear read 2026-10-17: Medium, Backlog. Relations read: DRG-591, DRG-461, DRG-607, DRG-585, DRG-547.
 
-OQ7's thin default stays: one contract per existing subscription. This section is the regrouping follow-up. It does not rewrite the backfill.
+The one-contract-per-subscription wording stays. This section is the regrouping follow-up. It does not rewrite the backfill.
 
 ### Problem
 
-There is no accepted co-term policy and no accepted way to merge agreements. Multi-line and multi-agreement changes need a date rule and, separately, a way to fold more than one agreement into one survivor. S7 already created the one-contract-per-subscription shape. Subscriptions that commercially belong together stay on separate headers until a later merge. [DRG-461](https://linear.app/drgamtd-workspace/issue/DRG-461) (BC-07-04) is the existing amendments-and-co-termination item. Its acceptance criteria are unchecked and its delivery text has not been reverified. This frame extends that item. It does not open a second co-term implementation.
+There is no accepted co-term policy and no accepted merge of agreements. Multi-agreement changes need a date rule and, separately, a way to fold agreements into one survivor. [DRG-461](https://linear.app/drgamtd-workspace/issue/DRG-461) is the existing BC-07-04 item (Linear read 2026-10-17: acceptance criteria unchecked). This frame links to that item.
 
-### Settled on main
+### Already on main
 
-- **Single-agreement mid-term end date.** Mid-term V5: amended lines co-term to the existing end date unless a co-term policy says otherwise. [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md). First-slice FR-11 repeats the existing-end rule. [`amendment-first-slice-requirements-and-acceptance.md`](../amendment-first-slice-requirements-and-acceptance.md).
-- **A date column exists. A policy does not.** V1_7 `amendment_documents.co_term_date` is a date. There is no `CoTermPolicy` table and no `merged_from_ids` column.
-- **OQ7 / S7 default is in force.** [`s7-v1-8-header-backfill.md`](../s7-v1-8-header-backfill.md) states the adopted wording: one thin contract per existing subscription, no synthetic history, no retroactive events, and a later merge tracked on DRG-554 is the place to regroup. The backfill functions do not regroup. `prior_contract_id` and `governing_agreement_ref` are null on those rows.
-- **The co-term spec is a proposal.** [`specs/co-termination.md`](specs/co-termination.md) status is proposal only. It names modes `LatestEnd`, `EarliestEnd`, `None`, `AlignToAgreement`, and a proposed `AlignToDate`. Its open questions 1–9 are unanswered. Open question 6 leaves merge versus co-term unset. Open question 8 points the day-count at the amendment proration rule and forbids a third formula.
-- **Renewal stub records a separate customer-level coterm note.** [`renewal-policy-stub.md`](../renewal-policy-stub.md) clarification: blended or rates-carry-forward, carry-forward as the named default, shared end date as the anchor, all-or-nothing per customer, optional renewal group. Approver deferred to DRG-591. That note is not an accepted policy.
-- **Proration is the Accepted day-stub.** Co-term chooses a date. The charge for a partial period stays [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) D-01. This section does not add a formula.
-- **DRG-461's `ContractAmended` event is not specified here.** S6 is not authorized. ADR-024 through ADR-027 stay Proposed. No event contract is added.
+- **V5 and FR-11.** `read` [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) V5: effective date on or after contract start and on or before contract end; amended lines co-term to the existing end date unless a co-term policy says otherwise. `read` FR-11 in [`amendment-first-slice-requirements-and-acceptance.md`](../amendment-first-slice-requirements-and-acceptance.md): amended lines co-term to the existing end date.
+- **Term hook.** `read` the same mid-term spec, extension point 2: "renewal policy may extend `effective_to` and the contract end date; the amendment policy forbids it."
+- **Date column, no policy table.** `read` `co_term_date date` on `amendment_documents` in `V1_7__contract_documents.sql`. A search of the CAM migration directory for `merged_from` found no match. There is no `CoTermPolicy` table in that directory (`read` as a filename and text search, not a catalog query of a live database).
+- **V1_8 wording.** `read` [`V1_8__contract_header_backfill.sql`](../../../backend/services/contract-asset-management/src/main/resources/db/migration/V1_8__contract_header_backfill.sql) header comment: one thin contract per existing subscription; no synthetic amendment history; no retroactive events; a later merge tracked on DRG-554 is the place to regroup; the backfill does not regroup. Functions named in that file: `contract_header_backfill_count`, `contract_header_backfill_apply`, `contract_header_backfill_compensate`. The comment says Flyway installs the functions and does not execute them. Whether any environment has called apply is `unverified`. `prior_contract_id` and `governing_agreement_ref` are null in the fill rules in that comment. The same wording is in [`s7-v1-8-header-backfill.md`](../s7-v1-8-header-backfill.md) (`read`).
+- **Register row for OQ7.** `read` OQ7: status `DEFAULT PROPOSED for slice`, proposed default "contract header only (S7), no synthetic history." Merged #642 text, quoted above: "It does not change OQ5 (adopted for the first slice), OQ7 (still `DEFAULT PROPOSED` in the register) or any ADR status."
+- **Co-term spec is a proposal.** `read` [`specs/co-termination.md`](specs/co-termination.md) status line and open questions 1–9. `AlignToDate` is proposed there and is not accepted. Open question 6 leaves merge versus co-term unset.
+- **Renewal stub coterm note.** `read` [`renewal-policy-stub.md`](../renewal-policy-stub.md) clarification 2026-10-16: blended or rates-carry-forward, carry-forward named as default, shared end date, all-or-nothing per customer, optional renewal group, approver deferred to DRG-591. That note is not an accepted policy.
+- **RN1 deferral.** `read` [`renewal-policy-spec.md`](renewal-policy-spec.md) RN1: a co-term anchor supplied by DRG-554 replaces the day-after-end date. The anchor's meaning stays DRG-554's.
+- **Proration.** Cited only: [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md). This section does not restate it. [`specs/co-termination.md`](specs/co-termination.md) open question 8 says the day-count is the amendment proration rule and that the slice must not add a third formula (`read`).
+- **DRG-461 event.** The Linear issue names a `ContractAmended` event (Linear read). No event contract is added here. S6 is not authorized (`read` register OQ5).
 
 ### Forks
 
-**F1. Mode set.**
+**554-F1. Mode set.**
 
 | Option | Meaning |
 |---|---|
-| A. DRG-554's four | `LatestEnd`, `EarliestEnd`, `None`, `AlignToAgreement`. |
-| B. Four plus `AlignToDate` | An explicit anchor date. The co-term proposal adds this because a named anniversary is neither the latest nor the earliest existing end. |
-| C. Customer-level renewal coterm as a second engine | The renewal-stub note (carry-forward, shared anchor, renewal group) is a separate policy with its own dates. |
+| A. Four modes | `LatestEnd`, `EarliestEnd`, `None`, `AlignToAgreement`, as named on DRG-554. |
+| B. Four plus `AlignToDate` | An explicit anchor date, from the co-term proposal. |
+| C. Second engine | The renewal-stub customer coterm is a separate date engine. |
 
-**Recommendation:** B for the agreement date rule. The renewal-stub coterm supplies an anchor into this same rule. It is not a second engine.
+**Recommendation:** B for the agreement date rule. The renewal-stub note supplies an anchor into that rule.
 
-**Default:** `AlignToDate` is in the proposed set. It is not accepted. A single-agreement mid-term amendment with no policy row still uses V5 (the existing end) and does not require a `CoTermPolicy`.
+**Default:** Proposed, unaccepted, owner decision required. The proposed set is the four DRG-554 modes plus `AlignToDate` (option B). A single-agreement mid-term amendment with no policy row still uses V5 (`read` mid-term spec). Alternatives written out: only `LatestEnd`, `EarliestEnd`, `None`, and `AlignToAgreement` (option A); a second customer-level coterm engine with its own dates (option C).
 
-**F2. Missing policy.**
+**554-F2. Missing policy.**
 
 | Option | Meaning |
 |---|---|
@@ -185,414 +247,394 @@ There is no accepted co-term policy and no accepted way to merge agreements. Mul
 
 **Recommendation:** C.
 
-**Default:** C. V5 covers the first slice. Multi-agreement co-term waits for an explicit mode.
+**Default:** Proposed, unaccepted, owner decision required. Single-agreement amendments keep V5, and a multi-agreement change with no mode is refused (option C). Alternatives written out: a missing policy means `None` (option A); a missing policy means `AlignToAgreement` (option B).
 
-**F3. Which lines move.**
+**554-F3. Which lines move.**
 
 | Option | Meaning |
 |---|---|
-| A. Every line on the target agreements | Untouched lines move too. |
+| A. All lines on the target agreements | Untouched lines move. |
 | B. Only lines in the change | A line the seller did not include keeps its end. |
 
-**Recommendation:** B.
+**Recommendation:** B. This matches co-term spec open question 3's boundary (`read` [`specs/co-termination.md`](specs/co-termination.md)). That question is still an owner decision there.
 
-**Default:** B.
+**Default:** Proposed, unaccepted, owner decision required. Only lines in the change move (option B). Alternatives written out: every line on the target agreements moves (option A).
 
-**F4. Shortening a term.**
+**554-F4. Shortening.**
 
 | Option | Meaning |
 |---|---|
-| A. Allowed, and a credit is emitted here | Co-term calculates the credit. |
-| B. Allowed as a date only | Credit, if any, is DRG-550. |
+| A. Credit emitted here | Co-term calculates a credit. |
+| B. Date only | Credit, if any, is DRG-550. |
 | C. Forbidden | `EarliestEnd` and an earlier anchor are rejected. |
 
-**Recommendation:** B. The Accepted proration ADR prices the requested quantity forward and does not emit a credit. Section 5 owns credit.
+**Recommendation:** B. This section does not calculate money.
 
-**Default:** B. Shortening is allowed only when the seller chose `EarliestEnd` or an earlier anchor. The co-term policy writes the date and writes no credit.
+**Default:** Proposed, unaccepted, owner decision required. The end date may move earlier only when the seller chose `EarliestEnd` or an earlier anchor, and this policy writes no credit (option B). Alternatives written out: co-term itself emits a credit (option A); shortening is forbidden (option C). Conversion price for any such credit is pending the DRG-609 design (not accepted).
 
-**F5. Lengthening past the governing contract end.**
-
-| Option | Meaning |
-|---|---|
-| A. Allowed as a mid-term amendment | The end date moves out. |
-| B. Refused on a mid-term amendment | Lengthening is a Renew, or new-contract mode under DRG-592. |
-| C. Allowed only as `AlignToDate` | An explicit anchor may pass the current end. |
-
-**Recommendation:** B. The mid-term policy forbids term extension. V5 caps the amended line at the existing end unless a co-term policy says otherwise. This frame's proposed policy does not say otherwise for a date past the governing end.
-
-**Default:** B. A mid-term co-term refuses an end after the governing contract end.
-
-**F6. Merge versus co-term, including OQ7 regrouping.**
+**554-F5. Lengthening past the governing end.**
 
 | Option | Meaning |
 |---|---|
-| A. Co-term only | Dates align. Agreements and S7 headers stay separate. No regrouping. |
-| B. Later DRG-554 merge retargets subscriptions | After an executed merge, `subscriptions.contract_id` moves to the survivor. Source headers stay as references. `mergedFromIds` is written on the survivor. The S7 backfill is not rerun. |
-| C. Regroup by DRG-592 new-contract mode | A new contract is the survivor. Backfilled headers stay put and are linked with `prior_contract_id`. |
+| A. Allowed mid-term | The end date moves out on an amendment. |
+| B. Refused mid-term | Lengthening is a Renew, or new-contract mode under DRG-592. |
+| C. `AlignToDate` may pass the end | An explicit anchor is the exception. |
 
-**Recommendation:** B for the OQ7 follow-up, because [`s7-v1-8-header-backfill.md`](../s7-v1-8-header-backfill.md) already names DRG-554 as the regrouping place. Co-term (F1) still aligns dates across agreements that remain separate. Merge is a different intent. Option C stays available if the owner refuses to retarget `contract_id`. Using C would put regrouping on DRG-592, which the S7 text does not say.
+**Recommendation:** B. `read` mid-term spec extension point 2: the amendment policy forbids extending the contract end date.
 
-**Default:** S7 rows stay one contract per subscription. The backfill is not regrouped. A merge intent is Proposed: it writes survivor identity, does not delete source rows, and does not run until the owner accepts a later change. The `contract_id` move itself is not specified by V1_8 and is not authorized here. [`oq7-header-backfill-owner-decision.md`](oq7-header-backfill-owner-decision.md) already records that no opened text specifies that move.
+**Default:** Proposed, unaccepted, owner decision required. A mid-term co-term refuses an end after the governing contract end (option B). Alternatives written out: the end date may move out on the amendment (option A); `AlignToDate` may pass the current end (option C).
 
-**F7. Source agreement after merge.**
-
-| Option | Meaning |
-|---|---|
-| A. Stays active as a reference until a later executed close | Matches the DRG-592 original-stays-open record. |
-| B. Cancelled when `mergedFromIds` is written | Commercial close is a side effect of the pointer. |
-| C. Deleted | Source row is removed. |
-
-**Recommendation:** A.
-
-**Default:** A. No delete. No automatic `TERMINATED`.
-
-**F8. Home for the work relative to DRG-461.**
+**554-F6. Merge versus co-term, including OQ7 regrouping.**
 
 | Option | Meaning |
 |---|---|
-| A. DRG-461 remains the capability item | This frame is the policy. Implementation links to DRG-461. |
-| B. DRG-554 replaces DRG-461 | BC-07-04 is closed as duplicate. |
+| A. Co-term only | Dates align. S7 headers stay one per subscription. No regrouping. |
+| B. Later merge retargets `contract_id` | After an executed merge, subscriptions point at the survivor. Source headers stay as references. The backfill is not rerun. |
+| C. Regroup through DRG-592 | A new contract is the survivor. Backfilled headers stay and are linked with `prior_contract_id`. |
 
-**Recommendation:** A. The DRG-554 description says extend or link rather than duplicate.
+**Recommendation:** B as the follow-up the V1_8 comment names, and only after a later owner decision. Co-term (554-F1) still aligns dates across agreements that remain separate.
 
-**Default:** A. DRG-461's `ContractAmended` event is not adopted. S6 remains unauthorized.
+**Default:** Proposed, unaccepted, owner decision required. `V1_8__contract_header_backfill.sql` rows stay one contract per subscription, and the backfill is not regrouped (the V1_8 comment, option A's present-tense result). The later merge that would retarget `subscriptions.contract_id` (option B) is a separate Proposed follow-up and is not run. Alternatives written out: never regroup, co-term dates only (option A); create a DRG-592 new contract and leave the backfilled headers in place (option C). No statement in `V1_8__contract_header_backfill.sql` updates `contract_id` from one contract to another (`read` header and fill rules). [`oq7-header-backfill-owner-decision.md`](oq7-header-backfill-owner-decision.md) records the same gap (`read`).
 
-### Owner decision needed
+**554-F7. Source after merge.**
 
-Confirm or replace F1–F8. The OQ7 one-contract-per-subscription default is not one of the open choices. F6's default leaves that default in place and keeps regrouping as a later, unaccepted merge.
+| Option | Meaning |
+|---|---|
+| A. Stays a reference | Active until a later executed close. |
+| B. Cancelled with the pointer | Commercial close is a side effect. |
+| C. Deleted | The source row is removed. |
+
+**Recommendation:** A. It matches the DRG-592 record that the original stays open (`read` field-schema clarification).
+
+**Default:** Proposed, unaccepted, owner decision required. The source stays active as a reference until a later executed close (option A). Alternatives written out: the source is cancelled when the survivor pointer is written (option B); the source row is deleted (option C).
+
+**554-F8. Home versus DRG-461.**
+
+| Option | Meaning |
+|---|---|
+| A. Link | DRG-461 remains the capability item. This note is the policy frame. |
+| B. Replace | DRG-554 closes DRG-461 as a duplicate. |
+
+**Recommendation:** A. The DRG-554 description says extend or link rather than duplicate (Linear read 2026-10-17).
+
+**Default:** Proposed, unaccepted, owner decision required. DRG-461 stays the capability item and this note does not adopt its `ContractAmended` event (option A). Alternatives written out: DRG-554 replaces DRG-461 and BC-07-04 is closed as a duplicate (option B). S6 remains unauthorized (`read` register OQ5).
 
 ### Dependencies
 
 | Dependency | Why it is named |
 |---|---|
-| DRG-461 | Existing BC-07-04 home. Link, do not fork a second model. |
-| DRG-585 / S7 | Headers exist as one per subscription. Regrouping waits on this frame's F6. |
-| [`specs/co-termination.md`](specs/co-termination.md) | Proposal this frame does not accept. `AlignToDate` and the merge questions come from its open list. |
-| [`specs/catalog-model.md`](specs/catalog-model.md) | Proposed `coTermable` flag. The catalog model is not accepted. A missing flag is not a refusal until that model is accepted. |
-| DRG-576 | Product relationships and eligibility. Backlog. |
-| DRG-591 | Approver for customer-level coterm. Parked. |
-| Accepted proration ADR | Day-count when the anchor falls mid-period. Not reopened. |
-| DRG-550 | Credit if a shortened term should pay one. Section 5. Default there is no credit. |
+| DRG-461 | BC-07-04 home. Link. |
+| `V1_8__contract_header_backfill.sql` (DRG-585) | One header per subscription. Regrouping is 554-F6 and is not run. |
+| [`specs/co-termination.md`](specs/co-termination.md) | Proposal. Not accepted. |
+| [`specs/catalog-model.md`](specs/catalog-model.md) | Proposed `coTermable` flag. Not accepted. A missing flag is not a refusal in this note. |
+| DRG-576 | Relationships and eligibility. Backlog on Linear (not re-read this pass, `unverified` beyond the 2026-10-17 read of DRG-576). |
+| DRG-591 | Approver. Parked. `read` OQ25. |
+| [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) | Day-count. Cited, not reopened. |
+| DRG-550 | Credit if a shortened term should pay one. 550-F2 default is `NoCredit`. |
+| DRG-609 | Conversion price on 554-F4. Design not accepted. |
 
 ### What it unblocks
 
-An owner confirmation unblocks a later co-term policy and a later merge design for OQ7 headers. It does not unblock a rewrite of V1_8, an S3 change, an S6 event, or DRG-461's unchecked acceptance criteria. Renewal RN1 in [`renewal-policy-spec.md`](renewal-policy-spec.md) already defers a co-term anchor to DRG-554. That deferral stays.
+An owner decision is the input to a later co-term policy and a later merge design. It does not rewrite `V1_8__contract_header_backfill.sql`, start S3, or authorize S6.
 
 ---
 
 ## 3. DRG-594 — Legal-review-free amendments
 
-**Issue:** [DRG-594](https://linear.app/drgamtd-workspace/issue/DRG-594) (RA-60), High, Backlog. Relations read: DRG-560, DRG-552, DRG-591, DRG-581, DRG-607, DRG-601.
+**Issue:** [DRG-594](https://linear.app/drgamtd-workspace/issue/DRG-594) (RA-60). Linear read 2026-10-17: High, Backlog. Relations read: DRG-560, DRG-552, DRG-591, DRG-581, DRG-607, DRG-601.
 
 ### Problem
 
-The call record says an amendment skips legal review only when it changes pricing, term, or seats, and nothing else. Clauses, products, special terms, and the governing agreement need legal review before execution. The first slice has no legal-review gate. Add and Remove of a product line are outside the free set unless product treats them as seats. General approvals (who approves, thresholds) stay parked on DRG-591 and [DRG-601](https://linear.app/drgamtd-workspace/issue/DRG-601).
+The on-main clarification says an amendment skips legal review only when it changes pricing, term, or seats, and nothing else. Clauses, products, special terms, and the governing agreement need legal review before execution. Add and Remove of a product line are outside that set unless product treats them as seats. General approvals stay parked on DRG-591 and DRG-601 (`read` OQ25; DRG-601 body was read 2026-10-17 as a relation title on DRG-594, body not re-opened this pass, `unverified`).
 
-### Settled on main
+### Already on main
 
-- **The free set is recorded and is not an ADR.** [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) clarification 2026-10-16: only pricing, term, or seats are legal-review-free. Add or Remove of a product line is outside that set unless product treats it as seats. That sentence is the open product question.
-- **First-slice signature cut has no legal gate.** Signature policies in slice: `NOT_REQUIRED`, `NOTICE_ONLY`, `CLICK_THROUGH`, and those auto-execute after `APPROVED` (FR-08). `WET` and `E_SIGN` exist on the V1_7 check constraint and are rejected for the slice (`SIGNATURE_NOT_SUPPORTED_IN_SLICE` in the S3 criteria). S3 has not started, so that rejection is not a running gate.
-- **Line vocabulary the classifier can read is already stored.** V1_7 `chk_amendment_line_action` allows `ADD`, `UPDATE`, `REMOVE`, `NO_CHANGE`, `RENEW`, `UPGRADE`, `DOWNGRADE`, `SWAP`, `CONVERT_METRIC`, `SUSPEND`, `RESUME`, `TERMINATE`. [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md) is a proposal and is not the authority for this classifier.
-- **State machine has no legal-review state.** Spec section 3: `DRAFT` to `IN_REVIEW` when priced and V1–V12 pass. No legal-review transition.
-- **OQ6 voids approvals on a pre-execution revision.** [`oq6-revision-model-owner-decision.md`](oq6-revision-model-owner-decision.md). A classification bound to a digest does not survive onto the next revision. OQ18 stays Proposed. S3 stays unauthorized.
-- **Partial apply is a different question.** OQ5 option A is adopted for the first slice in [`partial-apply-owner-decision.md`](partial-apply-owner-decision.md). That adoption does not accept [`specs/partial-apply.md`](specs/partial-apply.md) and does not authorize S4 or S6. A legal-review hold is not a `BLOCKED` unit.
+- **Free-set sentence, not an ADR.** `read` [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) clarification 2026-10-16: only pricing, term, or seats are legal-review-free. Adding or removing a product line is outside that set unless product treats it as seats.
+- **Signature tokens and the first-slice cut.** `read` `chk_amendment_document_signature` in `V1_7__contract_documents.sql`: `WET`, `E_SIGN`, `CLICK_THROUGH`, `NOTICE_ONLY`, `NOT_REQUIRED`. `read` OQ10 in the register and FR-08 in the requirements file: `NOT_REQUIRED`, `NOTICE_ONLY`, and `CLICK_THROUGH` auto-execute after `APPROVED`; other policies stay unexecutable in the slice. The S3 criterion `SIGNATURE_NOT_SUPPORTED_IN_SLICE` is text in the DRG-581 issue (Linear read) and in the requirements file. S3 has not started, so that rejection is not a running gate (`unverified` as runtime).
+- **Action tokens.** `read` `chk_amendment_line_action` in `V1_7__contract_documents.sql`: `ADD`, `UPDATE`, `REMOVE`, `NO_CHANGE`, `RENEW`, `UPGRADE`, `DOWNGRADE`, `SWAP`, `CONVERT_METRIC`, `SUSPEND`, `RESUME`, `TERMINATE`. `read` OQ12: slice action codes are Add, Update, Remove. [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md) is a proposal (`read` status line).
+- **No legal-review state in the spec table.** `read` mid-term spec section 3: `DRAFT` to `IN_REVIEW` when priced and V1 to V12 pass. The table has no legal-review state.
+- **OQ6, quoted, not paraphrased.** Merged #642 text: "The document returns to `DRAFT`. Approvals and signatures are void; pricing pins from the previous revision do not carry over, and the new revision must be priced and submitted again." The full paragraph is in the standing section.
+- **Partial apply is a different hold.** `read` OQ5 in the register: option A for the first slice; `specs/partial-apply.md` is not accepted; S4 and S6 are not authorized.
 
 ### Forks
 
-**F1. Seats versus Add and Remove.**
+**594-F1. Seats versus Add and Remove.**
 
 | Option | Meaning |
 |---|---|
-| A. Seats are a same-SKU quantity Update | `UPDATE` of quantity, price, or term on the existing SKU is free. `ADD` of a SKU and `REMOVE` of a product line require review. |
-| B. Same-SKU Add and Remove count as seats | Adding or removing seats of the SKU already on the contract is free. A different SKU requires review. |
+| A. Same-SKU quantity Update | `UPDATE` of quantity, price, or term on the existing SKU is free. `ADD` of a SKU and `REMOVE` of a product line require review. |
+| B. Same-SKU Add and Remove are seats | A different SKU requires review. |
 | C. Any quantity change is free | Includes a new SKU. |
 
-**Recommendation:** A. The call record says adding or removing a product line is outside the free set unless product treats it as seats. Treating a product add as seats blurs that sentence. A same-SKU quantity change is the seat change.
+**Recommendation:** A.
 
-**Default:** A. First-slice Add and Remove of SaaS lines require legal review under this proposed default. The first-slice text is not edited by this note, and S3 does not gain the gate.
+**Default:** Proposed, unaccepted, owner decision required. A same-SKU quantity `UPDATE` is seats; `ADD` of a SKU and `REMOVE` of a product line require review (option A). Alternatives written out: same-SKU Add and Remove count as seats (option B); any quantity change, including a new SKU, is free (option C). This default does not edit the first-slice text and does not add a gate to S3.
 
-**F2. Where the gate sits.**
+**594-F2. Where the gate sits.**
 
 | Option | Meaning |
 |---|---|
-| A. Guard on `DRAFT` to `IN_REVIEW` | Legal-review-required cannot leave `DRAFT` until a legal-review record exists. No new state. |
+| A. Guard on `DRAFT` to `IN_REVIEW` | No new state. |
 | B. New `LEGAL_REVIEW` state | Inserted before `APPROVED`. |
-| C. Allowed into `IN_REVIEW`, blocked before `APPROVED` | Review is an approval task, specified by DRG-591. |
+| C. Block before `APPROVED` | The document may enter `IN_REVIEW`. |
 
-**Recommendation:** A. The ticket asks for a gate on `DRAFT` to `IN_REVIEW` and a V-rule. A new state is a state-machine change this note does not accept. Option C pulls parked approval design forward.
+**Recommendation:** A. The DRG-594 description asks for a gate on `DRAFT` to `IN_REVIEW` and a V-rule (Linear read).
 
-**Default:** A. The guard is Proposed. It is not added to S3.
+**Default:** Proposed, unaccepted, owner decision required. A guard on `DRAFT` to `IN_REVIEW` and no new state (option A). Alternatives written out: a new `LEGAL_REVIEW` state before `APPROVED` (option B); entry to `IN_REVIEW` is allowed and the stop is before `APPROVED` (option C). The guard is not added to S3.
 
-**F3. Override.**
-
-| Option | Meaning |
-|---|---|
-| A. No override | A required document stays in `DRAFT` until the classification changes. |
-| B. A named legal role may override | The S2 event records the classification and the actor. Sales cannot override. |
-| C. Sales may override | The seller attests and continues. |
-
-**Recommendation:** B, with the role left unnamed until DRG-591 is unparked.
-
-**Default:** no override path exists until that role is named. Until then the guard refuses. Sales cannot override.
-
-**F4. Mixed documents and header edits.**
+**594-F3. Override.**
 
 | Option | Meaning |
 |---|---|
-| A. Whole document | One line or header edit outside the free set makes the document require review. |
-| B. Per line | Free lines skip review and other lines wait. |
-| C. Header term and price are free; governing agreement, clauses, and special terms require review | Combined with A for lines. |
+| A. No override | The document stays in `DRAFT` until the classification changes. |
+| B. Named legal role | The actor is recorded. Sales cannot override. |
+| C. Sales override | The seller attests and continues. |
 
-**Recommendation:** A, using C's field split. Free header fields are price and term. `governing_agreement_ref`, clauses, and special terms require review. Product identity on a line requires review.
+**Recommendation:** B. The role name stays on DRG-591.
 
-**Default:** A. The document is legal-review-required if any edit is outside the free set. Lines are not split across legal outcomes. That is distinct from OQ5 partial apply.
+**Default:** Proposed, unaccepted, owner decision required. A named legal role may override, and until that role is named the guard refuses (option B, with option A's refusal in force until the name exists). Sales cannot override. Alternatives written out: no override ever (option A); the seller may override (option C). An event type for the override is not enumerated in `V1_7__contract_documents.sql` (`read` `event_type varchar(80)` with no value list).
 
-**F5. First-slice timing.**
+**594-F4. Mixed edits.**
 
 | Option | Meaning |
 |---|---|
-| A. Gate enters before S3 starts | The first-slice auto-execute cut changes. |
-| B. Gate is the next increment | S1–S8 keep the current signature cut. The gate lands with DRG-594 after the owner accepts it. |
+| A. Whole document | One edit outside the free set requires review. |
+| B. Per line | Free lines skip review. |
+| C. Header split | Price and term are free. Governing agreement, clauses, and special terms require review. |
 
-**Recommendation:** B. Same sequencing as new-contract mode. This note does not rewrite FR-08.
+**Recommendation:** A, using C's header split.
 
-**Default:** B.
+**Default:** Proposed, unaccepted, owner decision required. One line or header edit outside the free set makes the whole document require review; free header fields are price and term (option A with the field split in option C). Alternatives written out: free lines skip review while other lines wait (option B); governing agreement and clauses are free as well (the opposite of option C). This is distinct from OQ5 partial apply (`read` register).
 
-### Owner decision needed
+**594-F5. First-slice timing.**
 
-Confirm or replace F1–F5. F1 is the product question the ticket leaves open: whether SaaS Add and Remove count as seats. The proposed default is that they do not.
+| Option | Meaning |
+|---|---|
+| A. Before S3 | FR-08 changes before S3 starts. |
+| B. Later increment | S1–S8 keep the current signature cut. |
+
+**Recommendation:** B.
+
+**Default:** Proposed, unaccepted, owner decision required. The gate is a later increment and S1–S8 keep the current signature cut (option B). Alternatives written out: the gate is required before S3 starts (option A). FR-08 is not rewritten.
 
 ### Dependencies
 
 | Dependency | Why it is named |
 |---|---|
-| DRG-552 | Action-code vocabulary. The V1_7 check constraint already stores a set. [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md) is not accepted. |
-| DRG-581 (S3) | The guard would live on the state machine S3 has not started. |
-| DRG-580 (S2) | Audit of classification and override uses the existing chain. No new event type is registered here. |
-| DRG-591, DRG-601, DRG-560 | Approval design stays parked. This section defines the bypass set only. |
-| OQ6 record | A revision returns the document to `DRAFT` and voids the prior classification. |
+| `V1_7__contract_documents.sql` `chk_amendment_line_action` | Stored action tokens. |
+| [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md) | Proposal. Not the classifier. |
+| DRG-581 (S3) | Not started. Quoted #642 text applies. |
+| DRG-580 writer | Existing append path. No new `event_type` list. |
+| DRG-591, DRG-601, DRG-560 | Approval design stays parked. |
+| OQ6 file | Quoted rule 1. A pre-execution revision returns the document to `DRAFT` and voids approvals and signatures. |
 
 ### What it unblocks
 
-An owner confirmation unblocks a later V-rule and a later guard on the S3 machine. It does not start S3, does not unpark DRG-591, and does not change first-slice auto-execute. DRG-537's UI spec already leaves this gate off the draft create body. That exclusion stays.
+An owner decision is the input to a later V-rule. It does not start S3, unpark DRG-591, or change FR-08. `read` [`story-drg-537-ui-spec.md`](story-drg-537-ui-spec.md): the legal-review gate is DRG-594 and is not a field on the draft create body.
 
 ---
 
 ## 4. DRG-599 — Amendment SKU mapping table
 
-**Issue:** [DRG-599](https://linear.app/drgamtd-workspace/issue/DRG-599) (RA-65), High, Backlog. Relations read: DRG-565, DRG-576, DRG-591, DRG-590, DRG-607.
+**Issue:** [DRG-599](https://linear.app/drgamtd-workspace/issue/DRG-599) (RA-65). Linear read 2026-10-17: High, Backlog. Relations read: DRG-565, DRG-576, DRG-591, DRG-590, DRG-607.
+
+Any price produced by a mapping, a swap, an upgrade, or a conversion is pending the DRG-609 design (not accepted). This section does not set that price.
 
 ### Problem
 
-Upgrade, swap, and replacement need a mapping from a SKU on the original contract to the SKU or SKUs on the amendment. The call record gives that table to the product team. Sales may dispute a mapping. A contested mapping holds the amendment: execution and apply wait until product resolves the dispute. First-slice Add, Update, and Remove on the same SKU do not use a mapping. Conditional rules on top of a mapping stay in Drools and stay parked on [DRG-590](https://linear.app/drgamtd-workspace/issue/DRG-590).
+Upgrade, swap, and replacement need a mapping from a SKU on the original contract to the SKU or SKUs on the amendment. The DRG-599 description gives the table to the product team, lets sales dispute a mapping, and holds execution and apply while a line uses a contested mapping (Linear read). Same-SKU Add, Update, and Remove do not use a mapping. Conditional rules stay parked on DRG-590 (`read` OQ24).
 
-### Settled on main
+### Already on main
 
-- **No product-to-product relationship is landed.** [`specs/catalog-model.md`](specs/catalog-model.md) records the product-service shape: unique `sku`, `ProductType`, status `DRAFT` / `ACTIVE` / `DEPRECATED` / `RETIRED`, and no relationship row. That file is a proposal. It does not accept a model.
-- **DRG-576 is the relationship story.** It asks for effective-dated `ProductRelationship` types `UPGRADE`, `DOWNGRADE`, `SWAP`, `SUCCESSOR`, `MAINTENANCE_FOR`, `ADD_ON_OF`. The catalog proposal says the dispute-and-hold flow is DRG-599 and is out of that slice. Its open question 8 leaves publish rights as DRG-599's subject and assumes product-service writes and quote-service reads.
-- **First slice excludes swaps.** Requirements file: Swap, Upgrade, and Downgrade wait for DRG-576. V1_7 still allows those action codes in the check constraint. Allowing the token is not a mapping table.
-- **Hold is not partial apply.** [`specs/partial-apply.md`](specs/partial-apply.md) lists SKU-mapping holds as out of that slice. OQ5 option A adopts unit status `BLOCKED` for a failed apply unit. A contested mapping holds the document before execution. It is not a partial-apply outcome.
-- **Executed documents stay immutable.** OQ6. A dispute does not rewrite an executed document.
-- **DRG-609 is not the validator.** The pricing-service design is not accepted. A mapping read is not routed through that design.
+- **No relationship table in product-service.** `read` `CREATE TABLE` names in [`V1__create_product_schema.sql`](../../../backend/services/product-service/src/main/resources/db/migration/V1__create_product_schema.sql): `products`, `product_bundles`, `product_bundle_items`, `product_option_groups`, `product_options`, `product_attributes`, `product_attribute_values`, `configuration_rules`. Later product-service migrations on this tree are `V1_3__create_outbox_events.sql`, `V1_4__add_product_retirement_fields.sql`, `V1_5__outbox_relay_status_and_leasing.sql`, `V1_6__outbox_event_envelope_columns.sql`, `V1_7__outbox_status_skipped.sql`, `V1_8__allow_canonical_ramp_product_types.sql`. A search of `backend/services/product-service` for `ProductRelationship` and `product_relationship` returned no matches. A live database catalog was not queried (`unverified`).
+- **Catalog proposal.** `read` [`specs/catalog-model.md`](specs/catalog-model.md): proposal only. It names relationship types and says the dispute-and-hold flow is DRG-599 and is out of that slice. Open question 8 leaves publish rights as DRG-599's subject.
+- **Slice action cut versus stored tokens.** `read` OQ12 and the requirements slice definition: Swap, Upgrade, and Downgrade wait for DRG-576. `read` `chk_amendment_line_action` in `V1_7__contract_documents.sql`: those tokens are allowed by the check. The check is not a mapping table.
+- **Partial apply.** `read` [`specs/partial-apply.md`](specs/partial-apply.md): SKU-mapping holds are out of that slice. `read` OQ5: unit outcome `BLOCKED` is the first-slice partial-apply adoption. A contested mapping is not that outcome.
+- **Executed document.** Merged #642 text: "The document is immutable. A new revision is refused with 409 `IMMUTABLE_EXECUTED` and an audit event, which is AC-S3-5 applied to revisions."
+- **DRG-609.** `read` the design note's status: a design proposal, not an ADR. Mapping validation is not routed through it.
 
 ### Forks
 
-**F1. Where the mapping lives.**
+**599-F1. Where the mapping lives.**
 
 | Option | Meaning |
 |---|---|
-| A. Relationship types on the DRG-576 model | One effective-dated row. Dispute status points at that version. No second table. |
-| B. A separate amendment SKU mapping table | Source SKU, target SKUs, effective dates, version, owned by product, beside the catalog relationship. |
-| C. Both | Catalog relationship authorizes the transition. The mapping table is a commercial overlay sales can dispute. |
+| A. Catalog relationship | One effective-dated row. Dispute status points at that version. |
+| B. Separate table | Source SKU, target SKUs, effective dates, version. |
+| C. Both | Catalog row plus a commercial overlay sales can dispute. |
 
-**Recommendation:** A. Two tables that both say "A upgrades to B" will diverge. The ticket allows either home. The catalog proposal already reserved the hold for DRG-599 without accepting the model.
+**Recommendation:** A. The DRG-599 description allows either home (Linear read). Two stores for the same pair will diverge.
 
-**Default:** A, still Proposed. This note does not accept [`specs/catalog-model.md`](specs/catalog-model.md). If the owner wants sales to dispute a commercial overlay without unpublishing the catalog row, C is the alternative, and the overlay is the row the hold reads.
+**Default:** Proposed, unaccepted, owner decision required. One effective-dated catalog relationship, with dispute status on that version (option A). This note does not accept [`specs/catalog-model.md`](specs/catalog-model.md). Alternatives written out: a separate amendment SKU mapping table (option B); both a catalog row and a commercial overlay (option C). Conversion price on the relationship is pending the DRG-609 design (not accepted).
 
-**F2. Dispute status and who resolves it.**
+**599-F2. Dispute status and who resolves it.**
 
 | Option | Meaning |
 |---|---|
-| A. `Active`, `Contested`, `Resolved`. Product resolves. Sales may open a dispute and may not clear it. | The ticket's set. |
-| B. Add `Rejected` | Product can refuse the mapping. The amendment stays held. |
+| A. Three statuses, product resolves | `Active`, `Contested`, `Resolved`. Sales may open a dispute and may not clear it. |
+| B. Add `Rejected` | Product can refuse the mapping. The hold remains. |
 | C. Sales resolves | The disputing seller clears the hold. |
 
-**Recommendation:** A. Option B can be added later without changing the hold. Option C contradicts the call record.
+**Recommendation:** A.
 
-**Default:** A. No SLA and no notification sender are chosen. The hold does not wait on a notification. DRG-591 stays parked for the wider approval design.
+**Default:** Proposed, unaccepted, owner decision required. Statuses `Active`, `Contested`, and `Resolved`; product resolves; sales may open and may not clear (option A). Alternatives written out: add `Rejected` (option B); sales clears the hold (option C). No SLA and no notification sender are in this default. DRG-591 stays parked (`read` OQ25).
 
-**F3. Where the hold bites.**
+**599-F3. Where the hold bites.**
 
 | Option | Meaning |
 |---|---|
-| A. Before `IN_REVIEW` and again before apply | A mapping contested after approval cannot execute or apply. The whole document waits. |
+| A. Before `IN_REVIEW` and before apply | The whole document waits. |
 | B. Apply only | The document can execute while contested. |
-| C. Per line, partial apply | Contested lines become `BLOCKED` units and other lines apply. |
+| C. Per line | Contested lines are partial-apply units. |
 
-**Recommendation:** A. The ticket says the amendment cannot proceed to execution or apply while any line uses a contested mapping. Option C collapses this into DRG-565.
+**Recommendation:** A. The DRG-599 description says the amendment cannot proceed to execution or apply while any line uses a contested mapping (Linear read).
 
-**Default:** A. Document-level hold. No unit commits. Distinct from OQ5. S3 and S4 are not authorized to implement it.
+**Default:** Proposed, unaccepted, owner decision required. The whole document waits before `IN_REVIEW` and again before apply (option A). Alternatives written out: the hold is apply-only (option B); contested lines become partial-apply units and other lines apply (option C). S3 and S4 are not authorized to implement the hold. S3 text is the #642 quotation. S4 is not authorized (`read` register OQ5).
 
-**F4. Which lines require a mapping.**
+**599-F4. Which lines need a mapping.**
 
 | Option | Meaning |
 |---|---|
-| A. Only when the source SKU and the target SKU differ | Same-SKU Add, Update, and Remove need no row. |
+| A. SKU change only | Same-SKU Add, Update, and Remove need no row. |
 | B. Every line | Including same-SKU quantity edits. |
 
-**Recommendation:** A. The ticket says first-slice same-SKU lines do not use mappings.
+**Recommendation:** A.
 
-**Default:** A.
+**Default:** Proposed, unaccepted, owner decision required. A mapping is required only when the source SKU and the target SKU differ (option A). Alternatives written out: every line requires a mapping, including same-SKU edits (option B).
 
-**F5. Pin versus live row.**
+**599-F5. Pin versus live row.**
 
 | Option | Meaning |
 |---|---|
-| A. Pin the relationship version on the line at pricing | A later contest holds documents that pinned that version and are not yet executed. |
-| B. Read the live row at apply | A mapping edit after pricing changes the executed meaning. |
+| A. Pin at pricing | A later contest holds documents that pinned that version and are not yet executed. |
+| B. Live row at apply | A mapping edit after pricing changes what apply reads. |
 
-**Recommendation:** A. It matches the catalog proposal's pin (its AC-4) without accepting that proposal. OQ6 keeps an executed document immutable, so a contest does not reopen it.
+**Recommendation:** A, together with the quoted #642 immutability sentence for an executed document.
 
-**Default:** A.
-
-### Owner decision needed
-
-Confirm or replace F1–F5. F1 is the table-versus-relationship choice the ticket names. The proposed default is one catalog relationship, product-owned, with dispute status on that version.
+**Default:** Proposed, unaccepted, owner decision required. The line pins the relationship version at pricing (option A). Alternatives written out: apply reads the live row (option B). For an executed document, the #642 text quoted in this section says the document is immutable.
 
 ### Dependencies
 
 | Dependency | Why it is named |
 |---|---|
-| DRG-576 and [`specs/catalog-model.md`](specs/catalog-model.md) | Proposed relationship types. Not accepted. |
-| DRG-421 | Catalog versions, named by DRG-576 as the pin. Not landed as that pin. |
-| DRG-552 | Action codes a relationship type must match. |
-| DRG-565 / OQ5 | Partial apply stays a different hold. |
-| DRG-590 | Conditional rules on top of a mapping. Parked. |
-| DRG-591 | Who resolves, beyond "product team". Parked for the general design. Product resolution is the proposed default here. |
-| DRG-609 | Not accepted. Mapping validation does not wait on that design and does not start it. |
+| DRG-576 and [`specs/catalog-model.md`](specs/catalog-model.md) | Proposed types. Not accepted. |
+| DRG-421 | Named by DRG-576 as the version pin (Linear read of DRG-576 on 2026-10-17). Not landed as that pin in the product migrations listed above. |
+| `chk_amendment_line_action` | Stored action tokens a type would match. |
+| DRG-565 / OQ5 | A different hold. |
+| DRG-590 | Conditional rules. Parked. `read` OQ24. |
+| DRG-591 | Wider approval design. Parked. |
+| DRG-609 | Conversion price and any priced mapping. Design not accepted. |
 
 ### What it unblocks
 
-An owner confirmation unblocks a later relationship-and-dispute design inside DRG-576's proposed model. It does not unblock catalog implementation, S3, S4, S6, or Drools rule work. Same-SKU first-slice lines stay mapping-free.
+An owner decision is the input to a later relationship-and-dispute design. It does not add a product migration, start S3, authorize S4 or S6, or accept the DRG-609 design.
 
 ---
 
 ## 5. DRG-550 — Price policy, credit, and termination fee
 
-**Issue:** [DRG-550](https://linear.app/drgamtd-workspace/issue/DRG-550) (RA-16), Medium, Backlog. Relations read: DRG-583, DRG-589, DRG-542, DRG-534, DRG-603, DRG-572, DRG-564, DRG-547.
+**Issue:** [DRG-550](https://linear.app/drgamtd-workspace/issue/DRG-550) (RA-16). Linear read 2026-10-17: Medium, Backlog. Relations read: DRG-583, DRG-589, DRG-542, DRG-534, DRG-603, DRG-572, DRG-564, DRG-547.
 
-The issue title and description still name proration. The formula is already Accepted. This section does not reopen it. The forks are the price mode, the credit policy, and the termination fee.
+Proration is [`docs/renewals-amendments/prereq/adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) (Accepted 2026-10-16, `read` status line). This section cites that file. It does not restate the decision, the formula, the rejected alternatives, or the delete list. The issue title and description still name proration (Linear read). Those words are not a fork here.
 
 ### Problem
 
-Continuation today keeps the contracted unit rate and prorates the stub. There is no accepted choice among retain, list, and override. There is no accepted credit policy and no accepted termination fee. Those are needed for downgrade and cancel-style amendment lines. [DRG-542](https://linear.app/drgamtd-workspace/issue/DRG-542) and [DRG-603](https://linear.app/drgamtd-workspace/issue/DRG-603) are Done. They closed the formula conflict. They did not close this policy set.
+DRG-550 asks for an amendment price policy, a credit policy, and a termination fee (Linear read). The mode names `RetainContracted`, `List`, and `Override` appear in [`mid-term-amendment-policy-spec.md`](../mid-term-amendment-policy-spec.md) section 1 item 4 (`read`), in the same sentence as a proration-method list. The proration-method list is not decided in this note. OQ9 in the register still says pricing-service support is unverified and blocks S5 (`read`). This pass did not re-read `QuoteContinuationPolicy.java` (`unverified`).
 
-### Settled on main
+### Already on main
 
-- **Formula.** [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) is Accepted. D-01 is the day-stub in `QuoteContinuationPolicy.plan`. D-02 keeps that method as the only implementation. D-04 says DRG-550 may add an amendment price policy (`RetainContracted`, `List`, `Override`), a credit policy, and a termination fee. The current continuation already retains the contracted unit rate. A credit for unused days of the old quantity, and a termination fee, are this story. The formula prices the requested quantity forward and does not emit that credit. A credit is not implemented by turning `rule-007` back on. `None` and `NextCycle`, if added, are switches around the accepted method. They are not a second formula. `MonthDay` in the mid-term spec's mode list is not reopened as a formula.
-- **Money columns exist. Policies do not.** V1_7 stores `credit_total` and `tcv_delta` on the document. It does not store a price mode, a credit policy, or a fee policy.
-- **DRG-609 is not accepted.** Moving evaluation into pricing-service, if a later story does that, moves this method. It does not reimplement it. The DRG-609 note does not authorize that move. S5 stays blocked.
-- **Audit of the decision is a different story.** [DRG-564](https://linear.app/drgamtd-workspace/issue/DRG-564) and [`story-drg-564-policy-decision-audit-trail.md`](story-drg-564-policy-decision-audit-trail.md). This note does not accept that trail.
-- **Customer cancellation refunds stay parked.** [DRG-589](https://linear.app/drgamtd-workspace/issue/DRG-589). This section does not unpark them.
-- **Ramp amendments stay on DRG-534.** Elapsed periods, future periods, and re-governance are that story. This section does not decide them.
-- **Mid-term OQ10 stays open.** Whether a downsell is permitted before a minimum commitment ends, and which credit or fee applies, is still an open question on the mid-term spec. The defaults below do not close OQ10.
+- **Proration ADR.** Path cited above. Header status Accepted. Body not restated.
+- **Money columns, no policy columns.** `read` `credit_total`, `tcv_delta`, `arr_delta`, and `one_time_total` on `amendment_documents` in `V1_7__contract_documents.sql` (column list in that `CREATE TABLE`). A search of `backend/services/contract-asset-management/src/main/resources/db/migration` for `price_mode`, `credit_policy`, `termination_fee`, `amendment_mode`, and `merged_from` found none of those tokens. `apply_status` appears only in the V1_7 comment that says the column is absent. A live database catalog was not queried (`unverified`).
+- **DRG-609.** `read` [`story-drg-609-pricing-service-continuation-design.md`](story-drg-609-pricing-service-continuation-design.md): design proposal, not an ADR. S5 stays outside this note. Conversion price is pending that design.
+- **Audit trail.** `read` [`story-drg-564-policy-decision-audit-trail.md`](story-drg-564-policy-decision-audit-trail.md) is a separate note. This frame does not accept it.
+- **Parked cancellation.** `read` OQ23: mid-term customer cancellation is parked (DRG-589). This section does not unpark it.
+- **Ramps.** DRG-534 was read on Linear on 2026-10-17 as a relation. Its body was not re-opened this pass (`unverified`). This section does not decide ramp locks.
+- **OQ10 on the mid-term spec.** `read` mid-term spec open question OQ10: whether a mid-term downsell is permitted before a minimum commitment ends, and its credit or fee policy, remains open (the spec points that question at RA-16). The defaults below do not close it.
 
 ### Forks
 
-**F1. Price mode.**
+**550-F1. Price mode.**
 
 | Option | Meaning |
 |---|---|
-| A. `RetainContracted` only | Today's continuation behavior. List and override are refused. |
-| B. `RetainContracted`, `List`, `Override` | The set D-04 names. Missing mode means `RetainContracted`. |
-| C. Add flat-adjustment as a fourth mode | A price delta that is not retain, list, or override. |
+| A. `RetainContracted` only | `List` and `Override` are refused. |
+| B. Three modes | `RetainContracted`, `List`, `Override`. Omitted mode means `RetainContracted`. |
+| C. Fourth mode | Flat adjustment as its own mode. |
 
-**Recommendation:** B. Flat adjustment is an `Override` or a delta recorded on top of `RetainContracted`. It is not a fourth formula. "Prorated delta" in the mid-term clarification means the Accepted stub applied to the requested quantity.
+**Recommendation:** B. Flat adjustment is recorded as `Override` or as a delta on `RetainContracted`, not as a fourth mode name.
 
-**Default:** B. The line defaults to `RetainContracted`. `List` and `Override` are explicit. `Override` still has to satisfy mid-term V14 (actor, reason, value) when that rule is implemented. This note does not implement V14.
+**Default:** Proposed, unaccepted, owner decision required. The line may be `RetainContracted`, `List`, or `Override`, and an omitted mode means `RetainContracted` (option B). Alternatives written out: `RetainContracted` only (option A); a fourth mode named flat adjustment (option C). `Override` still has to meet mid-term V14 when that rule is implemented (`read` V14 in the mid-term spec: actor, reason code, overridden value, and approval). This note does not implement V14. The proration ADR is not edited.
 
-**F2. Credit policy.**
+**550-F2. Credit policy.**
 
 | Option | Meaning |
 |---|---|
-| A. `NoCredit` | No credit line. Matches current continuation. |
-| B. `ProratedUnused` | A separate credit amount for the removed quantity, computed by calling the Accepted day-stub method. Not a new formula. |
-| C. `FullRemaining` | Credit the unused term in full, without the stub fraction. |
-| D. Seller picks per line, no tenant default | Every downgrade states a policy or is refused. |
+| A. `NoCredit` | No credit line from this policy. |
+| B. `ProratedUnused` | A policy name for unused time. The day-count is the cited proration ADR and is not restated. |
+| C. `FullRemaining` | A policy name for the unused term without a stub fraction. The arithmetic is not stated here. |
+| D. Seller picks, no tenant default | Every downgrade states a policy or is refused. |
 
-**Recommendation:** the set is A, B, and C. The default value is A. B calls the Accepted method and does not restore the full-term ratio. C is a commercial choice, not a proration formula. D forces a choice the first slice does not have a field for.
+**Recommendation:** The set is A, B, and C. The value in force is A.
 
-**Default:** `NoCredit`. A shortened co-term (section 2, F4) also emits no credit until the owner selects B or C. Mid-term OQ10 stays open.
+**Default:** Proposed, unaccepted, owner decision required. `NoCredit` (option A). A shortened co-term under 554-F4 also writes no credit under this default. Alternatives written out: `ProratedUnused` (option B); `FullRemaining` (option C); the seller must pick on every line and there is no tenant default (option D). Any conversion price is pending the DRG-609 design (not accepted). Mid-term OQ10 stays open (`read`). The proration ADR is cited and not restated.
 
-**F3. Termination fee.**
+**550-F3. Termination fee.**
 
 | Option | Meaning |
 |---|---|
 | A. `NoFee` | No fee. |
 | B. Flat amount | A configured amount, snapshotted on the decision. |
-| C. Percent of remaining contract value | A configured percent. The remaining value uses the Accepted forward charge, not a new day-count. |
+| C. Percent of remaining contract value | A configured percent. The count of "remaining" is the cited proration ADR and is not restated. |
 | D. Cut-off window | A fee applies only before a named date. |
 
-**Recommendation:** A as the default, with B and C as configured values the owner can turn on later. D is a further policy and is not in the proposed default set.
+**Recommendation:** A now. B and C are configured values an owner can turn on in a later decision. D is not in the recommended set.
 
-**Default:** `NoFee`. A fee is not folded into the proration method. DRG-589 stays parked. This fee, when later configured, is the amendment downgrade or early-end fee only.
+**Default:** Proposed, unaccepted, owner decision required. `NoFee` (option A). Alternatives written out: a flat amount (option B); a percent of remaining contract value (option C); a cut-off window (option D). DRG-589 stays parked (`read` OQ23). The proration ADR is cited and not restated.
 
-**F4. Where the three policies are stored.**
-
-| Option | Meaning |
-|---|---|
-| A. Tenant default, per-line override, snapshotted when priced | The snapshot is what apply reads. |
-| B. Per document only | Every line on the document shares one mode, one credit policy, and one fee. |
-| C. Pricing-service owns the policy store | Requires the unaccepted DRG-609 design. |
-
-**Recommendation:** A. Apply re-reads the snapshot. It does not re-resolve the tenant default. C waits on a design that is not accepted.
-
-**Default:** A. The snapshot names the price mode, the credit policy, and the fee policy. No pricing-service contract is added. DRG-564 remains the audit-trail story.
-
-**F5. Switches around the stub.**
+**550-F4. Where the three policies are stored.**
 
 | Option | Meaning |
 |---|---|
-| A. No extra switches | Every partial period uses the Accepted stub. |
-| B. `None` and `NextCycle` as switches | `None` skips the stub. `NextCycle` starts at the next billing boundary. The method underneath stays D-01. |
+| A. Tenant default and per-line override | Snapshotted when priced. Apply reads the snapshot. |
+| B. Per document | Every line shares one mode, one credit policy, and one fee. |
+| C. Pricing-service store | Pending the DRG-609 design (not accepted). |
 
-**Recommendation:** B, because D-04 already says those two, if added, are switches around the accepted method.
+**Recommendation:** A.
 
-**Default:** the switch is unset, so the Accepted stub runs. Adding the switch is a later change. It is not a new formula and it is not a reason to edit the proration ADR.
-
-### Owner decision needed
-
-Confirm or replace F1–F5. The proration formula is not on that list.
+**Default:** Proposed, unaccepted, owner decision required. A tenant default plus a per-line override, snapshotted when priced (option A). Alternatives written out: one mode, one credit policy, and one fee for the whole document (option B); pricing-service owns the store (option C), which is pending the DRG-609 design (not accepted). No pricing-service contract is added. DRG-564 remains the separate audit-trail note.
 
 ### Dependencies
 
 | Dependency | Why it is named |
 |---|---|
-| Accepted proration ADR, D-04 | Bounds this section. Credit and fee sit around the method. |
-| DRG-542, DRG-603 | Formula conflict is Done. Not reopened. |
-| DRG-609, DRG-583 (S5) | Pricing-service line pricing and PolicyDecision identity. Design not accepted. S5 blocked. |
-| DRG-564 | Audit trail for the snapshot. Separate note. Not accepted by this frame. |
-| DRG-534 | Ramp lock and re-governance. Out of this section. |
-| DRG-572 | One-time and retroactive charge lines. Out of this section. |
-| DRG-589 | Parked customer-cancellation refunds. Not unparked. |
-| DRG-554 | Date choice when a co-term shortens a line. Credit stays `NoCredit` under F2's default. |
-| Mid-term OQ10 | Minimum-commitment downsell. Still open. |
+| [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) | Cited. Not reopened. Not restated. |
+| DRG-542, DRG-603 | Linear read 2026-10-17: Done. That status is not a restatement of the formula. |
+| DRG-609, DRG-583 | Design not accepted. Conversion price pending that design. S5 is not started by this note. |
+| DRG-564 | Separate audit note. Not accepted here. |
+| DRG-534 | Ramps. Out of this section. Body `unverified` this pass. |
+| DRG-572 | One-time lines. Relation title read 2026-10-17. Body not re-opened (`unverified`). |
+| DRG-589 | Parked. `read` OQ23. |
+| DRG-554 | Date choice. Credit stays `NoCredit` under 550-F2. |
+| Mid-term OQ10 | Minimum-commitment downsell. Still open. `read`. |
 
 ### What it unblocks
 
-An owner confirmation unblocks a later policy model for price mode, credit, and termination fee around the Accepted stub. It does not unblock a formula change, a Drools edit, a pricing-service migration, S5, or S6. DRG-609 stays a proposal.
+An owner decision is the input to a later price, credit, and termination-fee policy. It does not change the proration ADR, edit Drools, add a pricing-service migration, start S5, or authorize S6.
 
 ---
 
-## What an owner confirmation would still not do
+## What an owner decision on this note still does not do
 
-Confirmation of any default in this note:
+A decision on any row in the owner-decision table:
 
 - accepts no ADR and edits no ADR;
 - leaves ADR-017 and ADR-024 through ADR-027 Proposed;
-- leaves the proration ADR Accepted and unchanged;
-- does not start S3 / DRG-581;
+- leaves [`adr-amendment-proration-formula.md`](adr-amendment-proration-formula.md) Accepted and unchanged;
+- does not start S3 / DRG-581 (merged #642 text: "S3 / DRG-581 requires separate owner authorization.");
 - does not authorize S6 / DRG-584;
 - does not accept the DRG-609 design;
-- does not change the OQ7 one-contract-per-subscription default;
+- does not specify entitlements or conversion price;
+- does not change the one-contract-per-subscription wording in `V1_8__contract_header_backfill.sql`;
 - authorizes no code, migration, flag, or deploy.
+
+Tickets stay In Review until the owner merges.
