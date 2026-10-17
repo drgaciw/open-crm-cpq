@@ -147,9 +147,13 @@ Each line also requires `businessCategory`, `applyTargetType`, `chargeType`, `pr
 
 `POST /amendments/{amendmentId}/revisions` (`openAmendmentRevision`) is marked `x-opencrm-status: proposal`. Success is 201: same `provisionalNumber`, document status `DRAFT`, previous revision `statusAtClose` `SUPERSEDED` with its digest kept, new revision `OPEN`, pins cleared, `approvalRef` and `signatureEnvelopeRef` null, `contentDigest` null until a later submit, `amendmentSeq` still null. Replay is 200. The quote-service POST description now says it is not this command.
 
+### Remaining CAM priced-state synchronization gap
+
+No CAM write or delivery event in the draft persists the repriced totals, pins and trace after supersession. Quote-service's LifecycleChange `:price` only changes quote-service state; the revision-opening command accepts no prices or pins. Desired atomic replacement is not an existing contract. S3/S5 implementation stays blocked until a separately accepted command/event contract specifies the expected CAM document version and revision, complete priced payload, atomic write, idempotency/replay, stale-result refusal and confirmed delivery. The choice of command versus event remains open; this note adds no route or event and does not claim the flow complete.
+
 ### What this unblocks for S3
 
-After the owner accepts this proposal and separately authorizes DRG-581, S3 has one CAM write to build and S5 has one command to call. This note does not authorize either build. OQ18 still blocks the digest library. Gap 2's column nullability still blocks inserting an unpriced row on the current not-null pin columns.
+Only after that missing delivery contract is accepted, the owner accepts this proposal and separately authorizes DRG-581, S3 has one CAM write to build and S5 has one command to call. This note does not authorize either build. OQ18 still blocks the digest library. Gap 2's column nullability still blocks inserting an unpriced row on the current not-null pin columns.
 
 ## Gap 2 — Unpriced pins
 
@@ -285,6 +289,7 @@ These criteria are proposed ACs, not adopted. The requirements now mark each one
 | 14 | OQ18 digest library | Unconfirmed | Proposed, unaccepted, owner decision required | Confirm `backend/libs/common`, built in S3. Place the library somewhere else. |
 | 15 | S3 / DRG-581 | Not authorized by this note | Separate owner act | Authorize DRG-581. Leave it unstarted. |
 | 16 | Unpriced current totals | Null until successful pricing atomically replaces all four totals; requires a later accepted migration | Proposed, unaccepted, owner decision required | Explicit totals-validity state under a separate accepted contract. No placeholder zeroes or stale prior totals. |
+| 17 | CAM priced-state synchronization | Not defined; S3/S5 implementation blocked until a complete revision/version-bound payload and replay/stale-result contract is accepted | Unresolved, owner decision required | A separately accepted CAM command or delivery event. Quote-service :price alone is not a CAM write. |
 
 ## What this note does not do
 
