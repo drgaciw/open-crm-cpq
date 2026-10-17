@@ -2,7 +2,15 @@
 
 **Status:** Proposed, unaccepted, owner decision required.
 
-**Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Story:** S3 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) stays unlaunched. This note does not authorize S3.
+**Standing conditions.** These three sentences govern this note:
+
+1. S3 stays UNAUTHORIZED.
+2. A merge of #657 is NOT S3 authorization.
+3. Recommending default (a) is NOT a migration approval.
+
+The gate-doc correction in section 6 stays a proposed edit. It is not applied.
+
+**Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Story:** S3 / [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) stays UNAUTHORIZED and stays unlaunched. This note does not authorize S3. A merge of #657 is NOT S3 authorization.
 
 **Reading base:** `main` at `0d71251d`. This note follows open draft [PR #653](https://github.com/drgaciw/open-crm-cpq/pull/653) (DRG-616). That pull request is open, targets `main`, and touches `docs/renewals-amendments/prereq/DRAFT-openapi-amendments.yaml`. This note does not edit that file, the OQ6 record, `story-s3-s4-authorization-gate.md`, or any ADR.
 
@@ -40,11 +48,11 @@ Draft PR #653 (body read; the branch was not checked out) proposes nullable pins
 | (b) | A sentinel digest with no defined meaning. Flag: **UNDEFINED**. No accepted document defines that sentinel. | Proposed, unaccepted, owner decision required |
 | (c) | Require priced revisions only. S3 would never store an unpriced or digest-less revision, and the gate sentence "None. V1_7 is S1." could stand. | Proposed, unaccepted, owner decision required |
 
-**Recommended default:** option (a). **Proposed, unaccepted, owner decision required.**
+**Recommended default:** option (a). **Proposed, unaccepted, owner decision required.** Recommending default (a) is NOT a migration approval.
 
 **Alternatives beside that default:** option (b), flagged UNDEFINED; option (c), priced revisions only.
 
-No outcome. The owner chooses. This note does not add a migration.
+No outcome. The owner chooses. This note does not add a migration. Recommending default (a) is NOT a migration approval.
 
 ## 2. OQ18, or a CAM-local interim digest
 
@@ -95,9 +103,9 @@ OQ6 section 4's two S3 tests, quoted exactly. They are criteria only. The record
 
 | # | Question | Recommended default | Status | Alternatives |
 |---|---|---|---|---|
-| 1 | Unpriced storage | Option (a): nullable pins plus a new CAM migration, `V1_10` or higher, next free at build time, with a rollback statement. `V1_9` stays reserved for S4. Never `V1_7_3`. | Proposed, unaccepted, owner decision required | (b) UNDEFINED sentinel digest. (c) Priced revisions only, so the gate cell "None. V1_7 is S1." can stand. |
+| 1 | Unpriced storage | Option (a): nullable pins plus a new CAM migration, `V1_10` or higher, next free at build time, with a rollback statement. `V1_9` stays reserved for S4. Never `V1_7_3`. Recommending default (a) is NOT a migration approval. | Proposed, unaccepted, owner decision required | (b) UNDEFINED sentinel digest. (c) Priced revisions only, so the gate cell "None. V1_7 is S1." can stand. |
 | 2 | OQ18 or interim digest | CAM-local interim digest function inside contract-asset-management, only if the owner approves it. | Proposed, unaccepted, owner decision required | Wait for owner confirmation of OQ18. Do not build the `backend/libs/common` library in S3 before that confirmation. |
-| 3 | S3 authorization | S3 / DRG-581 stays unlaunched. Separate owner authorization is still required. This note is not that authorization. | Proposed, unaccepted, owner decision required | A later owner record that explicitly authorizes DRG-581. |
+| 3 | S3 authorization | S3 stays UNAUTHORIZED. S3 / DRG-581 stays unlaunched. A merge of #657 is NOT S3 authorization. Separate owner authorization is still required. | Proposed, unaccepted, owner decision required | A later owner record that explicitly authorizes DRG-581. |
 | 4 | Order versus #653 | S3 waits on draft PR #653 or rebases over it. DRG-616 must be merged first. | Proposed, unaccepted, owner decision required | Start an S3 slice on current `main` and reconcile the OpenAPI draft afterwards. |
 | 5 | `VOID` and `OUT_FOR_SIGNATURE` | No default. OPEN ITEM. Not decided. | Proposed, unaccepted, owner decision required | Adopt the policy-spec void row. Build `OUT_FOR_SIGNATURE` in S3. |
 
@@ -154,7 +162,7 @@ File not edited: `docs/renewals-amendments/prereq/story-s3-s4-authorization-gate
 
 The S3 row's migration cell today reads: "None. V1_7 is S1."
 
-A later edit, applied only after the owner accepts it, would state that this holds only if S3 never stores an unpriced or digest-less revision, and would point at section 1 of this note. If option (a) is the accepted choice, that cell would name a new CAM migration at `V1_10` or higher (next free at build time, with a rollback statement), would keep `V1_9` reserved for the S4 apply ledger, and would forbid `V1_7_3`. This pull request does not apply that edit.
+A later edit, applied only after the owner accepts it, would state that this holds only if S3 never stores an unpriced or digest-less revision, and would point at section 1 of this note. If option (a) is the accepted choice, that cell would name a new CAM migration at `V1_10` or higher (next free at build time, with a rollback statement), would keep `V1_9` reserved for the S4 apply ledger, and would forbid `V1_7_3`. This correction stays a proposed edit. It is not applied. A merge of #657 does not apply it. Recommending default (a) is NOT a migration approval.
 
 ## 7. Not in scope — not built
 
