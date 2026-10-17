@@ -1,8 +1,8 @@
 # DRAFT ADR: Renewal segment schedule, multi-year escalators, and time-bounded price locks
 
-**Status:** Proposed on 2026-10-16. This file is Proposed. It is not an accepted ADR, and no link in this file presents it as one.
-**Date:** 2026-10-16
-**Deciders:** none. Each recommendation below is a proposal. The project owner decides it.
+**Status:** Accepted on 2026-10-17. On 2026-10-17 at 7:31 AM CT the project owner said, as relayed by Projects Manager, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644)" and "proceed with any mergers required". The owner's merge of this pull request is the confirming act. This status takes effect on that merge. This acceptance supersedes the earlier "Proposed / not accepted wholesale" wording of #662 and #663 only for this file. Acceptance authorizes no code, migration, or deploy. The file stays DRAFT-prefixed and unnumbered. Numbering is an owner follow-up. DRG-568 and DRG-532 unblock only after this pull request merges. Each recommendation in this file stays as it is.
+**Date:** 2026-10-16 (proposed). Accepted 2026-10-17.
+**Deciders:** Project owner, by the 2026-10-17 7:31 AM CT statement above, as relayed by Projects Manager. Each recommendation below stays as written.
 **Number:** none. This file stays under `docs/renewals-amendments/prereq/` with a `DRAFT-` prefix. It is not an entry in `docs/adr/` and it does not take a number. Do not add a row to `docs/adr/README.md` from this draft.
 **Story:** [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending) (escalator base, compounding, rounding; an addendum to ADR-023). Linear status when read: Backlog.
 **Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.
