@@ -1,8 +1,8 @@
 # ADR-026: Command messages between contexts
 
-**Status:** Proposed on 2026-10-04. Not accepted.
+**Status:** Accepted on 2026-10-17. The project owner told, on 2026-10-17 at 7:31 AM CT, as relayed by the Projects Manager bot: "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644); authorized opening their status-change PRs". The owner's merge of this PR is the confirming act and the status takes effect on merge. This supersedes the "retain their existing statuses" wording of PRs #662 and #663 only for ADR-026.
 **Date:** 2026-10-04
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted).
 **Amends (when accepted):** [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md), by adding a kind and a producer to the registry it made the contract.
 **Relates to:** [ADR-025](ADR-025-saga-process-manager.md) (process managers), [ADR-024](ADR-024-order-orchestration-context.md) (order context), [ADR-017](ADR-017-synchronous-inter-service-communication.md) (synchronous calls).
 **Does not authorize:** any code, topic or registry entry.
