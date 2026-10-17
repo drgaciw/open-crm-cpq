@@ -1,6 +1,8 @@
 # DRG-572 — One-time and retroactive charge lines: decision frame
 
-**Status:** Proposed, unaccepted, owner decision required. This file is not an ADR, takes no number, and is not copied into `docs/adr/`. It does not accept `specs/lifecycle-intents.md`, `specs/partial-apply.md`, `specs/maintenance.md`, `specs/conversions.md`, `specs/capacity-meters.md`, the OpenAPI draft, or the DRG-609 pricing-service design. Accepting this note authorizes no code, no migration, no flag, no topic, no gateway route, and no deploy.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** This file is not an ADR, takes no number, and is not copied into `docs/adr/`. It does not accept `specs/lifecycle-intents.md`, `specs/partial-apply.md`, `specs/maintenance.md`, `specs/conversions.md`, `specs/capacity-meters.md`, the OpenAPI draft, or the DRG-609 pricing-service design. Accepting this note authorizes no code, no migration, no flag, no topic, no gateway route, and no deploy.
 
 **Lifecycle-intents addendum (section 10):** proposal-marked and NOT applied. `specs/lifecycle-intents.md` was not edited.
 

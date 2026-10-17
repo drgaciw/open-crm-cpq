@@ -1,6 +1,6 @@
 # S3 reconciliation and owner-decision frame
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Standing conditions.** These three sentences govern this note:
 

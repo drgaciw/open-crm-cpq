@@ -2,7 +2,7 @@
 
 *open-crm-cpq (drgaciw/open-crm-cpq). Documentation only. Date: 2026-10-17. Base: `main` at `0d71251d7267b3a0124bff60bfc9f897ab1d3fb6`.*
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Story:** [DRG-549](https://linear.app/drgamtd-workspace/issue/DRG-549/renewal-pricing-policy-hierarchy-same-list-uplift-percent-uplift) (RA-15). This file is the design frame for how a renewal price is resolved. It is not an ADR, takes no number, and is not copied into `docs/adr/`.
 

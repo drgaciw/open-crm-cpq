@@ -1,6 +1,8 @@
 # DRG-616 — Three OQ6 design-contract gaps
 
-**Status of this note:** Proposed, unaccepted, owner decision required. This note is not an ADR. It does not accept a spec, a schema, an event contract, or a story. No flag. No deploy.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** This note is not an ADR. It does not accept a spec, a schema, an event contract, or a story. No flag. No deploy.
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Story:** [DRG-616](https://linear.app/drgamtd-workspace/issue/DRG-616/close-three-oq6-design-contract-gaps-before-s3-starts-revision-write). **Reading base:** `main` at `0d71251d`. The OQ6 record on that commit is the text merged by [#642](https://github.com/drgaciw/open-crm-cpq/pull/642) (`cursor/oq6-mid-flight-revision-fc70`).
 
@@ -10,7 +12,8 @@ Accepting this note authorizes no code, migration, flag, topic, gateway route, o
 
 | Item | Status in this note |
 |---|---|
-| This note, every fork, and every default below | **Proposed, unaccepted, owner decision required.** Alternatives are named beside each default. |
+| This note | **Accepted as documentation, 2026-10-17.** Scope is recorded in the [owner acceptance record](documentation-acceptance-2026-10-17.md). |
+| Every fork and every default below | **Proposed, unaccepted, owner decision required.** Alternatives are named beside each default. |
 | OQ6 | **Adopted only as recorded in #642.** Decided under delegation by CPQ Decision and relayed by Projects Manager. The delegation quotes in that record are "I delegate these decisions to you." (5:10 PM CT) and "Proceed" (5:52 PM CT). Those quotes are the grant. They are not an owner-authored choice of the rule. |
 | OQ18 | **Proposed, unaccepted, owner decision required.** S3 cannot start building the digest library before the owner confirms it. |
 | ADR-017, ADR-024, ADR-025, ADR-026, ADR-027 | **Proposed.** Not assumed accepted. |

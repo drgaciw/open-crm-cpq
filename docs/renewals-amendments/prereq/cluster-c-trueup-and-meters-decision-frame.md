@@ -1,6 +1,8 @@
 # Cluster C — true-up and meters: decision frame
 
-**Status:** Proposed, unaccepted, owner decision required. Not an ADR. This file takes no number and is not copied into `docs/adr/`. Landing it on `main` records the frame. It does not accept any default in it. Acceptance is a later owner act that changes this status line. DRG-569, DRG-570, and DRG-557 stay In Review until the owner merges. They are not Done on merge of a docs frame while code is open.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** Not an ADR. This file takes no number and is not copied into `docs/adr/`. Landing it on `main` records the frame. It does not accept any default in it. Acceptance is a later owner act that changes this status line. DRG-569, DRG-570, and DRG-557 stay In Review until the owner merges. They are not Done on merge of a docs frame while code is open.
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Cluster:** capacity meters and true-up (DRG-607 checklist row `capacity-meters`).
 
