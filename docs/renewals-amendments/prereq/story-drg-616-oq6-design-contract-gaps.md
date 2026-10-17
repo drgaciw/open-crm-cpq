@@ -147,6 +147,14 @@ Each line also requires `businessCategory`, `applyTargetType`, `chargeType`, `pr
 
 `POST /amendments/{amendmentId}/revisions` (`openAmendmentRevision`) is marked `x-opencrm-status: proposal`. Success is 201: same `provisionalNumber`, document status `DRAFT`, previous revision `statusAtClose` `SUPERSEDED` with its digest kept, new revision `OPEN`, pins cleared, `approvalRef` and `signatureEnvelopeRef` null, `contentDigest` null until a later submit, `amendmentSeq` still null. Replay is 200. The quote-service POST description now says it is not this command.
 
+### Immutable evidence before replacing current header state
+
+**Proposed, unaccepted, owner decision required:** the previous revision must have a complete immutable commercial envelope bound through `inputs_snapshot_ref` before its current dates/reason/totals can be replaced. The envelope records every commercial header field, all totals, lines and pins/trace, the source input-snapshot reference, and every other canonical digest input. The superseded revision must be reconstructable from that envelope alone. Binding may change an OPEN row in the same freeze transaction; frozen references and evidence never change, and archive failure aborts the entire revision. Further OPEN-row writes create new immutable envelopes. The separately accepted durable snapshot-store and canonicalization contracts are still required; a digest plus a pointer of undefined contents is not evidence preservation.
+
+### Materialized source hooks before CAM handoff
+
+The proposed ChangeLine revision response requires the five commercial fields CAM needs, including while unpriced. S5 explicitly materializes first-slice `priceAsOf = EFFECTIVE_DATE`, `policySlot = AMENDMENT`, `applyTargetType = SUBSCRIPTION`, and `chargeType = RECURRING` when absent; supported explicit price-as-of selections are retained. `businessCategory` must be resolved by the separately accepted action/category policy before handoff. An unresolved category refuses the handoff rather than being invented by CAM. These proposal defaults do not accept Cluster E or authorize code. They remove the assumption that a nullable/missing source hook can satisfy the required CAM payload.
+
 ### Remaining CAM priced-state synchronization gap
 
 No CAM write or delivery event in the draft persists the repriced totals, pins and trace after supersession. Quote-service's LifecycleChange `:price` only changes quote-service state; the revision-opening command accepts no prices or pins. Desired atomic replacement is not an existing contract. S3/S5 implementation stays blocked until a separately accepted command/event contract specifies the expected CAM document version and revision, complete priced payload, atomic write, idempotency/replay, stale-result refusal and confirmed delivery. The choice of command versus event remains open; this note adds no route or event and does not claim the flow complete.

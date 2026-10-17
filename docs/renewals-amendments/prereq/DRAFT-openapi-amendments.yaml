@@ -674,7 +674,24 @@ paths:
 
         Request. actionDate, contractEffectiveDate and backdatingReasonCode
         carry the resolved new commercial header, after quote-service has
-        applied its revision patch. CAM replaces those header values in the
+        applied its revision patch. Before any replacement, CAM must archive
+        the previous revision's complete commercial evidence in an immutable
+        revision-bound envelope and bind that envelope through the previous
+        revision's inputs_snapshot_ref. It contains the prior actionDate,
+        contractEffectiveDate, serviceActivationDate, customerAcceptanceDate,
+        backdatingReasonCode, coTermDate, currency, all four totals, lines,
+        pins/trace and every other commercial field covered by its digest,
+        plus the original input-snapshot reference. An unfrozen OPEN row may
+        acquire this envelope reference in the freeze transaction; once
+        frozen its reference and envelope never change. Each envelope is
+        retained independently of current header values. Archive/binding
+        failure aborts the revision transaction. A later write to an OPEN
+        revision creates a new immutable envelope and only replaces that
+        OPEN row's reference; it never overwrites an older envelope. The
+        durable snapshot-store contract still requires separate acceptance;
+        digest-library work also waits on owner confirmation of OQ18.
+        S3/S5 stays blocked without those accepted prerequisites.
+        CAM then replaces those header values in the
         same transaction that opens the revision; a null backdatingReasonCode
         explicitly clears the old reason. It validates the revised dates,
         including backdating rules, and digests the revised header on submit.
@@ -682,10 +699,20 @@ paths:
         unchanged. No date is silently taken from the previous revision.
         Each line explicitly supplies businessCategory, applyTargetType,
         chargeType, priceAsOf and policySlot; CAM invents no database default
-        for these NOT NULL commercial fields. Existing source/target and
-        action/category constraints still apply.
+        for these NOT NULL commercial fields. S5 materializes the values on
+        its ChangeLine revision response before the CAM call, even when
+        unpriced. Proposed first-slice source defaults are priceAsOf
+        EFFECTIVE_DATE, policySlot AMENDMENT, applyTargetType SUBSCRIPTION,
+        and chargeType RECURRING; explicit supported price-as-of choices are
+        retained. businessCategory is resolved under the separately accepted
+        action/category policy; missing or unresolved category refuses the
+        handoff rather than making CAM invent one. No incomplete source
+        operation is reported complete. These are proposal rules, not runtime
+        behavior or acceptance of the Cluster E defaults. Existing
+        source/target and action/category constraints still apply.
 
-        version is the amendment document row version the caller read. lifecycleChangeRevision is the superseding LifecycleChange
+        version is the amendment document row version the caller read.
+        lifecycleChangeRevision is the superseding LifecycleChange
         revision and is unique per document. targetQuoteId and
         inputsSnapshotRef are required because those columns are not null on
         main. lines carry commercial structure only. The server stores
@@ -2134,7 +2161,7 @@ components:
 
     ChangeLine:
       type: object
-      required: [lineId, actionCode, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom]
+      required: [lineId, actionCode, businessCategory, applyTargetType, quantitySemantics, startQty, deltaQty, endQty, effectiveFrom, chargeType, priceAsOf, policySlot]
       properties:
         lineId: {type: string, format: uuid}
         lineNo: {type: integer, minimum: 1}
@@ -2161,13 +2188,21 @@ components:
         chargeType:
           $ref: "#/components/schemas/ChargeType"
         priceAsOf:
-          nullable: true
           allOf:
             - $ref: "#/components/schemas/PriceAsOf"
+          default: EFFECTIVE_DATE
+          description: |
+            Proposed first-slice source default. S5 materializes this non-null
+            hook on create/revise before calling CAM, including while unpriced.
+            This is not a pricing pin and is not cleared by supersession.
         policySlot:
-          nullable: true
           allOf:
             - $ref: "#/components/schemas/PolicySlot"
+          default: AMENDMENT
+          description: |
+            Proposed first-slice source default. S5 materializes this non-null
+            hook on create/revise before calling CAM, including while unpriced.
+            This is not a pricing pin and is not cleared by supersession.
         amendMode:
           nullable: true
           allOf:
