@@ -174,7 +174,7 @@ The following are not built by this note and are not authorized by it:
 - **S7 backfill.** Not started. `V1_8__contract_header_backfill.sql` is already on `main` and is not edited.
 - **DRG-609.** Not accepted and not built.
 - **Flags.** `opencrm.outbox.relay.enabled` and `opencrm.pricing.ramp.enabled` are not set, flipped, or discussed as a change. No flag is involved.
-- **Outbox or bus publish for supersession.** A later S3 slice, if authorized, would write a local `amendment_document_events` row only. It would not publish that supersession to the outbox or the bus. The event type, payload, schema, and topic remain undecided, as OQ6 section 4 already records.
+- **Supersession domain event versus S2 audit publication.** A later S3 slice still has no accepted supersession domain-event payload, schema, topic, or outbox contract, as OQ6 section 4 records. This does not disable the existing S2 audit publication. `AmendmentEventWriter.append` persists each new hash-chained document event and calls `auditOutbox.stage(document, event)` in the same transaction (`backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/events/AmendmentEventWriter.java`, read during PR processing). It cannot be reused as a local-log-only writer while suppressing that audit outbox row. The local-log option in #653 must distinguish that existing audit obligation from a new supersession domain event; any exception needs a separate accepted audit decision. This note authorizes neither an exception nor S6 work.
 
 No deploy.
 
