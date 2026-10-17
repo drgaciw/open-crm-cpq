@@ -169,6 +169,8 @@ These four ADRs are not edited by this proposal and are not accepted by it. On o
 | **B. Spine wins. Order model narrows to on-prem lines. Mid-term SaaS applies with no order in v1. S2 stays additive. (chosen)** | Recorded CPQ Decision. Additive and reversible. Keeps DRG-580 to document id, amendment sequence, and digest. Leaves on-prem fulfilment specified and unimplemented. |
 | C. Fallback if the owner objects | Named by the ruling. Contents not stated. This draft does not define Option C. |
 
+The decision-options framing's Option A and Option C, which this table does not spell out, are listed in [drg-577-options-a-and-c.md](drg-577-options-a-and-c.md). That note overlaps [#623](https://github.com/drgaciw/open-crm-cpq/pull/623) and [#633](https://github.com/drgaciw/open-crm-cpq/pull/633) and adds only those two options. Option B in the table above stays the Accepted ruling. ADR-024 to ADR-027 remain Proposed until the owner narrows them.
+
 ## Consequences
 
 - **Positive.** One writer applies commercial state. One numbering scheme identifies an executed amendment. On-prem fulfilment has a stable boundary for DRG-578 and DRG-558. S2 can be drafted without an order payload.
