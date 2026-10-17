@@ -1,6 +1,8 @@
 # Cluster B — on-prem to SaaS and maintenance: decision frame
 
-**Status:** Proposed, unaccepted, owner decision required. This note records options, a recommendation, and a default for each fork. Merging it leaves every fork Proposed, unaccepted, owner decision required. It does not accept a policy, an ADR, a spec, or a story. DRG-573, DRG-574, DRG-556, DRG-559, and DRG-571 stay In Review until the owner merges. They are not Done on merge of this docs frame while code is open.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+
+**Original proposal scope (before acceptance):** This note records options, a recommendation, and a default for each fork. Merging it leaves every fork Proposed, unaccepted, owner decision required. It does not accept a policy, an ADR, a spec, or a story. DRG-573, DRG-574, DRG-556, DRG-559, and DRG-571 stay In Review until the owner merges. They are not Done on merge of this docs frame while code is open.
 **Date:** 2026-10-17.
 **Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642)).
 **Project:** OPEN-CRM-CPQ. Linear team DRG.

@@ -1,6 +1,6 @@
 # Cluster A — Amendment modes and commercial policy (decision frame)
 
-**Status:** Proposed, unaccepted, owner decision required.
+**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
 
 **Date:** 2026-10-17
 **Base:** `main` at `3ee3ca0f` (merge of [#642](https://github.com/drgaciw/open-crm-cpq/pull/642), merged 2026-10-17T07:40:40Z).
@@ -196,7 +196,7 @@ Entitlement resolution under every option is pending the DRG-609 design (not acc
 
 ### What it unblocks
 
-An owner decision on 592-F1 through 592-F6 is the input to a later schema increment. It does not start S3, authorize S6, or change `V1_7__contract_documents.sql`. DRG-607 can cite this frame. The frame stays Proposed, unaccepted, owner decision required.
+An owner decision on 592-F1 through 592-F6 is the input to a later schema increment. It does not start S3, authorize S6, or change `V1_7__contract_documents.sql`. DRG-607 can cite this accepted documentation frame. The individual forks stay Proposed, unaccepted, owner decision required.
 
 ---
 

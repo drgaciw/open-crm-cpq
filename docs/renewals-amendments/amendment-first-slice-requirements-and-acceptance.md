@@ -1,5 +1,7 @@
 # First slice: requirements and acceptance criteria
 
+**Documentation acceptance (2026-10-17):** The additions and corrections in PRs #653 and #661 are [accepted as documentation](prereq/documentation-acceptance-2026-10-17.md). Individual proposed criteria and unresolved contract decisions retain the statuses stated below; no implementation story is authorized.
+
 *open-crm-cpq, universal renewals-and-amendments. Documentation only. Date: 2026-10-16. Companion files: `renewals-amendments-dev-readiness.md`, `amendment-technical-approach-and-dependencies.md`, `renewals-amendments-open-questions-register.md`.*
 
 **Slice definition.** Mid-term amendment of an ACTIVE SaaS subscription set under one contract, using the spine in CAM (contract-documents module) and a minimal LifecycleChange (intent Amend) in quote-service. Action codes in slice: **Add, Update (quantity, Delta or Absolute), Remove**. Swap, Upgrade and Downgrade are out of slice because the catalog has no product relationships (RA-42 / DRG-576, adjacent assessment). Signature policies in slice: NOT_REQUIRED, NOTICE_ONLY, CLICK_THROUGH (auto-execute). Out of slice: e-signature adapter (DRG-457), on-prem and capacity lines (DRG-556, 557), ordering, fulfilment, renewal, price lock, history backfill.
