@@ -112,11 +112,27 @@ public class AmendmentController {
     }
 
     private static CommandContext context(HttpServletRequest request, String idempotencyKey) {
-        String actorType = request.getHeader("X-Actor-Type");
-        return new CommandContext(UUID.fromString(request.getHeader("X-Tenant-Id")), header(request, "X-Caller-Id"),
-                idempotencyKey, header(request, "X-Actor-Id"),
-                actorType == null || actorType.isBlank() ? ActorType.USER : ActorType.valueOf(actorType),
+        return new CommandContext(tenantId(request), header(request, "X-Caller-Id"),
+                idempotencyKey, header(request, "X-Actor-Id"), actorType(request),
                 header(request, "X-Actor-Role"), header(request, "X-Correlation-Id"));
+    }
+
+    private static UUID tenantId(HttpServletRequest request) {
+        String raw = header(request, "X-Tenant-Id");
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("X-Tenant-Id must be a UUID", HttpStatus.BAD_REQUEST, "VALIDATION_REJECTED");
+        }
+    }
+
+    private static ActorType actorType(HttpServletRequest request) {
+        String raw = header(request, "X-Actor-Type");
+        try {
+            return ActorType.valueOf(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("X-Actor-Type is not a known actor type", HttpStatus.BAD_REQUEST, "VALIDATION_REJECTED");
+        }
     }
 
     private static String header(HttpServletRequest request, String name) {

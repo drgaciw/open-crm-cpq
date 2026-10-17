@@ -345,6 +345,22 @@ class AmendmentDocumentWorkflowIntegrationTest {
     }
 
     @Test
+    void crossTenantWriteIsNotFoundAndLeavesTheDocumentUnchanged() {
+        Fixture fixture = fixture(SignaturePolicy.NOT_REQUIRED);
+        AmendmentView draft = documents.create(fixture.contract.getId(), create(fixture), context(fixture, "tenant-write"));
+        CommandContext other = new CommandContext(UUID.randomUUID(), "s5-caller", "tenant-write-other",
+                "seller-1", ActorType.USER, "seller", "corr-tenant-write");
+        assertThatThrownBy(() -> documents.submit(draft.id(), draft.version(), other))
+                .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> revisions.open(draft.id(), supersede(fixture, draft, 2), other))
+                .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
+        AmendmentView after = documents.get(draft.id());
+        assertThat(after.status()).isEqualTo(AmendmentDocumentStatus.DRAFT);
+        assertThat(after.version()).isEqualTo(draft.version());
+        assertThat(after.revisions()).hasSize(1);
+    }
+
+    @Test
     void crossTenantReadIsNotFound() {
         Fixture fixture = fixture(SignaturePolicy.NOT_REQUIRED);
         AmendmentView draft = documents.create(fixture.contract.getId(), create(fixture), context(fixture, "tenant-create"));
@@ -523,6 +539,7 @@ class AmendmentDocumentWorkflowIntegrationTest {
         headers.add("X-Tenant-Id", fixture.tenant.toString());
         headers.add("X-Caller-Id", "s5-caller");
         headers.add("X-Actor-Id", "seller-1");
+        headers.add("X-Actor-Type", "USER");
         headers.add("X-Actor-Role", "seller");
         headers.add("X-Correlation-Id", "corr-" + key);
         return headers;
