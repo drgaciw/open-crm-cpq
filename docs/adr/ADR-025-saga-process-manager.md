@@ -1,8 +1,8 @@
 # ADR-025: Saga mechanism — an in-house persisted process manager
 
-**Status:** Proposed on 2026-10-04. Not accepted.
+**Status:** Accepted on 2026-10-17. The project owner told, on 2026-10-17 at 7:31 AM CT, as relayed by the Projects Manager bot, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644); authorized opening their status-change PRs". The owner's merge of this PR is the confirming act and the status takes effect on merge. This supersedes the "retain their existing statuses" wording of PRs #662 and #663 only for ADR-025.
 **Date:** 2026-10-04
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted).
 **Relates to:** [ADR-024](ADR-024-order-orchestration-context.md) (order context), [ADR-026](ADR-026-command-messages.md) (commands), [ADR-027](ADR-027-compensation-and-point-of-no-return.md) (compensation), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (outbox, inbox, envelope), ADR-020 (observability, reserved). Backlog: Notion EPIC SAGA and SAGA-01 to SAGA-03, BC-08-03; Linear DRG-289, DRG-290.
 **Supersedes (when accepted):** the "Saga Orchestration (Temporal)" phase of `cpq-microservice-ddd-analysis.xml` (lines 128-132).
 **Does not authorize:** any code, schema, dependency or topic.
