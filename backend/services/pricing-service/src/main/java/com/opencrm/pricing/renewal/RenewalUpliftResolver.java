@@ -13,7 +13,8 @@ import java.util.Map;
  *
  * <p>Callers pass the five rungs unmerged. This class does not read another service's database,
  * does not call the rules port, does not persist a snapshot, and does not write an event.
- * List bases stay unresolved until DRG-539. Other modes stay unpriced until DRG-549.
+ * List bases stay unresolved until DRG-539. This slice prices {@code UPLIFT_PCT} and {@code SAME}.
+ * {@code SAME} carries the request exit net and does not guess a missing one. Other modes stay unpriced.
  * Escalator years are not expanded (DRG-533, DRG-568).
  */
 public final class RenewalUpliftResolver {
@@ -51,7 +52,7 @@ public final class RenewalUpliftResolver {
         Map<RenewalUpliftRungKind, RenewalUpliftRung> rungs = index(request.rungs());
         FieldSource<RenewalUpliftMode> mode = findFirst(rungs, RenewalUpliftRung::mode, false);
         if (mode != null) {
-            if (mode.value() != RenewalUpliftMode.UPLIFT_PCT) {
+            if (mode.value() != RenewalUpliftMode.UPLIFT_PCT && mode.value() != RenewalUpliftMode.SAME) {
                 throw new RenewalUpliftModeOutOfSliceException(mode.value());
             }
             requiredSourceId(rungs.get(mode.rung()));
@@ -82,6 +83,9 @@ public final class RenewalUpliftResolver {
 
         if (mode == null) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_RENEWAL_MODE, null, null, null, null, null);
+        }
+        if (mode.value() == RenewalUpliftMode.SAME) {
+            return resolveSame(merged, pin);
         }
         if (percent == null) {
             return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_UPLIFT, null, null, null, null, null);
@@ -124,6 +128,39 @@ public final class RenewalUpliftResolver {
         return finish(merged, pin, RenewalUpliftResolution.PRICED, bound(cap), bound(floor), capApplied, floorApplied, unit);
     }
 
+    /**
+     * SAME carries the request exit net at scale 4. Percent and basis are ignored.
+     * A missing or negative exit net is unresolved. The unit is not clamped: a value outside a
+     * normalized cap or floor is a price-protection conflict.
+     */
+    private static RenewalUpliftResult resolveSame(Merged merged, Pin pin) {
+        RenewalUpliftRequest request = merged.request();
+        if (request.exitNet() == null || request.exitNet().signum() < 0) {
+            return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_BASIS, null, null, null, null, null);
+        }
+        boolean listRequired = Boolean.TRUE.equals(merged.notAboveList().value());
+        if (pin.date() == null || pin.versionId() == null
+                || (listRequired && (pin.listUnit() == null || pin.listUnit().signum() < 0))) {
+            return finish(merged, pin, RenewalUpliftResolution.UNRESOLVED_BASIS, null, null, null, null, null);
+        }
+        Side cap = cap(request.exitNet(), merged.maxIncreasePct(), listRequired ? pin.listUnit() : null);
+        Side floor = floor(request.exitNet(), merged.notBelowExitNet().value(), merged.minIncreasePct(), merged.minUnitAmount());
+        if (cap != null && floor != null && floor.normalized().compareTo(cap.normalized()) > 0) {
+            return finish(merged, pin, RenewalUpliftResolution.PRICE_PROTECTION_CONFLICT,
+                    bound(cap), bound(floor), null, null, null);
+        }
+        BigDecimal unit = request.exitNet().setScale(UNIT_SCALE, RoundingMode.HALF_UP);
+        if ((cap != null && unit.compareTo(cap.normalized()) > 0)
+                || (floor != null && unit.compareTo(floor.normalized()) < 0)) {
+            return finish(merged, pin, RenewalUpliftResolution.PRICE_PROTECTION_CONFLICT,
+                    bound(cap), bound(floor), null, null, null);
+        }
+        if (unit.signum() < 0) {
+            throw new IllegalArgumentException("Renewal unit price cannot be negative");
+        }
+        return finish(merged, pin, RenewalUpliftResolution.PRICED, bound(cap), bound(floor), null, null, unit);
+    }
+
     private static RenewalUpliftResult finish(
             Merged merged,
             Pin pin,
@@ -134,7 +171,9 @@ public final class RenewalUpliftResolver {
             MonetaryBound floorApplied,
             BigDecimal unitPrice) {
         RenewalUpliftRequest request = merged.request();
-        boolean rulesSupplied = merged.percentPoints() != null
+        boolean same = merged.mode() != null && merged.mode().value() == RenewalUpliftMode.SAME;
+        boolean rulesSupplied = !same
+                && merged.percentPoints() != null
                 && merged.percentPoints().rung() == RenewalUpliftRungKind.RULES
                 && resolution != RenewalUpliftResolution.UNRESOLVED_RENEWAL_MODE
                 && resolution != RenewalUpliftResolution.UNRESOLVED_UPLIFT;
@@ -186,6 +225,9 @@ public final class RenewalUpliftResolver {
     private static String appliedId(Merged merged, RenewalUpliftResolution resolution) {
         if (resolution == RenewalUpliftResolution.UNRESOLVED_RENEWAL_MODE || merged.mode() == null) {
             return null;
+        }
+        if (merged.mode().value() == RenewalUpliftMode.SAME) {
+            return merged.mode().sourceId();
         }
         if (merged.percentPoints() != null && resolution != RenewalUpliftResolution.UNRESOLVED_UPLIFT) {
             return merged.percentPoints().sourceId();
