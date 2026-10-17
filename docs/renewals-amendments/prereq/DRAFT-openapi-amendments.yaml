@@ -3,6 +3,12 @@ info:
   title: Amendments and lifecycle changes (DRAFT proposal)
   version: 0.1.1-draft
   description: |
+    Decision update 2026-10-17: delegated-renewals-amendments-decisions-2026-10-17.md
+    adopts the indexed design decisions, OQ18 and CAM transaction/delivery rules.
+    This OpenAPI remains a draft interface artifact: the new priced-state command,
+    closed commercial-envelope DTO and receipt/reconciliation schemas still require
+    completion against that record before implementation release or code generation.
+
     Documentation accepted by the owner on 2026-10-17; see
     documentation-acceptance-2026-10-17.md for scope. Individual default and
     implementation-contract decisions remain subject to the gates below.
@@ -11,9 +17,9 @@ info:
     feature flag. It does not authorize merging, deploying, or enabling any
     runtime flag.
 
-    Status of every default in this file: Proposed, unaccepted, owner decision
-    required. This file is not an input to code generation and it defines no
-    contract test.
+    Historical proposal labels below retain the pre-decision interface sketch.
+    The delegated record governs adopted choices; other paths remain proposals.
+    This file is not an input to code generation and defines no executed test.
 
     HTTP contract for the contract-documents module and for quote-service
     lifecycle changes, so DRG-537 (renewals and amendments UI), DRG-581 (S3)
@@ -58,12 +64,12 @@ info:
 
     Money is a decimal string so numeric(19,4) scale survives JSON. Digests are
     lowercase hex SHA-256. Canonical JSON for `contentDigest` is the shared
-    digest library (S3 dependency, location still open). This proposal does not
-    define the canonicalization algorithm. OQ18 remains Proposed. This file
-    does not confirm OQ18 and does not authorize building that library.
+    digest library in backend/libs/common, delivered with S3 under confirmed OQ18.
+    CAM-COMMERCIAL-1 is defined in the delegated decision record. This file
+    does not authorize implementation or change the existing S2 event-chain format.
 
-    DRG-616 records three contracts. Each default is Proposed, unaccepted,
-    owner decision required.
+    DRG-616 decisions are adopted under the delegated record. Pre-decision
+    proposal wording below is historical; DTO/schema completion remains required.
     POST /amendments/{amendmentId}/revisions is the proposed CAM revision
     write. It follows the OQ6 ruling recorded in pull request #642: before
     execution, a new revision under the same document number, the old revision
@@ -649,17 +655,18 @@ paths:
         - $ref: "#/components/parameters/IdempotencyKey"
       tags: [amendments]
       operationId: openAmendmentRevision
-      summary: Open a new document revision before execution (proposal)
+      summary: Open a new document revision before execution (adopted design, draft schema)
       description: |
-        Proposal only. Status: Proposed. Not accepted. This operation does
-        not authorize S3, S5, S6, a migration, a flag, a topic, or a deploy.
-        OQ18 stays Proposed. ADR-017 and ADR-024 through ADR-027 stay
+        Design choices adopted by the delegated decision record, 2026-10-17.
+        This draft schema does not authorize S3, S5, S6, a migration, a flag,
+        a topic, or a deploy. OQ18 is confirmed under delegation.
+        ADR-017 and ADR-024 through ADR-027 stay
         Proposed. The DRG-609 design is not accepted. S3 / DRG-581 needs a
         separate owner authorization. S6 is not authorized.
 
         CAM owns this command. S5 would call it after a separate authorization
-        of that story. Draft criterion AC-S5-7 is a proposal in the
-        requirements file. This operation does not adopt it.
+        of that story. AC-S5-7 is adopted against the durable receipt/replay
+        contract in the delegated record; schema and delivery evidence remain due.
 
         The behavior follows the OQ6 ruling recorded in #642. That ruling is
         not re-decided here. Before execution (document status DRAFT,
@@ -692,9 +699,10 @@ paths:
         failure aborts the revision transaction. A later write to an OPEN
         revision creates a new immutable envelope and only replaces that
         OPEN row's reference; it never overwrites an older envelope. The
-        durable snapshot-store contract still requires separate acceptance;
-        digest-library work also waits on owner confirmation of OQ18.
-        S3/S5 stays blocked without those accepted prerequisites.
+        durable snapshot-store contract is adopted in the delegated record;
+        digest-library work follows confirmed OQ18 and still needs implementation authorization.
+        S3/S5 stays blocked until schemas, implementations and evidence are delivered
+        under separate implementation authorization.
         CAM then replaces those header values in the
         same transaction that opens the revision; a null backdatingReasonCode
         explicitly clears the old reason. It validates the revised dates,
@@ -2427,17 +2435,12 @@ components:
           nullable: true
         contentDigest:
           type: string
-          description: 'Proposed default (DRG-616, not accepted, not a migration): null on
-
-            an unpriced draft, including a revision opened by supersession,
-
-            until a later submit stores the digest. The field schema on main
-
-            still says content_digest is not null. OQ18 stays Proposed, so
-
-            this file does not define canonicalization.
-
-            '
+          description: >-
+            Adopted design: null on the current unpriced OPEN revision until submit.
+            Every frozen revision has a genuine close digest; old frozen evidence
+            retains its original digest format. Confirmed OQ18 and CAM-COMMERCIAL-1
+            are defined in the delegated decision record. Storage migration and
+            schema completion remain separately gated.
           pattern: ^[a-f0-9]{64}$
           nullable: true
         renditionDigest:
@@ -2578,15 +2581,11 @@ components:
           description: Quote opened for this revision. The proposed CAM write requires the caller to send it.
         contentDigest:
           type: string
-          description: 'Proposed default (DRG-616, not accepted, not a migration): null
-
-            while this revision is an unpriced DRAFT. The superseded revision
-
-            keeps its digest. The field schema on main still says not null.
-
-            OQ18 stays Proposed.
-
-            '
+          description: >-
+            Adopted design: null while this is the current unpriced OPEN revision.
+            Closing an unpriced revision computes a genuine digest of its immutable
+            null-bearing commercial envelope; a previously priced digest is retained.
+            Confirmed OQ18 supplies the shared versioned canonicalization contract.
           pattern: ^[a-f0-9]{64}$
           nullable: true
         inputsSnapshotRef: {type: string}
