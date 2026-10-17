@@ -1,9 +1,13 @@
-# Manual fallback only — primary CI runs in Jenkins (see docs/ci-jenkins-cutover.md).
-# Automatic push/PR triggers are intentionally disabled (Option B cutover).
+# Manual fallback plus a nightly run of the full matrix on main — primary CI runs in Jenkins
+# (see docs/ci-jenkins-cutover.md). Push/PR triggers stay disabled (Option B cutover); the nightly
+# schedule exists because no Jenkins instance is reachable, so integration and frontend stages
+# otherwise never run (ADR-003 section 8, amendment 2026-10-16).
 name: CI (manual fallback)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
 
 permissions:
   contents: read
@@ -25,6 +29,9 @@ jobs:
         run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
       - name: Verify shared libraries
         run: bash scripts/ci/run-core.sh shared-libraries
+      - name: Name failing tests
+        if: failure()
+        run: python3 scripts/ci/report-test-failures.py
       - name: Upload shared library test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,6 +53,9 @@ jobs:
           cache: maven
       - name: Fast unit verification
         run: bash scripts/ci/run-core.sh backend-unit
+      - name: Name failing tests
+        if: failure()
+        run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -68,6 +78,9 @@ jobs:
           cache: maven
       - name: Full Docker-backed verification
         run: bash scripts/ci/run-core.sh backend-integration
+      - name: Name failing tests
+        if: failure()
+        run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
