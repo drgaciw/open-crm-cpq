@@ -27,8 +27,8 @@ CPQ Decision on #653. Docs only. No flag. No deploy. Linear status was not chang
 
 1. **No V1_7 migration.** Nullable pins are described in the PROPOSED addendum appended to `amendment-entity-field-schema.md`. That addendum does not apply the change and does not rewrite the §2.5 row. If a migration is needed, it is a new migration in the S3 build. Its number is the next free at build time. V1_9 is reserved for S4, so this note assigns no number. The rollback statement is in that addendum.
 2. **No S6 files.** The ticket's request to add the event to S6-owned schemas and contract tests was not done. S6 is not authorized. No schema, registry entry, or contract test was added. The OpenAPI file is not an input to code generation and defines no contract test.
-3. **Requirements file and S3/S5 story notes were not edited.** `amendment-first-slice-requirements-and-acceptance.md`, `prereq/story-s3-s4-authorization-gate.md`, and `prereq/story-s5-lifecyclechange-readiness.md` are unchanged.
-4. **Done-when on the ticket is not met.** This note is not merged. DRG-581's acceptance criteria were not edited. DRG-616 remains Backlog. DRG-581, DRG-583, and DRG-584 remain Todo.
+3. **Requirements and S3/S5 status wording reconciled.** The requirements now label AC-S3-9..11, AC-S5-7 and AC-S8-6 Proposed, not adopted. The S3/S5 notes point to #642 and distinguish recorded OQ6 from unconfirmed OQ18. This reconciliation adopts none of the proposed API, storage, event, or delivery contracts.
+4. **Done-when on the ticket is not met.** This note is not merged. Repository acceptance criteria are status-marked; the Linear DRG-581 record was not edited. DRG-616 remains Backlog. DRG-581, DRG-583, and DRG-584 remain Todo.
 
 ## Gap 1 — CAM revision write
 
@@ -44,7 +44,7 @@ The same file defines `POST /lifecycle-changes/{lifecycleChangeId}/revisions` (`
 
 `oq6-revision-model-owner-decision.md` section 2, command boundary: "The exact CAM command/API, including route and request/response contract, is not decided here; the OpenAPI draft's LifecycleChange revision operation is tagged S5 and is not an accepted CAM API." Section 4: "The CAM command/API and expected-version contract ... remain open."
 
-`amendment-first-slice-requirements-and-acceptance.md` still states AC-S3-9, AC-S3-10, AC-S3-11, and AC-S5-7 as criteria. Those sentences were not edited. They remain proposals relative to the #642 record.
+`amendment-first-slice-requirements-and-acceptance.md` still states AC-S3-9, AC-S3-10, AC-S3-11, and AC-S5-7 as criteria. Those sentences are now labeled Proposed, not adopted relative to the #642 record; their behavior was not adopted by this reconciliation.
 
 ### Fork — where the write lives
 
@@ -161,13 +161,13 @@ The adopted rule clears pricing pins on the new revision and leaves that revisio
 
 The OpenAPI draft on main lists `productExternalId`, `pricebookVersion`, and `configurationHash` in `AmendmentLine.required`. The descriptions on the first two already say "Null until pricing pins" the value. `configurationHash` is a required SHA-256. `AmendmentRevision.contentDigest` and `AmendmentDocument.contentDigest` are required SHA-256 values. Policy-decision fields (`policyId`, `policyVersion`, `policyDecisionId`, `pricingTraceId`) are already nullable. §2.5 says those are "not null when priced."
 
-AC-S3-9, still an unedited draft criterion, says a superseding revision invalidates product, pricebook, configuration, and policy-decision pins bound to the previous digest.
+AC-S3-9, explicitly marked Proposed in the requirements, says a superseding revision invalidates product, pricebook, configuration, and policy-decision pins bound to the previous digest.
 
 ### Fork — how a cleared pin is stored
 
 | Option | Meaning |
 |---|---|
-| A | Nullable pins on the open revision only. The frozen previous revision keeps its pins. Submit and apply still require non-null pins (V9). |
+| A | Nullable pins while unpriced; frozen revisions preserve their original pin values. The frozen previous revision preserves its actual pins, including nulls if it was never priced. Submit and apply still require non-null pins (V9). |
 | B | An explicit invalidation flag. The three columns stay not null and keep the old values, plus a marker that they are void. |
 | C | Staging columns that are nullable. Price promotes them into the not-null columns. |
 
@@ -181,7 +181,7 @@ The OpenAPI draft records default A on `AmendmentLine`: the three fields are nul
 
 | Option | Meaning |
 |---|---|
-| A | `contentDigest` is null on the open unpriced revision until submit. The superseded revision keeps its digest. |
+| A | `contentDigest` is null on the open unpriced revision until submit. The superseded revision retains its digest; freezing a never-submitted draft still needs a digest-at-close contract. |
 | B | The server computes a digest of the unpriced content immediately. |
 | C | The new revision copies the previous digest. |
 
@@ -189,9 +189,11 @@ The OpenAPI draft records default A on `AmendmentLine`: the three fields are nul
 
 **Owner decision needed:** the field schema on main says `content_digest` is not null. Default A cannot be inserted until the owner accepts a null and a later migration, or rejects A. That migration, if any, is a new one in the S3 build, numbered the next free at build time. It is not V1_7. V1_9 stays reserved for S4. The OpenAPI draft shows null as the HTTP shape on `AmendmentDocument.contentDigest` and `AmendmentRevision.contentDigest`. That shape is Proposed, unaccepted, owner decision required. It is not a migration.
 
+**Remaining storage gap.** A revision can be superseded while still unpriced DRAFT. Frozen null pins must remain historical facts rather than being filled from the new revision. Freezing a never-submitted draft also requires an accepted digest-at-close contract, since the proposed open digest is null. This proposal does not choose that contract, and the API is not implementation-ready until it is resolved.
+
 ### What this unblocks for S3
 
-After the owner accepts default A for pins and for the digest, and separately authorizes DRG-581, S3 can persist the unpriced revision the adopted rule describes. The column change, if accepted, is a new migration in that build. Its number is the next free at build time. This note does not authorize that build or that migration.
+After the owner resolves that storage gap, accepts default A for pins and for the digest, and separately authorizes DRG-581, S3 can persist the unpriced revision the adopted rule describes. The column change, if accepted, is a new migration in that build. Its number is the next free at build time. This note does not authorize that build or that migration.
 
 ## Gap 3 — Supersession event
 
@@ -241,7 +243,7 @@ After the owner accepts default A, S3 can append one local log row on a successf
 
 ## Proposed ACs, not adopted
 
-These criteria are proposed ACs, not adopted. Their sentences were not edited. The requirements file and the S3 and S5 story notes were not edited.
+These criteria are proposed ACs, not adopted. The requirements now mark each one Proposed, and the S3/S5 notes reference the canonical #642 record and unconfirmed OQ18. This changes status wording, not the proposed behavior.
 
 | ID | Status | Target file |
 |---|---|---|
@@ -263,7 +265,7 @@ These criteria are proposed ACs, not adopted. Their sentences were not edited. T
 | 6 | `targetQuoteId` and `inputsSnapshotRef` | A. Caller supplies both | Proposed, unaccepted, owner decision required | B. Server placeholder. C. Nullable columns. No migration is written. |
 | 7 | Terminal 409 code | A. `ILLEGAL_TRANSITION` for terminal documents; `IMMUTABLE_EXECUTED` after execution | Proposed, unaccepted, owner decision required | B. `IMMUTABLE_EXECUTED` for every refusal. C. New code `TERMINAL_STATE`. |
 | 8 | Stale version when revision races execute | A. `VERSION_CONFLICT`, then `IMMUTABLE_EXECUTED` if a retry sees an executed document | Proposed, unaccepted, owner decision required | B. `VERSION_CONFLICT` only. C. `IMMUTABLE_EXECUTED` for every loser. |
-| 9 | Cleared pins | A. Nullable on the open revision only | Proposed, unaccepted, owner decision required | B. Invalidation flag; columns stay not null. C. Staging columns. |
+| 9 | Cleared pins | A. Nullable while unpriced; frozen values preserved | Proposed, unaccepted, owner decision required | B. Invalidation flag; columns stay not null. C. Staging columns. |
 | 10 | Digest of the open revision | A. Null until submit | Proposed, unaccepted, owner decision required | B. Compute immediately. That needs OQ18, which stays Proposed. C. Copy the previous digest. |
 | 11 | Success supersession fact | A. Local log row `AMENDMENT_SUPERSEDED` | Proposed, unaccepted, owner decision required | B. S6 schema and contract test. No S6 file is added. C. Reuse `AMENDMENT_DRAFTED`. |
 | 12 | Refusal audit type | A. Local row; type name not chosen | Proposed, unaccepted, owner decision required | B. `VALIDATION_REJECTED`. C. New name `AMENDMENT_REVISION_REJECTED`. |
@@ -278,9 +280,9 @@ These criteria are proposed ACs, not adopted. Their sentences were not edited. T
 - It does not accept ADR-017 or ADR-024 through ADR-027.
 - It does not accept the DRG-609 design.
 - It does not edit an Accepted ADR.
-- It appends a PROPOSED addendum to the field schema. That addendum describes nullable pins on open revisions only. It does not apply them and it does not rewrite earlier text.
+- It appends a PROPOSED addendum to the field schema. That addendum describes nullable pins while unpriced, with frozen values preserved. It does not apply them and it does not rewrite earlier text.
 - It does not add a V1_7 migration. It assigns no migration number. V1_9 stays reserved for S4.
-- It does not edit the requirements file or the S3/S5 story notes.
+- It reconciles proposal status in the requirements and S3/S5 notes; it adopts no additional acceptance contract.
 - It does not add an S6 file, a schema-registry entry, generated code, or a contract test.
 - It does not enable a flag, deploy, or send anything external.
 - It does not change Linear status.

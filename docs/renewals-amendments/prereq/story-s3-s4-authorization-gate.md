@@ -47,27 +47,15 @@ Linear issue status was read on 2026-10-16 from Linear, which is outside this gi
 
 ## OQ6 — Revision model when a LifecycleChange is superseded mid-flight
 
-**Question, as written.** ADR-035: "Revision model edge cases when LifecycleChange is superseded mid-flight." Register: status `DEFAULT PROPOSED`; blocks S3; needed before S3. Field schema §2.4: a new LifecycleChange revision creates a new document revision under the same number; at most one `EXECUTED`. Spike decision 6 is that same sentence. The acceptance checklist calls these "revision edge cases" and places them before S3.
+**Current reconciliation (2026-10-17, DRG-616).** The historical reading above predates #642. The canonical ruling is now [oq6-revision-model-owner-decision.md](oq6-revision-model-owner-decision.md), recorded under delegation, not the owner's personal choice.
 
-ADR-035 names the mid-flight edge and does not list options or define which states count as mid-flight. No file read for this note contains a menu titled for that edge.
+- Before execution (`DRAFT`, `IN_REVIEW`, `APPROVED`), a superseding LifecycleChange opens a new document revision under the same provisional number; the old revision is frozen `SUPERSEDED`, pins are cleared on the new revision, approvals and signatures are void, and the document returns to `DRAFT`.
+- After `EXECUTED`, including all apply outcomes, a revision is refused with 409 `IMMUTABLE_EXECUTED` and an audit event. The remedy is a new correcting LifecycleChange and document. `REJECTED` and `WITHDRAWN` remain terminal. At most one revision may be `EXECUTED`.
+- CAM owns revision and execution transitions. The exact CAM write, cleared-pin representation, supersession event contract, local concurrency protocol, and S5/S8 delivery boundary remain unaccepted proposals. [DRG-616's note](story-drg-616-oq6-design-contract-gaps.md) records alternatives, not adopted contracts. The linked requirements mark AC-S3-9..11, AC-S5-7 and AC-S8-6 Proposed.
+- OQ18 remains **Proposed until the owner confirms it**: the unconfirmed location is `backend/libs/common`, delivered in S3 and reused by S5/S6. Confirmation gates building that library only. It does not authorize S3 or S6 and is not a blanket gate on all S3 work.
+- `OUT_FOR_SIGNATURE` is unreachable in the first slice. The later signature story must void the envelope before a pre-execution revision. Document-level supersession by a later restatement is a different event.
 
-**Behaviors that are written (proposals and defaults, not an accepted model).**
-
-1. **Register / schema / spike default.** New document revision under the same amendment number. Drafts edit. At most one revision closes `EXECUTED` (V11, partial unique index in the schema). Revision `status_at_close` includes `SUPERSEDED`. Spike state table: a new revision of the same LifecycleChange freezes the old revision with its digest. `IN_REVIEW` and `OUT_FOR_SIGNATURE` can return to `DRAFT` on a new revision.
-2. **OpenAPI draft, `POST /lifecycle-changes/{id}/revisions`, tagged S5, status proposal.** Allowed from `DRAFT`, `PRICED`, `IN_APPROVAL`, `APPROVED`, and `PRESENTED`. The previous revision is frozen `SUPERSEDED`. Status returns to `DRAFT`. Pricing pins on the new revision are cleared. A new revision of an already `EXECUTED` document is refused with `IMMUTABLE_EXECUTED` (AC-S3-5). The correction path named there is a new lifecycle change.
-3. **After apply is blocked.** Spike §4 rule 5 and `partial-apply.md` AC-12: rebase opens a new revision. The OpenAPI `:rebase` operation is tagged later, and its description says it is not part of S3 or S5.
-4. **Document-level `SUPERSEDED`.** Spike state table: a later `AMENDED_AND_RESTATED` document executes; applied facts are not rewritten; only links are added. That is a different event from a LifecycleChange revision being superseded.
-
-**Proposed default, not adopted here.** The register default is behavior 1. It does not say what happens when the superseding revision arrives after the document is `EXECUTED` and before apply finishes. The OpenAPI draft refuses a new revision of an `EXECUTED` document. Those two texts can be read together only if "drafts only edit" means pre-execution edits, and an executed document is immutable (A1, AC-S3-5). That reading is an inference. The files do not state it as the mid-flight rule.
-
-**Consequences if the owner later adopts the register default for S3.**
-
-- S3 builds the state machine, gapless `{contract_number}-A{nnn}` at `EXECUTED`, and the "drafts only edit / one EXECUTED revision" rule. AC-S3-5 rejects updates to an `EXECUTED` document and audits them. AC-S3-7: a withdrawn draft consumes no number.
-- The mid-flight case ADR-035 names is still unspecified: in-flight `IN_REVIEW` or `OUT_FOR_SIGNATURE` versus already `EXECUTED` but not applied. S3's written acceptance criteria do not include a superseded-mid-flight test.
-- Price-lock stub: schedule edits in negotiation create revisions. Renewal stub: renegotiation creates revisions under one renewal number. Both assume the same-number model. Neither states the mid-flight rule.
-- Digest library location (OQ18) is `DEFAULT PROPOSED` as `backend/libs/common` and is listed as needed before S3. The OpenAPI draft says the canonicalization location is still open and calls the library an S3 dependency. Technical approach §2 assigns the shared canonical digest utility to S6. Three texts, three timings. Unresolved.
-
-**What stays blocked.** S3 stays blocked until the owner authorizes DRG-581. The register says the revision default is needed before S3. This file does not supply that authorization.
+**What stays blocked.** S3 / DRG-581 still needs separate owner authorization and accepted design prerequisites. Merging #642 recorded the ruling; it did not start S3. This reconciliation accepts no proposed contract and authorizes no story.
 
 ## OQ7 — Backfill strategy
 
@@ -127,7 +115,7 @@ Technical approach §3 and the field-schema addendum assign the next three CAM v
 - Migration: none named.
 - Additive fields on `backend/libs/common/src/main/java/com/opencrm/common/event/dto/QuoteAcceptedEvent.java`: optional `amendmentDocumentId` and per-line `applicationUnitNo` (FR-16, AC-S6-1). The spike writes the same path with a shortened `backend/libs/common/.../QuoteAcceptedEvent.java`.
 - Flag routing in `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/event/QuoteAcceptedEventConsumer.java` (technical approach §2).
-- Shared canonical digest utility in `backend/libs/common`. Class name not given. See the OQ18 timing conflict under OQ6.
+- Shared canonical digest utility in `backend/libs/common`. Class name not given. See the unconfirmed OQ18 proposal under OQ6.
 - Amendment event names in AC-S6-4: Drafted, Submitted, Approved, Executed, UnitApplied, Applied, ApplyBlocked, Withdrawn. Schema file names are not given. `backend/libs/common/src/main/java/com/opencrm/common/event/EventContractRegistry.java` exists. AC-S6-4 requires each event to have a registered schema and a contract test. Assigning that registry file to S6 is an inference from that criterion plus ADR-035's fitness function ("Event contract registry lists document lifecycle events"). The technical approach says "amendment event schemas" live in `backend/libs/common` and does not name the registry class.
 - Fixtures AC-S6-1 names: `backend/services/contract-asset-management/src/test/resources/accepted-v1/*.json`. Files present: `hybrid-credit-new.json`, `r4-accepted-event.json`, `ramp-new.json`.
 - Quote emission with `amendmentDocumentId` is assigned to S5 and S6 together (technical approach §2). The transcript names `QuoteAcceptedKafkaEventFactory`. Path verified: `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteAcceptedKafkaEventFactory.java`. Exclusive ownership by S6 is not stated.
@@ -195,4 +183,4 @@ S3 through S8 may cite the three Accepted prerequisite records within their stat
 
 ## Later owner record
 
-A later decision, not this file, would record: the OQ5 choice, the OQ6 mid-flight rule, the OQ7 slice-versus-history split, and an explicit authorization for each of DRG-581, DRG-582, DRG-584, and DRG-585. Until that record exists, S3 through S8 stay blocked.
+The OQ6 ruling is now recorded by #642; the historical OQ5 and OQ7 readings above are not reopened here. A later owner act must accept the remaining design contracts and explicitly authorize the relevant story. This file does not authorize DRG-581, DRG-582, DRG-584, DRG-585, or any other story.
