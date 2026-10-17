@@ -6,7 +6,7 @@
 
 **Story:** [DRG-549](https://linear.app/drgamtd-workspace/issue/DRG-549/renewal-pricing-policy-hierarchy-same-list-uplift-percent-uplift) (RA-15). This file is the design frame for how a renewal price is resolved. It is not an ADR, takes no number, and is not copied into `docs/adr/`.
 
-**Accepting this authorizes no code, migration or deploy.** It authorizes no Flyway file, no Drools edit, no flag, no route, and no merge. Pricing flags stay as they are. No real customer data is read or written. DRG-549 stays In Review until the owner merges. The later code-slice allowlist is a draft, not approved. A merge of #658 does not release the code slice.
+**Accepting this authorizes no code, migration or deploy.** It authorizes no Flyway file, no Drools edit, no flag, no route, and no merge. Pricing flags stay as they are. No real customer data is read or written. The recorded Linear read returned Backlog. This note changes no issue status. The intended workflow is for the issue owner to move it to In Review and keep it there until owner merge; that transition is not claimed to have happened. The later code-slice allowlist is a draft, not approved. A merge of #658 does not release the code slice.
 
 **Reads, and does not amend:** Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) (Accepted 2026-10-16). Precedence below cites that record. This frame does not restate it as a second rule.
 
@@ -23,7 +23,7 @@ Nothing was executed. This pass did not start Maven, a database, Testcontainers,
 | `verified by reading the pull request` | GitHub pull-request title, state, and merge commit, this pass. The branch was not checked out. |
 | `unverified` | Not established by a file, issue, or pull request opened in this pass. A truncated listing is `unverified`. |
 
-**GitNexus:** no `.gitnexus` directory on this tree. **Impact: UNKNOWN (no GitNexus index).**
+**GitNexus execution evidence (2026-10-17 PR processing):** no GitNexus MCP tool is exposed in this session. CLI v1.6.12 `impact RenewalUpliftResolver --direction upstream --repo <review-checkout>` was attempted against the review snapshot and returned `GitNexus: No indexed repositories found. Run: gitnexus analyze` (exit 1). The earlier `detect-changes --scope all --repo <review-checkout>` returned the same failure. This is a tool failure in this session, not a conclusion from the absence of a checked-in directory or a claim about another machine's configured index. **Impact remains UNKNOWN.** Text searches below corroborate only the named files/suffixes; they do not establish an empty graph or an unused symbol.
 
 **Claims marked as executed: none.**
 
@@ -128,13 +128,13 @@ This block is an option. It is not a decision. Proposed, unaccepted, owner decis
 | Property | Sketch |
 |---|---|
 | Versioned | One operation beside the existing `/api/v1/pricing` routes on `PricingExecutionController` (`/execute`, `/simulate`, `/simulate/bulk`, `/audit/{quoteExternalId}`). Sketch path: `POST /api/v1/pricing/renewals/resolve`. The path is not registered. |
-| Idempotent | The same request body returns the same response body. Repeating the call changes no stored state. |
+| Idempotent | The same request body returns the same resolved `data` and has no additional stored side effects. `ApiResponse.timestamp` and request trace metadata may differ; byte-identical response envelopes are not required. `ApiResponse` initializes timestamp with `Instant.now()`. |
 | Read-only | The handler calls the resolver and returns. It opens no write transaction. |
 | No persistence | No snapshot, no `PricingAuditLog` row, no outbox row, no schema-registry event. `RenewalUpliftResult`'s Javadoc already says nothing there is stored. |
 | Contract sketch | Request JSON matches `RenewalUpliftRequest`: `currency`, `exitNet`, `quantity`, `termMonths`, `pins`, and `rungs`. Rungs arrive unmerged. Response JSON matches `RenewalUpliftResult`, wrapped in the `ApiResponse` envelope `PricingServiceClient` already parses for execute and simulate. When a unit is returned, `flatPeriodCount` is 1. `retentionMarker` is copied through as an opaque string. |
 | Coded | No. |
 
-Schema-registry, outbox, commercial-decision audit, and event replay stay N/A on this sketch: the sketch emits no event and writes no decision. DRG-564 owns the audit store. This frame does not accept that note and does not start it.
+Schema-registry, outbox and event replay are N/A for this documentation-only change. A runtime resolver returning a price makes a commercial pricing decision even when the HTTP handler writes no row. Consuming that result to price or present a continuation is blocked until the DRG-564/DRG-612 audit-store and handoff contract is accepted and delivered: one immutable snapshot per priced continuation line, containing policy/version/mode, inputs and observed schedule revision, outputs/explanations/actor and digest. The caller must confirm that snapshot and retain its decision identity before using the result commercially. This frame neither implements that store nor permits an unaudited consumer. Preview-only calculations must be identified as such and cannot silently become commercial prices.
 
 `PricingServiceClient` (`backend/services/quote-service/src/main/java/com/opencrm/quote/client/PricingServiceClient.java`) currently posts to `/api/v1/pricing/execute` and `/api/v1/pricing/simulate` and parses `ApiResponse<PricingExecuteView>`. It has no renewal method. A call from that client exists only if the owner later accepts the HTTP option. Not in this file.
 
@@ -197,7 +197,7 @@ The allowlist is a draft, not approved. A merge of #658 does not release the cod
 | `backend/services/quote-service/src/test/java/com/opencrm/quote/quote/QuoteContinuationPolicyTest.java` | Tests for the policy change. The file is already on `main`. Its current assertions were not re-run. |
 | A new `RenewalPricingPolicy` at `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/RenewalPricingPolicy.java` | The mode value the service passes. The type does not exist today. |
 
-The allowlist contains no migration and no file under a `db/migration` directory. `QuoteContinuationPolicy` is static and pure, so the HTTP call and the transaction stay in `QuoteContinuationService`.
+The allowlist cannot be released for commercial price consumption before the accepted DRG-564/DRG-612 audit store and confirmed per-line handoff are delivered. This allowlist does not implement that dependency. It contains no migration and no file under a `db/migration` directory. `QuoteContinuationPolicy` is static and pure, so the HTTP call and the transaction stay in `QuoteContinuationService`.
 
 **Alternatives:** limit the later slice to the resolver and the new controller; add a Flyway migration, which this frame does not authorize.
 
@@ -212,7 +212,7 @@ Out of the allowlist: `RampEscalatorExpander`, price-lock fields, `ProductServic
 | Open Host Service | N/A | This change adds or changes no integration surface. The endpoint block above is an option, not a decision, and it is not coded. |
 | Schema-registry events | N/A | This change adds or changes no event. |
 | Outbox writes | N/A | This change writes no outbox row and publishes no event. |
-| Commercial-decision audit | N/A | This change writes no commercial decision. |
+| Commercial-decision audit | N/A for this docs change; runtime use gated | A returned runtime price is a commercial decision. Consuming it requires the accepted and delivered DRG-564/DRG-612 immutable snapshot/handoff contract. |
 | Event-replay test | N/A | This change produces no event, so it adds no replay test. |
 
 No flag is changed. Nothing is deployed. Accepting this authorizes no code, migration or deploy.
@@ -246,7 +246,7 @@ Read in this pass. Not executed.
 - Callers of `RenewalUpliftResolver` outside `backend/**/*.java`, `backend/**/*.xml`, and `backend/**/*.yml`.
 - Any runtime result: HTTP, Drools, database, or the 79 resolver tests named in the #640 body. Those tests were not run here.
 - Linear status after this read. The read returned Backlog. The precedence comment says status stays Backlog/In Review as set.
-- GitNexus impact. **Impact: UNKNOWN (no GitNexus index).**
+- GitNexus graph result: UNKNOWN. The actual CLI impact/detect-changes failures are recorded in Verification; no graph result is claimed.
 
 ## What this does not do
 
