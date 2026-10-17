@@ -1,6 +1,11 @@
 # DRG-572 — One-time and retroactive charge lines: decision frame
 
-**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+**Status:** Decisions adopted under owner delegation on 2026-10-17; effective on merge of the [delegated decision record](delegated-renewals-amendments-decisions-2026-10-17.md). Implementation remains separately gated.
+
+**Current authority:** The linked record assigns a disposition to every fork in this frame and supplies overriding contracts. All proposal labels, owner-confirmation requests, defaults and open-question wording below are the historical pre-decision frame at `285ffef8e08274600090d8ba077a0c92f489c062`. They are retained as rationale/alternatives, not additional current owner gates. Evidence and implementation claims retain their original dates and limits.
+
+## Historical decision frame
+
 
 **Original proposal scope (before acceptance):** This file is not an ADR, takes no number, and is not copied into `docs/adr/`. It does not accept `specs/lifecycle-intents.md`, `specs/partial-apply.md`, `specs/maintenance.md`, `specs/conversions.md`, `specs/capacity-meters.md`, the OpenAPI draft, or the DRG-609 pricing-service design. Accepting this note authorizes no code, no migration, no flag, no topic, no gateway route, and no deploy.
 

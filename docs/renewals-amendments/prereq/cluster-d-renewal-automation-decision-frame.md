@@ -2,7 +2,12 @@
 
 *open-crm-cpq (drgaciw/open-crm-cpq). Documentation only. New file. Date: 2026-10-17.*
 
-**Status:** Accepted as documentation on 2026-10-17. See the [owner acceptance record](documentation-acceptance-2026-10-17.md) for scope; individual forks and implementation gates retain their stated statuses.
+**Status:** Decisions adopted under owner delegation on 2026-10-17; effective on merge of the [delegated decision record](delegated-renewals-amendments-decisions-2026-10-17.md). Implementation remains separately gated.
+
+**Current authority:** The linked record assigns a disposition to every fork in this frame and supplies overriding contracts. All proposal labels, owner-confirmation requests, defaults and open-question wording below are the historical pre-decision frame at `285ffef8e08274600090d8ba077a0c92f489c062`. They are retained as rationale/alternatives, not additional current owner gates. Evidence and implementation claims retain their original dates and limits.
+
+## Historical decision frame
+
 
 **Original proposal scope (before acceptance):** This file is a decision frame. Merging it records the forks, the recommendation, and the default. It does not adopt a default, and it does not change any ADR status. DRG-555, DRG-593, and DRG-596 stay In Review until the owner merges.
 

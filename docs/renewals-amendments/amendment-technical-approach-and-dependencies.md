@@ -1,5 +1,7 @@
 # First slice: technical approach, dependencies, sequencing, risks and test strategy
 
+**Delegated decisions (2026-10-17):** OQ18 places the shared commercial digest utility in S3. Nullable storage/envelopes and the durable CAM/source delivery contracts are adopted design; source implementation and story authorization remain separate. See the [decision record](prereq/delegated-renewals-amendments-decisions-2026-10-17.md).
+
 *open-crm-cpq, universal renewals-and-amendments. Documentation only; no code. Date: 2026-10-16. Companion: `amendment-first-slice-requirements-and-acceptance.md` (requirement and story ids), `renewals-amendments-open-questions-register.md`. Conventions: [V] verified in the repo on 2026-10-16 through the GitHub connector or in the adjacent services assessment; [S] from a project file; [I] proposal.*
 
 ## 1. Approach in one paragraph
@@ -11,7 +13,7 @@ Build the spine in CAM as a separate contract-documents module (ADR-035 D-01, Ac
 | contract-asset-management | New module (package `contractdocuments`), migration V1_7 [V next free version after V1_6], event writer and verifier, amendment API, apply orchestrator reusing `AcceptedQuoteSubscriptionService` internals, flag routing in `QuoteAcceptedEventConsumer` | S1, S2, S3, S4, S6, S7 |
 | quote-service | LifecycleChange (Amend), `lifecycle-changes` API, facade on `QuoteContinuationController`, pricing client calls, pinning, QuoteAccepted emission with `amendmentDocumentId` | S5, S6 |
 | pricing-service | Evaluate AmendmentPolicy modes RetainContracted, List, Override and proration Daily, MonthDay, None, NextCycle; return PolicyDecision and trace id. **Not verified**: a code search for these mode names returned nothing, so existence of the modes must be confirmed (OQ9) | S5 |
-| backend/libs/common | `QuoteAcceptedEvent` fields, shared canonical digest utility, amendment event schemas | S6 |
+| backend/libs/common | Shared canonical commercial digest utility and fixtures: S3. QuoteAcceptedEvent fields and amendment event schemas: S6, separately gated. | S3 digest; S6 events |
 | approval-routing | Use existing ApprovalType CONTRACT_MODIFICATION for overrides and backdating [S spike 6] | S5 |
 | audit trail (DRG-309) | Consume outbox events | S2 |
 | document-generation | Not touched in slice (no AMENDMENT render type; render out of slice) | none |

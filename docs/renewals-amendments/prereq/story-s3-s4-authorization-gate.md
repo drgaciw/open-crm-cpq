@@ -1,5 +1,7 @@
 # Owner decision: S3–S8 authorization gate
 
+**Delegated decisions (2026-10-17):** Policy/contract choices are now adopted under delegation; this document remains an implementation gate. S3–S8 are not released. The old draft/reading-base material below is historical; its owner-confirmation wording does not reopen decided forks. See the [decision record](delegated-renewals-amendments-decisions-2026-10-17.md).
+
 **Status:** Owner-decision draft. This file authorizes nothing.
 **Date:** 2026-10-16.
 **Base branch:** `main`. This draft's pull request targets `main`. When the owner merges it, this file lands on `main`. It is not merged.
@@ -15,7 +17,7 @@ S3, S4, S5, S6, S7, and S8 stay blocked until the owner authorizes each one in a
 
 | Story | RA | Linear | Written scope | Migration the docs assign |
 |---|---|---|---|---|
-| S3 | RA-47 | [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) | Amendment document API and state machine. Requirements file §2. | None. V1_7 is S1. |
+| S3 | RA-47 | [DRG-581](https://linear.app/drgamtd-workspace/issue/DRG-581) | Amendment document API/state machine plus adopted concurrency and digest criteria. | Next free V1_10+ for full unpriced nullability, immutable envelopes/receipts; rollback guards required. V1_9 remains S4. |
 | S4 | RA-48 | [DRG-582](https://linear.app/drgamtd-workspace/issue/DRG-582) | Document-driven apply after EXECUTED. V1_9 apply ledger. | CAM `V1_9`. |
 | S6 | RA-50 | [DRG-584](https://linear.app/drgamtd-workspace/issue/DRG-584) | `QuoteAcceptedEvent` fields and per-tenant legacy-path gating. | None named. |
 | S7 | RA-51 | [DRG-585](https://linear.app/drgamtd-workspace/issue/DRG-585) | Contract header backfill. V1_8. | CAM `V1_8`. |
@@ -51,8 +53,8 @@ Linear issue status was read on 2026-10-16 from Linear, which is outside this gi
 
 - Before execution (`DRAFT`, `IN_REVIEW`, `APPROVED`), a superseding LifecycleChange opens a new document revision under the same provisional number; the old revision is frozen `SUPERSEDED`, pins are cleared on the new revision, approvals and signatures are void, and the document returns to `DRAFT`.
 - After `EXECUTED`, including all apply outcomes, a revision is refused with 409 `IMMUTABLE_EXECUTED` and an audit event. The remedy is a new correcting LifecycleChange and document. `REJECTED` and `WITHDRAWN` remain terminal. At most one revision may be `EXECUTED`.
-- CAM owns revision and execution transitions. The exact CAM write, cleared-pin representation, supersession event contract, local concurrency protocol, and S5/S8 delivery boundary remain unaccepted proposals. [DRG-616's note](story-drg-616-oq6-design-contract-gaps.md) records alternatives, not adopted contracts. The linked requirements mark AC-S3-9..11, AC-S5-7 and AC-S8-6 Proposed.
-- OQ18 remains **Proposed until the owner confirms it**: the unconfirmed location is `backend/libs/common`, delivered in S3 and reused by S5/S6. Confirmation gates building that library only. It does not authorize S3 or S6 and is not a blanket gate on all S3 work.
+- CAM owns revision/execution transitions. The [delegated record](delegated-renewals-amendments-decisions-2026-10-17.md#cam-transactions-and-delivery) now adopts the boundary/storage/audit/concurrency/delivery choices and AC-S3-9..11, AC-S5-7 and AC-S8-6. Exact DTO/schema completion and execution evidence remain required before release.
+- OQ18 is **confirmed under delegation 2026-10-17**, in `backend/libs/common`, delivered with S3 and reused by S5/S6. The [decision record](delegated-renewals-amendments-decisions-2026-10-17.md#storage-and-digests) supplies the canonicalization contract. This confirmation does not authorize S3 or S6 implementation.
 - `OUT_FOR_SIGNATURE` is unreachable in the first slice. The later signature story must void the envelope before a pre-execution revision. Document-level supersession by a later restatement is a different event.
 
 **What stays blocked.** S3 / DRG-581 still needs separate owner authorization and accepted design prerequisites. Merging #642 recorded the ruling; it did not start S3. This reconciliation accepts no proposed contract and authorizes no story.
@@ -115,7 +117,7 @@ Technical approach §3 and the field-schema addendum assign the next three CAM v
 - Migration: none named.
 - Additive fields on `backend/libs/common/src/main/java/com/opencrm/common/event/dto/QuoteAcceptedEvent.java`: optional `amendmentDocumentId` and per-line `applicationUnitNo` (FR-16, AC-S6-1). The spike writes the same path with a shortened `backend/libs/common/.../QuoteAcceptedEvent.java`.
 - Flag routing in `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/event/QuoteAcceptedEventConsumer.java` (technical approach §2).
-- Shared canonical digest utility in `backend/libs/common`. Class name not given. See the unconfirmed OQ18 proposal under OQ6.
+- Shared canonical digest utility in `backend/libs/common` is now assigned to S3 by confirmed OQ18. S6 reuses its versioned format and fixtures; this does not authorize S6 event work.
 - Amendment event names in AC-S6-4: Drafted, Submitted, Approved, Executed, UnitApplied, Applied, ApplyBlocked, Withdrawn. Schema file names are not given. `backend/libs/common/src/main/java/com/opencrm/common/event/EventContractRegistry.java` exists. AC-S6-4 requires each event to have a registered schema and a contract test. Assigning that registry file to S6 is an inference from that criterion plus ADR-035's fitness function ("Event contract registry lists document lifecycle events"). The technical approach says "amendment event schemas" live in `backend/libs/common` and does not name the registry class.
 - Fixtures AC-S6-1 names: `backend/services/contract-asset-management/src/test/resources/accepted-v1/*.json`. Files present: `hybrid-credit-new.json`, `r4-accepted-event.json`, `ramp-new.json`.
 - Quote emission with `amendmentDocumentId` is assigned to S5 and S6 together (technical approach §2). The transcript names `QuoteAcceptedKafkaEventFactory`. Path verified: `backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteAcceptedKafkaEventFactory.java`. Exclusive ownership by S6 is not stated.
