@@ -5,10 +5,10 @@ import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
@@ -40,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
                 + "com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration"
 })
 class PriceBookEntryRepositoryIntegrationTest {
-    @SpringBootConfiguration
+    // Not @SpringBootConfiguration: that marker is what an implicit @SpringBootTest lookup finds.
+    @Configuration
     @EnableAutoConfiguration
     @EntityScan(basePackageClasses = PriceBook.class)
     @EnableJpaRepositories(basePackageClasses = PriceBookEntryRepository.class)
