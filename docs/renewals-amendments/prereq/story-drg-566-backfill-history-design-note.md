@@ -4,7 +4,7 @@
 
 **Date:** 2026-10-17. **Project:** OPEN-CRM-CPQ. **Base:** `main` at `285ffef8` (merge of [#662](https://github.com/drgaciw/open-crm-cpq/pull/662)).
 
-**Story:** [DRG-566](https://linear.app/drgamtd-workspace/issue/DRG-566/backfill-amendment-history-for-existing-subscriptions) (RA-32). Linear status read this pass: Backlog. Priority Medium. The ticket stays In Review until the owner merges.
+**Story:** [DRG-566](https://linear.app/drgamtd-workspace/issue/DRG-566/backfill-amendment-history-for-existing-subscriptions) (RA-32). Linear status set this pass: In Review, linked to [#665](https://github.com/drgaciw/open-crm-cpq/pull/665). Priority Medium. The ticket stays In Review until the owner merges.
 
 This file is a design note only. It authorizes no code, no migration, no flag, no topic, no gateway route, and no deploy. It designs no backfill run and no apply. No count was taken. No function was called. Accepting this note authorizes no code, migration, or deploy.
 
@@ -279,7 +279,7 @@ Cluster F’s default adds no backfill of commitment periods. Updating the rate 
 - A sample `continuation_request_json` payload.
 - Row counts. No query was run.
 - DRG-554’s effect on `subscriptions.contract_id`. The OQ7 note already marks that move `unverified`.
-- Linear status of issues other than DRG-566. DRG-566 was Backlog when read this pass.
+- Linear status of issues other than DRG-566. DRG-566 was Backlog when first read this pass, then set to In Review and linked to #665.
 
 ## What this note does not do
 
