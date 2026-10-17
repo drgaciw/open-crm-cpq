@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.contract.domain.documents.RenewalPolicyRecord;
 import com.opencrm.contract.domain.documents.RenewalPolicyScopeKind;
 import com.opencrm.contract.dto.RenewalPolicyRecordDto;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class RenewalPolicyRecordService {
     private final RenewalPolicyRecords records;
     private final Clock clock;
 
+    @Autowired
     public RenewalPolicyRecordService(RenewalPolicyRecords records) {
         this(records, Clock.systemUTC());
     }
