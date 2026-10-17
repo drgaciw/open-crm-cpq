@@ -60,6 +60,14 @@ On `main` (and release branches as needed):
 - The repository is private and the plan offers no branch protection (the API answers 403), so the check cannot be marked required. Merge only when **Backend Unit (PR gate)** is green: `gh pr checks <n> --watch`.
 - If Jenkins comes back, keep requiring `jenkins/opencrm-cpq-ci` as described above. This job stays as the quick first signal.
 
+## Post-merge gate and nightly full run (added 2026-10-16)
+
+See ADR-003 section 8.
+
+- `.github/workflows/main-verify.yml` runs **Backend Unit (main)** on every push to `main`. Merges in a burst cancel each other's runs, so the newest head is always the one verified. A red result means the burst it covered broke `main`; fix or revert before the next merge.
+- `.github/workflows/ci.yml` also runs on a nightly schedule (02:17 UTC), so integration (Testcontainers), frontend, `cpq_beta` and the security audit run on `main` once a day while Jenkins is unreachable.
+- Check the latest result: `gh run list --workflow main-verify.yml --branch main --limit 1` and `gh run list --workflow ci.yml --limit 1`.
+
 ## Manual GHA fallback
 
 When Jenkins is unavailable or for debugging:

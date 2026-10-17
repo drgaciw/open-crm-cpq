@@ -4,15 +4,19 @@
 
 **Reading base:** `main` at `fd6421e414dc443d3730b870b0e0c4d4a3be693e`. That commit is a descendant of `a825641bd`. Citations below were read at that commit, or from Linear DRG-565 and the Notion RA-31 page on 2026-10-16. Claims not opened in this pass are marked **unverified**.
 
+**Integration update (#632).** Section 9 of `partial-apply-owner-decision.md` and the OQ5 register row now record option A as adopted for the first slice only. The observations below about a blank owner record and `DEFAULT PROPOSED` describe the pinned reading base, before #632. First-slice grouping is already met by one unit per target subscription. Adoption does not complete DRG-565: the prerequisite first-slice written ordering rules and acceptance conditions below remain unmet and can be completed without an apply engine. S4 / DRG-582 still waits on S3 / DRG-581, OQ6, DRG-562/563, and those DRG-565 written deliverables. The broader scenario set remains deferred under DRG-565 and the related later stories below. It is neither an S4 start gate nor added S4 acceptance scope; this note does not authorize S4.
+
 This note does not accept `specs/partial-apply.md`. It does not authorize S4 (DRG-582) or S6. It does not add a migration, a flag, a topic, a gateway route, or an apply ledger. It does not edit an ADR, the open-questions register, or `partial-apply-owner-decision.md`.
 
 ## Decision condition
 
-1. Create-before-terminate (who writes `dependsOnUnitNos`) is **UNMET**. It waits on S4's apply path (DRG-582).
-2. The three test scenarios (restructure, true-up, future-dated lines) are **UNMET**. They wait on S4's apply path (DRG-582).
+1. The prerequisite written create-before-terminate rule, including who writes `dependsOnUnitNos`, is **UNMET**. This design deliverable can be completed before S4 without an apply engine; implementing and enforcing it belongs to S4 / DRG-582.
+2. The requested restructure, true-up, and future-dated scenario set is **DEFERRED**, not met by this note. Its design remains follow-up work on DRG-565. Restructure implementation belongs with conversions / DRG-341; capacity true-up with DRG-557 and one-time charge routing / DRG-572. Future-dated scenario ownership and dependencies remain to be assigned in that later DRG-565 plan. No executable tests for this broader set are assigned to first-slice S4 by this record.
 3. Nothing in this note accepts `specs/partial-apply.md`.
 
-[#626](https://github.com/drgaciw/open-crm-cpq/pull/626) is merged on `main` as the owner-decision frame. GitHub records `mergedAt` `2026-10-16T22:03:29Z`; the merge commit `3b1e78f5` is dated 2026-10-16 17:03:28 -0500 (5:03 PM CT). Section 9 of `partial-apply-owner-decision.md` and the OQ5 register row still do not record the owner's delegated option A decision. This note does not edit them. Both were read on `origin/main` after `fd6421e4`: section 9 is still the blank owner record, and the register row is still `DEFAULT PROPOSED`.
+**Delivery boundary.** DRG-565's first-slice written ordering rules/acceptance conditions are the prerequisite to S4. Their implementation is S4 work. The existing AC-S4-1 through AC-S4-9 in `amendment-first-slice-requirements-and-acceptance.md` do not explicitly test dependency ordering. DRG-565's prerequisite written rules must include first-slice ordering acceptance conditions before S4 starts; this note records that coverage gap and does not claim the existing criteria verify ordering. The broader scenario set above remains later work under DRG-565 and its named related stories, pending a separately accepted plan and dependency/acceptance mapping. It does not block starting or completing first-slice S4, and this note does not add DRG-341, DRG-557, or DRG-572 to S4.
+
+[#626](https://github.com/drgaciw/open-crm-cpq/pull/626) is merged on `main` as the owner-decision frame. GitHub records `mergedAt` `2026-10-16T22:03:29Z`; the merge commit `3b1e78f5` is dated 2026-10-16 17:03:28 -0500 (5:03 PM CT). At the pinned reading base, section 9 of `partial-apply-owner-decision.md` and the OQ5 register row did not record the owner's delegated option A decision. This note does not edit them. Both were read on `origin/main` at `fd6421e4`: section 9 was the blank owner record, and the register row was `DEFAULT PROPOSED`. #632 subsequently recorded adoption in both places.
 
 ## 1. What is adopted
 
@@ -68,11 +72,11 @@ Related issues named on the Linear issue: DRG-536, DRG-559, DRG-557, DRG-341, DR
 | Issue text | Met by this note | Needs code, and why it is not in this change |
 |---|---|---|
 | All-or-nothing or unit by unit | Unit by unit. One unit per target subscription. Signature stays all-or-nothing. | The apply engine that commits a unit is S4 / DRG-582. |
-| Order of operations (create before terminate) | Not adopted. `partial-apply-owner-decision.md` section 8 item 1 still leaves who writes `dependsOnUnitNos` open. | Not built. Deciding and enforcing that order is outside option A. |
+| Order of operations (create before terminate) | Not adopted. `partial-apply-owner-decision.md` section 8 item 1 still leaves who writes `dependsOnUnitNos` open. A written rule is a DRG-565 prerequisite to S4 and requires no apply code. | Implementing and enforcing the agreed order belongs to S4 acceptance. Option A alone does not decide that rule. |
 | A unit fails after others have committed | No automatic rollback. Document `PARTIALLY_APPLIED`. Failed unit `BLOCKED`. Remedy is a correcting amendment. | Persisting that outcome is apply. Technical approach section 3 assigns it to V1_9 `document_apply_ledger` under S4 / DRG-582. That ledger is not in the SQL tree on this base. This change stops there. |
 | `PARTIALLY_APPLIED` and `APPLY_BLOCKED` | The cut in section 1. `APPLY_BLOCKED` means no unit has committed. | No new enum and no migration. Both names are already on `AmendmentDocumentStatus` and in `chk_amendment_document_status` (`V1_7__contract_documents.sql`). Unit statuses `PENDING`, `APPLIED`, and `BLOCKED` are already on `ApplicationUnitStatus` and in `chk_amendment_unit_status`. `ApplicationUnitStatus` says apply behavior is DRG-582. |
 | Grouping into ApplicationUnits and the state transitions | Section 1 states the first-slice grouping and the three apply outcomes. | A state-model class that performs those transitions would write apply rows. That needs the apply ledger. Not added. |
-| Test scenarios for restructure, true-up, and future-dated lines | Not met. Section 2 illustrates only the adopted SaaS cut. | Automated tests of those cases need the apply path and the ledger. The spike's restructure, true-up, and future-dated groupings are labeled `[INFERENCE]` in spike section 4. Option A does not adopt them. `specs/partial-apply.md` is not accepted. |
+| Test scenarios for restructure, true-up, and future-dated lines | Deferred under DRG-565. Section 2 illustrates only the adopted SaaS cut. The spike's broader groupings are labeled `[INFERENCE]`; option A does not adopt them. | Later implementation/test planning must include conversions / DRG-341 for restructure, capacity / DRG-557 and one-time routing / DRG-572 for true-up, and explicitly assign the future-dated case. This record authorizes none of that work and adds no S4 criterion. `specs/partial-apply.md` is not accepted. |
 
 Linear status at the time of the read was **Done** (completed 2026-10-16T22:03:31Z). The Notion RA-31 property `Status` was **Not started**. This note does not treat either value as evidence that the rules are implemented, and it does not change Linear or Notion.
 
@@ -107,4 +111,4 @@ These stay open. They are the list in `partial-apply-owner-decision.md` section 
 - The full body of DRG-582. Its title was read. The S4 assignment of V1_9 was read in `amendment-technical-approach-and-dependencies.md` section 3.
 - `AcceptedQuoteSubscriptionService` and `applied_quote_acceptances`. Not opened.
 - Backend Unit. No code changed, so no Backend Unit run. Run id: N/A.
-- Whether any later commit on `main` filled section 9 of the owner-decision file after `fd6421e4`. The file was read at that commit.
+- Other changes after the pinned reading base, except the canonical adoption record in #632 identified in the integration update.
