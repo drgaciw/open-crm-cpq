@@ -30,6 +30,7 @@ public final class KafkaTopics {
     // Quote Events
     public static final String QUOTE_STATUS_ACCEPTED = "cpq.quote.status.accepted";
     public static final String QUOTE_APPROVAL_REJECTED = "cpq.quote.approval.rejected";
+    public static final String RAMP_APPROVAL_BINDING_CHANGED = "cpq.quote.ramp.approval.binding.changed";
 
     // Approval Events
     public static final String APPROVAL_STEP_DECIDED = "cpq.approval.step.decided";

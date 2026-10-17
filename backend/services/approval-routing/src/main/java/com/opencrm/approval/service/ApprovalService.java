@@ -60,6 +60,10 @@ public class ApprovalService {
         }
 
         QuoteApprovalTierMapper.MappedApproval mapped = QuoteApprovalTierMapper.map(request.getTier());
+        if (request.getPricingFingerprint() != null && (!request.getPricingFingerprint().matches("[a-f0-9]{64}")
+                || request.getGoverningPeriod() == null || request.getGoverningPeriod() < 1)) {
+            throw new BusinessException("Invalid ramp approval binding", "INVALID_APPROVAL_SUBMIT");
+        }
 
         ApprovalRequest entity = ApprovalRequest.builder()
                 .quoteId(request.getQuoteId().trim())
@@ -69,6 +73,8 @@ public class ApprovalService {
                 .requestedDiscount(request.getRequestedDiscount())
                 .marginDelta(request.getMarginDelta())
                 .currencyCode(request.getCurrencyCode())
+                .pricingFingerprint(request.getPricingFingerprint())
+                .governingPeriod(request.getGoverningPeriod())
                 .requesterId(currentActor.id())
                 .submittedAt(Instant.now())
                 .approvalTier(mapped.approvalTier())

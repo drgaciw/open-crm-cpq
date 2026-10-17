@@ -25,6 +25,7 @@ public class QuoteLineItemService {
     private final QuoteLineItemRepository lineItemRepository;
     private final QuoteRepository quoteRepository;
     private final RampScheduleAttacher rampScheduleAttacher;
+    private final com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard;
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -34,11 +35,12 @@ public class QuoteLineItemService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
 
-        if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
+        if (!canEdit(quote)) {
             throw new BusinessException("Cannot modify line items in " + quote.getStatus() + " status", "QUOTE_NOT_EDITABLE");
         }
 
         RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
+        String previousAuthoring = authoringFingerprint(quote);
 
         QuoteLineItem item = QuoteLineItem.builder()
                 .quote(quote)
@@ -59,6 +61,7 @@ public class QuoteLineItemService {
         rampScheduleAttacher.attach(item, prepared);
 
         QuoteLineItem saved = lineItemRepository.save(item);
+        rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
         recalculateQuoteTotals(quote);
         log.info("Added line item {} to quote {}", saved.getId(), quote.getQuoteNumber());
 
@@ -75,7 +78,7 @@ public class QuoteLineItemService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
 
-        if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
+        if (!canEdit(quote)) {
             throw new BusinessException("Cannot modify line items in " + quote.getStatus() + " status", "QUOTE_NOT_EDITABLE");
         }
 
@@ -86,8 +89,10 @@ public class QuoteLineItemService {
             throw new BusinessException("Line item " + lineItemId + " does not belong to quote " + quoteId, "LINE_ITEM_QUOTE_MISMATCH");
         }
 
+        String previousAuthoring = authoringFingerprint(quote);
         item.softDelete();
         lineItemRepository.save(item);
+        rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
         recalculateQuoteTotals(quote);
         log.info("Removed line item {} from quote {}", lineItemId, quote.getQuoteNumber());
     }
@@ -96,7 +101,7 @@ public class QuoteLineItemService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
 
-        if (!EDITABLE_STATUSES.contains(quote.getStatus())) {
+        if (!canEdit(quote)) {
             throw new BusinessException("Cannot modify line items in " + quote.getStatus() + " status", "QUOTE_NOT_EDITABLE");
         }
 
@@ -108,6 +113,7 @@ public class QuoteLineItemService {
         }
 
         RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
+        String previousAuthoring = authoringFingerprint(quote);
 
         item.setProductExternalId(request.getProductExternalId());
         item.setProductName(request.getProductName());
@@ -116,16 +122,25 @@ public class QuoteLineItemService {
         item.setQuantity(request.getQuantity());
         item.setUnitOfMeasure(request.getUnitOfMeasure());
         item.setListPrice(request.getListPrice());
-        item.setUnitPrice(request.getListPrice());
-        item.setNetPrice(request.getListPrice());
-        item.setExtendedAmount(request.getListPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
         item.setBillingFrequency(request.getBillingFrequency());
         item.setSortOrder(request.getSortOrder());
         item.setNotes(request.getNotes());
         rampScheduleAttacher.attach(item, prepared);
 
+        boolean unchangedBoundAuthoring = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null
+                && previousAuthoring.equals(authoringFingerprint(quote));
+        if (!unchangedBoundAuthoring) {
+            item.setUnitPrice(request.getListPrice());
+            item.setNetPrice(request.getListPrice());
+            item.setExtendedAmount(request.getListPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
+            item.setPricingWaterfallJson(null);
+        }
+
         QuoteLineItem saved = lineItemRepository.save(item);
-        recalculateQuoteTotals(quote);
+        if (!unchangedBoundAuthoring) {
+            rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
+            recalculateQuoteTotals(quote);
+        }
         log.info("Updated line item {} in quote {}", lineItemId, quote.getQuoteNumber());
 
         return toDto(saved);
@@ -145,7 +160,23 @@ public class QuoteLineItemService {
         quote.setSubtotal(subtotal);
         quote.setTotalDiscount(totalDiscount);
         quote.setTotalAmount(subtotal.subtract(totalDiscount));
+        if (items.stream().anyMatch(RampScheduleViews::hasSteps)
+                || com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null) {
+            quote.setRampScheduleStale(true);
+        } else {
+            quote.setRampScheduleStale(false);
+        }
         quoteRepository.save(quote);
+    }
+
+    private boolean canEdit(Quote quote) {
+        return EDITABLE_STATUSES.contains(quote.getStatus()) || (quote.getStatus() == QuoteStatus.PENDING_APPROVAL
+                && com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null);
+    }
+
+    private String authoringFingerprint(Quote quote) {
+        return com.opencrm.quote.ramp.RampPricingSnapshot.authoringFingerprint(quote,
+                lineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(quote.getId()));
     }
 
     private QuoteLineItemDto toDto(QuoteLineItem item) {
@@ -169,6 +200,7 @@ public class QuoteLineItemService {
                 .pricingExplanationCode(item.getPricingExplanationCode())
                 .notes(item.getNotes())
                 .schedule(RampScheduleViews.toDto(item))
+                .pricedPeriods(com.opencrm.quote.ramp.RampPricingSnapshot.pricedPeriods(item))
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .version(item.getVersion())
