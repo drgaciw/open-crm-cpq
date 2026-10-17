@@ -1,8 +1,8 @@
 # ADR-024: Order orchestration context — placement, ownership and order model
 
-**Status:** Proposed on 2026-10-04. Not accepted.
+**Status:** Accepted on 2026-10-17. The project owner told the Projects Manager, on 2026-10-17 at 7:31 AM CT, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644); authorized opening their status-change PRs", relayed by the Projects Manager bot. The owner's merge of this PR is the confirming act and the status takes effect on merge. This supersedes the "retain their existing statuses" wording of PRs #662 and #663 only for ADR-024.
 **Date:** 2026-10-04
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (accepted).
 **Amends (when accepted):** [ADR-008](ADR-008-postgres-schema-per-service.md), by adding one schema. [ADR-023](ADR-023-price-ramp-schedule-model.md) D-08's delivery path: after cutover the rate periods and `exitArr` arrive on the `ActivateSubscription` command instead of `QuoteAccepted`. D-08's decision that contract-asset-management hosts the rate schedule is unchanged (D-02).
 **Relates to:** [ADR-025](ADR-025-saga-process-manager.md) (saga mechanism), [ADR-026](ADR-026-command-messages.md) (commands), [ADR-027](ADR-027-compensation-and-point-of-no-return.md) (compensation), [ADR-017](ADR-017-synchronous-inter-service-communication.md) (synchronous calls), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (events). Backlog: Notion EPIC BC-08 and stories BC-08-01 to BC-08-05; Linear DRG-290.
 **Does not authorize:** any code, schema, service, topic or gateway route. Each needs its own PR after this ADR is accepted.
