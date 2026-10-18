@@ -1,33 +1,33 @@
 # DRAFT ADR: Renewal segment schedule, multi-year escalators, and time-bounded price locks
 
-**Status:** Accepted on 2026-10-17. On 2026-10-17 at 7:31 AM CT the project owner said, as relayed by Projects Manager, "yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644)" and "proceed with any mergers required". The owner's merge of this pull request is the confirming act. This status takes effect on that merge. This acceptance supersedes the earlier "Proposed / not accepted wholesale" wording of #662 and #663 only for this file. Acceptance authorizes no code, migration, or deploy. The file stays DRAFT-prefixed and unnumbered. Numbering is an owner follow-up. DRG-568 and DRG-532 unblock only after this pull request merges. Each recommendation in this file stays as it is.
+**Status:** Accepted on 2026-10-17. Owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager ("yes to accepting ADR-017, ADR-024 to 027 and DRG-533 (#644)" and "proceed with any mergers required"). This acceptance is the status of this file. It supersedes the earlier "Proposed / not accepted wholesale" wording of #662 and #663 only for this file. Acceptance authorizes no code, migration, or deploy. The file stays DRAFT-prefixed and unnumbered. Numbering is an owner follow-up. DRG-568 and DRG-532 unblock only after this pull request merges. Each recommendation in this file stays as it is.
 **Date:** 2026-10-16 (proposed). Accepted 2026-10-17.
 **Deciders:** Project owner, by the 2026-10-17 7:31 AM CT statement above, as relayed by Projects Manager. Each recommendation below stays as written.
 **Number:** none. This file stays under `docs/renewals-amendments/prereq/` with a `DRAFT-` prefix. It is not an entry in `docs/adr/` and it does not take a number. Do not add a row to `docs/adr/README.md` from this draft.
 **Story:** [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533/adr-ramp-escalator-semantics-compounding-base-price-rounding-amending) (escalator base, compounding, rounding; an addendum to ADR-023). Linear status when read: Backlog.
-**Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.
+**Unblocks:** [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568/multi-year-renewal-escalators-and-time-bounded-price-locks-in-renewal) only after the status-change PR merges. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. Nothing in this file authorizes code.
 **Informs:** [DRG-532](https://linear.app/drgamtd-workspace/issue/DRG-532/ramp-schedule-authoring-generate-all-periods-from-term-escalator-no) (the generator that expands a term and an escalator), [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534/ramp-amendments-lock-elapsed-periods-amend-future-periods-re-govern-on) (amendments of stored periods).
 **Reads, and does not edit:** Accepted [ADR-023](../../adr/ADR-023-price-ramp-schedule-model.md) D-01, D-02, D-04, D-05, D-06, D-07. Accepted [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-and-precedence.md) D-01 through D-07, including D-06. Accepted [adr-amendment-proration-formula.md](adr-amendment-proration-formula.md).
 **Does not accept:** ADR-017, ADR-024, ADR-025, ADR-026, or ADR-027. Each of those files on this tree says Proposed on 2026-10-04 and not accepted. This draft does not change their status. It does not accept `prereq/specs/ramp-amendments.md`, `price-lock-policy-stub.md`, `DRAFT-openapi-amendments.yaml`, or the pricing-policy sanity check.
-**Code:** Nothing in this file authorizes code. It authorizes no schema change, Drools edit, flag, route, deploy, or merge. `opencrm.pricing.ramp.enabled` stays default off. No `opencrm.jev.*.enabled` flag is turned on. Later renewal periods stay unpriced while this file is Proposed.
+**Code:** Nothing in this file authorizes code. It authorizes no schema change, Drools edit, flag, route, deploy, or merge. `opencrm.pricing.ramp.enabled` stays default off. No `opencrm.jev.*.enabled` flag is turned on. Later renewal periods stay unpriced. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager.
 
-This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Until that separate pull request merges, DRG-568 stays blocked. This file is not that status change.
+This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. It unblocks DRG-568 only after the status-change PR merges. Until that separate pull request merges, DRG-568 stays blocked.
 
 ## Owner adoption record
 
-Relayed, and to be confirmed by the status-change pull request. This file stays Proposed. It is accepted only after the status-change PR merges; DRG-568 stays blocked until then.
+This file is Accepted. Owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. DRG-568 stays blocked until the status-change PR merges.
 
 Owner (drg) said at 7:31 AM CT 2026-10-17, as relayed by Projects Manager, that he accepts ADR-017, ADR-024 to 027 and DRG-533 (#644) and authorized the status-change PRs.
 
-That sentence is a relay. The confirming act is the owner's merge of the status-change pull request. This edit is not that pull request, and it does not copy the status line from the open status-change draft [#669](https://github.com/drgaciw/open-crm-cpq/pull/669).
+That sentence is the owner's acceptance, relayed by Projects Manager. This file's status is Accepted on that statement. This edit does not copy the status line from the open status-change draft [#669](https://github.com/drgaciw/open-crm-cpq/pull/669).
 
-[#663](https://github.com/drgaciw/open-crm-cpq/pull/663), in [delegated-renewals-amendments-decisions-2026-10-17.md](delegated-renewals-amendments-decisions-2026-10-17.md), says ADR-017, ADR-024 to ADR-027, and the DRG-533 proposal are not accepted wholesale. The 7:31 AM CT relay is later than that sentence. Until the status-change pull request merges, the status line at the top of this file stays Proposed, and D-06 of the accepted uplift record still holds: later periods do not grow.
+[#663](https://github.com/drgaciw/open-crm-cpq/pull/663), in [delegated-renewals-amendments-decisions-2026-10-17.md](delegated-renewals-amendments-decisions-2026-10-17.md), says ADR-017, ADR-024 to ADR-027, and the DRG-533 proposal are not accepted wholesale. The 7:31 AM CT relay is later than that sentence. The status line at the top of this file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. D-06 of the accepted uplift record still holds: later periods do not grow.
 
 The relay names ADR-017 and ADR-024 to ADR-027. This file does not change their status. On this tree each of those ADRs still says Proposed on 2026-10-04. A status change for any of them is its own pull request.
 
 Number stays none. [docs/adr/README.md](../../adr/README.md) ends at ADR-035. The repo does not assign the next number to this draft. Do not add a catalog row from this edit.
 
-[Definition of Done v0.3](https://app.notion.com/p/3fcf7cb4e4df8133860dcc8613c620eb) items 6 and 23: the options and the scale-4 default are already in "Owner decision needed"; the owner words and the time are the relay above. An ADR counts as accepted only after the owner accepts it and the status-change pull request merges. This file stays Proposed until that merge.
+[Definition of Done v0.3](https://app.notion.com/p/3fcf7cb4e4df8133860dcc8613c620eb) items 6 and 23: the options and the scale-4 default are already in "Owner decision needed"; the owner words and the time are the relay above. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager.
 
 ---
 
@@ -39,7 +39,7 @@ D-06 of [adr-renewal-uplift-basis-and-precedence.md](adr-renewal-uplift-basis-an
 
 > A multi-year renewal escalator, when one exists, starts from the single price this decision already computed. It does not grow later periods until DRG-533 is accepted.
 
-The same decision says DRG-568 owns the segment schedule and the time-bounded locks, consumes the first-period price and the per-step cap check, and does not choose a second compounding rule. This draft is that missing procedure. It stays Proposed, so D-06 still holds.
+The same decision says DRG-568 owns the segment schedule and the time-bounded locks, consumes the first-period price and the per-step cap check, and does not choose a second compounding rule. This draft is that missing procedure. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. D-06 still holds.
 
 ### What the tree does today
 
@@ -61,7 +61,7 @@ The arithmetic in the next section was recomputed with `Decimal` half-up in this
 
 ## Decision
 
-Proposed. Nothing in this section amends another ADR. Nothing in this section authorizes code. A later status-change pull request, after the owner answers "Owner decision needed", is a separate change from this file.
+Accepted. Owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. Nothing in this section amends another ADR. Nothing in this section authorizes code. A later status-change pull request is a separate change from this file.
 
 ### D-01 — Where a renewal escalator starts
 
@@ -172,7 +172,7 @@ DRG-526 (read 2026-10-16, status In Progress) owns effective-dated cost and says
 
 **`ENABLE_12M_PRICE_PROTECTION` remains the retention marker the accepted uplift record describes. A time-bounded lock is an explicit segment with dates. This draft does not turn the marker into a lock.**
 
-The uplift record assigns that choice to DRG-568. DRG-568 could make it only after the owner accepts this file and the status-change PR merges, and only in DRG-568's own change. Nothing in this file authorizes that code. A contract cap is still the price protection that wins, as that record's D-02 says.
+The uplift record assigns that choice to DRG-568. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. DRG-568 could make it only after the status-change PR merges, and only in DRG-568's own change. Nothing in this file authorizes that code. A contract cap is still the price protection that wins, as that record's D-02 says.
 
 ## Options considered
 
@@ -189,7 +189,7 @@ The uplift record assigns that choice to DRG-568. DRG-568 could make it only aft
 | Rounding | Full-precision compound, round the final unit once | Year 3 at scale 2 is 49.00. Intermediate units are not stable stored prices, so a cap check and the next period have no scale-4 absolute to read. | Rejected |
 | Lock shape | **Explicit segments `{from, to, mode, value}`; post-lock percent applies once to the locked unit (recommended)** | Scenario 4 is 5 months at 20.0000 and 9 months at 21.4000, total 14,630.00. The equal-block expander is not on this path. | Recommended |
 | Lock shape | Encode the lock as `everyMonths` on `RampEscalatorExpander` | 14 months with a 12-month step is `RAMP_TERM_MISMATCH`. Equal blocks cannot be 5 and 9. | Rejected |
-| Lock vs marker | **Keep `ENABLE_12M_PRICE_PROTECTION` as a marker (recommended)** | Agrees with the uplift record. A later DRG-568 change could still propose a dated segment, only after the owner accepts this file and the status-change PR merges. | Recommended |
+| Lock vs marker | **Keep `ENABLE_12M_PRICE_PROTECTION` as a marker (recommended)** | Agrees with the uplift record. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. A later DRG-568 change could still propose a dated segment, only after the status-change PR merges. | Recommended |
 | Named-seat tier | **Renewal segment nets skip a second named-seat subtraction (recommended)** | Stops 200 seats taking another 7% off a unit that is already net. | Recommended |
 | Named-seat tier | Run `RampPeriodPricer` unchanged on renewal absolutes | For `SAAS_SEAT_NAMED` at quantity ≥ 100, the net falls by the tier. Continuation does not do this today. | Rejected |
 | Off-boundary lock end | Day-stub from the proration record | The proration record prices amendments and expansions. No renewal splitter exists. | Deferred. Owner decision |
@@ -197,10 +197,10 @@ The uplift record assigns that choice to DRG-568. DRG-568 could make it only aft
 
 ## Consequences
 
-- This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Until that merge, the priced renewal remains the one flat period ADR-023 D-05 and the uplift record require. Escalator inputs may be copied as intent. They are not expanded. Nothing in this file authorizes code.
+- This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. It unblocks DRG-568 only after the status-change PR merges. Until that merge, the priced renewal remains the one flat period ADR-023 D-05 and the uplift record require. Escalator inputs may be copied as intent. They are not expanded. Nothing in this file authorizes code.
 - DRG-568 is the story that would implement the segment list, the lock dates, and the multi-line renewal, using D-01 through D-06, and it would not choose another compound rule or another unit scale. That implementation is not authorized here.
 - DRG-532's generator, when it is built, takes `compound`, the period-1 unit, the percent or amount, and `everyMonths`, and emits the equal-block segments in D-04. It refuses a term the step length does not divide.
-- DRG-534 would amend stored absolute periods. Regenerating them from the percent waits until the owner accepts this file and the status-change PR merges. The amendment story still owns elapsed-period locking. This draft does not accept `prereq/specs/ramp-amendments.md`, and nothing here authorizes that code.
+- DRG-534 would amend stored absolute periods. Regenerating them from the percent waits until the status-change PR merges. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. The amendment story still owns elapsed-period locking. This draft does not accept `prereq/specs/ramp-amendments.md`, and nothing here authorizes that code.
 - Fork 2 affects money rounding. On the 200-seat, 36-month example the scale-2 illustration is 330,264.00 and the scale-4 recommendation is 330,234.48. The difference is 29.52. A seller who has been shown 45.80 and 49.01 is looking at the scale-2 option. The default in the owner table is scale 4.
 - `QuoteContinuationPolicy` rounding the renewal unit to scale 2, and `draftRenewal` writing `"0"`, stay as they are. This draft does not change them.
 - ADR-023 is not edited. ADR-017 and ADR-024 through ADR-027 stay Proposed.
@@ -212,26 +212,26 @@ The uplift record assigns that choice to DRG-568. DRG-568 could make it only aft
 - Calling `RampEscalatorExpander` for the 14-month lock throws `RAMP_TERM_MISMATCH` and prices nothing. The control is D-04: locks are explicit segments.
 - Sending a finished renewal net through `RampPeriodPricer` on `SAAS_SEAT_NAMED` takes the named-seat tier off again. The control is D-05.
 - Expanding later periods before the status-change pull request merges contradicts the accepted uplift record's D-06.
-- Treating this Proposed file, the price-lock stub, or the ramp-amendment proposal as an authorization to code would let an implementation merge against text the owner has not adopted. This file stays Proposed.
+- Treating this Accepted file, the price-lock stub, or the ramp-amendment proposal as an authorization to code would let an implementation merge against text that authorizes no code. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. The price-lock stub and the ramp-amendment proposal stay outside this acceptance.
 
 ## What DRG-568 needs from this draft
 
-DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator and the AI Assist lock are not expressible, and that it depends on DRG-533. This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code. The inputs below are what that later story would use:
+DRG-568 (RA-34, read 2026-10-16, status Backlog) says a 36-month 7% escalator and the AI Assist lock are not expressible, and that it depends on DRG-533. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. It unblocks DRG-568 only after the status-change PR merges. Nothing in this file authorizes code. The inputs below are what that later story would use:
 
 1. Period 1 is the uplift record's unit (42.8000 in the example). Later percent steps use D-02 and D-03.
 2. Under the recommendation, the 36-month series is 42.8000, 45.7960, 49.0017, TCV 330,234.48, not 42.80 / 45.80 / 49.01, unless the owner replaces D-03 with scale 2.
 3. The lock is two explicit segments, 20.0000 for five months and 21.4000 for nine, total 14,630.00. The post-lock mode applies the percent once to the locked unit.
 4. Cap and floor are re-checked on every stored absolute. A generated step clamps. An explicit lock or override outside the bounds is `PRICE_PROTECTION_CONFLICT`.
-5. The segment list is per line. `draftRenewal`'s single-line, zero-uplift, 12-month draft is the current writer. Replacing it is DRG-568's work, and it is not authorized by this Proposed file.
+5. The segment list is per line. `draftRenewal`'s single-line, zero-uplift, 12-month draft is the current writer. Replacing it is DRG-568's work, and it is not authorized by this Accepted file. Owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager.
 6. The retention marker is not a lock unless DRG-568 itself decides that, after this acceptance.
 7. Month-boundary locks are the first slice if the owner keeps that recommendation. A lock ending mid-month is not specified here.
 8. No second compounding rule, and no use of the equal-block expander for unequal lock segments.
 
 ## Owner decision needed
 
-This file is Proposed. The seven recommendations are not in force. Each row has one recommendation and one default. The owner may keep the default or replace it. This file does not record that choice. Nothing in this file authorizes code.
+This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. The seven recommendations are not in force. Each row has one recommendation and one default. The owner may keep the default or replace it. This file does not record that choice. Nothing in this file authorizes code.
 
-This file unblocks DRG-568 only after the owner accepts this file and the status-change PR merges.
+This file unblocks DRG-568 only after the status-change PR merges.
 
 | # | Fork | Recommendation | Default |
 | --- | --- | --- | --- |
@@ -243,9 +243,9 @@ This file unblocks DRG-568 only after the owner accepts this file and the status
 | 6 | A lock that ends off a month boundary | Leave that end out of DRG-568's first slice, and leave the amendment day-stub on the amendment path. | Month-boundary locks only |
 | 7 | The retention marker | Leave `ENABLE_12M_PRICE_PROTECTION` as a marker, and leave any dated segment to a later DRG-568 change. | Marker, not a lock |
 
-Until the owner accepts this file and the status-change PR merges, D-06 of the uplift record stands: later periods do not grow.
+This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. D-06 of the uplift record stands: later periods do not grow.
 
-**Unblocks: DRG-568 only after the owner accepts this file and the status-change PR merges. Nothing in this file authorizes code.**
+**Unblocks: DRG-568 only after the status-change PR merges. This file is Accepted: owner drg accepted DRG-533 / #644 at 7:31 AM CT on 2026-10-17, as relayed by Projects Manager. Nothing in this file authorizes code.**
 
 ## Edge-case tests for DRG-532, DRG-568, and DRG-534
 
