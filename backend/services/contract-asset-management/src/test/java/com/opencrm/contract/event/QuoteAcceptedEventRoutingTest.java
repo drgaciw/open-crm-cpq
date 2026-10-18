@@ -30,8 +30,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -194,6 +196,47 @@ class QuoteAcceptedEventRoutingTest {
         });
         assertThat(meters.counter(AmendmentRoutingFlag.ROUTED_LEGACY).count()).isEqualTo(3.0);
         assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
+    }
+
+    /**
+     * Document routing is unbuilt, so the seam does not parse {@code amendmentDocumentId}.
+     * A malformed id and an unknown well-formed id stay on the legacy path for flag-off and for a set flag
+     * with no event tenant. A throw would be the existing non-retryable dead-letter path; this delivery must not take it.
+     */
+    @Test
+    @DisplayName("malformed or unknown document id stays on legacy apply, flag off and no tenant")
+    void malformedOrUnknownDocumentIdTakesLegacyPathUnchanged() {
+        List<String> documentIds = List.of(
+                "not-a-uuid",
+                "",
+                "   ",
+                "11111111-1111-4111-8111-000000000099");
+        List<AmendmentRoutingFlag> cells = List.of(
+                AmendmentRoutingFlag.off(),
+                AmendmentRoutingFlag.forTenants("tenant-on"));
+
+        int caseNo = 0;
+        for (String documentId : documentIds) {
+            for (AmendmentRoutingFlag flag : cells) {
+                bind(flag);
+                String quoteId = "Q-ID-" + caseNo++;
+                String payload = """
+                        {"eventType":"QuoteAccepted","eventVersion":1,"quoteId":"%s","customerId":"C-1","currencyCode":"USD","amendmentDocumentId":"%s"}"""
+                        .formatted(quoteId, documentId);
+                double legacyBefore = meters.counter(AmendmentRoutingFlag.ROUTED_LEGACY).count();
+
+                assertThatCode(() -> consumer.handleQuoteAccepted(record(quoteId, payload)))
+                        .doesNotThrowAnyException();
+
+                QuoteAcceptedEvent applied = captureSingleApply();
+                assertThat(applied.getQuoteId()).isEqualTo(quoteId);
+                assertThat(applied.getAmendmentDocumentId()).isEqualTo(documentId);
+                assertThat(flag.decide(applied)).isEqualTo(AmendmentRoutingDecision.LEGACY);
+                assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
+                assertThat(meters.counter(AmendmentRoutingFlag.ROUTED_LEGACY).count()).isEqualTo(legacyBefore + 1.0);
+                clearInvocations(acceptedQuotes);
+            }
+        }
     }
 
     private void bind(AmendmentRoutingFlag flag) {
