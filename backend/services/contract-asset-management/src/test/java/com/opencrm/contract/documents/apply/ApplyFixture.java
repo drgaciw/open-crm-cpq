@@ -19,6 +19,7 @@ import com.opencrm.contract.repository.documents.AmendmentApplicationUnitReposit
 import com.opencrm.contract.repository.documents.AmendmentDocumentRepository;
 import com.opencrm.contract.repository.documents.DocumentApplyLedgerRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.mockito.stubbing.Answer;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
@@ -117,7 +118,7 @@ final class ApplyFixture {
                     Long id = invocation.getArgument(0);
                     return periods.stream().filter(period -> id.equals(period.getSubscriptionId())).toList();
                 });
-        when(rates.save(any())).thenAnswer(invocation -> {
+        Answer<SubscriptionRatePeriod> persist = invocation -> {
             SubscriptionRatePeriod period = invocation.getArgument(0);
             if (period.getId() == null) {
                 period.setId(periodIds.incrementAndGet());
@@ -126,7 +127,9 @@ final class ApplyFixture {
                 periods.add(period);
             }
             return period;
-        });
+        };
+        when(rates.save(any())).thenAnswer(persist);
+        when(rates.saveAndFlush(any())).thenAnswer(persist);
         when(writer.appendApplyDecision(any())).thenAnswer(invocation -> {
             events.add(invocation.getArgument(0));
             return null;

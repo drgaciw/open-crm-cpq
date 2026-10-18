@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -144,7 +144,11 @@ class DocumentApplyAuthorizationTest {
         }
     }
 
-    @Configuration(proxyBeanMethods = false)
+    /**
+     * Security-slice only. {@code @TestConfiguration} is not component-scanned, so this mock
+     * orchestrator cannot replace the real bean in {@code @SpringBootTest}.
+     */
+    @TestConfiguration(proxyBeanMethods = false)
     @EnableWebMvc
     @ImportAutoConfiguration(OpenCrmSecurityAutoConfiguration.class)
     @Import({TestJwtDecoderConfiguration.class, DocumentApplyController.class, GlobalExceptionHandler.class})

@@ -121,7 +121,9 @@ final class DocumentApplyPeriods {
                 .netMonthly(monthly)
                 .provenance("DOCUMENT_APPLY")
                 .build();
-        rates.save(created);
+        // Flush before the JDBC trace update. JdbcTemplate does not see an unflushed INSERT,
+        // so the line id would stay null after commit.
+        rates.saveAndFlush(created);
         gateway.bindAmendmentLine(created.getId(), line.id(), revisionNo);
     }
 
