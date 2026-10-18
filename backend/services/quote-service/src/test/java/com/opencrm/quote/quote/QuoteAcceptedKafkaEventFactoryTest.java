@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -142,5 +143,56 @@ class QuoteAcceptedKafkaEventFactoryTest {
         QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(quote, List.of());
 
         assertThat(event.getLineItems()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void twoArgFromLeavesAmendmentFieldsNull() {
+        Quote quote = Quote.builder()
+                .uuid("quote-uuid-s6")
+                .quoteNumber("Q-S6")
+                .currency("USD")
+                .totalAmount(new BigDecimal("10.00"))
+                .build();
+        QuoteLineItem line = QuoteLineItem.builder()
+                .uuid("line-s6")
+                .productExternalId("prod-1")
+                .quantity(1)
+                .sortOrder(1)
+                .build();
+
+        QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(quote, List.of(line));
+
+        assertThat(event.getAmendmentDocumentId()).isNull();
+        assertThat(event.getLineItems()).singleElement()
+                .extracting(QuoteAcceptedEvent.LineItemSnapshot::getApplicationUnitNo)
+                .isNull();
+        assertThat(event.getEventType()).isEqualTo(EventContractRegistry.QUOTE_ACCEPTED_V1.eventType());
+        assertThat(event.getEventVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void optionalPassThroughCopiesDocumentIdAndUnitNumber() {
+        Quote quote = Quote.builder()
+                .uuid("quote-uuid-s6b")
+                .quoteNumber("Q-S6B")
+                .currency("USD")
+                .totalAmount(new BigDecimal("10.00"))
+                .build();
+        QuoteLineItem line = QuoteLineItem.builder()
+                .uuid("line-s6b")
+                .productExternalId("prod-1")
+                .quantity(2)
+                .sortOrder(1)
+                .build();
+
+        QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(
+                quote,
+                List.of(line),
+                "22222222-2222-4222-8222-222222222222",
+                Map.of("line-s6b", 3));
+
+        assertThat(event.getAmendmentDocumentId()).isEqualTo("22222222-2222-4222-8222-222222222222");
+        assertThat(event.getLineItems().getFirst().getApplicationUnitNo()).isEqualTo(3);
+        assertThat(event.getEventVersion()).isEqualTo(1);
     }
 }
