@@ -159,6 +159,25 @@ class AmendmentStateMachineTest {
     }
 
     @Test
+    void applyFromExecutedReachesEachApplyOutcomeAndEveryOtherStateIsRefused() {
+        assertThat(AmendmentStateMachine.apply(AmendmentDocumentStatus.EXECUTED, AmendmentDocumentStatus.APPLIED).allowed())
+                .isTrue();
+        assertThat(AmendmentStateMachine.apply(AmendmentDocumentStatus.EXECUTED, AmendmentDocumentStatus.PARTIALLY_APPLIED).status())
+                .isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+        assertThat(AmendmentStateMachine.apply(AmendmentDocumentStatus.EXECUTED, AmendmentDocumentStatus.APPLY_BLOCKED).status())
+                .isEqualTo(AmendmentDocumentStatus.APPLY_BLOCKED);
+        for (AmendmentDocumentStatus status : AmendmentDocumentStatus.values()) {
+            for (AmendmentDocumentStatus outcome : AmendmentDocumentStatus.values()) {
+                boolean allowed = status == AmendmentDocumentStatus.EXECUTED
+                        && (outcome == AmendmentDocumentStatus.APPLIED
+                        || outcome == AmendmentDocumentStatus.PARTIALLY_APPLIED
+                        || outcome == AmendmentDocumentStatus.APPLY_BLOCKED);
+                assertAllowed(AmendmentStateMachine.apply(status, outcome), allowed);
+            }
+        }
+    }
+
+    @Test
     void rejectReviewIsTerminal() {
         assertThat(AmendmentStateMachine.rejectReview(AmendmentDocumentStatus.IN_REVIEW).status())
                 .isEqualTo(AmendmentDocumentStatus.REJECTED);
