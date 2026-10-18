@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import com.opencrm.pricing.renewal.RenewalResolveController;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -155,6 +158,24 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Malformed JSON on the renewal resolve path, including an unknown property such as {@code tenantId}.
+     * Other pricing routes keep the generic 500 mapping.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path != null && path.endsWith(RenewalResolveController.PATH)) {
+            String traceId = MDC.get(TRACE_ID_KEY);
+            logger.warn("Unreadable renewal resolve body [traceId={}]", traceId);
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    "Malformed renewal resolve request",
+                    "MALFORMED_REQUEST",
+                    traceId));
+        }
+        return handleGenericException(ex);
     }
 
     /**
