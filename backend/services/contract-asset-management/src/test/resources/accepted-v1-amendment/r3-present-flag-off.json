@@ -1,0 +1,15 @@
+{
+  "eventType": "QuoteAccepted",
+  "eventVersion": 1,
+  "quoteId": "Q-R3",
+  "customerId": "synthetic-r3-customer",
+  "currencyCode": "USD",
+  "amendmentDocumentId": "11111111-1111-4111-8111-0000000000a1",
+  "lineItems": [
+    {
+      "lineUuid": "line-r3",
+      "quantity": 1,
+      "applicationUnitNo": 2
+    }
+  ]
+}
