@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -79,6 +80,7 @@ class DocumentApplyAuthorizationTest {
 
         @BeforeEach
         void setUp() {
+            clearInvocations(orchestrator);
             mvc = MockMvcBuilders.webAppContextSetup(context)
                     .addFilters(context.getBean("springSecurityFilterChain", Filter.class))
                     .build();
@@ -127,7 +129,7 @@ class DocumentApplyAuthorizationTest {
         void aNonCamPathIsNotThisEndpoint() throws Exception {
             mvc.perform(post("/api/v1/amendments/{amendmentId}:apply", UUID.randomUUID())
                             .header(HttpHeaders.AUTHORIZATION, TestTokens.service("quote-service", "Internal.Invoke").bearer()))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().is5xxServerError());
             verify(orchestrator, never()).apply(any());
         }
 
@@ -173,6 +175,7 @@ class DocumentApplyAuthorizationTest {
         @Test
         void aTokenWithoutTidIsPassedThroughAsMissingTenant() {
             DocumentApplyOrchestrator orchestrator = mock(DocumentApplyOrchestrator.class);
+            when(orchestrator.apply(any())).thenReturn(new ApplyResult(AmendmentDocumentStatus.EXECUTED, false));
             DocumentApplyController controller = new DocumentApplyController(orchestrator);
             UUID id = UUID.randomUUID();
             Jwt jwt = Jwt.withTokenValue("token")

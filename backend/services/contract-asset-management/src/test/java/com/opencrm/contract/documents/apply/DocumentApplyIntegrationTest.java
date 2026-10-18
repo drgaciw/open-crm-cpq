@@ -75,21 +75,21 @@ class DocumentApplyIntegrationTest {
         assertThat(result.status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
         assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
                 .isEqualTo("APPLIED");
-        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Integer.class, documentId))
-                .isEqualTo(2);
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
+                .isEqualTo(2L);
         assertThat(jdbc.queryForObject(
-                "select count(*) from subscription_rate_periods where amendment_document_line_id is not null", Integer.class))
-                .isEqualTo(2);
-        Integer appliedEvents = jdbc.queryForObject(
+                "select count(*) from subscription_rate_periods where amendment_document_line_id is not null", Long.class))
+                .isEqualTo(2L);
+        Long appliedEvents = jdbc.queryForObject(
                 "select count(*) from amendment_document_events where document_id = ? and event_type = ?",
-                Integer.class, documentId, DocumentApplyOrchestrator.EVENT_UNIT_APPLIED);
-        assertThat(appliedEvents).isEqualTo(2);
+                Long.class, documentId, DocumentApplyOrchestrator.EVENT_UNIT_APPLIED);
+        assertThat(appliedEvents).isEqualTo(2L);
 
         ApplyResult replay = orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service",
                 "ROLE_INTERNAL_INVOKE", "corr-int", Map.of()));
         assertThat(replay.replayed()).isTrue();
-        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Integer.class, documentId))
-                .isEqualTo(2);
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
+                .isEqualTo(2L);
     }
 
     private void seed(UUID tenant, UUID documentId, UUID firstSubscription, UUID secondSubscription, boolean conflict) {
@@ -118,8 +118,8 @@ class DocumentApplyIntegrationTest {
                         inputs_snapshot_ref, status_at_close, created_by)
                     values (?, 1, ?, 1, ?, ?, 'snapshot', 'EXECUTED', 'test')
                     """, documentId, tenant, quoteId, HASH);
-            insertSubscription(firstSubscription, 11L);
-            insertSubscription(secondSubscription, 12L);
+            insertSubscription(firstSubscription);
+            insertSubscription(secondSubscription);
             insertUnit(documentId, tenant, 1, firstSubscription);
             insertUnit(documentId, tenant, 2, secondSubscription);
             insertLine(documentId, tenant, 1, firstSubscription);
@@ -133,12 +133,12 @@ class DocumentApplyIntegrationTest {
         });
     }
 
-    private void insertSubscription(UUID uuid, long number) {
+    private void insertSubscription(UUID uuid) {
         jdbc.update("""
                 insert into subscriptions (uuid, subscription_number, customer_id, quote_id, status, plan_name,
                     start_date, end_date, commercial_revision, created_by)
                 values (?, ?, ?, ?, 'ACTIVE', 'Plan', '2026-01-01', '2026-12-31', 0, 'test')
-                """, uuid.toString(), "SUB-" + number, uuid.toString(), "Q-" + number);
+                """, uuid.toString(), "SUB-" + uuid, uuid.toString(), "Q-" + uuid);
     }
 
     private void insertUnit(UUID documentId, UUID tenant, int unitNo, UUID subscription) {
@@ -173,12 +173,12 @@ class DocumentApplyIntegrationTest {
                 .isInstanceOf(DocumentApplyException.class);
         assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
                 .isEqualTo("EXECUTED");
-        Integer audits = jdbc.queryForObject(
+        Long audits = jdbc.queryForObject(
                 "select count(*) from amendment_document_events where document_id = ? and reason_code = 'DIGEST_CONFLICT'",
-                Integer.class, documentId);
-        assertThat(audits).isEqualTo(1);
-        Integer outbox = jdbc.queryForObject("select count(*) from outbox_events where aggregate_id = ?", Integer.class,
+                Long.class, documentId);
+        assertThat(audits).isEqualTo(1L);
+        Long outbox = jdbc.queryForObject("select count(*) from outbox_events where aggregate_id = ?", Long.class,
                 documentId.toString());
-        assertThat(outbox).isEqualTo(1);
+        assertThat(outbox).isEqualTo(1L);
     }
 }
