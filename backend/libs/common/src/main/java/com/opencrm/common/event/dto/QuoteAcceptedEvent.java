@@ -30,6 +30,9 @@ import java.util.Map;
  * before the field existed has no {@code lineItems} at all. The relay has never run, so its first run will publish
  * outbox rows written before this change, and they carry none. Consumers must read {@code null} as "not provided",
  * never as "no lines".
+ *
+ * <p>S6 adds optional {@code amendmentDocumentId} and per-line {@code applicationUnitNo}. Both are null when absent
+ * and omitted from JSON. There is no tenant on this event. {@code EVENT_TYPE} and {@code EVENT_VERSION} stay at v1.
  */
 @Data
 @NoArgsConstructor
@@ -59,6 +62,9 @@ public class QuoteAcceptedEvent {
     private DealSnapshot deal;
     private List<LineItemSnapshot> lineItems;
     private SubscriptionChangeSnapshot subscriptionChange;
+    /** Amendment document this acceptance belongs to, when the quote was produced for one. Null on legacy events. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String amendmentDocumentId;
 
     public QuoteAcceptedEvent(
             String quoteId,
@@ -220,6 +226,9 @@ public class QuoteAcceptedEvent {
         private HybridMigrationSnapshot hybridMigration;
         @JsonInclude(JsonInclude.Include.NON_NULL)
         private ProrationSnapshot initialProration;
+        /** Application unit on the amendment document. Null when the line is not tied to a unit. */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private Integer applicationUnitNo;
     }
 
     /** Accepted priced facts, never an instruction to reprice authored steps. */

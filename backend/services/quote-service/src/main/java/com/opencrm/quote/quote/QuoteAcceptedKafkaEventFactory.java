@@ -19,6 +19,15 @@ final class QuoteAcceptedKafkaEventFactory {
     }
 
     static QuoteAcceptedEvent from(Quote quote, List<QuoteLineItem> lineItems) {
+        return from(quote, lineItems, null, null);
+    }
+
+    /**
+     * Optional pass-through for S6. A null document id and a null unit map leave the event unchanged from
+     * {@link #from(Quote, List)}. This method does not read a tenant from the quote.
+     */
+    static QuoteAcceptedEvent from(Quote quote, List<QuoteLineItem> lineItems,
+            String amendmentDocumentId, Map<String, Integer> applicationUnitNoByLineUuid) {
         AcceptedRampSnapshots.validatePairs(quote, lineItems);
         String quoteId = quote.getUuid() != null ? quote.getUuid() : quote.getQuoteNumber();
         String correlationId = quote.getUuid() != null ? quote.getUuid() : UUID.randomUUID().toString();
@@ -73,8 +82,9 @@ final class QuoteAcceptedKafkaEventFactory {
         // lines, which is different from a missing field.
         event.setLineItems(lineItems.stream()
                 .sorted(Comparator.comparingInt(QuoteLineItem::getSortOrder))
-                .map(line -> lineItemSnapshot(quote, line))
+                .map(line -> lineItemSnapshot(quote, line, applicationUnitNoByLineUuid))
                 .toList());
+        event.setAmendmentDocumentId(blankToNull(amendmentDocumentId));
         if (quote.getTargetSubscriptionNumber() != null) {
             if (quote.getDealType() == DealType.NEW || quote.getObservedRevision() == null || quote.getObservedRevision() < 0
                     || quote.getSubscriptionEffectiveDate() == null) {
@@ -91,7 +101,8 @@ final class QuoteAcceptedKafkaEventFactory {
         return event;
     }
 
-    private static QuoteAcceptedEvent.LineItemSnapshot lineItemSnapshot(Quote quote, QuoteLineItem lineItem) {
+    private static QuoteAcceptedEvent.LineItemSnapshot lineItemSnapshot(Quote quote, QuoteLineItem lineItem,
+            Map<String, Integer> applicationUnitNoByLineUuid) {
         return QuoteAcceptedEvent.LineItemSnapshot.builder()
                 .lineUuid(lineItem.getUuid())
                 .productExternalId(lineItem.getProductExternalId())
@@ -112,7 +123,22 @@ final class QuoteAcceptedKafkaEventFactory {
                 .sourceSubscriptionLineUuid(lineItem.getSourceSubscriptionLineUuid())
                 .hybridMigration(AcceptedRampSnapshots.hybrid(lineItem) != null ? AcceptedRampSnapshots.hybrid(lineItem).snapshot() : null)
                 .initialProration(AcceptedRampSnapshots.proration(quote, lineItem))
+                .applicationUnitNo(applicationUnitNo(applicationUnitNoByLineUuid, lineItem.getUuid()))
                 .build();
+    }
+
+    private static Integer applicationUnitNo(Map<String, Integer> applicationUnitNoByLineUuid, String lineUuid) {
+        if (applicationUnitNoByLineUuid == null || lineUuid == null) {
+            return null;
+        }
+        return applicationUnitNoByLineUuid.get(lineUuid);
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value;
     }
 
     private static String extractConfigurationId(String metadata) {

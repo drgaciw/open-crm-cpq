@@ -1,0 +1,23 @@
+package com.opencrm.common.event.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * S6 lifecycle schema, RESERVED, not emitted. documentStatus is the S3 name PARTIALLY_APPLIED:
+ * one application unit has been committed and the document is not yet APPLIED.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.ALWAYS)
+public record AmendmentUnitApplied(
+        UUID documentId,
+        UUID contractId,
+        String amendmentNumber,
+        String documentStatus,
+        Instant occurredAt,
+        String correlationId,
+        UUID eventId,
+        Integer applicationUnitNo) {
+}
