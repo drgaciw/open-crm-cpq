@@ -12,9 +12,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -48,7 +48,8 @@ class DocumentApplyWiringContextTest {
         });
     }
 
-    @Configuration(proxyBeanMethods = false)
+    /** Explicitly imported by the runner. Not component-scanned into the CAM application. */
+    @TestConfiguration(proxyBeanMethods = false)
     @Import({DocumentApplyOrchestrator.class, JdbcDocumentApplyGateway.class, DocumentApplyController.class})
     static class NewBeans {
         @Bean
