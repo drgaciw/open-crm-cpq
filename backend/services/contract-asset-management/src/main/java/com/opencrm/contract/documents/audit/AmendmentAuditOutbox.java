@@ -24,6 +24,12 @@ public class AmendmentAuditOutbox {
         this.publisher = publisher;
     }
 
+    /** Apply, block, and in-CAM refusal audits use the same outbox row as every other chain event. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void stageApplyDecision(AmendmentDocument document, AmendmentDocumentEvent event) {
+        stage(document, event);
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void stage(AmendmentDocument document, AmendmentDocumentEvent event) {
         AmendmentAuditEvent publication = new AmendmentAuditEvent(

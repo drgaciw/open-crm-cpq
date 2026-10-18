@@ -1,5 +1,6 @@
 package com.opencrm.contract.documents;
 
+import com.opencrm.contract.domain.documents.AmendmentDocumentStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -55,5 +56,9 @@ public class AmendmentDocumentService {
 
     public AmendmentView sendForSignature(UUID id, int version, CommandContext context) {
         return workflow.sendForSignature(id, version, context);
+    }
+
+    public Transition applyTransition(AmendmentDocumentStatus current, AmendmentDocumentStatus outcome) {
+        return workflow.applyTransition(current, outcome);
     }
 }

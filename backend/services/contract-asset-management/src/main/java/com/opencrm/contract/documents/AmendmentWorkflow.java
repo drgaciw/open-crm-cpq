@@ -892,6 +892,10 @@ class AmendmentWorkflow {
         return CommercialDigest.sha256(raw.toString().getBytes(StandardCharsets.UTF_8));
     }
 
+    public Transition applyTransition(AmendmentDocumentStatus current, AmendmentDocumentStatus outcome) {
+        return AmendmentStateMachine.apply(current, outcome);
+    }
+
     private record SubscriptionFact(UUID contractId, String status, long commercialRevision) {
     }
 }
