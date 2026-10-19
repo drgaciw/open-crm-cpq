@@ -6,7 +6,7 @@ import com.opencrm.contract.domain.documents.SignaturePolicy;
 import java.util.EnumSet;
 import java.util.Set;
 
-/** First-slice document transitions. Apply outcomes are recognized and not produced here. */
+/** First-slice document transitions. Apply outcomes are produced only from EXECUTED. */
 public final class AmendmentStateMachine {
 
     private static final Set<AmendmentDocumentStatus> PRE_EXECUTION = EnumSet.of(
@@ -79,6 +79,23 @@ public final class AmendmentStateMachine {
             return Transition.reject(status, 409, "IMMUTABLE_EXECUTED");
         }
         return illegal(status);
+    }
+
+    /**
+     * Apply may move EXECUTED to APPLIED, PARTIALLY_APPLIED, or APPLY_BLOCKED.
+     * Every other source state is refused, including VOID, OUT_FOR_SIGNATURE,
+     * PARTIALLY_APPLIED and APPLY_BLOCKED.
+     */
+    public static Transition apply(AmendmentDocumentStatus status, AmendmentDocumentStatus outcome) {
+        if (status != AmendmentDocumentStatus.EXECUTED) {
+            return illegal(status);
+        }
+        if (outcome != AmendmentDocumentStatus.APPLIED
+                && outcome != AmendmentDocumentStatus.PARTIALLY_APPLIED
+                && outcome != AmendmentDocumentStatus.APPLY_BLOCKED) {
+            return Transition.reject(status, 409, "ILLEGAL_TRANSITION");
+        }
+        return Transition.ok(outcome);
     }
 
     public static Transition rejectReview(AmendmentDocumentStatus status) {

@@ -83,8 +83,14 @@ public class AmendmentEventWriter {
         event.setContentHash(AmendmentEventHasher.contentHash(event));
         entityManager.persist(event);
         entityManager.flush();
-        auditOutbox.stage(document, event);
+        auditOutbox.stageApplyDecision(document, event);
         return event;
+    }
+
+    /** Apply, block, and refusal rows. One chain row and the outbox row from {@link #append}. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AmendmentDocumentEvent appendApplyDecision(AmendmentEventAppend command) {
+        return append(command);
     }
 
     private AmendmentDocumentEvent findBySource(UUID sourceEventId) {
