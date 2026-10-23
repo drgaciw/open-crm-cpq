@@ -106,6 +106,14 @@ public class DocumentApplyController {
         }
     }
 
-    public record ApplyView(UUID documentId, String status, boolean replayed) {
+    public record ApplyView(UUID documentId, String status, boolean replayed, List<UnitOutcome> unitOutcomes) {
+
+        public ApplyView(UUID documentId, String status, boolean replayed) {
+            this(documentId, status, replayed, null);
+        }
+
+        /** Additive unit row. {@code outcome} is {@code APPLIED} or {@code BLOCKED}. */
+        public record UnitOutcome(Integer unitId, String outcome, String reason) {
+        }
     }
 }
