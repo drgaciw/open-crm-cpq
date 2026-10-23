@@ -445,20 +445,12 @@ class QuoteServiceTenantTest {
                 .subject(subject);
     }
 
-    private static String tenantOf(Quote quote) throws Exception {
-        try {
-            return (String) Quote.class.getMethod("getTenantId").invoke(quote);
-        } catch (NoSuchMethodException ex) {
-            throw new AssertionError("Quote.tenantId is missing", ex);
-        }
+    private static String tenantOf(Quote quote) {
+        return quote.getTenantId();
     }
 
-    private static void setTenant(Quote quote, String tenant) throws Exception {
-        try {
-            Quote.class.getMethod("setTenantId", String.class).invoke(quote, tenant);
-        } catch (NoSuchMethodException ex) {
-            throw new AssertionError("Quote.tenantId is missing", ex);
-        }
+    private static void setTenant(Quote quote, String tenant) {
+        quote.setTenantId(tenant);
     }
 
     private static List<String> fieldNames(Class<?> type) {

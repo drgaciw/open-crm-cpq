@@ -41,6 +41,12 @@ public class Quote extends BaseEntity {
     @Column(name = "customer_external_id", nullable = false)
     private String customerExternalId;
 
+    /**
+     * tenantId is the Entra `tid` claim: a per-deployment value (single issuer per deployment, ADR-016), chosen by the owner on 2026-10-23 as a deliberately weak interim. It is NOT a real per-tenant id, and the planned event follow-up inherits this limit.
+     */
+    @Column(name = "tenant_id", length = 128, updatable = false)
+    private String tenantId;
+
     @Column(name = "deal_external_id")
     private String dealExternalId;
 

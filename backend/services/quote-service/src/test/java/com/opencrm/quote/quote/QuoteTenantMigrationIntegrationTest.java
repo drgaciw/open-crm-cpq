@@ -90,11 +90,7 @@ class QuoteTenantMigrationIntegrationTest {
             session.beginTransaction();
             Quote quote = session.find(Quote.class, id);
             quote.setName(name);
-            try {
-                Quote.class.getMethod("setTenantId", String.class).invoke(quote, tenant);
-            } catch (ReflectiveOperationException ex) {
-                throw new AssertionError("Quote.tenantId is missing", ex);
-            }
+            quote.setTenantId(tenant);
             session.getTransaction().commit();
         } catch (RuntimeException ex) {
             StandardServiceRegistryBuilder.destroy(registry);
@@ -174,10 +170,11 @@ class QuoteTenantMigrationIntegrationTest {
         String sql = new String(QuoteTenantMigrationIntegrationTest.class.getClassLoader()
                 .getResourceAsStream("db/migration/V1_13__quote_tenant_id.sql")
                 .readAllBytes());
-        int marker = sql.indexOf("Apply in the quote schema:");
-        assertThat(marker).isGreaterThan(0);
+        String marker = "Apply in the quote schema:";
+        int start = sql.indexOf(marker);
+        assertThat(start).isGreaterThan(0);
         List<String> statements = new ArrayList<>();
-        for (String raw : sql.substring(marker).split("\n")) {
+        for (String raw : sql.substring(start + marker.length()).split("\n")) {
             String line = raw.strip();
             if (line.isEmpty()) {
                 continue;
