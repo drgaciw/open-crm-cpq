@@ -34,9 +34,9 @@ Relevant existing content: the P2 capacity-meter policy and the Scenario 2 capac
 - **Dependencies:** PL-1 to PL-3; renewal policy (RA-34 area); see OQ21.
 - **Not an active dev story.**
 
-## PL-6 CRM forecasting requirements maturity review (PARKED, not an active dev story)
+## PL-6 CRM forecasting requirements maturity review (REVIEW STARTED 2026-10-23, not a dev story)
 
-Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracked as RA-54 / DRG-588 ("[PARKED]"). Sits next to the on-prem self-reported usage items (PL-1 to PL-5, RA-53 / DRG-587).
+Status: **REVIEW STARTED 2026-10-23.** The owner unparked the review. Started as a documentation-only review: see [crm-forecasting-requirements-maturity-review.md](crm-forecasting-requirements-maturity-review.md). Still not an active development story: no estimate, no code. Originally recorded 2026-10-16. Tracked as RA-54 / DRG-588 (now In Progress). Sits next to the on-prem self-reported usage items (PL-1 to PL-5, RA-53 / DRG-587).
 
 **Distinction (explicit):** this is a review of *overall CRM forecasting requirements* and how mature they are. It is SEPARATE from the net-new automatic re-forecast-on-amendment-save functionality already discussed for the renewals and amendments work. That re-forecast behavior is its own feature; this item does not design, replace, or block it.
 
@@ -48,7 +48,7 @@ Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracke
   3. Gaps: missing definitions (forecast categories, commit versus best case), no single source of truth, who consumes the forecast (finance, sales leadership), accuracy measurement, currency handling beyond ADR-032, on-prem usage input (see PL-1 to PL-5 and OQ21).
   4. Relationship to amendment re-forecast: list which forecast inputs an amendment changes (ARR, term, renewal date, lines) so the later re-forecast-on-amendment-save feature has a stable forecast model to write to. The review informs, but does not gate, that feature.
 - **Dependencies:** none for the review itself. Inputs: existing docs and agents above; ADR-032; renewal policy (RA-34 area); PL-1 to PL-5 for on-prem usage inputs. Output feeds the amendment re-forecast design.
-- **Revisit:** the user wants this brought up in a future conversation. Prompt the user to revisit "CRM forecasting requirements maturity review" at the next planning or renewals and amendments conversation, and when the first slice ships, whichever comes first. There is no automated reminder; this note and RA-54 / DRG-588 are the prompt.
+- **Revisit:** DONE 2026-10-23, the owner said yes and the review started (see the linked doc). Original note: the user wants this brought up in a future conversation. Prompt the user to revisit "CRM forecasting requirements maturity review" at the next planning or renewals and amendments conversation, and when the first slice ships, whichever comes first. There is no automated reminder; this note and RA-54 / DRG-588 are the prompt.
 - **Not an active dev story.** No estimate, no code.
 
 ## PL-7 Mid-term cancellation: proration and refunds (PARKED, not an active dev story)
