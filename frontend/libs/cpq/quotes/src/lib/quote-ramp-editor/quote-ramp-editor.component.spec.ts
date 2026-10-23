@@ -623,8 +623,6 @@ describe('QuoteRampEditorComponent', () => {
     expect(text()).toContain('Extend to months');
     duration.focus();
     expect(document.activeElement).toBe(duration);
-    extend.focus();
-    expect(document.activeElement).toBe(extend);
     component.onExtend();
     expect(extendRampSchedule).not.toHaveBeenCalled();
   });
@@ -671,6 +669,8 @@ describe('QuoteRampEditorComponent', () => {
       '[data-testid="extend-escalator"]',
     ) as HTMLButtonElement;
     expect(extend.disabled).toBe(false);
+    extend.focus();
+    expect(document.activeElement).toBe(extend);
     extend.click();
     fixture.detectChanges();
 

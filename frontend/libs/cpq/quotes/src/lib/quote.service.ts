@@ -15,6 +15,7 @@ import {
   PaginationMeta,
   SpringPageResponse,
   RampScheduleExpandRequest,
+  RampScheduleExtendRequest,
   RampStep,
 } from '@frontend/shared-models';
 
@@ -235,6 +236,22 @@ export class QuoteService {
   ): Observable<RampStep[]> {
     return this.http.post<RampStep[]>(
       `${this.basePath}/${quoteId}/ramp-schedule/expand`,
+      request,
+    );
+  }
+
+  /**
+   * Append periods to an existing schedule.
+   * POST /api/v1/quotes/{quoteId}/ramp-schedule/extend
+   * Returns the existing steps plus the new ones and writes nothing,
+   * including the quote term. Does not change opencrm.pricing.ramp.enabled.
+   */
+  extendRampSchedule(
+    quoteId: number,
+    request: RampScheduleExtendRequest,
+  ): Observable<RampStep[]> {
+    return this.http.post<RampStep[]>(
+      `${this.basePath}/${quoteId}/ramp-schedule/extend`,
       request,
     );
   }
