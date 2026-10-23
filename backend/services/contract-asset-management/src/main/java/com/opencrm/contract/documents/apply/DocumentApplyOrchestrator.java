@@ -31,8 +31,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -112,10 +115,16 @@ public class DocumentApplyOrchestrator {
         }
         if (recordedDigestConflictReplay(document, ordered, lines)) {
             log.info("document apply replay documentId={} status={}", document.getId(), document.getStatus());
-            return new ApplyResult(document.getStatus(), true);
+            return new ApplyResult(document.getStatus(), true, unitOutcomes(document, Map.of(), lines));
         }
         if (allDigestsConflict(document, ordered, lines)) {
-            audit(document, command, "DIGEST_CONFLICT", "apply key digest does not match the ledger");
+            unitTransaction.executeWithoutResult(status -> {
+                for (AmendmentApplicationUnit unit : ordered) {
+                    events.appendApplyDecision(event(document, command, EVENT_UNIT_BLOCKED, null, null,
+                            unit.getUnitNo(), "DIGEST_CONFLICT",
+                            "apply:DIGEST_CONFLICT:apply key digest does not match the ledger"));
+                }
+            });
             throw new DocumentApplyException("apply key digest does not match the ledger", HttpStatus.CONFLICT, "DIGEST_CONFLICT");
         }
         Transition permission = documentService.applyTransition(document.getStatus(), AmendmentDocumentStatus.APPLIED);
@@ -126,9 +135,11 @@ public class DocumentApplyOrchestrator {
         }
 
         boolean changed = false;
+        Map<Integer, String> blockReasons = new LinkedHashMap<>();
         for (AmendmentApplicationUnit unit : ordered) {
             try {
-                changed |= Boolean.TRUE.equals(unitTransaction.execute(status -> applyUnit(document, unit, lines, command)));
+                changed |= Boolean.TRUE.equals(unitTransaction.execute(
+                        status -> applyUnit(document, unit, lines, command, blockReasons)));
             } catch (DocumentApplyException ex) {
                 if (!"DIGEST_CONFLICT".equals(ex.getErrorCode())) {
                     throw ex;
@@ -138,6 +149,7 @@ public class DocumentApplyOrchestrator {
                     audit(document, command, "DIGEST_CONFLICT", "apply key digest does not match the ledger");
                     throw ex;
                 }
+                blockReasons.put(unit.getUnitNo(), "DIGEST_CONFLICT");
                 changed |= Boolean.TRUE.equals(unitTransaction.execute(
                         status -> blockDigestConflict(document, unit, command)));
             }
@@ -150,7 +162,40 @@ public class DocumentApplyOrchestrator {
             count(outcome);
             log.info("document apply documentId={} status={} alert={}", document.getId(), outcome, ALERT_CONDITION);
         }
-        return new ApplyResult(outcome, alreadyRecorded && !changed);
+        return new ApplyResult(outcome, alreadyRecorded && !changed, unitOutcomes(document, blockReasons, lines));
+    }
+
+    /**
+     * Present when at least one unit is BLOCKED. Applied siblings are included.
+     * BLOCKED is the persisted form of the OQ5 APPLY_BLOCKED unit state.
+     */
+    private List<ApplyResult.UnitOutcome> unitOutcomes(AmendmentDocument document, Map<Integer, String> blockReasons,
+                                                        List<ApplyLine> lines) {
+        List<ApplyResult.UnitOutcome> rows = new ArrayList<>();
+        boolean anyBlocked = false;
+        for (AmendmentApplicationUnit unit : orderedUnits(document)) {
+            if (unit.getStatus() == ApplicationUnitStatus.APPLIED) {
+                rows.add(new ApplyResult.UnitOutcome(unit.getUnitNo(), ApplicationUnitStatus.APPLIED.name(), null));
+            } else if (unit.getStatus() == ApplicationUnitStatus.BLOCKED) {
+                anyBlocked = true;
+                String reason = blockReasons.get(unit.getUnitNo());
+                if (reason == null && unitDigestConflicts(document, unit, lines)) {
+                    reason = "DIGEST_CONFLICT";
+                }
+                rows.add(new ApplyResult.UnitOutcome(unit.getUnitNo(), ApplicationUnitStatus.BLOCKED.name(), reason));
+            }
+        }
+        return anyBlocked ? rows : null;
+    }
+
+    private boolean unitDigestConflicts(AmendmentDocument document, AmendmentApplicationUnit unit, List<ApplyLine> lines) {
+        Optional<DocumentApplyLedgerEntry> existing = ledger.findByTenantIdAndDocumentIdAndUnitNo(
+                document.getTenantId(), document.getId(), unit.getUnitNo());
+        if (existing.isEmpty()) {
+            return false;
+        }
+        String digest = DocumentApplyDigest.unitDigest(document.getId(), unit, linesFor(lines, unit.getUnitNo()));
+        return !digest.equals(existing.get().getApplyKeyDigest());
     }
 
     /**
@@ -214,7 +259,7 @@ public class DocumentApplyOrchestrator {
     }
 
     private boolean applyUnit(AmendmentDocument document, AmendmentApplicationUnit stale, List<ApplyLine> allLines,
-                              ApplyCommand command) {
+                              ApplyCommand command, Map<Integer, String> blockReasons) {
         gateway.lockDocument(document.getId());
         gateway.lockSubscription(stale.getTargetRef());
         AmendmentApplicationUnit unit = orderedUnits(document).stream()
@@ -242,6 +287,7 @@ public class DocumentApplyOrchestrator {
         if (block != null) {
             unit.setStatus(ApplicationUnitStatus.BLOCKED);
             units.save(unit);
+            blockReasons.put(unit.getUnitNo(), block);
             events.appendApplyDecision(event(document, command, EVENT_UNIT_BLOCKED, null, null, unit.getUnitNo(),
                     block, "apply:" + block + ":" + DocumentApplyPeriods.detail(block)));
             meters.counter(UNITS_METRIC, "result", "blocked").increment();
