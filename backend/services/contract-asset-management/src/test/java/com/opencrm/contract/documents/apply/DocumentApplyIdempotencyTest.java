@@ -66,9 +66,11 @@ class DocumentApplyIdempotencyTest {
         assertThat(fixture.periods).isEmpty();
         assertThat(fixture.events).hasSize(1);
         var audit = fixture.events.get(0);
-        assertThat(audit.eventType()).isEqualTo(DocumentApplyOrchestrator.EVENT_REFUSED);
+        assertThat(audit.eventType()).isEqualTo(DocumentApplyOrchestrator.EVENT_UNIT_BLOCKED);
         assertThat(audit.reasonCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(audit.unitNo()).isEqualTo(1);
         assertThat(audit.documentId()).isEqualTo(fixture.document.getId());
+        assertThat(audit.payloadDigest()).matches("[0-9a-f]{64}");
         assertThat(audit.actorId()).isEqualTo("quote-service");
         assertThat(audit.actorRole()).isEqualTo("ROLE_INTERNAL_INVOKE");
     }
