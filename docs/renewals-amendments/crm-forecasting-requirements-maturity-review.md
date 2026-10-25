@@ -1,6 +1,6 @@
 # CRM forecasting requirements maturity review (PL-6)
 
-**Status:** REVIEW STARTED 2026-10-23; FQ1 to FQ3 decided by the owner 2026-10-23. Documentation only. This review assesses requirements; it does not decide a forecast model, accept an ADR, or authorize any story. Tracked as PL-6, Notion RA-54, Linear DRG-588, open question OQ22.
+**Status:** REVIEW STARTED 2026-10-23; FQ1 to FQ3 decided by the owner 2026-10-23; FQ10 decided 2026-10-25; definitions spec drafted. Documentation only. This review assesses requirements; it does not decide a forecast model, accept an ADR, or authorize any story. Tracked as PL-6, Notion RA-54, Linear DRG-588, open question OQ22.
 
 **Scope boundary:** this is the overall CRM forecasting requirements review. It is SEPARATE from the automatic re-forecast on amendment save (RA-66 / DRG-600). This review informs that feature but does not design, replace or gate it.
 
@@ -90,6 +90,8 @@ For the later DRG-600 feature, these inputs move when an amendment or renewal is
 - **FQ2. DECIDED:** the forecast unit is TCV.
 - **FQ3. DECIDED:** the source of truth for the renewal forecast is contract ARR in CAM.
 
+- **FQ10. DECIDED 2026-10-25, 15:34 Europe/Dublin:** renewal TCV = contract ARR in CAM x renewal term. Guards: partial years prorated by month; ramps are the sum of each period's ARR x that period's duration; if the renewal has no term yet, use the expiring contract's term and flag the row as assumed; store ARR next to TCV so ARR views keep working. Recommended by Jev router at about 0.8 confidence; decided by the owner.
+
 ### 7.2 Still open
 - **FQ4.** Are forecast categories (commit, best case, pipeline, omitted) needed, and who may submit or override?
 - **FQ5.** Should stage probabilities become tenant configuration, and may a rep override probability per deal?
@@ -97,7 +99,7 @@ For the later DRG-600 feature, these inputs move when an amendment or renewal is
 - **FQ7.** Snapshot cadence and accuracy metric, if any.
 - **FQ8.** Are the AI agent rollups (F3, F6) requirements or illustrative prose?
 - **FQ9.** Does the arr-bridge (F7) become the reporting model the forecast reads?
-- **FQ10. NEEDS DECISION (not decided here).** The forecast unit is TCV (FQ2) but the renewal source is contract ARR (FQ3), so the spec needs a rule converting renewal ARR to TCV. Candidate: renewal ARR times the renewal term (in years). Not chosen. Related: F2 weighted pipeline uses deal `amount` (no term semantics) and the arr-bridge (F7) stores annualized ARR components, so both will need a mapping to TCV. Open points include term source for renewals, partial-year and coterm terms, and ramps.
+- **FQ10.** Moved to 7.1 (decided 2026-10-25).
 
 ## 8. Recommended next step
-FQ1 to FQ3 are decided (section 7.1). Next step: draft the "CRM forecast definitions" spec, owned by sales leadership, in TCV, with renewal forecast sourced from contract ARR in CAM. One section per type F1 to F10 with owner, unit, inputs, rule, cadence and acceptance criteria. The spec must carry FQ10 (ARR to TCV rule) as an open decision until the owner decides it. No code and no ADR until the spec is reviewed. DRG-600 can continue its design against section 5 in the meantime. The spec is not drafted yet.
+FQ1 to FQ3 and FQ10 are decided (section 7.1). The CRM forecast definitions spec is drafted for owner review: [crm-forecast-definitions-spec.md](crm-forecast-definitions-spec.md). Next step: owner review of that spec and its open mapping choices. FQ4 to FQ9 stay open. No code and no ADR until the spec is reviewed. DRG-600 can continue its design against section 5.
