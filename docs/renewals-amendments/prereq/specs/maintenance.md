@@ -91,3 +91,62 @@ Illustrative anchors **[S sanity]**, not defaults: 20% of a $2,500/core licence 
 6. **Owner decision — quantity match.** Whether the maintenance quantity must equal the perpetual quantity. AC-4 assumes it follows the licence quantity when recalc is Yes. A maintenance line sold for a subset of cores is not specified.
 7. **Owner decision — list versus net when the licence was sold at a discount.** Percent of net follows the discounted licence. Percent of list ignores that discount. The owner picks the commercial meaning before AC-7 is a production default.
 8. **Owner decision — proration of the forward stub.** AC-4 uses 92/365 because the sanity check does. Daily versus month-day proration is shared with the true-up policy and is not chosen here.
+
+## DRG-642 fixtures (provisional)
+
+Fixture addendum, 2026-10-27. Checked against `main` `bf41c230f6309964a25ef5c2c12e84c41b0c37de`. These files do not accept a policy. Each file has `"status": "provisional"` because the maintenance ADR is still pending, and each file has `"licenceRenewed": false`.
+
+### Expected amounts
+
+| Fixture | Case | Expected maintenance amounts | Rounding |
+|---|---|---|---|
+| `fixtures/maintenance/renewal-maintenance-only.json` | Renew the maintenance line. Prior annual `40000.00`. Agreement uplift 5%. The perpetual line is `NoChange`. | Renewed annual `42000.00`. Uplift amount `2000.00`. Equation: `40000.00 × 1.05 = 42000.00`. | `HALF_UP`. Money scale 2. The factor `0.05` is exact. |
+| `fixtures/maintenance/licence-count-change.json` | Licence quantity 64 to 80. `recalcOnLicenceChange = Yes`. 20% of licence net `2500.00`. | Per core `500.00`. Annual at 64 cores `32000.00`. Annual at 80 cores `40000.00`. Forward amount on the 16-core delta `2016.44`. | `HALF_UP`. Money scale 2. The single quotient `(16 × 500.00 × 92) / 365` is `2016.438356164383561643835616`. Scale 4 of that quotient is `2016.4384`. |
+| `fixtures/maintenance/reinstatement-after-lapse.json` | Lapse of 3 months, cap 6 months, on annual `32000.00`. Fixture inputs: back-maintenance on, fee 10%. | Back-maintenance `8000.00`. Fee `3200.00`. The two amounts stay separate. Equations: `(32000.00 × 3) / 12 = 8000.00` and `32000.00 × 0.10 = 3200.00`. | `HALF_UP`. Money scale 2. The ratio `3/12` is the exact `0.25`. The fee rate `0.10` is exact. |
+
+The 20% rate, the 5% uplift, the 7% SaaS account rate, and the three reinstatement knobs are the illustrative figures already printed in AC-3, AC-4, AC-6, and AC-8. They are fixture inputs. They are not platform defaults.
+
+The renewal file prices the maintenance `Renew` line. The perpetual line is on the document as `NoChange`. The 7% SaaS account rate is recorded on the fixture and is not applied to the maintenance amount.
+
+The licence-count file prices the maintenance line from the linked licence after the quantity moves from 64 to 80. The licence line is the driver of that quantity. It is not a `Renew` line. The forward `2016.44` is the scale-2 result of the equation AC-4 already prints. Open question 8 is unchanged: this addendum does not choose daily or month-day proration.
+
+The reinstatement file prices maintenance amounts for a lapse inside the cap. The perpetual line is `NoChange`. The fee percent, the cap, and the back-maintenance flag are inputs of this fixture, as AC-8 already says.
+
+### Rounding observed in pricing-service
+
+OQ-1: `HALF_UP` stays on these fixtures. Money in the table is shown at 2 dp. Intermediate scales are named in each JSON file and below.
+
+| Location on `main` `bf41c230` | What it does |
+|---|---|
+| `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/MetricsCalculator.java` lines 26–27 and 266 | `MONEY_SCALE = 2`, `MONEY_ROUNDING = HALF_UP`, applied with `setScale`. |
+| `backend/services/pricing-service/src/main/java/com/opencrm/pricing/execution/PricingExecutionService.java` line 269 | Discount amount `setScale(2, RoundingMode.HALF_UP)`. |
+| `backend/services/pricing-service/src/main/java/com/opencrm/pricing/ramp/RampPeriodPricer.java` lines 32–35 and 111–116 | `UNIT_SCALE = 4`, `RATE_SCALE = 4`, `MONEY_SCALE = 2`, all `HALF_UP`. |
+| `backend/services/pricing-service/src/main/java/com/opencrm/pricing/renewal/RenewalUpliftResolver.java` lines 23–24, 114, and 293–299 | Unit scale 4 `HALF_UP`. Amount scale 2 `HALF_UP`. `increase` shifts percent points two places (`movePointLeft(2)`) and then scales the unit. |
+| `backend/services/pricing-service/src/main/java/com/opencrm/pricing/engine/PriceCalculationService.java` lines 65 and 79 | A discount ratio is divided at scale 4 `HALF_UP`. That ratio is not a money amount. |
+| `backend/services/pricing-service/src/main/resources/db/migration/V2__seed_default_rules.sql` lines 167–169 (`rule-007`, Amendment Proration) | `delta × remainingDays / fullTermDays` at scale 4 `HALF_UP`. |
+| `backend/services/pricing-service/src/main/resources/rules/perpetual-maintenance.drl` lines 11–13 | `maintenanceAmount = listPrice × 0.22` with no `RoundingMode` and no `setScale`. |
+
+`backend/libs/common/src/main/java/com/opencrm/common/valueobject/Money.java` lines 26–27, 52, 116, and 133 is outside pricing-service. It uses scale 2 `HALF_UP` on construction, on `divide`, and on the percentage factor. It is cited here because a later maintenance amount may pass through it.
+
+### Open items (scale)
+
+These fixtures keep `HALF_UP` and show money at 2 dp. Where two scales disagree, the disagreement stays open.
+
+1. **Quotient scale for the forward delta.** The AC-4 equation rounded once at scale 2 is `2016.44`. The same quotient at scale 4, which is the scale `rule-007` passes to `divide`, is `2016.4384`. A per-step `Money.divide` of `8000.00 / 365` at scale 2 is `21.92`, and `21.92 × 92` is `2016.64`. The fixture's expected money amount is the published AC-4 figure `2016.44`. The store scale and the order of the multiply and the divide stay open.
+2. **Legacy 22% product.** `perpetual-maintenance.drl` does not round. A scale-2 list price times `0.22` keeps the product scale of that multiplication. These fixtures use the 20% linked-line illustration from AC-3. They do not use the 22% rule, and they do not choose a scale for it.
+3. **Unit scale 4 beside money scale 2.** `RampPeriodPricer` and `RenewalUpliftResolver` keep a unit at scale 4 and a money amount at scale 2, both `HALF_UP`. The units in these three fixtures (`500.00`, `42000.00`, `8000.00`, `3200.00`) are exact at both scales, so the displayed money does not move. The maintenance unit scale stays open.
+4. **Month step on reinstatement.** `(32000.00 × 3) / 12` is `8000.00` at every scale. `Money.divide` of `32000.00 / 12` at scale 2 is `2666.67`, and `2666.67 × 3` is `8000.01`. The fixture's expected back-maintenance amount is the published AC-8 figure `8000.00`. The order of that division stays open. Pricing-service has no reinstatement calculation that picks an order.
+
+### Reinstatement basis
+
+Step 7 sketches back-maintenance for the gap together with `feePct` of the reinstated annual amount. AC-8 prints both amounts. Open question 4 leaves `backMaintenance`, `feePct`, and `maxLapseMonths` without defaults. This file therefore has no adopted reinstatement basis.
+
+Options:
+
+1. Back-maintenance for the lapse.
+2. A reinstatement fee percent.
+3. Both, as separate amounts.
+
+**Status: Proposed.** Proposed default: option 3, both, as separate amounts. The fee percent, the lapse cap, and whether back-maintenance is on stay unset. AC-8's 10%, 6 months, and 3-month lapse are inputs of the provisional fixture only.
+
+**Owner decision: ___ (drg, time)**
