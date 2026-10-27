@@ -1,0 +1,79 @@
+{
+  "id": "maintenance-licence-count-change",
+  "story": "DRG-642",
+  "cluster": "maintenance",
+  "status": "provisional",
+  "adr": "pending",
+  "licenceRenewed": false,
+  "currency": "USD",
+  "roundingMode": "HALF_UP",
+  "moneyScale": 2,
+  "intermediateScales": [
+    {
+      "name": "percent of licence net",
+      "expression": "2500.00 × 0.20",
+      "scale": 2,
+      "roundingMode": "HALF_UP",
+      "value": "500.00",
+      "note": "Exact at money scale 2 and at unit scale 4."
+    },
+    {
+      "name": "single quotient for the forward delta",
+      "expression": "(16 × 500.00 × 92) / 365",
+      "exact": "2016.438356164383561643835616",
+      "scale4HalfUp": "2016.4384",
+      "moneyScale2HalfUp": "2016.44",
+      "roundingMode": "HALF_UP",
+      "note": "The expected money amount is the scale-2 result. pricing-service rule-007 divides a quotient at scale 4. The two displays of this quotient are listed under the open item in maintenance.md. This fixture does not choose the store scale."
+    }
+  ],
+  "scenario": "licence-count-change",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/maintenance.md AC-3 and AC-4",
+    "docs/renewals-amendments/cpq-pricing-policy-sanity-check.md Scenario 2"
+  ],
+  "inputs": {
+    "illustrative": true,
+    "platformDefault": false,
+    "basis": "LicenceNet",
+    "pctOfLicenceNet": "20",
+    "licenceUnitNet": "2500.00",
+    "quantityBefore": 64,
+    "quantityAfter": 80,
+    "deltaCores": 16,
+    "recalcOnLicenceChange": "Yes",
+    "forwardEquation": "16 × 500.00 × 92 / 365",
+    "prorationMethod": "equation printed in maintenance.md AC-4; open question 8 is unchanged",
+    "lines": [
+      {
+        "id": "CL-10",
+        "role": "perpetual-licence",
+        "licenseModel": "Perpetual",
+        "intent": "quantity change on the linked licence",
+        "quantityBefore": 64,
+        "quantityAfter": 80
+      },
+      {
+        "id": "CL-11",
+        "role": "maintenance",
+        "licenseModel": "Maintenance",
+        "intent": "recompute from the licence line",
+        "relatedPerpetualLineId": "CL-10",
+        "driverLineId": "CL-10"
+      }
+    ]
+  },
+  "expected": {
+    "licenceRenewed": false,
+    "perCoreAnnual": "500.00",
+    "annualAt64Cores": "32000.00",
+    "annualAt80Cores": "40000.00",
+    "forwardMaintenanceOnDelta": "2016.44",
+    "equations": [
+      "2500.00 × 0.20 = 500.00",
+      "64 × 500.00 = 32000.00",
+      "80 × 500.00 = 40000.00",
+      "(16 × 500.00 × 92) / 365 = 2016.438356164383561643835616, HALF_UP at scale 2 = 2016.44"
+    ]
+  }
+}
