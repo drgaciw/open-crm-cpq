@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>4.0.9</version>
         <relativePath/>
     </parent>
 
@@ -47,7 +47,7 @@
 
         <!-- Database -->
         <postgresql.version>42.7.1</postgresql.version>
-        <!-- Align with Spring Boot 4.0.6 BOM (spring-boot-flyway requires Flyway 11). -->
+        <!-- Align with Spring Boot 4.0.9 BOM (spring-boot-flyway requires Flyway 11). -->
         <flyway.version>11.14.1</flyway.version>
 
         <!-- Utilities -->
@@ -196,7 +196,7 @@
                     <systemPropertyVariables>
                         <!-- Docker Engine 29+ requires API >= 1.44 (Testcontainers 1.x default is 1.32). -->
                         <api.version>1.44</api.version>
-                        <!-- HOLD: keep Spring Boot 4.0.6. Azure 5.8 "compatible with 3.0–3.2" is a verifier
+                        <!-- HOLD: keep Spring Boot 4.0.9. Azure 5.8 "compatible with 3.0–3.2" is a verifier
                              mismatch, not a Boot downgrade signal. Disable/exclude checker (or later bump
                              spring-cloud-azure to 7.x for Boot 4). Do not lower parent to Boot 3.x. -->
                         <spring.cloud.azure.compatibility-verifier.enabled>false</spring.cloud.azure.compatibility-verifier.enabled>
