@@ -1,0 +1,21 @@
+{
+    "issue": "DRG-595",
+    "ac_id": "AC-595-1",
+    "case": "owner-may-edit-draft",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "595-F1-A, 595-F4-A",
+    "input": {
+        "tenant_id": "t-1",
+        "actor_user_id": "user-owner",
+        "stored_owner_user_id": "user-owner",
+        "action": "EDIT",
+        "document_state": "DRAFT"
+    },
+    "expected": {
+        "allowed": true,
+        "error_code": null,
+        "http_status": null
+    }
+}

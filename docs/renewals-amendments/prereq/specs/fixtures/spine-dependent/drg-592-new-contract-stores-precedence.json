@@ -1,0 +1,39 @@
+{
+    "issue": "DRG-592",
+    "ac_id": "AC-592-1",
+    "case": "new-contract-stores-precedence",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "592-F1-A, 592-F4-A, 592-F6-A",
+    "input": {
+        "tenant_id": "t-1",
+        "amendment_mode": "NEW_CONTRACT",
+        "document_state_before": "EXECUTED",
+        "original_contract": {
+            "id": "c-orig",
+            "contract_state": "ACTIVE",
+            "precedence_flag": false,
+            "end_date": "2027-10-29"
+        }
+    },
+    "expected": {
+        "error_code": null,
+        "http_status": null,
+        "original_contract": {
+            "id": "c-orig",
+            "contract_state": "ACTIVE",
+            "precedence_flag": false
+        },
+        "new_contract": {
+            "created": true,
+            "contract_state": "ACTIVE",
+            "precedence_flag": true,
+            "prior_contract_id": "c-orig"
+        },
+        "document": {
+            "contract_id_is_new_contract": true,
+            "second_document_on_original": false
+        }
+    }
+}

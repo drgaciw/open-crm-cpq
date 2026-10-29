@@ -1,0 +1,28 @@
+{
+    "issue": "DRG-598",
+    "ac_id": "AC-598-2",
+    "case": "unapproved-expansion-does-not-apply",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "598-F1-A, 598-F3-A",
+    "input": {
+        "action": "APPLY",
+        "manifest_owner_slot": "___ (drg, time)",
+        "expansion": {
+            "add_ids": [
+                "sub-b"
+            ],
+            "metric": {
+                "segment": "enterprise"
+            }
+        }
+    },
+    "expected": {
+        "http_status": 409,
+        "error_code": "MANIFEST_UNAPPROVED",
+        "expansion_applied": false,
+        "backfill_invoked": false,
+        "header_written": false
+    }
+}

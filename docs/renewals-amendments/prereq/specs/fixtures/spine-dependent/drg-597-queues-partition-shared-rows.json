@@ -1,0 +1,35 @@
+{
+    "issue": "DRG-597",
+    "ac_id": "AC-597-1",
+    "case": "queues-partition-shared-rows",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "597-F1-A, 597-F2-A",
+    "input": {
+        "rows": [
+            {
+                "id": "lc-r",
+                "intent": "RENEW"
+            },
+            {
+                "id": "lc-a",
+                "intent": "AMEND"
+            }
+        ]
+    },
+    "expected": {
+        "renewals_queue": [
+            "lc-r"
+        ],
+        "amendments_queue": [
+            "lc-a"
+        ],
+        "shared_row_ids": [
+            "lc-r",
+            "lc-a"
+        ],
+        "copied_table": false,
+        "error_code": null
+    }
+}

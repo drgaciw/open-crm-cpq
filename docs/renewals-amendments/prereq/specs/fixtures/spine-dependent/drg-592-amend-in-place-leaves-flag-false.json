@@ -1,0 +1,32 @@
+{
+    "issue": "DRG-592",
+    "ac_id": "AC-592-2",
+    "case": "amend-in-place-leaves-flag-false",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "592-F1-A, 592-F5-A",
+    "input": {
+        "tenant_id": "t-1",
+        "amendment_mode": "AMEND_IN_PLACE",
+        "document_state_before": "EXECUTED",
+        "contract": {
+            "id": "c-orig",
+            "contract_state": "ACTIVE",
+            "precedence_flag": false
+        }
+    },
+    "expected": {
+        "error_code": null,
+        "http_status": null,
+        "contracts_inserted": 0,
+        "contract": {
+            "id": "c-orig",
+            "contract_state": "ACTIVE",
+            "precedence_flag": false
+        },
+        "document": {
+            "contract_id": "c-orig"
+        }
+    }
+}
