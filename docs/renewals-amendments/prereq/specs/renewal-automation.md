@@ -30,17 +30,45 @@ Expected values are in the tables. Pass or fail is against those values. This fi
 | AC-555-6 | Header `term_model` `Evergreen` and `end_date` null. `auto_renew` true. | Term-end action count 0 for all four actions. `end_date` remains null. |
 | AC-555-7 | Status `PENDING`, `SUSPENDED`, or `CANCELLED`. Any stored action. `auto_renew` true or false. | Term-end action count 0 for all four actions. `CANCELLED` does not receive a second `Cancel`. |
 | AC-555-8 | `end_date` 2027-03-31. `lead_time_days` 90. `kickoff_opt_in` true. Eligibility publication dated 2027-03-01 (`end_date` minus 30 days). | Drafts opened by this spec: 0. No scheduler edit. No earlier kickoff trigger is added. |
+| AC-555-9 | `ACTIVE`. `end_date` 2027-03-31. `as_of_date` 2027-03-31. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. `renewal_term_months` empty. No co-term anchor. OQ-RN-3 is set. The signature-policy value is not chosen in this row. | One system renewal reaches `EXECUTED` under that policy before any rate period is written. Renewed `effective_from` 2027-04-01. Renewed `effective_to` 2028-03-31. Header `end_date` 2028-03-31. Successor `auto_renew` true. These dates are renewal-policy-spec AC-RN-01, AC-RN-02, and AC-RN-17. |
+| AC-555-10 | Same gate as AC-555-9, stored action `RenewOnce`. Source `kickoff_opt_in` true. | Successor term 2027-04-01 through 2028-03-31. Successor `auto_renew` false. Successor `kickoff_opt_in` true. A later term end of that successor does not auto-apply. Renewal-policy-spec AC-RN-19. |
+| AC-555-11 | Same gate as AC-555-9, stored action `Evergreen`. | Successor header `term_model` Evergreen and `end_date` null. Successor `auto_renew` true. A later lead-time run opens nothing. RN2 does not apply. Renewal-policy-spec AC-RN-20. |
+| AC-555-12 | Same gate as AC-555-9, stored action `Cancel`. | Renew LifecycleChange count 0. `end_date` remains 2027-03-31. Renewed rate-period count 0. One non-renewal audit event is appended. `auto_renew` false. Renewal-policy-spec AC-RN-21. |
+
+#### AC-555-9 `Renew`
+
+Status: Proposed
+
+Owner decision: ___ (drg, time)
+
+#### AC-555-10 `RenewOnce`
+
+Status: Proposed
+
+Owner decision: ___ (drg, time)
+
+#### AC-555-11 `Evergreen`
+
+Status: Proposed
+
+Owner decision: ___ (drg, time)
+
+#### AC-555-12 `Cancel`
+
+Status: Proposed
+
+Owner decision: ___ (drg, time)
 
 #### Term-end table
 
-Four actions by state. Every cell is **not allowed**. No cell authorizes a run. `SubscriptionStatus` values are the enum on this `main`. `InGrace` and the Evergreen header are separate rows because they are not those enum constants.
+Four actions by state. `SubscriptionStatus` values are the enum on this `main`. `InGrace` and the Evergreen header are separate rows because they are not those enum constants. One row states an allowed path. Every other cell is **not allowed**.
 
 | State | Renew | RenewOnce | Evergreen | Cancel |
 |---|---|---|---|---|
 | `PENDING` | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. |
 | `ACTIVE`, `as_of_date` before `end_date` | not allowed (AC-555-1). The term-end clock is `as_of_date` equal to `end_date`. | not allowed (AC-555-1). Same clock. | not allowed (AC-555-1). Same clock. | not allowed (AC-555-1). Same clock. |
 | `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` false | not allowed (AC-555-2). `auto_renew` false withholds `Renew`. | not allowed (AC-555-2). `auto_renew` false withholds `RenewOnce`. | not allowed (AC-555-2). `auto_renew` false withholds `Evergreen`. | not allowed (AC-555-2). `auto_renew` false withholds `Cancel`. The term is not cancelled by this policy. |
-| `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, no open non-terminal renewal, signature policy unset | not allowed (AC-555-3). The stored candidate is withheld. Cluster-d fork RN-D. OQ-RN-3 is unset. | not allowed (AC-555-3). Same withhold. A non-stored action is also outside the one stored candidate. | not allowed (AC-555-3). Same withhold. | not allowed (AC-555-3). Same withhold. |
+| `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, no open non-terminal renewal | allowed (Proposed): one renewal reaches `EXECUTED` under the signature policy OQ-RN-3 names, then the successor term is 2027-04-01 through 2028-03-31 with header `end_date` 2028-03-31 and successor `auto_renew` true (AC-555-9) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): the same successor term as `Renew`, with successor `auto_renew` false and `kickoff_opt_in` copied (AC-555-10) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): successor `term_model` Evergreen, `end_date` null, successor `auto_renew` true, and a later lead-time run opens nothing (AC-555-11) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): no Renew LifecycleChange, `end_date` remains 2027-03-31, renewed rate-period count 0, one non-renewal audit event, and `auto_renew` false (AC-555-12) once OQ-RN-3 is set; until then refused per AC-555-3 |
 | `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, open non-terminal renewal | not allowed (AC-555-4). Open draft is left untouched. | not allowed (AC-555-4). Successor `auto_renew` is not cleared while the action is withheld. | not allowed (AC-555-4). Header `end_date` is not cleared. | not allowed (AC-555-4). The open draft is not cancelled by the term-end job. |
 | `SUSPENDED` | not allowed (AC-555-7). Eligibility selection described in cluster-d is `ACTIVE` only. | not allowed (AC-555-7). Same. | not allowed (AC-555-7). Same. | not allowed (AC-555-7). Same. |
 | `CANCELLED` | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). A second `Cancel` is not run. |
@@ -141,7 +169,7 @@ The price-protection marker is not a cap.
 | AC-568-1 | Term length 36 months. An annual 7 percent escalator is copied as intent only. Exit net 40.0000. Account percent 7. Basis left to DRG-604 D-01. | Priced period count 1. Period-1 unit 42.8000, the worked example per DRG-604 Accepted (#623). Period-2 unit absent. Period-3 unit absent. Compound flag absent. |
 | AC-568-2 | The AC-568-1 input. | Stored percent-of-original choice absent. Stored percent-of-prior choice absent. Year-2 unit absent. Year-3 unit absent. The ticket illustrations 45.80, 45.7960, 49.01, 49.00, and 49.0017 are not expected values. |
 | AC-568-3 | Rules rung returns `ENABLE_12M_PRICE_PROTECTION`. No rung sets `maxIncreasePct`. Exit net 40.0000. Account percent 7. | Marker stored as `ENABLE_12M_PRICE_PROTECTION`. `capApplied` absent. Priced period count 1. The marker does not change the unit. The marker is not a cap. |
-| AC-568-4 | A promotional unit 20.00 with a bound date 2027-03-31, inside a renewal whose single period would otherwise be the flat renewal. | Priced period count 1. A 5-month segment at 20.00 is absent. A following 9-month segment at 21.40 is absent. The time bound stays Proposed, as the slot above. |
+| AC-568-4 | Flat renewal 2027-04-01 through 2028-03-31 (12 months). Promotional unit 20.00 with bound 2027-08-31 inclusive, inside that renewal. | Priced period count 1. A 5-month segment at 20.00 from 2027-04-01 through 2027-08-31 is absent. A following 7-month segment at 21.40 from 2027-09-01 through 2028-03-31 is absent. Those two segments sum to 12 months. The time bound stays Proposed, as the slot above. |
 
 ---
 
@@ -155,12 +183,12 @@ Frame: [DRG-555](../cluster-d-renewal-automation-decision-frame.md#drg-555--auto
 
 Deltas:
 
-1. The term-end table is the state-by-action refusal matrix. §1.5 names the four results. It does not give a not-allowed cell for every state in the table.
-2. AC-555-3 withholds apply while the signature policy is unset. That is fork RN-D. Renewal-policy-spec AC-RN-17 describes `EXECUTED` after a signature policy exists. This file does not use that path, and it does not choose `NOTICE_ONLY` or `NOT_REQUIRED`.
+1. The term-end table pairs the four actions with each state. §1.5 names the four results. The row `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, and no open non-terminal renewal states each result as allowed (Proposed) once OQ-RN-3 is set. Every other cell is not allowed and cites its AC.
+2. AC-555-3 refuses that row while the signature policy is unset. AC-555-9 through AC-555-12 state the §1.5 results for `Renew`, `RenewOnce`, `Evergreen`, and `Cancel` after OQ-RN-3 is set. This file does not choose `NOTICE_ONLY` or `NOT_REQUIRED`.
 3. AC-555-8 states the draft count for a publication 30 days before end while lead time is 90. Fork RN-B already separates the clocks and leaves the earlier trigger unresolved. This file adds no trigger and does not edit `RenewalScheduler`.
 4. OQ-RN-DRIVE stays an open question with no selected option. The sentence "drive the scheduler" is not a criterion.
 
-DRG-606 RN2 (header `end_date` follows the latest renewed `effective_to`) is not exercised, because AC-555-3 writes no renewed line. RN5 (a perpetual line is not `Renew` and not `Remove`) is a line rule in §1.6. It is not a header term-end row, and it is not restated.
+DRG-606 RN2 (header `end_date` follows the latest renewed `effective_to`) is the header end 2028-03-31 in AC-555-9, and only after OQ-RN-3 is set. Until then AC-555-3 writes no renewed line. RN5 (a perpetual line is not `Renew` and not `Remove`) is a line rule in §1.6. It is not a header term-end row, and it is not restated.
 
 ### DRG-593
 
@@ -194,14 +222,14 @@ Delta: AC-567-1, AC-567-2, and AC-567-3 are the inputs for which that record alr
 
 Frame: [DRG-568 dependent](../cluster-d-renewal-automation-decision-frame.md#drg-568--multi-year-escalators-and-price-locks). DRG-604 D-06 already withholds later periods until the escalator procedure is accepted. DRG-549's later-year row already keeps one flat period.
 
-Delta: DRG-533 is not accepted, so this file does not read escalator semantics from the DRG-533 draft. AC-568-1 and AC-568-2 fix the expected priced shape at one period and leave both later-period bases unselected. AC-568-3 states that `ENABLE_12M_PRICE_PROTECTION` is stored as a marker and is not a cap (`capApplied` absent). AC-568-4 leaves the 2027-03-31 bound unpriced as a second segment. Whether a lock becomes time-bounded stays Proposed, with the owner slot blank. This file does not unblock DRG-568's implementation, and it does not amend ADR-023.
+Delta: DRG-533 is not accepted, so this file does not read escalator semantics from the DRG-533 draft. AC-568-1 and AC-568-2 fix the expected priced shape at one period and leave both later-period bases unselected. AC-568-3 states that `ENABLE_12M_PRICE_PROTECTION` is stored as a marker and is not a cap (`capApplied` absent). AC-568-4 leaves a bound of 2027-08-31, inside the renewal 2027-04-01 through 2028-03-31, unpriced as a 5-month segment plus a 7-month segment. Whether a lock becomes time-bounded stays Proposed, with the owner slot blank. This file does not unblock DRG-568's implementation, and it does not amend ADR-023.
 
 ### DRG-606 RN1–RN5
 
 | Rule | Where it lives | Use in this file |
 |---|---|---|
 | RN1 | renewal-policy-spec §1.6, AC-RN-01 | Cited by AC-593-1 for `effective_from` 2027-04-01. No second start-date rule. |
-| RN2 | §1.6, AC-RN-04 | Not exercised. AC-555-3 writes no renewed `effective_to`. |
+| RN2 | §1.6, AC-RN-04 | Cited by AC-555-9 for header `end_date` 2028-03-31 once OQ-RN-3 is set. AC-555-3 writes no renewed `effective_to` while OQ-RN-3 is unset. |
 | RN3 | §1.6, AC-RN-05 | Field list stays in §1.6. Basis and precedence: per DRG-604 Accepted (#623). Modes: DRG-549. |
 | RN4 | §1.6, AC-RN-06 | Cited by AC-593-1 (second create) and AC-555-4 (open draft withheld). |
 | RN5 | §1.6, AC-RN-09 | Not a header term-end row. Not restated. |
