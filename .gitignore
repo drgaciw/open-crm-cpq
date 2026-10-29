@@ -33,6 +33,7 @@ yarn-error.log*
 .env.local
 .env.*.local
 infra/jenkins/env/jenkins.env
+sfdc-consumer-key.md
 
 # Jenkins AI CI reports (generated per build)
 ci-reports/*.md
