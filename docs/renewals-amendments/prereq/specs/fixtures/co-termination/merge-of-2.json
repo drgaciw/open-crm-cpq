@@ -63,7 +63,7 @@
                 "stubDays": 22,
                 "periodDays": 31,
                 "periodAmount": "567.74",
-                "formula": "800.00 \u00d7 22 / 31 = 567.74 HALF_UP scale 2",
+                "formula": "800.00 x 22 / 31 = 567.74 HALF_UP scale 2",
                 "fullMonths": [
                     {
                         "start": "2026-09-01",
@@ -114,7 +114,7 @@
                 "stubDays": 22,
                 "periodDays": 31,
                 "periodAmount": "177.42",
-                "formula": "250.00 \u00d7 22 / 31 = 177.42 HALF_UP scale 2",
+                "formula": "250.00 x 22 / 31 = 177.42 HALF_UP scale 2",
                 "fullMonths": [
                     {
                         "start": "2026-09-01",
