@@ -50,7 +50,7 @@
                 "stubDays": 17,
                 "periodDays": 31,
                 "periodAmount": "438.71",
-                "formula": "800.00 \u00d7 17 / 31 = 438.71 HALF_UP scale 2",
+                "formula": "800.00 x 17 / 31 = 438.71 HALF_UP scale 2",
                 "fullMonths": [
                     {
                         "start": "2026-08-01",
