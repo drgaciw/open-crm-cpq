@@ -1,0 +1,161 @@
+{
+    "status": "provisional",
+    "proposalMark": "Proposed",
+    "ticket": "DRG-641",
+    "relatedTicket": "DRG-570",
+    "name": "frozen-snapshot-dispute",
+    "description": "A dispute raised after the snapshot freezes leaves the snapshot unchanged. The named outcome is a credit note. That outcome is Proposed and is not applied. The fixture runs no backfill.",
+    "contentHashAlgorithm": {
+        "name": "SHA-256",
+        "encoding": "64 lowercase hex",
+        "input": "UTF-8 canonical JSON of the snapshot object with contentHash removed: object keys sorted, separators comma and colon, no extra whitespace",
+        "status": "Proposed",
+        "ownerDecision": "___ (drg, time)"
+    },
+    "contentHashCanonical": "{\"committedCores\":64,\"currency\":\"USD\",\"frozenAt\":\"2026-10-05T12:00:00Z\",\"frozenBy\":\"actor-attest-1\",\"id\":\"snap-tu-641-frozen\",\"policyVersionId\":\"trueup-policy-proposed-v0\",\"priced\":{\"aggregationInput\":\"Peak\",\"aggregationOwnerDecision\":\"___ (drg, time)\",\"aggregationStatus\":\"Proposed\",\"arrearsAmount\":\"0.00\",\"currency\":\"USD\",\"excessCores\":16,\"overageAmount\":\"40000.00\",\"overageRate\":\"Contracted\",\"roundingMode\":\"HALF_UP\",\"scale\":2,\"unitRate\":\"2500.00\"},\"readingIds\":[\"r-2026-01\",\"r-2026-02\",\"r-2026-03\",\"r-2026-04\",\"r-2026-05\",\"r-2026-06\",\"r-2026-07\",\"r-2026-08\",\"r-2026-09\"],\"readings\":[{\"id\":\"r-2026-01\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":60,\"windowEnd\":\"2026-01-31\",\"windowStart\":\"2026-01-01\"},{\"id\":\"r-2026-02\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":62,\"windowEnd\":\"2026-02-28\",\"windowStart\":\"2026-02-01\"},{\"id\":\"r-2026-03\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":64,\"windowEnd\":\"2026-03-31\",\"windowStart\":\"2026-03-01\"},{\"id\":\"r-2026-04\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":66,\"windowEnd\":\"2026-04-30\",\"windowStart\":\"2026-04-01\"},{\"id\":\"r-2026-05\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":70,\"windowEnd\":\"2026-05-31\",\"windowStart\":\"2026-05-01\"},{\"id\":\"r-2026-06\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":72,\"windowEnd\":\"2026-06-30\",\"windowStart\":\"2026-06-01\"},{\"id\":\"r-2026-07\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":76,\"windowEnd\":\"2026-07-31\",\"windowStart\":\"2026-07-01\"},{\"id\":\"r-2026-08\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":78,\"windowEnd\":\"2026-08-31\",\"windowStart\":\"2026-08-01\"},{\"id\":\"r-2026-09\",\"status\":\"Attested\",\"unit\":\"core\",\"value\":80,\"windowEnd\":\"2026-09-30\",\"windowStart\":\"2026-09-01\"}],\"roundingMode\":\"HALF_UP\",\"scale\":2,\"status\":\"Frozen\"}",
+    "snapshot": {
+        "id": "snap-tu-641-frozen",
+        "status": "Frozen",
+        "frozenAt": "2026-10-05T12:00:00Z",
+        "frozenBy": "actor-attest-1",
+        "policyVersionId": "trueup-policy-proposed-v0",
+        "currency": "USD",
+        "scale": 2,
+        "roundingMode": "HALF_UP",
+        "committedCores": 64,
+        "readingIds": [
+            "r-2026-01",
+            "r-2026-02",
+            "r-2026-03",
+            "r-2026-04",
+            "r-2026-05",
+            "r-2026-06",
+            "r-2026-07",
+            "r-2026-08",
+            "r-2026-09"
+        ],
+        "readings": [
+            {
+                "id": "r-2026-01",
+                "status": "Attested",
+                "unit": "core",
+                "value": 60,
+                "windowStart": "2026-01-01",
+                "windowEnd": "2026-01-31"
+            },
+            {
+                "id": "r-2026-02",
+                "status": "Attested",
+                "unit": "core",
+                "value": 62,
+                "windowStart": "2026-02-01",
+                "windowEnd": "2026-02-28"
+            },
+            {
+                "id": "r-2026-03",
+                "status": "Attested",
+                "unit": "core",
+                "value": 64,
+                "windowStart": "2026-03-01",
+                "windowEnd": "2026-03-31"
+            },
+            {
+                "id": "r-2026-04",
+                "status": "Attested",
+                "unit": "core",
+                "value": 66,
+                "windowStart": "2026-04-01",
+                "windowEnd": "2026-04-30"
+            },
+            {
+                "id": "r-2026-05",
+                "status": "Attested",
+                "unit": "core",
+                "value": 70,
+                "windowStart": "2026-05-01",
+                "windowEnd": "2026-05-31"
+            },
+            {
+                "id": "r-2026-06",
+                "status": "Attested",
+                "unit": "core",
+                "value": 72,
+                "windowStart": "2026-06-01",
+                "windowEnd": "2026-06-30"
+            },
+            {
+                "id": "r-2026-07",
+                "status": "Attested",
+                "unit": "core",
+                "value": 76,
+                "windowStart": "2026-07-01",
+                "windowEnd": "2026-07-31"
+            },
+            {
+                "id": "r-2026-08",
+                "status": "Attested",
+                "unit": "core",
+                "value": 78,
+                "windowStart": "2026-08-01",
+                "windowEnd": "2026-08-31"
+            },
+            {
+                "id": "r-2026-09",
+                "status": "Attested",
+                "unit": "core",
+                "value": 80,
+                "windowStart": "2026-09-01",
+                "windowEnd": "2026-09-30"
+            }
+        ],
+        "priced": {
+            "aggregationInput": "Peak",
+            "aggregationStatus": "Proposed",
+            "aggregationOwnerDecision": "___ (drg, time)",
+            "excessCores": 16,
+            "overageRate": "Contracted",
+            "unitRate": "2500.00",
+            "overageAmount": "40000.00",
+            "arrearsAmount": "0.00",
+            "currency": "USD",
+            "scale": 2,
+            "roundingMode": "HALF_UP"
+        },
+        "contentHash": "ce55f9dc7ccdecb1f446df0afe3becaebeee0098915518177e61a3122ae25c90"
+    },
+    "disputeAfterFreeze": {
+        "raisedAt": "2026-10-20T15:00:00Z",
+        "frozenAt": "2026-10-05T12:00:00Z",
+        "readingId": "r-2026-09",
+        "disputeStatus": "Disputed",
+        "writesSnapshot": false,
+        "reopensSnapshot": false,
+        "backfill": false
+    },
+    "expected": {
+        "snapshotId": "snap-tu-641-frozen",
+        "snapshotStatus": "Frozen",
+        "contentHash": "ce55f9dc7ccdecb1f446df0afe3becaebeee0098915518177e61a3122ae25c90",
+        "contentHashUnchanged": true,
+        "readingCount": 9,
+        "disputedReadingId": "r-2026-09",
+        "disputedReadingStatusInsideSnapshot": "Attested",
+        "disputedReadingValueInsideSnapshot": 80,
+        "excessCores": 16,
+        "overageAmount": "40000.00",
+        "arrearsAmount": "0.00",
+        "currency": "USD",
+        "scale": 2,
+        "roundingMode": "HALF_UP",
+        "reopened": false,
+        "newSnapshotCreated": false,
+        "backfill": false,
+        "s7": "gated",
+        "proposedOutcome": {
+            "name": "credit-note",
+            "status": "Proposed",
+            "applied": false,
+            "ownerDecision": "___ (drg, time)"
+        }
+    }
+}
