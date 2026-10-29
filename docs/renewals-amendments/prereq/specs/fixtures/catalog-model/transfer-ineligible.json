@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-transfer-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "transfer-ineligible-add-on-of",
+  "intent": "Transfer",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Transfer",
+    "fromSku": "SKU-ADDON-H",
+    "toSku": "SKU-BASE-G",
+    "relationshipType": "ADD_ON_OF",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "ADD_ON_OF",
+    "errorCode": "TRANSFER_NOT_ELIGIBLE",
+    "fromSku": "SKU-ADDON-H",
+    "toSku": "SKU-BASE-G",
+    "onDate": "2026-10-05",
+    "reason": "ADD_ON_OF is outside the eligible product-relationship types for Transfer. Eligible types: none. Product SKU-ADDON-H to SKU-BASE-G on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}
