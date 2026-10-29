@@ -72,8 +72,7 @@ Fixture `fixtures/capacity-meters/frozen-snapshot-dispute.proposed.json`. DRG-57
 
 | Field | Expected |
 |---|---|
-| Fixture `status` | `provisional` |
-| Proposal mark | Proposed |
+| Fixture `status` | `Proposed` |
 | Snapshot id | `snap-tu-641-frozen` |
 | Snapshot status before the dispute and after it | `Frozen` |
 | `frozenAt` | `2026-10-05T12:00:00Z` |
@@ -116,7 +115,7 @@ Parameter defaults. Every amount is the subscription currency at scale 2, `Round
 
 This section is the DRG-641 record for the [DRG-569](https://linear.app/drgamtd-workspace/issue/DRG-569) knobs named in the expected-value table. It links to [cluster-c-trueup-and-meters-decision-frame.md](../cluster-c-trueup-and-meters-decision-frame.md) and does not edit that file. Conflicts with that frame are open items at the end of this section. Worked numbers use the illustrative Scenario 2 readings in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The fixture file is `fixtures/capacity-meters/frozen-snapshot-dispute.proposed.json`. No other snapshot fixture is replaced.
 
-**Money rule.** The currency of every overage amount is the subscription currency. `Subscription.currencyCode` defaults to `"USD"` in `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/domain/Subscription.java`. The proposed `TrueUpPolicy` shape in this file names no other currency, so each worked example uses USD. Each money result is a decimal at scale 2. Rounding is `RoundingMode.HALF_UP`, applied once to the extended amount. CPQ Decision 2026-10-27 (decision-scores-2026-10-27.md), OQ-2, is the ruling that sets this example format. That scores file is not in this tree. The ruling is cited. It does not fill an owner slot.
+**Money rule.** The currency of every overage amount is the subscription currency. `Subscription.currencyCode` defaults to `"USD"` in `backend/services/contract-asset-management/src/main/java/com/opencrm/contract/domain/Subscription.java`. The proposed `TrueUpPolicy` shape in this file names no other currency, so each worked example uses USD. Each money result is a decimal at scale 2. Rounding is `RoundingMode.HALF_UP`, applied once to the extended amount. That format does not fill an owner slot.
 
 #### Measurement window
 
@@ -210,7 +209,7 @@ Clause illustration, same owner slot, not the Proposed default. Inputs: `FromFir
 
 #### Frozen snapshot (DRG-570)
 
-[DRG-570](https://linear.app/drgamtd-workspace/issue/DRG-570) is the provenance, dispute, and frozen-snapshot story. The fixture `frozen-snapshot-dispute.proposed.json` is the check. Its name carries `proposed`. Its `status` is `provisional`.
+[DRG-570](https://linear.app/drgamtd-workspace/issue/DRG-570) is the provenance, dispute, and frozen-snapshot story. The fixture `frozen-snapshot-dispute.proposed.json` is the check. Its name carries `proposed`. Its `status` is `Proposed`.
 
 The snapshot `snap-tu-641-frozen` is `Frozen` at `2026-10-05T12:00:00Z` with nine `Attested` readings, values 60, 62, 64, 66, 70, 72, 76, 78, 80. The priced block records excess 16, overage 40000.00 USD, arrears 0.00 USD, scale 2, `HALF_UP`. The aggregation input on that priced block is Peak, with `aggregationStatus` Proposed and `aggregationOwnerDecision` `___ (drg, time)`. Peak is an input of the frozen example so the 16 can be checked by hand. It is frame fork F1. It is not a DRG-641 default row, and the owner slot is blank.
 

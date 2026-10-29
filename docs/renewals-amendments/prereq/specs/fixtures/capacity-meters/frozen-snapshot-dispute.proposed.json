@@ -1,6 +1,5 @@
 {
-    "status": "provisional",
-    "proposalMark": "Proposed",
+    "status": "Proposed",
     "ticket": "DRG-641",
     "relatedTicket": "DRG-570",
     "name": "frozen-snapshot-dispute",
