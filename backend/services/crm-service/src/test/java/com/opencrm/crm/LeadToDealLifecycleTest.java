@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.opencrm.crm.contact.ContactCreateRequest;
 import com.opencrm.crm.contact.ContactRepository;
+import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealLoseRequest;
 import com.opencrm.crm.lead.LeadCreateRequest;
@@ -228,7 +229,11 @@ class LeadToDealLifecycleTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.stage").value("NEGOTIATION"))
                 .andExpect(jsonPath("$.data.probability").value(80));
 
-        // Step 9: Win the deal
+        // Step 9: Win the deal once an accepted quote is recorded
+        Deal openDeal = dealRepository.findById(dealId).orElseThrow();
+        openDeal.setAcceptedQuoteId("accepted-quote-" + dealId);
+        dealRepository.saveAndFlush(openDeal);
+
         mockMvc.perform(post("/api/v1/deals/{id}/win", dealId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))

@@ -48,6 +48,8 @@ public final class KafkaTopics {
     public static final String CONTACT_CREATED = "cpq.crm.contact.created";
     public static final String DEAL_STAGE_CHANGED = "cpq.crm.deal.stage.changed";
     public static final String DEAL_CLOSED = "cpq.crm.deal.closed";
+    /** DRG-485. OpportunityCreated. Deal is the opportunity. */
+    public static final String DEAL_CREATED = "cpq.crm.deal.created";
 
     /** DRG-654. Installed-base asset created from an activated contract line. */
     public static final String ASSET_CREATED = "cpq.asset.created";

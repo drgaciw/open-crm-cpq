@@ -66,6 +66,7 @@ public class DealService {
         currencyConverter.freeze(deal);
 
         Deal saved = dealRepository.save(deal);
+        domainEvents.dealCreated(saved);
         log.info("Created deal with ID: {}", saved.getId());
 
         return dealMapper.toDto(saved);
@@ -263,6 +264,9 @@ public class DealService {
 
     /**
      * Mark deal as won.
+     *
+     * <p>Requires an accepted quote already recorded on the deal (DRG-485 / BC-13-01). Quote acceptance records
+     * that id and marks the deal won in {@code QuoteAcceptedDealProcessor}; this method does not take a quote id.
      */
     public DealDto win(Long id) {
         log.debug("Marking deal ID {} as won", id);
@@ -281,6 +285,12 @@ public class DealService {
 
         if (deal.getStage() == DealStage.LOST) {
             throw new BusinessException("Cannot mark a lost deal as won", "INVALID_STATE_TRANSITION");
+        }
+
+        if (!hasAcceptedQuote(deal)) {
+            throw new BusinessException(
+                    "An opportunity cannot be won without an accepted quote",
+                    "OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE");
         }
 
         DealStage previousStage = deal.getStage();
@@ -349,6 +359,10 @@ public class DealService {
         }
 
         return summary;
+    }
+
+    private static boolean hasAcceptedQuote(Deal deal) {
+        return deal.getAcceptedQuoteId() != null && !deal.getAcceptedQuoteId().isBlank();
     }
 
     /**

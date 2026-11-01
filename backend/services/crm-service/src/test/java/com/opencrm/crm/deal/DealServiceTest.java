@@ -120,9 +120,10 @@ class DealServiceTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getName()).isEqualTo("Big Deal");
-            var inOrder = inOrder(currencyConverter, dealRepository);
+            var inOrder = inOrder(currencyConverter, dealRepository, domainEvents);
             inOrder.verify(currencyConverter).freeze(deal);
             inOrder.verify(dealRepository).save(deal);
+            inOrder.verify(domainEvents).dealCreated(deal);
         }
 
         @Test
@@ -683,9 +684,10 @@ class DealServiceTest {
     class Win {
 
         @Test
-        @DisplayName("should mark deal as won")
+        @DisplayName("should mark deal as won when an accepted quote is already recorded")
         void shouldMarkDealAsWon() {
             deal.setStage(DealStage.NEGOTIATION);
+            deal.setAcceptedQuoteId("quote-uuid-1");
             when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
             when(dealRepository.save(deal)).thenReturn(deal);
             when(dealMapper.toDto(deal)).thenReturn(dealDto);
@@ -696,6 +698,32 @@ class DealServiceTest {
             assertThat(deal.getStage()).isEqualTo(DealStage.WON);
             assertThat(deal.getProbability()).isEqualTo(100);
             assertThat(deal.getWonAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("should reject a win when no accepted quote is recorded")
+        void shouldRejectWinWithoutAcceptedQuote() {
+            deal.setStage(DealStage.NEGOTIATION);
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+
+            assertThatThrownBy(() -> dealService.win(1L))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
+                            .isEqualTo("OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE"));
+            verify(dealRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should reject a win when the recorded accepted quote id is blank")
+        void shouldRejectWinWhenAcceptedQuoteIsBlank() {
+            deal.setStage(DealStage.NEGOTIATION);
+            deal.setAcceptedQuoteId("  ");
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+
+            assertThatThrownBy(() -> dealService.win(1L))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
+                            .isEqualTo("OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE"));
         }
 
         @Test
