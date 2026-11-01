@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -39,6 +40,11 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
      */
     @EntityGraph(attributePaths = {"organization"})
     Page<Contact> findByOrganizationIdAndDeletedFalse(Long organizationId, Pageable pageable);
+
+    /**
+     * Every contact row for the organization, including soft-deleted rows, so a merge can repoint the foreign key.
+     */
+    List<Contact> findAllByOrganizationId(Long organizationId);
 
     /**
      * Find all contacts with a specific status (non-deleted).

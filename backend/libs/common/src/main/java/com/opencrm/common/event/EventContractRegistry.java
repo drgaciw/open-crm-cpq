@@ -1,5 +1,6 @@
 package com.opencrm.common.event;
 
+import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
@@ -181,6 +182,10 @@ public final class EventContractRegistry {
     public static final EventContract ASSET_SUPERSEDED_V1 = published(
             "AssetSuperseded", "contract-asset-management", KafkaTopics.ASSET_SUPERSEDED, AssetSupersededEvent.class);
 
+    /** DRG-484. CRM-owned rows are repointed in this service; other services consume the event. */
+    public static final EventContract ACCOUNTS_MERGED_V1 = published(
+            "AccountsMerged", "crm-service", KafkaTopics.ACCOUNTS_MERGED, AccountsMergedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -207,7 +212,8 @@ public final class EventContractRegistry {
             ASSET_AMENDED_V1,
             ASSET_TERMINATED_V1,
             ASSET_SUPERSEDED_V1,
-            HIERARCHY_CHANGED_V1);
+            HIERARCHY_CHANGED_V1,
+            ACCOUNTS_MERGED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

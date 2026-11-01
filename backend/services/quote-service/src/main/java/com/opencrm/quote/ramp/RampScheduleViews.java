@@ -73,6 +73,7 @@ public final class RampScheduleViews {
                 .mode(RampEscalatorMode.valueOf(item.getRampEscalatorMode()))
                 .amount(item.getRampEscalatorAmount())
                 .everyMonths(item.getRampEscalatorEveryMonths())
+                .compounding(item.getRampEscalatorCompounding())
                 .build();
     }
 }

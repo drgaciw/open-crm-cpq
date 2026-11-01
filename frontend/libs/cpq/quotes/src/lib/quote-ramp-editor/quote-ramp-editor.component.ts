@@ -37,6 +37,7 @@ import {
   RampPricedPeriod,
   RampPriceBasis,
   RampSchedule,
+  RampScheduleExtendResult,
   RampStep,
 } from '@frontend/shared-models';
 import { CurrencyFormatPipe } from '@frontend/shared-ui';
@@ -215,11 +216,12 @@ export function rampStepMatchesBasis(
 }
 
 function escalatorDividesTerm(everyMonths: number, durationInMonths: number): boolean {
+  // Retained helper name for existing callers; a positive term may now have a short final period.
   return (
     Number.isInteger(everyMonths) &&
     everyMonths >= 1 &&
     Number.isInteger(durationInMonths) &&
-    durationInMonths % everyMonths === 0
+    durationInMonths >= 1
   );
 }
 
@@ -381,6 +383,7 @@ export class QuoteRampEditorComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly quoteId = input<number | null>(null);
+  readonly quoteVersion = input<number | null>(null);
   readonly lines = input<QuoteLineItemDto[]>([]);
   readonly durationInMonths = input(12);
   readonly currency = input('USD');
@@ -399,6 +402,7 @@ export class QuoteRampEditorComponent {
   readonly saving = signal(false);
   readonly expanding = signal(false);
   readonly extending = signal(false);
+  readonly committingExtension = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.group({
@@ -406,6 +410,7 @@ export class QuoteRampEditorComponent {
     escalator: this.fb.group({
       startPrice: this.fb.control<number | null>(null),
       mode: this.fb.nonNullable.control<RampEscalatorMode>('PERCENT'),
+      compounding: this.fb.nonNullable.control(true),
       amount: this.fb.control<number | null>(null),
       everyMonths: this.fb.control<number | null>(12, {
         validators: [Validators.min(1)],
@@ -417,6 +422,7 @@ export class QuoteRampEditorComponent {
   private readonly formRevision = signal(0);
   private readonly previewVersion = computed(() => ({
     quoteId: this.quoteId(),
+    quoteVersion: this.quoteVersion(),
     lineId: this.selectedLineId(),
     duration: this.durationInMonths(),
     revision: this.formRevision(),
@@ -516,13 +522,6 @@ export class QuoteRampEditorComponent {
     if (!Number.isInteger(duration) || duration <= covered) {
       return 'RAMP_TERM_MISMATCH: the new term must be longer than the periods already shown.';
     }
-    if (
-      escalator != null &&
-      escalator.everyMonths >= 1 &&
-      (duration - covered) % escalator.everyMonths !== 0
-    ) {
-      return 'RAMP_TERM_MISMATCH: the added months must be a multiple of every months.';
-    }
     if (escalator != null && escalator.amount < 0) {
       return 'RAMP_NEGATIVE_VALUE: escalator amount is negative.';
     }
@@ -543,7 +542,7 @@ export class QuoteRampEditorComponent {
       return false;
     }
     const escalator = this.readEscalator();
-    if (escalator == null || escalator.amount < 0 || escalator.everyMonths < 1) {
+    if (escalator == null || escalator.amount < 0 || !escalatorDividesTerm(escalator.everyMonths, duration)) {
       return false;
     }
     const covered = this.coveredMonths();
@@ -609,11 +608,12 @@ export class QuoteRampEditorComponent {
   });
 
   onLineChange(lineId: number): void {
+    if (this.committingExtension()) return;
     this.selectedLineId.set(lineId);
   }
 
   addPeriod(partial: Partial<RampStep> = {}): void {
-    if (!this.editable() || this.saving() || !this.lineAllowed()) {
+    if (!this.editable() || this.saving() || this.committingExtension() || !this.lineAllowed()) {
       return;
     }
     const steps = this.form.controls.steps;
@@ -641,7 +641,7 @@ export class QuoteRampEditorComponent {
   }
 
   removePeriod(index: number): void {
-    if (!this.editable() || this.saving()) {
+    if (!this.editable() || this.saving() || this.committingExtension()) {
       return;
     }
     this.form.controls.steps.removeAt(index);
@@ -695,7 +695,12 @@ export class QuoteRampEditorComponent {
     const steps = this.readSteps(false);
     const preview = this.previewContext();
     const active = { context: preview, cancel: new Subject<void>() };
-    this.activePreview = active;
+    const persist = this.quoteVersion() != null;
+    // A committed extension must receive its response even if local context changes.
+    // Only read-only previews participate in cancellation on form edits.
+    if (!persist) this.activePreview = active;
+    this.committingExtension.set(persist);
+    this.syncLock();
     this.extending.set(true);
     this.error.set(null);
     this.quoteService
@@ -703,15 +708,32 @@ export class QuoteRampEditorComponent {
         steps,
         durationInMonths: duration,
         escalator,
+        ...(this.quoteVersion() == null ? {} : {
+          lineItemId: this.selectedLineId() ?? undefined,
+          expectedQuoteVersion: this.quoteVersion() ?? undefined,
+        }),
       })
       .pipe(take(1), takeUntil(active.cancel), takeUntilDestroyed(this.destroyRef), finalize(() => {
-        if (this.activePreview === active) {
+        if (persist || this.activePreview === active) {
           this.activePreview = null;
           this.extending.set(false);
+          this.committingExtension.set(false);
+          this.syncLock();
         }
       }))
       .subscribe({
-        next: (returned) => this.applyPreview(preview, returned),
+        next: (returned: RampScheduleExtendResult) => {
+          const current = this.isCurrentPreview(preview);
+          if (!current && !persist) {
+            this.reportDiscardedPreview(preview);
+            return;
+          }
+          if (current) this.replaceSteps(this.previewSteps(returned));
+          if (returned.durationInMonths != null && returned.quoteVersion != null && preview.lineId != null) {
+            if (current) this.form.markAsPristine();
+            this.quoteService.applyRampExtension(quoteId, preview.lineId, returned);
+          }
+        },
         error: (err: unknown) => {
           if (this.isCurrentPreview(preview)) this.error.set(httpErrorMessage(err));
           else this.reportDiscardedPreview(preview);
@@ -845,6 +867,7 @@ export class QuoteRampEditorComponent {
       mode: raw.mode,
       amount,
       everyMonths,
+      ...(raw.compounding ? {} : { compounding: false }),
     };
   }
 
@@ -866,14 +889,14 @@ export class QuoteRampEditorComponent {
     ) {
       issues.push({
         code: 'RAMP_TERM_MISMATCH',
-        message: 'RAMP_TERM_MISMATCH: escalator length does not divide the quote term.',
+        message: 'RAMP_TERM_MISMATCH: term and period length must be positive whole months.',
       });
     }
     return issues;
   }
 
   private syncLock(editable = this.editable()): void {
-    if (editable) {
+    if (editable && !this.committingExtension()) {
       this.form.enable({ emitEvent: false });
     } else {
       this.form.disable({ emitEvent: false });
@@ -881,11 +904,8 @@ export class QuoteRampEditorComponent {
   }
 
   private applyLine(line: QuoteLineItemDto | null): void {
-    const steps = this.form.controls.steps;
-    steps.clear({ emitEvent: false });
-    for (const step of line?.schedule?.steps ?? []) {
-      steps.push(this.periodGroup(step), { emitEvent: false });
-    }
+    this.form.setControl('steps', this.fb.array((line?.schedule?.steps ?? []).map((step) => this.periodGroup(step))),
+      { emitEvent: false });
     const escalator = line?.schedule?.escalator;
     this.form.controls.escalator.reset(
       {
@@ -893,6 +913,7 @@ export class QuoteRampEditorComponent {
         mode: escalator?.mode ?? 'PERCENT',
         amount: escalator?.amount ?? null,
         everyMonths: escalator?.everyMonths ?? 12,
+        compounding: escalator?.compounding ?? true,
       },
       { emitEvent: false },
     );
@@ -950,11 +971,10 @@ export class QuoteRampEditorComponent {
   }
 
   private replaceSteps(steps: RampStep[]): void {
-    const array = this.form.controls.steps;
-    array.clear({ emitEvent: false });
-    for (const step of steps) {
-      array.push(this.periodGroup(step), { emitEvent: false });
-    }
+    const array = this.fb.array(steps.map((step) => this.periodGroup(step)));
+    // Notify the root form that the controls were replaced so retained DOM rows
+    // bind to the new controls even when the generated period count is unchanged.
+    this.form.setControl('steps', array, { emitEvent: false });
     array.markAsDirty();
     this.formRevision.update((revision) => revision + 1);
   }

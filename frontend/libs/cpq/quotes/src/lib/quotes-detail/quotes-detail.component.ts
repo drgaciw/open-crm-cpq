@@ -509,6 +509,7 @@ function httpErrorMessage(err: unknown): string {
           [quoteId]="numericId()"
           [lines]="lineItems()"
           [durationInMonths]="quote.durationInMonths"
+          [quoteVersion]="quote.version ?? null"
           [currency]="quote.currency || 'USD'"
           [editable]="canEditLines()"
           [tcv]="quote.tcv ?? null"

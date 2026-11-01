@@ -2,6 +2,8 @@ package com.opencrm.crm.organization;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +18,10 @@ import java.util.List;
  */
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, Long>, JpaSpecificationExecutor<Organization> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Organization o where o.id = :id")
+    Optional<Organization> findByIdForMerge(@Param("id") Long id);
 
     /**
      * Find organization by UUID.

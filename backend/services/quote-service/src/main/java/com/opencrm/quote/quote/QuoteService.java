@@ -318,6 +318,8 @@ public class QuoteService {
             quote.setNotes(quote.getNotes() != null ? quote.getNotes() + "\nRejection: " + reason : "Rejection: " + reason);
         }
         Quote saved = quoteRepository.save(quote);
+        // REJECTED is editable; callers use this version for the next schedule write.
+        quoteRepository.flush();
         log.info("Quote {} rejected", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
     }
@@ -511,6 +513,7 @@ public class QuoteService {
                     .rampEscalatorMode(source.getRampEscalatorMode())
                     .rampEscalatorAmount(source.getRampEscalatorAmount())
                     .rampEscalatorEveryMonths(source.getRampEscalatorEveryMonths())
+                    .rampEscalatorCompounding(source.getRampEscalatorCompounding())
                     .build();
             copyRampSteps(source, copy);
             clonedLines.add(copy);
@@ -567,7 +570,10 @@ public class QuoteService {
             quote.setRampScheduleStale(false);
             bindRampSnapshot(quote,lineItems,previousFingerprint,previousApproval,previouslyRequired);
             quoteLineItemRepository.saveAll(lineItems);
-            return quoteMapper.toDto(quoteRepository.save(quote));
+            // Flush the calculated root before mapping so the returned optimistic version is current.
+            Quote saved = quoteRepository.save(quote);
+            quoteRepository.flush();
+            return quoteMapper.toDto(saved);
         }
 
         Map<String, Object> pricingContext = buildPricingContext(quote, lineItems);
@@ -590,7 +596,9 @@ public class QuoteService {
         quote.setRampScheduleStale(false);
         bindRampSnapshot(quote, lineItems, previousFingerprint, previousApproval, previouslyRequired);
 
+        // The response feeds subsequent version-checked extension; map the flushed version.
         Quote saved = quoteRepository.save(quote);
+        quoteRepository.flush();
         log.info("Calculated pricing for quote {}", saved.getQuoteNumber());
         QuoteDto dto = quoteMapper.toDto(saved);
         stampRampView(dto, saved, pricedByLineId);
