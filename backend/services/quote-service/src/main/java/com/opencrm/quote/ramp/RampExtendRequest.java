@@ -1,0 +1,24 @@
+package com.opencrm.quote.ramp;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+/**
+ * Body of {@code POST /api/v1/quotes/{quoteId}/ramp-schedule/extend}.
+ * Preview only: nothing is stored, including the quote term.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RampExtendRequest {
+
+    private List<RampStepDto> steps;
+    /** Whole term after the extension, not the number of months to add. */
+    private Integer durationInMonths;
+    private RampEscalatorDto escalator;
+}

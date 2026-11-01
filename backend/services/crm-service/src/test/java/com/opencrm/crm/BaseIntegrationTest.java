@@ -72,7 +72,7 @@ public abstract class BaseIntegrationTest {
     void cleanupDatabase() {
         transactionTemplate.executeWithoutResult(status -> {
             entityManager.createNativeQuery(
-                    "TRUNCATE TABLE crm.leads, crm.deals, crm.contacts, crm.organizations RESTART IDENTITY CASCADE"
+                    "TRUNCATE TABLE crm.outbox_events, crm.leads, crm.deals, crm.contacts, crm.organizations RESTART IDENTITY CASCADE"
             ).executeUpdate();
             entityManager.flush();
             entityManager.clear();
