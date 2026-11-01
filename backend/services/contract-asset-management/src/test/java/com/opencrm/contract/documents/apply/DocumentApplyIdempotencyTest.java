@@ -75,7 +75,7 @@ class DocumentApplyIdempotencyTest {
         assertThat(audit.actorRole()).isEqualTo("ROLE_INTERNAL_INVOKE");
     }
 
-    @Test
+    @org.junit.jupiter.api.RepeatedTest(20)
     void concurrentApplySerializesOnTheAdvisoryLock() throws Exception {
         ApplyFixture fixture = executedAdd();
         ExecutorService pool = Executors.newFixedThreadPool(2);

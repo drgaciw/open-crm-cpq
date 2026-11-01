@@ -284,6 +284,7 @@ class DocumentApplyMidLoopConflictTest {
         String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), second,
                 fixture.lines.stream().filter(line -> line.unitNo() == 2).toList());
         second.setStatus(ApplicationUnitStatus.APPLIED);
+        markEvidence(fixture, second, null);
         second.setApplyKeyDigest(digest);
         DocumentApplyLedgerEntry entry = ledgerRow(fixture, 2);
         entry.setApplyKeyDigest(digest);
@@ -359,6 +360,7 @@ class DocumentApplyMidLoopConflictTest {
         blocked.setApplyKeyDigest(DocumentApplyDigest.unitDigest(fixture.document.getId(), blocked,
                 fixture.lines.stream().filter(line -> line.unitNo() == 1).toList()));
         blocked.setStatus(ApplicationUnitStatus.BLOCKED);
+        markEvidence(fixture, blocked, "V3");
 
         ApplyResult result = fixture.apply();
 
@@ -380,11 +382,18 @@ class DocumentApplyMidLoopConflictTest {
         String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), applied,
                 fixture.lines.stream().filter(line -> line.unitNo() == 1).toList());
         applied.setStatus(ApplicationUnitStatus.APPLIED);
+        markEvidence(fixture, applied, null);
         applied.setApplyKeyDigest(digest);
         DocumentApplyLedgerEntry entry = ledgerRow(fixture, 1);
         entry.setApplyKeyDigest(digest);
         fixture.ledger.put(fixture.document.getId() + ":1", entry);
         return fixture;
+    }
+
+    private static void markEvidence(ApplyFixture fixture, com.opencrm.contract.domain.documents.AmendmentApplicationUnit unit, String reason) {
+        unit.setAttemptRevisionNo(fixture.document.getCurrentRevisionNo());
+        unit.setAttemptPinFingerprint(DocumentApplyOrchestrator.pinFingerprint(fixture.document, unit, fixture.command()));
+        unit.setBlockReason(reason);
     }
 
     private static ApplyFixture threeUnitsWithUnitTwoConflict() {
