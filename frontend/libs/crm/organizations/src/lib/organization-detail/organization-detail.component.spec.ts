@@ -49,19 +49,16 @@ describe('OrganizationDetailComponent account UX', () => {
     const oldContacts = httpMock.expectOne((r) => r.url === '/api/v1/organizations/7/contacts');
     const oldDeals = httpMock.expectOne((r) => r.url === '/api/v1/deals');
     const oldHierarchy = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
-    const oldMerge = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
     fixture.componentRef.setInput('id', '8');
     fixture.detectChanges();
     expect(oldAccount.cancelled).toBe(true);
     expect(oldContacts.cancelled).toBe(true);
     expect(oldDeals.cancelled).toBe(true);
     expect(oldHierarchy.cancelled).toBe(true);
-    expect(oldMerge.cancelled).toBe(true);
     httpMock.expectOne('/api/v1/organizations/8').flush({ ...account, id: 8, uuid: 'uuid-8', name: 'Other' });
     httpMock.expectOne((r) => r.url === '/api/v1/organizations/8/contacts').flush({ content: [] });
     httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
     httpMock.expectOne('/api/v1/organizations/8/hierarchy').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
-    httpMock.expectOne('/api/v1/organizations/8/merge-candidates').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
     httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
     fixture.detectChanges();
@@ -108,10 +105,6 @@ describe('OrganizationDetailComponent account UX', () => {
       { message: 'Not found' },
       { status: 404, statusText: 'Not Found' },
     );
-    httpMock.expectOne('/api/v1/organizations/7/merge-candidates').flush(
-      { message: 'Not found' },
-      { status: 404, statusText: 'Not Found' },
-    );
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
@@ -129,6 +122,17 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(el.textContent).toContain('Archive');
   });
 
+  it('does not fetch or expose merge without the server capability contract', () => {
+    flushAccount();
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    httpMock.expectNone('/api/v1/organizations/7/merge-candidates');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="account-merge"]')).toBeNull();
+    httpMock.expectNone((request) => request.method === 'POST' && request.url.endsWith('/merge'));
+  });
+
   it('navigates hierarchy when the parent API is present and explains cycles', () => {
     flushAccount();
     httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
@@ -138,9 +142,6 @@ describe('OrganizationDetailComponent account UX', () => {
       ancestors: [{ id: 1, name: 'Root' }],
       children: [{ id: 3, name: 'Sub' }],
     });
-    httpMock.expectOne('/api/v1/organizations/7/merge-candidates').flush([
-      { id: 4, name: 'Dup Co', reason: 'Same domain' },
-    ]);
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
@@ -148,10 +149,6 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(hierarchy).toBeTruthy();
     expect(hierarchy?.querySelector('a[href="/organizations/1"]')?.textContent).toContain('Root');
     expect(hierarchy?.querySelector('a[href="/organizations/3"]')?.textContent).toContain('Sub');
-
-    const merge = el.querySelector('[data-testid="account-merge"]');
-    expect(merge?.textContent).toContain('Dup Co');
-    expect(merge?.querySelector('a[href="/organizations/4"]')).toBeTruthy();
 
     const parentInput = el.querySelector(
       '[data-testid="account-parent-id"]',

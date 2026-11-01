@@ -199,21 +199,7 @@ describe('OrganizationService', () => {
     expect(service.hierarchyError()).toContain('This parent would create a cycle');
   });
 
-  it('hides merge candidates when the merge API is absent', () => {
-    service.loadMergeCandidates(7);
-    const req = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
-    req.flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
-    expect(service.mergeAvailable()).toBe(false);
-    expect(service.error()).toBeNull();
-  });
 
-  it('lists merge candidates when the merge API responds', () => {
-    service.loadMergeCandidates(7);
-    const req = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
-    req.flush([{ id: 4, name: 'Dup Co', reason: 'Same domain' }]);
-    expect(service.mergeAvailable()).toBe(true);
-    expect(service.mergeCandidates()?.[0].name).toBe('Dup Co');
-  });
 });
 
 function deal(

@@ -276,41 +276,7 @@ import { OrganizationService } from '../organization.service';
           </mat-card>
         }
 
-        @if (orgService.mergeAvailable()) {
-          <mat-card class="full-width" data-testid="account-merge">
-            <mat-card-header>
-              <mat-card-title>Merge candidates</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <p class="empty-text">
-                Merge stays an operations action and appears only when the merge API is available.
-              </p>
-              @if (orgService.mergeError(); as mergeError) {
-                <div class="error-banner" role="alert">
-                  <mat-icon>error_outline</mat-icon>
-                  <span>{{ mergeError }}</span>
-                </div>
-              }
-              @if ((orgService.mergeCandidates() ?? []).length === 0) {
-                <p class="empty-text">No merge candidates.</p>
-              } @else {
-                <ul class="contact-list">
-                  @for (candidate of orgService.mergeCandidates() ?? []; track candidate.id) {
-                    <li>
-                      <a [routerLink]="['/organizations', candidate.id]" class="contact-link">{{ candidate.name }}</a>
-                      @if (candidate.reason) {
-                        <span class="contact-meta">{{ candidate.reason }}</span>
-                      }
-                      <button mat-stroked-button type="button" (click)="onMerge(candidate.id)">
-                        Merge into this account
-                      </button>
-                    </li>
-                  }
-                </ul>
-              }
-            </mat-card-content>
-          </mat-card>
-        }
+
       </div>
     }
   `,
@@ -400,7 +366,6 @@ export class OrganizationDetailComponent implements OnInit, OnChanges {
     this.orgService.loadOrganizationContacts(id);
     this.orgService.loadRelatedDeals(id);
     this.orgService.loadHierarchy(id);
-    this.orgService.loadMergeCandidates(id);
   }
 
   clearError(): void {
@@ -427,10 +392,6 @@ export class OrganizationDetailComponent implements OnInit, OnChanges {
 
   onClearParent(): void {
     this.orgService.linkParent(Number(this.id()), null);
-  }
-
-  onMerge(sourceId: number): void {
-    this.orgService.mergeInto(Number(this.id()), sourceId);
   }
 
   goBack(): void {

@@ -25,13 +25,6 @@ export interface AccountHierarchy {
   children: AccountRef[];
 }
 
-/** GET /api/v1/organizations/{id}/merge-candidates. Absent (404) means merge is not deployed. */
-export interface MergeCandidate {
-  id: number;
-  name: string;
-  reason?: string;
-}
-
 /** Optional list filters. Empty strings are omitted from the query. */
 export interface AccountListFilters {
   industry?: string;
@@ -114,9 +107,6 @@ export class OrganizationService {
     this.hierarchy.set(null);
     this.hierarchyAvailable.set(false);
     this.hierarchyError.set(null);
-    this.mergeCandidates.set(null);
-    this.mergeAvailable.set(false);
-    this.mergeError.set(null);
   }
 
   // State
@@ -149,11 +139,6 @@ export class OrganizationService {
   readonly hierarchy = signal<AccountHierarchy | null>(null);
   readonly hierarchyAvailable = signal(false);
   readonly hierarchyError = signal<string | null>(null);
-
-  /** Null when the merge API is absent. An empty array means the API is present with no candidates. */
-  readonly mergeCandidates = signal<MergeCandidate[] | null>(null);
-  readonly mergeAvailable = signal(false);
-  readonly mergeError = signal<string | null>(null);
 
   readonly isEmpty = computed(() => this.organizations().length === 0 && !this.loading());
 
@@ -393,41 +378,4 @@ export class OrganizationService {
       });
   }
 
-  /** GET /api/v1/organizations/{id}/merge-candidates. A 404 hides the merge UI. */
-  loadMergeCandidates(id: number): void {
-    this.mergeError.set(null);
-    this.mergeAvailable.set(false);
-    this.http
-      .get<MergeCandidate[] | SpringPageResponse<MergeCandidate>>(
-        `${this.basePath}/${id}/merge-candidates`,
-      )
-      .pipe(takeUntil(this.detailChanged))
-      .subscribe({
-        next: (body) => {
-          this.mergeAvailable.set(true);
-          this.mergeCandidates.set(asRows(body));
-        },
-        error: (err) => {
-          this.mergeCandidates.set(null);
-          this.mergeAvailable.set(false);
-          if (httpStatus(err) !== 404) {
-            this.mergeError.set(httpErrorMessage(err, 'Merge candidates are unavailable'));
-          }
-        },
-      });
-  }
-
-  /** POST /api/v1/organizations/{survivorId}/merge */
-  mergeInto(survivorId: number, sourceId: number): void {
-    this.mergeError.set(null);
-    this.http
-      .post<void>(`${this.basePath}/${survivorId}/merge`, { survivorId, sourceId })
-      .pipe(takeUntil(this.detailChanged))
-      .subscribe({
-        next: () => this.loadMergeCandidates(survivorId),
-        error: (err) => {
-          this.mergeError.set(httpErrorMessage(err, 'Could not merge these accounts'));
-        },
-      });
-  }
 }
