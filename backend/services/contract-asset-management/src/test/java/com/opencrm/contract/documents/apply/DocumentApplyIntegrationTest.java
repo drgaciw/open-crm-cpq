@@ -493,6 +493,122 @@ class DocumentApplyIntegrationTest {
         }
     }
 
+    @Test
+    void executedDocumentMustNotMutateSubscriptionLinkedToAnotherTenantsContract() {
+        UUID tenant = UUID.randomUUID(), otherTenant = UUID.randomUUID(), documentId = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+        seed(tenant, documentId, target, UUID.randomUUID(), false);
+        UUID foreignContract = UUID.randomUUID();
+        jdbc.update("""
+                insert into contracts (id, tenant_id, contract_number, customer_account_id, term_model,
+                    start_date, end_date, status, last_executed_seq, created_by)
+                values (?, ?, ?, ?, 'TERMED', '2026-01-01', '2026-12-31', 'ACTIVE', 0, 'test')
+                """, foreignContract, otherTenant, "FOREIGN-" + foreignContract, UUID.randomUUID());
+        jdbc.update("update subscriptions set contract_id = ? where uuid = ?", foreignContract, target.toString());
+        assertThat(orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())).status())
+                .isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+        assertBlockedTarget(documentId, target);
+    }
+
+    @Test
+    void documentContractWhoseTenantChangesCannotAuthorizeTargets() {
+        UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID(), target = UUID.randomUUID();
+        seed(tenant, documentId, target, UUID.randomUUID(), false);
+        jdbc.update("update contracts set tenant_id = ? where id = (select contract_id from amendment_documents where id = ?)", UUID.randomUUID(), documentId);
+        assertThat(orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())).status())
+                .isEqualTo(AmendmentDocumentStatus.APPLY_BLOCKED);
+        assertBlockedTarget(documentId, target);
+    }
+
+    @Test
+    void sameTenantWrongContractAndMissingLinkAreBlockedWithAuditAndReplay() {
+        for (boolean missing : new boolean[]{false, true}) {
+            UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID(), target = UUID.randomUUID();
+            seed(tenant, documentId, target, UUID.randomUUID(), false);
+            UUID wrong = missing ? null : insertOtherContract(tenant);
+            jdbc.update("update subscriptions set contract_id = ? where uuid = ?", wrong, target.toString());
+            ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of());
+            ApplyResult first = orchestrator.apply(command);
+            assertThat(first.status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+            assertBlockedTarget(documentId, target);
+            assertThat(orchestrator.apply(command).replayed()).isTrue();
+            assertBlockedTarget(documentId, target);
+        }
+    }
+
+    private UUID insertOtherContract(UUID tenant) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                insert into contracts (id, tenant_id, contract_number, customer_account_id, term_model,
+                    start_date, end_date, status, last_executed_seq, created_by)
+                values (?, ?, ?, ?, 'TERMED', '2026-01-01', '2026-12-31', 'ACTIVE', 0, 'test')
+                """, id, tenant, "OTHER-" + id, UUID.randomUUID());
+        return id;
+    }
+
+    private void assertBlockedTarget(UUID documentId, UUID target) {
+        assertThat(jdbc.queryForObject("select commercial_revision from subscriptions where uuid = ?", Long.class, target.toString())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from subscription_rate_periods p join subscriptions s on s.id = p.subscription_id where s.uuid = ?", Long.class, target.toString())).isZero();
+        assertThat(jdbc.queryForObject("select block_reason from amendment_application_units where document_id = ? and unit_no = 1", String.class, documentId)).isEqualTo("TARGET_CONTRACT_MISMATCH");
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ? and unit_no = 1", Long.class, documentId)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_UNIT_BLOCKED' and unit_no = 1 and reason_code = 'TARGET_CONTRACT_MISMATCH'", Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void subscriptionRelinkCommittedWhileApplyWaitsIsRecheckedUnderRowLock() throws Exception {
+        UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID(), target = UUID.randomUUID();
+        seed(tenant, documentId, target, UUID.randomUUID(), false);
+        UUID wrong = insertOtherContract(tenant);
+        var locked = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var relink = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                jdbc.queryForObject("select id from subscriptions where uuid = ? for update", Long.class, target.toString());
+                jdbc.update("update subscriptions set contract_id = ? where uuid = ?", wrong, target.toString());
+                locked.countDown();
+                try { if (!release.await(15, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("timeout"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            }));
+            assertThat(locked.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var apply = executor.submit(() -> orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())));
+            long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (System.nanoTime() < until && jdbc.queryForObject("select count(*) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query ilike '%subscription%'", Long.class) == 0) Thread.sleep(20);
+            assertThat(jdbc.queryForObject("select count(*) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query ilike '%subscription%'", Long.class)).isGreaterThan(0);
+            release.countDown();
+            relink.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(apply.get(15, java.util.concurrent.TimeUnit.SECONDS).status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+            assertBlockedTarget(documentId, target);
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test
+    void failedBlockedAuditRollsBackTheUnitAndTargetWrites() {
+        UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID(), target = UUID.randomUUID();
+        seed(tenant, documentId, target, UUID.randomUUID(), false);
+        jdbc.update("update subscriptions set contract_id = null where uuid = ?", target.toString());
+        jdbc.execute("""
+                create function test_reject_contract_block() returns trigger language plpgsql as $$
+                begin
+                    if new.reason_code = 'TARGET_CONTRACT_MISMATCH' then raise exception 'test audit failure'; end if;
+                    return new;
+                end $$
+                """);
+        jdbc.execute("create trigger test_reject_contract_block before insert on amendment_document_events for each row execute function test_reject_contract_block()");
+        try {
+            assertThatThrownBy(() -> orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())))
+                    .isInstanceOf(RuntimeException.class);
+            assertThat(jdbc.queryForObject("select status from amendment_application_units where document_id = ? and unit_no = 1", String.class, documentId)).isEqualTo("PENDING");
+            assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId)).isEqualTo("EXECUTED");
+            assertThat(jdbc.queryForObject("select commercial_revision from subscriptions where uuid = ?", Long.class, target.toString())).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from amendment_document_events where document_id = ? and reason_code = 'TARGET_CONTRACT_MISMATCH'", Long.class, documentId)).isZero();
+        } finally {
+            jdbc.execute("drop trigger test_reject_contract_block on amendment_document_events");
+            jdbc.execute("drop function test_reject_contract_block()");
+        }
+    }
+
     private void seed(UUID tenant, UUID documentId, UUID firstSubscription, UUID secondSubscription, boolean conflict) {
         UUID contractId = UUID.randomUUID();
         UUID lifecycleId = UUID.randomUUID();
@@ -521,6 +637,8 @@ class DocumentApplyIntegrationTest {
                     """, documentId, tenant, quoteId, HASH);
             insertSubscription(firstSubscription);
             insertSubscription(secondSubscription);
+            jdbc.update("update subscriptions set contract_id = ? where uuid in (?, ?)",
+                    contractId, firstSubscription.toString(), secondSubscription.toString());
             insertUnit(documentId, tenant, 1, firstSubscription);
             insertUnit(documentId, tenant, 2, secondSubscription);
             insertLine(documentId, tenant, 1, firstSubscription);

@@ -13,6 +13,13 @@ public interface DocumentApplyGateway {
 
     Optional<ApplyTarget> subscription(String subscriptionUuid);
 
+    /**
+     * Caller holds the subscription row lock. Only the exact document contract is accepted; successor
+     * chains need a separate authorization contract. This check does not establish link provenance.
+     * A matching contract row remains share-locked until commit.
+     */
+    boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId);
+
     List<ApplyLine> lines(UUID documentId, int revisionNo);
 
     void bindAmendmentLine(long periodId, UUID lineId, int revisionNo);
