@@ -397,6 +397,7 @@ export class QuoteRampEditorComponent {
   readonly selectedLineId = signal<number | null>(null);
   readonly saving = signal(false);
   readonly expanding = signal(false);
+  readonly extending = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.group({
@@ -409,6 +410,7 @@ export class QuoteRampEditorComponent {
         validators: [Validators.min(1)],
       }),
     }),
+    extendDuration: this.fb.control<number | null>(null),
   });
 
   private readonly formRevision = signal(0);
@@ -492,6 +494,51 @@ export class QuoteRampEditorComponent {
       return false;
     }
     return escalatorDividesTerm(escalator.everyMonths, this.durationInMonths());
+  });
+
+  readonly extendIssue = computed((): string | null => {
+    this.formRevision();
+    const duration = finiteOrNull(this.form.controls.extendDuration.value);
+    if (duration == null || this.form.controls.steps.length === 0) {
+      return null;
+    }
+    const covered = this.coveredMonths();
+    const escalator = this.readEscalator();
+    if (!Number.isInteger(duration) || duration <= covered) {
+      return 'RAMP_TERM_MISMATCH: the new term must be longer than the periods already shown.';
+    }
+    if (
+      escalator != null &&
+      escalator.everyMonths >= 1 &&
+      (duration - covered) % escalator.everyMonths !== 0
+    ) {
+      return 'RAMP_TERM_MISMATCH: the added months must be a multiple of every months.';
+    }
+    if (escalator != null && escalator.amount < 0) {
+      return 'RAMP_NEGATIVE_VALUE: escalator amount is negative.';
+    }
+    return null;
+  });
+
+  readonly canExtend = computed(() => {
+    this.formRevision();
+    if (!this.editable() || this.extending() || !this.lineAllowed() || this.quoteId() == null) {
+      return false;
+    }
+    const duration = finiteOrNull(this.form.controls.extendDuration.value);
+    if (
+      this.form.controls.steps.length === 0 ||
+      duration == null ||
+      this.extendIssue() != null
+    ) {
+      return false;
+    }
+    const escalator = this.readEscalator();
+    if (escalator == null || escalator.amount < 0 || escalator.everyMonths < 1) {
+      return false;
+    }
+    const covered = this.coveredMonths();
+    return validateRampSchedule(this.readSteps(true), covered, true).length === 0;
   });
 
   constructor() {
@@ -600,10 +647,42 @@ export class QuoteRampEditorComponent {
       .subscribe({
         next: (steps) => {
           this.expanding.set(false);
-          this.replaceSteps(Array.isArray(steps) ? steps : []);
+          this.replaceSteps(this.previewSteps(steps));
         },
         error: (err: unknown) => {
           this.expanding.set(false);
+          this.error.set(httpErrorMessage(err));
+        },
+      });
+  }
+
+  onExtend(): void {
+    if (!this.canExtend()) {
+      return;
+    }
+    const quoteId = this.quoteId();
+    const escalator = this.readEscalator();
+    const duration = finiteOrNull(this.form.controls.extendDuration.value);
+    if (quoteId == null || escalator == null || duration == null) {
+      return;
+    }
+    const steps = this.readSteps(false);
+    this.extending.set(true);
+    this.error.set(null);
+    this.quoteService
+      .extendRampSchedule(quoteId, {
+        steps,
+        durationInMonths: duration,
+        escalator,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (returned) => {
+          this.extending.set(false);
+          this.replaceSteps(this.previewSteps(returned));
+        },
+        error: (err: unknown) => {
+          this.extending.set(false);
           this.error.set(httpErrorMessage(err));
         },
       });
@@ -786,10 +865,38 @@ export class QuoteRampEditorComponent {
       },
       { emitEvent: false },
     );
+    this.form.controls.extendDuration.reset(null, { emitEvent: false });
     this.form.markAsPristine();
     this.error.set(null);
     this.syncLock();
     this.formRevision.update((revision) => revision + 1);
+  }
+
+  private coveredMonths(): number {
+    const steps = this.readSteps(false);
+    if (steps.length === 0) {
+      return 0;
+    }
+    const last = steps[steps.length - 1];
+    if (!Number.isInteger(last.startMonth) || !Number.isInteger(last.months)) {
+      return 0;
+    }
+    return last.startMonth + last.months - 1;
+  }
+
+  private previewSteps(body: unknown): RampStep[] {
+    if (Array.isArray(body)) {
+      return body;
+    }
+    if (
+      body != null &&
+      typeof body === 'object' &&
+      'steps' in body &&
+      Array.isArray((body as { steps: unknown }).steps)
+    ) {
+      return (body as { steps: RampStep[] }).steps;
+    }
+    return [];
   }
 
   private replaceSteps(steps: RampStep[]): void {
