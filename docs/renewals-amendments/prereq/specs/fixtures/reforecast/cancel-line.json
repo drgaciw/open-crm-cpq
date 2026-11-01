@@ -1,0 +1,23 @@
+{
+    "id": "reforecast-cancel-line",
+    "story": "DRG-600",
+    "cluster": "reforecast",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "label": "illustrative",
+    "figures": "illustrative numbers only; not a price and not a commercial term",
+    "case": "cancel-line",
+    "line_action": "cancel",
+    "rounding": {
+        "scale": 2,
+        "mode": "HALF_UP"
+    },
+    "inputs": {
+        "prior_tcv": "960.005",
+        "new_tcv": "0.00"
+    },
+    "expected": {
+        "raw_delta_tcv": "-960.005",
+        "forecast_delta_tcv": "-960.01"
+    }
+}
