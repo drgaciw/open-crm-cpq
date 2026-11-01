@@ -2,6 +2,7 @@ package com.opencrm.contract.documents.apply;
 
 import com.opencrm.contract.ContractAssetManagementApplication;
 import com.opencrm.contract.domain.documents.AmendmentDocumentStatus;
+import com.opencrm.contract.repository.documents.AmendmentApplicationUnitRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +61,12 @@ class DocumentApplyIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactions;
 
+    @Autowired
+    private AmendmentApplicationUnitRepository units;
+
+    @Autowired
+    private DocumentApplyGateway gateway;
+
     @Test
     void twoUnitsApplied() {
         UUID tenant = UUID.randomUUID();
@@ -78,7 +85,8 @@ class DocumentApplyIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
                 .isEqualTo(2L);
         assertThat(jdbc.queryForObject(
-                "select count(*) from subscription_rate_periods where amendment_document_line_id is not null", Long.class))
+                "select count(*) from subscription_rate_periods where amendment_document_line_id in "
+                        + "(select id from amendment_document_lines where document_id = ?)", Long.class, documentId))
                 .isEqualTo(2L);
         Long appliedEvents = jdbc.queryForObject(
                 "select count(*) from amendment_document_events where document_id = ? and event_type = ?",
@@ -90,6 +98,150 @@ class DocumentApplyIntegrationTest {
         assertThat(replay.replayed()).isTrue();
         assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
                 .isEqualTo(2L);
+    }
+
+    @Test
+    void partialReplayPersistsAttemptDigestAndRejectsChangedAppliedUnit() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 2, ?, 'earlier')
+                """, tenant, documentId, "cd".repeat(32));
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+        assertThat(jdbc.queryForObject("""
+                select apply_key_digest from amendment_application_units where document_id = ? and unit_no = 2
+                """, String.class, documentId)).matches("[0-9a-f]{64}");
+        assertThat(orchestrator.apply(command).replayed()).isTrue();
+
+        jdbc.update("update amendment_application_units set observed_commercial_revision = 99 where document_id = ? and unit_no = 1",
+                documentId);
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForObject("""
+                select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_REFUSED'
+                """, Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void interruptedApplyRejectsChangedCommittedUnitBeforePendingSibling() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var first = units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId).getFirst();
+        String digest = DocumentApplyDigest.unitDigest(documentId, first,
+                gateway.lines(documentId, 1).stream().filter(line -> line.unitNo() == 1).toList());
+        jdbc.update("""
+                update amendment_application_units set status = 'APPLIED', apply_key_digest = ?,
+                    observed_commercial_revision = 99, dependency_order = 2
+                where document_id = ? and unit_no = 1
+                """, digest, documentId);
+        jdbc.update("update amendment_application_units set dependency_order = 1 where document_id = ? and unit_no = 2",
+                documentId);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 1, ?, 'earlier')
+                """, tenant, documentId, digest);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForObject("""
+                select status from amendment_application_units where document_id = ? and unit_no = 2
+                """, String.class, documentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("""
+                select count(*) from document_apply_ledger where document_id = ?
+                """, Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void pendingMatchingLedgerDoesNotApplyEarlierSibling() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var first = units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId).getFirst();
+        String digest = DocumentApplyDigest.unitDigest(documentId, first,
+                gateway.lines(documentId, 1).stream().filter(line -> line.unitNo() == 1).toList());
+        jdbc.update("update amendment_application_units set dependency_order = 2 where document_id = ? and unit_no = 1",
+                documentId);
+        jdbc.update("update amendment_application_units set dependency_order = 1 where document_id = ? and unit_no = 2",
+                documentId);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 1, ?, 'earlier')
+                """, tenant, documentId, digest);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForList("""
+                select status from amendment_application_units where document_id = ? order by unit_no
+                """, String.class, documentId)).containsExactly("PENDING", "PENDING");
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?",
+                Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void recoveryFinalizesCommittedUnitsAndWritesOneOutcomeEvent() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seedFullyAppliedUnits(tenant, documentId);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(orchestrator.apply(command).replayed()).isTrue();
+        assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                .isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("""
+                select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_DOCUMENT_APPLIED'
+                """, Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void recoveryRollsBackOutcomeWhenAuditInsertFails() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seedFullyAppliedUnits(tenant, documentId);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+        jdbc.execute("alter table amendment_document_events add constraint test_reject_recovery_event check "
+                + "(document_id <> '" + documentId + "'::uuid or event_type <> 'APPLY_DOCUMENT_APPLIED')");
+        try {
+            assertThatThrownBy(() -> orchestrator.apply(command)).isInstanceOf(RuntimeException.class);
+            assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                    .isEqualTo("EXECUTED");
+            assertThat(jdbc.queryForObject("""
+                    select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_DOCUMENT_APPLIED'
+                    """, Long.class, documentId)).isZero();
+        } finally {
+            jdbc.execute("alter table amendment_document_events drop constraint test_reject_recovery_event");
+        }
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+    }
+
+    private void seedFullyAppliedUnits(UUID tenant, UUID documentId) {
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var lines = gateway.lines(documentId, 1);
+        for (var unit : units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId)) {
+            String digest = DocumentApplyDigest.unitDigest(documentId, unit,
+                    lines.stream().filter(line -> line.unitNo() == unit.getUnitNo()).toList());
+            jdbc.update("update amendment_application_units set status = 'APPLIED', apply_key_digest = ? "
+                    + "where document_id = ? and unit_no = ?", digest, documentId, unit.getUnitNo());
+            jdbc.update("""
+                    insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                    values (?, ?, ?, ?, 'earlier')
+                    """, tenant, documentId, unit.getUnitNo(), digest);
+        }
     }
 
     private void seed(UUID tenant, UUID documentId, UUID firstSubscription, UUID secondSubscription, boolean conflict) {

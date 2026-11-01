@@ -5,6 +5,8 @@ import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealCurrencyConverter;
 import com.opencrm.crm.deal.DealRepository;
+import com.opencrm.crm.deal.DealStage;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class QuoteAcceptedDealProcessor {
     private final DealRepository dealRepository;
     private final KafkaInbox inbox;
     private final DealCurrencyConverter currencyConverter;
+    private final CrmDomainEvents domainEvents;
 
     /**
      * Marks the deal WON from quote acceptance fields, once per quote.
@@ -54,6 +57,7 @@ public class QuoteAcceptedDealProcessor {
     }
 
     private void applyToDeal(Deal deal, QuoteAcceptedCrmMessage event) {
+        DealStage previousStage = deal.getStage();
         deal.markWon();
         if (event.getAcceptedAt() != null) {
             deal.setWonAt(event.getAcceptedAt());
@@ -69,6 +73,7 @@ public class QuoteAcceptedDealProcessor {
         // A missing acceptedAt falls back to processing time inside the converter.
         currencyConverter.freeze(deal, event.getAcceptedAt());
         dealRepository.save(deal);
+        domainEvents.dealTransition(deal, previousStage);
         String amountLog = event.getTotalAmount() != null ? event.getTotalAmount().toPlainString() : "n/a";
         log.info("Updated deal {} to WON from quote {} (amount={})",
                 deal.getUuid(),

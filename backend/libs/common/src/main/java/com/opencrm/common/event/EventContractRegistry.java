@@ -3,9 +3,13 @@ package com.opencrm.common.event;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
+import com.opencrm.common.event.dto.DealClosedEvent;
+import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
+import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
@@ -136,6 +140,19 @@ public final class EventContractRegistry {
     public static final EventContract RULE_SET_PUBLISHED_V1 = reserved(
             "RuleSetPublished", "pricing-service", KafkaTopics.RULE_SET_PUBLISHED, null);
 
+    /** AccountCreated from BC-12-01. Appended; existing contracts keep their order. */
+    public static final EventContract ORGANIZATION_CREATED_V1 = published(
+            "OrganizationCreated", "crm-service", KafkaTopics.ORGANIZATION_CREATED, OrganizationCreatedEvent.class);
+
+    public static final EventContract CONTACT_CREATED_V1 = published(
+            "ContactCreated", "crm-service", KafkaTopics.CONTACT_CREATED, ContactCreatedEvent.class);
+
+    public static final EventContract DEAL_STAGE_CHANGED_V1 = published(
+            "DealStageChanged", "crm-service", KafkaTopics.DEAL_STAGE_CHANGED, DealStageChangedEvent.class);
+
+    public static final EventContract DEAL_CLOSED_V1 = published(
+            "DealClosed", "crm-service", KafkaTopics.DEAL_CLOSED, DealClosedEvent.class);
+
     /** DRG-654. One asset created per activated contract line. */
     public static final EventContract ASSET_CREATED_V1 = published(
             "AssetCreated", "contract-asset-management", KafkaTopics.ASSET_CREATED, AssetCreatedEvent.class);
@@ -161,6 +178,10 @@ public final class EventContractRegistry {
             APPROVAL_STEP_DECIDED_V1,
             APPROVAL_OUTCOME_COMPLETED_V1,
             RULE_SET_PUBLISHED_V1,
+            ORGANIZATION_CREATED_V1,
+            CONTACT_CREATED_V1,
+            DEAL_STAGE_CHANGED_V1,
+            DEAL_CLOSED_V1,
             ASSET_CREATED_V1,
             ASSET_AUDIT_RECORDED_V1);
 
