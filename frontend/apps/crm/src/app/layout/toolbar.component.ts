@@ -20,7 +20,7 @@ import { SessionService } from '@frontend/shared-data-access';
       >
         <mat-icon>menu</mat-icon>
       </button>
-      <span class="toolbar-title">Open CRM</span>
+      <span class="toolbar-title">Open CRM CPQ</span>
       <span class="toolbar-spacer"></span>
       <button
         mat-icon-button

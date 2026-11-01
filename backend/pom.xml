@@ -46,7 +46,6 @@
         <spring-cloud.version>2025.1.1</spring-cloud.version>
 
         <!-- Database -->
-        <postgresql.version>42.7.1</postgresql.version>
         <!-- Align with Spring Boot 4.0.9 BOM (spring-boot-flyway requires Flyway 11). -->
         <flyway.version>11.14.1</flyway.version>
 
@@ -55,7 +54,7 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>2.3.0</springdoc.version>
         <jjwt.version>0.12.3</jjwt.version>
-        <commons-lang3.version>3.14.0</commons-lang3.version>
+        <commons-lang3.version>3.21.0</commons-lang3.version>
         <commons-io.version>2.15.1</commons-io.version>
 
         <!-- Rules Engines -->
@@ -70,7 +69,7 @@
 
         <!-- gRPC -->
         <grpc.version>1.60.1</grpc.version>
-        <protobuf.version>3.25.1</protobuf.version>
+        <protobuf.version>3.25.9</protobuf.version>
         <grpc-spring-boot-starter.version>3.0.0.RELEASE</grpc-spring-boot-starter.version>
 
         <!-- Testing -->

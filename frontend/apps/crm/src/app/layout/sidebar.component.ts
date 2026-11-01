@@ -10,7 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="sidebar-header">
-      <h2 class="sidebar-title">Open CRM</h2>
+      <h2 class="sidebar-title">Open CRM CPQ</h2>
     </div>
     <mat-nav-list>
       <h3 class="nav-group">CRM</h3>
