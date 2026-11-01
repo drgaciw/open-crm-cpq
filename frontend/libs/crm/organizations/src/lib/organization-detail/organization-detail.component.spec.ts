@@ -44,6 +44,31 @@ describe('OrganizationDetailComponent account UX', () => {
     httpMock.verify();
   });
 
+  it('loads the new account and clears stale data when the route id changes', () => {
+    const oldAccount = httpMock.expectOne('/api/v1/organizations/7');
+    const oldContacts = httpMock.expectOne((r) => r.url === '/api/v1/organizations/7/contacts');
+    const oldDeals = httpMock.expectOne((r) => r.url === '/api/v1/deals');
+    const oldHierarchy = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
+    const oldMerge = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
+    fixture.componentRef.setInput('id', '8');
+    fixture.detectChanges();
+    expect(oldAccount.cancelled).toBe(true);
+    expect(oldContacts.cancelled).toBe(true);
+    expect(oldDeals.cancelled).toBe(true);
+    expect(oldHierarchy.cancelled).toBe(true);
+    expect(oldMerge.cancelled).toBe(true);
+    httpMock.expectOne('/api/v1/organizations/8').flush({ ...account, id: 8, uuid: 'uuid-8', name: 'Other' });
+    httpMock.expectOne((r) => r.url === '/api/v1/organizations/8/contacts').flush({ content: [] });
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/8/hierarchy').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    httpMock.expectOne('/api/v1/organizations/8/merge-candidates').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Other');
+    expect(fixture.nativeElement.textContent).not.toContain('Acme Account');
+  });
+
   it('links related contacts, deals, and quotes without dead ends', () => {
     flushAccount();
     const deals = httpMock.expectOne(

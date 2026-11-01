@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, input, ChangeDetectionStrategy, signal, effect, Injector } from '@angular/core';
+import { Component, inject, OnInit, OnChanges, input, ChangeDetectionStrategy, signal, effect, Injector } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -367,7 +367,7 @@ import { OrganizationService } from '../organization.service';
     .value { font-size: 0.95rem; }
   `],
 })
-export class OrganizationDetailComponent implements OnInit {
+export class OrganizationDetailComponent implements OnInit, OnChanges {
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -377,7 +377,6 @@ export class OrganizationDetailComponent implements OnInit {
   private quotesLoadedFor: number | null = null;
 
   ngOnInit(): void {
-    this.loadAccount();
     effect(() => {
       const org = this.orgService.selectedOrganization();
       const id = Number(this.id());
@@ -389,9 +388,14 @@ export class OrganizationDetailComponent implements OnInit {
     }, { injector: this.injector });
   }
 
+  ngOnChanges(): void {
+    this.loadAccount();
+  }
+
   private loadAccount(): void {
     const id = Number(this.id());
     this.quotesLoadedFor = null;
+    this.orgService.resetAccountDetail();
     this.orgService.getById(id);
     this.orgService.loadOrganizationContacts(id);
     this.orgService.loadRelatedDeals(id);

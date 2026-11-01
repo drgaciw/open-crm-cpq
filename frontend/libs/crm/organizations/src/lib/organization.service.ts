@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, Subject, finalize, takeUntil } from 'rxjs';
 import {
   OrganizationDto,
   OrganizationCreateRequest,
@@ -100,6 +100,23 @@ function asRows<T>(body: SpringPageResponse<T> | T[] | null | undefined): T[] {
 export class OrganizationService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/organizations';
+  private readonly detailChanged = new Subject<void>();
+
+  resetAccountDetail(): void {
+    this.detailChanged.next();
+    this.selectedOrganization.set(null);
+    this.organizationContacts.set([]);
+    this.relatedDeals.set([]);
+    this.relatedQuotes.set([]);
+    this.relatedDealsError.set(null);
+    this.relatedQuotesError.set(null);
+    this.hierarchy.set(null);
+    this.hierarchyAvailable.set(false);
+    this.hierarchyError.set(null);
+    this.mergeCandidates.set(null);
+    this.mergeAvailable.set(false);
+    this.mergeError.set(null);
+  }
 
   // State
   readonly organizations = signal<OrganizationDto[]>([]);
@@ -173,7 +190,7 @@ export class OrganizationService {
     this.loading.set(true);
     this.http
       .get<OrganizationDto>(`${this.basePath}/${id}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (org) => this.selectedOrganization.set(org),
         error: (err) => {
@@ -248,7 +265,7 @@ export class OrganizationService {
       .set('sort', 'createdAt,desc');
     this.http
       .get<SpringPageResponse<ContactDto>>(`${this.basePath}/${organizationId}/contacts`, { params })
-      .pipe(finalize(() => this.organizationContactsLoading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.organizationContactsLoading.set(false)))
       .subscribe({
         next: (p) => this.organizationContacts.set(p.content ?? p),
         error: (err) => {
@@ -272,7 +289,7 @@ export class OrganizationService {
       .set('organizationId', String(organizationId));
     this.http
       .get<SpringPageResponse<DealDto>>('/api/v1/deals', { params })
-      .pipe(finalize(() => this.relatedDealsLoading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.relatedDealsLoading.set(false)))
       .subscribe({
         next: (body) => {
           this.relatedDeals.set(
@@ -302,7 +319,7 @@ export class OrganizationService {
       .set('customerExternalId', account.uuid);
     this.http
       .get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params })
-      .pipe(finalize(() => this.relatedQuotesLoading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.relatedQuotesLoading.set(false)))
       .subscribe({
         next: (body) => {
           this.relatedQuotes.set(
@@ -320,7 +337,7 @@ export class OrganizationService {
   loadHierarchy(id: number): void {
     this.hierarchyError.set(null);
     this.hierarchyAvailable.set(false);
-    this.http.get<AccountHierarchy>(`${this.basePath}/${id}/hierarchy`).subscribe({
+    this.http.get<AccountHierarchy>(`${this.basePath}/${id}/hierarchy`).pipe(takeUntil(this.detailChanged)).subscribe({
       next: (tree) => {
         this.hierarchyAvailable.set(true);
         this.hierarchy.set({
@@ -344,6 +361,7 @@ export class OrganizationService {
     this.hierarchyError.set(null);
     this.http
       .put<AccountHierarchy>(`${this.basePath}/${id}/parent`, { parentId })
+      .pipe(takeUntil(this.detailChanged))
       .subscribe({
         next: (tree) => {
           this.hierarchyAvailable.set(true);
@@ -371,6 +389,7 @@ export class OrganizationService {
       .get<MergeCandidate[] | SpringPageResponse<MergeCandidate>>(
         `${this.basePath}/${id}/merge-candidates`,
       )
+      .pipe(takeUntil(this.detailChanged))
       .subscribe({
         next: (body) => {
           this.mergeAvailable.set(true);
@@ -391,6 +410,7 @@ export class OrganizationService {
     this.mergeError.set(null);
     this.http
       .post<void>(`${this.basePath}/${survivorId}/merge`, { survivorId, sourceId })
+      .pipe(takeUntil(this.detailChanged))
       .subscribe({
         next: () => this.loadMergeCandidates(survivorId),
         error: (err) => {
