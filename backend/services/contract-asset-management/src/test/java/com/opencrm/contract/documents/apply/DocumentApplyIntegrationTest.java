@@ -2,6 +2,7 @@ package com.opencrm.contract.documents.apply;
 
 import com.opencrm.contract.ContractAssetManagementApplication;
 import com.opencrm.contract.domain.documents.AmendmentDocumentStatus;
+import com.opencrm.contract.repository.documents.AmendmentApplicationUnitRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,12 @@ class DocumentApplyIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    @Autowired
+    private AmendmentApplicationUnitRepository units;
+
+    @Autowired
+    private DocumentApplyGateway gateway;
 
     @Test
     void twoUnitsApplied() {
@@ -118,6 +125,39 @@ class DocumentApplyIntegrationTest {
                         ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
         assertThat(jdbc.queryForObject("""
                 select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_REFUSED'
+                """, Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void interruptedApplyRejectsChangedCommittedUnitBeforePendingSibling() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var first = units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId).getFirst();
+        String digest = DocumentApplyDigest.unitDigest(documentId, first,
+                gateway.lines(documentId, 1).stream().filter(line -> line.unitNo() == 1).toList());
+        jdbc.update("""
+                update amendment_application_units set status = 'APPLIED', apply_key_digest = ?,
+                    observed_commercial_revision = 99, dependency_order = 2
+                where document_id = ? and unit_no = 1
+                """, digest, documentId);
+        jdbc.update("update amendment_application_units set dependency_order = 1 where document_id = ? and unit_no = 2",
+                documentId);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 1, ?, 'earlier')
+                """, tenant, documentId, digest);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForObject("""
+                select status from amendment_application_units where document_id = ? and unit_no = 2
+                """, String.class, documentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("""
+                select count(*) from document_apply_ledger where document_id = ?
                 """, Long.class, documentId)).isEqualTo(1L);
     }
 
