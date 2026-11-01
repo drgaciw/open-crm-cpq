@@ -414,8 +414,14 @@ export class OrganizationDetailComponent implements OnInit {
   onDelete(): void {
     const org = this.orgService.selectedOrganization();
     if (org && confirm(`Archive "${org.name}"? The account will be hidden from lists.`)) {
-      this.orgService.delete(org.id).subscribe(() => {
-        this.router.navigate(['/organizations']);
+      this.orgService.delete(org.id).subscribe({
+        next: () => { if (Number(this.id()) === org.id) this.router.navigate(['/organizations']); },
+        error: (error: { error?: { errorCode?: string } }) => {
+          if (Number(this.id()) !== org.id) return;
+          this.orgService.error.set(error?.error?.errorCode === 'HIERARCHY_HAS_CHILDREN'
+            ? 'This account has active child accounts. Hierarchy management is unavailable; contact an administrator.'
+            : 'Could not archive this account. Please try again.');
+        },
       });
     }
   }

@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * Repository for Organization entity.
@@ -56,4 +57,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
      * Check if organization exists by ID.
      */
     boolean existsById(Long id);
+
+    boolean existsByParentOrganizationIdAndDeletedFalse(Long parentId);
+    List<Organization> findByParentOrganizationIdAndDeletedFalseOrderByIdAsc(Long parentId);
 }

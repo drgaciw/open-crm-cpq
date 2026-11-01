@@ -26,6 +26,7 @@ public class OrganizationService {
     private final OrganizationMapper organizationMapper;
     private final ContactService contactService;
     private final CrmDomainEvents domainEvents;
+    private final AccountHierarchyService accountHierarchyService;
 
     /** Resolve the legacy numeric API ID without exposing it as a cross-service account ID. */
     @Transactional(readOnly = true)
@@ -44,6 +45,7 @@ public class OrganizationService {
     public OrganizationDto create(OrganizationCreateRequest request) {
         log.debug("Creating new organization: {}", request.getName());
 
+        if (request.getParentOrganizationId() != null) throw hierarchyUnavailable();
         // Convert request to entity
         Organization organization = organizationMapper.toEntity(request);
 
@@ -88,16 +90,20 @@ public class OrganizationService {
     public OrganizationDto update(AccountId id, OrganizationUpdateRequest request) {
         log.debug("Updating organization with ID: {}", id.value());
 
+        if (request.getParentOrganizationId() != null) throw hierarchyUnavailable();
         Organization organization = requireActive(id);
 
         // Update entity with non-null fields
         organizationMapper.updateEntity(request, organization);
 
-        // Save and return
         Organization updated = organizationRepository.save(organization);
         log.info("Updated organization with ID: {}", updated.getId());
 
         return organizationMapper.toDto(updated);
+    }
+
+    private static com.opencrm.common.exception.BusinessException hierarchyUnavailable() {
+        return new com.opencrm.common.exception.BusinessException("Account hierarchy is not available", org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "HIERARCHY_UNAVAILABLE");
     }
 
     /**
@@ -107,7 +113,13 @@ public class OrganizationService {
     public void delete(AccountId id) {
         log.debug("Deleting organization with ID: {}", id.value());
 
+        accountHierarchyService.lockHierarchy();
+        accountHierarchyService.flushAfterLock();
         Organization organization = requireActive(id);
+        accountHierarchyService.refreshAfterLock(organization);
+        if (organizationRepository.existsByParentOrganizationIdAndDeletedFalse(organization.getId())) {
+            throw new com.opencrm.common.exception.BusinessException("This account has active child accounts. Hierarchy management is unavailable; contact an administrator", "HIERARCHY_HAS_CHILDREN");
+        }
         organization.softDelete();
         organizationRepository.save(organization);
         log.info("Soft deleted organization with ID: {}", id.value());

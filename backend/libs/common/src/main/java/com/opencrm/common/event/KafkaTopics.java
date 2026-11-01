@@ -60,6 +60,9 @@ public final class KafkaTopics {
     /** DRG-655. ChangeLine Swap or Upgrade. The successor row exists before this event. */
     public static final String ASSET_SUPERSEDED = "cpq.asset.superseded";
 
+    /** DRG-482 / BC-12-02. Account parent link created or changed. */
+    public static final String HIERARCHY_CHANGED = "cpq.crm.account.hierarchy-changed";
+
     /** DRG-484. One organization merged into an explicitly chosen survivor. */
     public static final String ACCOUNTS_MERGED = "cpq.crm.account.merged";
 }
