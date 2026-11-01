@@ -52,13 +52,8 @@ public class AmendmentController {
         return respond(revisions.openForHttp(amendmentId, body, context(request, idempotencyKey)), HttpStatus.CREATED);
     }
 
-    @PostMapping("/api/v1/amendments/{amendmentId}/revisions/{revisionNo}/pricing")
-    public ApiResponse<AmendmentView> price(@PathVariable UUID amendmentId, @PathVariable int revisionNo,
-                                            @RequestBody InstallPricing body,
-                                            @RequestHeader("Idempotency-Key") String idempotencyKey,
-                                            HttpServletRequest request) {
-        return ApiResponse.success(revisions.installPricing(amendmentId, revisionNo, body, context(request, idempotencyKey)));
-    }
+    // The priced-write HTTP route is held until pricing-owned decision evidence can be verified.
+    // AmendmentRevisionService retains the unreleased workflow scaffold for integration development.
 
     @PostMapping("/api/v1/amendments/{amendmentId}:submit")
     public ApiResponse<AmendmentView> submit(@PathVariable UUID amendmentId, @RequestBody VersionBody body,
