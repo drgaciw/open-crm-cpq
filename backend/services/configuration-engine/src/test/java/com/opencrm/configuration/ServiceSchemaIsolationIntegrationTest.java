@@ -35,9 +35,10 @@ class ServiceSchemaIsolationIntegrationTest {
 
     /** Flyway versions applied to schema contract. Count is this list, not a floor. */
     private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
-            "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12");
+            "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12",
+            "1.13", "1.14", "1.15");
 
-    /** Every base table in schema contract, including V1_10's two tables, renewal_policy_record, and document_apply_ledger. */
+    /** Every base table in schema contract, including assets and the asset history. */
     private static final List<String> CONTRACT_TABLES = List.of(
             "amendment_application_units",
             "amendment_commercial_envelopes",
@@ -47,6 +48,8 @@ class ServiceSchemaIsolationIntegrationTest {
             "amendment_documents",
             "amendment_operation_receipts",
             "applied_quote_acceptances",
+            "asset_history",
+            "assets",
             "contracts",
             "document_apply_ledger",
             "flyway_schema_history",
@@ -69,7 +72,8 @@ class ServiceSchemaIsolationIntegrationTest {
             // V1_7_2 frozen line membership, V1_8 header backfill functions,
             // V1_10 unpriced revision storage (S3). That file is one Flyway version and creates two tables.
             // V1_11 renewal policy records.
-            // V1_9 is permanently unused (owner, 2026-10-18) and is not in the directory; V1_12 creates document_apply_ledger.
+            // V1_9 is permanently unused; V1_12 creates the ledger, V1_13 assets,
+            // V1_14 asset history, and V1_15 adds unit replay evidence.
             new Service("contract-asset-management", "contract", "subscriptions", CONTRACT_MIGRATION_VERSIONS.size()));
 
     @Test
@@ -173,6 +177,26 @@ class ServiceSchemaIsolationIntegrationTest {
             }
         }
         assertThat(tables).containsExactlyElementsOf(CONTRACT_TABLES);
+
+        List<String> replayColumns = new ArrayList<>();
+        try (var result = statement.executeQuery(
+                "SELECT column_name || ':' || data_type || ':' || is_nullable FROM information_schema.columns "
+                        + "WHERE table_schema = 'contract' AND table_name = 'amendment_application_units' "
+                        + "AND column_name IN ('attempt_pin_fingerprint', 'attempt_revision_no', 'block_reason') "
+                        + "ORDER BY column_name")) {
+            while (result.next()) replayColumns.add(result.getString(1));
+        }
+        assertThat(replayColumns).containsExactly(
+                "attempt_pin_fingerprint:character varying:YES", "attempt_revision_no:integer:YES",
+                "block_reason:character varying:YES");
+
+        List<String> replayConstraints = new ArrayList<>();
+        try (var result = statement.executeQuery(
+                "SELECT conname FROM pg_constraint WHERE conrelid = 'contract.amendment_application_units'::regclass "
+                        + "AND conname IN ('chk_apply_attempt_pin', 'chk_apply_attempt_revision') ORDER BY conname")) {
+            while (result.next()) replayConstraints.add(result.getString(1));
+        }
+        assertThat(replayConstraints).containsExactly("chk_apply_attempt_pin", "chk_apply_attempt_revision");
     }
 
     private static void createDatabase(String name) throws Exception {
