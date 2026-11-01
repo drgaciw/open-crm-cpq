@@ -42,4 +42,15 @@ public final class KafkaTopics {
     public static final String SUBSCRIPTION_RAMP_APPLIED = "cpq.subscription.ramp.applied";
     public static final String SUBSCRIPTION_RENEWAL_ELIGIBLE = "cpq.subscription.renewal.eligible";
     public static final String CONTRACT_EXECUTED = "cpq.contract.executed";
+
+    // CRM domain events (DRG-510). Appended so existing constants keep their order.
+    public static final String ORGANIZATION_CREATED = "cpq.crm.organization.created";
+    public static final String CONTACT_CREATED = "cpq.crm.contact.created";
+    public static final String DEAL_STAGE_CHANGED = "cpq.crm.deal.stage.changed";
+    public static final String DEAL_CLOSED = "cpq.crm.deal.closed";
+
+    /** DRG-654. Installed-base asset created from an activated contract line. */
+    public static final String ASSET_CREATED = "cpq.asset.created";
+    /** DRG-654. Audit of an asset creation. */
+    public static final String ASSET_AUDIT = "cpq.asset.audit";
 }

@@ -116,4 +116,12 @@ export default [
     checkId: 'catalog.dialog.whitespace-sku-rejected-client-side',
     class: 'functional',
   },
+  {
+    id: 'H-CPQ-P-015',
+    claim: 'New Product dialog: SKU/Name maxLength schema messages exist and mat-error blocks iterate errors(), but filling past the limit leaves Create disabled with no visible mat-error (same Signal Forms / mat-error gap as H-CPQ-P-001 for List price min).',
+    file: `${CATALOG}/product-create-dialog/product-create-dialog.component.ts`,
+    triage: 'browserCheckable',
+    checkId: 'catalog.field.SKU.validator.maxLength',
+    class: 'functional',
+  },
 ].map(validateHypothesis);

@@ -66,7 +66,7 @@ public class ProductOptionService {
                 .priceAdjustment(request.getPriceAdjustment() != null ? request.getPriceAdjustment() : BigDecimal.ZERO)
                 .adjustmentType(request.getAdjustmentType() != null ? request.getAdjustmentType() : AdjustmentType.ABSOLUTE)
                 .defaultOption(request.isDefaultOption())
-                .sortOrder(request.getSortOrder())
+                .sortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder())
                 .build();
 
         group.getOptions().add(option);
