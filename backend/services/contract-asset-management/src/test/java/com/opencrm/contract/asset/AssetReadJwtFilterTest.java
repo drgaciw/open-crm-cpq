@@ -36,10 +36,14 @@ class AssetReadJwtFilterTest {
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
     @ImportAutoConfiguration(OpenCrmSecurityAutoConfiguration.class)
-    @Import({AssetController.class, AssetQueryController.class, GlobalExceptionHandler.class})
+    @Import({AssetController.class, AssetQueryController.class, AssetReportController.class, GlobalExceptionHandler.class})
     static class App {
         @Bean AssetQueryService query() { return new AssetQueryService(mock(AssetRepository.class), mock(AssetMapper.class)); }
-        @Bean AssetHistoryProjection history() { return new AssetHistoryProjection(mock(AssetHistoryStore.class)); }
+        @Bean AssetHistoryStore historyStore() { return mock(AssetHistoryStore.class); }
+        @Bean AssetHistoryProjection history(AssetHistoryStore historyStore) { return new AssetHistoryProjection(historyStore); }
+        @Bean AssetReportService reports(AssetHistoryProjection history, AssetHistoryStore historyStore) {
+            return new AssetReportService(history, historyStore);
+        }
         @Bean @Primary JwtDecoder decoder() {
             return token -> {
                 var builder = Jwt.withTokenValue(token).header("alg", "none").subject("caller")
@@ -64,5 +68,11 @@ class AssetReadJwtFilterTest {
         mvc.perform(get("/api/v1/assets/a/history").header("Authorization", "Bearer blank")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/assets").header("Authorization", "Bearer user")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/assets/a/history").header("Authorization", "Bearer user")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/assets/reports/churn").header("Authorization", "Bearer app")
+                        .param("accountId", "a").param("periodStart", "2026-01-01").param("periodEnd", "2026-06-30"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/assets/reports/upcoming-renewals").header("Authorization", "Bearer user")
+                        .param("accountId", "a").param("withinDays", "30").param("asOf", "2026-06-01"))
+                .andExpect(status().isOk());
     }
 }

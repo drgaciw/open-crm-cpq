@@ -30,10 +30,14 @@ class AssetReadDevModeTest {
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
     @ImportAutoConfiguration(OpenCrmSecurityAutoConfiguration.class)
-    @Import({AssetController.class, AssetQueryController.class, GlobalExceptionHandler.class})
+    @Import({AssetController.class, AssetQueryController.class, AssetReportController.class, GlobalExceptionHandler.class})
     static class App {
         @Bean AssetQueryService query() { return new AssetQueryService(mock(AssetRepository.class), mock(AssetMapper.class)); }
-        @Bean AssetHistoryProjection history() { return new AssetHistoryProjection(mock(AssetHistoryStore.class)); }
+        @Bean AssetHistoryStore historyStore() { return mock(AssetHistoryStore.class); }
+        @Bean AssetHistoryProjection history(AssetHistoryStore historyStore) { return new AssetHistoryProjection(historyStore); }
+        @Bean AssetReportService reports(AssetHistoryProjection history, AssetHistoryStore historyStore) {
+            return new AssetReportService(history, historyStore);
+        }
     }
 
     @Autowired WebApplicationContext context;
@@ -46,6 +50,12 @@ class AssetReadDevModeTest {
         mvc.perform(get("/api/v1/assets/a/history")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/assets/a/supersede-chain")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/assets").param("accountId", "a").param("asOf", "2026-01-01"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/assets/reports/upcoming-renewals")
+                        .param("accountId", "a").param("windowStart", "2026-06-01").param("windowEnd", "2026-06-30"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/assets/reports/churn")
+                        .param("accountId", "a").param("periodStart", "2026-01-01").param("periodEnd", "2026-06-30"))
                 .andExpect(status().isForbidden());
     }
 }
