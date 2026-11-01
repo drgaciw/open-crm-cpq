@@ -30,13 +30,14 @@ Each section lists the acceptance-criterion table first, then inputs, outputs, s
 |---|---|---|---|
 | AC-592-1 | `fixtures/spine-dependent/drg-592-new-contract-stores-precedence.json` | `amendment_mode` `NEW_CONTRACT`. Document state `EXECUTED`. Original contract `c-orig`, contract state `ACTIVE`, `precedence_flag` false, `end_date` `2027-10-29`. | `error_code` null. A new contract is created, contract state `ACTIVE`, `precedence_flag` true, `prior_contract_id` `c-orig`. Original stays `ACTIVE` with `precedence_flag` false. The document's `contract_id` is the new contract. The original has no second document. |
 | AC-592-2 | `fixtures/spine-dependent/drg-592-amend-in-place-leaves-flag-false.json` | `amendment_mode` `AMEND_IN_PLACE`. Document state `EXECUTED`. Contract `c-orig`, contract state `ACTIVE`, `precedence_flag` false. | `error_code` null. `contracts_inserted` 0. `precedence_flag` stays false. `document.contract_id` stays `c-orig`. |
-| AC-592-3 | `fixtures/spine-dependent/drg-592-two-true-flags-fail-closed.json` | Pricing read. Two `ACTIVE` contracts, `c-1` and `c-2`, both `precedence_flag` true. | HTTP 409. `error_code` `PRECEDENCE_CONFLICT`. `price` null. Both contracts stay visible. |
+| AC-592-3 | `fixtures/spine-dependent/drg-592-two-true-flags-fail-closed.json` | Pricing read for chain `c-1` → `c-2` (`c-2.prior_contract_id = c-1`). Both contracts are `ACTIVE` and have `precedence_flag` true. | HTTP 409. `error_code` `PRECEDENCE_CONFLICT`. `price` null. Both contracts stay visible. |
+| AC-592-4 | `fixtures/spine-dependent/drg-592-independent-chains-do-not-conflict.json` | Two independent active chains for the same customer each have one true flag; pricing requests `c-1`. | Pricing selects `c-1` without a cross-chain conflict. Both remain visible. |
 
 ### Inputs
 
 - Tenant id, amendment document id, and `amendment_mode` (`NEW_CONTRACT` or `AMEND_IN_PLACE`).
 - The source contract id, its contract state, its `end_date`, and its stored `precedence_flag`.
-- For a pricing read, the set of `ACTIVE` contracts for the customer in the tenant.
+- For a pricing read, the requested contract and the `ACTIVE` contracts in its proposed `prior_contract_id` chain, within the caller's tenant. Independent chains for the same customer are outside this read.
 
 ### Outputs
 
@@ -100,7 +101,7 @@ AC-592-1 and AC-592-2 expect `error_code` null.
 
 | Option | Meaning |
 |---|---|
-| A | Pricing reads the precedence-true contract. Both contracts stay visible. Two true flags fail closed with `PRECEDENCE_CONFLICT`. Zero true flags and one active contract: that contract is the pricing source. |
+| A | Within the requested contract chain, pricing reads the precedence-true contract. Both contracts stay visible. Two true flags in that chain fail closed with `PRECEDENCE_CONFLICT`; a winner in an independent chain does not conflict. Zero true flags and one active contract in the chain: that contract is the pricing source. |
 | B | The flag wins pricing, and DRG-595 owns visibility. |
 | C | Pricing, entitlement, and visibility each use their own rule. |
 
@@ -308,7 +309,7 @@ This choice is the open question on the as-is record above. Option B is listed. 
 |---|---|---|---|
 | AC-595-1 | `fixtures/spine-dependent/drg-595-owner-may-edit-draft.json` | Actor `user-owner`, stored owner `user-owner`, action `EDIT`, document state `DRAFT`, tenant `t-1`. | `allowed` true. `error_code` null. |
 | AC-595-2 | `fixtures/spine-dependent/drg-595-read-only-verbs-refused.json` | Actors `user-ops` (`role_label` `SALES_OPS`) and `user-fin` (`role_label` `FINANCE`). Actions `EDIT`, `SUBMIT`, `APPROVE`, `EXECUTE`. Tenant `t-1`. | Each action `allowed` false. HTTP 403. `error_code` `READ_ONLY_FORBIDDEN`. |
-| AC-595-3 | `fixtures/spine-dependent/drg-595-read-only-audit-same-tenant.json` | Actor `user-fin`, `role_label` `FINANCE`, action `READ_AUDIT`. Contract `c-1` in tenant `t-1`. Contract `c-2` in tenant `t-2`. | Same-tenant read `allowed` true, audit events returned, `writes` 0. Other-tenant read `allowed` false. HTTP 403. `error_code` `TENANT_MISMATCH`. |
+| AC-595-3 | `fixtures/spine-dependent/drg-595-read-only-audit-same-tenant.json` | Actor `user-fin`, caller tenant `t-1`, `role_label` `FINANCE`, action `READ_AUDIT`. Contract `c-1` in tenant `t-1`. Contract `c-2` in tenant `t-2`. | Same-tenant read `allowed` true, audit events returned, `writes` 0. Other-tenant read `allowed` false. HTTP 403. `error_code` `TENANT_MISMATCH`. |
 
 `role_label` in these fixtures is the ticket's words. It is not an Entra role name on main. See 595-F5.
 
@@ -573,7 +574,7 @@ Intent is a column on the amendment document **[S]**. There is no renewals-queue
 
 **Issue:** [DRG-598](https://linear.app/drgamtd-workspace/issue/DRG-598) (RA-64).
 
-**Issue text [S].** In-flight contracts migrate in phases ordered by contract end date. The first phase is upcoming renewals, the nearest end dates. Scope expands incrementally from sales and marketing metrics. S7 itself is unchanged and can run per phase. OQ7 stays open. This section specifies the phase manifest. It does not call the backfill.
+**Issue text [S].** In-flight contracts migrate in phases ordered by contract end date. The first phase is upcoming renewals, the nearest end dates. Scope expands incrementally from sales and marketing metrics. The historical issue says S7 is unchanged and can run per phase and that OQ7 stays open. Those statements are superseded by the current constraints below. This section specifies the phase manifest. It does not call the backfill.
 
 ### Acceptance criteria and fixtures
 
@@ -615,7 +616,7 @@ AC-598-1 and AC-598-3 expect `error_code` null. They also expect `backfill_invok
 
 ### As-is on main `bf41c230`
 
-S7 orders nothing by end date. `contract_header_backfill_apply` takes a tenant id **[S]**. Eligible rows in the V1_8 header comment are `contract_id` null. A phase in this spec is a list of ids. It is not a call to that function.
+S7 orders nothing by end date. `contract_header_backfill_apply` takes a tenant id **[S]**. Eligible rows in the V1_8 header comment are `contract_id` null. A phase in this spec is a list of ids. The tenant-wide function cannot select that list; a separately delivered selector or guarded wrapper is required before a phased run. The [delegated migration decision](../delegated-renewals-amendments-decisions-2026-10-17.md) adopts one thin contract per existing subscription, header-only and without synthetic history. This spec authorizes no backfill.
 
 ### Proposed choices
 
@@ -732,6 +733,7 @@ S7 orders nothing by end date. `contract_header_backfill_apply` takes a tenant i
 | AC-599-1 | `fixtures/spine-dependent/drg-599-same-sku-needs-no-mapping.json` | From `DRAFT`. Line `UPDATE` source `SKU-A` target `SKU-A`. | `mapping_required` false. `dispute_checked` false. Transition to `IN_REVIEW` allowed. Document state `IN_REVIEW`. `error_code` null. |
 | AC-599-2 | `fixtures/spine-dependent/drg-599-contested-mapping-holds-document.json` | From `DRAFT`. Line `SWAP` source `SKU-A` target `SKU-B`. Pinned relationship version `v3`. `dispute_state` `CONTESTED`. Sales actor sets `dispute_state` `RESOLVED`. | Transition refused. Document state stays `DRAFT`. `apply_allowed` false. HTTP 409. `error_code` `MAPPING_CONTESTED`. Sales resolve HTTP 403. `error_code` `DISPUTE_RESOLVE_FORBIDDEN`. `dispute_state` stays `CONTESTED`. |
 | AC-599-3 | `fixtures/spine-dependent/drg-599-pinned-version-clears-only-when-product-resolves.json` | Same line pinned to `v3`. Product actor sets pinned `v3` to `RESOLVED`. Live row `v4` is `CONTESTED`. | Pinned `v3` `dispute_state` `RESOLVED`. `hold_on_pinned_version` false. Transition to `IN_REVIEW` allowed. The pin stays `v3`. `error_code` null. |
+| AC-599-4 | `fixtures/spine-dependent/drg-599-add-without-source-needs-no-mapping.json` | First-slice `ADD` has no source SKU and target `SKU-B`. | No mapping or dispute check is required solely due to the missing source. |
 
 ### Inputs
 
@@ -806,7 +808,7 @@ Product-service migrations on this tree have no `product_relationship` table **[
 | B | Apply only. |
 | C | Contested lines are partial-apply units. |
 
-**Default:** Option A. The fixtures assert the `DRAFT` to `IN_REVIEW` gate. The same code applies at the other two gates under this option.
+**Default:** Option A. The fixtures assert the `DRAFT` to `IN_REVIEW` gate. Option A proposes the same recheck at the other two gates. Its treatment of a contest raised after execution but before apply conflicts with the earlier 599-F5 wording and remains an owner decision; do not implement either outcome as settled.
 
 **Status:** Proposed
 
@@ -816,7 +818,7 @@ Product-service migrations on this tree have no `product_relationship` table **[
 
 | Option | Meaning |
 |---|---|
-| A | A mapping is required only when the source SKU and the target SKU differ. |
+| A | A mapping is required only when both source and target SKUs are present and differ. A first-slice `ADD` with no source or `REMOVE` with no target does not require a mapping solely because an endpoint is absent. |
 | B | Every line requires a mapping, including same-SKU edits. |
 
 **Default:** Option A.
@@ -829,7 +831,7 @@ Product-service migrations on this tree have no `product_relationship` table **[
 
 | Option | Meaning |
 |---|---|
-| A | The line pins the relationship version at pricing. A later contest holds documents that pinned that version and are not yet executed. |
+| A | The line pins the relationship version at pricing. A later contest holds documents that pinned that version and are not yet executed. Whether a contest raised after execution but before apply also holds apply remains unresolved: 599-F3 option A rechecks the pin before apply, while this option previously exempted executed documents. The owner must reconcile those choices; an immutable pin alone does not settle apply eligibility. |
 | B | Apply reads the live row. |
 
 **Default:** Option A.
