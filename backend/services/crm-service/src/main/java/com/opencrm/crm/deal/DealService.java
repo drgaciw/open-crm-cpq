@@ -207,6 +207,14 @@ public class DealService {
         return deals.map(dealMapper::toDto);
     }
 
+    @Transactional(readOnly = true)
+    public Page<DealDto> listByOrganization(Pageable pageable, DealStage stage, Long organizationId) {
+        Page<Deal> deals = stage == null
+                ? dealRepository.findByOrganization_IdAndDeletedFalse(organizationId, pageable)
+                : dealRepository.findByOrganization_IdAndStageAndDeletedFalse(organizationId, stage, pageable);
+        return deals.map(dealMapper::toDto);
+    }
+
     /**
      * Search deals by name.
      */

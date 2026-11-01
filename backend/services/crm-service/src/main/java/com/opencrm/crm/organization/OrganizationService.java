@@ -141,6 +141,14 @@ public class OrganizationService {
         return organizations.map(organizationMapper::toDto);
     }
 
+    @Transactional(readOnly = true)
+    public Page<OrganizationDto> filter(String query, OrganizationType type, String industry,
+                                        String territory, String ownerId, Pageable pageable) {
+        return organizationRepository.findAll(
+                OrganizationFilters.matching(query, type, industry, territory, ownerId), pageable)
+                .map(organizationMapper::toDto);
+    }
+
     /**
      * Get contacts belonging to an organization.
      */

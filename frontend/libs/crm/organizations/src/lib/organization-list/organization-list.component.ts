@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { OrganizationService } from '../organization.service';
+import { ACCOUNT_INDUSTRIES } from '../account-industries';
 import { OrganizationDto } from '@frontend/shared-models';
 import {
   EmptyStateComponent,
@@ -33,22 +34,58 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-page-header
-      title="Organizations"
-      subtitle="Manage your business relationships"
+      title="Accounts"
+      subtitle="Manage customer accounts"
     >
       <div actions>
         <button mat-raised-button color="primary" (click)="onCreate()">
           <mat-icon>add</mat-icon>
-          New Organization
+          New Account
         </button>
       </div>
       <div search>
         <app-search-input
-          placeholder="Search organizations..."
+          placeholder="Search accounts..."
           (searchChange)="onSearch($event)"
         />
       </div>
     </app-page-header>
+
+    <div class="account-filters">
+      <label>
+        Industry
+        <select
+          data-testid="account-industry-filter"
+          [value]="industryFilter()"
+          (change)="onIndustryFilter($any($event.target).value)"
+        >
+          <option value="">All industries</option>
+          @for (ind of industries; track ind) {
+            <option [value]="ind">{{ ind }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Territory
+        <input
+          data-testid="account-territory-filter"
+          type="text"
+          [value]="territoryFilter()"
+          (input)="onTerritoryFilter($any($event.target).value)"
+          placeholder="Territory"
+        />
+      </label>
+      <label>
+        Owner
+        <input
+          data-testid="account-owner-filter"
+          type="text"
+          [value]="ownerFilter()"
+          (input)="onOwnerFilter($any($event.target).value)"
+          placeholder="Owner"
+        />
+      </label>
+    </div>
 
     @if (orgService.error()) {
       <div class="error-banner" role="alert">
@@ -68,14 +105,14 @@ import {
     @if (!orgService.loading() && !orgService.error() && orgService.isEmpty()) {
       <app-empty-state
         icon="business"
-        title="No organizations yet"
-        message="Create your first organization to get started."
-        actionLabel="Create Organization"
+        [title]="hasActiveCriteria() ? 'No matching accounts' : 'No accounts yet'"
+        [message]="hasActiveCriteria() ? 'Try changing your search or filters.' : 'Create your first account to get started.'"
+        [actionLabel]="hasActiveCriteria() ? '' : 'Create Account'"
         (action)="onCreate()"
       />
     } @else if (!orgService.loading() && !orgService.isEmpty()) {
       <div class="table-container">
-        <table mat-table [dataSource]="orgService.organizations()" [trackBy]="trackById" matSort
+        <table mat-table [dataSource]="visibleOrganizations()" [trackBy]="trackById" matSort
                (matSortChange)="onSort($event)">
 
           <ng-container matColumnDef="name">
@@ -90,6 +127,16 @@ import {
             <td mat-cell *matCellDef="let org">{{ org.industry || '—' }}</td>
           </ng-container>
 
+          <ng-container matColumnDef="territory">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Territory</th>
+            <td mat-cell *matCellDef="let org">{{ org.territory || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="owner">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="ownerId">Owner</th>
+            <td mat-cell *matCellDef="let org">{{ org.ownerId || '—' }}</td>
+          </ng-container>
+
           <ng-container matColumnDef="city">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>City</th>
             <td mat-cell *matCellDef="let org">{{ org.city || '—' }}</td>
@@ -102,8 +149,8 @@ import {
 
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let org">
-              <button mat-icon-button [matMenuTriggerFor]="menu">
+            <td mat-cell *matCellDef="let org" (click)="$event.stopPropagation()">
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Account actions">
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #menu="matMenu">
@@ -112,8 +159,8 @@ import {
                   <span>Edit</span>
                 </button>
                 <button mat-menu-item (click)="onDelete(org)" class="delete-action">
-                  <mat-icon>delete</mat-icon>
-                  <span>Delete</span>
+                  <mat-icon>archive</mat-icon>
+                  <span>Archive</span>
                 </button>
               </mat-menu>
             </td>
@@ -154,15 +201,42 @@ import {
       background: #ffebee;
       color: #c62828;
     }
+    .account-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 0 0 16px;
+    }
+    .account-filters label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.75rem;
+      color: #555;
+    }
+    .account-filters select,
+    .account-filters input {
+      min-width: 180px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
   `],
 })
 export class OrganizationListComponent implements OnInit {
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
 
-  displayedColumns = ['name', 'industry', 'city', 'phone', 'actions'];
+  displayedColumns = ['name', 'industry', 'territory', 'owner', 'city', 'phone', 'actions'];
+  readonly industries = ACCOUNT_INDUSTRIES;
+  readonly industryFilter = signal('');
+  readonly territoryFilter = signal('');
+  readonly ownerFilter = signal('');
+  readonly visibleOrganizations = this.orgService.organizations;
   private currentSort = 'name,asc';
-  private lastSearchQuery = '';
+  readonly searchQuery = signal('');
+  readonly hasActiveCriteria = computed(() => !!(this.searchQuery() || this.industryFilter().trim() || this.territoryFilter().trim() || this.ownerFilter().trim()));
 
   trackById(index: number, item: OrganizationDto): string | number {
     return item.id;
@@ -173,40 +247,42 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onSearch(query: string): void {
-    const trimmed = query.trim();
-    this.lastSearchQuery = trimmed;
-    if (trimmed) {
-      this.orgService.search(trimmed);
-    } else {
-      this.orgService.list(0, 20, this.currentSort);
-    }
+    this.searchQuery.set(query.trim());
+    this.reload(0);
   }
 
   clearError(): void {
     this.orgService.error.set(null);
   }
 
+  onIndustryFilter(value: string): void {
+    this.industryFilter.set(value);
+    this.reload(0);
+  }
+
+  onTerritoryFilter(value: string): void {
+    this.territoryFilter.set(value);
+    this.reload(0);
+  }
+
+  onOwnerFilter(value: string): void {
+    this.ownerFilter.set(value);
+    this.reload(0);
+  }
+
   onRetry(): void {
-    if (this.lastSearchQuery) {
-      this.orgService.search(this.lastSearchQuery);
-    } else {
-      this.orgService.list(
-        this.orgService.pagination().page,
-        this.orgService.pagination().size,
-        this.currentSort,
-      );
-    }
+    this.reload(this.orgService.pagination().page);
   }
 
   onPageChange(event: PageEvent): void {
-    this.orgService.list(event.pageIndex, event.pageSize, this.currentSort);
+    this.reload(event.pageIndex, event.pageSize);
   }
 
   onSort(sort: Sort): void {
     this.currentSort = sort.active && sort.direction
       ? `${sort.active},${sort.direction}`
       : 'name,asc';
-    this.orgService.list(0, this.orgService.pagination().size, this.currentSort);
+    this.reload(0);
   }
 
   onCreate(): void {
@@ -222,14 +298,39 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onDelete(org: OrganizationDto): void {
-    if (confirm(`Delete "${org.name}"? This action cannot be undone.`)) {
+    if (confirm(`Archive "${org.name}"? The account will be hidden from lists.`)) {
       this.orgService.delete(org.id).subscribe(() => {
-        this.orgService.list(
-          this.orgService.pagination().page,
-          this.orgService.pagination().size,
-          this.currentSort
-        );
+        this.reload(this.orgService.pagination().page);
       });
     }
+  }
+
+  private currentFilters():
+    | { industry: string; territory: string; ownerId: string }
+    | undefined {
+    const industry = this.industryFilter().trim();
+    const territory = this.territoryFilter().trim();
+    const ownerId = this.ownerFilter().trim();
+    if (!industry && !territory && !ownerId) {
+      return undefined;
+    }
+    return { industry, territory, ownerId };
+  }
+
+  private reload(page: number, size = this.orgService.pagination().size): void {
+    const filters = this.currentFilters();
+    if (this.searchQuery()) {
+      if (filters) {
+        this.orgService.search(this.searchQuery(), page, size, this.currentSort, filters);
+      } else {
+        this.orgService.search(this.searchQuery(), page, size, this.currentSort);
+      }
+      return;
+    }
+    if (filters) {
+      this.orgService.list(page, size, this.currentSort, filters);
+      return;
+    }
+    this.orgService.list(page, size, this.currentSort);
   }
 }

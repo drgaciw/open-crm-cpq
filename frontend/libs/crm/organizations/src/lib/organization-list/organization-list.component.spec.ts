@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, computed } from '@angular/core';
 import { of } from 'rxjs';
+import { PageEvent } from '@angular/material/paginator';
 import { OrganizationListComponent } from './organization-list.component';
 import { OrganizationService } from '../organization.service';
 import { OrganizationDto, PaginationMeta } from '@frontend/shared-models';
@@ -78,8 +79,8 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('app-page-header')).toBeTruthy();
     expect(el.querySelector('app-empty-state')).toBeTruthy();
-    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No organizations yet');
-    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Organization');
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No accounts yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
   });
 
   it('shows error banner and hides empty-state on failed load', () => {
@@ -125,7 +126,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
 
   it('onSearch with term calls OrganizationService.search', () => {
     component.onSearch('  acme  ');
-    expect(searchSpy).toHaveBeenCalledWith('acme');
+    expect(searchSpy).toHaveBeenCalledWith('acme', 0, 20, 'name,asc');
   });
 
   it('onSearch with blank term reloads list', () => {
@@ -134,4 +135,114 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
     expect(searchSpy).not.toHaveBeenCalled();
   });
+
+  it('uses Account product copy on the list', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('h1')?.textContent).toContain('Accounts');
+    expect(el.textContent).toContain('New Account');
+    expect(el.querySelector('app-search-input input')?.getAttribute('placeholder')).toBe(
+      'Search accounts...',
+    );
+  });
+
+  it('empty state invites the seller to create an account', () => {
+    organizations.set([]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No accounts yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
+  });
+
+  it('explains an empty filtered result without claiming there are no accounts', () => {
+    organizations.set([]);
+    loading.set(false);
+    error.set(null);
+    component.onTerritoryFilter('West');
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching accounts');
+    expect(el.querySelector('.empty-state-message')?.textContent).toContain('filters');
+    expect(el.querySelector('.empty-state-action')).toBeNull();
+  });
+
+  it('offers industry, territory, and owner filters', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('[data-testid="account-industry-filter"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="account-territory-filter"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="account-owner-filter"]')).toBeTruthy();
+  });
+
+  it('requests filters from the server rather than narrowing a loaded page', () => {
+    organizations.set([
+      org({ id: 1, name: 'Acme', industry: 'Technology', territory: 'West', ownerId: 'ada' }),
+      org({ id: 2, name: 'Globex', industry: 'Finance', territory: 'East', ownerId: 'grace' }),
+    ]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    const industry = fixture.nativeElement.querySelector(
+      '[data-testid="account-industry-filter"]',
+    ) as HTMLSelectElement;
+    industry.value = 'Technology';
+    industry.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Acme');
+    expect(text).toContain('Globex');
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc', {
+      industry: 'Technology',
+      territory: '',
+      ownerId: '',
+    });
+  });
+
+  it('keeps the search query when the seller changes page', () => {
+    component.onSearch('acme');
+    searchSpy.mockClear();
+    listSpy.mockClear();
+    const event: PageEvent = { pageIndex: 2, pageSize: 10, length: 40, previousPageIndex: 0 };
+    component.onPageChange(event);
+    expect(searchSpy).toHaveBeenCalledWith('acme', 2, 10, 'name,asc');
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('labels archive as a soft hide and still calls delete', () => {
+    const row = org({ id: 4, name: 'To Hide' });
+    organizations.set([row]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    component.onDelete(row);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Archive "To Hide"? The account will be hidden from lists.',
+    );
+  });
+
+  it('names the row actions button for screen readers', () => {
+    organizations.set([org({ id: 8, name: 'Named' })]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector(
+      'button[aria-label="Account actions"]',
+    );
+    expect(trigger).toBeTruthy();
+  });
 });
+
+function org(
+  partial: Partial<OrganizationDto> & Pick<OrganizationDto, 'id' | 'name'>,
+): OrganizationDto {
+  return {
+    uuid: `u-${partial.id}`,
+    createdAt: '',
+    updatedAt: '',
+    ...partial,
+  };
+}
