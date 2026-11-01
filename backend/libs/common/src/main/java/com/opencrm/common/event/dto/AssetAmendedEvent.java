@@ -20,6 +20,7 @@ public record AssetAmendedEvent(
         String status,
         LocalDate effectiveStart,
         LocalDate effectiveEnd,
+        LocalDate effectiveDate,
         String sourceAmendmentId,
         String sourceApplyUnit) {
 }

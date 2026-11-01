@@ -5,7 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /** Projection store for unit tests. Not a Spring bean and not a producer. */
-final class InMemoryAssetHistoryStore implements AssetHistoryStore {
+public final class InMemoryAssetHistoryStore implements AssetHistoryStore {
 
     private final List<AssetHistoryEntry> rows = new ArrayList<>();
     private long sequence;

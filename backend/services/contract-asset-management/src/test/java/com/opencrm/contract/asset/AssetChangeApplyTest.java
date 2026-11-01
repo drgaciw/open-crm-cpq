@@ -31,7 +31,7 @@ class AssetChangeApplyTest {
     private final AssetAuditOutbox audit = mock(AssetAuditOutbox.class);
     private final InMemoryAssetHistoryStore historyStore = new InMemoryAssetHistoryStore();
     private final AssetChangeApply apply = new AssetChangeApply(
-            assets, publisher, audit, new AssetHistoryProjection(historyStore));
+            assets, new AssetEventPublisher(publisher), audit, new AssetHistoryProjection(historyStore));
 
     private Asset asset;
     private Subscription subscription;
@@ -92,12 +92,34 @@ class AssetChangeApplyTest {
         InOrder order = inOrder(assets, publisher);
         order.verify(assets).save(org.mockito.ArgumentMatchers.argThat(saved ->
                 saved.getStatus() == AssetStatus.ACTIVE && asset.getUuid().equals(saved.getSupersedes())));
+        order.verify(publisher).publish(eq("Asset"), any(), eq(EventContractRegistry.ASSET_CREATED_V1), any(), any());
         order.verify(assets).save(org.mockito.ArgumentMatchers.argThat(saved ->
                 saved.getStatus() == AssetStatus.SUPERSEDED && saved.getSupersededBy() != null));
         order.verify(publisher).publish(eq("Asset"), eq(asset.getUuid()),
                 eq(EventContractRegistry.ASSET_SUPERSEDED_V1), any(), any());
         assertThat(historyStore.findByEventType(AssetHistoryKind.SUPERSEDED)).hasSize(1);
         assertThat(historyStore.findByEventType(AssetHistoryKind.CREATED)).hasSize(1);
+        verify(audit, org.mockito.Mockito.times(2)).stage(any(), any(), eq("corr"));
+    }
+
+    @Test
+    void upgradePublishesTheSuccessorBeforeThePredecessor() {
+        apply.onUnitApplied(subscription, List.of(line(ActionCode.UPGRADE, new BigDecimal("5"),
+                LocalDate.parse("2026-04-01"))), UUID.randomUUID(), 3, "corr");
+        assertThat(asset.getStatus()).isEqualTo(AssetStatus.SUPERSEDED);
+        verify(publisher).publish(eq("Asset"), any(), eq(EventContractRegistry.ASSET_CREATED_V1), any(), any());
+        verify(publisher).publish(eq("Asset"), eq(asset.getUuid()),
+                eq(EventContractRegistry.ASSET_SUPERSEDED_V1), any(), any());
+    }
+
+    @Test
+    void terminatePublishesAssetTerminatedOnce() {
+        ApplyLine terminate = line(ActionCode.TERMINATE, null, LocalDate.parse("2026-06-01"));
+        apply.onUnitApplied(subscription, List.of(terminate), UUID.randomUUID(), 5, "corr");
+        apply.onUnitApplied(subscription, List.of(terminate), UUID.randomUUID(), 5, "corr");
+        assertThat(asset.getStatus()).isEqualTo(AssetStatus.TERMINATED);
+        verify(publisher).publish(eq("Asset"), eq(asset.getUuid()),
+                eq(EventContractRegistry.ASSET_TERMINATED_V1), any(), any());
     }
 
     @Test

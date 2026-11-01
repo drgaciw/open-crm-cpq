@@ -5,8 +5,7 @@ import java.time.LocalDate;
 
 /**
  * One fact the history projection can apply.
- * Amended, superseded, and terminated facts are published by DRG-655.
- * Tests may still build them with local fixtures.
+ * Amended, superseded, and terminated facts are the DRG-655 events.
  */
 public record AssetHistoryFact(
         String eventId,

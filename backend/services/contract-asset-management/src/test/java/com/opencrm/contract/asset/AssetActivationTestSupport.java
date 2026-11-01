@@ -87,7 +87,8 @@ final class AssetActivationTestSupport {
             return null;
         }).when(publisher).publish(any(), any(), any(), any(), any());
 
-        activation = new AssetActivation(assetRepository, entitlements, publisher, new AssetAuditOutbox(publisher));
+        activation = new AssetActivation(assetRepository, entitlements,
+                new AssetEventPublisher(publisher), new AssetAuditOutbox(publisher));
         subscriptions = new AcceptedQuoteSubscriptionService(subscriptionRepository, rates, ledger,
                 new AcceptedRampValidator(), MAPPER, jdbc);
         subscriptions.setAssetActivation(activation);

@@ -15,7 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
 
-/** Stages the asset-creation audit in the domain transaction. This does not enable the relay. */
+/** Stages one audit row for a commercial asset change. This does not enable the relay. */
 @Service
 public class AssetAuditOutbox {
     public static final String TOPIC = KafkaTopics.ASSET_AUDIT;
@@ -29,7 +29,7 @@ public class AssetAuditOutbox {
     }
 
     /**
-     * {@code createdEventId} is the AssetCreated outbox id this audit describes.
+     * {@code createdEventId} is the lifecycle outbox id this audit describes.
      * The audit row itself gets a new id: {@code outbox_events.uuid} is unique, and both contracts are outbox rows.
      */
     @Transactional(propagation = Propagation.MANDATORY)

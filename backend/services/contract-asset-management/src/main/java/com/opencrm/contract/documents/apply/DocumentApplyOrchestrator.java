@@ -469,9 +469,10 @@ public class DocumentApplyOrchestrator {
             return true;
         }
         int revisionNo = document.getExecutedRevisionNo() == null ? document.getCurrentRevisionNo() : document.getExecutedRevisionNo();
-        DocumentApplyPeriods.write(subscription, revisionNo, lines, periods, rates, gateway);
+        var opened = DocumentApplyPeriods.write(subscription, revisionNo, lines, periods, rates, gateway);
         if (assetChanges != null) {
-            assetChanges.onUnitApplied(subscription, lines, document.getId(), unit.getUnitNo(), command.correlationId());
+            assetChanges.onUnitApplied(subscription, lines, document.getId(), unit.getUnitNo(),
+                    command.correlationId(), opened);
         }
         long nextRevision = Math.addExact(subscription.getCommercialRevision(), 1L);
         subscription.setCommercialRevision(nextRevision);
