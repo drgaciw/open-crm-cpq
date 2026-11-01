@@ -43,10 +43,11 @@ class AssetReadJwtFilterTest {
         @Bean @Primary JwtDecoder decoder() {
             return token -> {
                 var builder = Jwt.withTokenValue(token).header("alg", "none").subject("caller")
-                        .claim("azp", "client").claim("roles", List.of("InstalledBase.Read"))
+                        .claim("roles", List.of("InstalledBase.Read"))
                         .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
-                if ("app".equals(token)) builder.claim("idtyp", "app");
-                else builder.claim("scp", "access_as_user");
+                if ("app".equals(token)) builder.claim("idtyp", "app").claim("azp", "client");
+                else if ("blank".equals(token)) builder.claim("scp", " ");
+                else if (!"ambiguous".equals(token)) builder.claim("scp", "access_as_user");
                 return builder.build();
             };
         }
@@ -59,6 +60,8 @@ class AssetReadJwtFilterTest {
                 .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
         mvc.perform(get("/api/v1/assets").header("Authorization", "Bearer app")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/assets/a/history").header("Authorization", "Bearer app")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/assets").header("Authorization", "Bearer ambiguous")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/assets/a/history").header("Authorization", "Bearer blank")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/assets").header("Authorization", "Bearer user")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/assets/a/history").header("Authorization", "Bearer user")).andExpect(status().isOk());
     }
