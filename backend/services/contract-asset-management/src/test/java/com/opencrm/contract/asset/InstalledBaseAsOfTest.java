@@ -4,6 +4,8 @@ import com.opencrm.common.event.dto.AssetCreatedEvent;
 import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
 import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -28,6 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * A date on or after termination excludes the asset.
  */
 class InstalledBaseAsOfTest {
+    @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
+    @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
 
     private static final String ASSET = "dddddddd-dddd-4ddd-8ddd-ddddddddddd4";
     private static final String SUCCESSOR = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5";

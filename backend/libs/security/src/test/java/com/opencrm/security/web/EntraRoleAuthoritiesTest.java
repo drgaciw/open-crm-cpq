@@ -24,6 +24,7 @@ class EntraRoleAuthoritiesTest {
             "CFO, ROLE_CFO",
             "Admin, ROLE_ADMIN",
             "Internal.Invoke, ROLE_INTERNAL_INVOKE",
+            "InstalledBase.Read, ROLE_INSTALLED_BASE_READ",
             "deal-desk, ROLE_DEAL_DESK",
             "'  Sales VP ', ROLE_SALES_VP"
     })

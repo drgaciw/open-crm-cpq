@@ -82,6 +82,7 @@ public class AssetHistoryProjection {
 
     @Transactional(readOnly = true)
     public List<AssetHistoryEntryDto> history(String assetId) {
+        InstalledBaseReadAccess.require();
         if (blank(assetId)) {
             return List.of();
         }
@@ -90,6 +91,7 @@ public class AssetHistoryProjection {
 
     @Transactional(readOnly = true)
     public SupersedeChainDto chain(String assetId, String direction) {
+        InstalledBaseReadAccess.require();
         String selected = directionOf(direction);
         Map<String, List<AssetHistoryEntry>> successorsOf = new HashMap<>();
         Map<String, List<AssetHistoryEntry>> predecessorsOf = new HashMap<>();
@@ -119,6 +121,7 @@ public class AssetHistoryProjection {
 
     @Transactional(readOnly = true)
     public List<InstalledAssetDto> installedBase(String accountId, LocalDate asOf) {
+        InstalledBaseReadAccess.require();
         if (blank(accountId) || asOf == null) {
             return List.of();
         }

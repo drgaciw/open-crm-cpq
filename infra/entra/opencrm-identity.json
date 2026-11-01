@@ -47,6 +47,11 @@
         "description": "Administers OpenCRM. Decides no approvals."
       },
       {
+        "value": "InstalledBase.Read",
+        "allowedMemberTypes": ["User"],
+        "description": "Reads installed-base assets and history across all accounts; grant only to appropriately authorized users."
+      },
+      {
         "value": "Internal.Invoke",
         "allowedMemberTypes": ["Application"],
         "description": "Calls another service's /internal/** API with a service token."

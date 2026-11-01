@@ -3,6 +3,8 @@ package com.opencrm.contract.asset;
 import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -14,6 +16,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 /** A three-link supersede chain is walked in both directions from any asset. */
 class AssetSupersedeChainTest {
+    @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
+    @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
 
     private static final String A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
     private static final String B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2";

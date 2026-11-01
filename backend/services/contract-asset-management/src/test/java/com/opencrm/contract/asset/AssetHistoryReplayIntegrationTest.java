@@ -7,6 +7,8 @@ import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
 import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "opencrm.subscription-ramp.enabled=false",
         "opencrm.outbox.relay.enabled=false"})
 class AssetHistoryReplayIntegrationTest {
+    @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
+    @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
 
     private static final String ASSET = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
     private static final String SUCCESSOR = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2";

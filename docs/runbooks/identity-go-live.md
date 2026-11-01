@@ -24,7 +24,7 @@ One registration represents the whole API. Every service accepts its tokens (ADR
 | `requestedAccessTokenVersion` (manifest, `api` section) | `2` | The services accept the v2.0 issuer only. v2.0 tokens carry the API's **client id** as `aud` |
 | Exposed delegated scope | `access_as_user` | User tokens need a delegated scope (`scp`). The services tell users from services by it |
 | Optional claim, access token | `idtyp` | Marks app-only tokens as `idtyp=app`, so service tokens are recognised explicitly |
-| App roles | `CPQ.User`, `DealDesk`, `SalesVP`, `CFO`, `Admin` for users; `Internal.Invoke` for applications | See the manifest for the descriptions. The code maps `DealDesk` to `ROLE_DEAL_DESK` and so on |
+| App roles | `CPQ.User`, `DealDesk`, `SalesVP`, `CFO`, `Admin`, `InstalledBase.Read` for users; `Internal.Invoke` for applications | See the manifest for the descriptions. `InstalledBase.Read` grants all-account asset reads and must be restricted accordingly; it is not account isolation |
 | Enterprise application: assignment required | Yes | Only assigned users and workloads get tokens for the API |
 
 Record the API's **Application (client) ID**. Every service needs it in `OPENCRM_SECURITY_JWT_AUDIENCES` (section 4). The services refuse to start in production without it, because without it they would refuse every token.
@@ -131,6 +131,7 @@ Tick every line in the environment, and keep the evidence (screenshots, log line
 - [ ] Superseded approvals: when the discount figures for a quote line change while its approval is `PENDING`, the old request shows as `SUPERSEDED`, only the new one is decidable, and deciding the old one answers `409 APPROVAL_SUPERSEDED`.
 - [ ] The `CFO` group has two or more members.
 - [ ] Service calls: a quote's configuration check (quote-service to configuration-engine `/internal`) and price-book lookups (pricing-service to pricebook-service `/internal`) succeed; the same `/internal` path with a user token gets `403`.
+- [ ] Installed base: a delegated user assigned `InstalledBase.Read` can read assets; a user without it and an app-only token are denied. Provision and assign the role deliberately, and complete account-scoped authorization before broader rollout; see [asset read access](asset-read-access.md).
 - [ ] Sign-out (toolbar) ends the session at the gateway and at Entra, and returns to the app.
 - [ ] In staging, with the production configuration, a service started with `SPRING_PROFILES_ACTIVE=dev` refuses to start, and so does one without `OPENCRM_SECURITY_JWT_AUDIENCES`.
 

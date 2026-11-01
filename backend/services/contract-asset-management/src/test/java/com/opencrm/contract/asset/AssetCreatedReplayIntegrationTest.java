@@ -7,6 +7,8 @@ import com.opencrm.contract.ContractAssetManagementApplication;
 import com.opencrm.contract.service.AcceptedQuoteSubscriptionService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "opencrm.subscription-ramp.enabled=false",
         "opencrm.outbox.relay.enabled=false"})
 class AssetCreatedReplayIntegrationTest {
+    @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
+    @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
