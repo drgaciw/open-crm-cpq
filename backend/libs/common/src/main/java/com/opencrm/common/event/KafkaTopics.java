@@ -59,4 +59,7 @@ public final class KafkaTopics {
     public static final String ASSET_TERMINATED = "cpq.asset.terminated";
     /** DRG-655. ChangeLine Swap or Upgrade. The successor row exists before this event. */
     public static final String ASSET_SUPERSEDED = "cpq.asset.superseded";
+
+    /** DRG-484. One organization merged into an explicitly chosen survivor. */
+    public static final String ACCOUNTS_MERGED = "cpq.crm.account.merged";
 }
