@@ -6,9 +6,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -26,9 +29,19 @@ class AssetReadAuthorizationTest {
         signIn("ROLE_CPQ_USER");
         assertAllReadsDenied();
     }
+    @Test void appOnlyTokenWithRoleIsDeniedBeforeDataAccess() {
+        signInJwt(true, true);
+        assertAllReadsDenied();
+    }
+    @Test void inferredAppOnlyTokenWithRoleIsDeniedBeforeDataAccess() {
+        signInJwt(true, false);
+        assertAllReadsDenied();
+    }
     @Test void explicitInstalledBaseCapabilityAllowsReads() {
-        signIn("ROLE_INSTALLED_BASE_READ");
+        signInJwt(false, false);
+        when(assets.findById(1L)).thenReturn(Optional.of(Asset.builder().id(1L).build()));
         query.list(null, null, null);
+        query.get(1L);
         projection.history("asset");
         projection.chain("asset", "both");
         projection.installedBase("account", LocalDate.of(2026, 1, 1));
@@ -48,5 +61,12 @@ class AssetReadAuthorizationTest {
     private static void signIn(String role) {
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 "caller", "n/a", List.of(new SimpleGrantedAuthority(role))));
+    }
+    private static void signInJwt(boolean appOnly, boolean explicitType) {
+        var builder = Jwt.withTokenValue("token").header("alg", "none").subject("caller").claim("azp", "client");
+        if (explicitType) builder.claim("idtyp", "app");
+        if (!appOnly) builder.claim("scp", "access_as_user");
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(),
+                List.of(new SimpleGrantedAuthority("ROLE_INSTALLED_BASE_READ"))));
     }
 }

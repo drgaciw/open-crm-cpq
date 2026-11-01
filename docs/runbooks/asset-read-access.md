@@ -1,6 +1,6 @@
 # Installed-base read access
 
-Asset list, item, history, supersede-chain, and as-of reads require the Entra app role `InstalledBase.Read`, mapped to `ROLE_INSTALLED_BASE_READ`. An authenticated caller with only general OpenCRM roles is denied. The checked-in identity manifest declares this User role; it must still be provisioned and assigned in each actual Entra tenant before those users can read assets.
+Asset list, item, history, supersede-chain, and as-of reads require a human user with the Entra app role `InstalledBase.Read`, mapped to `ROLE_INSTALLED_BASE_READ`. An authenticated caller with only general OpenCRM roles is denied; app-only JWTs are denied even if they carry the authority. The checked-in identity manifest declares this User role; it must still be provisioned and assigned in each actual Entra tenant before those users can read assets. In dev mode the web filter permits anonymous requests, but asset reads still fail closed with 403 unless an authenticated user with this role is provided.
 
 This is a coarse capability granting read access across all accounts. It does not implement tenant isolation or account-scoped authorization. Grant it only to users authorized to read the complete installed base, and do not enable broader production access until a separate account-scope policy is enforced and tested. Service principals are not granted this role by the manifest.
 

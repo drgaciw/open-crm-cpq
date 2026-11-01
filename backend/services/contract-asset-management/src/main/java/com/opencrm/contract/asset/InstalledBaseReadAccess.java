@@ -10,7 +10,8 @@ final class InstalledBaseReadAccess {
 
     static void require() {
         String authority = EntraRoleAuthorities.authorityFor("InstalledBase.Read");
-        if (SecurityUtils.getCurrentCaller().filter(caller -> caller.hasAuthority(authority)).isEmpty()) {
+        if (SecurityUtils.getCurrentUser()
+                .filter(user -> user.getRoles() != null && user.getRoles().contains(authority)).isEmpty()) {
             throw new AccessDeniedException("Installed-base read capability is required");
         }
     }
