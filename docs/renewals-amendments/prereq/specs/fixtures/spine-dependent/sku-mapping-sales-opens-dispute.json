@@ -1,0 +1,31 @@
+{
+    "issue": "DRG-649",
+    "ac_id": "AC-649-2",
+    "case": "sales-opens-dispute",
+    "main_sha": "6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861",
+    "drg_599_section_sha": "352971f0f176a64d9925171e8b370f08906f9b37",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "649-F2-A, 649-F3-A, 649-F4-A, 649-F5-A, 649-F6-A",
+    "input": {
+        "document_state_before": "IN_REVIEW",
+        "line": {
+            "relationship_version": "v3",
+            "dispute_state": "ACTIVE"
+        },
+        "dispute_open": {
+            "actor_role": "SALES",
+            "relationship_version": "v3"
+        }
+    },
+    "expected": {
+        "dispute_state": "CONTESTED",
+        "audit_recorded": true,
+        "notification_sent": false,
+        "sla_clock_started": false,
+        "document_state": "IN_REVIEW",
+        "hold_state": "MAPPING_HOLD",
+        "apply_allowed": false,
+        "error_code": null
+    }
+}
