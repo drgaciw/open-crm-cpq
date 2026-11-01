@@ -125,9 +125,15 @@ public class ContactService {
 
         if (request.getOrganizationId() != null) {
             AccountId accountId = OrganizationAccountIds.fromExternalId(request.getOrganizationId(), organizationRepository);
+            // Resolve uniqueness before comparing local row IDs: two legacy rows may differ only in UUID case.
+            Organization requested = organizationRepository.findByUuidIgnoreCase(accountId.value())
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", accountId.value()));
             if (contact.getOrganization() == null ||
-                !accountId.equals(AccountId.of(contact.getOrganization().getUuid()))) {
-                contact.setOrganization(requireActiveOrganization(accountId));
+                !requested.getId().equals(contact.getOrganization().getId())) {
+                if (requested.isDeleted()) {
+                    throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");
+                }
+                contact.setOrganization(requested);
             }
         }
 
