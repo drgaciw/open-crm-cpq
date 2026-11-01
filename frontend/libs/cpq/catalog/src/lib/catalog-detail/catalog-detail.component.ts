@@ -636,7 +636,8 @@ function httpErrorMessage(
       .badge {
         font-size: 11px;
         font-weight: 600;
-        text-transform: uppercase;
+        /* Do not use text-transform: uppercase — Chromium exposes the transformed
+           string via innerText / a11y, breaking UAT contracts (e.g. "default" badge). */
         padding: 2px 6px;
         border-radius: 4px;
         background: #e3f2fd;

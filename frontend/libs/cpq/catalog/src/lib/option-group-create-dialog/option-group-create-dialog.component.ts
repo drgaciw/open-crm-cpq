@@ -196,6 +196,8 @@ export class OptionGroupCreateDialogComponent {
       name: value.name.trim(),
       selectionType: value.selectionType as SelectionType,
       minSelections: Number(value.minSelections) || 0,
+      // Backend rejects omitted sortOrder under Jackson creator-binding; always send 0.
+      sortOrder: 0,
     };
     if (value.maxSelections != null && !Number.isNaN(Number(value.maxSelections))) {
       request.maxSelections = Number(value.maxSelections);
