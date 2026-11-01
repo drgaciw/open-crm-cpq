@@ -7,6 +7,7 @@ import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.fx.CurrencyCodes;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class DealService {
     private final OrganizationRepository organizationRepository;
     private final DealMapper dealMapper;
     private final DealCurrencyConverter currencyConverter;
+    private final CrmDomainEvents domainEvents;
 
     /**
      * Create a new deal.
@@ -131,6 +133,7 @@ public class DealService {
 
         BigDecimal previousAmount = deal.getAmount();
         String previousCurrency = deal.getCurrency();
+        DealStage previousStage = deal.getStage();
 
         dealMapper.updateEntity(request, deal);
         if (!closed) {
@@ -152,6 +155,7 @@ public class DealService {
         }
 
         Deal updated = dealRepository.save(deal);
+        domainEvents.dealTransition(updated, previousStage);
         log.info("Updated deal ID: {}", updated.getId());
 
         return dealMapper.toDto(updated);
@@ -231,8 +235,10 @@ public class DealService {
             throw new BusinessException("Deal is at final stage. Use win or lose endpoint to close the deal", "INVALID_STATE_TRANSITION");
         }
 
+        DealStage previousStage = deal.getStage();
         deal.advanceStage();
         Deal updated = dealRepository.save(deal);
+        domainEvents.dealTransition(updated, previousStage);
 
         log.info("Advanced deal ID {} to stage {}", id, updated.getStage());
         return dealMapper.toDto(updated);
@@ -260,9 +266,11 @@ public class DealService {
             throw new BusinessException("Cannot mark a lost deal as won", "INVALID_STATE_TRANSITION");
         }
 
+        DealStage previousStage = deal.getStage();
         deal.markWon();
         currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
+        domainEvents.dealTransition(updated, previousStage);
 
         log.info("Marked deal ID {} as won", id);
         return dealMapper.toDto(updated);
@@ -290,9 +298,11 @@ public class DealService {
             throw new BusinessException("Deal is already marked as LOST", "INVALID_STATE_TRANSITION");
         }
 
+        DealStage previousStage = deal.getStage();
         deal.markLost(request.getReason());
         currencyConverter.freeze(deal);
         Deal updated = dealRepository.save(deal);
+        domainEvents.dealTransition(updated, previousStage);
 
         log.info("Marked deal ID {} as lost", id);
         return dealMapper.toDto(updated);

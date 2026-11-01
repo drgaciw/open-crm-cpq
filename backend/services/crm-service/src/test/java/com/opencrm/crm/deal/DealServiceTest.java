@@ -6,6 +6,7 @@ import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +45,9 @@ class DealServiceTest {
 
     @Mock
     private DealCurrencyConverter currencyConverter;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private DealService dealService;
