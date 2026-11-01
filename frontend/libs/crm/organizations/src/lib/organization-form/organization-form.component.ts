@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { OrganizationType } from '@frontend/shared-models';
+import { ACCOUNT_INDUSTRIES } from '../account-industries';
 import { OrganizationService } from '../organization.service';
 
 @Component({
@@ -29,7 +31,7 @@ import { OrganizationService } from '../organization.service';
       <button mat-icon-button (click)="goBack()" aria-label="Go back">
         <mat-icon>arrow_back</mat-icon>
       </button>
-      <h1>{{ isEditMode ? 'Edit Organization' : 'New Organization' }}</h1>
+      <h1>{{ isEditMode ? 'Edit Account' : 'New Account' }}</h1>
     </div>
 
     <mat-card class="form-card">
@@ -38,8 +40,8 @@ import { OrganizationService } from '../organization.service';
           <h3 class="section-title">Basic Information</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Organization Name</mat-label>
-              <input matInput formControlName="name" placeholder="Enter organization name">
+              <mat-label>Account Name</mat-label>
+              <input matInput formControlName="name" placeholder="Enter account name">
               @if (form.get('name')?.hasError('required')) {
                 <mat-error>Name is required</mat-error>
               }
@@ -59,6 +61,26 @@ import { OrganizationService } from '../organization.service';
             <mat-form-field appearance="outline">
               <mat-label>Website</mat-label>
               <input matInput formControlName="website" placeholder="https://example.com">
+            </mat-form-field>
+          </div>
+
+          <div class="form-row three-col">
+            <mat-form-field appearance="outline">
+              <mat-label>Type</mat-label>
+              <mat-select formControlName="type">
+                <mat-option value="">None</mat-option>
+                @for (accountType of accountTypes; track accountType) {
+                  <mat-option [value]="accountType">{{ accountType }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Territory</mat-label>
+              <input matInput formControlName="territory" placeholder="West">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Owner</mat-label>
+              <input matInput formControlName="ownerId" placeholder="Owner id">
             </mat-form-field>
           </div>
 
@@ -155,10 +177,14 @@ export class OrganizationFormComponent implements OnInit {
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
 
-  industries = [
-    'Technology', 'Healthcare', 'Finance', 'Education', 'Manufacturing',
-    'Retail', 'Real Estate', 'Consulting', 'Media', 'Telecommunications',
-    'Energy', 'Transportation', 'Government', 'Non-Profit', 'Other',
+  industries = [...ACCOUNT_INDUSTRIES];
+  accountTypes: OrganizationType[] = [
+    'PROSPECT',
+    'CUSTOMER',
+    'PARTNER',
+    'VENDOR',
+    'COMPETITOR',
+    'OTHER',
   ];
 
   ngOnInit(): void {
@@ -174,6 +200,9 @@ export class OrganizationFormComponent implements OnInit {
       postalCode: [''],
       country: [''],
       description: [''],
+      territory: [''],
+      ownerId: [''],
+      type: [''],
     });
 
     const idVal = this.id();
@@ -194,7 +223,7 @@ export class OrganizationFormComponent implements OnInit {
     if (this.form.invalid) return;
     this.saving.set(true);
 
-    const data = this.form.value;
+    const data = this.payload();
     const idVal = this.id();
 
     if (this.isEditMode && idVal) {
@@ -208,6 +237,15 @@ export class OrganizationFormComponent implements OnInit {
         error: () => this.saving.set(false),
       });
     }
+  }
+
+  /** Drop a blank enum so Jackson does not reject `type: ""`. */
+  private payload(): ReturnType<FormGroup['getRawValue']> {
+    const data = { ...this.form.value } as { type?: string };
+    if (!data.type) {
+      delete data.type;
+    }
+    return data;
   }
 
   goBack(): void {

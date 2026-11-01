@@ -57,4 +57,25 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     expect(submit.disabled).toBe(false);
     expect(submit.textContent).toContain('Create');
   });
+
+  it('uses Account copy and captures territory and owner', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('h1')?.textContent).toContain('New Account');
+    expect(el.textContent).toContain('Account Name');
+    expect(el.textContent).toContain('Territory');
+    expect(el.textContent).toContain('Owner');
+    expect(component.form.contains('territory')).toBe(true);
+    expect(component.form.contains('ownerId')).toBe(true);
+  });
+
+  it('omits a blank account type from the create body', () => {
+    const orgService = TestBed.inject(OrganizationService) as unknown as {
+      create: ReturnType<typeof vi.fn>;
+    };
+    component.form.patchValue({ name: 'Acme', type: '' });
+    component.onSubmit();
+    const body = orgService.create.mock.calls[0][0] as { name: string; type?: string };
+    expect(body.name).toBe('Acme');
+    expect(body).not.toHaveProperty('type');
+  });
 });

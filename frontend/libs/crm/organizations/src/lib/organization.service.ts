@@ -1,14 +1,39 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { EMPTY, NEVER, Observable, Subject, expand, finalize, takeUntil, toArray } from 'rxjs';
 import {
   OrganizationDto,
   OrganizationCreateRequest,
   OrganizationUpdateRequest,
   PaginationMeta,
   ContactDto,
+  DealDto,
+  QuoteDto,
   SpringPageResponse,
 } from '@frontend/shared-models';
+
+/** Parent/child account returned by the hierarchy API when BC-12-02 is deployed. */
+export interface AccountRef {
+  id: number;
+  name: string;
+}
+
+/** GET /api/v1/organizations/{id}/hierarchy. Absent (404) means the API is not deployed. */
+export interface AccountHierarchy {
+  parent: AccountRef | null;
+  ancestors: AccountRef[];
+  children: AccountRef[];
+}
+
+/** Optional list filters. Empty strings are omitted from the query. */
+export interface AccountListFilters {
+  industry?: string;
+  territory?: string;
+  ownerId?: string;
+}
+
+export const HIERARCHY_CYCLE_MESSAGE =
+  'This parent would create a cycle. Choose an account that is not already below this one.';
 
 /** Local H1 helper: message [CODE] when errorCode present (Wave U3). */
 function httpErrorMessage(err: unknown, fallback: string): string {
@@ -25,10 +50,65 @@ function httpErrorMessage(err: unknown, fallback: string): string {
   return message;
 }
 
+function httpStatus(err: unknown): number | undefined {
+  const status = (err as { status?: number } | null)?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+function isHierarchyCycle(err: unknown): boolean {
+  const e = err as {
+    errorCode?: string;
+    error?: { message?: string; errorCode?: string };
+    message?: string;
+  } | null;
+  const code = e?.errorCode || e?.error?.errorCode;
+  const message = e?.error?.message || e?.message || '';
+  return code === 'HIERARCHY_CYCLE' || /cycle/i.test(message);
+}
+
+function appendFilters(params: HttpParams, filters?: AccountListFilters): HttpParams {
+  if (!filters) {
+    return params;
+  }
+  if (filters.industry) {
+    params = params.set('industry', filters.industry);
+  }
+  if (filters.territory) {
+    params = params.set('territory', filters.territory);
+  }
+  if (filters.ownerId) {
+    params = params.set('ownerId', filters.ownerId);
+  }
+  return params;
+}
+
+function asRows<T>(body: SpringPageResponse<T> | T[] | null | undefined): T[] {
+  if (Array.isArray(body)) {
+    return body;
+  }
+  return body?.content ?? [];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrganizationService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/organizations';
+  private readonly detailChanged = new Subject<void>();
+  private readonly listChanged = new Subject<void>();
+
+  resetAccountDetail(): void {
+    this.detailChanged.next();
+    this.selectedOrganization.set(null);
+    this.organizationContacts.set([]);
+    this.relatedDeals.set([]);
+    this.relatedQuotes.set([]);
+    this.relatedQuotesTruncated.set(false);
+    this.relatedDealsError.set(null);
+    this.relatedQuotesError.set(null);
+    this.hierarchy.set(null);
+    this.hierarchyAvailable.set(false);
+    this.hierarchyError.set(null);
+  }
 
   // State
   readonly organizations = signal<OrganizationDto[]>([]);
@@ -46,19 +126,36 @@ export class OrganizationService {
   readonly organizationContacts = signal<ContactDto[]>([]);
   readonly organizationContactsLoading = signal(false);
 
+  /** Deals whose organizationId matches the open account. */
+  readonly relatedDeals = signal<DealDto[]>([]);
+  readonly relatedDealsLoading = signal(false);
+  readonly relatedDealsError = signal<string | null>(null);
+
+  /** Quotes whose customerExternalId matches this account. */
+  readonly relatedQuotes = signal<QuoteDto[]>([]);
+  readonly relatedQuotesLoading = signal(false);
+  readonly relatedQuotesTruncated = signal(false);
+  readonly relatedQuotesError = signal<string | null>(null);
+
+  /** Null until a hierarchy response arrives. False when the parent API 404s. */
+  readonly hierarchy = signal<AccountHierarchy | null>(null);
+  readonly hierarchyAvailable = signal(false);
+  readonly hierarchyError = signal<string | null>(null);
+
   readonly isEmpty = computed(() => this.organizations().length === 0 && !this.loading());
 
-  list(page = 0, size = 20, sort = 'name,asc'): void {
+  list(page = 0, size = 20, sort = 'name,asc', filters?: AccountListFilters): void {
+    this.listChanged.next();
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams()
-      .set('page', page)
-      .set('size', size)
-      .set('sort', sort);
+    const params = appendFilters(
+      new HttpParams().set('page', page).set('size', size).set('sort', sort),
+      filters,
+    );
 
     this.http
       .get<SpringPageResponse<OrganizationDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.organizations.set(p.content ?? p);
@@ -82,7 +179,7 @@ export class OrganizationService {
     this.loading.set(true);
     this.http
       .get<OrganizationDto>(`${this.basePath}/${id}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (org) => this.selectedOrganization.set(org),
         error: (err) => {
@@ -103,14 +200,31 @@ export class OrganizationService {
     return this.http.delete<void>(`${this.basePath}/${id}`);
   }
 
-  search(query: string): void {
+  search(
+    query: string,
+    page?: number,
+    size?: number,
+    sort?: string,
+    filters?: AccountListFilters,
+  ): void {
+    if (page !== undefined) this.listChanged.next();
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams().set('q', query);
+    let params = new HttpParams().set('q', query);
+    if (page !== undefined) {
+      params = params.set('page', String(page));
+    }
+    if (size !== undefined) {
+      params = params.set('size', String(size));
+    }
+    if (sort !== undefined) {
+      params = params.set('sort', sort);
+    }
+    params = appendFilters(params, filters);
     // Interceptor rebuilds List+PageInfo into SpringPageResponse
     this.http
       .get<SpringPageResponse<OrganizationDto>>(`${this.basePath}/search`, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(page === undefined ? NEVER : this.listChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.organizations.set(p.content ?? p);
@@ -141,7 +255,7 @@ export class OrganizationService {
       .set('sort', 'createdAt,desc');
     this.http
       .get<SpringPageResponse<ContactDto>>(`${this.basePath}/${organizationId}/contacts`, { params })
-      .pipe(finalize(() => this.organizationContactsLoading.set(false)))
+      .pipe(takeUntil(this.detailChanged), finalize(() => this.organizationContactsLoading.set(false)))
       .subscribe({
         next: (p) => this.organizationContacts.set(p.content ?? p),
         error: (err) => {
@@ -150,4 +264,132 @@ export class OrganizationService {
         },
       });
   }
+
+  /**
+   * GET /api/v1/deals?organizationId=
+   * Fetch all account-scoped pages so later matches are not omitted.
+   * A failure leaves a section error and does not replace the account banner.
+   */
+  loadRelatedDeals(organizationId: number): void {
+    this.relatedDealsError.set(null);
+    this.relatedDealsLoading.set(true);
+    const params = new HttpParams()
+      .set('page', '0')
+      .set('size', '100')
+      .set('organizationId', String(organizationId));
+    this.http
+      .get<SpringPageResponse<DealDto>>('/api/v1/deals', { params })
+      .pipe(
+        expand((page) => page.number + 1 < page.totalPages
+          ? this.http.get<SpringPageResponse<DealDto>>('/api/v1/deals', {
+              params: params.set('page', page.number + 1),
+            })
+          : EMPTY),
+        toArray(),
+        takeUntil(this.detailChanged),
+        finalize(() => this.relatedDealsLoading.set(false)),
+      )
+      .subscribe({
+        next: (pages) => {
+          this.relatedDeals.set(
+            pages.flatMap(asRows).filter((deal) => deal.organizationId === organizationId),
+          );
+        },
+        error: (err) => {
+          this.relatedDeals.set([]);
+          this.relatedDealsError.set(httpErrorMessage(err, 'Deals are unavailable'));
+        },
+      });
+  }
+
+  /** The quote API compares customerExternalId case-sensitively. Query only the canonical lowercase
+   * account UUID; uppercase UUIDs and opaque legacy IDs need an authoritative mapping. */
+  loadRelatedQuotes(account: OrganizationDto): void {
+    this.relatedQuotesError.set(null);
+    this.relatedQuotes.set([]);
+    this.relatedQuotesTruncated.set(false);
+    const accountId = typeof account.uuid === 'string' ? account.uuid.toLowerCase() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(accountId)) {
+      this.relatedQuotesLoading.set(false);
+      this.relatedQuotesError.set('Quotes cannot be matched: the account identifier is unavailable.');
+      return;
+    }
+    this.relatedQuotesLoading.set(true);
+    const maxPages = 5;
+    const params = new HttpParams().set('page', '0').set('size', '50').set('sort', 'id,asc')
+      .set('customerExternalId', accountId);
+    this.http.get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params })
+      .pipe(
+        expand((page, index) => index + 1 < maxPages && index + 1 < (page.totalPages ?? 1)
+          ? this.http.get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params: params.set('page', index + 1) })
+          : EMPTY, 1),
+        toArray(),
+        takeUntil(this.detailChanged),
+        finalize(() => this.relatedQuotesLoading.set(false)),
+      )
+      .subscribe({
+        next: (pages) => {
+          const byId = new Map<number, QuoteDto>();
+          for (const quote of pages.flatMap(asRows)) {
+            if (quote.customerExternalId === accountId && !byId.has(quote.id)) byId.set(quote.id, quote);
+          }
+          this.relatedQuotes.set([...byId.values()]);
+          const last = pages[pages.length - 1];
+          this.relatedQuotesTruncated.set(last != null && (last.totalPages ?? 1) > pages.length);
+        },
+        error: (err) => {
+          this.relatedQuotes.set([]);
+          this.relatedQuotesError.set(httpErrorMessage(err, 'Quotes are unavailable'));
+        },
+      });
+  }
+
+  /** GET /api/v1/organizations/{id}/hierarchy. A 404 hides the hierarchy UI. */
+  loadHierarchy(id: number): void {
+    this.hierarchyError.set(null);
+    this.hierarchyAvailable.set(false);
+    this.http.get<AccountHierarchy>(`${this.basePath}/${id}/hierarchy`).pipe(takeUntil(this.detailChanged)).subscribe({
+      next: (tree) => {
+        this.hierarchyAvailable.set(true);
+        this.hierarchy.set({
+          parent: tree?.parent ?? null,
+          ancestors: tree?.ancestors ?? [],
+          children: tree?.children ?? [],
+        });
+      },
+      error: (err) => {
+        this.hierarchy.set(null);
+        this.hierarchyAvailable.set(false);
+        if (httpStatus(err) !== 404) {
+          this.hierarchyError.set(httpErrorMessage(err, 'Account hierarchy is unavailable'));
+        }
+      },
+    });
+  }
+
+  /** PUT /api/v1/organizations/{id}/parent. Cycle responses become an actionable message. */
+  linkParent(id: number, parentId: number | null): void {
+    this.hierarchyError.set(null);
+    this.http
+      .put<AccountHierarchy>(`${this.basePath}/${id}/parent`, { parentId })
+      .pipe(takeUntil(this.detailChanged))
+      .subscribe({
+        next: (tree) => {
+          this.hierarchyAvailable.set(true);
+          this.hierarchy.set({
+            parent: tree?.parent ?? null,
+            ancestors: tree?.ancestors ?? [],
+            children: tree?.children ?? [],
+          });
+        },
+        error: (err) => {
+          this.hierarchyError.set(
+            isHierarchyCycle(err)
+              ? HIERARCHY_CYCLE_MESSAGE
+              : httpErrorMessage(err, 'Could not update the parent account'),
+          );
+        },
+      });
+  }
+
 }

@@ -43,10 +43,10 @@ export default {
     await runCrud(ctx, list, form, {
       entity: 'organization',
       apiPath: API,
-      nameField: 'Organization Name',
+      nameField: 'Account Name',
       detailUrl: /\/organizations\/(\d+)$/,
       editPath: (id) => `/organizations/${id}/edit`,
-      deleteAction: detail.actions.find((a) => a.name === 'Delete'),
+      deleteAction: detail.actions.find((a) => a.name === 'Archive'),
     });
 
     // Detail-page structure needs a record that has every optional card populated.
@@ -99,8 +99,8 @@ export default {
     await runCheck(ctx, 'organizations.list.delete-cancel-keeps-record', async () => {
       const victim = await ensure(ctx, 'organization');
       await goto(page, `/organizations/${victim.id}`);
-      await withNativeDialog(page, { type: 'confirm', message: /^Delete ".+"\?$/, accept: false },
-        () => page.getByRole('button', { name: 'Delete', exact: true }).click());
+      await withNativeDialog(page, { type: 'confirm', message: /^Archive ".+"\? The account will be hidden from lists\.$/, accept: false },
+        () => page.getByRole('button', { name: 'Archive', exact: true }).click());
       const still = await api.get(`${API}/${victim.id}`);
       if (still?.id !== victim.id) throw new Error('record disappeared although the confirm was cancelled');
     });

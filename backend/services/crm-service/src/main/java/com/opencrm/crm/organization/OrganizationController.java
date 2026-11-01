@@ -40,9 +40,14 @@ public class OrganizationController {
     public ApiResponse<List<OrganizationDto>> list(
         @Parameter(description = "Filter by organization type")
         @RequestParam(required = false) OrganizationType type,
+        @RequestParam(required = false) String industry,
+        @RequestParam(required = false) String territory,
+        @RequestParam(required = false) String ownerId,
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<OrganizationDto> organizations = organizationService.list(pageable, type);
+        Page<OrganizationDto> organizations = industry == null && territory == null && ownerId == null
+            ? organizationService.list(pageable, type)
+            : organizationService.filter(null, type, industry, territory, ownerId, pageable);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
             .page(organizations.getNumber())
@@ -92,9 +97,14 @@ public class OrganizationController {
     public ApiResponse<List<OrganizationDto>> search(
         @Parameter(description = "Search query (searches organization name)")
         @RequestParam String q,
+        @RequestParam(required = false) String industry,
+        @RequestParam(required = false) String territory,
+        @RequestParam(required = false) String ownerId,
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<OrganizationDto> organizations = organizationService.search(q, pageable);
+        Page<OrganizationDto> organizations = industry == null && territory == null && ownerId == null
+            ? organizationService.search(q, pageable)
+            : organizationService.filter(q, null, industry, territory, ownerId, pageable);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
             .page(organizations.getNumber())

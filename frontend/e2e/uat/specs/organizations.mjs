@@ -15,19 +15,19 @@ const text = (label, apiPath, extra = {}) => ({
 export const list = validateSpec({
   id: 'organizations',
   path: '/organizations',
-  heading: 'Organizations',
-  subtitle: 'Manage your business relationships',
+  heading: 'Accounts',
+  subtitle: 'Manage customer accounts',
   backend: 'crm',
   sidebar: 'Organizations',
-  searchPlaceholder: 'Search organizations...',
+  searchPlaceholder: 'Search accounts...',
   actions: [
-    { name: 'New Organization', in: 'header', navigatesTo: '/organizations/new' },
+    { name: 'New Account', in: 'header', navigatesTo: '/organizations/new' },
   ],
-  tables: [{ columns: ['Name', 'Industry', 'City', 'Phone'], sortable: ['Name', 'Industry', 'City'], pageSizes: [10, 20, 50] }],
+  tables: [{ columns: ['Name', 'Industry', 'Territory', 'Owner', 'City', 'Phone'], sortable: ['Name', 'Industry', 'Territory', 'Owner', 'City'], pageSizes: [10, 20, 50] }],
   emptyState: {
-    title: 'No organizations yet',
-    message: 'Create your first organization to get started.',
-    action: 'Create Organization',
+    title: 'No accounts yet',
+    message: 'Create your first account to get started.',
+    action: 'Create Account',
   },
   forms: [{
     id: 'organization',
@@ -38,13 +38,13 @@ export const list = validateSpec({
     cancel: { name: 'Cancel' },
     serverError: 'snackbar',
     modes: {
-      create: { path: '/organizations/new', heading: 'New Organization', submit: 'Create' },
-      edit: { heading: 'Edit Organization', submit: 'Update' },
+      create: { path: '/organizations/new', heading: 'New Account', submit: 'Create' },
+      edit: { heading: 'Edit Account', submit: 'Update' },
     },
     fields: [
-      text('Organization Name', 'name', {
+      text('Account Name', 'name', {
         required: true,
-        placeholder: 'Enter organization name',
+        placeholder: 'Enter account name',
         sample: 'Acme', // replaced with a run-unique name by the CRUD runner
         validators: [{ kind: 'required', sample: '', expectError: 'Name is required' }],
       }),
@@ -53,6 +53,16 @@ export const list = validateSpec({
         persist: { create: true, update: true, apiPath: 'industry' },
         options: [{ label: 'None', value: '' }, ...INDUSTRIES.map((i) => ({ label: i, value: i }))],
       },
+      {
+        label: 'Type', kind: 'select', sample: 'CUSTOMER',
+        persist: { create: true, update: true, apiPath: 'type' },
+        options: [
+          { label: 'None', value: '' },
+          ...['PROSPECT', 'CUSTOMER', 'PARTNER', 'VENDOR', 'COMPETITOR', 'OTHER'].map((value) => ({ label: value, value })),
+        ],
+      },
+      text('Territory', 'territory', { placeholder: 'West', sample: 'West' }),
+      text('Owner', 'ownerId', { placeholder: 'Owner id', sample: 'uat-owner' }),
       text('Website', 'website', { placeholder: 'https://example.com', sample: 'https://uat.example.com' }),
       text('Phone', 'phone', { placeholder: '+1 (555) 000-0000', sample: '+1 (555) 010-0199', editSample: '+1 (555) 010-0200' }),
       text('Address Line 1', 'addressLine1', { sample: '1 Test Way' }),
@@ -75,16 +85,18 @@ export const detail = validateSpec({
   actions: [
     { name: 'Edit', in: 'header', navigatesTo: '/organizations/:id/edit' },
     {
-      name: 'Delete', in: 'header',
-      confirm: { kind: 'native', message: /^Delete ".+"\?$/ },
+      name: 'Archive', in: 'header',
+      confirm: { kind: 'native', message: /^Archive ".+"\? The account will be hidden from lists\.$/ },
       effect: { navigate: '/organizations' },
     },
   ],
   cards: [
-    { title: 'Contact Information', labels: ['Phone', 'Website'] },
+    { title: 'Contact Information', labels: ['Phone', 'Website', 'Territory', 'Owner'] },
     { title: 'Address', labels: ['Address Line 1', 'City', 'State', 'Postal Code', 'Country'] },
     { title: 'Description', optional: true },
-    { title: 'Contacts at this organization', emptyText: 'No linked contacts yet.' },
+    { title: 'Contacts at this account', emptyText: 'No linked contacts yet.' },
+    { title: 'Deals', emptyText: 'No deals linked to this account.' },
+    { title: 'Quotes', emptyText: 'No quotes found for this account ID.' },
   ],
 });
 

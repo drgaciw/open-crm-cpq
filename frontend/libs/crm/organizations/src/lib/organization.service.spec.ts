@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { OrganizationService } from './organization.service';
-import { OrganizationDto, SpringPageResponse } from '@frontend/shared-models';
+import { DealDto, OrganizationDto, QuoteDto, SpringPageResponse } from '@frontend/shared-models';
 
 function org(
   partial: Partial<OrganizationDto> & Pick<OrganizationDto, 'id' | 'name'>,
@@ -73,4 +73,186 @@ describe('OrganizationService', () => {
     );
     expect(service.error()).toBe('Organization not found [RESOURCE_NOT_FOUND]');
   });
+
+  it('search keeps /organizations and forwards page, size, and sort', () => {
+    service.search('acme', 1, 10, 'name,desc');
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/organizations/search' &&
+        r.params.get('q') === 'acme' &&
+        r.params.get('page') === '1' &&
+        r.params.get('size') === '10' &&
+        r.params.get('sort') === 'name,desc',
+    );
+    req.flush({ content: [], number: 1, size: 10, totalElements: 0, totalPages: 0 });
+  });
+
+  it('list forwards industry, territory, and owner filters on /organizations', () => {
+    service.list(0, 20, 'name,asc', {
+      industry: 'Technology',
+      territory: 'West',
+      ownerId: 'ada',
+    });
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/organizations' &&
+        r.params.get('industry') === 'Technology' &&
+        r.params.get('territory') === 'West' &&
+        r.params.get('ownerId') === 'ada',
+    );
+    req.flush({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 });
+  });
+
+  it('cancels an older list request when a newer filtered search starts', () => {
+    service.list(0, 20, 'name,asc', { territory: 'West' });
+    const old = httpMock.expectOne((r) => r.url === '/api/v1/organizations');
+    service.search('Acme', 0, 20, 'name,asc', { territory: 'East' });
+    expect(old.cancelled).toBe(true);
+    expect(service.loading()).toBe(true);
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/organizations/search');
+    latest.flush({ content: [org({ id: 7, name: 'Acme East' })], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+    expect(service.organizations().map((item) => item.name)).toEqual(['Acme East']);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('loadRelatedDeals calls /api/v1/deals and keeps only this account', () => {
+    service.loadRelatedDeals(7);
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v1/deals' && r.params.get('organizationId') === '7',
+    );
+    const page: SpringPageResponse<DealDto> = {
+      content: [
+        deal({ id: 3, name: 'Renewal', organizationId: 7 }),
+        deal({ id: 4, name: 'Other', organizationId: 8 }),
+      ],
+      number: 0,
+      size: 100,
+      totalElements: 2,
+      totalPages: 1,
+    };
+    req.flush(page);
+    expect(service.relatedDeals().map((d) => d.id)).toEqual([3]);
+  });
+
+  it('loads every page of account-scoped deals', () => {
+    service.loadRelatedDeals(7);
+    const first = httpMock.expectOne((r) => r.url === '/api/v1/deals' && r.params.get('page') === '0');
+    expect(first.request.params.get('organizationId')).toBe('7');
+    first.flush({ content: [deal({ id: 3, name: 'First', organizationId: 7 })], number: 0, size: 100, totalElements: 101, totalPages: 2 });
+    const second = httpMock.expectOne((r) => r.url === '/api/v1/deals' && r.params.get('page') === '1');
+    expect(second.request.params.get('organizationId')).toBe('7');
+    second.flush({ content: [deal({ id: 4, name: 'Later', organizationId: 7 })], number: 1, size: 100, totalElements: 101, totalPages: 2 });
+    expect(service.relatedDeals().map((d) => d.id)).toEqual([3, 4]);
+  });
+
+  it('loads UUID-matching quote pages and ignores duplicate and legacy customer IDs', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    const account = org({ id: 7, name: 'Acme', uuid: uuid.toUpperCase() });
+    service.loadRelatedQuotes(account);
+    const first = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '0');
+    expect(first.request.params.get('customerExternalId')).toBe(uuid);
+    expect(first.request.params.get('sort')).toBe('id,asc');
+    first.flush({ content: [quote({ id: 9, name: 'Q-9', customerExternalId: uuid }),
+      quote({ id: 10, name: 'Numeric', customerExternalId: '7' }),
+      quote({ id: 11, name: 'Name', customerExternalId: 'Acme' }),
+      quote({ id: 13, name: 'Uppercase', customerExternalId: uuid.toUpperCase() })], number: 0, size: 50, totalElements: 51, totalPages: 2 });
+    const second = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '1');
+    expect(second.request.params.get('customerExternalId')).toBe(uuid);
+    second.flush({ content: [quote({ id: 9, name: 'Q-9 duplicate', customerExternalId: uuid }),
+      quote({ id: 12, name: 'Later', customerExternalId: uuid })], number: 1, size: 50, totalElements: 51, totalPages: 2 });
+    expect(service.relatedQuotes().map((q) => q.id)).toEqual([9, 12]);
+    expect(service.relatedQuotesTruncated()).toBe(false);
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+  });
+
+  it('caps quote requests and flags a truncated result', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid }));
+    for (let page = 0; page < 5; page++) {
+      const request = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === String(page));
+      request.flush({ content: [quote({ id: page + 1, name: `Q-${page}`, customerExternalId: uuid })], number: page, size: 50, totalElements: 300, totalPages: 6 });
+    }
+    expect(service.relatedQuotesTruncated()).toBe(true);
+    expect(service.relatedQuotes()).toHaveLength(5);
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+  });
+
+  it('cancels remaining quote pages when the account changes', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid }));
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '0')
+      .flush({ content: [], number: 0, size: 50, totalElements: 51, totalPages: 2 });
+    const pending = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '1');
+    service.resetAccountDetail();
+    expect(pending.cancelled).toBe(true);
+    expect(service.relatedQuotes()).toEqual([]);
+    expect(service.relatedQuotesTruncated()).toBe(false);
+  });
+
+  it('refuses a non-UUID account identity instead of querying opaque customer IDs', () => {
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid: 'not-a-uuid' }));
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+    expect(service.relatedQuotesError()).toContain('account identifier');
+  });
+
+  it('hides hierarchy when the parent API is absent', () => {
+    service.loadHierarchy(7);
+    const req = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
+    req.flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    expect(service.hierarchyAvailable()).toBe(false);
+    expect(service.error()).toBeNull();
+  });
+
+  it('shows hierarchy when the parent API returns a tree', () => {
+    service.loadHierarchy(7);
+    const req = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
+    req.flush({
+      parent: { id: 1, name: 'Root' },
+      ancestors: [{ id: 1, name: 'Root' }],
+      children: [{ id: 3, name: 'Sub' }],
+    });
+    expect(service.hierarchyAvailable()).toBe(true);
+    expect(service.hierarchy()?.parent?.name).toBe('Root');
+    expect(service.hierarchy()?.children[0].name).toBe('Sub');
+  });
+
+  it('linkParent surfaces an actionable cycle error', () => {
+    service.linkParent(7, 7);
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v1/organizations/7/parent' && r.method === 'PUT',
+    );
+    expect(req.request.body).toEqual({ parentId: 7 });
+    req.flush(
+      { message: 'Hierarchy cycle detected', errorCode: 'HIERARCHY_CYCLE' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    expect(service.hierarchyError()).toContain('This parent would create a cycle');
+  });
+
+
 });
+
+function deal(
+  partial: Partial<DealDto> & Pick<DealDto, 'id' | 'name'>,
+): DealDto {
+  return {
+    uuid: `d-${partial.id}`,
+    stage: 'PROSPECTING',
+    createdAt: '',
+    updatedAt: '',
+    ...partial,
+  };
+}
+
+function quote(
+  partial: Partial<QuoteDto> & Pick<QuoteDto, 'id' | 'name' | 'customerExternalId'>,
+): QuoteDto {
+  return {
+    uuid: `q-${partial.id}`,
+    status: 'DRAFT',
+    durationInMonths: 12,
+    createdAt: '',
+    updatedAt: '',
+    ...partial,
+  };
+}

@@ -30,6 +30,12 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @EntityGraph(attributePaths = {"organization", "primaryContact"})
     Page<Deal> findByStageAndDeletedFalse(DealStage stage, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"organization", "primaryContact"})
+    Page<Deal> findByOrganization_IdAndDeletedFalse(Long organizationId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"organization", "primaryContact"})
+    Page<Deal> findByOrganization_IdAndStageAndDeletedFalse(Long organizationId, DealStage stage, Pageable pageable);
+
     /**
      * Find deals by owner (excluding deleted).
      */

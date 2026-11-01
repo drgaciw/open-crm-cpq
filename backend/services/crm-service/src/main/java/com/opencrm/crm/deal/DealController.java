@@ -42,8 +42,10 @@ public class DealController {
     @Operation(summary = "List deals", description = "Get a paginated list of deals with optional filtering")
     public ApiResponse<List<DealDto>> list(
             @PageableDefault(size = 20) Pageable pageable,
-            @RequestParam(required = false) DealStage stage) {
-        Page<DealDto> deals = dealService.list(pageable, stage);
+            @RequestParam(required = false) DealStage stage,
+            @RequestParam(required = false) Long organizationId) {
+        Page<DealDto> deals = organizationId == null ? dealService.list(pageable, stage)
+                : dealService.listByOrganization(pageable, stage, organizationId);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
                 .page(deals.getNumber())

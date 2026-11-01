@@ -21,7 +21,7 @@ function record(id, status, detail = '', severity = 'info') {
 
 const CRM_PAGES = [
   ['/dashboard', 'Dashboard'],
-  ['/organizations', 'Organizations'],
+  ['/organizations', 'Accounts'],
   ['/contacts', 'Contacts'],
   ['/leads', 'Leads'],
   ['/deals', 'Deals'],
@@ -134,7 +134,7 @@ async function main() {
     // --- 4. XSS / unicode / oversized / SQL / null / RTL ---
     await goto(page, '/organizations/new');
     await page
-      .getByRole('textbox', { name: 'Organization Name' })
+      .getByRole('textbox', { name: 'Account Name' })
       .fill(`Chaos ${XSS} ${UNICODE} ${SQLISH} ${NULL_BYTE} ${RTL}`);
     await page.getByRole('textbox', { name: 'Description' }).fill(OVERSIZE);
     await page.getByRole('textbox', { name: 'Website' }).fill('javascript:alert(1)');
@@ -309,7 +309,7 @@ async function main() {
       }
     });
     await goto(page, '/organizations/new');
-    await page.getByRole('textbox', { name: 'Organization Name' }).fill(`LateCancel ${stamp}`);
+    await page.getByRole('textbox', { name: 'Account Name' }).fill(`LateCancel ${stamp}`);
     await page.getByRole('button', { name: 'Create' }).click().catch(() => {});
     await page.waitForTimeout(200);
     await page.getByRole('button', { name: 'Cancel' }).click().catch(() => {});
@@ -424,7 +424,7 @@ async function main() {
     await goto(page, '/organizations/new').catch(() => {});
     // may fail navigation; try fill if still there
     if (page.url().includes('/organizations/new')) {
-      await page.getByRole('textbox', { name: 'Organization Name' }).fill(`Offline ${stamp}`).catch(() => {});
+      await page.getByRole('textbox', { name: 'Account Name' }).fill(`Offline ${stamp}`).catch(() => {});
       await page.getByRole('button', { name: 'Create' }).click().catch(() => {});
       await page.waitForTimeout(1500);
       const enabledOffline = await createEnabled(page);
@@ -440,7 +440,7 @@ async function main() {
     }
     await context.setOffline(false);
     await goto(page, '/organizations/new');
-    await page.getByRole('textbox', { name: 'Organization Name' }).fill(`OnlineAfter ${stamp}`);
+    await page.getByRole('textbox', { name: 'Account Name' }).fill(`OnlineAfter ${stamp}`);
     const onlineEnabled = await createEnabled(page);
     record('online-after-offline', onlineEnabled ? 'PASS' : 'FAIL', `createEnabled=${onlineEnabled}`);
 
