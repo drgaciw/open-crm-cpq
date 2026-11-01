@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-suspend-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "suspend-ineligible-downgrade",
+  "intent": "Suspend",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Suspend",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-CORE-C",
+    "relationshipType": "DOWNGRADE",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "DOWNGRADE",
+    "errorCode": "SUSPEND_NOT_ELIGIBLE",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-CORE-C",
+    "onDate": "2026-10-05",
+    "reason": "DOWNGRADE is outside the eligible product-relationship types for Suspend. Eligible types: none. Product SKU-CORE-A to SKU-CORE-C on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}

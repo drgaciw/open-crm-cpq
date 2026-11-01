@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-cancel-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "cancel-ineligible-upgrade",
+  "intent": "Cancel",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Cancel",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-SAAS-B",
+    "relationshipType": "UPGRADE",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "UPGRADE",
+    "errorCode": "CANCEL_NOT_ELIGIBLE",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-SAAS-B",
+    "onDate": "2026-10-05",
+    "reason": "UPGRADE is outside the eligible product-relationship types for Cancel. Eligible types: none. Product SKU-CORE-A to SKU-SAAS-B on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}
