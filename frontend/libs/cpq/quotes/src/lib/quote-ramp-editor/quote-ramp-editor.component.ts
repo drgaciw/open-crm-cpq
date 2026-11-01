@@ -10,6 +10,7 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, finalize, take, takeUntil } from 'rxjs';
 import {
   FormBuilder,
   FormControl,
@@ -414,6 +415,14 @@ export class QuoteRampEditorComponent {
   });
 
   private readonly formRevision = signal(0);
+  private readonly previewVersion = computed(() => ({
+    quoteId: this.quoteId(),
+    lineId: this.selectedLineId(),
+    duration: this.durationInMonths(),
+    revision: this.formRevision(),
+    editable: this.editable(),
+  }));
+  private activePreview: { context: ReturnType<QuoteRampEditorComponent['previewContext']>; cancel: Subject<void> } | null = null;
   private appliedKey = '';
   private appliedLineId: number | null = null;
 
@@ -563,6 +572,18 @@ export class QuoteRampEditorComponent {
     });
   });
 
+  private readonly cancelStalePreview = effect(() => {
+    const current = this.previewVersion();
+    untracked(() => {
+      const active = this.activePreview;
+      if (active != null && active.context !== current) {
+        this.reportDiscardedPreview(active.context);
+        active.cancel.next();
+        active.cancel.complete();
+      }
+    });
+  });
+
   private readonly lockWhenReadonly = effect(() => {
     const editable = this.editable();
     untracked(() => {
@@ -637,6 +658,8 @@ export class QuoteRampEditorComponent {
       return;
     }
     const preview = this.previewContext();
+    const active = { context: preview, cancel: new Subject<void>() };
+    this.activePreview = active;
     this.expanding.set(true);
     this.error.set(null);
     this.quoteService
@@ -644,15 +667,17 @@ export class QuoteRampEditorComponent {
         durationInMonths: this.durationInMonths(),
         escalator,
       })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(take(1), takeUntil(active.cancel), takeUntilDestroyed(this.destroyRef), finalize(() => {
+        if (this.activePreview === active) {
+          this.activePreview = null;
+          this.expanding.set(false);
+        }
+      }))
       .subscribe({
-        next: (steps) => {
-          this.expanding.set(false);
-          this.applyPreview(preview, steps);
-        },
+        next: (steps) => this.applyPreview(preview, steps),
         error: (err: unknown) => {
-          this.expanding.set(false);
           if (this.isCurrentPreview(preview)) this.error.set(httpErrorMessage(err));
+          else this.reportDiscardedPreview(preview);
         },
       });
   }
@@ -669,6 +694,8 @@ export class QuoteRampEditorComponent {
     }
     const steps = this.readSteps(false);
     const preview = this.previewContext();
+    const active = { context: preview, cancel: new Subject<void>() };
+    this.activePreview = active;
     this.extending.set(true);
     this.error.set(null);
     this.quoteService
@@ -677,15 +704,17 @@ export class QuoteRampEditorComponent {
         durationInMonths: duration,
         escalator,
       })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(take(1), takeUntil(active.cancel), takeUntilDestroyed(this.destroyRef), finalize(() => {
+        if (this.activePreview === active) {
+          this.activePreview = null;
+          this.extending.set(false);
+        }
+      }))
       .subscribe({
-        next: (returned) => {
-          this.extending.set(false);
-          this.applyPreview(preview, returned);
-        },
+        next: (returned) => this.applyPreview(preview, returned),
         error: (err: unknown) => {
-          this.extending.set(false);
           if (this.isCurrentPreview(preview)) this.error.set(httpErrorMessage(err));
+          else this.reportDiscardedPreview(preview);
         },
       });
   }
@@ -875,25 +904,22 @@ export class QuoteRampEditorComponent {
   }
 
   private previewContext() {
-    return {
-      quoteId: this.quoteId(),
-      lineId: this.selectedLineId(),
-      duration: this.durationInMonths(),
-      revision: this.formRevision(),
-    };
+    return this.previewVersion();
   }
 
   private isCurrentPreview(context: ReturnType<QuoteRampEditorComponent['previewContext']>): boolean {
-    return this.editable() && this.quoteId() === context.quoteId && this.selectedLineId() === context.lineId
-      && this.durationInMonths() === context.duration && this.formRevision() === context.revision;
+    return context.editable && this.previewVersion() === context;
+  }
+
+  private reportDiscardedPreview(context: ReturnType<QuoteRampEditorComponent['previewContext']>): void {
+    if (this.editable() && this.quoteId() === context.quoteId && this.selectedLineId() === context.lineId) {
+      this.error.set('The schedule changed while the preview was running. Generate the preview again.');
+    }
   }
 
   private applyPreview(context: ReturnType<QuoteRampEditorComponent['previewContext']>, result: unknown): void {
-    if (this.isCurrentPreview(context)) {
-      this.replaceSteps(this.previewSteps(result));
-    } else if (this.editable() && this.quoteId() === context.quoteId && this.selectedLineId() === context.lineId) {
-      this.error.set('The schedule changed while the preview was running. Generate the preview again.');
-    }
+    if (this.isCurrentPreview(context)) this.replaceSteps(this.previewSteps(result));
+    else this.reportDiscardedPreview(context);
   }
 
   private coveredMonths(): number {

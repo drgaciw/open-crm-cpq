@@ -750,6 +750,106 @@ describe('QuoteRampEditorComponent', () => {
     expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(123);
   });
 
+  it('cancels an extension when editability changes, even if it later returns', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    fixture.componentRef.setInput('editable', false);
+    fixture.detectChanges();
+    expect(pending.observed).toBe(false);
+    expect(component.extending()).toBe(false);
+    fixture.componentRef.setInput('editable', true);
+    fixture.detectChanges();
+    pending.next([step({ months: 36, unitPrice: 999 })]);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(40);
+  });
+
+  it('discards a response when the term changes and returns before change detection', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    fixture.componentRef.setInput('durationInMonths', 48);
+    fixture.componentRef.setInput('durationInMonths', 36);
+    pending.next([step({ months: 36, unitPrice: 999 })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(40);
+  });
+
+  it('cancels the old request when switching lines so the new line is not blocked', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
+    fixture.detectChanges();
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    component.onLineChange(2);
+    fixture.detectChanges();
+    expect(pending.observed).toBe(false);
+    expect(component.extending()).toBe(false);
+    expect(component.canSave()).toBe(true);
+  });
+
+  it('keeps a new preview busy when a cancelled older request produces a late response', () => {
+    const first = new Subject<RampStep[]>();
+    const second = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValueOnce(first.asObservable()).mockReturnValueOnce(second.asObservable());
+    fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
+    fixture.detectChanges();
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    component.onLineChange(2);
+    fixture.detectChanges();
+    component.form.controls.escalator.setValue({ startPrice: 123, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    expect(component.extending()).toBe(true);
+    first.next([step({ months: 36, unitPrice: 999 })]);
+    expect(component.extending()).toBe(true);
+    second.next([step({ months: 36, unitPrice: 123 }), step({ sequence: 2, startMonth: 37, unitPrice: 129.15 })]);
+    expect(component.extending()).toBe(false);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(123);
+  });
+
+  it('rejects a response after a transient line change before change detection', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fixture.componentRef.setInput('lines', [line(), line({ id: 2 })]);
+    fixture.detectChanges();
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    component.onLineChange(2);
+    component.onLineChange(1);
+    pending.next([step({ months: 36, unitPrice: 999 })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(40);
+  });
+
+  it('reports that an edited schedule invalidated a preview even when the old request fails', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    component.form.controls.steps.at(0).controls.unitPrice.setValue(77);
+    pending.error(new Error('old request failed'));
+    fixture.detectChanges();
+    expect(text()).toContain('schedule changed while the preview was running');
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(77);
+  });
+
   it('AC-532-9 shows the extend error and keeps the edited rows', () => {
     extendRampSchedule.mockReturnValue(
       throwError(() => ({ message: 'RAMP_TERM_MISMATCH', errorCode: 'RAMP_SCHEDULE_INVALID' })),
