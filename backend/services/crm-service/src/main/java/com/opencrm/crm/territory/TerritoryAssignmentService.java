@@ -8,6 +8,7 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class TerritoryAssignmentService {
     private final OutboxEventPublisher outboxEventPublisher;
     private final Clock clock;
 
+    @Autowired
     public TerritoryAssignmentService(OrganizationRepository organizationRepository,
                                       TerritoryAssignmentRuleRepository ruleRepository,
                                       OrganizationTerritoryAssignmentRepository assignmentRepository,
