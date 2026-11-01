@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.opencrm.common.event.NonRetryableEventException;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.contract.asset.AssetActivation;
 import com.opencrm.contract.domain.AppliedQuoteAcceptance;
 import com.opencrm.contract.domain.ErpSyncStatus;
 import com.opencrm.contract.domain.Subscription;
@@ -14,6 +15,7 @@ import com.opencrm.contract.repository.AppliedQuoteAcceptanceRepository;
 import com.opencrm.contract.repository.SubscriptionRatePeriodRepository;
 import com.opencrm.contract.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,16 @@ public class AcceptedQuoteSubscriptionService {
     private final AcceptedRampValidator validator;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
+    /** Absent when tests construct this service directly, so those tests keep the previous subscription behaviour. */
+    private AssetActivation assetActivation;
+
+    /**
+     * Additive collaborator. Spring sets it on the bean. The generated constructor is unchanged.
+     */
+    @Autowired(required = false)
+    public void setAssetActivation(AssetActivation assetActivation) {
+        this.assetActivation = assetActivation;
+    }
 
     public void apply(QuoteAcceptedEvent event) {
         AcceptedRampValidator.require(event.getCustomerId() != null && !event.getCustomerId().isBlank(), "Accepted customer is missing");
@@ -116,6 +128,7 @@ public class AcceptedQuoteSubscriptionService {
         rates.saveAll(periods);
         ledger.save(AppliedQuoteAcceptance.builder().acceptedQuoteId(event.getQuoteId()).subscriptionId(subscription.getId())
                 .operation(operation).commercialDigest(digest).build());
+        recordAssets(event, subscription, periods);
     }
 
     private void mutate(QuoteAcceptedEvent event, String digest, String operation) {
@@ -210,6 +223,13 @@ public class AcceptedQuoteSubscriptionService {
         subscriptions.save(target);
         ledger.save(AppliedQuoteAcceptance.builder().acceptedQuoteId(event.getQuoteId()).subscriptionId(target.getId())
                 .operation(operation).commercialDigest(digest).build());
+        recordAssets(event, target, priced.periods());
+    }
+
+    private void recordAssets(QuoteAcceptedEvent event, Subscription subscription, List<SubscriptionRatePeriod> periods) {
+        if (assetActivation != null) {
+            assetActivation.onActivated(event, subscription, periods);
+        }
     }
 
     private int anchoredOffset(LocalDate anchor, LocalDate start) {
