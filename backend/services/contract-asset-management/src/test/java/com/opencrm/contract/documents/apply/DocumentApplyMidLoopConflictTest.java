@@ -320,6 +320,34 @@ class DocumentApplyMidLoopConflictTest {
     }
 
     @Test
+    void mixedLedgerRejectsPendingUnitBeforeProcessingAnySibling() {
+        ApplyFixture fixture = new ApplyFixture();
+        Subscription first = fixture.subscription(1L, 4L, START, END);
+        Subscription second = fixture.subscription(2L, 7L, START, END);
+        var pending = fixture.unit(1, first, 4L);
+        var sibling = fixture.unit(2, second, 7L);
+        fixture.line(1, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        fixture.line(2, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), pending,
+                fixture.lines.stream().filter(line -> line.unitNo() == 1).toList());
+        DocumentApplyLedgerEntry entry = ledgerRow(fixture, 1);
+        entry.setApplyKeyDigest(digest);
+        fixture.ledger.put(fixture.document.getId() + ":1", entry);
+        pending.setDependencyOrder(2);
+        sibling.setDependencyOrder(1);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(pending.getStatus()).isEqualTo(ApplicationUnitStatus.PENDING);
+        assertThat(sibling.getStatus()).isEqualTo(ApplicationUnitStatus.PENDING);
+        assertThat(fixture.periods).isEmpty();
+        assertThat(fixture.ledger).hasSize(1);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+    }
+
+    @Test
     void crashRecoveryDoesNotReevaluateCommittedBlockedUnit() {
         ApplyFixture fixture = new ApplyFixture();
         Subscription first = fixture.subscription(1L, 4L, START, END);

@@ -114,6 +114,20 @@ public class DocumentApplyOrchestrator {
             throw new DocumentApplyException("apply key digest does not match the recorded attempt",
                     HttpStatus.CONFLICT, "DIGEST_CONFLICT");
         }
+        boolean inconsistentPending = Boolean.TRUE.equals(unitTransaction.execute(status -> {
+            gateway.lockDocument(document.getId());
+            for (AmendmentApplicationUnit unit : orderedUnits(document)) {
+                if (unit.getStatus() == ApplicationUnitStatus.PENDING && pendingMatchesLedger(document, unit, lines)) {
+                    return true;
+                }
+            }
+            return false;
+        }));
+        if (inconsistentPending) {
+            audit(document, command, "DIGEST_CONFLICT", "ledger exists for a unit that is not applied");
+            throw new DocumentApplyException("ledger exists for a unit that is not applied",
+                    HttpStatus.CONFLICT, "DIGEST_CONFLICT");
+        }
         if (sameDigestReplay(document, ordered, lines)) {
             if (document.getStatus() == AmendmentDocumentStatus.EXECUTED) {
                 if (ordered.stream().anyMatch(unit -> unit.getStatus() != ApplicationUnitStatus.APPLIED)) {
@@ -163,6 +177,10 @@ public class DocumentApplyOrchestrator {
                 changed |= Boolean.TRUE.equals(unitTransaction.execute(
                         status -> applyUnit(document, unit, lines, command, blockReasons)));
             } catch (DocumentApplyException ex) {
+                if (ex instanceof PendingLedgerInconsistency) {
+                    audit(document, command, "DIGEST_CONFLICT", "ledger exists for a unit that is not applied");
+                    throw ex;
+                }
                 if (!"DIGEST_CONFLICT".equals(ex.getErrorCode())) {
                     throw ex;
                 }
@@ -314,6 +332,19 @@ public class DocumentApplyOrchestrator {
         return orderedUnits(document).stream().anyMatch(unit -> unit.getStatus() == ApplicationUnitStatus.APPLIED);
     }
 
+    private boolean pendingMatchesLedger(AmendmentDocument document, AmendmentApplicationUnit unit, List<ApplyLine> lines) {
+        Optional<DocumentApplyLedgerEntry> entry = ledger.findByTenantIdAndDocumentIdAndUnitNo(
+                document.getTenantId(), document.getId(), unit.getUnitNo());
+        return entry.isPresent() && DocumentApplyDigest.unitDigest(document.getId(), unit, linesFor(lines, unit.getUnitNo()))
+                .equals(entry.get().getApplyKeyDigest());
+    }
+
+    private static final class PendingLedgerInconsistency extends DocumentApplyException {
+        private PendingLedgerInconsistency() {
+            super("ledger exists for a unit that is not applied", HttpStatus.CONFLICT, "DIGEST_CONFLICT");
+        }
+    }
+
     private boolean applyUnit(AmendmentDocument document, AmendmentApplicationUnit stale, List<ApplyLine> allLines,
                               ApplyCommand command, Map<Integer, String> blockReasons) {
         gateway.lockDocument(document.getId());
@@ -344,6 +375,9 @@ public class DocumentApplyOrchestrator {
             if (!digest.equals(existing.get().getApplyKeyDigest())) {
                 throw new DocumentApplyException("apply key digest does not match the ledger",
                         HttpStatus.CONFLICT, "DIGEST_CONFLICT");
+            }
+            if (unit.getStatus() == ApplicationUnitStatus.PENDING) {
+                throw new PendingLedgerInconsistency();
             }
             return false;
         }

@@ -162,6 +162,35 @@ class DocumentApplyIntegrationTest {
     }
 
     @Test
+    void pendingMatchingLedgerDoesNotApplyEarlierSibling() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var first = units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId).getFirst();
+        String digest = DocumentApplyDigest.unitDigest(documentId, first,
+                gateway.lines(documentId, 1).stream().filter(line -> line.unitNo() == 1).toList());
+        jdbc.update("update amendment_application_units set dependency_order = 2 where document_id = ? and unit_no = 1",
+                documentId);
+        jdbc.update("update amendment_application_units set dependency_order = 1 where document_id = ? and unit_no = 2",
+                documentId);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 1, ?, 'earlier')
+                """, tenant, documentId, digest);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForList("""
+                select status from amendment_application_units where document_id = ? order by unit_no
+                """, String.class, documentId)).containsExactly("PENDING", "PENDING");
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?",
+                Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
     void recoveryFinalizesCommittedUnitsAndWritesOneOutcomeEvent() {
         UUID tenant = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
