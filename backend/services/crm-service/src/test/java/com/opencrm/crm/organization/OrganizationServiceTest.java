@@ -1,6 +1,7 @@
 package com.opencrm.crm.organization;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.contact.ContactDto;
 import com.opencrm.crm.contact.ContactService;
 import com.opencrm.crm.outbox.CrmDomainEvents;
@@ -104,7 +105,7 @@ class OrganizationServiceTest {
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
             when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
 
-            OrganizationDto result = organizationService.getById(1L);
+            OrganizationDto result = organizationService.getById(AccountId.of(1L));
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(1L);
@@ -115,7 +116,7 @@ class OrganizationServiceTest {
         void shouldThrowWhenNotFound() {
             when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.getById(999L))
+            assertThatThrownBy(() -> organizationService.getById(AccountId.of(999L)))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -125,7 +126,7 @@ class OrganizationServiceTest {
             organization.setDeleted(true);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.getById(1L))
+            assertThatThrownBy(() -> organizationService.getById(AccountId.of(1L)))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -177,7 +178,7 @@ class OrganizationServiceTest {
             when(organizationRepository.save(organization)).thenReturn(organization);
             when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
 
-            OrganizationDto result = organizationService.update(1L, updateRequest);
+            OrganizationDto result = organizationService.update(AccountId.of(1L), updateRequest);
 
             assertThat(result).isNotNull();
             verify(organizationMapper).updateEntity(updateRequest, organization);
@@ -189,7 +190,7 @@ class OrganizationServiceTest {
         void shouldThrowWhenNotFoundOnUpdate() {
             when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.update(999L, updateRequest))
+            assertThatThrownBy(() -> organizationService.update(AccountId.of(999L), updateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -199,7 +200,7 @@ class OrganizationServiceTest {
             organization.setDeleted(true);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.update(1L, updateRequest))
+            assertThatThrownBy(() -> organizationService.update(AccountId.of(1L), updateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -213,7 +214,7 @@ class OrganizationServiceTest {
         void shouldSoftDeleteOrganization() {
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
 
-            organizationService.delete(1L);
+            organizationService.delete(AccountId.of(1L));
 
             assertThat(organization.isDeleted()).isTrue();
             verify(organizationRepository).save(organization);
@@ -224,7 +225,7 @@ class OrganizationServiceTest {
         void shouldThrowWhenDeletingNonExistent() {
             when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.delete(999L))
+            assertThatThrownBy(() -> organizationService.delete(AccountId.of(999L)))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -234,7 +235,7 @@ class OrganizationServiceTest {
             organization.setDeleted(true);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.delete(1L))
+            assertThatThrownBy(() -> organizationService.delete(AccountId.of(1L)))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -315,12 +316,12 @@ class OrganizationServiceTest {
             Page<ContactDto> contactPage = new PageImpl<>(List.of(
                     ContactDto.builder().id(1L).firstName("John").lastName("Doe").build()
             ));
-            when(contactService.getByOrganization(1L, pageable)).thenReturn(contactPage);
+            when(contactService.getByOrganization(AccountId.of(1L), pageable)).thenReturn(contactPage);
 
-            Page<ContactDto> result = organizationService.getContacts(1L, pageable);
+            Page<ContactDto> result = organizationService.getContacts(AccountId.of(1L), pageable);
 
             assertThat(result.getContent()).hasSize(1);
-            verify(contactService).getByOrganization(1L, pageable);
+            verify(contactService).getByOrganization(AccountId.of(1L), pageable);
         }
 
         @Test
@@ -328,7 +329,7 @@ class OrganizationServiceTest {
         void shouldThrowWhenOrgNotFound() {
             when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.getContacts(999L, pageable))
+            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of(999L), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -338,7 +339,7 @@ class OrganizationServiceTest {
             organization.setDeleted(true);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.getContacts(1L, pageable))
+            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of(1L), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }

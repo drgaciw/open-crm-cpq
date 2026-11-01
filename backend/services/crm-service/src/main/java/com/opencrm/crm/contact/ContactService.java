@@ -2,6 +2,7 @@ package com.opencrm.crm.contact;
 
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import com.opencrm.crm.outbox.CrmDomainEvents;
@@ -47,16 +48,8 @@ public class ContactService {
         // Convert request to entity
         Contact contact = contactMapper.toEntity(request);
 
-        // Link to organization if provided
         if (request.getOrganizationId() != null) {
-            Organization organization = organizationRepository.findById(request.getOrganizationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Organization", request.getOrganizationId()));
-
-            if (organization.isDeleted()) {
-                throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");
-            }
-
-            contact.setOrganization(organization);
+            contact.setOrganization(requireActiveOrganization(AccountId.of(request.getOrganizationId())));
         }
 
         // Save and return
@@ -129,19 +122,11 @@ public class ContactService {
             }
         }
 
-        // Update organization if provided
         if (request.getOrganizationId() != null) {
+            AccountId accountId = AccountId.of(request.getOrganizationId());
             if (contact.getOrganization() == null ||
-                !contact.getOrganization().getId().equals(request.getOrganizationId())) {
-
-                Organization organization = organizationRepository.findById(request.getOrganizationId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Organization", request.getOrganizationId()));
-
-                if (organization.isDeleted()) {
-                    throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");
-                }
-
-                contact.setOrganization(organization);
+                !accountId.equals(AccountId.of(contact.getOrganization().getId()))) {
+                contact.setOrganization(requireActiveOrganization(accountId));
             }
         }
 
@@ -206,15 +191,24 @@ public class ContactService {
      * Get contacts by organization.
      */
     @Transactional(readOnly = true)
-    public Page<ContactDto> getByOrganization(Long organizationId, Pageable pageable) {
-        log.debug("Fetching contacts for organization ID: {}", organizationId);
+    public Page<ContactDto> getByOrganization(AccountId accountId, Pageable pageable) {
+        log.debug("Fetching contacts for organization ID: {}", accountId.value());
 
-        // Verify organization exists
+        Long organizationId = accountId.value();
         if (!organizationRepository.existsById(organizationId)) {
             throw new ResourceNotFoundException("Organization", organizationId);
         }
 
         Page<Contact> contacts = contactRepository.findByOrganizationIdAndDeletedFalse(organizationId, pageable);
         return contacts.map(contactMapper::toDto);
+    }
+
+    private Organization requireActiveOrganization(AccountId accountId) {
+        Organization organization = organizationRepository.findById(accountId.value())
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", accountId.value()));
+        if (organization.isDeleted()) {
+            throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");
+        }
+        return organization;
     }
 }

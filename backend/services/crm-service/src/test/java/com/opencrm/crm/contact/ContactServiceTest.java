@@ -2,6 +2,7 @@ package com.opencrm.crm.contact;
 
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import com.opencrm.crm.outbox.CrmDomainEvents;
@@ -437,7 +438,7 @@ class ContactServiceTest {
             when(contactRepository.findByOrganizationIdAndDeletedFalse(1L, pageable)).thenReturn(page);
             when(contactMapper.toDto(contact)).thenReturn(contactDto);
 
-            Page<ContactDto> result = contactService.getByOrganization(1L, pageable);
+            Page<ContactDto> result = contactService.getByOrganization(AccountId.of(1L), pageable);
 
             assertThat(result.getContent()).hasSize(1);
         }
@@ -447,7 +448,7 @@ class ContactServiceTest {
         void shouldThrowWhenOrgNotFound() {
             when(organizationRepository.existsById(999L)).thenReturn(false);
 
-            assertThatThrownBy(() -> contactService.getByOrganization(999L, pageable))
+            assertThatThrownBy(() -> contactService.getByOrganization(AccountId.of(999L), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }

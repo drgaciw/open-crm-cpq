@@ -1,5 +1,6 @@
 package com.opencrm.crm.organization;
 
+import com.opencrm.common.valueobject.AccountId;
 import org.mapstruct.*;
 
 import java.util.List;
@@ -27,9 +28,27 @@ public interface OrganizationMapper {
 
     /**
      * Convert Organization entity to OrganizationDto.
+     * {@code id} stays a {@code Long} on the wire and is read from {@link AccountId}.
      */
+    @Mapping(target = "id", source = ".", qualifiedByName = "accountIdValue")
     @Mapping(target = "contactCount", expression = "java(entity.getContactCount() != null ? entity.getContactCount() : 0)")
     OrganizationDto toDto(Organization entity);
+
+    /**
+     * Shared-kernel identifier for this organization. Null until the row has an id.
+     */
+    default AccountId accountId(Organization entity) {
+        if (entity == null || entity.getId() == null) {
+            return null;
+        }
+        return AccountId.of(entity.getId());
+    }
+
+    @Named("accountIdValue")
+    default Long accountIdValue(Organization entity) {
+        AccountId accountId = accountId(entity);
+        return accountId == null ? null : accountId.value();
+    }
 
     /**
      * Update Organization entity from OrganizationUpdateRequest.

@@ -1,6 +1,7 @@
 package com.opencrm.crm.organization;
 
 import com.opencrm.common.dto.ApiResponse;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.contact.ContactDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -62,7 +63,7 @@ public class OrganizationController {
         @Parameter(description = "Organization ID")
         @PathVariable Long id
     ) {
-        OrganizationDto organization = organizationService.getById(id);
+        OrganizationDto organization = organizationService.getById(AccountId.of(id));
         return ApiResponse.success(organization);
     }
 
@@ -73,7 +74,7 @@ public class OrganizationController {
         @PathVariable Long id,
         @Valid @RequestBody OrganizationUpdateRequest request
     ) {
-        OrganizationDto organization = organizationService.update(id, request);
+        OrganizationDto organization = organizationService.update(AccountId.of(id), request);
         return ApiResponse.success(organization, "Organization updated successfully");
     }
 
@@ -83,7 +84,7 @@ public class OrganizationController {
         @Parameter(description = "Organization ID")
         @PathVariable Long id
     ) {
-        organizationService.delete(id);
+        organizationService.delete(AccountId.of(id));
         return ApiResponse.success(null, "Deleted successfully");
     }
 
@@ -115,7 +116,7 @@ public class OrganizationController {
         @PathVariable Long id,
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<ContactDto> contacts = organizationService.getContacts(id, pageable);
+        Page<ContactDto> contacts = organizationService.getContacts(AccountId.of(id), pageable);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
             .page(contacts.getNumber())
