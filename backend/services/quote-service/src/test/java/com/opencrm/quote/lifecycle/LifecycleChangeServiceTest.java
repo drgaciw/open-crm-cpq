@@ -57,6 +57,7 @@ class LifecycleChangeServiceTest {
     private final LifecycleChangeAuditWriter audit = mock(LifecycleChangeAuditWriter.class);
     private final SubscriptionTargetReader subscriptions = mock(SubscriptionTargetReader.class);
     private final PricingServiceClient pricing = mock(PricingServiceClient.class);
+    private final LifecycleCreateLock createLock = mock(LifecycleCreateLock.class);
     private final Map<UUID, LifecycleChange> stored = new HashMap<>();
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
@@ -79,6 +80,15 @@ class LifecycleChangeServiceTest {
             }
             return Optional.of(change);
         });
+        when(changes.advanceVersion(any(), any(), any(Long.class))).thenAnswer(invocation -> {
+            LifecycleChange change = stored.get(invocation.getArgument(0));
+            Long expected = invocation.getArgument(2);
+            if (change == null || !change.getTid().equals(invocation.getArgument(1)) || !expected.equals(change.getVersion())) {
+                return 0;
+            }
+            change.setVersion(expected + 1);
+            return 1;
+        });
         when(changes.findByTidAndIdempotencyKey(any(), any())).thenAnswer(invocation -> stored.values().stream()
                 .filter(change -> invocation.getArgument(0).equals(change.getTid()))
                 .filter(change -> invocation.getArgument(1).equals(change.getIdempotencyKey()))
@@ -89,6 +99,58 @@ class LifecycleChangeServiceTest {
     void signOut() {
         TestCallers.clear();
         stored.clear();
+    }
+
+    @Test
+    void createRejectsAStaleOrMissingTargetRevision() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        when(subscriptions.read(SUBSCRIPTION)).thenReturn(new SubscriptionTarget(SUBSCRIPTION, "ACTIVE", 5L));
+        assertThatThrownBy(() -> service().create(twoLines(), null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("V3");
+        assertThat(stored).isEmpty();
+        when(subscriptions.read(SUBSCRIPTION)).thenReturn(new SubscriptionTarget(SUBSCRIPTION, "ACTIVE", null));
+        assertThatThrownBy(() -> service().create(twoLines(), null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("V3");
+        assertThat(stored).isEmpty();
+    }
+
+    @Test
+    void priceRechecksObservedRevisionBeforeCallingPricing() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        LifecycleChangeService service = service();
+        UUID id = service.create(twoLines(), null).body().getId();
+        when(subscriptions.read(SUBSCRIPTION)).thenReturn(new SubscriptionTarget(SUBSCRIPTION, "ACTIVE", 5L));
+        assertThatThrownBy(() -> service.price(id, priceCommand(0L)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("V3");
+        verify(pricing, never()).evaluateContinuation(any());
+    }
+
+    @Test
+    void submitRechecksRevisionAfterPricing() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        LifecycleChangeService service = service();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        UUID id = service.create(twoLines(), null).body().getId();
+        service.price(id, priceCommand(0L));
+        when(subscriptions.read(SUBSCRIPTION)).thenReturn(new SubscriptionTarget(SUBSCRIPTION, "ACTIVE", 5L));
+        assertThatThrownBy(() -> service.submit(id, version(1L)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("V3");
+        assertThat(stored.get(id).getStatus()).isEqualTo(LifecycleChangeStatus.PRICED);
+    }
+
+    @Test
+    void successfulCommandsReturnNewVersionsAndRejectStaleOnes() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        LifecycleChangeService service = service();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        UUID id = service.create(twoLines(), null).body().getId();
+        assertThat(service.price(id, priceCommand(0L)).body().getVersion()).isEqualTo(1L);
+        assertThatThrownBy(() -> service.submit(id, version(0L)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(error -> ((BusinessException) error).getErrorCode()).isEqualTo("VERSION_CONFLICT");
+        assertThat(service.submit(id, version(1L)).body().getVersion()).isEqualTo(2L);
     }
 
     @Test
@@ -313,11 +375,11 @@ class LifecycleChangeServiceTest {
         UUID id = service.create(twoLines(), "idem-1").body().getId();
         assertThat(service.price(id, priceCommand(0L)).body().getStatus()).isEqualTo("PRICED");
 
-        LifecycleChangeResult submitted = service.submit(id, version(0L));
+        LifecycleChangeResult submitted = service.submit(id, version(1L));
 
         assertThat(submitted.replayed()).isFalse();
         assertThat(submitted.body().getStatus()).isEqualTo("IN_APPROVAL");
-        assertThat(service.submit(id, version(0L)).replayed()).isTrue();
+        assertThat(service.submit(id, version(1L)).replayed()).isTrue();
         verify(audit, never()).record(any());
     }
 
@@ -404,7 +466,7 @@ class LifecycleChangeServiceTest {
         when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
         UUID id = service.create(twoLines(), null).body().getId();
         service.price(id, priceCommand(0L));
-        assertThat(service.submit(id, version(0L)).body().getLines())
+        assertThat(service.submit(id, version(1L)).body().getLines())
                 .allSatisfy(line -> assertThat(line.getConfigurationHash()).isNull());
 
         stored.clear();
@@ -413,7 +475,7 @@ class LifecycleChangeServiceTest {
         stored.get(unpinned).getLines().get(0).setPricebookVersion(null);
         stored.get(unpinned).setStatus(LifecycleChangeStatus.PRICED);
 
-        assertThatThrownBy(() -> service.submit(unpinned, version(0L)))
+        assertThatThrownBy(() -> service.submit(unpinned, version(1L)))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getMessage()).contains("V9"));
         verify(audit, never()).record(any());
@@ -452,7 +514,7 @@ class LifecycleChangeServiceTest {
     }
 
     private LifecycleChangeService service() {
-        return new LifecycleChangeService(changes, audit, subscriptions, pricing, json);
+        return new LifecycleChangeService(changes, audit, subscriptions, pricing, json, createLock);
     }
 
     private static void assertStatus(Throwable error, HttpStatus status, String code) {
