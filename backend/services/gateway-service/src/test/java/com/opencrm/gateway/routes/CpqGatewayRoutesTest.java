@@ -238,6 +238,8 @@ class CpqGatewayRoutesTest {
                 "CRM contacts must route to crm-service");
         assertTrue(yaml.contains("/api/v1/deals/**"),
                 "CRM deals must route to crm-service");
+        assertTrue(yaml.contains("/api/v1/playbooks/**"),
+                "CRM playbooks must route to crm-service");
         assertTrue(yaml.contains("Path=/api/v1/erp/**"),
                 "ERP agent-contract paths must hit erp-stub");
     }
