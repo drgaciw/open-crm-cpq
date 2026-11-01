@@ -402,6 +402,21 @@ describe('QuoteService', () => {
     httpMock.expectNone('/api/v1/quotes/7/line-items');
   });
 
+  it('applies a committed extension without changing other lines or another selected quote', () => {
+    const original = quote({ id: 7, name: 'Ramp', customerExternalId: 'c', version: 3,
+      lineItems: [lineItem({ id: 9, productExternalId: 'seats' }), lineItem({ id: 10, productExternalId: 'other' })] });
+    service.selectedQuote.set(original);
+    const result = { steps: [], durationInMonths: 24, quoteVersion: 4, quoteStatus: 'DRAFT' as const };
+    service.applyRampExtension(7, 9, result);
+    expect(service.selectedQuote()).toMatchObject({ durationInMonths: 24, version: 4, rampScheduleStale: true });
+    expect(service.selectedQuote()?.lineItems?.[1]).toBe(original.lineItems?.[1]);
+    const after = service.selectedQuote();
+    service.applyRampExtension(8, 9, { ...result, durationInMonths: 36 });
+    expect(service.selectedQuote()).toBe(after);
+    service.applyRampExtension(7, 9, { ...result, durationInMonths: 12, quoteVersion: 3 });
+    expect(service.selectedQuote()).toBe(after);
+  });
+
   it('extendRampSchedule POSTs the existing steps and new term and does not change quote signals', async () => {
     const beforeQuotes = service.quotes();
     const beforeSelected = service.selectedQuote();
