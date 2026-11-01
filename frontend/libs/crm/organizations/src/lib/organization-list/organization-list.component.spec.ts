@@ -79,8 +79,8 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('app-page-header')).toBeTruthy();
     expect(el.querySelector('app-empty-state')).toBeTruthy();
-    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No organizations yet');
-    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Organization');
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No accounts yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
   });
 
   it('shows error banner and hides empty-state on failed load', () => {

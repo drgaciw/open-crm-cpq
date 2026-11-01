@@ -35,7 +35,7 @@ async function main() {
     ok('dashboard loads');
 
     for (const [path, heading] of [
-      ['/organizations', 'Organizations'],
+      ['/organizations', 'Accounts'],
       ['/contacts', 'Contacts'],
       ['/leads', 'Leads'],
       ['/deals', 'Deals'],
@@ -48,7 +48,7 @@ async function main() {
     // Organization create
     await gotoApp('/organizations/new');
     const orgName = `UAT PW Org ${stamp}`;
-    await page.getByRole('textbox', { name: 'Organization Name' }).fill(orgName);
+    await page.getByRole('textbox', { name: 'Account Name' }).fill(orgName);
     await page.getByRole('textbox', { name: 'City' }).fill('Austin');
     await page.getByRole('button', { name: 'Create' }).click();
     await page.waitForURL(/\/organizations(\/|$)/);

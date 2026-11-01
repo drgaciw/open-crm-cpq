@@ -75,13 +75,7 @@ describe('OrganizationService', () => {
   });
 
   it('search keeps /organizations and forwards page, size, and sort', () => {
-    const search = service.search as (
-      query: string,
-      page?: number,
-      size?: number,
-      sort?: string,
-    ) => void;
-    search.call(service, 'acme', 1, 10, 'name,desc');
+    service.search('acme', 1, 10, 'name,desc');
     const req = httpMock.expectOne(
       (r) =>
         r.url === '/api/v1/organizations/search' &&
@@ -94,13 +88,7 @@ describe('OrganizationService', () => {
   });
 
   it('list forwards industry, territory, and owner filters on /organizations', () => {
-    const list = service.list as (
-      page?: number,
-      size?: number,
-      sort?: string,
-      filters?: { industry?: string; territory?: string; ownerId?: string },
-    ) => void;
-    list.call(service, 0, 20, 'name,asc', {
+    service.list(0, 20, 'name,asc', {
       industry: 'Technology',
       territory: 'West',
       ownerId: 'ada',
@@ -116,12 +104,7 @@ describe('OrganizationService', () => {
   });
 
   it('loadRelatedDeals calls /api/v1/deals and keeps only this account', () => {
-    const api = service as OrganizationService & {
-      loadRelatedDeals?: (id: number) => void;
-      relatedDeals?: () => DealDto[];
-    };
-    expect(typeof api.loadRelatedDeals).toBe('function');
-    api.loadRelatedDeals!(7);
+    service.loadRelatedDeals(7);
     const req = httpMock.expectOne(
       (r) => r.url === '/api/v1/deals' && r.params.get('organizationId') === '7',
     );
@@ -136,17 +119,12 @@ describe('OrganizationService', () => {
       totalPages: 1,
     };
     req.flush(page);
-    expect(api.relatedDeals!().map((d) => d.id)).toEqual([3]);
+    expect(service.relatedDeals().map((d) => d.id)).toEqual([3]);
   });
 
   it('loadRelatedQuotes calls /api/v1/quotes with the account uuid', () => {
-    const api = service as OrganizationService & {
-      loadRelatedQuotes?: (account: OrganizationDto) => void;
-      relatedQuotes?: () => QuoteDto[];
-    };
-    expect(typeof api.loadRelatedQuotes).toBe('function');
     const account = org({ id: 7, name: 'Acme', uuid: 'uuid-7' });
-    api.loadRelatedQuotes!(account);
+    service.loadRelatedQuotes(account);
     const req = httpMock.expectOne(
       (r) => r.url === '/api/v1/quotes' && r.params.get('customerExternalId') === 'uuid-7',
     );
@@ -161,48 +139,32 @@ describe('OrganizationService', () => {
       totalPages: 1,
     };
     req.flush(page);
-    expect(api.relatedQuotes!().map((q) => q.id)).toEqual([9]);
+    expect(service.relatedQuotes().map((q) => q.id)).toEqual([9]);
   });
 
   it('hides hierarchy when the parent API is absent', () => {
-    const api = service as OrganizationService & {
-      loadHierarchy?: (id: number) => void;
-      hierarchyAvailable?: () => boolean;
-    };
-    expect(typeof api.loadHierarchy).toBe('function');
-    api.loadHierarchy!(7);
+    service.loadHierarchy(7);
     const req = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
     req.flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
-    expect(api.hierarchyAvailable!()).toBe(false);
+    expect(service.hierarchyAvailable()).toBe(false);
     expect(service.error()).toBeNull();
   });
 
   it('shows hierarchy when the parent API returns a tree', () => {
-    const api = service as OrganizationService & {
-      loadHierarchy?: (id: number) => void;
-      hierarchyAvailable?: () => boolean;
-      hierarchy?: () => { parent: { id: number; name: string } | null; children: { name: string }[] } | null;
-    };
-    expect(typeof api.loadHierarchy).toBe('function');
-    api.loadHierarchy!(7);
+    service.loadHierarchy(7);
     const req = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
     req.flush({
       parent: { id: 1, name: 'Root' },
       ancestors: [{ id: 1, name: 'Root' }],
       children: [{ id: 3, name: 'Sub' }],
     });
-    expect(api.hierarchyAvailable!()).toBe(true);
-    expect(api.hierarchy!()?.parent?.name).toBe('Root');
-    expect(api.hierarchy!()?.children[0].name).toBe('Sub');
+    expect(service.hierarchyAvailable()).toBe(true);
+    expect(service.hierarchy()?.parent?.name).toBe('Root');
+    expect(service.hierarchy()?.children[0].name).toBe('Sub');
   });
 
   it('linkParent surfaces an actionable cycle error', () => {
-    const api = service as OrganizationService & {
-      linkParent?: (id: number, parentId: number) => void;
-      hierarchyError?: () => string | null;
-    };
-    expect(typeof api.linkParent).toBe('function');
-    api.linkParent!(7, 7);
+    service.linkParent(7, 7);
     const req = httpMock.expectOne(
       (r) => r.url === '/api/v1/organizations/7/parent' && r.method === 'PUT',
     );
@@ -211,34 +173,23 @@ describe('OrganizationService', () => {
       { message: 'Hierarchy cycle detected', errorCode: 'HIERARCHY_CYCLE' },
       { status: 409, statusText: 'Conflict' },
     );
-    expect(api.hierarchyError!()).toContain('This parent would create a cycle');
+    expect(service.hierarchyError()).toContain('This parent would create a cycle');
   });
 
   it('hides merge candidates when the merge API is absent', () => {
-    const api = service as OrganizationService & {
-      loadMergeCandidates?: (id: number) => void;
-      mergeAvailable?: () => boolean;
-    };
-    expect(typeof api.loadMergeCandidates).toBe('function');
-    api.loadMergeCandidates!(7);
+    service.loadMergeCandidates(7);
     const req = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
     req.flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
-    expect(api.mergeAvailable!()).toBe(false);
+    expect(service.mergeAvailable()).toBe(false);
     expect(service.error()).toBeNull();
   });
 
   it('lists merge candidates when the merge API responds', () => {
-    const api = service as OrganizationService & {
-      loadMergeCandidates?: (id: number) => void;
-      mergeAvailable?: () => boolean;
-      mergeCandidates?: () => { id: number; name: string }[] | null;
-    };
-    expect(typeof api.loadMergeCandidates).toBe('function');
-    api.loadMergeCandidates!(7);
+    service.loadMergeCandidates(7);
     const req = httpMock.expectOne('/api/v1/organizations/7/merge-candidates');
     req.flush([{ id: 4, name: 'Dup Co', reason: 'Same domain' }]);
-    expect(api.mergeAvailable!()).toBe(true);
-    expect(api.mergeCandidates!()?.[0].name).toBe('Dup Co');
+    expect(service.mergeAvailable()).toBe(true);
+    expect(service.mergeCandidates()?.[0].name).toBe('Dup Co');
   });
 });
 
