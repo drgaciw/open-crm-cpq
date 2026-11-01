@@ -1,0 +1,35 @@
+{
+  "id": "lifecycle-intents-null-effective-end",
+  "story": "DRG-646",
+  "cluster": "lifecycle-intents",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "null-effective-end",
+  "sources": [
+    "DRG-624-rulings.md",
+    "DRG-624"
+  ],
+  "inputs": {
+    "actionDate": "2026-10-05",
+    "contractEffective": "2026-10-05",
+    "serviceActivation": "2026-10-05",
+    "customerAcceptance": "2026-10-05",
+    "trigger": "contractEffective",
+    "effectiveEndDate": null,
+    "startDate": "2026-10-05"
+  },
+  "expected": {
+    "effectiveDate": "2026-10-05",
+    "trigger": "contractEffective",
+    "relation": "same-day",
+    "effectiveEndDate": null,
+    "coverage": "open-ended",
+    "treatedAsEnded": false,
+    "citation": "DRG-624-rulings.md",
+    "citationLabel": "ruling, pre-merge",
+    "reverify": "to re-verify at DRG-624 merge",
+    "drg624Merged": false,
+    "mergeSha": null,
+    "startDateNull": false
+  }
+}
