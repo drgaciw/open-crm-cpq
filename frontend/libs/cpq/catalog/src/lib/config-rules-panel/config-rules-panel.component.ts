@@ -175,7 +175,8 @@ function httpErrorMessage(err: unknown, fallback: string): string {
       .rules-table th {
         font-size: 12px;
         font-weight: 600;
-        text-transform: uppercase;
+        /* Do not use text-transform: uppercase — Chromium exposes the transformed
+           string as the columnheader accessible name, breaking a11y + UAT contracts. */
         letter-spacing: 0.4px;
         color: #757575;
       }

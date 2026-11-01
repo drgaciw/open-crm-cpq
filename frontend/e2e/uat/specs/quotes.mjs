@@ -116,12 +116,13 @@ export const detail = validateSpec({
     },
     {
       name: 'Approve', in: 'menu', menuTrigger: MENU, enabledWhen: ['IN_REVIEW', 'PENDING_APPROVAL'],
-      titleDisabled: 'Approve is available for IN_REVIEW or PENDING_APPROVAL',
+      // Keep in sync with quotes-detail.component.ts disabled [title] copy.
+      titleDisabled: 'Approve is available in review; pending approvals are decided in Approvals',
       effect: { status: 'APPROVED' },
     },
     {
       name: 'Reject', in: 'menu', menuTrigger: MENU, enabledWhen: ['IN_REVIEW', 'PENDING_APPROVAL'],
-      titleDisabled: 'Reject is available for IN_REVIEW or PENDING_APPROVAL',
+      titleDisabled: 'Reject is available in review; pending approvals are decided in Approvals',
       confirm: { kind: 'prompt', message: 'Rejection reason (optional):' },
       effect: { status: 'REJECTED' },
       hypothesis: 'H-CPQ-Q-005',

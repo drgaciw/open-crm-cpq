@@ -206,6 +206,8 @@ export class OptionCreateDialogComponent {
       productId: this.data.productId,
       name: value.name.trim(),
       defaultOption: value.defaultOption,
+      // Backend rejects omitted sortOrder under Jackson creator-binding; always send 0.
+      sortOrder: 0,
     };
     if (
       value.priceAdjustment != null &&

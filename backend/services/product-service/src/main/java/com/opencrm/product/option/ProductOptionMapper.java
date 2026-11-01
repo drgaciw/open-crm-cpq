@@ -16,6 +16,7 @@ public interface ProductOptionMapper {
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "options", ignore = true)
+    @Mapping(target = "sortOrder", expression = "java(request.getSortOrder() == null ? 0 : request.getSortOrder())")
     ProductOptionGroup toEntity(OptionGroupCreateRequest request);
 
     @Mapping(target = "options", source = "options")
