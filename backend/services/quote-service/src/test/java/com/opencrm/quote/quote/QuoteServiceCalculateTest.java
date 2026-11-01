@@ -123,6 +123,7 @@ class QuoteServiceCalculateTest {
         when(quoteMapper.toDto(quote)).thenReturn(QuoteDto.builder().id(1L).quoteNumber("Q-1").build());
 
         QuoteDto view = quoteService.calculate(1L);
+        verify(quoteRepository).flush();
 
         assertThat(line.getListPrice()).isEqualByComparingTo("100.00");
         assertThat(line.getUnitPrice()).isEqualByComparingTo("90.00");

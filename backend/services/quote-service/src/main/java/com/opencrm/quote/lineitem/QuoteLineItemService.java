@@ -8,6 +8,9 @@ import com.opencrm.quote.quote.QuoteStatus;
 import com.opencrm.quote.ramp.RampScheduleAttacher;
 import com.opencrm.quote.ramp.RampScheduleViews;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,12 @@ public class QuoteLineItemService {
     private final QuoteRepository quoteRepository;
     private final RampScheduleAttacher rampScheduleAttacher;
     private final com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard;
+    @PersistenceContext private EntityManager entityManager;
+
+    /** Every line write participates in the quote version used by atomic ramp extension. */
+    private void advanceQuoteVersion(Quote quote) {
+        entityManager.lock(quote, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
+    }
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
@@ -40,6 +49,7 @@ public class QuoteLineItemService {
         }
 
         RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
+        advanceQuoteVersion(quote);
         String previousAuthoring = authoringFingerprint(quote);
 
         QuoteLineItem item = QuoteLineItem.builder()
@@ -91,6 +101,7 @@ public class QuoteLineItemService {
             throw new BusinessException("Line item " + lineItemId + " does not belong to quote " + quoteId, "LINE_ITEM_QUOTE_MISMATCH");
         }
 
+        advanceQuoteVersion(quote);
         String previousAuthoring = authoringFingerprint(quote);
         item.softDelete();
         lineItemRepository.save(item);
@@ -115,6 +126,7 @@ public class QuoteLineItemService {
         }
 
         RampScheduleAttacher.PreparedRampSchedule prepared = rampScheduleAttacher.prepare(quote, request);
+        advanceQuoteVersion(quote);
         String previousAuthoring = authoringFingerprint(quote);
 
         item.setProductExternalId(request.getProductExternalId());
@@ -200,6 +212,8 @@ public class QuoteLineItemService {
                         .billingFrequency(item.getBillingFrequency()).lineItemType(item.getLineItemType()).build());
         String previousAuthoring = authoringFingerprint(quote);
         try {
+            // Lock and advance the root before touching any line row, including same-term catch-up.
+            advanceQuoteVersion(quote);
             quote.setDurationInMonths(durationInMonths);
             rampScheduleAttacher.attach(item, prepared);
             item.setPricingWaterfallJson(null);
@@ -208,11 +222,8 @@ public class QuoteLineItemService {
             rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
             // Every line is checked against the new term before calculate/submit can proceed.
             quote.setRampScheduleStale(true);
-            // A second line can catch up to an already extended term. Make the root
-            // dirty in that case too, so its version serializes every schedule save.
-            quote.setUpdatedAt(java.time.Instant.now());
             return quoteRepository.saveAndFlush(quote);
-        } catch (org.springframework.dao.OptimisticLockingFailureException conflict) {
+        } catch (org.springframework.dao.OptimisticLockingFailureException | jakarta.persistence.OptimisticLockException conflict) {
             throw new BusinessException("Quote changed; reload before extending the term",
                     org.springframework.http.HttpStatus.CONFLICT, "QUOTE_VERSION_CONFLICT");
         }

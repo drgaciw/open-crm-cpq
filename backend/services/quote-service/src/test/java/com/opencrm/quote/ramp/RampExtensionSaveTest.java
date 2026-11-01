@@ -31,9 +31,10 @@ class RampExtensionSaveTest {
         line.setId(9L);
         when(quotes.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote));
         var expander = new RampEscalatorExpander();
-        service = new RampScheduleQueryService(quotes, properties, expander,
-                new QuoteLineItemService(lines, quotes,
-                        new RampScheduleAttacher(properties, new RampScheduleValidator(), expander), guard));
+        var lineService = new QuoteLineItemService(lines, quotes,
+                new RampScheduleAttacher(properties, new RampScheduleValidator(), expander), guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(lineService, "entityManager", mock(jakarta.persistence.EntityManager.class));
+        service = new RampScheduleQueryService(quotes, properties, expander, lineService);
     }
 
     @Test void savesTermAndScheduleTogetherAndReturnsFlushedVersion() {
@@ -63,7 +64,7 @@ class RampExtensionSaveTest {
         quote.setDurationInMonths(24);
         quote.setRampScheduleStale(true);
         savesTermAndScheduleTogetherAndReturnsFlushedVersion();
-        assertThat(quote.getUpdatedAt()).isNotNull();
+        verify(quotes).saveAndFlush(quote);
     }
 
     @Test void refusesLineFromAnotherQuoteBeforeMutation() {

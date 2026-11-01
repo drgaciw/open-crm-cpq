@@ -57,6 +57,7 @@ class QuoteLineItemServiceRampTest {
                 new RampScheduleValidator(),
                 new RampEscalatorExpander());
         service = new QuoteLineItemService(lineItemRepository, quoteRepository, attacher, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
     }
 
     @Test
@@ -341,6 +342,7 @@ class QuoteLineItemServiceRampTest {
                 new RampScheduleValidator(), properties, org.mockito.Mockito.mock(com.opencrm.quote.client.ApprovalRoutingClient.class), outbox);
         service = new QuoteLineItemService(lineItemRepository, quoteRepository,
                 new RampScheduleAttacher(properties, new RampScheduleValidator(), new RampEscalatorExpander()), guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
         return line;
     }
 

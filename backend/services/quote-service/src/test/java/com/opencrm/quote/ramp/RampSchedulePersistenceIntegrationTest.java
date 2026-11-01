@@ -228,6 +228,86 @@ class RampSchedulePersistenceIntegrationTest {
         });
     }
 
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void extensionWithOldQuoteVersionMustNotOverwriteNewerScheduleEdit() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        PersistedRamp fixture = persistedRamp(tx, "STALE-LINE-EDIT");
+        tx.executeWithoutResult(status -> service().updateLineItem(fixture.quoteId(), fixture.lineId(),
+                request(List.of(step(1, 1, 36, "41")))));
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> service().persistExtendedRamp(
+                fixture.quoteId(), fixture.lineId(), 48, fixture.version(),
+                RampScheduleDto.builder().steps(List.of(step(1, 1, 48, "40"))).build())))
+                .isInstanceOf(com.opencrm.common.exception.BusinessException.class)
+                .extracting("errorCode").isEqualTo("QUOTE_VERSION_CONFLICT");
+        tx.executeWithoutResult(status -> assertThat(lines.findById(fixture.lineId()).orElseThrow().getRampSteps().getFirst().getUnitPrice())
+                .isEqualByComparingTo("41"));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void addAndRemoveAdvanceQuoteVersionEvenWhenTotalsAreUnchanged() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        PersistedRamp fixture = persistedRamp(tx, "VERSION-LINE-OPS");
+        Long zeroLineId = tx.execute(status -> {
+            var zero = request(List.of(step(1, 1, 36, "0")));
+            zero.setListPrice(BigDecimal.ZERO);
+            return service().addLineItem(fixture.quoteId(), zero).getId();
+        });
+        long committedAfterAdd = tx.execute(status -> quotes.findById(fixture.quoteId()).orElseThrow().getVersion());
+        assertThat(committedAfterAdd).isGreaterThan(fixture.version());
+        tx.executeWithoutResult(status -> service().removeLineItem(fixture.quoteId(), zeroLineId));
+        Long committedAfterRemove = tx.execute(status -> quotes.findById(fixture.quoteId()).orElseThrow().getVersion());
+        assertThat(committedAfterRemove).isGreaterThan(committedAfterAdd);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentLineEditAndExtensionCannotBothCommit() throws Exception {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        PersistedRamp fixture = persistedRamp(tx, "EDIT-EXTEND-RACE");
+        CountDownLatch loaded = new CountDownLatch(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var edit = pool.submit(() -> raceEditOrExtend(fixture, loaded, false));
+            var extend = pool.submit(() -> raceEditOrExtend(fixture, loaded, true));
+            List<String> result = List.of(edit.get(30, TimeUnit.SECONDS), extend.get(30, TimeUnit.SECONDS));
+            assertThat(result).filteredOn("COMMITTED"::equals).hasSize(1);
+            assertThat(result).filteredOn(value -> !"COMMITTED".equals(value)).hasSize(1);
+            System.out.println("edit/extend race outcomes " + result);
+        }
+    }
+
+    private String raceEditOrExtend(PersistedRamp fixture, CountDownLatch loaded, boolean extend) {
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                quotes.findById(fixture.quoteId()).orElseThrow();
+                lines.findById(fixture.lineId()).orElseThrow().getRampSteps().size();
+                loaded.countDown();
+                try { if (!loaded.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timeout"); }
+                catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
+                if (extend) service().persistExtendedRamp(fixture.quoteId(), fixture.lineId(), 48, fixture.version(),
+                        RampScheduleDto.builder().steps(List.of(step(1, 1, 48, "40"))).build());
+                else service().updateLineItem(fixture.quoteId(), fixture.lineId(), request(List.of(step(1, 1, 36, "41"))));
+            });
+            return "COMMITTED";
+        } catch (RuntimeException ex) { return ex.getClass().getName() + ":" + ex.getMessage(); }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void unchangedTermAndScheduleStillAdvanceVersionAndReturnCommittedVersion() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        PersistedRamp fixture = persistedRamp(tx, "SAME-TERM-VERSION");
+        Long returned = tx.execute(status -> {
+            Quote q = quotes.findById(fixture.quoteId()).orElseThrow();
+            assertThat(q.isRampScheduleStale()).isTrue();
+            return service().persistExtendedRamp(fixture.quoteId(), fixture.lineId(), 36, fixture.version(),
+                    RampScheduleDto.builder().steps(List.of(step(1, 1, 36, "40"))).build()).getVersion();
+        });
+        Long committed = tx.execute(status -> quotes.findById(fixture.quoteId()).orElseThrow().getVersion());
+        assertThat(committed).isGreaterThan(fixture.version()).isEqualTo(returned);
+    }
+
     private ExtensionAttempt concurrentAttempt(PersistedRamp fixture, CountDownLatch bothLoaded, String price) {
         try {
             return new TransactionTemplate(transactionManager).execute(status -> {
@@ -272,8 +352,10 @@ class RampSchedulePersistenceIntegrationTest {
         var validator = new RampScheduleValidator();
         var guard = new RampScheduleGuard(lines, steps, validator, properties,
                 mock(ApprovalRoutingClient.class), mock(OutboxEventPublisher.class));
-        return new QuoteLineItemService(lines, quotes,
+        var service = new QuoteLineItemService(lines, quotes,
                 new RampScheduleAttacher(properties, validator, new RampEscalatorExpander()), guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", entityManager);
+        return service;
     }
     private LineItemCreateRequest request(List<RampStepDto> schedule) {
         return LineItemCreateRequest.builder().productExternalId("seats").productName("Seats")
