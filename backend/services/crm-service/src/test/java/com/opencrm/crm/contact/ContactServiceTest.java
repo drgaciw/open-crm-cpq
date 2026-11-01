@@ -2,6 +2,7 @@ package com.opencrm.crm.contact;
 
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import com.opencrm.crm.outbox.CrmDomainEvents;
@@ -54,7 +55,7 @@ class ContactServiceTest {
     void setUp() {
         organization = Organization.builder()
                 .id(1L)
-                .uuid("org-uuid")
+                .uuid("550e8400-e29b-41d4-a716-446655440000")
                 .name("Acme Corp")
                 .deleted(false)
                 .build();
@@ -114,6 +115,7 @@ class ContactServiceTest {
             when(contactRepository.existsByEmailIgnoreCaseAndDeletedFalse("john@example.com")).thenReturn(false);
             when(contactMapper.toEntity(createRequest)).thenReturn(contact);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             when(contactRepository.save(contact)).thenReturn(contact);
             when(contactMapper.toDto(contact)).thenReturn(contactDto);
 
@@ -167,6 +169,7 @@ class ContactServiceTest {
             when(contactRepository.existsByEmailIgnoreCaseAndDeletedFalse("john@example.com")).thenReturn(false);
             when(contactMapper.toEntity(createRequest)).thenReturn(contact);
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
             assertThatThrownBy(() -> contactService.create(createRequest))
                     .isInstanceOf(BusinessException.class)
@@ -315,6 +318,7 @@ class ContactServiceTest {
             updateRequest.setOrganizationId(1L);
             when(contactRepository.findById(1L)).thenReturn(Optional.of(contact));
             when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             when(contactRepository.save(contact)).thenReturn(contact);
             when(contactMapper.toDto(contact)).thenReturn(contactDto);
 
@@ -432,12 +436,12 @@ class ContactServiceTest {
         @Test
         @DisplayName("should get contacts by organization")
         void shouldGetContactsByOrganization() {
-            when(organizationRepository.existsById(1L)).thenReturn(true);
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             Page<Contact> page = new PageImpl<>(List.of(contact));
             when(contactRepository.findByOrganizationIdAndDeletedFalse(1L, pageable)).thenReturn(page);
             when(contactMapper.toDto(contact)).thenReturn(contactDto);
 
-            Page<ContactDto> result = contactService.getByOrganization(1L, pageable);
+            Page<ContactDto> result = contactService.getByOrganization(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), pageable);
 
             assertThat(result.getContent()).hasSize(1);
         }
@@ -445,9 +449,9 @@ class ContactServiceTest {
         @Test
         @DisplayName("should throw when organization not found")
         void shouldThrowWhenOrgNotFound() {
-            when(organizationRepository.existsById(999L)).thenReturn(false);
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440999")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> contactService.getByOrganization(999L, pageable))
+            assertThatThrownBy(() -> contactService.getByOrganization(AccountId.of("550e8400-e29b-41d4-a716-446655440999"), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
