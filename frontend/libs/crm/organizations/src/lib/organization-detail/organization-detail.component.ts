@@ -345,7 +345,10 @@ export class OrganizationDetailComponent implements OnInit {
   /** Reload when route `:id` changes (component input binding; not ngOnChanges). */
   private readonly reloadWhenRouteIdChanges = effect(() => {
     const _id = this.id();
-    untracked(() => this.loadAccount());
+    untracked(() => {
+      this.parentIdDraft.set('');
+      this.loadAccount();
+    });
   });
 
   ngOnInit(): void {

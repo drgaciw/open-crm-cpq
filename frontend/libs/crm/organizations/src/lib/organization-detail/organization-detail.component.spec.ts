@@ -52,9 +52,13 @@ describe('OrganizationDetailComponent account UX', () => {
     const oldDeals = httpMock.expectOne((r) => r.url === '/api/v1/deals');
     const oldHierarchy = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
     getByIdSpy.mockClear();
+    fixture.componentInstance.parentIdDraft.set('42');
     fixture.componentRef.setInput('id', '8');
     fixture.detectChanges();
     expect(getByIdSpy).toHaveBeenCalledWith(8);
+    expect(fixture.componentInstance.parentIdDraft()).toBe('');
+    fixture.componentInstance.onSetParent();
+    httpMock.expectNone((request) => request.method === 'PUT' && request.url === '/api/v1/organizations/8/parent');
     expect(oldAccount.cancelled).toBe(true);
     expect(oldContacts.cancelled).toBe(true);
     expect(oldDeals.cancelled).toBe(true);
