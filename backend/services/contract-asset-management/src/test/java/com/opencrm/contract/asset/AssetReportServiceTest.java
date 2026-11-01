@@ -2,9 +2,6 @@ package com.opencrm.contract.asset;
 
 import com.opencrm.common.event.dto.AssetCreatedEvent;
 import com.opencrm.common.exception.BusinessException;
-import com.opencrm.contract.asset.fixtures.AssetAmendedFixture;
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
-import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,14 +48,14 @@ class AssetReportServiceTest {
         created("dddddddd-dddd-4ddd-8ddd-ddddddddddd4", ACCOUNT, "1", "2026-01-01", "2026-05-31");
         created("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5", ACCOUNT, "1", "2026-01-01", "2026-07-01");
         created("ffffffff-ffff-4fff-8fff-fffffffffff6", ACCOUNT, "1", "2026-01-01", "2026-06-15");
-        projection.apply(AssetTerminatedFixture.of(
+        AssetReportTestEvents.terminated(projection,
                 "evt-t", "ffffffff-ffff-4fff-8fff-fffffffffff6", ACCOUNT,
-                LocalDate.parse("2026-04-01"), "amd-t", "1"));
+                LocalDate.parse("2026-04-01"), "amd-t", "1");
         created("99999999-9999-4999-8999-999999999999", ACCOUNT, "2", "2026-01-01", "2026-06-10");
         created(SUCCESSOR, ACCOUNT, "2", "2026-05-01", "2026-06-20");
-        projection.apply(AssetSupersededFixture.of(
+        AssetReportTestEvents.superseded(projection,
                 "evt-s", "99999999-9999-4999-8999-999999999999", ACCOUNT,
-                LocalDate.parse("2026-05-01"), "amd-s", "1", SUCCESSOR));
+                LocalDate.parse("2026-05-01"), "amd-s", "1", SUCCESSOR);
         created("88888888-8888-4888-8888-888888888888", OTHER, "9", "2026-01-01", "2026-06-15");
 
         UpcomingRenewalsReport report = reports.upcomingRenewals(
@@ -109,10 +106,10 @@ class AssetReportServiceTest {
     void terminationOnThePeriodBoundsIsChurnAndAnUpsizeIsNot() {
         created(ASSET, ACCOUNT, "4", "2026-01-01", "2026-12-31");
         created(SECOND, ACCOUNT, "6", "2026-01-01", "2026-12-31");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-start", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-1", "1"));
-        projection.apply(AssetAmendedFixture.of(
-                "evt-up", SECOND, ACCOUNT, LocalDate.parse("2026-06-30"), "amd-2", "1", new BigDecimal("9")));
+        AssetReportTestEvents.terminated(projection,
+                "evt-start", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-1", "1");
+        AssetReportTestEvents.amended(projection,
+                "evt-up", SECOND, ACCOUNT, LocalDate.parse("2026-06-30"), "amd-2", "1", new BigDecimal("9"));
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30"));
@@ -131,11 +128,11 @@ class AssetReportServiceTest {
     @Test
     void terminationOutsideThePeriodIsNotChurn() {
         created(ASSET, ACCOUNT, "4", "2026-01-01", "2026-12-31");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-before", ASSET, ACCOUNT, LocalDate.parse("2026-03-31"), "amd-1", "1"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-before", ASSET, ACCOUNT, LocalDate.parse("2026-03-31"), "amd-1", "1");
         created(SECOND, ACCOUNT, "2", "2026-01-01", "2026-12-31");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-after", SECOND, ACCOUNT, LocalDate.parse("2026-07-01"), "amd-2", "1"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-after", SECOND, ACCOUNT, LocalDate.parse("2026-07-01"), "amd-2", "1");
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30"));
@@ -148,10 +145,10 @@ class AssetReportServiceTest {
     void supersedeIsNotChurnEvenWhenTheSuccessorQuantityIsLower() {
         created(ASSET, ACCOUNT, "10", "2026-01-01", "2026-12-31");
         created(SUCCESSOR, ACCOUNT, "3", "2026-05-01", "2026-12-31");
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-s", "1", SUCCESSOR));
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-t", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-t", "1"));
+        AssetReportTestEvents.superseded(projection,
+                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-s", "1", SUCCESSOR);
+        AssetReportTestEvents.terminated(projection,
+                "evt-t", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-t", "1");
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30"));
@@ -163,10 +160,10 @@ class AssetReportServiceTest {
     @Test
     void downsizeBeforeALaterSupersedeIsChurnAndTheSupersedeIsNot() {
         created(ASSET, ACCOUNT, "10", "2026-01-01", "2026-12-31");
-        projection.apply(AssetAmendedFixture.of(
-                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-d", "1", new BigDecimal("7")));
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-s", "1", SUCCESSOR));
+        AssetReportTestEvents.amended(projection,
+                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-d", "1", new BigDecimal("7"));
+        AssetReportTestEvents.superseded(projection,
+                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-s", "1", SUCCESSOR);
         created(SUCCESSOR, ACCOUNT, "7", "2026-05-20", "2026-12-31");
 
         AssetChurnReport report = reports.churn(
@@ -183,10 +180,10 @@ class AssetReportServiceTest {
     @Test
     void sameDayDownsizeStillCountsWhenTheAssetIsAlsoSuperseded() {
         created(ASSET, ACCOUNT, "10", "2026-01-01", "2026-12-31");
-        projection.apply(AssetAmendedFixture.of(
-                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-d", "1", new BigDecimal("4")));
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-s", "1", SUCCESSOR));
+        AssetReportTestEvents.amended(projection,
+                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-d", "1", new BigDecimal("4"));
+        AssetReportTestEvents.superseded(projection,
+                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-s", "1", SUCCESSOR);
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-04-30"));
@@ -200,10 +197,10 @@ class AssetReportServiceTest {
     @Test
     void amendmentAfterSupersedeIsNotADownsize() {
         created(ASSET, ACCOUNT, "10", "2026-01-01", "2026-12-31");
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-s", "1", SUCCESSOR));
-        projection.apply(AssetAmendedFixture.of(
-                "evt-late", ASSET, ACCOUNT, LocalDate.parse("2026-04-15"), "amd-l", "1", new BigDecimal("1")));
+        AssetReportTestEvents.superseded(projection,
+                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-s", "1", SUCCESSOR);
+        AssetReportTestEvents.amended(projection,
+                "evt-late", ASSET, ACCOUNT, LocalDate.parse("2026-04-15"), "amd-l", "1", new BigDecimal("1"));
 
         assertThat(reports.churn(ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-04-30")).getEvents())
                 .isEmpty();
@@ -215,10 +212,10 @@ class AssetReportServiceTest {
         projection.apply(new AssetHistoryFact(
                 "evt-note", AssetHistoryKind.AMENDED, ASSET, ACCOUNT, LocalDate.parse("2026-04-10"),
                 null, "amd-n", "1", null, null, null, null, "prod-a", null));
-        projection.apply(AssetAmendedFixture.of(
-                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-15"), "amd-d", "1", new BigDecimal("4")));
-        projection.apply(AssetAmendedFixture.of(
-                "evt-same", ASSET, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-e", "1", new BigDecimal("4.0")));
+        AssetReportTestEvents.amended(projection,
+                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-15"), "amd-d", "1", new BigDecimal("4"));
+        AssetReportTestEvents.amended(projection,
+                "evt-same", ASSET, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-e", "1", new BigDecimal("4.0"));
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30"));
@@ -233,10 +230,10 @@ class AssetReportServiceTest {
     @Test
     void downsizeThenTerminationBothCountAndSumToTheOriginalQuantity() {
         created(ASSET, ACCOUNT, "10", "2026-01-01", "2026-12-31");
-        projection.apply(AssetAmendedFixture.of(
-                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-d", "1", new BigDecimal("6")));
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-t", ASSET, ACCOUNT, LocalDate.parse("2026-06-01"), "amd-t", "1"));
+        AssetReportTestEvents.amended(projection,
+                "evt-down", ASSET, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-d", "1", new BigDecimal("6"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-t", ASSET, ACCOUNT, LocalDate.parse("2026-06-01"), "amd-t", "1");
 
         AssetChurnReport report = reports.churn(
                 ACCOUNT, LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30"));
