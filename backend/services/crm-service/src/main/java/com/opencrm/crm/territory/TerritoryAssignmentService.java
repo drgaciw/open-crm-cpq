@@ -8,7 +8,10 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,32 +31,45 @@ public class TerritoryAssignmentService {
     private static final int DEFAULT_PRIORITY = 100;
 
     private final OrganizationRepository organizationRepository;
+    private final TerritoryOrganizationLockRepository organizationLocks;
     private final TerritoryAssignmentRuleRepository ruleRepository;
     private final OrganizationTerritoryAssignmentRepository assignmentRepository;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final EntityManager entityManager;
+    private final TerritoryAssignmentReadiness readiness;
     private final Clock clock;
 
     @Autowired
     public TerritoryAssignmentService(OrganizationRepository organizationRepository,
+                                      TerritoryOrganizationLockRepository organizationLocks,
                                       TerritoryAssignmentRuleRepository ruleRepository,
                                       OrganizationTerritoryAssignmentRepository assignmentRepository,
-                                      OutboxEventPublisher outboxEventPublisher) {
-        this(organizationRepository, ruleRepository, assignmentRepository, outboxEventPublisher, Clock.systemUTC());
+                                      OutboxEventPublisher outboxEventPublisher,
+                                      EntityManager entityManager,
+                                      TerritoryAssignmentReadiness readiness) {
+        this(organizationRepository, organizationLocks, ruleRepository, assignmentRepository, outboxEventPublisher, entityManager, readiness, Clock.systemUTC());
     }
 
     TerritoryAssignmentService(OrganizationRepository organizationRepository,
+                               TerritoryOrganizationLockRepository organizationLocks,
                                TerritoryAssignmentRuleRepository ruleRepository,
                                OrganizationTerritoryAssignmentRepository assignmentRepository,
                                OutboxEventPublisher outboxEventPublisher,
+                               EntityManager entityManager,
+                               TerritoryAssignmentReadiness readiness,
                                Clock clock) {
         this.organizationRepository = organizationRepository;
+        this.organizationLocks = organizationLocks;
         this.ruleRepository = ruleRepository;
         this.assignmentRepository = assignmentRepository;
         this.outboxEventPublisher = outboxEventPublisher;
+        this.entityManager = entityManager;
+        this.readiness = readiness;
         this.clock = clock;
     }
 
     public TerritoryRuleResponse createRule(TerritoryRuleRequest request) {
+        requireReady();
         if (!request.isEmployeeRangeOrdered()) {
             throw new BusinessException(
                     "minEmployeeCount must not exceed maxEmployeeCount", "INVALID_TERRITORY_RULE");
@@ -75,6 +91,7 @@ public class TerritoryAssignmentService {
 
     @Transactional(readOnly = true)
     public List<TerritoryRuleResponse> listRules() {
+        requireReady();
         return ruleRepository.findByDeletedFalseOrderByPriorityAscIdAsc().stream()
                 .map(TerritoryAssignmentService::toResponse)
                 .toList();
@@ -86,11 +103,16 @@ public class TerritoryAssignmentService {
      * organization unassigned and emits nothing.
      */
     public OrganizationSegmentResponse assign(Long organizationId) {
-        Organization organization = requireActive(organizationId);
+        requireReady();
+        // Lock before reading assignment or facts so simultaneous first assignments serialize.
+        Organization organization = requireActive(organizationId, organizationLocks.findForAssignment(organizationId));
         Optional<TerritoryAssignmentRule> match = TerritoryAssignmentRules.select(
                 facts(organization), ruleRepository.findApplicable());
         Optional<OrganizationTerritoryAssignment> current =
                 assignmentRepository.findByOrganizationId(organization.getId());
+        // A request-bound EntityManager may already hold a stale assignment. Refresh only this
+        // row after the organization lock, so no-op decisions and updates use committed state.
+        current.ifPresent(row -> entityManager.refresh(row, LockModeType.PESSIMISTIC_WRITE));
 
         if (match.isEmpty()) {
             current.filter(row -> !row.isDeleted()).ifPresent(row -> {
@@ -121,6 +143,7 @@ public class TerritoryAssignmentService {
     /** GetSegment. A missing organization is not found. An existing organization may be unassigned. */
     @Transactional(readOnly = true)
     public OrganizationSegmentResponse getSegment(Long organizationId) {
+        requireReady();
         Organization organization = requireActive(organizationId);
         return assignmentRepository.findByOrganizationId(organization.getId())
                 .filter(row -> !row.isDeleted())
@@ -141,6 +164,13 @@ public class TerritoryAssignmentService {
                         saved.getAssignedAt()));
     }
 
+    private void requireReady() {
+        if (!readiness.isReady()) {
+            throw new BusinessException("Territory assignment is not ready", HttpStatus.SERVICE_UNAVAILABLE,
+                    "TERRITORY_ASSIGNMENT_NOT_READY");
+        }
+    }
+
     private static boolean assignmentChanged(OrganizationTerritoryAssignment row, TerritoryAssignmentRule rule) {
         if (row.getId() == null || row.isDeleted()) {
             return true;
@@ -152,7 +182,11 @@ public class TerritoryAssignmentService {
     }
 
     private Organization requireActive(Long organizationId) {
-        Organization organization = organizationRepository.findById(organizationId)
+        return requireActive(organizationId, organizationRepository.findById(organizationId));
+    }
+
+    private static Organization requireActive(Long organizationId, Optional<Organization> found) {
+        Organization organization = found
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
         if (organization.isDeleted()) {
             throw new ResourceNotFoundException("Organization", organizationId);

@@ -47,18 +47,25 @@ class TerritoryAssignmentServiceTest {
     @Mock
     private OrganizationRepository organizationRepository;
     @Mock
+    private TerritoryOrganizationLockRepository organizationLocks;
+    @Mock
     private TerritoryAssignmentRuleRepository ruleRepository;
     @Mock
     private OrganizationTerritoryAssignmentRepository assignmentRepository;
     @Mock
     private OutboxEventPublisher outboxEventPublisher;
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+    @Mock
+    private TerritoryAssignmentReadiness readiness;
 
     private TerritoryAssignmentService service;
 
     @BeforeEach
     void setUp() {
         service = new TerritoryAssignmentService(
-                organizationRepository, ruleRepository, assignmentRepository, outboxEventPublisher, CLOCK);
+                organizationRepository, organizationLocks, ruleRepository, assignmentRepository, outboxEventPublisher, entityManager, readiness, CLOCK);
+        org.mockito.Mockito.lenient().when(readiness.isReady()).thenReturn(true);
     }
 
     @Test
@@ -203,7 +210,7 @@ class TerritoryAssignmentServiceTest {
 
         Organization deleted = organization();
         deleted.setDeleted(true);
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(deleted));
+        when(organizationLocks.findForAssignment(ORG_ID)).thenReturn(Optional.of(deleted));
         assertThatThrownBy(() -> service.assign(ORG_ID)).isInstanceOf(ResourceNotFoundException.class);
         verifyNoInteractions(outboxEventPublisher);
     }
@@ -272,7 +279,8 @@ class TerritoryAssignmentServiceTest {
     }
 
     private void stubOrganization() {
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(organization()));
+        org.mockito.Mockito.lenient().when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(organization()));
+        org.mockito.Mockito.lenient().when(organizationLocks.findForAssignment(ORG_ID)).thenReturn(Optional.of(organization()));
     }
 
     private static Organization organization() {
