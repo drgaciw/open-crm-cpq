@@ -18,6 +18,7 @@ public class AssetQueryService {
     }
 
     public AssetDto get(Long id) {
+        InstalledBaseReadAccess.require();
         Asset asset = assets.findById(id)
                 .filter(row -> !row.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", id));
@@ -25,6 +26,7 @@ public class AssetQueryService {
     }
 
     public List<AssetDto> list(String accountId, Long subscriptionId, String contractLineId) {
+        InstalledBaseReadAccess.require();
         List<Asset> rows;
         if (subscriptionId != null && present(contractLineId)) {
             rows = assets.findBySubscriptionIdAndContractLineIdAndDeletedFalse(subscriptionId, contractLineId)

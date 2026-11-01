@@ -5,6 +5,8 @@ import com.opencrm.contract.asset.fixtures.AssetAmendedFixture;
 import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
 import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -20,6 +22,8 @@ import static org.assertj.core.api.Assertions.tuple;
  * with effective dates and the source amendment and apply unit.
  */
 class AssetHistoryProjectionTest {
+    @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
+    @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
 
     private static final String ASSET = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
     private static final String SUCCESSOR = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2";
