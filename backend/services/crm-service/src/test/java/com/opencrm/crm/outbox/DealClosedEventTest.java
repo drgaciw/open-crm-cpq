@@ -1,6 +1,9 @@
 package com.opencrm.crm.outbox;
 
+import com.opencrm.common.event.dto.QuoteAcceptedCrmMessage;
 import com.opencrm.crm.BaseIntegrationTest;
+import com.opencrm.crm.event.QuoteAcceptedDealProcessor;
+import com.opencrm.crm.event.QuoteAcceptedOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -32,6 +36,9 @@ class DealClosedEventTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private QuoteAcceptedDealProcessor quoteAcceptedDealProcessor;
 
     private CrmOutboxHttp http;
     private CrmOutboxRows rows;
@@ -60,6 +67,29 @@ class DealClosedEventTest extends BaseIntegrationTest {
         http.lose(created.id(), "timing");
 
         assertClosed(created.uuid(), "LOST", "timing");
+    }
+
+    @Test
+    void acceptingQuoteAfterLossOmitsTheOldLossReasonFromWonEvent() throws Exception {
+        CrmOutboxHttp.Created created = http.createDeal("Reclosed deal");
+        http.lose(created.id(), "timing");
+        QuoteAcceptedCrmMessage message = QuoteAcceptedCrmMessage.builder()
+                .quoteUuid(UUID.randomUUID().toString())
+                .dealExternalId(created.uuid())
+                .build();
+
+        assertThat(quoteAcceptedDealProcessor.applyWinFromQuote(message, created.uuid()))
+                .isEqualTo(QuoteAcceptedOutcome.APPLIED);
+        var events = rows.forAggregate(created.uuid(), CrmOutboxTopics.DEAL_CLOSED);
+        assertThat(events).hasSize(2);
+        var won = events.stream().map(rows::payload)
+                .map(payload -> objectMapper.readTree(payload))
+                .filter(payload -> "WON".equals(payload.get("outcome").asString()))
+                .findFirst().orElseThrow();
+        assertThat(won.get("previousStage").asString()).isEqualTo("LOST");
+        assertThat(won.hasNonNull("lostReason")).isFalse();
+        assertThat(jdbcTemplate.queryForObject("SELECT lost_reason FROM deals WHERE id = ?", String.class, created.id()))
+                .isEqualTo("timing");
     }
 
     @Test
