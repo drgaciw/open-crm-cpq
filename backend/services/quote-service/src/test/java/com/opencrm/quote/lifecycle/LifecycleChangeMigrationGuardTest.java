@@ -12,11 +12,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Docker-free migration count. The count is this list, not a floor.
- * V1_13 is quote tenant_id; S5 lifecycle tables are V1_14 only.
+ * V1_13 is quote tenant_id; V1_14 creates lifecycle tables and V1_15 adds validation evidence.
  * Rejections go to {@code lifecycle_change_audit} in that same file, not a second migration,
  * and not {@code commercial_decision_audit} (CPQ Decision 2026-10-26, option b).
  */
-@DisplayName("DRG-583 V1_14 lifecycle migration guard")
+@DisplayName("DRG-583 lifecycle migration guard")
 class LifecycleChangeMigrationGuardTest {
 
     /** Quote-service Flyway versions on main; the list is the guard, not a floor. */
@@ -32,10 +32,11 @@ class LifecycleChangeMigrationGuardTest {
             "V1_11__processed_events_inbox.sql",
             "V1_12__continuation_operation.sql",
             "V1_13__quote_tenant_id.sql",
-            "V1_14__lifecycle_changes.sql");
+            "V1_14__lifecycle_changes.sql",
+            "V1_15__lifecycle_pricing_validation.sql");
 
     @Test
-    @DisplayName("quote-service has exactly these versions, including V1_13 tenant and V1_14 lifecycle")
+    @DisplayName("quote-service has exactly these versions, including lifecycle validation evidence")
     void versionCountIsTheList() throws IOException {
         try (var files = Files.list(migrationDir())) {
             List<String> names = files
