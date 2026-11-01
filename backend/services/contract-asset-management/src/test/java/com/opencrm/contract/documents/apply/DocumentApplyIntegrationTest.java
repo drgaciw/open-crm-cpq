@@ -68,6 +68,7 @@ class DocumentApplyIntegrationTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setupMvc() {
+        org.mockito.Mockito.when(testReadiness.isReady()).thenReturn(true);
         mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(webContext)
                 .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()).build();
         testMvc.set(mvc);
@@ -93,6 +94,74 @@ class DocumentApplyIntegrationTest {
 
     @Autowired
     private com.opencrm.contract.documents.events.AmendmentEventWriter eventWriter;
+
+    @Autowired
+    private AssetLifecycleReadiness testReadiness;
+
+    @Test
+    void defaultHoldAuditsAndLeavesDocumentAndUnitsRetryable() {
+        org.mockito.Mockito.when(testReadiness.isReady()).thenReturn(false);
+        UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID();
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        seed(tenant, documentId, first, second, false);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service",
+                "ROLE_INTERNAL_INVOKE", "corr-hold", Map.of());
+        for (int attempt = 0; attempt < 2; attempt++) {
+            assertThatThrownBy(() -> orchestrator.apply(command)).isInstanceOfSatisfying(DocumentApplyException.class,
+                    ex -> {
+                        assertThat(ex.getStatus()).isEqualTo(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+                        assertThat(ex.getErrorCode()).isEqualTo("ASSET_LIFECYCLE_HOLD");
+                    });
+        }
+        assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                .isEqualTo("EXECUTED");
+        assertThat(jdbc.queryForObject("select count(*) from amendment_application_units where document_id = ? and status = 'PENDING'",
+                Long.class, documentId)).isEqualTo(2L);
+        assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?",
+                Long.class, documentId)).isZero();
+        assertThat(jdbc.queryForObject("select sum(commercial_revision) from subscriptions where uuid in (?, ?)",
+                Long.class, first.toString(), second.toString())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from subscription_rate_periods where amendment_document_line_id in "
+                + "(select id from amendment_document_lines where document_id = ?)", Long.class, documentId)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from amendment_document_events where document_id = ? and reason_code = 'ASSET_LIFECYCLE_HOLD'",
+                Long.class, documentId)).isEqualTo(2L);
+        assertThat(jdbc.queryForObject("select count(*) from outbox_events where aggregate_id = ?",
+                Long.class, documentId.toString())).isEqualTo(2L);
+    }
+
+    @Test
+    void failedHoldAuditLeavesNoPartialWrites() {
+        org.mockito.Mockito.when(testReadiness.isReady()).thenReturn(false);
+        UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        jdbc.execute("""
+                create function test_reject_asset_hold() returns trigger language plpgsql as $$
+                begin
+                    if new.reason_code = 'ASSET_LIFECYCLE_HOLD' then raise exception 'test hold audit failure'; end if;
+                    return new;
+                end $$
+                """);
+        jdbc.execute("create trigger test_reject_asset_hold before insert on amendment_document_events for each row execute function test_reject_asset_hold()");
+        try {
+            assertThatThrownBy(() -> orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service",
+                    "ROLE_INTERNAL_INVOKE", "corr-hold-failure", Map.of()))).isInstanceOf(RuntimeException.class);
+            assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                    .isEqualTo("EXECUTED");
+            assertThat(jdbc.queryForObject("select count(*) from amendment_application_units where document_id = ? and status = 'PENDING'",
+                    Long.class, documentId)).isEqualTo(2L);
+            assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?",
+                    Long.class, documentId)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from subscription_rate_periods where amendment_document_line_id in "
+                    + "(select id from amendment_document_lines where document_id = ?)", Long.class, documentId)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from amendment_document_events where document_id = ?",
+                    Long.class, documentId)).isZero();
+            assertThat(jdbc.queryForObject("select count(*) from outbox_events where aggregate_id = ?",
+                    Long.class, documentId.toString())).isZero();
+        } finally {
+            jdbc.execute("drop trigger test_reject_asset_hold on amendment_document_events");
+            jdbc.execute("drop function test_reject_asset_hold()");
+        }
+    }
 
     @Test
     void twoUnitsApplied() {
@@ -416,6 +485,12 @@ class DocumentApplyIntegrationTest {
 
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
     static class OsivPreloadConfiguration {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        AssetLifecycleReadiness testAssetLifecycleReadiness() {
+            return org.mockito.Mockito.mock(AssetLifecycleReadiness.class);
+        }
+
         @org.springframework.context.annotation.Bean
         java.util.concurrent.atomic.AtomicReference<MockMvc> testMvc() {
             return new java.util.concurrent.atomic.AtomicReference<>();
