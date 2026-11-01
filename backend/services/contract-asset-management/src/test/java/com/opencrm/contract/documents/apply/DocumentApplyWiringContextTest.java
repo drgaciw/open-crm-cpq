@@ -44,6 +44,7 @@ class DocumentApplyWiringContextTest {
             assertThat(loaded).hasSingleBean(JdbcDocumentApplyGateway.class);
             assertThat(loaded).hasSingleBean(DocumentApplyController.class);
             assertThat(loaded).hasSingleBean(EntityManager.class);
+            assertThat(loaded.getBean(AssetLifecycleReadiness.class).isReady()).isFalse();
             assertThat(loaded.getBean(DocumentApplyOrchestrator.class)).isNotNull();
             assertThat(loaded.getBean(JdbcDocumentApplyGateway.class)).isNotNull();
             assertThat(loaded.getBean(DocumentApplyController.class)).isNotNull();
@@ -52,7 +53,8 @@ class DocumentApplyWiringContextTest {
 
     /** Explicitly imported by the runner. Not component-scanned into the CAM application. */
     @TestConfiguration(proxyBeanMethods = false)
-    @Import({DocumentApplyOrchestrator.class, JdbcDocumentApplyGateway.class, DocumentApplyController.class})
+    @Import({DocumentApplyOrchestrator.class, JdbcDocumentApplyGateway.class, DocumentApplyController.class,
+            AssetLifecycleReadiness.class})
     static class NewBeans {
         @Bean
         AmendmentDocumentRepository amendmentDocumentRepository() {

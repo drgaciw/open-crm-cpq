@@ -72,6 +72,7 @@ public class DocumentApplyOrchestrator {
     private final MeterRegistry meters;
     private final TransactionTemplate unitTransaction;
     private final EntityManager entityManager;
+    private final AssetLifecycleReadiness assetLifecycleReadiness;
     /** Absent in tests that construct the orchestrator directly. Production injects the DRG-655 mapper. */
     private AssetChangeApply assetChanges;
 
@@ -86,7 +87,8 @@ public class DocumentApplyOrchestrator {
                                      DocumentApplyGateway gateway,
                                      MeterRegistry meters,
                                      PlatformTransactionManager transactions,
-                                     EntityManager entityManager) {
+                                     EntityManager entityManager,
+                                     AssetLifecycleReadiness assetLifecycleReadiness) {
         this.documents = documents;
         this.units = units;
         this.ledger = ledger;
@@ -97,6 +99,7 @@ public class DocumentApplyOrchestrator {
         this.gateway = gateway;
         this.meters = meters;
         this.entityManager = entityManager;
+        this.assetLifecycleReadiness = assetLifecycleReadiness;
         this.unitTransaction = new TransactionTemplate(transactions);
         this.unitTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -145,6 +148,9 @@ public class DocumentApplyOrchestrator {
             throw new DocumentApplyException("apply is refused unless the document is EXECUTED",
                     HttpStatus.valueOf(preflight.permission().httpStatus()), preflight.permission().errorCode());
         }
+        if (preflight.kind() == PreflightKind.ASSET_LIFECYCLE_HOLD) {
+            refuseForAssetLifecycleHold(document, command);
+        }
 
         final AmendmentDocument applyDocument = document;
         boolean changed = false;
@@ -153,6 +159,9 @@ public class DocumentApplyOrchestrator {
                 changed |= Boolean.TRUE.equals(unitTransaction.execute(
                         status -> applyUnit(applyDocument, unit, command)));
             } catch (DocumentApplyException ex) {
+                if (ex instanceof AssetLifecycleHold) {
+                    refuseForAssetLifecycleHold(document, command);
+                }
                 if (ex instanceof PendingLedgerInconsistency) {
                     audit(document, command, "DIGEST_CONFLICT", "ledger exists for a unit that is not applied");
                     throw ex;
@@ -169,6 +178,9 @@ public class DocumentApplyOrchestrator {
                     changed |= Boolean.TRUE.equals(unitTransaction.execute(
                             status -> blockDigestConflict(applyDocument, unit, command)));
                 } catch (DocumentApplyException terminalConflict) {
+                    if (terminalConflict instanceof AssetLifecycleHold) {
+                        refuseForAssetLifecycleHold(document, command);
+                    }
                     audit(document, command, "DIGEST_CONFLICT", "apply key digest does not match the recorded attempt");
                     throw terminalConflict;
                 }
@@ -214,7 +226,7 @@ public class DocumentApplyOrchestrator {
         entityManager.clear();
     }
 
-    private enum PreflightKind { PROCEED, REPLAY, CONFLICT, ALL_LEDGER_CONFLICT, NOT_EXECUTED }
+    private enum PreflightKind { PROCEED, REPLAY, CONFLICT, ALL_LEDGER_CONFLICT, NOT_EXECUTED, ASSET_LIFECYCLE_HOLD }
     private record Preflight(PreflightKind kind, AmendmentDocument document, List<AmendmentApplicationUnit> units,
                              List<ApplyLine> lines, ApplyResult result, Transition permission,
                              AmendmentDocumentStatus recoveredOutcome) {}
@@ -283,8 +295,37 @@ public class DocumentApplyOrchestrator {
             return new Preflight(PreflightKind.ALL_LEDGER_CONFLICT, current, ordered, lines, null, null, null);
         }
         Transition permission = documentService.applyTransition(current.getStatus(), AmendmentDocumentStatus.APPLIED);
+        if (permission.allowed() && !assetLifecycleReadiness.isReady() && hasPendingAssetWork(ordered, lines)) {
+            return new Preflight(PreflightKind.ASSET_LIFECYCLE_HOLD, current, ordered, lines, null, permission, null);
+        }
         return new Preflight(permission.allowed() ? PreflightKind.PROCEED : PreflightKind.NOT_EXECUTED,
                 current, ordered, lines, null, permission, null);
+    }
+
+    /** Empty or unrecognized pending work is ambiguous and must be held as well. */
+    private static boolean hasPendingAssetWork(List<AmendmentApplicationUnit> ordered, List<ApplyLine> lines) {
+        for (AmendmentApplicationUnit unit : ordered) {
+            if (unit.getStatus() != ApplicationUnitStatus.PENDING) continue;
+            List<ApplyLine> pendingLines = linesFor(lines, unit.getUnitNo());
+            if (pendingLines.isEmpty() || pendingLines.stream().anyMatch(line -> line.action() == null
+                    || switch (line.action()) {
+                        case ADD, UPDATE, REMOVE, TERMINATE, SWAP, UPGRADE -> true;
+                        case NO_CHANGE, RENEW, DOWNGRADE, CONVERT_METRIC, SUSPEND, RESUME -> false;
+                    })) return true;
+        }
+        return false;
+    }
+
+    private void refuseForAssetLifecycleHold(AmendmentDocument document, ApplyCommand command) {
+        audit(document, command, "ASSET_LIFECYCLE_HOLD", "installed-asset lifecycle is not ready");
+        throw new AssetLifecycleHold();
+    }
+
+    private static final class AssetLifecycleHold extends DocumentApplyException {
+        private AssetLifecycleHold() {
+            super("Installed-asset lifecycle work is held until it is ready",
+                    HttpStatus.SERVICE_UNAVAILABLE, "ASSET_LIFECYCLE_HOLD");
+        }
     }
 
     /** Reject changed or unverifiable committed units before replay or processing pending siblings. */
@@ -341,6 +382,9 @@ public class DocumentApplyOrchestrator {
         }
         document = fresh;
         List<ApplyLine> lines = gateway.lines(document.getId(), document.getCurrentRevisionNo());
+        if (!assetLifecycleReadiness.isReady() && hasPendingAssetWork(orderedUnits(document), lines)) {
+            throw new AssetLifecycleHold();
+        }
         AmendmentApplicationUnit unit = orderedUnits(document).stream()
                 .filter(row -> row.getUnitNo().equals(stale.getUnitNo()))
                 .findFirst()
@@ -406,6 +450,10 @@ public class DocumentApplyOrchestrator {
             throw new DocumentApplyException("apply revision changed", HttpStatus.CONFLICT, "DIGEST_CONFLICT");
         }
         document = fresh;
+        if (!assetLifecycleReadiness.isReady() && hasPendingAssetWork(orderedUnits(document),
+                gateway.lines(document.getId(), document.getCurrentRevisionNo()))) {
+            throw new AssetLifecycleHold();
+        }
         gateway.lockSubscription(stale.getTargetRef());
         AmendmentApplicationUnit unit = orderedUnits(document).stream()
                 .filter(row -> row.getUnitNo().equals(stale.getUnitNo()))
