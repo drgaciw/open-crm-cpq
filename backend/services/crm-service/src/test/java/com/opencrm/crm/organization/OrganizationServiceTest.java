@@ -99,20 +99,15 @@ class OrganizationServiceTest {
         }
 
         @Test
-        @DisplayName("should link a parent through the hierarchy service")
-        void shouldLinkParentOnCreate() {
-            String uuid = "550e8400-e29b-41d4-a716-446655440000";
-            organization.setUuid(uuid);
+        void parentOnCreateIsHeldBeforeAnyWrite() {
             createRequest.setParentOrganizationId(9L);
-            when(organizationMapper.toEntity(createRequest)).thenReturn(organization);
-            when(organizationRepository.save(organization)).thenReturn(organization);
-            when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
-
-            organizationService.create(createRequest);
-
-            verify(domainEvents).organizationCreated(organization);
-            verify(accountHierarchyService).linkToParent(AccountId.of(uuid), 9L);
+            assertThatThrownBy(() -> organizationService.create(createRequest))
+                    .isInstanceOf(com.opencrm.common.exception.BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+            verify(organizationRepository, never()).save(any());
+            verify(domainEvents, never()).organizationCreated(any());
         }
+
     }
 
     @Nested
@@ -224,18 +219,12 @@ class OrganizationServiceTest {
         }
 
         @Test
-        @DisplayName("should link a parent through the hierarchy service")
-        void shouldLinkParentOnUpdate() {
-            String uuid = "550e8400-e29b-41d4-a716-446655440000";
-            organization.setUuid(uuid);
+        void parentOnUpdateIsHeldBeforeAnyWrite() {
             updateRequest.setParentOrganizationId(9L);
-            when(organizationRepository.findByUuidIgnoreCase(uuid)).thenReturn(Optional.of(organization));
-            when(organizationRepository.save(organization)).thenReturn(organization);
-            when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
-
-            organizationService.update(AccountId.of(uuid), updateRequest);
-
-            verify(accountHierarchyService).linkToParent(AccountId.of(uuid), 9L);
+            assertThatThrownBy(() -> organizationService.update(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), updateRequest))
+                    .isInstanceOf(com.opencrm.common.exception.BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+            verify(organizationRepository, never()).save(any());
         }
 
         @Test

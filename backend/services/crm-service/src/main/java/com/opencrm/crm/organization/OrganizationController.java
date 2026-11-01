@@ -26,7 +26,6 @@ import java.util.List;
 public class OrganizationController {
 
     private final OrganizationService organizationService;
-    private final AccountHierarchyService accountHierarchyService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -83,32 +82,15 @@ public class OrganizationController {
         return ApiResponse.success(organization, "Organization updated successfully");
     }
 
+    // Explicit 404 keeps the existing client hidden while tenant authorization and event propagation are unavailable.
     @PutMapping("/{id}/parent")
-    @Operation(summary = "Link organization to a parent",
-            description = "Sets or clears the parent account. Self-parent and ancestor cycles are rejected.")
-    public ApiResponse<AccountHierarchyDto> linkToParent(
-        @Parameter(description = "Organization ID")
-        @PathVariable Long id,
-        @Valid @RequestBody LinkToParentRequest request
-    ) {
-        AccountHierarchyDto hierarchy = accountHierarchyService.linkToParent(
-                organizationService.resolveAccountId(id), request.getParentOrganizationId());
-        String message = request.getParentOrganizationId() == null
-                ? "Organization unlinked from its parent"
-                : "Organization linked to parent";
-        return ApiResponse.success(hierarchy, message);
+    public ApiResponse<Void> unavailableParent(@PathVariable Long id) {
+        throw new com.opencrm.common.exception.ResourceNotFoundException("Account hierarchy", id);
     }
 
     @GetMapping("/{id}/hierarchy")
-    @Operation(summary = "Resolve organization hierarchy",
-            description = "Returns the root-to-organization chain and ancestor account ids for inheritance.")
-    public ApiResponse<AccountHierarchyDto> resolveHierarchy(
-        @Parameter(description = "Organization ID")
-        @PathVariable Long id
-    ) {
-        AccountHierarchyDto hierarchy = accountHierarchyService.resolveHierarchy(
-                organizationService.resolveAccountId(id));
-        return ApiResponse.success(hierarchy);
+    public ApiResponse<Void> unavailableHierarchy(@PathVariable Long id) {
+        throw new com.opencrm.common.exception.ResourceNotFoundException("Account hierarchy", id);
     }
 
     @DeleteMapping("/{id}")

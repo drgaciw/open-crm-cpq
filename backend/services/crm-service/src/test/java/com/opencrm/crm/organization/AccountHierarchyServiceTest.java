@@ -46,7 +46,7 @@ class AccountHierarchyServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountHierarchyService(organizationRepository, outboxEventPublisher);
+        service = new AccountHierarchyService(organizationRepository, outboxEventPublisher, org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
         root = organization(1L, ROOT_ID, "Root", null);
         parent = organization(2L, PARENT_ID, "Parent", 1L);
         child = organization(3L, CHILD_ID, "Child", null);

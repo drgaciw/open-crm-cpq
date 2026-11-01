@@ -19,6 +19,10 @@ public class AccountHierarchyDto {
     private Long organizationId;
     private String accountId;
     private Long parentOrganizationId;
+    // The existing account UI consumes these fields; retain the richer UUID chain below.
+    private AccountHierarchyNodeDto parent;
+    private List<AccountHierarchyNodeDto> ancestors;
+    private List<AccountHierarchyNodeDto> children;
 
     /**
      * Account UUIDs of ancestors, nearest parent first and the root last.

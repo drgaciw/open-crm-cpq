@@ -8,6 +8,8 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.common.valueobject.AccountId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.persistence.EntityManager;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,22 @@ public class AccountHierarchyService {
 
     private final OrganizationRepository organizationRepository;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final JdbcTemplate jdbc;
+    private final EntityManager entityManager;
+    private static final long HIERARCHY_LOCK = 0x4849455241524348L;
+
+    /** All parent writes and deletes serialize before reading hierarchy state. */
+    void lockHierarchy() {
+        jdbc.query("select pg_advisory_xact_lock(?)", rs -> null, HIERARCHY_LOCK);
+    }
+
+    void flushAfterLock() { entityManager.flush(); }
+
+    void refreshAfterLock(Organization organization) {
+        entityManager.refresh(organization);
+        if (organization.isDeleted()) throw new ResourceNotFoundException("Organization", organization.getId());
+    }
+
 
     /**
      * Point {@code childId} at {@code parentOrganizationId}. Null clears the parent.
@@ -42,7 +60,12 @@ public class AccountHierarchyService {
      */
     @CacheEvict(value = "organizations", key = "#childId.value()")
     public AccountHierarchyDto linkToParent(AccountId childId, Long parentOrganizationId) {
+        lockHierarchy();
+        // A caller may share this transaction and have pending edits; flush them before refresh.
+        // If validation later fails, the enclosing transaction rolls the flush back.
+        entityManager.flush();
         Organization child = requireActive(childId);
+        refreshAfterLock(child);
         Long previousParentOrganizationId = child.getParentOrganizationId();
         if (Objects.equals(previousParentOrganizationId, parentOrganizationId)) {
             return describe(child);
@@ -137,7 +160,14 @@ public class AccountHierarchyService {
         List<String> ancestorIds = ancestorsNearestFirst.stream()
                 .map(Organization::getUuid)
                 .toList();
+        List<AccountHierarchyNodeDto> ancestorNodes = chain.subList(0, chain.size() - 1);
+        List<AccountHierarchyNodeDto> children = organizationRepository
+                .findByParentOrganizationIdAndDeletedFalseOrderByIdAsc(organization.getId()).stream()
+                .map(AccountHierarchyService::toNode).toList();
         return AccountHierarchyDto.builder()
+                .parent(ancestorsNearestFirst.isEmpty() ? null : toNode(ancestorsNearestFirst.getFirst()))
+                .ancestors(List.copyOf(ancestorNodes))
+                .children(children)
                 .organizationId(organization.getId())
                 .accountId(organization.getUuid())
                 .parentOrganizationId(organization.getParentOrganizationId())
@@ -167,6 +197,7 @@ public class AccountHierarchyService {
     private Organization requireActiveById(Long id) {
         Organization organization = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+        entityManager.refresh(organization);
         if (organization.isDeleted()) {
             throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");
         }

@@ -70,6 +70,7 @@ public class OrganizationUpdateRequest {
      * Null leaves the current parent unchanged. Clear a parent with
      * {@code PUT /api/v1/organizations/{id}/parent}.
      */
+    @com.fasterxml.jackson.annotation.JsonAlias("parentId")
     @Positive(message = "Parent organization id must be positive")
     private Long parentOrganizationId;
 }
