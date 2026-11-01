@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,6 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,7 @@ public class LifecycleChangeService {
     private static final Set<String> UNSUPPORTED_AT_SUBMIT = Set.of("SWAP", "UPGRADE", "DOWNGRADE");
     private static final String RETAIN_CONTRACTED = "RETAIN_CONTRACTED";
     private static final String DAILY = "DAILY";
+    private static final int PRICING_VALIDATION_VERSION = 1;
 
     private final LifecycleChangeRepository changes;
     private final LifecycleChangeAuditWriter audit;
@@ -123,7 +126,9 @@ public class LifecycleChangeService {
         return toResponse(load(requireUser(), id));
     }
 
-    @Transactional
+    // Pricing commits independently even when called inside another transaction. Callers must not
+    // hold this change's row lock across the call. A failed-reprice demotion must never commit caller work.
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = RepriceRejected.class)
     public LifecycleChangeResult price(UUID id, PriceLifecycleChangeRequest request) {
         UserContext user = requireUser();
         LifecycleChange change = load(user, id);
@@ -132,25 +137,43 @@ public class LifecycleChangeService {
             throw new BusinessException("Only a draft or priced change can be priced",
                     HttpStatus.CONFLICT, "ILLEGAL_TRANSITION");
         }
+        boolean repricing = change.getStatus() == LifecycleChangeStatus.PRICED;
         change = reserveVersion(user, change, request.getVersion());
-        for (ChangeLine line : change.getLines()) {
-            if (line.getTargetSubscriptionId() != null) {
-                assertCurrentTarget(user, change.getId(), line, null);
+        try {
+            for (ChangeLine line : change.getLines()) {
+                if (line.getTargetSubscriptionId() != null) {
+                    assertCurrentTarget(user, change.getId(), line, null);
+                }
             }
-        }
-        Map<String, Object> body = pricingRequest(change);
-        ApiResponse<ContinuationEvaluationView> response = pricing.evaluateContinuation(body);
-        if (response == null || !response.isSuccess() || response.getData() == null || response.getData().getLines() == null) {
-            throw new BusinessException("Pricing continuation did not return a decision",
-                    HttpStatus.BAD_GATEWAY, "PRICING_UNAVAILABLE");
-        }
-        applyPricing(change, response.getData());
-        if (change.getLines().stream().allMatch(this::hasPricePins)) {
+            Map<String, Object> body = pricingRequest(change);
+            ApiResponse<ContinuationEvaluationView> response;
+            try {
+                response = pricing.evaluateContinuation(body);
+            } catch (BusinessException ex) {
+                throw ex;
+            } catch (RuntimeException ex) {
+                throw invalidPricing();
+            }
+            if (response == null || !response.isSuccess() || response.getData() == null) {
+                throw invalidPricing();
+            }
+            if (!blank(response.getTraceId()) && !response.getTraceId().equals(response.getData().getTraceId())) {
+                throw invalidPricing();
+            }
+            applyPricing(change, response.getData());
             change.setStatus(LifecycleChangeStatus.PRICED);
+            change.setPricingValidationVersion(PRICING_VALIDATION_VERSION);
+            LifecycleChange saved = changes.save(change);
+            log.info("LifecycleChange priced id={} tid={} actor={}", saved.getId(), saved.getTid(), user.getUserId());
+            return LifecycleChangeResult.created(toResponse(saved));
+        } catch (BusinessException ex) {
+            if (repricing) {
+                clearPricing(change);
+                changes.save(change);
+                throw new RepriceRejected(ex);
+            }
+            throw ex;
         }
-        LifecycleChange saved = changes.save(change);
-        log.info("LifecycleChange priced id={} tid={} actor={}", saved.getId(), saved.getTid(), user.getUserId());
-        return LifecycleChangeResult.created(toResponse(saved));
     }
 
     @Transactional
@@ -158,6 +181,7 @@ public class LifecycleChangeService {
         UserContext user = requireUser();
         LifecycleChange change = load(user, id);
         if (change.getStatus() == LifecycleChangeStatus.IN_APPROVAL) {
+            requireValidatedPricing(change);
             if (!isSubmitReplayVersion(change, command.getVersion())) {
                 throw versionConflict();
             }
@@ -179,14 +203,17 @@ public class LifecycleChangeService {
             throw new BusinessException("Submit is only allowed from PRICED",
                     HttpStatus.CONFLICT, "ILLEGAL_TRANSITION");
         }
+        requireValidatedPricing(change);
         if (changes.advanceVersion(change.getId(), user.getTenantId(), command.getVersion()) != 1) {
             LifecycleChange current = load(user, id);
             if (current.getStatus() == LifecycleChangeStatus.IN_APPROVAL && isSubmitReplayVersion(current, command.getVersion())) {
+                requireValidatedPricing(current);
                 return LifecycleChangeResult.replay(toResponse(current));
             }
             throw versionConflict();
         }
         change = load(user, id);
+        requireValidatedPricing(change);
         for (ChangeLine line : change.getLines()) {
             if (line.getTargetSubscriptionId() != null) {
                 assertCurrentTarget(user, change.getId(), line, null);
@@ -194,6 +221,9 @@ public class LifecycleChangeService {
             if (!hasDecisionIds(line)) {
                 throw rejected("V8: a priced line is missing policyDecisionId, policyId, policyVersion or pricingTraceId",
                         "VALIDATION_REJECTED");
+            }
+            if (line.getUnitPrice() == null || line.getUnitPrice().signum() < 0 || line.getNetAmount() == null) {
+                throw rejected("V8: a priced line is missing valid pricing amounts", "VALIDATION_REJECTED");
             }
             if (blank(line.getProductExternalId()) || blank(line.getPricebookVersion())) {
                 throw rejected("V9: product and pricebook pins are required", "VALIDATION_REJECTED");
@@ -329,42 +359,127 @@ public class LifecycleChangeService {
         return body;
     }
 
+    private record ValidatedPrice(ChangeLine line, String decision, String policy, String policyVersion,
+                                  String trace, String pricebook, String configurationHash,
+                                  BigDecimal unitRate, BigDecimal amount) { }
+
     private void applyPricing(LifecycleChange change, ContinuationEvaluationView view) {
+        if (change.getLines().isEmpty() || view.getLines() == null || view.getLines().size() != change.getLines().size()
+                || !validText(view.getPolicyId(), 100) || !validText(view.getPolicyVersion(), 64)
+                || !validText(view.getTraceId(), 64)) {
+            throw invalidPricing();
+        }
         Map<String, ContinuationEvaluationView.Line> byRef = new LinkedHashMap<>();
         for (ContinuationEvaluationView.Line priced : view.getLines()) {
-            if (priced.getLineRef() != null) {
-                byRef.put(priced.getLineRef(), priced);
+            if (priced == null || blank(priced.getLineRef()) || byRef.putIfAbsent(priced.getLineRef(), priced) != null) {
+                throw invalidPricing();
             }
         }
+        List<ValidatedPrice> validated = new ArrayList<>();
+        Set<String> decisions = new HashSet<>();
         for (ChangeLine line : change.getLines()) {
             ContinuationEvaluationView.Line priced = byRef.get(line.getId().toString());
-            if (priced == null) {
-                throw new BusinessException("Pricing continuation omitted a line",
-                        HttpStatus.BAD_GATEWAY, "PRICING_UNAVAILABLE");
+            if (priced == null || !"PRICED".equals(priced.getProcedureStatus())
+                    || !validText(priced.getPolicyDecisionId(), 64) || !decisions.add(priced.getPolicyDecisionId())
+                    || !matchesOrAbsent(priced.getPolicyId(), view.getPolicyId())
+                    || !matchesOrAbsent(priced.getPolicyVersion(), view.getPolicyVersion())
+                    || !matchesOrAbsent(priced.getTraceId(), view.getTraceId())
+                    || !validText(line.getProductExternalId(), 255)
+                    || !line.getProductExternalId().equals(priced.getProductExternalId())
+                    || !validText(priced.getPricebookVersion(), 64)
+                    || (priced.getConfigurationHash() != null
+                        && !priced.getConfigurationHash().matches("[0-9a-f]{64}"))) {
+                throw invalidPricing();
             }
+            BigDecimal endQuantity = pricingDecimal(priced.getEndQuantity());
+            BigDecimal unitRate = pricingDecimal(priced.getUnitRate());
+            BigDecimal amount = pricingDecimal(priced.getAmount());
+            if (endQuantity.compareTo(line.getEndQty()) != 0 || unitRate.signum() < 0) {
+                throw invalidPricing();
+            }
+            validated.add(new ValidatedPrice(line, priced.getPolicyDecisionId(), view.getPolicyId(),
+                    view.getPolicyVersion(), view.getTraceId(), priced.getPricebookVersion(),
+                    priced.getConfigurationHash(), unitRate, amount));
+        }
+        for (ValidatedPrice priced : validated) {
+            ChangeLine line = priced.line();
             line.setAmendMode(RETAIN_CONTRACTED);
             line.setProrationMethod(DAILY);
-            line.setPolicyDecisionId(priced.getPolicyDecisionId());
-            line.setPolicyId(firstText(priced.getPolicyId(), view.getPolicyId()));
-            line.setPolicyVersion(firstText(priced.getPolicyVersion(), view.getPolicyVersion()));
-            line.setPricingTraceId(firstText(priced.getTraceId(), view.getTraceId()));
-            if (!blank(priced.getProductExternalId())) {
-                line.setProductExternalId(priced.getProductExternalId());
-            }
-            line.setPricebookVersion(priced.getPricebookVersion());
-            line.setConfigurationHash(priced.getConfigurationHash());
-            line.setUnitPrice(optionalMoney(priced.getUnitRate()));
-            line.setNetAmount(optionalMoney(priced.getAmount()));
+            line.setPolicyDecisionId(priced.decision());
+            line.setPolicyId(priced.policy());
+            line.setPolicyVersion(priced.policyVersion());
+            line.setPricingTraceId(priced.trace());
+            line.setPricebookVersion(priced.pricebook());
+            line.setConfigurationHash(priced.configurationHash());
+            line.setUnitPrice(priced.unitRate());
+            line.setNetAmount(priced.amount());
         }
-    }
-
-    private boolean hasPricePins(ChangeLine line) {
-        return hasDecisionIds(line) && !blank(line.getProductExternalId()) && !blank(line.getPricebookVersion());
     }
 
     private static boolean hasDecisionIds(ChangeLine line) {
         return !blank(line.getPolicyDecisionId()) && !blank(line.getPolicyId())
                 && !blank(line.getPolicyVersion()) && !blank(line.getPricingTraceId());
+    }
+
+    private static void requireValidatedPricing(LifecycleChange change) {
+        if (!Integer.valueOf(PRICING_VALIDATION_VERSION).equals(change.getPricingValidationVersion())
+                || change.getLines().isEmpty()) {
+            throw rejected("Pricing evidence is unverified; reprice before submitting", "VALIDATION_REJECTED");
+        }
+    }
+
+    private static void clearPricing(LifecycleChange change) {
+        change.setStatus(LifecycleChangeStatus.DRAFT);
+        change.setPricingValidationVersion(null);
+        for (ChangeLine line : change.getLines()) {
+            line.setAmendMode(null);
+            line.setProrationMethod(null);
+            line.setPolicyDecisionId(null);
+            line.setPolicyId(null);
+            line.setPolicyVersion(null);
+            line.setPricingTraceId(null);
+            line.setPricebookVersion(null);
+            line.setConfigurationHash(null);
+            line.setUnitPrice(null);
+            line.setNetAmount(null);
+        }
+    }
+
+    private static boolean validText(String value, int maxLength) {
+        return !blank(value) && value.length() <= maxLength;
+    }
+
+    private static boolean matchesOrAbsent(String value, String expected) {
+        return blank(value) || value.equals(expected);
+    }
+
+    /** Exact numeric(19,4) conversion: pricing values must not be silently rounded or overflow. */
+    private static BigDecimal pricingDecimal(String value) {
+        if (blank(value) || value.length() > 128) {
+            throw invalidPricing();
+        }
+        try {
+            BigDecimal number = new BigDecimal(value.trim());
+            if ((long) number.precision() - number.scale() > 15 || number.stripTrailingZeros().scale() > 4) {
+                throw invalidPricing();
+            }
+            return number.setScale(4, RoundingMode.UNNECESSARY);
+        } catch (NumberFormatException | ArithmeticException ex) {
+            throw invalidPricing();
+        }
+    }
+
+    private static BusinessException invalidPricing() {
+        return new BusinessException("Pricing continuation returned incomplete or inconsistent evidence",
+                HttpStatus.BAD_GATEWAY, "PRICING_UNAVAILABLE");
+    }
+
+    /** Commits only the demotion and cleared evidence when a reprice fails after its version reservation. */
+    private static final class RepriceRejected extends BusinessException {
+        private RepriceRejected(BusinessException cause) {
+            super(cause.getMessage(), cause.getStatus(), cause.getErrorCode());
+            initCause(cause);
+        }
     }
 
     private LifecycleChange load(UserContext user, UUID id) {
@@ -507,13 +622,6 @@ public class LifecycleChangeService {
             return value.setScale(4, RoundingMode.HALF_UP);
         }
         return value.setScale(4, RoundingMode.UNNECESSARY);
-    }
-
-    private static BigDecimal optionalMoney(String raw) {
-        if (blank(raw)) {
-            return null;
-        }
-        return money(raw);
     }
 
     private static String plain(BigDecimal value) {

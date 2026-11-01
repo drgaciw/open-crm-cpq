@@ -62,6 +62,10 @@ public class LifecycleChange implements Persistable<UUID> {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    /** Response-shape validation only, not proof of a trusted pricing decision. Null requires reprice. */
+    @Column(name = "pricing_validation_version")
+    private Integer pricingValidationVersion;
+
     @Column(name = "action_date", nullable = false)
     private LocalDate actionDate;
 
