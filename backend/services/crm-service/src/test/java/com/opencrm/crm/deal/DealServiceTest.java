@@ -279,8 +279,30 @@ class DealServiceTest {
             assertTerminalUpdate(DealStage.LOST, 0);
         }
 
+        @Test
+        @DisplayName("should reject an update to WON when no accepted quote is recorded")
+        void shouldRejectUpdateToWonWithoutAcceptedQuote() {
+            updateRequest.setStage(DealStage.WON);
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            doAnswer(inv -> {
+                Deal target = inv.getArgument(1);
+                target.setStage(DealStage.WON);
+                return null;
+            }).when(dealMapper).updateEntity(updateRequest, deal);
+
+            assertThatThrownBy(() -> dealService.update(1L, updateRequest))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
+                            .isEqualTo("OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE"));
+            verify(dealRepository, never()).save(any());
+            verify(domainEvents, never()).dealTransition(any(), any());
+        }
+
         private void assertTerminalUpdate(DealStage stage, int probability) {
             updateRequest.setStage(stage);
+            if (stage == DealStage.WON) {
+                deal.setAcceptedQuoteId("quote-accepted");
+            }
             when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
             doAnswer(inv -> {
                 Deal target = inv.getArgument(1);

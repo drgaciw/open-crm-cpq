@@ -138,6 +138,11 @@ public class DealService {
 
         dealMapper.updateEntity(request, deal);
         if (!closed) {
+            if (deal.getStage() == DealStage.WON && !hasAcceptedQuote(deal)) {
+                throw new BusinessException(
+                        "An opportunity cannot be won without an accepted quote",
+                        "OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE");
+            }
             if (deal.getStage() == DealStage.WON) {
                 deal.markWon();
                 currencyConverter.freeze(deal);
