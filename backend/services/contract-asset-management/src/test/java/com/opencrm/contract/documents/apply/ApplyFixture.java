@@ -228,6 +228,14 @@ final class ApplyFixture {
         return period;
     }
 
+    /** Sold end stays on {@code endDate}. The effective end is null, which is open-ended coverage. */
+    SubscriptionRatePeriod openEndedPeriod(Subscription subscription, String acceptedLine, BigDecimal quantity,
+                                           LocalDate start, LocalDate end) {
+        SubscriptionRatePeriod period = openPeriod(subscription, acceptedLine, quantity, start, end);
+        period.setEffectiveEndDate(null);
+        return period;
+    }
+
     ApplyCommand command() {
         return new ApplyCommand(document.getId(), tenantId, "quote-service", "ROLE_INTERNAL_INVOKE", "corr-s4", java.util.Map.of());
     }
