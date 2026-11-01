@@ -182,6 +182,71 @@ class DocumentApplyMidLoopConflictTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void changedAppliedUnitIsRefusedAfterPartialApply() {
+        ApplyFixture fixture = threeUnitsWithUnitTwoConflict();
+        fixture.apply();
+        int periods = fixture.periods.size();
+        fixture.units.get(0).setObservedCommercialRevision(99L);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(fixture.periods).hasSize(periods);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+    }
+
+    @Test
+    void changedBlockedUnitIsRefusedAfterPartialApply() {
+        ApplyFixture fixture = threeUnitsWithUnitTwoConflict();
+        fixture.apply();
+        int periods = fixture.periods.size();
+        fixture.units.get(1).setObservedCommercialRevision(99L);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(fixture.periods).hasSize(periods);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+    }
+
+    @Test
+    void changedBlockedUnitMatchingLedgerIsStillNotAReplay() {
+        ApplyFixture fixture = threeUnitsWithUnitTwoConflict();
+        var blocked = fixture.units.get(1);
+        blocked.setObservedCommercialRevision(99L);
+        String laterDigest = DocumentApplyDigest.unitDigest(fixture.document.getId(), blocked,
+                fixture.lines.stream().filter(line -> line.unitNo() == 2).toList());
+        blocked.setObservedCommercialRevision(7L);
+        fixture.ledger.get(fixture.document.getId() + ":2").setApplyKeyDigest(laterDigest);
+        fixture.apply();
+        blocked.setObservedCommercialRevision(99L);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+    }
+
+    @Test
+    void missingBlockedAttemptDigestIsRefusedRatherThanAssumedToMatch() {
+        ApplyFixture fixture = threeUnitsWithUnitTwoConflict();
+        fixture.apply();
+        fixture.units.get(1).setApplyKeyDigest(null);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
     private static ApplyFixture threeUnitsWithUnitTwoConflict() {
         ApplyFixture fixture = new ApplyFixture();
         Subscription first = fixture.subscription(1L, 4L, START, END);

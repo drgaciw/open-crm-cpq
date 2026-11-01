@@ -109,6 +109,11 @@ public class DocumentApplyOrchestrator {
         }
         List<AmendmentApplicationUnit> ordered = orderedUnits(document);
         List<ApplyLine> lines = gateway.lines(document.getId(), document.getCurrentRevisionNo());
+        if (terminalPartialOutcome(document, ordered) && !matchesTerminalAttempt(document, ordered, lines)) {
+            audit(document, command, "DIGEST_CONFLICT", "apply key digest does not match the recorded attempt");
+            throw new DocumentApplyException("apply key digest does not match the recorded attempt",
+                    HttpStatus.CONFLICT, "DIGEST_CONFLICT");
+        }
         if (sameDigestReplay(document, ordered, lines)) {
             log.info("document apply replay documentId={} status={}", document.getId(), document.getStatus());
             return new ApplyResult(document.getStatus(), true);
@@ -151,7 +156,7 @@ public class DocumentApplyOrchestrator {
                 }
                 blockReasons.put(unit.getUnitNo(), "DIGEST_CONFLICT");
                 changed |= Boolean.TRUE.equals(unitTransaction.execute(
-                        status -> blockDigestConflict(document, unit, command)));
+                        status -> blockDigestConflict(document, unit, lines, command)));
             }
         }
         AmendmentDocumentStatus outcome = outcome(orderedUnits(document));
@@ -217,6 +222,32 @@ public class DocumentApplyOrchestrator {
         return ordered.stream().noneMatch(unit -> unit.getStatus() == ApplicationUnitStatus.PENDING);
     }
 
+    private boolean terminalPartialOutcome(AmendmentDocument document, List<AmendmentApplicationUnit> ordered) {
+        return !ordered.isEmpty()
+                && (document.getStatus() == AmendmentDocumentStatus.PARTIALLY_APPLIED
+                    || document.getStatus() == AmendmentDocumentStatus.APPLY_BLOCKED)
+                && ordered.stream().noneMatch(unit -> unit.getStatus() == ApplicationUnitStatus.PENDING);
+    }
+
+    /** Reject changed or unverifiable terminal attempts before either replay path can return success. */
+    private boolean matchesTerminalAttempt(AmendmentDocument document, List<AmendmentApplicationUnit> ordered,
+                                           List<ApplyLine> lines) {
+        for (AmendmentApplicationUnit unit : ordered) {
+            String digest = DocumentApplyDigest.unitDigest(document.getId(), unit, linesFor(lines, unit.getUnitNo()));
+            if (!digest.equals(unit.getApplyKeyDigest())) {
+                return false;
+            }
+            if (unit.getStatus() == ApplicationUnitStatus.APPLIED) {
+                Optional<DocumentApplyLedgerEntry> entry = ledger.findByTenantIdAndDocumentIdAndUnitNo(
+                        document.getTenantId(), document.getId(), unit.getUnitNo());
+                if (entry.isEmpty() || !digest.equals(entry.get().getApplyKeyDigest())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /** True when every unit already has a ledger row and none of those digests match. */
     private boolean allDigestsConflict(AmendmentDocument document, List<AmendmentApplicationUnit> ordered,
                                        List<ApplyLine> lines) {
@@ -237,7 +268,8 @@ public class DocumentApplyOrchestrator {
         return true;
     }
 
-    private boolean blockDigestConflict(AmendmentDocument document, AmendmentApplicationUnit stale, ApplyCommand command) {
+    private boolean blockDigestConflict(AmendmentDocument document, AmendmentApplicationUnit stale,
+                                        List<ApplyLine> lines, ApplyCommand command) {
         gateway.lockDocument(document.getId());
         AmendmentApplicationUnit unit = orderedUnits(document).stream()
                 .filter(row -> row.getUnitNo().equals(stale.getUnitNo()))
@@ -247,6 +279,7 @@ public class DocumentApplyOrchestrator {
             return false;
         }
         unit.setStatus(ApplicationUnitStatus.BLOCKED);
+        unit.setApplyKeyDigest(DocumentApplyDigest.unitDigest(document.getId(), unit, linesFor(lines, unit.getUnitNo())));
         units.save(unit);
         events.appendApplyDecision(event(document, command, EVENT_UNIT_BLOCKED, null, null, unit.getUnitNo(),
                 "DIGEST_CONFLICT", "apply:DIGEST_CONFLICT:apply key digest does not match the ledger"));
@@ -286,6 +319,7 @@ public class DocumentApplyOrchestrator {
         String block = DocumentApplyPeriods.blockReason(unit, subscription, lines, periods, observedPricebook);
         if (block != null) {
             unit.setStatus(ApplicationUnitStatus.BLOCKED);
+            unit.setApplyKeyDigest(digest);
             units.save(unit);
             blockReasons.put(unit.getUnitNo(), block);
             events.appendApplyDecision(event(document, command, EVENT_UNIT_BLOCKED, null, null, unit.getUnitNo(),
