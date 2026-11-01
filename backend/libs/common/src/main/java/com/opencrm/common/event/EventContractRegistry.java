@@ -15,6 +15,7 @@ import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
+import com.opencrm.common.event.dto.TerritoryAssignedEvent;
 import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetAuditEvent;
 import com.opencrm.common.event.dto.AssetCreatedEvent;
@@ -176,6 +177,10 @@ public final class EventContractRegistry {
     public static final EventContract ASSET_SUPERSEDED_V1 = published(
             "AssetSuperseded", "contract-asset-management", KafkaTopics.ASSET_SUPERSEDED, AssetSupersededEvent.class);
 
+    /** DRG-483. One territory and segment assignment for an account. */
+    public static final EventContract TERRITORY_ASSIGNED_V1 = published(
+            "TerritoryAssigned", "crm-service", KafkaTopics.TERRITORY_ASSIGNED, TerritoryAssignedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -201,7 +206,8 @@ public final class EventContractRegistry {
             ASSET_AUDIT_RECORDED_V1,
             ASSET_AMENDED_V1,
             ASSET_TERMINATED_V1,
-            ASSET_SUPERSEDED_V1);
+            ASSET_SUPERSEDED_V1,
+            TERRITORY_ASSIGNED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
