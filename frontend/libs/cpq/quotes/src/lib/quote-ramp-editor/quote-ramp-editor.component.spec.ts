@@ -5,6 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, Subject, throwError } from 'rxjs';
 import {
   QuoteLineItemDto,
+  RampScheduleExtendResult,
   RampStep,
 } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
@@ -196,12 +197,14 @@ describe('QuoteRampEditorComponent', () => {
   let updateLineItem: ReturnType<typeof vi.fn>;
   let expandRampSchedule: ReturnType<typeof vi.fn>;
   let extendRampSchedule: ReturnType<typeof vi.fn>;
+  let applyRampExtension: ReturnType<typeof vi.fn>;
   let getById: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     updateLineItem = vi.fn(() => of(line()));
     expandRampSchedule = vi.fn(() => of([]));
     extendRampSchedule = vi.fn(() => of([]));
+    applyRampExtension = vi.fn();
     getById = vi.fn();
 
     await TestBed.configureTestingModule({
@@ -214,6 +217,7 @@ describe('QuoteRampEditorComponent', () => {
             updateLineItem,
             expandRampSchedule,
             extendRampSchedule,
+            applyRampExtension,
             getById,
           },
         },
@@ -328,23 +332,162 @@ describe('QuoteRampEditorComponent', () => {
     expect(updateLineItem).not.toHaveBeenCalled();
   });
 
-  it('shows RAMP_TERM_MISMATCH when the escalator length does not divide the term', () => {
-    component.form.controls.escalator.setValue({
+  it('allows generation when the final period is shorter than the interval', () => {
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 40,
       mode: 'PERCENT',
       amount: 5,
       everyMonths: 10,
     });
     fixture.detectChanges();
-    expect(text()).toContain('RAMP_TERM_MISMATCH');
+    expect(component.canExpand()).toBe(true);
     expect(text()).toContain('5 means 5%');
     expect(text()).not.toContain('0.05 = 5%');
     const generate = fixture.nativeElement.querySelector(
       '[data-testid="expand-escalator"]',
     ) as HTMLButtonElement;
-    expect(generate.disabled).toBe(true);
+    expect(generate.disabled).toBe(false);
     component.onExpand();
-    expect(expandRampSchedule).not.toHaveBeenCalled();
+    expect(expandRampSchedule).toHaveBeenCalledWith(7, {
+      durationInMonths: 36,
+      escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 10 },
+    });
+  });
+
+  it('generates and saves a short tail with the explicit non-compounding option', () => {
+    fixture.componentRef.setInput('durationInMonths', 14);
+    expandRampSchedule.mockReturnValue(of({ steps: [step(), step({ sequence: 2, startMonth: 13, months: 2, unitPrice: 42 })] }));
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12, compounding: false });
+    fixture.detectChanges();
+    component.onExpand();
+    fixture.detectChanges();
+    expect(expandRampSchedule).toHaveBeenCalledWith(7, {
+      durationInMonths: 14,
+      escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12, compounding: false },
+    });
+    expect(component.issues()).toEqual([]);
+    expect(component.canSave()).toBe(true);
+    component.onSave();
+    expect(updateLineItem).toHaveBeenCalledWith(7, 1, expect.objectContaining({
+      schedule: expect.objectContaining({ escalator: expect.objectContaining({ compounding: false }) }),
+    }));
+  });
+
+  it('restores non-compounding from a saved schedule and locks its selector with the form', () => {
+    fixture.componentRef.setInput('lines', [line({ schedule: {
+      steps: [step({ months: 36 })],
+      escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12, compounding: false },
+    } })]);
+    fixture.detectChanges();
+    expect(component.form.controls.escalator.controls.compounding.value).toBe(false);
+    fixture.componentRef.setInput('editable', false);
+    fixture.detectChanges();
+    expect(component.form.controls.escalator.controls.compounding.disabled).toBe(true);
+  });
+
+  it('rebinds same-count regenerated period inputs and edits to the replacement controls', () => {
+    const compound = [step({ unitPrice: 100 }), step({ sequence: 2, startMonth: 13, unitPrice: 110 }),
+      step({ sequence: 3, startMonth: 25, unitPrice: 121 })];
+    const nonCompounding = compound.map((period, index) => ({ ...period, unitPrice: [100, 110, 120][index] }));
+    expandRampSchedule.mockReturnValueOnce(of(compound)).mockReturnValueOnce(of(nonCompounding));
+    component.form.controls.escalator.setValue({ startPrice: 100, mode: 'PERCENT', amount: 10, everyMonths: 12, compounding: true });
+    fixture.detectChanges();
+    component.onExpand();
+    fixture.detectChanges();
+    expect((fixture.nativeElement.querySelector('[data-testid="period-unit-2"]') as HTMLInputElement).value).toBe('121');
+
+    component.form.controls.escalator.controls.compounding.setValue(false);
+    fixture.detectChanges();
+    component.onExpand();
+    fixture.detectChanges();
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(120);
+    const replacementInput = fixture.nativeElement.querySelector('[data-testid="period-unit-2"]') as HTMLInputElement;
+    expect(replacementInput.value).toBe('120');
+    replacementInput.value = '125';
+    replacementInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(125);
+
+    component.form.markAsPristine();
+    fixture.componentRef.setInput('lines', [line({ schedule: { steps: nonCompounding.map((period, index) =>
+      ({ ...period, unitPrice: [100, 110, 130][index] })) } })]);
+    fixture.detectChanges();
+    const refreshedInput = fixture.nativeElement.querySelector('[data-testid="period-unit-2"]') as HTMLInputElement;
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(130);
+    expect(refreshedInput.value).toBe('130');
+    refreshedInput.value = '135';
+    refreshedInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(135);
+  });
+
+  it('rebinds refreshed line period inputs before any generation', () => {
+    const periods = [step({ unitPrice: 100 }), step({ sequence: 2, startMonth: 13, unitPrice: 110 }),
+      step({ sequence: 3, startMonth: 25, unitPrice: 121 })];
+    fixture.componentRef.setInput('lines', [line({ schedule: { steps: periods } })]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement.querySelector('[data-testid="period-unit-2"]') as HTMLInputElement).value).toBe('121');
+    fixture.componentRef.setInput('lines', [line({ schedule: { steps: periods.map((period, index) =>
+      ({ ...period, unitPrice: [100, 110, 130][index] })) } })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(130);
+    const refreshedInput = fixture.nativeElement.querySelector('[data-testid="period-unit-2"]') as HTMLInputElement;
+    expect(refreshedInput.value).toBe('130');
+    refreshedInput.value = '135';
+    refreshedInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(135);
+  });
+
+  it('extends a short tail atomically when quote version is available and applies the persisted result', () => {
+    fixture.componentRef.setInput('quoteVersion', 3);
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 100 }]);
+    component.form.controls.escalator.setValue({ startPrice: 100, mode: 'PERCENT', amount: 10, everyMonths: 12, compounding: false });
+    component.form.controls.extendDuration.setValue(42);
+    const result = { steps: [step({ months: 36, unitPrice: 100 }), step({ sequence: 2, startMonth: 37, months: 6, unitPrice: 110 })], durationInMonths: 42, quoteVersion: 4 };
+    extendRampSchedule.mockReturnValue(of(result));
+    applyRampExtension.mockImplementation(() => {
+      fixture.componentRef.setInput('durationInMonths', 42);
+      fixture.componentRef.setInput('quoteVersion', 4);
+    });
+    fixture.detectChanges();
+    expect(component.canExtend()).toBe(true);
+    component.onExtend();
+    fixture.detectChanges();
+    expect(extendRampSchedule).toHaveBeenCalledWith(7, expect.objectContaining({
+      lineItemId: 1, expectedQuoteVersion: 3, durationInMonths: 42,
+      escalator: expect.objectContaining({ compounding: false }),
+    }));
+    expect(applyRampExtension).toHaveBeenCalledWith(7, 1, result);
+    expect(component.form.controls.steps.at(1).controls.months.value).toBe(6);
+    expect(component.issues()).toEqual([]);
+    expect(component.form.pristine).toBe(true);
+    expect(component.error()).toBeNull();
+  });
+
+  it('reconciles a committed extension after an external form change without discarding its response', () => {
+    fixture.componentRef.setInput('quoteVersion', 3);
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 100 }]);
+    component.form.controls.escalator.setValue({ startPrice: 100, mode: 'PERCENT', amount: 10, everyMonths: 12, compounding: true });
+    component.form.controls.extendDuration.setValue(42);
+    const pending = new Subject<RampScheduleExtendResult>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fixture.detectChanges();
+    component.onExtend();
+    fixture.detectChanges();
+    expect(component.form.disabled).toBe(true);
+    component.onLineChange(99);
+    component.addPeriod();
+    expect(component.selectedLineId()).toBe(1);
+    expect(component.form.controls.steps.length).toBe(1);
+    // Programmatic edits can still happen while disabled; keep them while reconciling the committed result.
+    component.form.controls.steps.at(0).controls.unitPrice.setValue(150);
+    fixture.detectChanges();
+    const result = { steps: [step({ months: 36, unitPrice: 100 }), step({ sequence: 2, startMonth: 37, months: 6, unitPrice: 110 })], durationInMonths: 42, quoteVersion: 4 };
+    pending.next(result);
+    fixture.detectChanges();
+    expect(applyRampExtension).toHaveBeenCalledWith(7, 1, result);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(150);
+    expect(component.extending()).toBe(false);
+    expect(component.form.enabled).toBe(true);
+    expect(component.error()).toBeNull();
   });
 
   it('saves a discount fraction of 0.05 and an escalator of 5 percent points', () => {
@@ -358,7 +501,7 @@ describe('QuoteRampEditorComponent', () => {
       },
     ]);
     component.form.controls.steps.at(0).controls.unitPrice.setValue(null);
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 40,
       mode: 'PERCENT',
       amount: 5,
@@ -431,7 +574,7 @@ describe('QuoteRampEditorComponent', () => {
         step({ sequence: 3, startMonth: 25, months: 12, unitPrice: 44.1 }),
       ]),
     );
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 40,
       mode: 'PERCENT',
       amount: 5,
@@ -584,7 +727,7 @@ describe('QuoteRampEditorComponent', () => {
         ],
       }),
     );
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 42.8,
       mode: 'PERCENT',
       amount: 7,
@@ -629,7 +772,7 @@ describe('QuoteRampEditorComponent', () => {
 
   it('AC-532-9 shows a term mismatch and does not extend when the new term is not longer', () => {
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 42.8 }]);
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 42.8,
       mode: 'PERCENT',
       amount: 7,
@@ -656,7 +799,7 @@ describe('QuoteRampEditorComponent', () => {
       { startMonth: 13, months: 12, quantity: 50, unitPrice: 44 },
       { startMonth: 25, months: 12, quantity: 50, unitPrice: 47 },
     ]);
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 42.8,
       mode: 'PERCENT',
       amount: 7,
@@ -709,7 +852,7 @@ describe('QuoteRampEditorComponent', () => {
     fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
     fixture.detectChanges();
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     component.onLineChange(2);
@@ -724,7 +867,7 @@ describe('QuoteRampEditorComponent', () => {
     const pending = new Subject<RampStep[]>();
     extendRampSchedule.mockReturnValue(pending.asObservable());
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     expect(component.canSave()).toBe(false);
@@ -741,7 +884,7 @@ describe('QuoteRampEditorComponent', () => {
     expandRampSchedule.mockReturnValue(pending.asObservable());
     fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
     fixture.detectChanges();
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.onExpand();
     component.onLineChange(2);
     fixture.detectChanges();
@@ -754,7 +897,7 @@ describe('QuoteRampEditorComponent', () => {
     const pending = new Subject<RampStep[]>();
     extendRampSchedule.mockReturnValue(pending.asObservable());
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     fixture.componentRef.setInput('editable', false);
@@ -771,7 +914,7 @@ describe('QuoteRampEditorComponent', () => {
     const pending = new Subject<RampStep[]>();
     extendRampSchedule.mockReturnValue(pending.asObservable());
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     fixture.componentRef.setInput('durationInMonths', 48);
@@ -787,7 +930,7 @@ describe('QuoteRampEditorComponent', () => {
     fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
     fixture.detectChanges();
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     component.onLineChange(2);
@@ -804,12 +947,12 @@ describe('QuoteRampEditorComponent', () => {
     fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
     fixture.detectChanges();
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     component.onLineChange(2);
     fixture.detectChanges();
-    component.form.controls.escalator.setValue({ startPrice: 123, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 123, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     expect(component.extending()).toBe(true);
@@ -826,7 +969,7 @@ describe('QuoteRampEditorComponent', () => {
     fixture.componentRef.setInput('lines', [line(), line({ id: 2 })]);
     fixture.detectChanges();
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     component.onLineChange(2);
@@ -840,7 +983,7 @@ describe('QuoteRampEditorComponent', () => {
     const pending = new Subject<RampStep[]>();
     extendRampSchedule.mockReturnValue(pending.asObservable());
     fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
-    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.escalator.setValue({ compounding: true, startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
     component.form.controls.extendDuration.setValue(48);
     component.onExtend();
     component.form.controls.steps.at(0).controls.unitPrice.setValue(77);
@@ -859,7 +1002,7 @@ describe('QuoteRampEditorComponent', () => {
       { startMonth: 13, months: 12, quantity: 50, unitPrice: 44 },
       { startMonth: 25, months: 12, quantity: 50, unitPrice: 47 },
     ]);
-    component.form.controls.escalator.setValue({
+    component.form.controls.escalator.setValue({ compounding: true,
       startPrice: 42.8,
       mode: 'PERCENT',
       amount: 7,
@@ -924,7 +1067,7 @@ describe('QuoteRampEditorComponent HTTP', () => {
     fixture.componentRef.setInput('editable', true);
     fixture.detectChanges();
 
-    fixture.componentInstance.form.controls.escalator.setValue({
+    fixture.componentInstance.form.controls.escalator.setValue({ compounding: true,
       startPrice: 40,
       mode: 'PERCENT',
       amount: 5,
@@ -982,7 +1125,7 @@ describe('QuoteRampEditorComponent HTTP', () => {
       quantity: 50,
       unitPrice: 42.8,
     });
-    fixture.componentInstance.form.controls.escalator.setValue({
+    fixture.componentInstance.form.controls.escalator.setValue({ compounding: true,
       startPrice: 42.8,
       mode: 'PERCENT',
       amount: 7,

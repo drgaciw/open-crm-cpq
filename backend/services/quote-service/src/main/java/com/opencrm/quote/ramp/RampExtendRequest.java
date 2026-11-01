@@ -9,7 +9,8 @@ import java.util.List;
 
 /**
  * Body of {@code POST /api/v1/quotes/{quoteId}/ramp-schedule/extend}.
- * Preview only: nothing is stored, including the quote term.
+ * Without the paired line/version fields this previews only. With both supplied,
+ * the extended line schedule and quote term are committed atomically.
  */
 @Data
 @Builder
@@ -21,4 +22,6 @@ public class RampExtendRequest {
     /** Whole term after the extension, not the number of months to add. */
     private Integer durationInMonths;
     private RampEscalatorDto escalator;
+    private Long lineItemId;
+    private Long expectedQuoteVersion;
 }

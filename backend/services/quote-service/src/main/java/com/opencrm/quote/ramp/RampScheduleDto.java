@@ -17,4 +17,8 @@ public class RampScheduleDto {
 
     private List<RampStepDto> steps;
     private RampEscalatorDto escalator;
+    /** Present only after an atomic extension save. */
+    private Integer durationInMonths;
+    private Long quoteVersion;
+    private com.opencrm.quote.quote.QuoteStatus quoteStatus;
 }

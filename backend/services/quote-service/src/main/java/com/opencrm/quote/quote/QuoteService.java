@@ -511,6 +511,7 @@ public class QuoteService {
                     .rampEscalatorMode(source.getRampEscalatorMode())
                     .rampEscalatorAmount(source.getRampEscalatorAmount())
                     .rampEscalatorEveryMonths(source.getRampEscalatorEveryMonths())
+                    .rampEscalatorCompounding(source.getRampEscalatorCompounding())
                     .build();
             copyRampSteps(source, copy);
             clonedLines.add(copy);
