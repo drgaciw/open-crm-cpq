@@ -60,6 +60,7 @@ final class ApplyFixture {
     final List<LineBind> binds = new ArrayList<>();
     final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     final DocumentApplyOrchestrator orchestrator;
+    final AssetLifecycleReadiness readiness;
     private final AtomicLong periodIds = new AtomicLong(100);
     private final ReentrantLock documentLock = new ReentrantLock();
     private final java.util.concurrent.atomic.AtomicInteger lockCalls = new java.util.concurrent.atomic.AtomicInteger();
@@ -67,6 +68,10 @@ final class ApplyFixture {
     java.util.function.IntConsumer afterDocumentUnlock = ignored -> {};
 
     ApplyFixture() {
+        this(true);
+    }
+
+    ApplyFixture(boolean assetLifecycleReady) {
         document = AmendmentDocument.builder()
                 .id(UUID.randomUUID())
                 .tenantId(tenantId)
@@ -174,8 +179,10 @@ final class ApplyFixture {
             return null;
         }).when(gateway).lockDocument(any());
 
+        readiness = mock(AssetLifecycleReadiness.class);
+        when(readiness.isReady()).thenReturn(assetLifecycleReady);
         orchestrator = new DocumentApplyOrchestrator(documents, unitRepository, ledgerRepository, subscriptions, rates,
-                writer, documentService, gateway, meters, new DirectTransactions(), mock(jakarta.persistence.EntityManager.class));
+                writer, documentService, gateway, meters, new DirectTransactions(), mock(jakarta.persistence.EntityManager.class), readiness);
     }
 
     AmendmentApplicationUnit unit(int unitNo, Subscription subscription, long observedRevision) {
