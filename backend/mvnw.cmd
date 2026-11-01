@@ -18,7 +18,7 @@
 @REM ----------------------------------------------------------------------------
 
 @REM ----------------------------------------------------------------------------
-@REM Apache Maven Wrapper startup batch script, version 3.3.2
+@REM Apache Maven Wrapper startup batch script, version 3.3.4
 @REM ----------------------------------------------------------------------------
 
 @REM Begin all REM://lines with '@' in case MAVEN_BATCH_ECHO is 'on'
