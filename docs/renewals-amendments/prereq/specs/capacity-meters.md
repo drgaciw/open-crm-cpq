@@ -80,7 +80,7 @@ Fixture `fixtures/capacity-meters/frozen-snapshot-dispute.proposed.json`. DRG-57
 | Reading the dispute names | `r-2026-09` |
 | `r-2026-09` status inside the snapshot | `Attested` |
 | `r-2026-09` value inside the snapshot | 80 |
-| Content hash | `ce55f9dc7ccdecb1f446df0afe3becaebeee0098915518177e61a3122ae25c90` |
+| Content hash | `b9195936e93f70a81609974fd94c7cded5c00007c585011788b0395a2373c680` |
 | Content hash after the dispute | the same 64 hex digits |
 | Excess cores | 16 |
 | Overage amount | 40000.00 USD |
@@ -213,9 +213,9 @@ Clause illustration, same owner slot, not the Proposed default. Inputs: `FromFir
 
 The snapshot `snap-tu-641-frozen` is `Frozen` at `2026-10-05T12:00:00Z` with nine `Attested` readings, values 60, 62, 64, 66, 70, 72, 76, 78, 80. The priced block records excess 16, overage 40000.00 USD, arrears 0.00 USD, scale 2, `HALF_UP`. The aggregation input on that priced block is Peak, with `aggregationStatus` Proposed and `aggregationOwnerDecision` `___ (drg, time)`. Peak is an input of the frozen example so the 16 can be checked by hand. It is frame fork F1. It is not a DRG-641 default row, and the owner slot is blank.
 
-At `2026-10-20T15:00:00Z` a dispute names reading `r-2026-09` and carries dispute status `Disputed`. `writesSnapshot` is false. `reopensSnapshot` is false. Inside the snapshot, `r-2026-09` stays `Attested` with value 80. `snapshot.status` stays `Frozen`. `snapshot.contentHash` stays `ce55f9dc7ccdecb1f446df0afe3becaebeee0098915518177e61a3122ae25c90`. `snapshot.priced` stays on the amounts above. `reopened` is false. `newSnapshotCreated` is false. `backfill` is false. S7 stays gated.
+At `2026-10-20T15:00:00Z` a dispute names reading `r-2026-09` and carries dispute status `Disputed`. `writesSnapshot` is false. `reopensSnapshot` is false. Inside the snapshot, `r-2026-09` stays `Attested` with value 80. `snapshot.status` stays `Frozen`. `snapshot.contentHash` stays `b9195936e93f70a81609974fd94c7cded5c00007c585011788b0395a2373c680`. `snapshot.priced` stays on the amounts above. `reopened` is false. `newSnapshotCreated` is false. `backfill` is false. S7 stays gated.
 
-The content hash is SHA-256 over the UTF-8 canonical JSON in `contentHashCanonical`: the snapshot object with `contentHash` removed, keys sorted, separators comma and colon, no extra whitespace, written as 64 lowercase hex. That encoding is the shape the Cluster C frame proposes for a snapshot hash. The algorithm row in the fixture is Status: Proposed, and its owner decision is `___ (drg, time)`. This section does not call `AmendmentEventHasher`.
+Each reading carries an illustrative source and attestation actor, time and method; these synthetic values are fixture data, not a selected production policy. The content hash is SHA-256 over the UTF-8 canonical JSON in `contentHashCanonical`: the snapshot object with `contentHash` removed, keys sorted, separators comma and colon, no extra whitespace, written as 64 lowercase hex. That encoding is the shape the Cluster C frame proposes for a snapshot hash. The algorithm row in the fixture is Status: Proposed, and its owner decision is `___ (drg, time)`. This section does not call `AmendmentEventHasher`.
 
 The named outcome is `credit-note`.
 

@@ -6,11 +6,11 @@
 
 **Issues.** [DRG-643](https://linear.app/drgamtd-workspace/issue/DRG-643). One section each for [DRG-555](https://linear.app/drgamtd-workspace/issue/DRG-555), [DRG-593](https://linear.app/drgamtd-workspace/issue/DRG-593), [DRG-596](https://linear.app/drgamtd-workspace/issue/DRG-596), [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567), and [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568).
 
-**Sources, linked and not copied.** [DRG-606](https://linear.app/drgamtd-workspace/issue/DRG-606) RN1–RN5 in [renewal-policy-spec.md](../renewal-policy-spec.md) §1.6. Forks in [cluster-d-renewal-automation-decision-frame.md](../cluster-d-renewal-automation-decision-frame.md). Mode catalog in [drg-549-renewal-pricing-resolution-design-frame.md](../drg-549-renewal-pricing-resolution-design-frame.md). Uplift basis, the D-04 overlay, and a null percent: per DRG-604 Accepted (#623), [adr-renewal-uplift-basis-and-precedence.md](../adr-renewal-uplift-basis-and-precedence.md).
+**Sources, linked and not copied.** The [delegated decision record](../delegated-renewals-amendments-decisions-2026-10-17.md#renewal-automation) is the adopted baseline and overrides historical forks in the cluster-d frame. [DRG-606](https://linear.app/drgamtd-workspace/issue/DRG-606) RN1–RN5 in [renewal-policy-spec.md](../renewal-policy-spec.md) §1.6. Forks in [cluster-d-renewal-automation-decision-frame.md](../cluster-d-renewal-automation-decision-frame.md). Mode catalog in [drg-549-renewal-pricing-resolution-design-frame.md](../drg-549-renewal-pricing-resolution-design-frame.md). Uplift basis, the D-04 overlay, and a null percent: per DRG-604 Accepted (#623), [adr-renewal-uplift-basis-and-precedence.md](../adr-renewal-uplift-basis-and-precedence.md).
 
 Worked term below, taken from renewal-policy-spec §1.6: current term ends **2027-03-31**. Day counts are `end_date − as_of_date`. 2026-12-31 is 90 days before that end. 2026-12-30 is 91. 2027-03-01 is 30. 2027-03-30 is 1. 2027-02-14 is 45. 2027-02-13 is 46. Figures are the sanity-check illustration (exit net 40.0000), not customer data.
 
-Every choice in this file stays Proposed. Every default below is `Status: Proposed` and the owner slot is blank.
+This spec and its acceptance criteria remain Proposed; they do not authorize implementation. The separately adopted decision record selects the opt-in defaults, distinct CAM daily kickoff scan, catch-up and cycle deduplication, and excludes unattended execution in this slice. Historical fork labels and blank slots below do not reopen those adopted choices.
 
 ---
 
@@ -22,18 +22,20 @@ Expected values are in the tables. Pass or fail is against those values. This fi
 
 | ID | Given | Expected |
 |---|---|---|
-| AC-555-1 | Subscription `ACTIVE`. `end_date` 2027-03-31. `as_of_date` 2027-03-30. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. | Term-end action count 0. LifecycleChange count 0. `end_date` remains 2027-03-31. No renewed rate period. `auto_renew` remains true. |
-| AC-555-2 | Subscription `ACTIVE`. `as_of_date` equals `end_date` 2027-03-31. `auto_renew` false. Run once for each stored action `Renew`, `RenewOnce`, `Evergreen`, `Cancel`. | For each stored action: LifecycleChange count 0, `end_date` remains 2027-03-31, no renewed rate period, `auto_renew` remains false. The `Cancel` run does not cancel the term. |
+| AC-555-1 | Subscription `ACTIVE`. `end_date` 2027-03-31. `as_of_date` 2027-03-30. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. `kickoff_opt_in` false. | Term-end action count 0. LifecycleChange count 0. `end_date` remains 2027-03-31. No renewed rate period. `auto_renew` remains true. |
+| AC-555-2 | Subscription `ACTIVE`. `as_of_date` equals `end_date` 2027-03-31. `auto_renew` false. `kickoff_opt_in` false. Run once for each stored action `Renew`, `RenewOnce`, `Evergreen`, `Cancel`. | For each stored action: LifecycleChange count 0, `end_date` remains 2027-03-31, no renewed rate period, `auto_renew` remains false. The `Cancel` run does not cancel the term. |
 | AC-555-3 | Subscription `ACTIVE`. `as_of_date` equals `end_date`. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. Signature policy unset. | LifecycleChange is not `EXECUTED`. Renewed rate-period count 0. `end_date` remains 2027-03-31. The same withheld result holds when the stored action is `RenewOnce`, `Evergreen`, or `Cancel`: the other three actions also stay at count 0, because one stored action is the only candidate and that candidate is withheld. |
 | AC-555-4 | Subscription `ACTIVE`. `as_of_date` equals `end_date`. `auto_renew` true. Stored action `RenewOnce`. A non-terminal renewal for that contract and term end already exists (state `DRAFT`). | Existing id unchanged. New renewal id count 0. Audit event `TermEndDeferredToOpenRenewal` appended once. `auto_renew` remains true. No successor is written, so the successor flag is not cleared. |
 | AC-555-5 | Status `EXPIRED`, or the proposed status `InGrace`. `as_of_date` on or after `end_date`. `auto_renew` true. Stored action `Renew`. | Term-end action count 0 for `Renew`, `RenewOnce`, `Evergreen`, and `Cancel`. `InGrace` is not a `SubscriptionStatus` constant (`PENDING`, `ACTIVE`, `SUSPENDED`, `CANCELLED`, `EXPIRED`). |
 | AC-555-6 | Header `term_model` `Evergreen` and `end_date` null. `auto_renew` true. | Term-end action count 0 for all four actions. `end_date` remains null. |
 | AC-555-7 | Status `PENDING`, `SUSPENDED`, or `CANCELLED`. Any stored action. `auto_renew` true or false. | Term-end action count 0 for all four actions. `CANCELLED` does not receive a second `Cancel`. |
-| AC-555-8 | `end_date` 2027-03-31. `lead_time_days` 90. `kickoff_opt_in` true. Eligibility publication dated 2027-03-01 (`end_date` minus 30 days). | Drafts opened by this spec: 0. No scheduler edit. No earlier kickoff trigger is added. |
-| AC-555-9 | `ACTIVE`. `end_date` 2027-03-31. `as_of_date` 2027-03-31. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. `renewal_term_months` empty. No co-term anchor. OQ-RN-3 is set. The signature-policy value is not chosen in this row. | One system renewal reaches `EXECUTED` under that policy before any rate period is written. Renewed `effective_from` 2027-04-01. Renewed `effective_to` 2028-03-31. Header `end_date` 2028-03-31. Successor `auto_renew` true. These dates are renewal-policy-spec AC-RN-01, AC-RN-02, and AC-RN-17. |
-| AC-555-10 | Same gate as AC-555-9, stored action `RenewOnce`. Source `kickoff_opt_in` true. | Successor term 2027-04-01 through 2028-03-31. Successor `auto_renew` false. Successor `kickoff_opt_in` true. A later term end of that successor does not auto-apply. Renewal-policy-spec AC-RN-19. |
-| AC-555-11 | Same gate as AC-555-9, stored action `Evergreen`. | Successor header `term_model` Evergreen and `end_date` null. Successor `auto_renew` true. A later lead-time run opens nothing. RN2 does not apply. Renewal-policy-spec AC-RN-20. |
-| AC-555-12 | Same gate as AC-555-9, stored action `Cancel`. | Renew LifecycleChange count 0. `end_date` remains 2027-03-31. Renewed rate-period count 0. One non-renewal audit event is appended. `auto_renew` false. Renewal-policy-spec AC-RN-21. |
+| AC-555-8 | `end_date` 2027-03-31. `lead_time_days` 90. `kickoff_opt_in` true. Eligibility publication dated 2027-03-01 (`end_date` minus 30 days). | Proposed future scan: none on 2026-12-30; one kickoff operation/draft on or after 2026-12-31 and before term end. On 2027-03-01, a missed scan catches up; if that cycle already ran, it returns the existing operation and creates no second draft. The 30-day publication is separate. Current implementation is not changed by this document. |
+| AC-555-9 | `ACTIVE`. `end_date` 2027-03-31. `as_of_date` 2027-03-31. `auto_renew` true. Stored action `Renew`. No open non-terminal renewal. `renewal_term_months` empty. No co-term anchor. The signature-policy value is not chosen in this row. | No unattended path reaches `EXECUTED`, writes a renewed rate period, or changes the header. The flow stops for the existing explicit signature/approval process. Only after that separate process succeeds may the proposed successor use `effective_from` 2027-04-01, `effective_to` 2028-03-31, header `end_date` 2028-03-31, and `auto_renew` true (AC-RN-01, AC-RN-02, AC-RN-17). |
+| AC-555-10 | Same gate as AC-555-9, stored action `RenewOnce`. Source `kickoff_opt_in` true. | No unattended execution or successor write. After the separate explicit flow succeeds, the proposed successor term is 2027-04-01 through 2028-03-31, `auto_renew` false, and `kickoff_opt_in` true (AC-RN-19). |
+| AC-555-11 | Same gate as AC-555-9, stored action `Evergreen`. | No unattended execution or successor write. After the separate explicit flow succeeds, the proposed successor is Evergreen with null `end_date` and `auto_renew` true; finite-date kickoff skips it (AC-RN-20). |
+| AC-555-12 | Same gate as AC-555-9, stored action `Cancel`. | No unattended `EXECUTED` or renewed rate-period write. The non-renewal outcome and its audit remain a Proposed later criterion (AC-RN-21); this row does not choose an automated cancellation mechanism. |
+| AC-555-13 | An opted-in finite contract is due for kickoff. Run the future scan twice for the same tenant, contract and end date, including once after a settings-version change. | One kickoff operation for the cycle; the settings version is captured as evidence, not added to the deduplication key. No second draft is created. |
+| AC-555-14 | A kickoff is selected, then the contract opts out or its end-date/version changes before dispatch. | Recheck before dispatch and do not dispatch the stale candidate. A missed scan may catch up only while the adopted due window is still open. |
 
 #### AC-555-9 `Renew`
 
@@ -61,14 +63,14 @@ Owner decision: ___ (drg, time)
 
 #### Term-end table
 
-Four actions by state. `SubscriptionStatus` values are the enum on this `main`. `InGrace` and the Evergreen header are separate rows because they are not those enum constants. One row states an allowed path. Every other cell is **not allowed**.
+Four actions by state. `SubscriptionStatus` values are the enum on this `main`. `InGrace` and the Evergreen header are separate rows because they are not those enum constants. The term-end automation does not execute a renewal unattended; the independent lead-time kickoff may create a draft before term end.
 
 | State | Renew | RenewOnce | Evergreen | Cancel |
 |---|---|---|---|---|
 | `PENDING` | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. | not allowed (AC-555-7). No ACTIVE term-end scan. |
 | `ACTIVE`, `as_of_date` before `end_date` | not allowed (AC-555-1). The term-end clock is `as_of_date` equal to `end_date`. | not allowed (AC-555-1). Same clock. | not allowed (AC-555-1). Same clock. | not allowed (AC-555-1). Same clock. |
 | `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` false | not allowed (AC-555-2). `auto_renew` false withholds `Renew`. | not allowed (AC-555-2). `auto_renew` false withholds `RenewOnce`. | not allowed (AC-555-2). `auto_renew` false withholds `Evergreen`. | not allowed (AC-555-2). `auto_renew` false withholds `Cancel`. The term is not cancelled by this policy. |
-| `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, no open non-terminal renewal | allowed (Proposed): one renewal reaches `EXECUTED` under the signature policy OQ-RN-3 names, then the successor term is 2027-04-01 through 2028-03-31 with header `end_date` 2028-03-31 and successor `auto_renew` true (AC-555-9) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): the same successor term as `Renew`, with successor `auto_renew` false and `kickoff_opt_in` copied (AC-555-10) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): successor `term_model` Evergreen, `end_date` null, successor `auto_renew` true, and a later lead-time run opens nothing (AC-555-11) once OQ-RN-3 is set; until then refused per AC-555-3 | allowed (Proposed): no Renew LifecycleChange, `end_date` remains 2027-03-31, renewed rate-period count 0, one non-renewal audit event, and `auto_renew` false (AC-555-12) once OQ-RN-3 is set; until then refused per AC-555-3 |
+| `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, no open non-terminal renewal | No unattended `EXECUTED` or successor write (AC-555-9). Explicit workflow required. | Same gate (AC-555-10). | Same gate (AC-555-11). | No unattended execution or successor write (AC-555-12). |
 | `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, open non-terminal renewal | not allowed (AC-555-4). Open draft is left untouched. | not allowed (AC-555-4). Successor `auto_renew` is not cleared while the action is withheld. | not allowed (AC-555-4). Header `end_date` is not cleared. | not allowed (AC-555-4). The open draft is not cancelled by the term-end job. |
 | `SUSPENDED` | not allowed (AC-555-7). Eligibility selection described in cluster-d is `ACTIVE` only. | not allowed (AC-555-7). Same. | not allowed (AC-555-7). Same. | not allowed (AC-555-7). Same. |
 | `CANCELLED` | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). Outside the `ACTIVE` scan. | not allowed (AC-555-7). A second `Cancel` is not run. |
@@ -76,7 +78,7 @@ Four actions by state. `SubscriptionStatus` values are the enum on this `main`. 
 | `InGrace` (proposed name, not a `SubscriptionStatus` constant) | not allowed (AC-555-5). | not allowed (AC-555-5). | not allowed (AC-555-5). | not allowed (AC-555-5). |
 | Header `term_model` `Evergreen`, `end_date` null | not allowed (AC-555-6). No end date, so the term-end clock has no day to fire. | not allowed (AC-555-6). Same. | not allowed (AC-555-6). The header is already Evergreen. The action does not run again. | not allowed (AC-555-6). Same. No end date to cancel against. |
 
-**OQ-RN-3, signature policy for an unattended term-end.** `NOTICE_ONLY` and `NOT_REQUIRED` stay unselected.
+**OQ-RN-3, historical unattended term-end fork.** The adopted record excludes unattended `EXECUTED` in this slice regardless of the policy value. `NOTICE_ONLY` and `NOT_REQUIRED` remain unselected here; a different unattended path would require a separate superseding decision.
 
 Status: Proposed
 
@@ -95,33 +97,21 @@ Owner decision: ___ (drg, time)
 | AC-593-1 | Manual create. Mode start-from-scratch. Contract `end_date` 2027-03-31. No co-term anchor. Then a second manual create for the same contract and term end while the first is non-terminal. | First create: Renew LifecycleChange count 1, copied line count 0, `effective_from` 2027-04-01. The date is DRG-606 RN1 (renewal-policy-spec §1.6); this row does not define a second date rule. Second create: same id returned, new id count 0. That guard is DRG-606 RN4. |
 | AC-593-2 | A lead-time kickoff path, when kickoff is on. | Creation mode `auto-generate`. Start-from-scratch count 0. Copied shape remains the landed single accepted recurring line, uplift left unset, term 12 months. `draftRenewal` gains no parameter from this file. |
 | AC-593-3 | Two creates of the same renewal. One opts in prior-term usage. The resolved policy declares no usage input. | The opted-in quote stores the context reference. Its pricing input snapshot omits that reference. The priced result equals the create with the opt-in off. A missing percent still resolves as AC-567-1 on both creates. Usage does not supply a percent. |
-| AC-593-4 | `SubscriptionRenewalEligibleEvent` delivered in description only. `opencrm.pricing.ramp.enabled` false. Renewal outbox relay disabled. | Drafts opened: 0. The consumer class stays unregistered. This file does not register it. |
+| AC-593-4 | `SubscriptionRenewalEligibleEvent` delivered in description only. `opencrm.pricing.ramp.enabled` false. Renewal outbox relay disabled. | The publication alone opens no draft; the independent opted-in CAM daily scan remains a separate adopted design and may open one when due. This file registers no consumer or worker. |
 
 ### DRG-596 — automation settings
 
 #### Default: auto-renew off
 
-`auto_renew` is opt-in per contract. A contract with no settings write has `auto_renew` false. A clause write cannot set it true (AC-596-4).
-
-Status: Proposed
-
-Owner decision: ___ (drg, time)
+`auto_renew` is opt-in per contract. A contract with no settings write has `auto_renew` false. A clause write cannot set it true (AC-596-4). This default is adopted in the delegated decision record; these test criteria remain Proposed.
 
 #### Default: notice-period default with override
 
-One global notice period, plus a per-contract override. This file sets no global integer. With no override and no global integer, notice-record count is 0 on every date, including `end_date`. A per-contract override is the day count the notice record shows when a record is written. The clause field is a trigger source, not that day count.
-
-Status: Proposed
-
-Owner decision: ___ (drg, time)
+One global notice period, plus a per-contract override. This file sets no global integer. With no override and no global integer, notice-record count is 0 on every date, including `end_date`. A per-contract override is the day count the notice record shows when a record is written. The clause field is a trigger source, not that day count. The delegated record leaves the global notice number unset; these test criteria remain Proposed.
 
 #### Default: 90-day opt-in
 
-`kickoff_opt_in` is opt-in per contract and false when no settings write exists. `lead_time_days` is stored as 90 and is unused while `kickoff_opt_in` is false.
-
-Status: Proposed
-
-Owner decision: ___ (drg, time)
+`kickoff_opt_in` is opt-in per contract and false when no settings write exists. `lead_time_days` is stored as 90 and is unused while `kickoff_opt_in` is false. Both defaults are adopted in the delegated decision record; these test criteria remain Proposed.
 
 | ID | Given | Expected |
 |---|---|---|
@@ -183,12 +173,12 @@ Frame: [DRG-555](../cluster-d-renewal-automation-decision-frame.md#drg-555--auto
 
 Deltas:
 
-1. The term-end table pairs the four actions with each state. §1.5 names the four results. The row `ACTIVE`, `as_of_date` = `end_date`, `auto_renew` true, and no open non-terminal renewal states each result as allowed (Proposed) once OQ-RN-3 is set. Every other cell is not allowed and cites its AC.
-2. AC-555-3 refuses that row while the signature policy is unset. AC-555-9 through AC-555-12 state the §1.5 results for `Renew`, `RenewOnce`, `Evergreen`, and `Cancel` after OQ-RN-3 is set. This file does not choose `NOTICE_ONLY` or `NOT_REQUIRED`.
-3. AC-555-8 states the draft count for a publication 30 days before end while lead time is 90. Fork RN-B already separates the clocks and leaves the earlier trigger unresolved. This file adds no trigger and does not edit `RenewalScheduler`.
-4. OQ-RN-DRIVE stays an open question with no selected option. The sentence "drive the scheduler" is not a criterion.
+1. The term-end table pairs the four actions with each state. The adopted decision excludes unattended `EXECUTED`; any later successor results require the existing explicit workflow and remain Proposed criteria.
+2. AC-555-3 and AC-555-9 through AC-555-12 do not authorize an unattended path even if a signature-policy value is later selected. This file does not choose `NOTICE_ONLY` or `NOT_REQUIRED`.
+3. AC-555-8 tests the adopted separate CAM daily kickoff scan, including catch-up and one operation per tenant/contract/end-date cycle. It is independent of the existing 30-day eligibility publication and does not edit `RenewalScheduler`.
+4. The historical OQ-RN-DRIVE fork is superseded by the adopted distinct CAM scan; its implementation, idempotency and configuration are still delivery work, not current behavior.
 
-DRG-606 RN2 (header `end_date` follows the latest renewed `effective_to`) is the header end 2028-03-31 in AC-555-9, and only after OQ-RN-3 is set. Until then AC-555-3 writes no renewed line. RN5 (a perpetual line is not `Renew` and not `Remove`) is a line rule in §1.6. It is not a header term-end row, and it is not restated.
+DRG-606 RN2 (header `end_date` follows the latest renewed `effective_to`) is the proposed header end 2028-03-31 in AC-555-9, only after the separate explicit workflow succeeds. The unattended path writes no renewed line. RN5 (a perpetual line is not `Renew` and not `Remove`) is a line rule in §1.6. It is not a header term-end row, and it is not restated.
 
 ### DRG-593
 
@@ -199,7 +189,7 @@ Deltas:
 1. Basis, precedence, and a null percent are per DRG-604 Accepted (#623). The mode catalog is DRG-549. AC-593-2 does not list those fields again. Auto-generate, in this file, keeps the landed single-line draft (fork QM-B).
 2. AC-593-1 uses RN1 for `effective_from` and RN4 for the second create. It adds the expected copied-line count of 0 for start-from-scratch.
 3. AC-593-3 adds the expected price equality when prior-term usage is opted in and the policy declares no usage input. The SaaS payload shape (policy OQ-RN-8) and on-prem usage (DRG-587) stay outside this file.
-4. AC-593-4 adds the expected draft count 0 while the consumer is unregistered (fork QM-D). Kickoff, when it exists, uses auto-generate (fork QM-A). Start-from-scratch is a manual or API choice in AC-593-1.
+4. AC-593-4 keeps the publication from creating a draft by itself while its consumer is unregistered. The adopted independent CAM kickoff scan, once implemented and opted in, uses auto-generate. Start-from-scratch is a manual or API choice in AC-593-1.
 
 ### DRG-596
 
@@ -207,10 +197,10 @@ Frame: [DRG-596](../cluster-d-renewal-automation-decision-frame.md#drg-596--auto
 
 Deltas:
 
-1. The three defaults are restated above with `Status: Proposed` and a blank owner slot. Fork AS-A is the source of the off defaults and the stored 90. This file does not fill the slot from the 2026-10-16 call notes.
+1. The criteria remain Proposed, while the delegated record already adopts both opt-ins off and a 90-day lead time. Those adopted defaults are not a new owner decision in this file.
 2. AC-596-2 is the notice delta. Fork AS-B leaves the global integer unset. The expected counts are 0 until an override (or a later integer) exists, and 1 on 2027-02-14 when the override is 45, with no LifecycleChange.
-3. AC-596-4 is the clause delta. Writing clause `notice_period_days` and `term_end_action` leaves both opt-ins false. Fork AS-C keeps clause columns off the settings chain. This file adds no settings table.
-4. AC-596-3 and AC-596-5 keep the 90-day value unused while kickoff is off, including when a 30-day publication exists. The §1.7 matrix is the frame's future-consumer description (fork AS-D). This file does not register that consumer, so it does not restate the four matrix rows as runs that happen now.
+3. AC-596-4 is the clause delta. Writing clause `notice_period_days` and `term_end_action` leaves both opt-ins false. The adopted design uses versioned CAM settings and a separate append-only settings audit; this document creates no table.
+4. AC-596-3 and AC-596-5 keep the 90-day value unused while kickoff is off. The adopted opt-in CAM scan and the 30-day publication remain separate, and neither is newly enabled by this document.
 
 ### DRG-567
 
@@ -229,7 +219,7 @@ Delta: This file records the accepted status of DRG-533 without treating its rec
 | Rule | Where it lives | Use in this file |
 |---|---|---|
 | RN1 | renewal-policy-spec §1.6, AC-RN-01 | Cited by AC-593-1 for `effective_from` 2027-04-01. No second start-date rule. |
-| RN2 | §1.6, AC-RN-04 | Cited by AC-555-9 for header `end_date` 2028-03-31 once OQ-RN-3 is set. AC-555-3 writes no renewed `effective_to` while OQ-RN-3 is unset. |
+| RN2 | §1.6, AC-RN-04 | Cited by AC-555-9 for a proposed header `end_date` 2028-03-31 after the explicit workflow succeeds; the unattended path writes no renewed `effective_to`. |
 | RN3 | §1.6, AC-RN-05 | Field list stays in §1.6. Basis and precedence: per DRG-604 Accepted (#623). Modes: DRG-549. |
 | RN4 | §1.6, AC-RN-06 | Cited by AC-593-1 (second create) and AC-555-4 (open draft withheld). |
 | RN5 | §1.6, AC-RN-09 | Not a header term-end row. Not restated. |
