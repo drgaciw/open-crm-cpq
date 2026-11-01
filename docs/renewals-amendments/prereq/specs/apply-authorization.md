@@ -24,7 +24,7 @@ The controller exposes one route and does not check a role itself:
 
 The role gate is the shared security chain, which CAM does not replace:
 
-- `backend/libs/security/src/main/java/com/opencrm/security/web/OpenCrmSecurityAutoConfiguration.java` lines 44–45: in `jwt` mode, `/internal/**` needs a service token with app role `Internal.Invoke`.
+- `backend/libs/security/src/main/java/com/opencrm/security/web/OpenCrmSecurityAutoConfiguration.java` lines 44–45: in `jwt` mode, `/internal/**` requires the authority derived from app role `Internal.Invoke`. The matcher checks the authority, not whether the caller is a service principal.
 - Same file, lines 91–94: the JWT converter is `EntraRoleAuthorities`, and `internalAuthority` is `EntraRoleAuthorities.authorityFor(properties.getInternalRole())`.
 - Same file, line 102: `requestMatchers("/internal/**").hasAuthority(internalAuthority)`.
 - Same file, lines 103–105: customizer rules run after that matcher, then `/api/v1/**` and every other request need an authenticated token.
@@ -40,7 +40,7 @@ What the existing chain test already records (`DocumentApplyAuthorizationTest.ja
 | Caller | Result |
 |---|---|
 | No token | 401, `WWW-Authenticate` starts with `Bearer`. The orchestrator is not called. |
-| User token `CPQ.User`, `DealDesk`, `SalesVP`, `CFO`, `Admin`, or `Legal` | 403. The orchestrator is not called. |
+| User token with `CPQ.User`, `DealDesk`, `SalesVP`, `CFO`, `Admin`, or `Legal`, and without `Internal.Invoke` | 403. The orchestrator is not called. |
 | Service token with no `Internal.Invoke` | 403. The orchestrator is not called. |
 | Service token `quote-service` with `Internal.Invoke` | Admitted. The test expects 200 when the orchestrator returns a result, and the command carries `ROLE_INTERNAL_INVOKE` and the token `tid`. |
 
@@ -73,7 +73,7 @@ A caller who holds more than one role is allowed when any held role's cell is al
 
 **Status: Proposed.**
 
-`Internal.Invoke` is the only role the gate admits. The path stays `POST /internal/v1/amendments/{amendmentId}:apply`. The chain rule stays `hasAuthority(ROLE_INTERNAL_INVOKE)`.
+`Internal.Invoke` is the only role the gate admits. The path stays `POST /internal/v1/amendments/{amendmentId}:apply`. The chain rule stays `hasAuthority(ROLE_INTERNAL_INVOKE)`. It does not enforce the service-principal distinction by itself: a valid user JWT carrying that authority also passes the matcher. ADR-016 requires a service token; any restriction on assignment of that role is outside this matcher and is not established by these tests.
 
 | App role | Authority | Role gate | HTTP |
 |---|---|---|---|
@@ -97,8 +97,9 @@ Negative tests this option implies. Each refused row is one test. The allow row 
 7. User token with only `Legal`. Expect 403.
 8. Service token with no `Internal.Invoke`. Expect 403.
 9. Service token with `Internal.Invoke`. Expect the orchestrator to be called, with `ROLE_INTERNAL_INVOKE` on the command.
+10. User JWT with `Internal.Invoke`. The current matcher admits the authority; add a test to document this distinction and verify any independent identity-provider restriction.
 
-`DocumentApplyAuthorizationTest.unauthenticatedAndRolesWithoutInternalInvokeAreTheBaselineRefusal` and `internalInvokeReachesTheOrchestratorWithTheTokenTenant` already cover this list on main. A later story that keeps A reuses those tests. It does not add a new role.
+`DocumentApplyAuthorizationTest.unauthenticatedAndRolesWithoutInternalInvokeAreTheBaselineRefusal` and `internalInvokeReachesTheOrchestratorWithTheTokenTenant` cover items 1–9 on main. Item 10 is not covered by those tests. A later story that keeps A reuses the existing tests and checks that distinction; it does not add a new role.
 
 ## Option B. Per-role allow list matching S5 / DRG-583
 
@@ -141,7 +142,7 @@ Negative tests this option implies:
 10. User with only `CFO`. Expect admitted.
 11. User with `Admin` and `DealDesk`. Expect admitted.
 
-On today's chain, a user token cannot pass line 102 of `OpenCrmSecurityAutoConfiguration`, because a user token does not carry `Internal.Invoke`. A later code story that implements B has to admit those four user authorities. That story is not this file. This file does not edit the security config.
+On today's chain, a user token without `Internal.Invoke` cannot pass line 102 of `OpenCrmSecurityAutoConfiguration`. The matcher does not distinguish a user JWT that carries that role from a service JWT. A later code story that implements B has to admit those four user authorities. That story is not this file. This file does not edit the security config.
 
 ## Option C. Option B plus an amount threshold
 
