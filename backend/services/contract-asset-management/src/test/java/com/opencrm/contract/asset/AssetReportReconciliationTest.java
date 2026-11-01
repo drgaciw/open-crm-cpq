@@ -1,9 +1,6 @@
 package com.opencrm.contract.asset;
 
 import com.opencrm.common.event.dto.AssetCreatedEvent;
-import com.opencrm.contract.asset.fixtures.AssetAmendedFixture;
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
-import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -171,28 +168,28 @@ class AssetReportReconciliationTest {
     private void sample() {
         created(ACTIVE, ACCOUNT, "prod-a", "10", "2026-01-01", "2026-06-15");
         created(TERMINATED, ACCOUNT, "prod-b", "4", "2026-01-01", "2026-12-31");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-term", TERMINATED, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-term", "1"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-term", TERMINATED, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-term", "1");
         created(DOWNSIZED, ACCOUNT, "prod-c", "8", "2026-01-01", "2026-12-31");
         projection.apply(new AssetHistoryFact(
                 "evt-note", AssetHistoryKind.AMENDED, DOWNSIZED, ACCOUNT, LocalDate.parse("2026-04-10"),
                 null, "amd-note", "1", null, null, null, null, null, null));
-        projection.apply(AssetAmendedFixture.of(
-                "evt-down", DOWNSIZED, ACCOUNT, LocalDate.parse("2026-05-15"), "amd-down", "1", new BigDecimal("5")));
+        AssetReportTestEvents.amended(projection,
+                "evt-down", DOWNSIZED, ACCOUNT, LocalDate.parse("2026-05-15"), "amd-down", "1", new BigDecimal("5"));
         created(SUPERSEDED, ACCOUNT, "prod-d", "2", "2026-01-01", "2026-08-01");
-        projection.apply(AssetSupersededFixture.of(
-                "evt-super", SUPERSEDED, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-super", "1", SUCCESSOR));
+        AssetReportTestEvents.superseded(projection,
+                "evt-super", SUPERSEDED, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-super", "1", SUCCESSOR);
         created(SUCCESSOR, ACCOUNT, "prod-e", "2", "2026-05-20", "2026-06-20");
         created(UPSIZED, ACCOUNT, "prod-g", "6", "2026-02-01", "2026-11-30");
-        projection.apply(AssetAmendedFixture.of(
-                "evt-up", UPSIZED, ACCOUNT, LocalDate.parse("2026-06-01"), "amd-up", "1", new BigDecimal("9")));
+        AssetReportTestEvents.amended(projection,
+                "evt-up", UPSIZED, ACCOUNT, LocalDate.parse("2026-06-01"), "amd-up", "1", new BigDecimal("9"));
         created(END_MOVED, ACCOUNT, "prod-h", "1", "2026-01-01", "2026-12-31");
         projection.apply(new AssetHistoryFact(
                 "evt-end", AssetHistoryKind.AMENDED, END_MOVED, ACCOUNT, LocalDate.parse("2026-03-01"),
                 LocalDate.parse("2026-06-20"), "amd-end", "1", null, null, null, null, null, null));
         created(OUTSIDER, OTHER, "prod-f", "100", "2026-01-01", "2026-06-15");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-out", OUTSIDER, OTHER, LocalDate.parse("2026-05-02"), "amd-out", "1"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-out", OUTSIDER, OTHER, LocalDate.parse("2026-05-02"), "amd-out", "1");
     }
 
     private void created(String assetId, String accountId, String product, String quantity, String start, String end) {
