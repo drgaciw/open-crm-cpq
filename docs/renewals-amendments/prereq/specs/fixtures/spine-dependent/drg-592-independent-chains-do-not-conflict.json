@@ -1,0 +1,35 @@
+{
+    "issue": "DRG-592",
+    "ac_id": "AC-592-4",
+    "case": "independent-chains-do-not-conflict",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "592-F3-A",
+    "input": {
+        "tenant_id": "t-1",
+        "read": "pricing",
+        "requested_contract_id": "c-1",
+        "active_contracts": [
+            {
+                "id": "c-1",
+                "customer_id": "customer-1",
+                "prior_contract_id": null,
+                "contract_state": "ACTIVE",
+                "precedence_flag": true
+            },
+            {
+                "id": "c-2",
+                "customer_id": "customer-1",
+                "prior_contract_id": null,
+                "contract_state": "ACTIVE",
+                "precedence_flag": true
+            }
+        ]
+    },
+    "expected": {
+        "pricing_contract_id": "c-1",
+        "error_code": null,
+        "both_visible": true
+    }
+}
