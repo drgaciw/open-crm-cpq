@@ -52,7 +52,7 @@ export const list = validateSpec({
     },
   ],
   tables: [{
-    columns: ['Title', 'Status', 'Priority', 'Source', 'Estimated Value', 'Contact', 'Organization'],
+    columns: ['Title', 'Status', 'Priority', 'Source', 'Estimated Value', 'Score (advisory)', 'Contact', 'Organization'],
     sortable: ['Title', 'Status', 'Priority', 'Source', 'Estimated Value'],
     pageSizes: [10, 20, 50],
   }],

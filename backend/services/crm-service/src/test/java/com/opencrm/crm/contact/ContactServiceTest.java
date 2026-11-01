@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,6 +37,9 @@ class ContactServiceTest {
 
     @Mock
     private ContactMapper contactMapper;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private ContactService contactService;

@@ -7,6 +7,7 @@ import {
   QuoteDto,
   QuoteLineItemDto,
   QuoteUpdateRequest,
+  RampScheduleExtendRequest,
   SpringPageResponse,
 } from '@frontend/shared-models';
 
@@ -399,5 +400,68 @@ describe('QuoteService', () => {
     expect(service.selectedQuote()).toBe(beforeSelected);
     expect(service.lineItems()).toBe(beforeLines);
     httpMock.expectNone('/api/v1/quotes/7/line-items');
+  });
+
+  it('extendRampSchedule POSTs the existing steps and new term and does not change quote signals', async () => {
+    const beforeQuotes = service.quotes();
+    const beforeSelected = service.selectedQuote();
+    const beforeLines = service.lineItems();
+    const body: RampScheduleExtendRequest = {
+      durationInMonths: 60,
+      steps: [
+        {
+          sequence: 1,
+          startMonth: 1,
+          months: 12,
+          quantity: 50,
+          priceBasis: 'ABSOLUTE',
+          unitPrice: 42.8,
+        },
+        {
+          sequence: 2,
+          startMonth: 13,
+          months: 12,
+          quantity: 50,
+          priceBasis: 'ABSOLUTE',
+          unitPrice: 44,
+        },
+        {
+          sequence: 3,
+          startMonth: 25,
+          months: 12,
+          quantity: 50,
+          priceBasis: 'ABSOLUTE',
+          unitPrice: 47,
+        },
+      ],
+      escalator: {
+        startPrice: 42.8,
+        mode: 'PERCENT',
+        amount: 7,
+        everyMonths: 12,
+      },
+    };
+    const steps = [
+      ...body.steps,
+      {
+        sequence: 4,
+        startMonth: 37,
+        months: 12,
+        quantity: 50,
+        priceBasis: 'ABSOLUTE' as const,
+        unitPrice: 50.29,
+      },
+    ];
+    const pending = firstValueFrom(service.extendRampSchedule(7, body));
+    const req = httpMock.expectOne('/api/v1/quotes/7/ramp-schedule/extend');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(body);
+    req.flush(steps);
+    await expect(pending).resolves.toEqual(steps);
+    expect(service.quotes()).toBe(beforeQuotes);
+    expect(service.selectedQuote()).toBe(beforeSelected);
+    expect(service.lineItems()).toBe(beforeLines);
+    httpMock.expectNone('/api/v1/quotes/7/line-items');
+    httpMock.expectNone('/api/v1/quotes/7');
   });
 });

@@ -47,7 +47,17 @@ public class DocumentApplyController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         ApplyResult result = orchestrator.apply(new ApplyCommand(amendmentId, tenantOrNull(authentication),
                 caller(authentication), authorities(authentication), correlationId, pins(body)));
-        return ApiResponse.success(new ApplyView(amendmentId, result.status().name(), result.replayed()));
+        return ApiResponse.success(new ApplyView(amendmentId, result.status().name(), result.replayed(),
+                unitOutcomes(result.unitOutcomes())));
+    }
+
+    private static List<ApplyView.UnitOutcome> unitOutcomes(List<ApplyResult.UnitOutcome> units) {
+        if (units == null) {
+            return null;
+        }
+        return units.stream()
+                .map(unit -> new ApplyView.UnitOutcome(unit.unitId(), unit.outcome(), unit.reason()))
+                .toList();
     }
 
     private static UUID tenantOrNull(Authentication authentication) {
@@ -106,6 +116,14 @@ public class DocumentApplyController {
         }
     }
 
-    public record ApplyView(UUID documentId, String status, boolean replayed) {
+    public record ApplyView(UUID documentId, String status, boolean replayed, List<UnitOutcome> unitOutcomes) {
+
+        public ApplyView(UUID documentId, String status, boolean replayed) {
+            this(documentId, status, replayed, null);
+        }
+
+        /** Additive unit row. {@code outcome} is {@code APPLIED} or {@code BLOCKED}. */
+        public record UnitOutcome(Integer unitId, String outcome, String reason) {
+        }
     }
 }

@@ -35,7 +35,8 @@ public class RampScheduleAttacher {
         boolean explicitSteps = schedule.getSteps() != null && !schedule.getSteps().isEmpty();
         List<RampStepDto> steps = explicitSteps
                 ? schedule.getSteps()
-                : expander.expand(quote.getDurationInMonths(), schedule.getEscalator(), request.getQuantity());
+                : expander.expand(quote.getDurationInMonths(), schedule.getEscalator(), request.getQuantity(),
+                        properties.getMaxPeriods());
         validator.validate(
                 steps,
                 quote.getDurationInMonths(),

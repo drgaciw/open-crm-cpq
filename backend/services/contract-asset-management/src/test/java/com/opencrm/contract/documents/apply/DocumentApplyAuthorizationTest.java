@@ -243,7 +243,13 @@ class DocumentApplyAuthorizationTest {
                     .createdBy("earlier")
                     .build());
             assertThatThrownBy(fixture::apply).isInstanceOf(DocumentApplyException.class);
-            assertOneAudit(fixture, "DIGEST_CONFLICT");
+            assertThat(fixture.events).hasSize(1);
+            var audit = fixture.events.get(0);
+            assertThat(audit.eventType()).isEqualTo(DocumentApplyOrchestrator.EVENT_UNIT_BLOCKED);
+            assertThat(audit.reasonCode()).isEqualTo("DIGEST_CONFLICT");
+            assertThat(audit.unitNo()).isEqualTo(1);
+            assertThat(audit.documentId()).isEqualTo(fixture.document.getId());
+            assertThat(audit.payloadDigest()).matches("[0-9a-f]{64}");
             assertThat(fixture.ledger).hasSize(1);
             assertThat(fixture.document.getStatus()).isEqualTo(AmendmentDocumentStatus.EXECUTED);
         }

@@ -27,6 +27,8 @@ public class PricingServiceClient {
 
     private static final TypeReference<ApiResponse<PricingExecuteView>> RESPONSE_TYPE =
             new TypeReference<>() {};
+    private static final TypeReference<ApiResponse<ContinuationEvaluationView>> CONTINUATION_TYPE =
+            new TypeReference<>() {};
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -52,6 +54,15 @@ public class PricingServiceClient {
     }
 
     /**
+     * Add/Update/Remove continuation evaluation (DRG-609 option B).
+     * Execute and simulate are unchanged. The response carries one PolicyDecision id per line.
+     */
+    public ApiResponse<ContinuationEvaluationView> evaluateContinuation(Map<String, Object> request) {
+        log.debug("Calling pricing service to evaluate a continuation");
+        return parse(postForBody("/api/v1/pricing/continuation/evaluate", request), CONTINUATION_TYPE);
+    }
+
+    /**
      * 4xx bodies are pricing refusals (422 with no success payload). 5xx stays a transport failure.
      */
     private String postForBody(String uri, Map<String, Object> pricingContext) {
@@ -70,11 +81,15 @@ public class PricingServiceClient {
     }
 
     private ApiResponse<PricingExecuteView> parsePricingResponse(String raw) {
+        return parse(raw, RESPONSE_TYPE);
+    }
+
+    private <T> ApiResponse<T> parse(String raw, TypeReference<ApiResponse<T>> type) {
         if (raw == null || raw.isBlank()) {
             return ApiResponse.error("Empty pricing response");
         }
         try {
-            return objectMapper.readValue(raw, RESPONSE_TYPE);
+            return objectMapper.readValue(raw, type);
         } catch (IOException ex) {
             throw new RestClientException("Failed to parse pricing JSON: " + ex.getMessage(), ex);
         }
