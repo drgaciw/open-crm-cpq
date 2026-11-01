@@ -1,0 +1,111 @@
+{
+    "id": "co-term-same-end",
+    "cluster": "co-termination",
+    "story": "DRG-638",
+    "status": "per DRG-603 Accepted (PR #623)",
+    "exampleFigures": true,
+    "currency": "USD",
+    "scenario": "same-end",
+    "proration": {
+        "method": "day-stub",
+        "implementation": "QuoteContinuationPolicy.plan",
+        "adr": "DRG-603",
+        "acceptance": "per DRG-603 Accepted (PR #623)",
+        "pullRequest": "https://github.com/drgaciw/open-crm-cpq/pull/623",
+        "roundingMode": "HALF_UP",
+        "scale": 2
+    },
+    "coTermMode": {
+        "mode": "LatestEnd",
+        "options": [
+            "LatestEnd",
+            "EarliestEnd",
+            "None",
+            "AlignToAgreement",
+            "AlignToDate"
+        ],
+        "defaultSelected": false,
+        "status": "Proposed",
+        "ownerDecision": "___ (drg, time)"
+    },
+    "effectiveDate": "2026-07-15",
+    "billingAnchorDate": "2026-01-01",
+    "agreementsRemainSeparate": true,
+    "lines": [
+        {
+            "lineId": "line-saas",
+            "agreementId": "agr-saas",
+            "sku": "Analytics Cloud",
+            "inChange": true,
+            "netUnitPrice": "40.00",
+            "requestedQuantity": 20,
+            "priorEnd": "2026-12-31",
+            "resultingEnd": "2026-12-31",
+            "billingAnchorDate": "2026-01-01",
+            "effectiveDate": "2026-07-15",
+            "expected": {
+                "monthly": "800.00",
+                "billingPeriodStart": "2026-07-01",
+                "billingPeriodEnd": "2026-07-31",
+                "stubDays": 17,
+                "periodDays": 31,
+                "periodAmount": "438.71",
+                "formula": "800.00 x 17 / 31 = 438.71 HALF_UP scale 2",
+                "fullMonths": [
+                    {
+                        "start": "2026-08-01",
+                        "end": "2026-08-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-09-01",
+                        "end": "2026-09-30",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-10-01",
+                        "end": "2026-10-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-11-01",
+                        "end": "2026-11-30",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-12-01",
+                        "end": "2026-12-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    }
+                ],
+                "fullMonthTotal": "4000.00",
+                "tcv": "4438.71",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        },
+        {
+            "lineId": "line-assist",
+            "agreementId": "agr-saas",
+            "sku": "AI Assist",
+            "inChange": false,
+            "priorEnd": "2026-12-31",
+            "resultingEnd": "2026-12-31",
+            "inclusion": {
+                "status": "Proposed",
+                "ownerDecision": "___ (drg, time)"
+            },
+            "expected": {
+                "repriced": false,
+                "chargeAmount": "0.00",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        }
+    ]
+}

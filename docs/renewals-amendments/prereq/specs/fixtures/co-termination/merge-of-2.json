@@ -1,0 +1,156 @@
+{
+    "id": "co-term-merge-of-2",
+    "cluster": "co-termination",
+    "story": "DRG-638",
+    "status": "per DRG-603 Accepted (PR #623)",
+    "exampleFigures": true,
+    "currency": "USD",
+    "scenario": "merge-of-2",
+    "proration": {
+        "method": "day-stub",
+        "implementation": "QuoteContinuationPolicy.plan",
+        "adr": "DRG-603",
+        "acceptance": "per DRG-603 Accepted (PR #623)",
+        "pullRequest": "https://github.com/drgaciw/open-crm-cpq/pull/623",
+        "roundingMode": "HALF_UP",
+        "scale": 2
+    },
+    "coTermMode": {
+        "mode": "LatestEnd",
+        "options": [
+            "LatestEnd",
+            "EarliestEnd",
+            "None",
+            "AlignToAgreement",
+            "AlignToDate"
+        ],
+        "defaultSelected": false,
+        "status": "Proposed",
+        "ownerDecision": "___ (drg, time)"
+    },
+    "effectiveDate": "2026-08-10",
+    "billingAnchorDate": "2026-01-01",
+    "agreementsRemainSeparate": false,
+    "merge": {
+        "survivorAgreementId": "agr-a",
+        "mergedFromIds": [
+            "agr-b"
+        ],
+        "sourceAgreementId": "agr-b",
+        "sourceSurvivorId": "agr-a",
+        "sourceDeleted": false,
+        "sourceDisposition": {
+            "status": "Proposed",
+            "ownerDecision": "___ (drg, time)"
+        }
+    },
+    "lines": [
+        {
+            "lineId": "line-a",
+            "agreementId": "agr-a",
+            "sku": "Analytics Cloud",
+            "inChange": true,
+            "netUnitPrice": "40.00",
+            "requestedQuantity": 20,
+            "priorEnd": "2026-10-31",
+            "resultingEnd": "2026-12-31",
+            "billingAnchorDate": "2026-01-01",
+            "effectiveDate": "2026-08-10",
+            "expected": {
+                "monthly": "800.00",
+                "billingPeriodStart": "2026-08-01",
+                "billingPeriodEnd": "2026-08-31",
+                "stubDays": 22,
+                "periodDays": 31,
+                "periodAmount": "567.74",
+                "formula": "800.00 x 22 / 31 = 567.74 HALF_UP scale 2",
+                "fullMonths": [
+                    {
+                        "start": "2026-09-01",
+                        "end": "2026-09-30",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-10-01",
+                        "end": "2026-10-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-11-01",
+                        "end": "2026-11-30",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-12-01",
+                        "end": "2026-12-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    }
+                ],
+                "fullMonthTotal": "3200.00",
+                "tcv": "3767.74",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        },
+        {
+            "lineId": "line-b",
+            "agreementId": "agr-b",
+            "sku": "Reporting Server",
+            "inChange": true,
+            "netUnitPrice": "25.00",
+            "requestedQuantity": 10,
+            "priorEnd": "2026-12-31",
+            "resultingEnd": "2026-12-31",
+            "billingAnchorDate": "2026-01-01",
+            "effectiveDate": "2026-08-10",
+            "expected": {
+                "monthly": "250.00",
+                "billingPeriodStart": "2026-08-01",
+                "billingPeriodEnd": "2026-08-31",
+                "stubDays": 22,
+                "periodDays": 31,
+                "periodAmount": "177.42",
+                "formula": "250.00 x 22 / 31 = 177.42 HALF_UP scale 2",
+                "fullMonths": [
+                    {
+                        "start": "2026-09-01",
+                        "end": "2026-09-30",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-10-01",
+                        "end": "2026-10-31",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-11-01",
+                        "end": "2026-11-30",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-12-01",
+                        "end": "2026-12-31",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    }
+                ],
+                "fullMonthTotal": "1000.00",
+                "tcv": "1177.42",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        }
+    ],
+    "expected": {
+        "combinedTcv": "4945.16",
+        "creditAmount": "0.00",
+        "creditEmitted": false
+    }
+}

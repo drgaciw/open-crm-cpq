@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-resume-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "resume-ineligible-swap",
+  "intent": "Resume",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Resume",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-CORE-D",
+    "relationshipType": "SWAP",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "SWAP",
+    "errorCode": "RESUME_NOT_ELIGIBLE",
+    "fromSku": "SKU-CORE-A",
+    "toSku": "SKU-CORE-D",
+    "onDate": "2026-10-05",
+    "reason": "SWAP is outside the eligible product-relationship types for Resume. Eligible types: none. Product SKU-CORE-A to SKU-CORE-D on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}

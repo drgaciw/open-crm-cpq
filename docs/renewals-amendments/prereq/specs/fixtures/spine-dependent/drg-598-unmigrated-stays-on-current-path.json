@@ -1,0 +1,23 @@
+{
+    "issue": "DRG-598",
+    "ac_id": "AC-598-3",
+    "case": "unmigrated-stays-on-current-path",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "598-F5-A",
+    "input": {
+        "subscription": {
+            "id": "sub-d",
+            "contract_id": null,
+            "on_manifest": false
+        }
+    },
+    "expected": {
+        "contract_id": null,
+        "header_written": false,
+        "oq11_flag_changed": false,
+        "acceptance_path": "CURRENT",
+        "error_code": null
+    }
+}

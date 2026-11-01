@@ -1,0 +1,34 @@
+{
+    "issue": "DRG-597",
+    "ac_id": "AC-597-3",
+    "case": "owner-sets-due-date",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "597-F1-A, 597-F3-B, 597-F4-A",
+    "input": {
+        "lifecycle_change_id": "lc-r",
+        "owner_write": {
+            "actor_user_id": "user-owner",
+            "due_on": "2026-12-01"
+        },
+        "sales_ops_write": {
+            "actor_user_id": "user-ops",
+            "role_label": "SALES_OPS",
+            "assignee_user_id": "user-ops"
+        }
+    },
+    "expected": {
+        "side_row": {
+            "lifecycle_change_id": "lc-r",
+            "due_on": "2026-12-01",
+            "assignee_user_id": null
+        },
+        "copied_table": false,
+        "sales_ops_write": {
+            "http_status": 403,
+            "error_code": "ASSIGNMENT_FORBIDDEN",
+            "assignee_user_id": null
+        }
+    }
+}

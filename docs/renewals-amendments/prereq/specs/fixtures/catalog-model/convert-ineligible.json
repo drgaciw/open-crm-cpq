@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-convert-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "convert-ineligible-maintenance-for",
+  "intent": "Convert",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Convert",
+    "fromSku": "SKU-MAINT-M",
+    "toSku": "SKU-PERP-F",
+    "relationshipType": "MAINTENANCE_FOR",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "MAINTENANCE_FOR",
+    "errorCode": "CONVERT_NOT_ELIGIBLE",
+    "fromSku": "SKU-MAINT-M",
+    "toSku": "SKU-PERP-F",
+    "onDate": "2026-10-05",
+    "reason": "MAINTENANCE_FOR is outside the eligible product-relationship types for Convert. Eligible types: none. Product SKU-MAINT-M to SKU-PERP-F on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}

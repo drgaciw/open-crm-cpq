@@ -1,0 +1,23 @@
+{
+    "issue": "DRG-597",
+    "ac_id": "AC-597-2",
+    "case": "other-intent-in-neither-queue",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "597-F2-A",
+    "input": {
+        "rows": [
+            {
+                "id": "lc-s",
+                "intent": "SUSPEND"
+            }
+        ]
+    },
+    "expected": {
+        "renewals_queue": [],
+        "amendments_queue": [],
+        "queue_membership": null,
+        "error_code": null
+    }
+}
