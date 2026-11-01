@@ -10,6 +10,7 @@ import com.opencrm.quote.client.*;
 import com.opencrm.quote.lineitem.*;
 import com.opencrm.quote.ramp.*;
 import com.opencrm.security.CurrentActor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,6 +38,7 @@ public class QuoteContinuationService {
     private final JdbcTemplate jdbc;
     private final CurrentActor actor;
     private final RestClient scheduleHttp;
+    private AssetRenewalDrafts assetRenewals;
 
     public QuoteContinuationService(SubscriptionScheduleClient schedules, QuoteRepository quotes,
                                     QuoteLineItemRepository lines, QuoteNumberGenerator numbers, QuoteMapper mapper,
@@ -56,10 +58,16 @@ public class QuoteContinuationService {
         this.scheduleHttp = scheduleHttp;
     }
 
+    @Autowired(required = false)
+    void setAssetRenewalClients(AssetReadClient assets, RenewalPolicyClient policies) {
+        this.assetRenewals = new AssetRenewalDrafts(assets, policies, schedules, quotes, lines, numbers, mapper,
+                attacher, json, jdbc, actor);
+    }
+
     /** Append-only commercial decision for a draft this service opened from renewal eligibility. */
     static final String SYSTEM_RENEWAL_DRAFT = "SYSTEM_RENEWAL_DRAFT";
     private static final String RENEWAL_EXIT_RATE = "RENEWAL_EXIT_RATE";
-    private static final String AUDIT_INSERT = """
+    static final String AUDIT_INSERT = """
             INSERT INTO commercial_decision_audit (
                 quote_id, quote_number, decision_kind, decided_by, policy_id, operation, mode,
                 subscription_id, event_id, inputs_json, outputs_json)
@@ -68,12 +76,14 @@ public class QuoteContinuationService {
     @Transactional(readOnly=true)
     public QuoteContinuationPolicy.Plan preview(QuoteContinuationRequest request) {
         requireEnabled();
+        if (fromActiveAssets(request)) return assetRenewals().preview(request);
         return QuoteContinuationPolicy.plan(request,schedules.byNumber(request.getTargetSubscriptionNumber()));
     }
 
     @Transactional
     public QuoteDto author(QuoteContinuationRequest request) {
         requireEnabled();
+        if (fromActiveAssets(request)) return assetRenewals().author(request);
         var target=schedules.byNumber(request.getTargetSubscriptionNumber());
         var plan=QuoteContinuationPolicy.plan(request,target);
         var source=QuoteContinuationPolicy.source(request,target);
@@ -270,6 +280,7 @@ public class QuoteContinuationService {
         QuoteContinuationRequest request;
         try { request=json.readValue(quote.getContinuationRequestJson(),QuoteContinuationRequest.class); }
         catch (Exception ex) { throw invalid("Unreadable continuation authoring context"); }
+        if (fromActiveAssets(request)) return assetRenewals().validate(quote, items, request);
         if (!Objects.equals(quote.getTargetSubscriptionNumber(),request.getTargetSubscriptionNumber())
                 || !Objects.equals(quote.getCustomerExternalId(),request.getCustomerExternalId())
                 || !Objects.equals(quote.getCurrency(),request.getCurrency()) || !Objects.equals(quote.getObservedRevision(),request.getObservedRevision())
@@ -318,6 +329,13 @@ public class QuoteContinuationService {
         // Repair only after every identity, revision, date and price check has passed.
         if (quote.getContinuationOperation() == null) quote.setContinuationOperation(request.getOperation());
         return plan;
+    }
+    private boolean fromActiveAssets(QuoteContinuationRequest request) {
+        return request != null && request.getRenewalSourceMode() == QuoteContinuationRequest.RenewalSourceMode.FROM_ACTIVE_ASSETS;
+    }
+    private AssetRenewalDrafts assetRenewals() {
+        if (assetRenewals == null) throw new IllegalStateException("Asset renewal reads are not configured");
+        return assetRenewals;
     }
     private boolean sameAmount(BigDecimal left,BigDecimal right) {return left != null && right != null && left.compareTo(right)==0;}
     private void requireEnabled() { if (!properties.isEnabled()) throw RampScheduleException.notSupported(); }
