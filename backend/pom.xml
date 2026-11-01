@@ -46,7 +46,6 @@
         <spring-cloud.version>2025.1.1</spring-cloud.version>
 
         <!-- Database -->
-        <postgresql.version>42.7.1</postgresql.version>
         <!-- Align with Spring Boot 4.0.6 BOM (spring-boot-flyway requires Flyway 11). -->
         <flyway.version>11.14.1</flyway.version>
 
