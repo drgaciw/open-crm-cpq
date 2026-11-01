@@ -103,6 +103,18 @@ describe('OrganizationService', () => {
     req.flush({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 });
   });
 
+  it('cancels an older list request when a newer filtered search starts', () => {
+    service.list(0, 20, 'name,asc', { territory: 'West' });
+    const old = httpMock.expectOne((r) => r.url === '/api/v1/organizations');
+    service.search('Acme', 0, 20, 'name,asc', { territory: 'East' });
+    expect(old.cancelled).toBe(true);
+    expect(service.loading()).toBe(true);
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/organizations/search');
+    latest.flush({ content: [org({ id: 7, name: 'Acme East' })], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+    expect(service.organizations().map((item) => item.name)).toEqual(['Acme East']);
+    expect(service.loading()).toBe(false);
+  });
+
   it('loadRelatedDeals calls /api/v1/deals and keeps only this account', () => {
     service.loadRelatedDeals(7);
     const req = httpMock.expectOne(
@@ -120,6 +132,17 @@ describe('OrganizationService', () => {
     };
     req.flush(page);
     expect(service.relatedDeals().map((d) => d.id)).toEqual([3]);
+  });
+
+  it('loads every page of account-scoped deals', () => {
+    service.loadRelatedDeals(7);
+    const first = httpMock.expectOne((r) => r.url === '/api/v1/deals' && r.params.get('page') === '0');
+    expect(first.request.params.get('organizationId')).toBe('7');
+    first.flush({ content: [deal({ id: 3, name: 'First', organizationId: 7 })], number: 0, size: 100, totalElements: 101, totalPages: 2 });
+    const second = httpMock.expectOne((r) => r.url === '/api/v1/deals' && r.params.get('page') === '1');
+    expect(second.request.params.get('organizationId')).toBe('7');
+    second.flush({ content: [deal({ id: 4, name: 'Later', organizationId: 7 })], number: 1, size: 100, totalElements: 101, totalPages: 2 });
+    expect(service.relatedDeals().map((d) => d.id)).toEqual([3, 4]);
   });
 
   it('loadRelatedQuotes calls /api/v1/quotes with the account uuid', () => {

@@ -105,9 +105,9 @@ import {
     @if (!orgService.loading() && !orgService.error() && orgService.isEmpty()) {
       <app-empty-state
         icon="business"
-        title="No accounts yet"
-        message="Create your first account to get started."
-        actionLabel="Create Account"
+        [title]="hasActiveCriteria() ? 'No matching accounts' : 'No accounts yet'"
+        [message]="hasActiveCriteria() ? 'Try changing your search or filters.' : 'Create your first account to get started.'"
+        [actionLabel]="hasActiveCriteria() ? '' : 'Create Account'"
         (action)="onCreate()"
       />
     } @else if (!orgService.loading() && !orgService.isEmpty()) {
@@ -233,25 +233,10 @@ export class OrganizationListComponent implements OnInit {
   readonly industryFilter = signal('');
   readonly territoryFilter = signal('');
   readonly ownerFilter = signal('');
-  readonly visibleOrganizations = computed(() => {
-    const industry = this.industryFilter().trim().toLowerCase();
-    const territory = this.territoryFilter().trim().toLowerCase();
-    const owner = this.ownerFilter().trim().toLowerCase();
-    return this.orgService.organizations().filter((org) => {
-      if (industry && (org.industry ?? '').toLowerCase() !== industry) {
-        return false;
-      }
-      if (territory && !(org.territory ?? '').toLowerCase().includes(territory)) {
-        return false;
-      }
-      if (owner && !(org.ownerId ?? '').toLowerCase().includes(owner)) {
-        return false;
-      }
-      return true;
-    });
-  });
+  readonly visibleOrganizations = this.orgService.organizations;
   private currentSort = 'name,asc';
-  private lastSearchQuery = '';
+  readonly searchQuery = signal('');
+  readonly hasActiveCriteria = computed(() => !!(this.searchQuery() || this.industryFilter().trim() || this.territoryFilter().trim() || this.ownerFilter().trim()));
 
   trackById(index: number, item: OrganizationDto): string | number {
     return item.id;
@@ -262,18 +247,8 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onSearch(query: string): void {
-    const trimmed = query.trim();
-    this.lastSearchQuery = trimmed;
-    if (trimmed) {
-      const filters = this.currentFilters();
-      if (filters) {
-        this.orgService.search(trimmed, 0, this.orgService.pagination().size, this.currentSort, filters);
-      } else {
-        this.orgService.search(trimmed);
-      }
-    } else {
-      this.reload(0);
-    }
+    this.searchQuery.set(query.trim());
+    this.reload(0);
   }
 
   clearError(): void {
@@ -344,11 +319,11 @@ export class OrganizationListComponent implements OnInit {
 
   private reload(page: number, size = this.orgService.pagination().size): void {
     const filters = this.currentFilters();
-    if (this.lastSearchQuery) {
+    if (this.searchQuery()) {
       if (filters) {
-        this.orgService.search(this.lastSearchQuery, page, size, this.currentSort, filters);
+        this.orgService.search(this.searchQuery(), page, size, this.currentSort, filters);
       } else {
-        this.orgService.search(this.lastSearchQuery, page, size, this.currentSort);
+        this.orgService.search(this.searchQuery(), page, size, this.currentSort);
       }
       return;
     }

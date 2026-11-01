@@ -126,7 +126,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
 
   it('onSearch with term calls OrganizationService.search', () => {
     component.onSearch('  acme  ');
-    expect(searchSpy).toHaveBeenCalledWith('acme');
+    expect(searchSpy).toHaveBeenCalledWith('acme', 0, 20, 'name,asc');
   });
 
   it('onSearch with blank term reloads list', () => {
@@ -155,6 +155,18 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
   });
 
+  it('explains an empty filtered result without claiming there are no accounts', () => {
+    organizations.set([]);
+    loading.set(false);
+    error.set(null);
+    component.onTerritoryFilter('West');
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching accounts');
+    expect(el.querySelector('.empty-state-message')?.textContent).toContain('filters');
+    expect(el.querySelector('.empty-state-action')).toBeNull();
+  });
+
   it('offers industry, territory, and owner filters', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('[data-testid="account-industry-filter"]')).toBeTruthy();
@@ -162,7 +174,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect(el.querySelector('[data-testid="account-owner-filter"]')).toBeTruthy();
   });
 
-  it('filters the loaded page by industry, territory, and owner', () => {
+  it('requests filters from the server rather than narrowing a loaded page', () => {
     organizations.set([
       org({ id: 1, name: 'Acme', industry: 'Technology', territory: 'West', ownerId: 'ada' }),
       org({ id: 2, name: 'Globex', industry: 'Finance', territory: 'East', ownerId: 'grace' }),
@@ -180,7 +192,7 @@ describe('OrganizationListComponent SearchInput wiring', () => {
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Acme');
-    expect(text).not.toContain('Globex');
+    expect(text).toContain('Globex');
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc', {
       industry: 'Technology',
       territory: '',

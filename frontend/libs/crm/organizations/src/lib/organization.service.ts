@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, Subject, finalize, takeUntil } from 'rxjs';
+import { EMPTY, NEVER, Observable, Subject, expand, finalize, takeUntil, toArray } from 'rxjs';
 import {
   OrganizationDto,
   OrganizationCreateRequest,
@@ -101,6 +101,7 @@ export class OrganizationService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/organizations';
   private readonly detailChanged = new Subject<void>();
+  private readonly listChanged = new Subject<void>();
 
   resetAccountDetail(): void {
     this.detailChanged.next();
@@ -157,6 +158,7 @@ export class OrganizationService {
   readonly isEmpty = computed(() => this.organizations().length === 0 && !this.loading());
 
   list(page = 0, size = 20, sort = 'name,asc', filters?: AccountListFilters): void {
+    this.listChanged.next();
     this.error.set(null);
     this.loading.set(true);
     const params = appendFilters(
@@ -166,7 +168,7 @@ export class OrganizationService {
 
     this.http
       .get<SpringPageResponse<OrganizationDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.organizations.set(p.content ?? p);
@@ -218,6 +220,7 @@ export class OrganizationService {
     sort?: string,
     filters?: AccountListFilters,
   ): void {
+    if (page !== undefined) this.listChanged.next();
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams().set('q', query);
@@ -234,7 +237,7 @@ export class OrganizationService {
     // Interceptor rebuilds List+PageInfo into SpringPageResponse
     this.http
       .get<SpringPageResponse<OrganizationDto>>(`${this.basePath}/search`, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(page === undefined ? NEVER : this.listChanged), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.organizations.set(p.content ?? p);
@@ -277,7 +280,7 @@ export class OrganizationService {
 
   /**
    * GET /api/v1/deals?organizationId=
-   * The deals API does not filter server-side yet, so rows are narrowed here.
+   * Fetch all account-scoped pages so later matches are not omitted.
    * A failure leaves a section error and does not replace the account banner.
    */
   loadRelatedDeals(organizationId: number): void {
@@ -289,11 +292,20 @@ export class OrganizationService {
       .set('organizationId', String(organizationId));
     this.http
       .get<SpringPageResponse<DealDto>>('/api/v1/deals', { params })
-      .pipe(takeUntil(this.detailChanged), finalize(() => this.relatedDealsLoading.set(false)))
+      .pipe(
+        expand((page) => page.number + 1 < page.totalPages
+          ? this.http.get<SpringPageResponse<DealDto>>('/api/v1/deals', {
+              params: params.set('page', page.number + 1),
+            })
+          : EMPTY),
+        toArray(),
+        takeUntil(this.detailChanged),
+        finalize(() => this.relatedDealsLoading.set(false)),
+      )
       .subscribe({
-        next: (body) => {
+        next: (pages) => {
           this.relatedDeals.set(
-            asRows(body).filter((deal) => deal.organizationId === organizationId),
+            pages.flatMap(asRows).filter((deal) => deal.organizationId === organizationId),
           );
         },
         error: (err) => {
