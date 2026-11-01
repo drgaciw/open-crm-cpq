@@ -57,6 +57,7 @@ class QuoteLineItemServiceRampTest {
                 new RampScheduleValidator(),
                 new RampEscalatorExpander());
         service = new QuoteLineItemService(lineItemRepository, quoteRepository, attacher, org.mockito.Mockito.mock(com.opencrm.quote.ramp.RampScheduleGuard.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
     }
 
     @Test
@@ -206,25 +207,23 @@ class QuoteLineItemServiceRampTest {
     }
 
     @Test
-    @DisplayName("an escalator that does not divide the term reports RAMP_TERM_MISMATCH and persists nothing")
+    @DisplayName("an escalator that does not divide the term persists a contiguous short final period")
     void indivisibleEscalatorPersistsNothing() {
         properties.setEnabled(true);
         Quote quote = quote(14);
         when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
 
-        assertThatThrownBy(() -> service.addLineItem(
+        stubSave();
+        QuoteLineItemDto dto = service.addLineItem(
                 1L,
-                request(RampScheduleDto.builder().escalator(escalator()).build())))
-                .isInstanceOf(RampScheduleException.class)
-                .satisfies(ex -> {
-                    RampScheduleException ramp = (RampScheduleException) ex;
-                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
-                    assertThat(ramp.getStatus().value()).isEqualTo(422);
-                });
-
-        verify(lineItemRepository, never()).save(any());
-        verify(quoteRepository, never()).save(any());
+                request(RampScheduleDto.builder().escalator(escalator()).build()));
+        QuoteLineItem persisted = saved();
+        assertThat(persisted.getRampSteps()).extracting(QuoteRampStep::getStartMonth).containsExactly(1, 13);
+        assertThat(persisted.getRampSteps()).extracting(QuoteRampStep::getMonths).containsExactly(12, 2);
+        assertThat(persisted.getRampSteps()).extracting(row -> row.getUnitPrice().toPlainString())
+                .containsExactly("40.0000", "42.0000");
+        assertThat(persisted.getRampSteps().stream().mapToInt(QuoteRampStep::getMonths).sum()).isEqualTo(14);
+        assertThat(dto.getSchedule().getSteps()).extracting(RampStepDto::getMonths).containsExactly(12, 2);
     }
 
     @Test
@@ -343,6 +342,7 @@ class QuoteLineItemServiceRampTest {
                 new RampScheduleValidator(), properties, org.mockito.Mockito.mock(com.opencrm.quote.client.ApprovalRoutingClient.class), outbox);
         service = new QuoteLineItemService(lineItemRepository, quoteRepository,
                 new RampScheduleAttacher(properties, new RampScheduleValidator(), new RampEscalatorExpander()), guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
         return line;
     }
 

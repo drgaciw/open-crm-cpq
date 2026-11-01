@@ -11,9 +11,9 @@ import java.util.List;
 /**
  * Expands an escalator into explicit absolute periods. Unit prices use scale 4,
  * half-up. PERCENT amount is percent points: 5 means 5 percent. AMOUNT adds
- * currency units. Steps do not store a discount fraction. Each period is exactly
- * {@code everyMonths} long. A term that length does not divide is
- * {@code RAMP_TERM_MISMATCH} and produces no steps.
+ * currency units. Steps do not store a discount fraction. A final period may be
+ * shorter than {@code everyMonths}. Non-compounding percentages use the base
+ * increment before rounding each output price, avoiding cumulative rounding drift.
  */
 @Component
 public class RampEscalatorExpander {
@@ -32,9 +32,6 @@ public class RampEscalatorExpander {
             throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
         }
         int everyMonths = escalator.getEveryMonths();
-        if (durationInMonths % everyMonths != 0) {
-            throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
-        }
         if (escalator.getMode() == null || escalator.getStartPrice() == null || escalator.getAmount() == null) {
             throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
         }
@@ -42,23 +39,27 @@ public class RampEscalatorExpander {
             throw RampScheduleException.invalid(List.of(RampReasons.NEGATIVE_VALUE));
         }
 
-        int count = durationInMonths / everyMonths;
+        int count = (int) (((long) durationInMonths + everyMonths - 1) / everyMonths);
         if (count > maxPeriods) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }
-        BigDecimal price = escalator.getStartPrice().setScale(UNIT_SCALE, RoundingMode.HALF_UP);
+        BigDecimal base = escalator.getStartPrice().setScale(UNIT_SCALE, RoundingMode.HALF_UP);
+        BigDecimal price = base;
         List<RampStepDto> steps = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             steps.add(RampStepDto.builder()
                     .sequence(index + 1)
                     .startMonth(1 + (index * everyMonths))
-                    .months(everyMonths)
+                    .months(Math.min(everyMonths, durationInMonths - (index * everyMonths)))
                     .quantity(quantity)
                     .priceBasis(RampPriceBasis.ABSOLUTE)
                     .unitPrice(price)
                     .build());
             if (index + 1 < count) {
-                price = nextPrice(price, escalator);
+                price = isNonCompoundingPercent(escalator)
+                        ? base.add(baseIncrement(escalator).multiply(BigDecimal.valueOf(index + 1)))
+                                .setScale(UNIT_SCALE, RoundingMode.HALF_UP)
+                        : nextPrice(price, escalator);
             }
         }
         return List.copyOf(steps);
@@ -76,7 +77,8 @@ public class RampEscalatorExpander {
     public List<RampStepDto> extend(List<RampStepDto> existing, int durationInMonths, RampEscalatorDto escalator,
                                     int maxPeriods) {
         if (escalator == null || escalator.getEveryMonths() == null || escalator.getEveryMonths() < 1
-                || escalator.getMode() == null || escalator.getAmount() == null) {
+                || escalator.getMode() == null || escalator.getAmount() == null
+                || (isNonCompoundingPercent(escalator) && escalator.getStartPrice() == null)) {
             throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
         }
         if (escalator.getAmount().signum() < 0
@@ -131,26 +133,26 @@ public class RampEscalatorExpander {
         }
         int everyMonths = escalator.getEveryMonths();
         long extension = durationInMonths - coveredMonths;
-        if (extension % everyMonths != 0) {
-            throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
-        }
-
-        long countLong = extension / everyMonths;
+        long countLong = (extension + everyMonths - 1) / everyMonths;
         if (countLong + existing.size() > maxPeriods) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }
         int count = (int) countLong;
         int sequence = last.getSequence() == null ? ordered.size() : last.getSequence();
-        BigDecimal price = last.getUnitPrice();
+        BigDecimal anchor = last.getUnitPrice();
+        BigDecimal price = anchor;
         List<RampStepDto> steps = new ArrayList<>(existing.size() + count);
         steps.addAll(existing);
         for (int index = 0; index < count; index++) {
-            price = nextPrice(price, escalator);
+            price = isNonCompoundingPercent(escalator)
+                    ? anchor.add(baseIncrement(escalator).multiply(BigDecimal.valueOf(index + 1)))
+                            .setScale(UNIT_SCALE, RoundingMode.HALF_UP)
+                    : nextPrice(price, escalator);
             sequence++;
             steps.add(RampStepDto.builder()
                     .sequence(sequence)
                     .startMonth(Math.toIntExact(coveredMonths + 1 + ((long) index * everyMonths)))
-                    .months(everyMonths)
+                    .months((int) Math.min(everyMonths, extension - ((long) index * everyMonths)))
                     .quantity(last.getQuantity())
                     .priceBasis(RampPriceBasis.ABSOLUTE)
                     .unitPrice(price)
@@ -165,5 +167,15 @@ public class RampEscalatorExpander {
             return price.multiply(factor).setScale(UNIT_SCALE, RoundingMode.HALF_UP);
         }
         return price.add(escalator.getAmount()).setScale(UNIT_SCALE, RoundingMode.HALF_UP);
+    }
+
+    private static boolean isNonCompoundingPercent(RampEscalatorDto escalator) {
+        return escalator.getMode() == RampEscalatorMode.PERCENT && Boolean.FALSE.equals(escalator.getCompounding());
+    }
+
+    private static BigDecimal baseIncrement(RampEscalatorDto escalator) {
+        // Match the scale of persisted authoring inputs so save/reload cannot alter the increment.
+        return escalator.getStartPrice().setScale(UNIT_SCALE, RoundingMode.HALF_UP)
+                .multiply(escalator.getAmount().setScale(UNIT_SCALE, RoundingMode.HALF_UP).movePointLeft(2));
     }
 }

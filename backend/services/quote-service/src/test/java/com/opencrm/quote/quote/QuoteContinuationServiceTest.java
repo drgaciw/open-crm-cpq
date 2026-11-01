@@ -112,6 +112,7 @@ class QuoteContinuationServiceTest {
     @Test void finalPartialOnlyHasNoInventedMonthlySoldRampAndKeepsPositiveNominalTerm() {
         continuations.author(request(LocalDate.of(2029,12,15)));var dto=lifecycle.calculate(1L);
         assertThat(requests).hasSize(1);assertThat(dto.getDurationInMonths()).isEqualTo(1);
+        verify(repository).flush();
         assertThat(dto.getTcv()).isEqualByComparingTo("548.39");assertThat(dto.getAcv()).isEqualByComparingTo("6580.68");
         var event=QuoteAcceptedKafkaEventFactory.from(saved,saved.getLineItems());
         assertThat(event.getLineItems().getFirst().getRamp()).isNull();

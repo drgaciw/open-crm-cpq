@@ -33,7 +33,8 @@ class LifecycleChangeMigrationGuardTest {
             "V1_12__continuation_operation.sql",
             "V1_13__quote_tenant_id.sql",
             "V1_14__lifecycle_changes.sql",
-            "V1_15__lifecycle_pricing_validation.sql");
+            "V1_15__lifecycle_pricing_validation.sql",
+            "V1_16__ramp_escalator_compounding.sql");
 
     @Test
     @DisplayName("quote-service has exactly these versions, including lifecycle validation evidence")

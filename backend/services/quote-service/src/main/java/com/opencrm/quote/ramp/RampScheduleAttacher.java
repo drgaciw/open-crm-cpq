@@ -115,6 +115,7 @@ public class RampScheduleAttacher {
         item.setRampEscalatorMode(escalator.getMode() == null ? null : escalator.getMode().name());
         item.setRampEscalatorAmount(scale4(escalator.getAmount()));
         item.setRampEscalatorEveryMonths(escalator.getEveryMonths());
+        item.setRampEscalatorCompounding(escalator.getCompounding());
     }
 
     private static void clearEscalator(QuoteLineItem item) {
@@ -122,6 +123,7 @@ public class RampScheduleAttacher {
         item.setRampEscalatorMode(null);
         item.setRampEscalatorAmount(null);
         item.setRampEscalatorEveryMonths(null);
+        item.setRampEscalatorCompounding(null);
     }
 
     private static BigDecimal scale4(BigDecimal value) {

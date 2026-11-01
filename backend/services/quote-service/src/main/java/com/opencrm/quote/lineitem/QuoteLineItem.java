@@ -109,6 +109,10 @@ public class QuoteLineItem extends BaseEntity {
     @Column(name = "ramp_escalator_every_months")
     private Integer rampEscalatorEveryMonths;
 
+    /** Null preserves legacy compound growth. */
+    @Column(name = "ramp_escalator_compounding")
+    private Boolean rampEscalatorCompounding;
+
     @OneToMany(mappedBy = "lineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
     @SQLRestriction("is_deleted = false")

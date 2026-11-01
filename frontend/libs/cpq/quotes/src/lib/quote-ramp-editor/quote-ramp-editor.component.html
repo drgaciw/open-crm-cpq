@@ -4,7 +4,7 @@
   </mat-card-header>
   <mat-card-content>
     <p class="hint">
-      Periods are whole months. An escalator only fills the rows; Save schedule stores them.
+      Periods are whole months. Generate fills the rows; Save schedule stores your edits.
     </p>
 
     @if (error(); as err) {
@@ -23,6 +23,7 @@
         <mat-select
           data-testid="ramp-line"
           [value]="selectedLineId()"
+          [disabled]="committingExtension()"
           (selectionChange)="onLineChange($event.value)"
         >
           @for (line of lines(); track line.id) {
@@ -164,7 +165,13 @@
         <h3>Escalator</h3>
         <p class="hint" id="escalator-hint">
           Percent mode is percent points (5 means 5%). Amount mode adds that currency value.
-          This is not the step discount fraction. Generate and Extend do not save the quote.
+          A short final period covers any remaining months.
+          This is not the step discount fraction. Generate previews the periods.
+          @if (quoteVersion() !== null) {
+            Extend saves the longer quote term and this line's schedule together.
+          } @else {
+            Extend previews the additional periods.
+          }
         </p>
         <div class="escalator-row" formGroupName="escalator">
           <mat-form-field appearance="outline">
@@ -197,6 +204,13 @@
               data-testid="escalator-amount"
               [readonly]="!editable()"
             />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Percent growth</mat-label>
+            <mat-select formControlName="compounding" data-testid="escalator-compounding">
+              <mat-option [value]="true">Compound from the previous period</mat-option>
+              <mat-option [value]="false">Increase from the start price</mat-option>
+            </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Every months</mat-label>

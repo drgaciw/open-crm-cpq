@@ -81,16 +81,12 @@ class RampEscalatorExpanderTest {
     }
 
     @Test
-    @DisplayName("a term that everyMonths does not divide reports only RAMP_TERM_MISMATCH")
+    @DisplayName("a term that everyMonths does not divide ends with a short final period")
     void indivisibleTermReportsMismatch() {
-        assertThatThrownBy(() -> expander.expand(14, escalator(RampEscalatorMode.PERCENT, "40", "5", 12), 1))
-                .isInstanceOf(RampScheduleException.class)
-                .satisfies(ex -> {
-                    RampScheduleException ramp = (RampScheduleException) ex;
-                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
-                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getStatus().value()).isEqualTo(422);
-                });
+        List<RampStepDto> result = expander.expand(14, escalator(RampEscalatorMode.PERCENT, "40", "5", 12), 1);
+        assertThat(result).extracting(RampStepDto::getStartMonth).containsExactly(1, 13);
+        assertThat(result).extracting(RampStepDto::getMonths).containsExactly(12, 2);
+        assertThat(prices(result)).containsExactly("40.0000", "42.0000");
     }
 
     @Test
@@ -181,7 +177,7 @@ class RampEscalatorExpanderTest {
     }
 
     @Test
-    @DisplayName("AC-532-5: a term that is not longer, or an extension the step does not divide, is RAMP_TERM_MISMATCH")
+    @DisplayName("AC-532-5: a term that is not longer is RAMP_TERM_MISMATCH")
     void extendRejectsTermThatDoesNotGrowByWholeSteps() {
         List<RampStepDto> existing = goldenThirtySix();
 
@@ -191,9 +187,11 @@ class RampEscalatorExpanderTest {
         assertThatThrownBy(() -> expander.extend(existing, 24, sevenPercent()))
                 .isInstanceOf(RampScheduleException.class)
                 .satisfies(reason(RampReasons.TERM_MISMATCH));
-        assertThatThrownBy(() -> expander.extend(existing, 42, sevenPercent()))
-                .isInstanceOf(RampScheduleException.class)
-                .satisfies(reason(RampReasons.TERM_MISMATCH));
+        List<RampStepDto> partial = expander.extend(existing, 42, sevenPercent());
+        assertThat(partial).hasSize(4);
+        assertThat(partial.getLast().getMonths()).isEqualTo(6);
+        assertThat(partial.getLast().getStartMonth()).isEqualTo(37);
+        assertThat(partial.getLast().getUnitPrice()).isEqualByComparingTo("52.4318");
     }
 
     @Test
@@ -255,6 +253,75 @@ class RampEscalatorExpanderTest {
                 .isInstanceOf(RampScheduleException.class)
                 .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
                         .containsExactly(RampReasons.PERIOD_EMPTY));
+    }
+
+    @Test
+    void nonCompoundingPercentUsesOriginalBaseAndRoundsEachOutputOnce() {
+        RampEscalatorDto inputs = escalator(RampEscalatorMode.PERCENT, "100", "10", 12);
+        inputs.setCompounding(false);
+        assertThat(prices(expander.expand(36, inputs, 2))).containsExactly("100.0000", "110.0000", "120.0000");
+
+        inputs.setStartPrice(new BigDecimal("2"));
+        inputs.setAmount(new BigDecimal("1.1125"));
+        assertThat(prices(expander.expand(36, inputs, 2))).containsExactly("2.0000", "2.0223", "2.0445");
+    }
+
+    @Test
+    void explicitCompoundingAndAmountModeRetainPriorArithmetic() {
+        RampEscalatorDto inputs = escalator(RampEscalatorMode.PERCENT, "100", "10", 12);
+        inputs.setCompounding(true);
+        assertThat(prices(expander.expand(36, inputs, 1))).containsExactly("100.0000", "110.0000", "121.0000");
+        inputs.setMode(RampEscalatorMode.AMOUNT);
+        inputs.setCompounding(false);
+        assertThat(prices(expander.expand(36, inputs, 1))).containsExactly("100.0000", "110.0000", "120.0000");
+    }
+
+    @Test
+    void nonCompoundingExtensionPreservesEditedFinalPriceAndUsesBaseIncrement() {
+        RampEscalatorDto inputs = escalator(RampEscalatorMode.PERCENT, "100", "10", 12);
+        inputs.setCompounding(false);
+        List<RampStepDto> existing = List.of(absolute(1, 1, 12, "100"), absolute(2, 13, 12, "115"));
+        List<RampStepDto> result = expander.extend(existing, 49, inputs);
+        assertThat(result.getFirst()).isSameAs(existing.getFirst());
+        assertThat(result.get(1)).isSameAs(existing.get(1));
+        assertThat(prices(result)).containsExactly("100", "115", "125.0000", "135.0000", "145.0000");
+        assertThat(result).extracting(RampStepDto::getMonths).containsExactly(12, 12, 12, 12, 1);
+    }
+
+    @Test
+    void nonCompoundingExtensionRequiresBaseButLegacyModesDoNot() {
+        RampEscalatorDto inputs = sevenPercent();
+        inputs.setStartPrice(null);
+        assertThat(expander.extend(goldenThirtySix(), 48, inputs)).hasSize(4);
+        inputs.setCompounding(false);
+        assertThatThrownBy(() -> expander.extend(goldenThirtySix(), 48, inputs))
+                .isInstanceOf(RampScheduleException.class).satisfies(reason(RampReasons.PERIOD_EMPTY));
+        inputs.setMode(RampEscalatorMode.AMOUNT);
+        assertThat(expander.extend(goldenThirtySix(), 48, inputs)).hasSize(4);
+    }
+
+    @Test
+    void shortTermAndExistingShortTailRemainContiguous() {
+        List<RampStepDto> shortTerm = expander.expand(2, sevenPercent(), 1);
+        assertThat(shortTerm).hasSize(1);
+        assertThat(shortTerm.getFirst().getMonths()).isEqualTo(2);
+        List<RampStepDto> existing = expander.expand(14, sevenPercent(), 1);
+        List<RampStepDto> result = expander.extend(existing, 24, sevenPercent());
+        assertThat(result.get(1)).isSameAs(existing.get(1));
+        assertThat(result).extracting(RampStepDto::getStartMonth).containsExactly(1, 13, 15);
+        assertThat(result).extracting(RampStepDto::getMonths).containsExactly(12, 2, 10);
+    }
+
+    @Test
+    void ceilingPeriodCountIsCheckedWithoutOverflow() {
+        assertThatThrownBy(() -> expander.expand(25, sevenPercent(), 1, 2))
+                .isInstanceOf(RampScheduleException.class).satisfies(reason(RampReasons.TOO_MANY_PERIODS));
+        assertThatThrownBy(() -> expander.extend(goldenThirtySix(), 61, sevenPercent(), 5))
+                .isInstanceOf(RampScheduleException.class).satisfies(reason(RampReasons.TOO_MANY_PERIODS));
+        RampEscalatorDto veryLongPeriod = escalator(RampEscalatorMode.AMOUNT, "1", "1", Integer.MAX_VALUE - 1);
+        List<RampStepDto> result = expander.expand(Integer.MAX_VALUE, veryLongPeriod, 1, 2);
+        assertThat(result).extracting(RampStepDto::getMonths).containsExactly(Integer.MAX_VALUE - 1, 1);
+        assertThat(result.getLast().getStartMonth()).isEqualTo(Integer.MAX_VALUE);
     }
 
     private static List<String> prices(List<RampStepDto> steps) {

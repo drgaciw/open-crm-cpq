@@ -16,6 +16,7 @@ import {
   SpringPageResponse,
   RampScheduleExpandRequest,
   RampScheduleExtendRequest,
+  RampScheduleExtendResult,
   RampStep,
 } from '@frontend/shared-models';
 
@@ -243,17 +244,32 @@ export class QuoteService {
   /**
    * Append periods to an existing schedule.
    * POST /api/v1/quotes/{quoteId}/ramp-schedule/extend
-   * Returns the existing steps plus the new ones and writes nothing,
-   * including the quote term. Does not change opencrm.pricing.ramp.enabled.
+   * The paired line/version fields commit the schedule and term atomically.
+   * Without them this remains a preview. State is applied after the editor
+   * accepts the response so changing the term does not invalidate that response.
    */
   extendRampSchedule(
     quoteId: number,
     request: RampScheduleExtendRequest,
-  ): Observable<RampStep[]> {
-    return this.http.post<RampStep[]>(
+  ): Observable<RampScheduleExtendResult> {
+    return this.http.post<RampScheduleExtendResult>(
       `${this.basePath}/${quoteId}/ramp-schedule/extend`,
       request,
     );
+  }
+
+  applyRampExtension(quoteId: number, lineId: number, result: RampScheduleExtendResult): void {
+    const current = this.selectedQuote();
+    if (current?.id !== quoteId || result.durationInMonths == null || result.quoteVersion == null) return;
+    if (current.version != null && current.version > result.quoteVersion) return;
+    const lineItems = current.lineItems?.map(line => line.id === lineId
+      ? { ...line, schedule: { steps: result.steps, escalator: result.escalator }, pricedPeriods: [] }
+      : line);
+    this.selectedQuote.set({ ...current, durationInMonths: result.durationInMonths,
+      version: result.quoteVersion, status: result.quoteStatus ?? current.status, rampScheduleStale: true, lineItems });
+    this.lineItems.set(this.lineItems().map(line => line.id === lineId
+      ? { ...line, schedule: { steps: result.steps, escalator: result.escalator }, pricedPeriods: [] }
+      : line));
   }
 
   /**

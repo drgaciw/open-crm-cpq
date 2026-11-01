@@ -1,6 +1,8 @@
 package com.opencrm.quote.ramp;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.exception.BusinessException;
+import com.opencrm.quote.lineitem.QuoteLineItemService;
 import com.opencrm.quote.quote.QuoteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ public class RampScheduleQueryService {
     private final QuoteRepository quoteRepository;
     private final RampPricingProperties properties;
     private final RampEscalatorExpander expander;
+    private final QuoteLineItemService lineItemService;
 
     @Transactional(readOnly = true)
     public RampScheduleDto expand(Long quoteId, RampExpandRequest request) {
@@ -40,11 +43,14 @@ public class RampScheduleQueryService {
     }
 
     /**
-     * Preview an extension. Reads the quote so a missing id is a 404, and writes nothing.
      * Existing steps stay as submitted; new steps continue from the last absolute unit.
+     * The line/version pair opts into an atomic schedule and term save.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public RampScheduleDto extend(Long quoteId, RampExtendRequest request) {
+        if ((request.getLineItemId() == null) != (request.getExpectedQuoteVersion() == null)) {
+            throw new BusinessException("lineItemId and expectedQuoteVersion must be supplied together", "VALIDATION_ERROR");
+        }
         if (quoteRepository.findByIdAndDeletedFalse(quoteId).isEmpty()) {
             throw new ResourceNotFoundException("Quote", quoteId);
         }
@@ -59,9 +65,17 @@ public class RampScheduleQueryService {
         if (steps.size() > properties.getMaxPeriods()) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }
-        return RampScheduleDto.builder()
+        RampScheduleDto schedule = RampScheduleDto.builder()
                 .steps(steps)
                 .escalator(request.getEscalator())
                 .build();
+        if (request.getLineItemId() != null) {
+            var saved = lineItemService.persistExtendedRamp(quoteId, request.getLineItemId(), duration,
+                    request.getExpectedQuoteVersion(), schedule);
+            schedule.setDurationInMonths(duration);
+            schedule.setQuoteVersion(saved.getVersion());
+            schedule.setQuoteStatus(saved.getStatus());
+        }
+        return schedule;
     }
 }

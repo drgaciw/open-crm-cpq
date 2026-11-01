@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/quotes/{quoteId}/ramp-schedule")
 @RequiredArgsConstructor
-@Tag(name = "Quote ramp schedule", description = "Ramp authoring preview. Expansion and extension do not persist.")
+@Tag(name = "Quote ramp schedule", description = "Ramp authoring: expansion previews; extension can atomically save a selected line and term.")
 public class RampScheduleController {
 
     private final RampScheduleQueryService rampScheduleQueryService;
@@ -28,7 +28,7 @@ public class RampScheduleController {
     }
 
     @PostMapping("/extend")
-    @Operation(summary = "Append periods from the last unit price without saving them or the quote term")
+    @Operation(summary = "Append periods; paired lineItemId and expectedQuoteVersion save schedule and quote term atomically")
     public ApiResponse<RampScheduleDto> extend(
             @PathVariable Long quoteId,
             @RequestBody RampExtendRequest request) {

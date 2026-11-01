@@ -22,4 +22,7 @@ public class RampEscalatorDto {
     private RampEscalatorMode mode;
     private BigDecimal amount;
     private Integer everyMonths;
+
+    /** Omitted/null retains compound growth; false applies each increase to startPrice. */
+    private Boolean compounding;
 }

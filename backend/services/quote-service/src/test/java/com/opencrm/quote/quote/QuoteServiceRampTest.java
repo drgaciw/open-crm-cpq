@@ -279,6 +279,7 @@ class QuoteServiceRampTest {
         source.setRampEscalatorStartPrice(new BigDecimal("40.0000"));
         source.setRampEscalatorAmount(new BigDecimal("5.0000"));
         source.setRampEscalatorEveryMonths(12);
+        source.setRampEscalatorCompounding(false);
         source.setPricingExplanationCode("LIST");
         source.setPricingWaterfallJson("{\"skip\":true}");
         QuoteRampStep deleted = step(2, 13, 12, new BigDecimal("45.0000"));
@@ -328,6 +329,7 @@ class QuoteServiceRampTest {
         assertThat(copy.getRampEscalatorStartPrice()).isEqualByComparingTo("40.0000");
         assertThat(copy.getRampEscalatorAmount()).isEqualByComparingTo("5.0000");
         assertThat(copy.getRampEscalatorEveryMonths()).isEqualTo(12);
+        assertThat(copy.getRampEscalatorCompounding()).isFalse();
         assertThat(copy.getPricingExplanationCode()).isNull();
         assertThat(copy.getPricingWaterfallJson()).isNull();
     }

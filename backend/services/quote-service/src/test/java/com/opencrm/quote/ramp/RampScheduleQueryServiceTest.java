@@ -33,7 +33,8 @@ class RampScheduleQueryServiceTest {
     @BeforeEach
     void setUp() {
         properties = new RampPricingProperties();
-        service = new RampScheduleQueryService(quoteRepository, properties, new RampEscalatorExpander());
+        service = new RampScheduleQueryService(quoteRepository, properties, new RampEscalatorExpander(),
+                org.mockito.Mockito.mock(com.opencrm.quote.lineitem.QuoteLineItemService.class));
     }
 
     @Test
@@ -93,18 +94,14 @@ class RampScheduleQueryServiceTest {
     }
 
     @Test
-    @DisplayName("a term the step length does not divide reports RAMP_TERM_MISMATCH and persists nothing")
+    @DisplayName("a term the step length does not divide previews a short final period and persists nothing")
     void indivisibleTermPersistsNothing() {
         properties.setEnabled(true);
         when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
 
-        assertThatThrownBy(() -> service.expand(7L, request(14, 1)))
-                .isInstanceOf(RampScheduleException.class)
-                .satisfies(ex -> {
-                    RampScheduleException ramp = (RampScheduleException) ex;
-                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.SCHEDULE_INVALID);
-                    assertThat(ramp.getReasons()).containsExactly(RampReasons.TERM_MISMATCH);
-                });
+        RampScheduleDto result = service.expand(7L, request(14, 1));
+        assertThat(result.getSteps()).extracting(RampStepDto::getMonths).containsExactly(12, 2);
+        assertThat(result.getSteps()).extracting(RampStepDto::getStartMonth).containsExactly(1, 13);
 
         verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
