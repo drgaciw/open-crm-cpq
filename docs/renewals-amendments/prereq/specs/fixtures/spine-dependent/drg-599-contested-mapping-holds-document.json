@@ -1,0 +1,37 @@
+{
+    "issue": "DRG-599",
+    "ac_id": "AC-599-2",
+    "case": "contested-mapping-holds-document",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "599-F2-A, 599-F3-A",
+    "input": {
+        "document_state_before": "DRAFT",
+        "line": {
+            "action_code": "SWAP",
+            "source_sku": "SKU-A",
+            "target_sku": "SKU-B",
+            "relationship_version": "v3",
+            "dispute_state": "CONTESTED"
+        },
+        "sales_resolve": {
+            "actor_role": "SALES",
+            "dispute_state": "RESOLVED"
+        }
+    },
+    "expected": {
+        "transition_to_in_review": "refused",
+        "document_state": "DRAFT",
+        "apply_allowed": false,
+        "hold": {
+            "http_status": 409,
+            "error_code": "MAPPING_CONTESTED"
+        },
+        "sales_resolve": {
+            "http_status": 403,
+            "error_code": "DISPUTE_RESOLVE_FORBIDDEN"
+        },
+        "dispute_state": "CONTESTED"
+    }
+}

@@ -1,0 +1,34 @@
+{
+    "issue": "DRG-594",
+    "ac_id": "AC-594-3",
+    "case": "mixed-document-requires-review",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "594-F4-A, 594-F6-A",
+    "input": {
+        "document_state_before": "DRAFT",
+        "lines": [
+            {
+                "action_code": "UPDATE",
+                "source_sku": "SKU-A",
+                "target_sku": "SKU-A",
+                "quantity_before": 10,
+                "quantity_after": 12
+            }
+        ],
+        "header_edits": [
+            "governing_agreement_ref"
+        ]
+    },
+    "expected": {
+        "legal_review_required": true,
+        "per_line_skip": false,
+        "transition_to_in_review": "refused",
+        "document_state": "DRAFT",
+        "http_status": 409,
+        "error_code": "LEGAL_REVIEW_REQUIRED",
+        "approval_row_written": false,
+        "approval_type_written": null
+    }
+}

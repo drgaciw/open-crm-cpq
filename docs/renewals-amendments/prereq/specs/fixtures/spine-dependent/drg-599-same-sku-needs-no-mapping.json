@@ -1,0 +1,24 @@
+{
+    "issue": "DRG-599",
+    "ac_id": "AC-599-1",
+    "case": "same-sku-needs-no-mapping",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "599-F4-A",
+    "input": {
+        "document_state_before": "DRAFT",
+        "line": {
+            "action_code": "UPDATE",
+            "source_sku": "SKU-A",
+            "target_sku": "SKU-A"
+        }
+    },
+    "expected": {
+        "mapping_required": false,
+        "dispute_checked": false,
+        "transition_to_in_review": "allowed",
+        "document_state": "IN_REVIEW",
+        "error_code": null
+    }
+}

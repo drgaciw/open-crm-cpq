@@ -1,0 +1,31 @@
+{
+    "issue": "DRG-592",
+    "ac_id": "AC-592-3",
+    "case": "two-true-flags-fail-closed",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "592-F3-A",
+    "input": {
+        "tenant_id": "t-1",
+        "read": "pricing",
+        "active_contracts": [
+            {
+                "id": "c-1",
+                "contract_state": "ACTIVE",
+                "precedence_flag": true
+            },
+            {
+                "id": "c-2",
+                "contract_state": "ACTIVE",
+                "precedence_flag": true
+            }
+        ]
+    },
+    "expected": {
+        "http_status": 409,
+        "error_code": "PRECEDENCE_CONFLICT",
+        "price": null,
+        "both_visible": true
+    }
+}

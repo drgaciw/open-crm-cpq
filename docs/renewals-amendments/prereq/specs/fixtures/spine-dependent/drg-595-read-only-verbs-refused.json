@@ -1,0 +1,88 @@
+{
+    "issue": "DRG-595",
+    "ac_id": "AC-595-2",
+    "case": "read-only-verbs-refused",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "595-F5-A, 595-F4-A",
+    "input": {
+        "tenant_id": "t-1",
+        "actors": [
+            {
+                "actor_user_id": "user-ops",
+                "role_label": "SALES_OPS"
+            },
+            {
+                "actor_user_id": "user-fin",
+                "role_label": "FINANCE"
+            }
+        ],
+        "actions": [
+            "EDIT",
+            "SUBMIT",
+            "APPROVE",
+            "EXECUTE"
+        ]
+    },
+    "expected": {
+        "results": [
+            {
+                "actor_user_id": "user-ops",
+                "action": "EDIT",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-ops",
+                "action": "SUBMIT",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-ops",
+                "action": "APPROVE",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-ops",
+                "action": "EXECUTE",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-fin",
+                "action": "EDIT",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-fin",
+                "action": "SUBMIT",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-fin",
+                "action": "APPROVE",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            },
+            {
+                "actor_user_id": "user-fin",
+                "action": "EXECUTE",
+                "allowed": false,
+                "http_status": 403,
+                "error_code": "READ_ONLY_FORBIDDEN"
+            }
+        ]
+    }
+}

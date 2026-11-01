@@ -1,0 +1,39 @@
+{
+    "issue": "DRG-599",
+    "ac_id": "AC-599-3",
+    "case": "pinned-version-clears-only-when-product-resolves",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "599-F2-A, 599-F5-A",
+    "input": {
+        "document_state_before": "DRAFT",
+        "line": {
+            "action_code": "SWAP",
+            "source_sku": "SKU-A",
+            "target_sku": "SKU-B",
+            "relationship_version": "v3",
+            "dispute_state": "CONTESTED"
+        },
+        "product_resolve": {
+            "actor_role": "PRODUCT",
+            "relationship_version": "v3",
+            "dispute_state": "RESOLVED"
+        },
+        "live_row": {
+            "relationship_version": "v4",
+            "dispute_state": "CONTESTED"
+        }
+    },
+    "expected": {
+        "pinned_version": "v3",
+        "dispute_state": "RESOLVED",
+        "hold_on_pinned_version": false,
+        "transition_to_in_review": "allowed",
+        "live_row_unchanged": {
+            "relationship_version": "v4",
+            "dispute_state": "CONTESTED"
+        },
+        "error_code": null
+    }
+}
