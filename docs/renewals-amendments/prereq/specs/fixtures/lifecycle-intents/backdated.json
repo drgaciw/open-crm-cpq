@@ -1,0 +1,33 @@
+{
+  "id": "lifecycle-intents-backdated",
+  "story": "DRG-646",
+  "cluster": "lifecycle-intents",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "backdated",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/lifecycle-intents.md AC-8 and AC-9",
+    "DRG-553"
+  ],
+  "inputs": {
+    "actionDate": "2026-10-05",
+    "contractEffective": "2026-10-01",
+    "serviceActivation": "2026-10-01",
+    "customerAcceptance": "2026-10-20",
+    "trigger": "contractEffective",
+    "effectiveEndDate": "2027-09-30",
+    "startDate": "2026-10-01"
+  },
+  "expected": {
+    "effectiveDate": "2026-10-01",
+    "trigger": "contractEffective",
+    "relation": "backdated",
+    "predicate": "contractEffective 2026-10-01 is before actionDate 2026-10-05",
+    "datesStored": true,
+    "customerVisibleTransition": "refused until a backdating reason code and an approval rule exist",
+    "backdatingReasonCodeSet": false,
+    "effectiveEndDate": "2027-09-30",
+    "coverage": "bounded",
+    "startDateNull": false
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "lifecycle-intents-same-day",
+  "story": "DRG-646",
+  "cluster": "lifecycle-intents",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "same-day",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/lifecycle-intents.md dates section",
+    "DRG-553"
+  ],
+  "inputs": {
+    "actionDate": "2026-10-05",
+    "contractEffective": "2026-10-05",
+    "serviceActivation": "2026-10-05",
+    "customerAcceptance": "2026-10-05",
+    "trigger": "contractEffective",
+    "effectiveEndDate": "2027-09-30",
+    "startDate": "2026-10-05"
+  },
+  "expected": {
+    "effectiveDate": "2026-10-05",
+    "trigger": "contractEffective",
+    "relation": "same-day",
+    "predicate": "contractEffective 2026-10-05 equals actionDate 2026-10-05",
+    "datesStored": true,
+    "backdatingRefusalApplies": false,
+    "effectiveEndDate": "2027-09-30",
+    "coverage": "bounded",
+    "startDateNull": false
+  }
+}

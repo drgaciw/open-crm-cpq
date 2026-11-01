@@ -1,0 +1,32 @@
+{
+  "id": "lifecycle-intents-future-dated",
+  "story": "DRG-646",
+  "cluster": "lifecycle-intents",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "future-dated",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/lifecycle-intents.md dates section",
+    "DRG-553"
+  ],
+  "inputs": {
+    "actionDate": "2026-10-05",
+    "contractEffective": "2026-11-01",
+    "serviceActivation": "2026-11-01",
+    "customerAcceptance": "2026-11-15",
+    "trigger": "contractEffective",
+    "effectiveEndDate": "2027-09-30",
+    "startDate": "2026-11-01"
+  },
+  "expected": {
+    "effectiveDate": "2026-11-01",
+    "trigger": "contractEffective",
+    "relation": "future-dated",
+    "predicate": "contractEffective 2026-11-01 is after actionDate 2026-10-05",
+    "datesStored": true,
+    "backdatingRefusalApplies": false,
+    "effectiveEndDate": "2027-09-30",
+    "coverage": "bounded",
+    "startDateNull": false
+  }
+}
