@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /**
  * Reads unmerged CAM renewal policy rungs. There is no tenant argument: the service token carries it.
- * This client is not wired into quote continuation.
+ * From-active-assets renewals apply these rungs through {@code QuoteContinuationPolicy}.
  */
 public interface RenewalPolicyClient {
 

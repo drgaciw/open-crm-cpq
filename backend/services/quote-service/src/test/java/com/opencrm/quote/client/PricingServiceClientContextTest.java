@@ -53,8 +53,12 @@ class PricingServiceClientContextTest {
         assertThat(context.getBean("configurationEngineRestClient", RestClient.class)).isNotNull();
         assertThat(context.getBean("approvalRoutingRestClient", RestClient.class)).isNotNull();
         assertThat(context.getBean("subscriptionScheduleRestClient", RestClient.class)).isNotNull();
+        assertThat(context.getBean("assetReadRestClient", RestClient.class)).isNotNull();
+        assertThat(context.getBean(AssetReadClient.class)).isNotNull();
+        assertThat(context.getBean(RenewalPolicyClient.class)).isInstanceOf(HttpRenewalPolicyClient.class);
         assertThat(context.getBeansOfType(RestClient.class))
-                .containsOnlyKeys("pricingRestClient", "configurationEngineRestClient", "approvalRoutingRestClient", "subscriptionScheduleRestClient");
+                .containsOnlyKeys("pricingRestClient", "configurationEngineRestClient", "approvalRoutingRestClient",
+                        "subscriptionScheduleRestClient", "assetReadRestClient");
         assertThat(context.getBean(OutboundAuth.class)).isNotNull();
     }
 }
