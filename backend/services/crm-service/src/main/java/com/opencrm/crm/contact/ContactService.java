@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.organization.Organization;
+import com.opencrm.crm.organization.OrganizationAccountIds;
 import com.opencrm.crm.organization.OrganizationRepository;
 import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,7 @@ public class ContactService {
         Contact contact = contactMapper.toEntity(request);
 
         if (request.getOrganizationId() != null) {
-            contact.setOrganization(requireActiveOrganization(AccountId.of(request.getOrganizationId())));
+            contact.setOrganization(requireActiveOrganization(OrganizationAccountIds.fromExternalId(request.getOrganizationId())));
         }
 
         // Save and return
@@ -123,7 +124,7 @@ public class ContactService {
         }
 
         if (request.getOrganizationId() != null) {
-            AccountId accountId = AccountId.of(request.getOrganizationId());
+            AccountId accountId = OrganizationAccountIds.fromExternalId(request.getOrganizationId());
             if (contact.getOrganization() == null ||
                 !accountId.equals(AccountId.of(contact.getOrganization().getId()))) {
                 contact.setOrganization(requireActiveOrganization(accountId));
