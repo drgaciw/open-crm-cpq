@@ -1,0 +1,74 @@
+{
+  "id": "maintenance-reinstatement-after-lapse",
+  "story": "DRG-642",
+  "cluster": "maintenance",
+  "status": "provisional",
+  "adr": "pending",
+  "licenceRenewed": false,
+  "currency": "USD",
+  "roundingMode": "HALF_UP",
+  "moneyScale": 2,
+  "intermediateScales": [
+    {
+      "name": "lapse fraction",
+      "expression": "3 / 12",
+      "scale": 2,
+      "roundingMode": "HALF_UP",
+      "value": "0.25",
+      "note": "Exact. (32000.00 × 3) / 12 is 8000.00 at every scale."
+    },
+    {
+      "name": "fee rate",
+      "expression": "10 / 100",
+      "scale": 2,
+      "roundingMode": "HALF_UP",
+      "value": "0.10",
+      "note": "Exact. 32000.00 × 0.10 is 3200.00."
+    }
+  ],
+  "scenario": "reinstatement-after-lapse",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/maintenance.md step 7 and AC-8"
+  ],
+  "inputs": {
+    "illustrative": true,
+    "platformDefault": false,
+    "knobsAreFixtureInputs": true,
+    "reinstatementBasis": {
+      "value": "both",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)"
+    },
+    "lapseMonths": 3,
+    "maxLapseMonths": 6,
+    "backMaintenance": "Yes",
+    "feePct": "10",
+    "maintenanceAnnual": "32000.00",
+    "lines": [
+      {
+        "id": "CL-10",
+        "role": "perpetual-licence",
+        "licenseModel": "Perpetual",
+        "intent": "NoChange"
+      },
+      {
+        "id": "CL-11",
+        "role": "maintenance",
+        "licenseModel": "Maintenance",
+        "intent": "reinstatement amounts on the maintenance line",
+        "relatedPerpetualLineId": "CL-10"
+      }
+    ]
+  },
+  "expected": {
+    "licenceRenewed": false,
+    "insideCap": true,
+    "backMaintenanceAmount": "8000.00",
+    "reinstatementFeeAmount": "3200.00",
+    "amountsAreSeparate": true,
+    "equations": [
+      "(32000.00 × 3) / 12 = 8000.00",
+      "32000.00 × 0.10 = 3200.00"
+    ]
+  }
+}

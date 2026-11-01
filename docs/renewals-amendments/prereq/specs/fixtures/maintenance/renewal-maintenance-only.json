@@ -1,0 +1,56 @@
+{
+  "id": "maintenance-renewal-maintenance-only",
+  "story": "DRG-642",
+  "cluster": "maintenance",
+  "status": "provisional",
+  "adr": "pending",
+  "licenceRenewed": false,
+  "currency": "USD",
+  "roundingMode": "HALF_UP",
+  "moneyScale": 2,
+  "intermediateScales": [
+    {
+      "name": "uplift factor from percent points",
+      "expression": "5 movePointLeft 2",
+      "scale": 2,
+      "roundingMode": "HALF_UP",
+      "value": "0.05",
+      "note": "Exact. RenewalUpliftResolver.increase uses this shift, then setScale(4, HALF_UP) on a unit. 40000.00 × 1.05 is exact at scale 2 and at scale 4."
+    }
+  ],
+  "scenario": "renewal",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/maintenance.md AC-2 and AC-6",
+    "docs/renewals-amendments/cpq-pricing-policy-sanity-check.md Scenario 4"
+  ],
+  "inputs": {
+    "illustrative": true,
+    "platformDefault": false,
+    "maintenanceAnnualBefore": "40000.00",
+    "upliftPct": "5",
+    "upliftLevel": "agreement",
+    "saasAccountUpliftPct": "7",
+    "saasAccountUpliftAppliedToMaintenance": false,
+    "lines": [
+      {
+        "id": "CL-10",
+        "role": "perpetual-licence",
+        "licenseModel": "Perpetual",
+        "intent": "NoChange"
+      },
+      {
+        "id": "CL-11",
+        "role": "maintenance",
+        "licenseModel": "Maintenance",
+        "intent": "Renew",
+        "relatedPerpetualLineId": "CL-10"
+      }
+    ]
+  },
+  "expected": {
+    "licenceRenewed": false,
+    "maintenanceAnnual": "42000.00",
+    "upliftAmount": "2000.00",
+    "equation": "40000.00 × 1.05 = 42000.00"
+  }
+}
