@@ -88,7 +88,7 @@ public class CrmDomainEvents {
                         organizationId(deal),
                         deal.getStage().name(),
                         previousStage.name(),
-                        Instant.now(),
+                        occurredAt(deal.getStage() == DealStage.WON ? deal.getWonAt() : deal.getLostAt()),
                         deal.getLostReason()));
     }
 
