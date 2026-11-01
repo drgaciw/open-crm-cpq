@@ -68,11 +68,16 @@ import { OrganizationService } from '../organization.service';
             <mat-form-field appearance="outline">
               <mat-label>Type</mat-label>
               <mat-select formControlName="type">
-                <mat-option value="">None</mat-option>
+                @if (allowNoType()) {
+                  <mat-option value="">None</mat-option>
+                }
                 @for (accountType of accountTypes; track accountType) {
                   <mat-option [value]="accountType">{{ accountType }}</mat-option>
                 }
               </mat-select>
+              @if (isEditMode && !allowNoType()) {
+                <mat-hint>An existing type cannot be cleared.</mat-hint>
+              }
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Territory</mat-label>
@@ -176,6 +181,7 @@ export class OrganizationFormComponent implements OnInit {
   isEditMode = false;
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
+  readonly allowNoType = signal(true);
 
   industries = [...ACCOUNT_INDUSTRIES];
   accountTypes: OrganizationType[] = [
@@ -208,12 +214,20 @@ export class OrganizationFormComponent implements OnInit {
     const idVal = this.id();
     if (idVal) {
       this.isEditMode = true;
+      this.allowNoType.set(false);
+      this.form.get('type')?.setValidators(Validators.required);
+      this.form.get('type')?.updateValueAndValidity({ emitEvent: false });
       this.orgService.getById(Number(idVal));
       // Patch form when data loads
       effect(() => {
         const org = this.orgService.selectedOrganization();
-        if (org) {
-          this.form.patchValue(org);
+        if (org && org.id === Number(idVal)) {
+          const hasType = !!org.type;
+          this.allowNoType.set(!hasType);
+          const type = this.form.get('type');
+          type?.setValidators(hasType ? Validators.required : null);
+          this.form.patchValue({ ...org, type: org.type ?? '' });
+          type?.updateValueAndValidity({ emitEvent: false });
         }
       }, { injector: this.injector });
     }
