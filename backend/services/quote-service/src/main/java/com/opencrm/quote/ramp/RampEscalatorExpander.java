@@ -21,6 +21,10 @@ public class RampEscalatorExpander {
     static final int UNIT_SCALE = 4;
 
     public List<RampStepDto> expand(int durationInMonths, RampEscalatorDto escalator, Integer quantity) {
+        return expand(durationInMonths, escalator, quantity, Integer.MAX_VALUE);
+    }
+
+    public List<RampStepDto> expand(int durationInMonths, RampEscalatorDto escalator, Integer quantity, int maxPeriods) {
         if (durationInMonths < 1) {
             throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
         }
@@ -39,6 +43,9 @@ public class RampEscalatorExpander {
         }
 
         int count = durationInMonths / everyMonths;
+        if (count > maxPeriods) {
+            throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
+        }
         BigDecimal price = escalator.getStartPrice().setScale(UNIT_SCALE, RoundingMode.HALF_UP);
         List<RampStepDto> steps = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
@@ -63,6 +70,11 @@ public class RampEscalatorExpander {
      * new unit is one escalation of the last step's absolute unit price.
      */
     public List<RampStepDto> extend(List<RampStepDto> existing, int durationInMonths, RampEscalatorDto escalator) {
+        return extend(existing, durationInMonths, escalator, Integer.MAX_VALUE);
+    }
+
+    public List<RampStepDto> extend(List<RampStepDto> existing, int durationInMonths, RampEscalatorDto escalator,
+                                    int maxPeriods) {
         if (escalator == null || escalator.getEveryMonths() == null || escalator.getEveryMonths() < 1
                 || escalator.getMode() == null || escalator.getAmount() == null) {
             throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
@@ -74,14 +86,17 @@ public class RampEscalatorExpander {
         if (existing == null || existing.isEmpty()) {
             throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
         }
+        if (existing.size() > maxPeriods) {
+            throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
+        }
 
         List<RampStepDto> ordered = existing.stream()
                 .sorted(Comparator.comparing((RampStepDto step) -> step == null || step.getStartMonth() == null
                         ? Integer.MAX_VALUE
                         : step.getStartMonth()))
                 .toList();
-        int expectedStart = 1;
-        int coveredMonths = 0;
+        long expectedStart = 1;
+        long coveredMonths = 0;
         for (RampStepDto step : ordered) {
             if (step == null) {
                 throw RampScheduleException.invalid(List.of(RampReasons.PERIOD_EMPTY));
@@ -97,7 +112,7 @@ public class RampEscalatorExpander {
             if (start < expectedStart) {
                 throw RampScheduleException.invalid(List.of(RampReasons.OVERLAP));
             }
-            expectedStart = start + months;
+            expectedStart = (long) start + months;
             coveredMonths += months;
             if (step.getUnitPrice() != null && step.getUnitPrice().signum() < 0) {
                 throw RampScheduleException.invalid(List.of(RampReasons.NEGATIVE_VALUE));
@@ -115,12 +130,16 @@ public class RampEscalatorExpander {
             throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
         }
         int everyMonths = escalator.getEveryMonths();
-        int extension = durationInMonths - coveredMonths;
+        long extension = durationInMonths - coveredMonths;
         if (extension % everyMonths != 0) {
             throw RampScheduleException.invalid(List.of(RampReasons.TERM_MISMATCH));
         }
 
-        int count = extension / everyMonths;
+        long countLong = extension / everyMonths;
+        if (countLong + existing.size() > maxPeriods) {
+            throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
+        }
+        int count = (int) countLong;
         int sequence = last.getSequence() == null ? ordered.size() : last.getSequence();
         BigDecimal price = last.getUnitPrice();
         List<RampStepDto> steps = new ArrayList<>(existing.size() + count);
@@ -130,7 +149,7 @@ public class RampEscalatorExpander {
             sequence++;
             steps.add(RampStepDto.builder()
                     .sequence(sequence)
-                    .startMonth(coveredMonths + 1 + (index * everyMonths))
+                    .startMonth(Math.toIntExact(coveredMonths + 1 + ((long) index * everyMonths)))
                     .months(everyMonths)
                     .quantity(last.getQuantity())
                     .priceBasis(RampPriceBasis.ABSOLUTE)

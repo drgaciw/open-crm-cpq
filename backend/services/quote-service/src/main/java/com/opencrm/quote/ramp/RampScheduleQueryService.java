@@ -28,7 +28,8 @@ public class RampScheduleQueryService {
             throw RampScheduleException.notSupported();
         }
         int duration = request.getDurationInMonths() == null ? 0 : request.getDurationInMonths();
-        List<RampStepDto> steps = expander.expand(duration, request.getEscalator(), request.getQuantity());
+        List<RampStepDto> steps = expander.expand(duration, request.getEscalator(), request.getQuantity(),
+                properties.getMaxPeriods());
         if (steps.size() > properties.getMaxPeriods()) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }
@@ -54,7 +55,7 @@ public class RampScheduleQueryService {
         List<RampStepDto> steps = expander.extend(
                 request.getSteps() == null ? List.of() : request.getSteps(),
                 duration,
-                request.getEscalator());
+                request.getEscalator(), properties.getMaxPeriods());
         if (steps.size() > properties.getMaxPeriods()) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }

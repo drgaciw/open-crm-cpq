@@ -14,6 +14,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Ramp escalator AC-04")
 class RampEscalatorExpanderTest {
 
+    @Test
+    void rejectsHugeExpansionAndExtensionBeforeAllocation() {
+        RampEscalatorDto monthly = escalator(RampEscalatorMode.AMOUNT, "40", "1", 1);
+        assertThatThrownBy(() -> expander.expand(Integer.MAX_VALUE, monthly, 1, 12))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(reason(RampReasons.TOO_MANY_PERIODS));
+        assertThatThrownBy(() -> expander.extend(goldenThirtySix(), Integer.MAX_VALUE, monthly, 12))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(reason(RampReasons.TOO_MANY_PERIODS));
+    }
+
     private RampEscalatorExpander expander;
 
     @BeforeEach
