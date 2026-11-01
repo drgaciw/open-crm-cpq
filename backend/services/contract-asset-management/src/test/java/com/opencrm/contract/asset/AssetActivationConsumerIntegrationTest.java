@@ -40,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.kafka.listener.auto-startup=false",
         "opencrm.erp-sync.enabled=false",
         "opencrm.subscription-ramp.enabled=false",
-        "opencrm.outbox.relay.enabled=false"})
+        "opencrm.outbox.relay.enabled=false",
+        "opencrm.assets.legacy-acceptance-write-enabled=true"})
 class AssetActivationConsumerIntegrationTest {
 
     private static final String NEW_LINE_A = "11111111-1111-4111-8111-000000000201";

@@ -9,6 +9,7 @@ import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionRatePeriod;
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,8 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Creates one asset per activated contract line inside the accepted-quote transaction. */
+/** Legacy acceptance-time writer; held off until an effective-activation implementation exists. */
 @Service
+@ConditionalOnProperty(prefix = "opencrm.assets", name = "legacy-acceptance-write-enabled", havingValue = "true")
 public class AssetActivation {
     static final String AGGREGATE_TYPE = "Asset";
     private final AssetRepository assets;
