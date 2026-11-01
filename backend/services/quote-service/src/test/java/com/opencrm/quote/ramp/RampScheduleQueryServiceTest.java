@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -108,6 +109,89 @@ class RampScheduleQueryServiceTest {
         verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    @DisplayName("AC-532-6: flag off refuses extend and saves nothing")
+    void extendFlagOffRefuses() {
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
+
+        assertThatThrownBy(() -> service.extend(7L, extendRequest(60)))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> {
+                    RampScheduleException ramp = (RampScheduleException) ex;
+                    assertThat(ramp.getErrorCode()).isEqualTo(RampReasons.NOT_SUPPORTED);
+                    assertThat(ramp.getStatus().value()).isEqualTo(422);
+                });
+
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(quoteRepository, never()).flush();
+        verify(quoteRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("AC-532-6: a missing quote is a 404 and extend writes nothing")
+    void extendMissingQuote() {
+        properties.setEnabled(true);
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.extend(7L, extendRequest(60)))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(quoteRepository, never()).flush();
+    }
+
+    @Test
+    @DisplayName("AC-532-3: flag on extends the preview and does not save or flush")
+    void extendAppendsWithoutSaving() {
+        properties.setEnabled(true);
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
+
+        RampScheduleDto first = service.extend(7L, extendRequest(60));
+        RampScheduleDto second = service.extend(7L, extendRequest(60));
+
+        assertThat(first.getSteps()).extracting(step -> step.getUnitPrice().toPlainString())
+                .containsExactly("42.8000", "45.7960", "49.0017", "52.4318", "56.1020");
+        assertThat(second.getSteps()).extracting(step -> step.getUnitPrice().toPlainString())
+                .containsExactly("42.8000", "45.7960", "49.0017", "52.4318", "56.1020");
+        assertThat(first.getSteps()).extracting(RampStepDto::getStartMonth).containsExactly(1, 13, 25, 37, 49);
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(quoteRepository, never()).flush();
+        verify(quoteRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("AC-532-5: total periods above the cap is RAMP_TOO_MANY_PERIODS and saves nothing")
+    void extendCapApplies() {
+        properties.setEnabled(true);
+        properties.setMaxPeriods(4);
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
+
+        assertThatThrownBy(() -> service.extend(7L, extendRequest(60)))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
+                        .containsExactly(RampReasons.TOO_MANY_PERIODS));
+
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(quoteRepository, never()).flush();
+    }
+
+    @Test
+    @DisplayName("AC-532-5: a rejected extend writes nothing")
+    void extendRejectionWritesNothing() {
+        properties.setEnabled(true);
+        when(quoteRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(quote()));
+        RampExtendRequest request = extendRequest(36);
+
+        assertThatThrownBy(() -> service.extend(7L, request))
+                .isInstanceOf(RampScheduleException.class)
+                .satisfies(ex -> assertThat(((RampScheduleException) ex).getReasons())
+                        .containsExactly(RampReasons.TERM_MISMATCH));
+
+        verify(quoteRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(quoteRepository, never()).flush();
+        verify(quoteRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
     private static Quote quote() {
         Quote quote = Quote.builder().quoteNumber("Q-7").build();
         quote.setId(7L);
@@ -124,6 +208,33 @@ class RampScheduleQueryServiceTest {
                         .amount(new BigDecimal("5"))
                         .everyMonths(12)
                         .build())
+                .build();
+    }
+
+    private static RampExtendRequest extendRequest(int duration) {
+        return RampExtendRequest.builder()
+                .durationInMonths(duration)
+                .steps(List.of(
+                        step(1, 1, "42.8000"),
+                        step(2, 13, "45.7960"),
+                        step(3, 25, "49.0017")))
+                .escalator(RampEscalatorDto.builder()
+                        .mode(RampEscalatorMode.PERCENT)
+                        .startPrice(new BigDecimal("42.80"))
+                        .amount(new BigDecimal("7"))
+                        .everyMonths(12)
+                        .build())
+                .build();
+    }
+
+    private static RampStepDto step(int sequence, int startMonth, String price) {
+        return RampStepDto.builder()
+                .sequence(sequence)
+                .startMonth(startMonth)
+                .months(12)
+                .quantity(2)
+                .priceBasis(RampPriceBasis.ABSOLUTE)
+                .unitPrice(new BigDecimal(price))
                 .build();
     }
 }

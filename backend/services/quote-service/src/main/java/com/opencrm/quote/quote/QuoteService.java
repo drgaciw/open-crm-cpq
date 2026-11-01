@@ -89,6 +89,7 @@ public class QuoteService {
         if (request.getDurationInMonths() == null) {
             quote.setDurationInMonths(12);
         }
+        quote.setTenantId(QuoteTenantResolver.currentTenantId());
 
         Quote saved = quoteRepository.save(quote);
         log.info("Created quote: {}", saved.getQuoteNumber());
@@ -473,6 +474,7 @@ public class QuoteService {
                 .subscriptionEffectiveDate(original.getSubscriptionEffectiveDate())
                 .continuationRequestJson(original.getContinuationRequestJson())
                 .continuationOperation(original.getContinuationOperation())
+                .tenantId(QuoteTenantResolver.currentTenantId())
                 .notes(original.getNotes())
                 .rampScheduleStale(original.isRampScheduleStale())
                 .build();

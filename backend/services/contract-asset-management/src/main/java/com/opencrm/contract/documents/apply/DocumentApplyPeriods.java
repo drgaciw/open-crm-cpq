@@ -132,7 +132,11 @@ final class DocumentApplyPeriods {
                 .filter(period -> !period.isDeleted() && !period.isRetired())
                 .filter(period -> line.sourceAcceptedLineUuid() != null
                         && line.sourceAcceptedLineUuid().equals(period.getAcceptedLineUuid()))
-                .filter(period -> !period.getEffectiveEndDate().isBefore(line.effectiveFrom()))
+                // A null effective end is open-ended coverage, so it still matches.
+                .filter(period -> {
+                    LocalDate effectiveEnd = period.getEffectiveEndDate();
+                    return effectiveEnd == null || !effectiveEnd.isBefore(line.effectiveFrom());
+                })
                 .toList();
     }
 }

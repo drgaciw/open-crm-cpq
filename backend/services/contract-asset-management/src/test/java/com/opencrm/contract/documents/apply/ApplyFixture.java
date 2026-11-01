@@ -62,6 +62,9 @@ final class ApplyFixture {
     final DocumentApplyOrchestrator orchestrator;
     private final AtomicLong periodIds = new AtomicLong(100);
     private final ReentrantLock documentLock = new ReentrantLock();
+    private final java.util.concurrent.atomic.AtomicInteger lockCalls = new java.util.concurrent.atomic.AtomicInteger();
+    java.util.function.IntConsumer afterDocumentLock = ignored -> {};
+    java.util.function.IntConsumer afterDocumentUnlock = ignored -> {};
 
     ApplyFixture() {
         document = AmendmentDocument.builder()
@@ -93,10 +96,16 @@ final class ApplyFixture {
                                 .thenComparing(AmendmentApplicationUnit::getUnitNo))
                         .toList());
         when(unitRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ledgerRepository.findById(any())).thenAnswer(invocation -> {
+            DocumentApplyLedgerEntry.Key key = invocation.getArgument(0);
+            return Optional.ofNullable(ledger.get(key.getDocumentId() + ":" + key.getUnitNo()));
+        });
         when(ledgerRepository.findByTenantIdAndDocumentIdAndUnitNo(any(), any(), any())).thenAnswer(invocation -> {
+            UUID requestedTenant = invocation.getArgument(0);
             UUID documentId = invocation.getArgument(1);
             Integer unitNo = invocation.getArgument(2);
-            return Optional.ofNullable(ledger.get(documentId + ":" + unitNo));
+            return Optional.ofNullable(ledger.get(documentId + ":" + unitNo))
+                    .filter(entry -> requestedTenant.equals(entry.getTenantId()));
         });
         when(ledgerRepository.save(any())).thenAnswer(invocation -> {
             DocumentApplyLedgerEntry entry = invocation.getArgument(0);
@@ -151,17 +160,20 @@ final class ApplyFixture {
         }).when(gateway).bindAmendmentLine(anyLong(), any(), anyInt());
         doAnswer(invocation -> {
             documentLock.lock();
+            int call = lockCalls.incrementAndGet();
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int status) {
                     documentLock.unlock();
+                    afterDocumentUnlock.accept(call);
                 }
             });
+            afterDocumentLock.accept(call);
             return null;
         }).when(gateway).lockDocument(any());
 
         orchestrator = new DocumentApplyOrchestrator(documents, unitRepository, ledgerRepository, subscriptions, rates,
-                writer, documentService, gateway, meters, new DirectTransactions());
+                writer, documentService, gateway, meters, new DirectTransactions(), mock(jakarta.persistence.EntityManager.class));
     }
 
     AmendmentApplicationUnit unit(int unitNo, Subscription subscription, long observedRevision) {
@@ -225,6 +237,14 @@ final class ApplyFixture {
                 .retired(false)
                 .build();
         periods.add(period);
+        return period;
+    }
+
+    /** Sold end stays on {@code endDate}. The effective end is null, which is open-ended coverage. */
+    SubscriptionRatePeriod openEndedPeriod(Subscription subscription, String acceptedLine, BigDecimal quantity,
+                                           LocalDate start, LocalDate end) {
+        SubscriptionRatePeriod period = openPeriod(subscription, acceptedLine, quantity, start, end);
+        period.setEffectiveEndDate(null);
         return period;
     }
 

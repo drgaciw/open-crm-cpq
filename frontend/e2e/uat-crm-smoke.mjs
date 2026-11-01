@@ -29,7 +29,9 @@ async function main() {
 
   try {
     await gotoApp('/dashboard');
-    await page.getByRole('heading', { name: 'Dashboard' }).waitFor();
+    // Page titles are h1; empty-state copy is often an h3 that substring-matches the entity name
+    // (e.g. "No organizations yet" vs "Organizations") — require exact accessible name.
+    await page.getByRole('heading', { name: 'Dashboard', exact: true }).waitFor();
     ok('dashboard loads');
 
     for (const [path, heading] of [
@@ -39,7 +41,7 @@ async function main() {
       ['/deals', 'Deals'],
     ]) {
       await gotoApp(path);
-      await page.getByRole('heading', { name: heading }).waitFor();
+      await page.getByRole('heading', { name: heading, exact: true }).waitFor();
       ok(`${path} list`);
     }
 
@@ -94,7 +96,7 @@ async function main() {
     ]) {
       await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
       try {
-        await page.getByRole('heading', { name: heading }).first().waitFor({ timeout: 10000 });
+        await page.getByRole('heading', { name: heading, exact: typeof heading === 'string' }).first().waitFor({ timeout: 10000 });
         ok(`${path} shell`);
       } catch (e) {
         fail(`${path} shell`, String(e.message || e));

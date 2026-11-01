@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -25,6 +26,7 @@ public class ContactService {
     private final ContactRepository contactRepository;
     private final OrganizationRepository organizationRepository;
     private final ContactMapper contactMapper;
+    private final CrmDomainEvents domainEvents;
 
     /**
      * Create a new contact.
@@ -59,6 +61,7 @@ public class ContactService {
 
         // Save and return
         Contact saved = contactRepository.save(contact);
+        domainEvents.contactCreated(saved);
         log.info("Created contact with ID: {} and UUID: {}", saved.getId(), saved.getUuid());
 
         return contactMapper.toDto(saved);
