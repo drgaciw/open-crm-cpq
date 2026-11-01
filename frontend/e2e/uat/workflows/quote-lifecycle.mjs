@@ -18,15 +18,40 @@ import { withNativeDialog, confirmMatDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectSnackbar, expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { ApiCallError } from '../../lib/api.mjs';
 import { blockedReason } from '../../lib/preflight.mjs';
-import { ensure } from '../fixtures.mjs';
+import { ensure, uniqueName } from '../fixtures.mjs';
 import { detail, STATUS_LABELS } from '../specs/quotes.mjs';
 
 export const API = '/api/v1/quotes';
+const PRICE_BOOKS = '/api/v1/price-books';
 
 const action = (name) => detail.actions.find((a) => a.name === name);
 const form = (id) => detail.forms.find((f) => f.id === id);
 const card = (page, title) => scopeLocator(page, { kind: 'card', title });
 const squash = (text) => (text ?? '').replace(/\s+/g, ' ').trim();
+/** Match CurrencyFormatPipe (en-US + quote currency). Header edit may change currency (e.g. to GBP). */
+const formatMoney = (amount, currency) =>
+  Number(amount).toLocaleString('en-US', { style: 'currency', currency: currency || 'USD' });
+
+/** Seed a private mutable regional book; never change the environment's default. */
+async function ensureMutableDefaultPriceBook(ctx) {
+  return ensure(ctx, 'priceBook', {
+    name: uniqueName(ctx.runId, 'calc-book'),
+    region: `UAT-${ctx.runId}`,
+    currency: 'USD',
+    isDefault: false,
+  });
+}
+
+async function ensurePriceBookEntryForProduct(ctx, bookId, product) {
+  const path = `${PRICE_BOOKS}/${bookId}/entries`;
+  const entry = await ctx.api.post(path, {
+    productExternalId: String(product.id),
+    listPrice: product.listPrice ?? 25,
+    currency: product.currency || 'USD',
+  });
+  if (entry?.id === undefined) throw new Error('price book entry was created without an id');
+  ctx.api.track('priceBookEntry', entry.id, `${path}/${entry.id}`);
+}
 
 /** Page-level action banner — the header / line-item / document cards own separate banners. */
 const actionBanner = (page) => page.locator('.error-banner[role="alert"]:not(mat-card .error-banner)').first();
@@ -54,15 +79,30 @@ const quoteDto = (api, id) => api.get(`${API}/${id}`);
 
 /** One product per run; its numeric id is what the Submit configuration preflight parses. */
 const products = new Map();
+const priceBooks = new Map();
+const pricingCustomers = new Map();
 export async function productFor(ctx) {
-  if (!products.has(ctx.runId)) products.set(ctx.runId, await ensure(ctx, 'product'));
+  if (!products.has(ctx.runId)) {
+    const product = await ensure(ctx, 'product');
+    const book = priceBooks.get(ctx.runId) ?? await ensureMutableDefaultPriceBook(ctx);
+    priceBooks.set(ctx.runId, book);
+    await ensurePriceBookEntryForProduct(ctx, book.id, product);
+    products.set(ctx.runId, product);
+  }
   return products.get(ctx.runId);
 }
 
 /** A DRAFT quote with one line item whose productExternalId is a real numeric product id. */
 export async function draftWithLine(ctx, overrides = {}) {
   const product = await productFor(ctx);
-  const quote = await ensure(ctx, 'quote', overrides);
+  if (!pricingCustomers.has(ctx.runId)) {
+    pricingCustomers.set(ctx.runId, await ensure(ctx, 'pricingCustomer'));
+  }
+  const quote = await ensure(ctx, 'quote', {
+    customerExternalId: pricingCustomers.get(ctx.runId).externalId,
+    region: priceBooks.get(ctx.runId).region,
+    ...overrides,
+  });
   try {
     await ctx.api.post(`${API}/${quote.id}/line-items`, {
       productExternalId: String(product.id), productName: product.name, listPrice: 25, quantity: 2,
@@ -460,8 +500,10 @@ export async function runLineItems(ctx, quote) {
         if (JSON.stringify(headers.map((h) => h.toLowerCase())) !== JSON.stringify(table.columns.map((c) => c.toLowerCase()))) {
           throw new Error(`line columns are [${headers.join(', ')}]`);
         }
+        const dto = await quoteDto(api, id);
+        const money = formatMoney(25, dto.currency);
         const text = squash(await row().innerText());
-        for (const want of ['3', '$25.00']) if (!text.includes(want)) throw new Error(`row lacks "${want}": "${text}"`);
+        for (const want of ['3', money]) if (!text.includes(want)) throw new Error(`row lacks "${want}": "${text}"`);
         const details = squash(await card(page, 'Quote details').innerText());
         if (!/Line items 1\b/i.test(details)) throw new Error(`details card line count is wrong: "${details}"`);
         return text;
@@ -470,14 +512,15 @@ export async function runLineItems(ctx, quote) {
     {
       id: 'quotes.lines.edit.cancel-discards',
       run: async () => {
-        await row().getByRole('button', { name: edit.open.action, exact: true }).click();
-        const name = edit.fields[0];
-        await control(row(), name).waitFor({ state: 'visible' });
-        await fill(page, row(), name, 'UAT discarded');
-        // After typing, the row no longer contains the product name as *text*, so re-find by id.
+        // Scope by product id before Edit: once the Name cell is an <input>, hasText(productName)
+        // no longer matches the row (input values are not element text).
         const editing = scopeLocator(page, { kind: 'row', rowText: String(state.product.id), within: edit.scope.within });
+        await editing.getByRole('button', { name: edit.open.action, exact: true }).click();
+        const name = edit.fields[0];
+        await control(editing, name).waitFor({ state: 'visible' });
+        await fill(page, editing, name, 'UAT discarded');
         await editing.getByRole('button', { name: edit.cancel.name, exact: true }).click();
-        await row().getByRole('button', { name: edit.open.action, exact: true }).waitFor({ state: 'visible' });
+        await editing.getByRole('button', { name: edit.open.action, exact: true }).waitFor({ state: 'visible' });
         const [line] = await lines();
         if (line.productName !== state.product.name) throw new Error(`Cancel persisted "${line.productName}"`);
       },
@@ -497,7 +540,8 @@ export async function runLineItems(ctx, quote) {
           .map((f) => `${f.label}: typed "${f.editSample}", API holds "${readPath(line, f.persist.apiPath)}"`);
         if (problems.length) throw new Error(problems.join('; '));
         const text = squash(await editing.innerText());
-        if (!text.includes('UAT line renamed') || !text.includes('$40.00')) throw new Error(`row did not refresh: "${text}"`);
+        const money = formatMoney(40, (await quoteDto(api, id)).currency);
+        if (!text.includes('UAT line renamed') || !text.includes(money)) throw new Error(`row did not refresh: "${text}"`);
         return text;
       },
     },
@@ -551,7 +595,7 @@ export async function runCalculate(ctx) {
     const dto = await quoteDto(api, quote.id);
     if (!(Number(dto.totalAmount) > 0)) throw new Error(`Calculate returned 2xx but totalAmount is ${dto.totalAmount}`);
     const shown = squash(await card(page, 'Quote details').innerText());
-    const money = Number(dto.totalAmount).toLocaleString('en-US', { style: 'currency', currency: dto.currency || 'USD' });
+    const money = formatMoney(dto.totalAmount, dto.currency);
     await waitUntil(async () => squash(await card(page, 'Quote details').innerText()), (t) => t.includes(money), {
       timeoutMs: 5000, describe: () => `details card does not show ${money}: "${shown}"`,
     });

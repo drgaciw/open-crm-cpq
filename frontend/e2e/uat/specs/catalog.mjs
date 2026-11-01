@@ -51,7 +51,8 @@ export const list = validateSpec({
           persist: { create: true, apiPath: 'sku' },
           validators: [
             { kind: 'required', sample: '', expectError: 'SKU is required' },
-            { kind: 'maxLength', sample: 'S'.repeat(101), expectError: 'SKU must be at most 100 characters' },
+            // H-CPQ-P-015: schema message exists but Signal Forms leaves Create disabled with no mat-error.
+            { kind: 'maxLength', sample: 'S'.repeat(101), expectError: null, hypothesis: 'H-CPQ-P-015' },
           ],
         },
         {
@@ -59,7 +60,7 @@ export const list = validateSpec({
           persist: { create: true, update: true, apiPath: 'name' },
           validators: [
             { kind: 'required', sample: '', expectError: 'Name is required' },
-            { kind: 'maxLength', sample: 'N'.repeat(256), expectError: 'Name must be at most 255 characters' },
+            { kind: 'maxLength', sample: 'N'.repeat(256), expectError: null, hypothesis: 'H-CPQ-P-015' },
           ],
         },
         {

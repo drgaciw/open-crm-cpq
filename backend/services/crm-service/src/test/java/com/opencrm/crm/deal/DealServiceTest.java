@@ -6,6 +6,7 @@ import com.opencrm.crm.contact.Contact;
 import com.opencrm.crm.contact.ContactRepository;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +45,9 @@ class DealServiceTest {
 
     @Mock
     private DealCurrencyConverter currencyConverter;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private DealService dealService;
@@ -263,6 +267,43 @@ class DealServiceTest {
     @Nested
     @DisplayName("update")
     class Update {
+
+        @Test
+        void updateToWonUsesClosePathAfterMappingMoney() {
+            assertTerminalUpdate(DealStage.WON, 100);
+        }
+
+        @Test
+        void updateToLostUsesClosePathAfterMappingMoney() {
+            assertTerminalUpdate(DealStage.LOST, 0);
+        }
+
+        private void assertTerminalUpdate(DealStage stage, int probability) {
+            updateRequest.setStage(stage);
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            doAnswer(inv -> {
+                Deal target = inv.getArgument(1);
+                target.setStage(stage);
+                target.setAmount(new BigDecimal("2000.00"));
+                target.setCurrency("GBP");
+                return null;
+            }).when(dealMapper).updateEntity(updateRequest, deal);
+            doAnswer(inv -> {
+                Deal closed = inv.getArgument(0);
+                assertThat(closed.getAmount()).isEqualByComparingTo("2000.00");
+                assertThat(closed.getCurrency()).isEqualTo("GBP");
+                assertThat(closed.getProbability()).isEqualTo(probability);
+                return null;
+            }).when(currencyConverter).freeze(deal);
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            dealService.update(1L, updateRequest);
+
+            verify(currencyConverter).freeze(deal);
+            verify(currencyConverter, never()).freezeIfNeeded(any(), any(), any());
+            verify(domainEvents).dealTransition(deal, DealStage.PROSPECTING);
+        }
 
         @Test
         @DisplayName("should update deal successfully")

@@ -335,13 +335,13 @@ async function main() {
       await page.reload({ waitUntil: 'domcontentloaded' });
     }
     await page
-      .getByRole('heading', { name: 'Leads' })
+      .getByRole('heading', { name: 'Leads', exact: true })
       .first()
       .waitFor({ timeout: 15000 })
       .catch(() => {});
     record(
       'reload-storm-leads',
-      (await page.getByRole('heading', { name: 'Leads' }).count()) > 0 ? 'PASS' : 'FAIL',
+      (await page.getByRole('heading', { name: 'Leads', exact: true }).count()) > 0 ? 'PASS' : 'FAIL',
       `url=${page.url()}`,
     );
 
