@@ -16,6 +16,7 @@ import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetAuditEvent;
@@ -186,6 +187,10 @@ public final class EventContractRegistry {
     public static final EventContract ACCOUNTS_MERGED_V1 = published(
             "AccountsMerged", "crm-service", KafkaTopics.ACCOUNTS_MERGED, AccountsMergedEvent.class);
 
+    /** DRG-487 / BC-13-03. Advisory solution from a guided selling session. Does not close the deal. */
+    public static final EventContract SOLUTION_DERIVED_V1 = published(
+            "SolutionDerived", "crm-service", KafkaTopics.SOLUTION_DERIVED, SolutionDerivedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -213,7 +218,8 @@ public final class EventContractRegistry {
             ASSET_TERMINATED_V1,
             ASSET_SUPERSEDED_V1,
             HIERARCHY_CHANGED_V1,
-            ACCOUNTS_MERGED_V1);
+            ACCOUNTS_MERGED_V1,
+            SOLUTION_DERIVED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

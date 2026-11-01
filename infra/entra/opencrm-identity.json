@@ -105,6 +105,12 @@
       "serviceAccount": "ai-service",
       "appRoles": [],
       "calls": "gateway bearer lane (user token, else service token)"
+    },
+    {
+      "service": "crm-service",
+      "serviceAccount": "crm-service",
+      "appRoles": [],
+      "calls": "configuration-engine /api/v1/configurations (user token, else service token) for guided selling"
     }
   ],
   "everyService": {
