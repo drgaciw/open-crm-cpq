@@ -42,4 +42,9 @@ public final class KafkaTopics {
     public static final String SUBSCRIPTION_RAMP_APPLIED = "cpq.subscription.ramp.applied";
     public static final String SUBSCRIPTION_RENEWAL_ELIGIBLE = "cpq.subscription.renewal.eligible";
     public static final String CONTRACT_EXECUTED = "cpq.contract.executed";
+
+    /** DRG-654. Installed-base asset created from an activated contract line. */
+    public static final String ASSET_CREATED = "cpq.asset.created";
+    /** DRG-654. Audit of an asset creation. */
+    public static final String ASSET_AUDIT = "cpq.asset.audit";
 }

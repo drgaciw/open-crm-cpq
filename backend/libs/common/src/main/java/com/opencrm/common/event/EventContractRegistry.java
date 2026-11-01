@@ -11,6 +11,8 @@ import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
+import com.opencrm.common.event.dto.AssetAuditEvent;
+import com.opencrm.common.event.dto.AssetCreatedEvent;
 
 import java.util.List;
 import java.util.Objects;
@@ -134,6 +136,14 @@ public final class EventContractRegistry {
     public static final EventContract RULE_SET_PUBLISHED_V1 = reserved(
             "RuleSetPublished", "pricing-service", KafkaTopics.RULE_SET_PUBLISHED, null);
 
+    /** DRG-654. One asset created per activated contract line. */
+    public static final EventContract ASSET_CREATED_V1 = published(
+            "AssetCreated", "contract-asset-management", KafkaTopics.ASSET_CREATED, AssetCreatedEvent.class);
+
+    /** DRG-654. Audit of that creation, same transaction, separate contract. */
+    public static final EventContract ASSET_AUDIT_RECORDED_V1 = published(
+            "AssetAuditRecorded", "contract-asset-management", KafkaTopics.ASSET_AUDIT, AssetAuditEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -150,7 +160,9 @@ public final class EventContractRegistry {
             CONTRACT_EXECUTED_V1,
             APPROVAL_STEP_DECIDED_V1,
             APPROVAL_OUTCOME_COMPLETED_V1,
-            RULE_SET_PUBLISHED_V1);
+            RULE_SET_PUBLISHED_V1,
+            ASSET_CREATED_V1,
+            ASSET_AUDIT_RECORDED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
