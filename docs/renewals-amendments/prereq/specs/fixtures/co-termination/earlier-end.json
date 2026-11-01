@@ -1,0 +1,114 @@
+{
+    "id": "co-term-earlier-end",
+    "cluster": "co-termination",
+    "story": "DRG-638",
+    "status": "per DRG-603 Accepted (PR #623)",
+    "exampleFigures": true,
+    "currency": "USD",
+    "scenario": "earlier-end",
+    "proration": {
+        "method": "day-stub",
+        "implementation": "QuoteContinuationPolicy.plan",
+        "adr": "DRG-603",
+        "acceptance": "per DRG-603 Accepted (PR #623)",
+        "pullRequest": "https://github.com/drgaciw/open-crm-cpq/pull/623",
+        "roundingMode": "HALF_UP",
+        "scale": 2
+    },
+    "coTermMode": {
+        "mode": "EarliestEnd",
+        "options": [
+            "LatestEnd",
+            "EarliestEnd",
+            "None",
+            "AlignToAgreement",
+            "AlignToDate"
+        ],
+        "defaultSelected": false,
+        "status": "Proposed",
+        "ownerDecision": "___ (drg, time)"
+    },
+    "effectiveDate": "2026-07-15",
+    "billingAnchorDate": "2026-01-01",
+    "agreementsRemainSeparate": true,
+    "lines": [
+        {
+            "lineId": "line-saas",
+            "agreementId": "agr-saas",
+            "sku": "Analytics Cloud",
+            "inChange": true,
+            "netUnitPrice": "40.00",
+            "requestedQuantity": 20,
+            "priorEnd": "2026-12-31",
+            "resultingEnd": "2026-09-30",
+            "billingAnchorDate": "2026-01-01",
+            "effectiveDate": "2026-07-15",
+            "expected": {
+                "monthly": "800.00",
+                "billingPeriodStart": "2026-07-01",
+                "billingPeriodEnd": "2026-07-31",
+                "stubDays": 17,
+                "periodDays": 31,
+                "periodAmount": "438.71",
+                "formula": "800.00 x 17 / 31 = 438.71 HALF_UP scale 2",
+                "fullMonths": [
+                    {
+                        "start": "2026-08-01",
+                        "end": "2026-08-31",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-09-01",
+                        "end": "2026-09-30",
+                        "amount": "800.00",
+                        "dayProrated": false
+                    }
+                ],
+                "fullMonthTotal": "1600.00",
+                "tcv": "2038.71",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        },
+        {
+            "lineId": "line-onprem",
+            "agreementId": "agr-onprem",
+            "sku": "Reporting Server",
+            "inChange": true,
+            "netUnitPrice": "25.00",
+            "requestedQuantity": 10,
+            "priorEnd": "2026-09-30",
+            "resultingEnd": "2026-09-30",
+            "billingAnchorDate": "2026-01-01",
+            "effectiveDate": "2026-07-15",
+            "expected": {
+                "monthly": "250.00",
+                "billingPeriodStart": "2026-07-01",
+                "billingPeriodEnd": "2026-07-31",
+                "stubDays": 17,
+                "periodDays": 31,
+                "periodAmount": "137.10",
+                "formula": "250.00 x 17 / 31 = 137.10 HALF_UP scale 2",
+                "fullMonths": [
+                    {
+                        "start": "2026-08-01",
+                        "end": "2026-08-31",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    },
+                    {
+                        "start": "2026-09-01",
+                        "end": "2026-09-30",
+                        "amount": "250.00",
+                        "dayProrated": false
+                    }
+                ],
+                "fullMonthTotal": "500.00",
+                "tcv": "637.10",
+                "creditAmount": "0.00",
+                "creditEmitted": false
+            }
+        }
+    ]
+}
