@@ -44,13 +44,17 @@ describe('OrganizationDetailComponent account UX', () => {
     httpMock.verify();
   });
 
-  it('loads the new account and clears stale data when the route id changes', () => {
+  it('loads the new account and clears stale data when the id signal input changes', () => {
+    const orgService = TestBed.inject(OrganizationService);
+    const getByIdSpy = vi.spyOn(orgService, 'getById');
     const oldAccount = httpMock.expectOne('/api/v1/organizations/7');
     const oldContacts = httpMock.expectOne((r) => r.url === '/api/v1/organizations/7/contacts');
     const oldDeals = httpMock.expectOne((r) => r.url === '/api/v1/deals');
     const oldHierarchy = httpMock.expectOne('/api/v1/organizations/7/hierarchy');
+    getByIdSpy.mockClear();
     fixture.componentRef.setInput('id', '8');
     fixture.detectChanges();
+    expect(getByIdSpy).toHaveBeenCalledWith(8);
     expect(oldAccount.cancelled).toBe(true);
     expect(oldContacts.cancelled).toBe(true);
     expect(oldDeals.cancelled).toBe(true);

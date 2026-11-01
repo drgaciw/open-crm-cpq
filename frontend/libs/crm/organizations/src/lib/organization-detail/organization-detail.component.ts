@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnChanges, input, ChangeDetectionStrategy, signal, effect, Injector } from '@angular/core';
+import { Component, inject, OnInit, input, ChangeDetectionStrategy, signal, effect, Injector, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -333,7 +333,7 @@ import { OrganizationService } from '../organization.service';
     .value { font-size: 0.95rem; }
   `],
 })
-export class OrganizationDetailComponent implements OnInit, OnChanges {
+export class OrganizationDetailComponent implements OnInit {
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -341,6 +341,12 @@ export class OrganizationDetailComponent implements OnInit, OnChanges {
   id = input.required<string>();
   readonly parentIdDraft = signal('');
   private quotesLoadedFor: number | null = null;
+
+  /** Reload when route `:id` changes (component input binding; not ngOnChanges). */
+  private readonly reloadWhenRouteIdChanges = effect(() => {
+    const _id = this.id();
+    untracked(() => this.loadAccount());
+  });
 
   ngOnInit(): void {
     effect(() => {
@@ -352,10 +358,6 @@ export class OrganizationDetailComponent implements OnInit, OnChanges {
       this.quotesLoadedFor = org.id;
       this.orgService.loadRelatedQuotes(org);
     }, { injector: this.injector });
-  }
-
-  ngOnChanges(): void {
-    this.loadAccount();
   }
 
   private loadAccount(): void {
