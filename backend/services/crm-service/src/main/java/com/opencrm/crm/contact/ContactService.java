@@ -50,7 +50,7 @@ public class ContactService {
         Contact contact = contactMapper.toEntity(request);
 
         if (request.getOrganizationId() != null) {
-            contact.setOrganization(requireActiveOrganization(OrganizationAccountIds.fromExternalId(request.getOrganizationId())));
+            contact.setOrganization(requireActiveOrganization(OrganizationAccountIds.fromExternalId(request.getOrganizationId(), organizationRepository)));
         }
 
         // Save and return
@@ -124,9 +124,9 @@ public class ContactService {
         }
 
         if (request.getOrganizationId() != null) {
-            AccountId accountId = OrganizationAccountIds.fromExternalId(request.getOrganizationId());
+            AccountId accountId = OrganizationAccountIds.fromExternalId(request.getOrganizationId(), organizationRepository);
             if (contact.getOrganization() == null ||
-                !accountId.equals(AccountId.of(contact.getOrganization().getId()))) {
+                !accountId.equals(AccountId.of(contact.getOrganization().getUuid()))) {
                 contact.setOrganization(requireActiveOrganization(accountId));
             }
         }
@@ -195,17 +195,16 @@ public class ContactService {
     public Page<ContactDto> getByOrganization(AccountId accountId, Pageable pageable) {
         log.debug("Fetching contacts for organization ID: {}", accountId.value());
 
-        Long organizationId = accountId.value();
-        if (!organizationRepository.existsById(organizationId)) {
-            throw new ResourceNotFoundException("Organization", organizationId);
-        }
+        Organization organization = organizationRepository.findByUuidIgnoreCase(accountId.value())
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", accountId.value()));
+        Long organizationId = organization.getId();
 
         Page<Contact> contacts = contactRepository.findByOrganizationIdAndDeletedFalse(organizationId, pageable);
         return contacts.map(contactMapper::toDto);
     }
 
     private Organization requireActiveOrganization(AccountId accountId) {
-        Organization organization = organizationRepository.findById(accountId.value())
+        Organization organization = organizationRepository.findByUuidIgnoreCase(accountId.value())
             .orElseThrow(() -> new ResourceNotFoundException("Organization", accountId.value()));
         if (organization.isDeleted()) {
             throw new BusinessException("Cannot link to deleted organization", "ORGANIZATION_DELETED");

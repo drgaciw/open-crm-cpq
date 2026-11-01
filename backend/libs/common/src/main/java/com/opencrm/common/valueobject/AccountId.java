@@ -1,22 +1,29 @@
 package com.opencrm.common.valueobject;
 
+import java.util.UUID;
+
 /**
- * Shared-kernel identifier for an account. An account is the CRM organization, and this wraps that
- * row's existing {@code Long} id. It is not a JPA embeddable and it is not a Spring bean: JSON
- * fields stay {@code Long}.
+ * Shared-kernel account identity: the CRM organization's public UUID, not its local numeric row ID.
  */
-public record AccountId(Long value) {
+public record AccountId(String value) {
 
     public AccountId {
         if (value == null) {
             throw new IllegalArgumentException("Account id cannot be null");
         }
-        if (value <= 0) {
-            throw new IllegalArgumentException("Account id must be positive");
+        String canonical;
+        try {
+            canonical = UUID.fromString(value).toString();
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Account id must be a UUID", ex);
         }
+        if (!canonical.equalsIgnoreCase(value)) {
+            throw new IllegalArgumentException("Account id must be a canonical UUID");
+        }
+        value = canonical;
     }
 
-    public static AccountId of(Long value) {
+    public static AccountId of(String value) {
         return new AccountId(value);
     }
 }

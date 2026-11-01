@@ -62,7 +62,7 @@ public class OrganizationController {
         @Parameter(description = "Organization ID")
         @PathVariable Long id
     ) {
-        OrganizationDto organization = organizationService.getById(OrganizationAccountIds.fromExternalId(id));
+        OrganizationDto organization = organizationService.getById(organizationService.resolveAccountId(id));
         return ApiResponse.success(organization);
     }
 
@@ -73,7 +73,7 @@ public class OrganizationController {
         @PathVariable Long id,
         @Valid @RequestBody OrganizationUpdateRequest request
     ) {
-        OrganizationDto organization = organizationService.update(OrganizationAccountIds.fromExternalId(id), request);
+        OrganizationDto organization = organizationService.update(organizationService.resolveAccountId(id), request);
         return ApiResponse.success(organization, "Organization updated successfully");
     }
 
@@ -83,7 +83,7 @@ public class OrganizationController {
         @Parameter(description = "Organization ID")
         @PathVariable Long id
     ) {
-        organizationService.delete(OrganizationAccountIds.fromExternalId(id));
+        organizationService.delete(organizationService.resolveAccountId(id));
         return ApiResponse.success(null, "Deleted successfully");
     }
 
@@ -115,7 +115,7 @@ public class OrganizationController {
         @PathVariable Long id,
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<ContactDto> contacts = organizationService.getContacts(OrganizationAccountIds.fromExternalId(id), pageable);
+        Page<ContactDto> contacts = organizationService.getContacts(organizationService.resolveAccountId(id), pageable);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
             .page(contacts.getNumber())

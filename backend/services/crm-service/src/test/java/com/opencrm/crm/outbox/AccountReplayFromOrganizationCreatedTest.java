@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -26,6 +27,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -89,6 +91,21 @@ class AccountReplayFromOrganizationCreatedTest extends BaseIntegrationTest {
         assertThat(once).isEqualTo(accountsFromApi());
     }
 
+    @Test
+    void contactEventUsesSameAccountUuidWhileRestKeepsNumericOrganizationId() throws Exception {
+        CrmOutboxHttp.Created account = http.createOrganization("Contact account");
+        String response = mockMvc.perform(post("/api/v1/contacts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Jane\",\"lastName\":\"Doe\",\"organizationId\":" + account.id() + "}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        JsonNode contact = objectMapper.readTree(response).get("data");
+        assertThat(contact.get("organizationId").asLong()).isEqualTo(account.id());
+        var events = rows.forAggregate(contact.get("uuid").asString(), CrmOutboxTopics.CONTACT_CREATED);
+        assertThat(events).hasSize(1);
+        JsonNode event = objectMapper.readTree(rows.payload(events.getFirst()));
+        assertThat(AccountId.of(event.get("organizationId").asString())).isEqualTo(AccountId.of(account.uuid()));
+    }
+
     private List<ConsumerRecord<String, String>> readStream(
             String groupPrefix, CrmOutboxHttp.Created first, CrmOutboxHttp.Created second) {
         List<ConsumerRecord<String, String>> records = new ArrayList<>();
@@ -107,9 +124,7 @@ class AccountReplayFromOrganizationCreatedTest extends BaseIntegrationTest {
             JsonNode payload = objectMapper.readTree(record.value());
             String uuid = payload.get("organizationId").asString();
             String name = payload.get("name").asString();
-            Long id = jdbcTemplate.queryForObject(
-                    "SELECT id FROM organizations WHERE uuid = ?", Long.class, uuid);
-            AccountId accountId = AccountId.of(id);
+            AccountId accountId = AccountId.of(uuid);
             String view = uuid + "\n" + name;
             String existing = projection.putIfAbsent(accountId, view);
             if (existing != null) {
@@ -128,7 +143,7 @@ class AccountReplayFromOrganizationCreatedTest extends BaseIntegrationTest {
                 .get("data");
         Map<AccountId, String> accounts = new LinkedHashMap<>();
         for (JsonNode row : data) {
-            AccountId accountId = AccountId.of(row.get("id").asLong());
+            AccountId accountId = AccountId.of(row.get("uuid").asString());
             accounts.put(accountId, row.get("uuid").asString() + "\n" + row.get("name").asString());
         }
         return accounts;

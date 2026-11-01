@@ -28,26 +28,19 @@ public interface OrganizationMapper {
 
     /**
      * Convert Organization entity to OrganizationDto.
-     * {@code id} stays a {@code Long} on the wire and is read from {@link AccountId}.
+     * The legacy numeric {@code id} and public UUID remain unchanged on the wire.
      */
-    @Mapping(target = "id", source = ".", qualifiedByName = "accountIdValue")
     @Mapping(target = "contactCount", expression = "java(entity.getContactCount() != null ? entity.getContactCount() : 0)")
     OrganizationDto toDto(Organization entity);
 
     /**
-     * Shared-kernel identifier for this organization. Null until the row has an id.
+     * Shared-kernel identifier for this organization. Null until a UUID has been assigned.
      */
     default AccountId accountId(Organization entity) {
-        if (entity == null || entity.getId() == null) {
+        if (entity == null || entity.getUuid() == null) {
             return null;
         }
-        return AccountId.of(entity.getId());
-    }
-
-    @Named("accountIdValue")
-    default Long accountIdValue(Organization entity) {
-        AccountId accountId = accountId(entity);
-        return accountId == null ? null : accountId.value();
+        return AccountId.of(entity.getUuid());
     }
 
     /**

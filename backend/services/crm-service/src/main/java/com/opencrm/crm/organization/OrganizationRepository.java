@@ -20,6 +20,9 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
      */
     Optional<Organization> findByUuid(String uuid);
 
+    /** Legacy imports may have stored canonical UUIDs in uppercase. */
+    Optional<Organization> findByUuidIgnoreCase(String uuid);
+
     /**
      * Find organizations by name (case-insensitive partial match).
      */

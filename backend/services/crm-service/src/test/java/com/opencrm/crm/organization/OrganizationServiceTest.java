@@ -100,12 +100,29 @@ class OrganizationServiceTest {
     class GetById {
 
         @Test
+        void resolvesLegacyNumericIdToPublicUuid() {
+            String uuid = "550e8400-e29b-41d4-a716-446655440000";
+            organization.setUuid(uuid);
+            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            assertThat(organizationService.resolveAccountId(1L)).isEqualTo(AccountId.of(uuid));
+        }
+
+        @Test
+        void legacyLookupReturnsNotFoundForDeletedOrganization() {
+            organization.setDeleted(true);
+            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            assertThatThrownBy(() -> organizationService.resolveAccountId(1L))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("1");
+        }
+
+        @Test
         @DisplayName("should return organization when found")
         void shouldReturnOrganization() {
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
 
-            OrganizationDto result = organizationService.getById(AccountId.of(1L));
+            OrganizationDto result = organizationService.getById(AccountId.of("550e8400-e29b-41d4-a716-446655440000"));
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(1L);
@@ -114,9 +131,9 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should throw when organization not found")
         void shouldThrowWhenNotFound() {
-            when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440999")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.getById(AccountId.of(999L)))
+            assertThatThrownBy(() -> organizationService.getById(AccountId.of("550e8400-e29b-41d4-a716-446655440999")))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -124,9 +141,9 @@ class OrganizationServiceTest {
         @DisplayName("should throw when organization is deleted")
         void shouldThrowWhenDeleted() {
             organization.setDeleted(true);
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.getById(AccountId.of(1L)))
+            assertThatThrownBy(() -> organizationService.getById(AccountId.of("550e8400-e29b-41d4-a716-446655440000")))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -174,11 +191,11 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should update organization successfully")
         void shouldUpdateOrganization() {
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             when(organizationRepository.save(organization)).thenReturn(organization);
             when(organizationMapper.toDto(organization)).thenReturn(organizationDto);
 
-            OrganizationDto result = organizationService.update(AccountId.of(1L), updateRequest);
+            OrganizationDto result = organizationService.update(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), updateRequest);
 
             assertThat(result).isNotNull();
             verify(organizationMapper).updateEntity(updateRequest, organization);
@@ -188,9 +205,9 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should throw when organization not found on update")
         void shouldThrowWhenNotFoundOnUpdate() {
-            when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440999")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.update(AccountId.of(999L), updateRequest))
+            assertThatThrownBy(() -> organizationService.update(AccountId.of("550e8400-e29b-41d4-a716-446655440999"), updateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -198,9 +215,9 @@ class OrganizationServiceTest {
         @DisplayName("should throw when updating deleted organization")
         void shouldThrowWhenUpdatingDeleted() {
             organization.setDeleted(true);
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.update(AccountId.of(1L), updateRequest))
+            assertThatThrownBy(() -> organizationService.update(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), updateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -212,9 +229,9 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should soft delete organization")
         void shouldSoftDeleteOrganization() {
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
-            organizationService.delete(AccountId.of(1L));
+            organizationService.delete(AccountId.of("550e8400-e29b-41d4-a716-446655440000"));
 
             assertThat(organization.isDeleted()).isTrue();
             verify(organizationRepository).save(organization);
@@ -223,9 +240,9 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should throw when deleting non-existent organization")
         void shouldThrowWhenDeletingNonExistent() {
-            when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440999")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.delete(AccountId.of(999L)))
+            assertThatThrownBy(() -> organizationService.delete(AccountId.of("550e8400-e29b-41d4-a716-446655440999")))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -233,9 +250,9 @@ class OrganizationServiceTest {
         @DisplayName("should throw when deleting already deleted organization")
         void shouldThrowWhenAlreadyDeleted() {
             organization.setDeleted(true);
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.delete(AccountId.of(1L)))
+            assertThatThrownBy(() -> organizationService.delete(AccountId.of("550e8400-e29b-41d4-a716-446655440000")))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
@@ -312,24 +329,24 @@ class OrganizationServiceTest {
         @Test
         @DisplayName("should get contacts for organization")
         void shouldGetContacts() {
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
             Page<ContactDto> contactPage = new PageImpl<>(List.of(
                     ContactDto.builder().id(1L).firstName("John").lastName("Doe").build()
             ));
-            when(contactService.getByOrganization(AccountId.of(1L), pageable)).thenReturn(contactPage);
+            when(contactService.getByOrganization(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), pageable)).thenReturn(contactPage);
 
-            Page<ContactDto> result = organizationService.getContacts(AccountId.of(1L), pageable);
+            Page<ContactDto> result = organizationService.getContacts(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), pageable);
 
             assertThat(result.getContent()).hasSize(1);
-            verify(contactService).getByOrganization(AccountId.of(1L), pageable);
+            verify(contactService).getByOrganization(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), pageable);
         }
 
         @Test
         @DisplayName("should throw when organization not found for getContacts")
         void shouldThrowWhenOrgNotFound() {
-            when(organizationRepository.findById(999L)).thenReturn(Optional.empty());
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440999")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of(999L), pageable))
+            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of("550e8400-e29b-41d4-a716-446655440999"), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -337,9 +354,9 @@ class OrganizationServiceTest {
         @DisplayName("should throw when organization is deleted for getContacts")
         void shouldThrowWhenOrgDeletedForGetContacts() {
             organization.setDeleted(true);
-            when(organizationRepository.findById(1L)).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByUuidIgnoreCase("550e8400-e29b-41d4-a716-446655440000")).thenReturn(Optional.of(organization));
 
-            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of(1L), pageable))
+            assertThatThrownBy(() -> organizationService.getContacts(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), pageable))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }

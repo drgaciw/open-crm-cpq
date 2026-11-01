@@ -8,7 +8,6 @@ import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,6 +26,17 @@ public class OrganizationService {
     private final OrganizationMapper organizationMapper;
     private final ContactService contactService;
     private final CrmDomainEvents domainEvents;
+
+    /** Resolve the legacy numeric API ID without exposing it as a cross-service account ID. */
+    @Transactional(readOnly = true)
+    public AccountId resolveAccountId(Long legacyId) {
+        Organization organization = organizationRepository.findById(legacyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", legacyId));
+        if (organization.isDeleted()) {
+            throw new ResourceNotFoundException("Organization", legacyId);
+        }
+        return AccountId.of(organization.getUuid());
+    }
 
     /**
      * Create a new organization.
@@ -48,7 +58,6 @@ public class OrganizationService {
     /**
      * Get organization by ID.
      */
-    @Cacheable(value = "organizations", key = "#id.value()")
     @Transactional(readOnly = true)
     public OrganizationDto getById(AccountId id) {
         log.debug("Fetching organization by ID: {}", id.value());
@@ -143,8 +152,8 @@ public class OrganizationService {
     }
 
     private Organization requireActive(AccountId id) {
-        Long rawId = id.value();
-        Organization organization = organizationRepository.findById(rawId)
+        String rawId = id.value();
+        Organization organization = organizationRepository.findByUuidIgnoreCase(rawId)
             .orElseThrow(() -> new ResourceNotFoundException("Organization", rawId));
         if (organization.isDeleted()) {
             throw new ResourceNotFoundException("Organization", rawId);
