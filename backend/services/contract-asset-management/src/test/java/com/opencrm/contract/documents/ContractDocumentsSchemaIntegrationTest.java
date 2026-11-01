@@ -120,6 +120,30 @@ class ContractDocumentsSchemaIntegrationTest {
                     rs.getString("is_nullable") + " " + rs.getString("data_type"));
         });
         assertThat(actual).containsExactlyInAnyOrderEntriesOf(expectedColumns());
+        Map<String, Integer> replayWidths = new HashMap<>();
+        jdbc.query("""
+                SELECT column_name, character_maximum_length FROM information_schema.columns
+                WHERE table_schema = 'contract' AND table_name = 'amendment_application_units'
+                  AND column_name IN ('attempt_pin_fingerprint', 'block_reason')
+                """, rs -> {
+            replayWidths.put(rs.getString("column_name"), rs.getInt("character_maximum_length"));
+        });
+        assertThat(replayWidths).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "attempt_pin_fingerprint", 67, "block_reason", 64));
+        String revisionConstraint = jdbc.queryForObject("""
+                SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = 'contract' AND t.relname = 'amendment_application_units'
+                  AND c.conname = 'chk_apply_attempt_revision' AND c.contype = 'c' AND c.convalidated
+                """, String.class);
+        String pinConstraint = jdbc.queryForObject("""
+                SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = 'contract' AND t.relname = 'amendment_application_units'
+                  AND c.conname = 'chk_apply_attempt_pin' AND c.contype = 'c' AND c.convalidated
+                """, String.class);
+        assertThat(revisionConstraint).contains("attempt_revision_no >= 1");
+        assertThat(pinConstraint).contains("^v1:[0-9a-f]{64}$");
         assertThat(jdbc.queryForObject("""
                 SELECT is_nullable || ' ' || data_type FROM information_schema.columns
                 WHERE table_schema = 'contract' AND table_name = 'subscriptions' AND column_name = 'contract_id'
@@ -501,7 +525,9 @@ class ContractDocumentsSchemaIntegrationTest {
         put(columns, "amendment_application_units", "YES bigint", "applied_commercial_revision");
         put(columns, "amendment_application_units", "NO character varying",
                 "target_type", "target_ref", "status", "created_by");
-        put(columns, "amendment_application_units", "YES character varying", "apply_key_digest", "updated_by");
+        put(columns, "amendment_application_units", "YES character varying", "apply_key_digest", "updated_by",
+                "attempt_pin_fingerprint", "block_reason");
+        put(columns, "amendment_application_units", "YES integer", "attempt_revision_no");
         put(columns, "amendment_application_units", "NO timestamp with time zone", "created_at");
         put(columns, "amendment_application_units", "YES timestamp with time zone", "updated_at");
 
