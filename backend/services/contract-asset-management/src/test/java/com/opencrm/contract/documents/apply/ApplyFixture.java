@@ -70,6 +70,7 @@ final class ApplyFixture {
         document = AmendmentDocument.builder()
                 .id(UUID.randomUUID())
                 .tenantId(tenantId)
+                .contractId(UUID.randomUUID())
                 .status(AmendmentDocumentStatus.EXECUTED)
                 .currentRevisionNo(1)
                 .executedRevisionNo(1)
@@ -84,6 +85,7 @@ final class ApplyFixture {
         AmendmentEventWriter writer = mock(AmendmentEventWriter.class);
         AmendmentDocumentService documentService = mock(AmendmentDocumentService.class);
         DocumentApplyGateway gateway = mock(DocumentApplyGateway.class);
+        when(gateway.targetBelongsToContract(anyLong(), any(), any())).thenReturn(true);
 
         when(documents.findById(any())).thenAnswer(invocation -> {
             UUID id = invocation.getArgument(0);

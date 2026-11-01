@@ -51,6 +51,16 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
     }
 
     @Override
+    public boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId) {
+        if (contractId == null || tenantId == null) return false;
+        return !jdbc.query("""
+                select c.id from subscriptions s join contracts c on c.id = s.contract_id
+                where s.id = ? and s.is_deleted = false and c.id = ? and c.tenant_id = ?
+                for share of c
+                """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId, contractId, tenantId).isEmpty();
+    }
+
+    @Override
     public List<ApplyLine> lines(UUID documentId, int revisionNo) {
         return jdbc.query("""
                 select id, line_no, application_unit_no, action_code, source_accepted_line_uuid, end_qty,
