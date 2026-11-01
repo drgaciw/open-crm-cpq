@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -53,23 +54,26 @@ public class LifecycleChangeService {
     private final SubscriptionTargetReader subscriptions;
     private final PricingServiceClient pricing;
     private final ObjectMapper json;
+    private final LifecycleCreateLock createLock;
 
     public LifecycleChangeService(LifecycleChangeRepository changes, LifecycleChangeAuditWriter audit,
                                   SubscriptionTargetReader subscriptions, PricingServiceClient pricing,
-                                  ObjectMapper json) {
+                                  ObjectMapper json, LifecycleCreateLock createLock) {
         this.changes = changes;
         this.audit = audit;
         this.subscriptions = subscriptions;
         this.pricing = pricing;
         this.json = json;
+        this.createLock = createLock;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public LifecycleChangeResult create(CreateLifecycleChangeRequest request, String idempotencyKey) {
         UserContext user = requireUser();
         String key = firstText(idempotencyKey, request.getRequestIdentifier());
         String hash = bodyHash(request);
         if (key != null) {
+            createLock.lock(user.getTenantId(), key);
             Optional<LifecycleChange> existing = changes.findByTidAndIdempotencyKey(user.getTenantId(), key);
             if (existing.isPresent()) {
                 if (hash.equals(existing.get().getIdempotencyBodyHash())) {
@@ -85,7 +89,7 @@ public class LifecycleChangeService {
         List<ChangeLine> lines = prepareLines(user.getTenantId(), request.getLines());
         for (ChangeLine line : lines) {
             if (line.getTargetSubscriptionId() != null) {
-                assertActive(user, null, line.getTargetSubscriptionId(), request);
+                assertCurrentTarget(user, null, line, request);
             }
         }
         LifecycleChange change = new LifecycleChange();
@@ -128,6 +132,12 @@ public class LifecycleChangeService {
             throw new BusinessException("Only a draft or priced change can be priced",
                     HttpStatus.CONFLICT, "ILLEGAL_TRANSITION");
         }
+        change = reserveVersion(user, change, request.getVersion());
+        for (ChangeLine line : change.getLines()) {
+            if (line.getTargetSubscriptionId() != null) {
+                assertCurrentTarget(user, change.getId(), line, null);
+            }
+        }
         Map<String, Object> body = pricingRequest(change);
         ApiResponse<ContinuationEvaluationView> response = pricing.evaluateContinuation(body);
         if (response == null || !response.isSuccess() || response.getData() == null || response.getData().getLines() == null) {
@@ -147,6 +157,15 @@ public class LifecycleChangeService {
     public LifecycleChangeResult submit(UUID id, VersionedCommand command) {
         UserContext user = requireUser();
         LifecycleChange change = load(user, id);
+        if (change.getStatus() == LifecycleChangeStatus.IN_APPROVAL) {
+            if (!isSubmitReplayVersion(change, command.getVersion())) {
+                throw versionConflict();
+            }
+            log.info("LifecycleChange submitted id={} tid={} actor={} replay=true",
+                    change.getId(), change.getTid(), user.getUserId());
+            return LifecycleChangeResult.replay(toResponse(change));
+        }
+        requireVersion(change, command.getVersion());
         ChangeLine unsupported = change.getLines().stream()
                 .filter(line -> UNSUPPORTED_AT_SUBMIT.contains(line.getActionCode()))
                 .findFirst()
@@ -156,20 +175,21 @@ public class LifecycleChangeService {
                     write(Map.of("lifecycleChangeId", change.getId().toString(), "actionCode", unsupported.getActionCode())),
                     write(Map.of("errorCode", "ACTION_NOT_SUPPORTED_IN_SLICE")));
         }
-        if (change.getStatus() == LifecycleChangeStatus.IN_APPROVAL) {
-            requireVersion(change, command.getVersion());
-            log.info("LifecycleChange submitted id={} tid={} actor={} replay=true",
-                    change.getId(), change.getTid(), user.getUserId());
-            return LifecycleChangeResult.replay(toResponse(change));
-        }
         if (change.getStatus() != LifecycleChangeStatus.PRICED) {
             throw new BusinessException("Submit is only allowed from PRICED",
                     HttpStatus.CONFLICT, "ILLEGAL_TRANSITION");
         }
-        requireVersion(change, command.getVersion());
+        if (changes.advanceVersion(change.getId(), user.getTenantId(), command.getVersion()) != 1) {
+            LifecycleChange current = load(user, id);
+            if (current.getStatus() == LifecycleChangeStatus.IN_APPROVAL && isSubmitReplayVersion(current, command.getVersion())) {
+                return LifecycleChangeResult.replay(toResponse(current));
+            }
+            throw versionConflict();
+        }
+        change = load(user, id);
         for (ChangeLine line : change.getLines()) {
             if (line.getTargetSubscriptionId() != null) {
-                assertActive(user, change.getId(), line.getTargetSubscriptionId(), null);
+                assertCurrentTarget(user, change.getId(), line, null);
             }
             if (!hasDecisionIds(line)) {
                 throw rejected("V8: a priced line is missing policyDecisionId, policyId, policyVersion or pricingTraceId",
@@ -185,10 +205,20 @@ public class LifecycleChangeService {
         return LifecycleChangeResult.created(toResponse(saved));
     }
 
-    private void assertActive(UserContext user, UUID changeId, String subscriptionId, CreateLifecycleChangeRequest request) {
+    private void assertCurrentTarget(UserContext user, UUID changeId, ChangeLine line, CreateLifecycleChangeRequest request) {
+        String subscriptionId = line.getTargetSubscriptionId();
         SubscriptionTarget target = subscriptions.read(subscriptionId);
         if (target != null && target.status() != null && "ACTIVE".equalsIgnoreCase(target.status())) {
-            return;
+            if (target.commercialRevision() != null && target.commercialRevision().equals(line.getObservedCommercialRevision())) {
+                return;
+            }
+            String inputs = write(Map.of("subscriptionId", subscriptionId,
+                    "observedRevision", String.valueOf(line.getObservedCommercialRevision()),
+                    "currentRevision", String.valueOf(target.commercialRevision())));
+            audit.record(new LifecycleChangeAuditEntry(user.getTenantId(), changeId, subscriptionId, DECISION_KIND,
+                    "OBSERVED_REVISION_MISMATCH", user.getUserId(), inputs,
+                    write(Map.of("errorCode", "VALIDATION_REJECTED", "ruleId", "V3"))));
+            throw rejected("V3: observed commercial revision does not match the subscription", "VALIDATION_REJECTED");
         }
         String inputs = request == null
                 ? write(Map.of("subscriptionId", subscriptionId))
@@ -340,6 +370,23 @@ public class LifecycleChangeService {
     private LifecycleChange load(UserContext user, UUID id) {
         return changes.findByIdAndTid(id, user.getTenantId())
                 .orElseThrow(() -> new BusinessException("LifecycleChange not found", HttpStatus.NOT_FOUND, "NOT_FOUND"));
+    }
+
+    private LifecycleChange reserveVersion(UserContext user, LifecycleChange change, Long expected) {
+        if (expected == null || changes.advanceVersion(change.getId(), user.getTenantId(), expected) != 1) {
+            throw versionConflict();
+        }
+        return load(user, change.getId());
+    }
+
+    private static boolean isSubmitReplayVersion(LifecycleChange change, Long requested) {
+        Long current = change.getVersion();
+        return requested != null && current != null
+                && (requested.equals(current) || (current > 0 && requested == current - 1));
+    }
+
+    private static BusinessException versionConflict() {
+        return new BusinessException("Version conflict", HttpStatus.CONFLICT, "VERSION_CONFLICT");
     }
 
     private static void requireVersion(LifecycleChange change, Long version) {

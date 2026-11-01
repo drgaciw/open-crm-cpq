@@ -4,6 +4,7 @@ import com.opencrm.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +21,13 @@ import java.util.UUID;
  * <p>Authentication is the shared JWT chain in libs/security. The tenant id is taken from the
  * token, never from the body. Rate limiting is the gateway Redis RequestRateLimiter: 50 requests
  * per second replenish and a burst of 100 ({@code RATE_LIMIT_REPLENISH_RATE} /
- * {@code RATE_LIMIT_BURST_CAPACITY}). This story adds no limiter.
+ * {@code RATE_LIMIT_BURST_CAPACITY}). This controller is disabled by default. Do not enable it or
+ * route it through the gateway until pricing and tenant/contract-scoped target ownership are
+ * implemented and the apply boundary atomically rechecks observed revisions.
  */
 @RestController
 @RequestMapping("/api/v1/lifecycle-changes")
+@ConditionalOnProperty(name = "opencrm.lifecycle-change.enabled", havingValue = "true")
 public class LifecycleChangeController {
 
     private final LifecycleChangeService service;

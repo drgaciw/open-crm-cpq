@@ -30,7 +30,7 @@ class LifecycleWiringTest {
     @Test
     @DisplayName("controller, service, audit writer and subscription reader each load once")
     void newBeansLoad() {
-        context.run(loaded -> {
+        context.withPropertyValues("opencrm.lifecycle-change.enabled=true").run(loaded -> {
             assertThat(loaded).hasNotFailed();
             assertThat(loaded).hasSingleBean(LifecycleChangeController.class);
             assertThat(loaded).hasSingleBean(LifecycleChangeService.class);
@@ -38,6 +38,18 @@ class LifecycleWiringTest {
             assertThat(loaded).hasSingleBean(LifecycleChangeAuditWriter.class);
             assertThat(loaded).hasSingleBean(ScheduleSubscriptionTargetReader.class);
             assertThat(loaded).hasSingleBean(SubscriptionTargetReader.class);
+        });
+    }
+
+    @Test
+    void controllerIsAbsentByDefaultAndWhenExplicitlyDisabled() {
+        context.run(loaded -> {
+            assertThat(loaded).hasNotFailed();
+            assertThat(loaded).doesNotHaveBean(LifecycleChangeController.class);
+        });
+        context.withPropertyValues("opencrm.lifecycle-change.enabled=false").run(loaded -> {
+            assertThat(loaded).hasNotFailed();
+            assertThat(loaded).doesNotHaveBean(LifecycleChangeController.class);
         });
     }
 
