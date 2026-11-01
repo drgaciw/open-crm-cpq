@@ -53,4 +53,10 @@ public final class KafkaTopics {
     public static final String ASSET_CREATED = "cpq.asset.created";
     /** DRG-654. Audit of an asset creation. */
     public static final String ASSET_AUDIT = "cpq.asset.audit";
+    /** DRG-655. ChangeLine Update applied to an installed asset. */
+    public static final String ASSET_AMENDED = "cpq.asset.amended";
+    /** DRG-655. ChangeLine Remove or Terminate applied to an installed asset. */
+    public static final String ASSET_TERMINATED = "cpq.asset.terminated";
+    /** DRG-655. ChangeLine Swap or Upgrade. The successor row exists before this event. */
+    public static final String ASSET_SUPERSEDED = "cpq.asset.superseded";
 }

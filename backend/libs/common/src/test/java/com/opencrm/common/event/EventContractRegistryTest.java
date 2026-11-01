@@ -98,6 +98,9 @@ class EventContractRegistryTest {
         expected.put("cpq.crm.deal.closed", "DealClosed v1, crm-service, PUBLISHED");
         expected.put("cpq.asset.created", "AssetCreated v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.asset.audit", "AssetAuditRecorded v1, contract-asset-management, PUBLISHED");
+        expected.put("cpq.asset.amended", "AssetAmended v1, contract-asset-management, PUBLISHED");
+        expected.put("cpq.asset.terminated", "AssetTerminated v1, contract-asset-management, PUBLISHED");
+        expected.put("cpq.asset.superseded", "AssetSuperseded v1, contract-asset-management, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
             actual.put(contract.topic(), contract.eventType() + " v" + contract.eventVersion() + ", "
