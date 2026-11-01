@@ -154,7 +154,7 @@ Residual criteria (the automation path still has no price for these inputs):
 
 ### DRG-568 — multi-year escalators and time-bounded locks
 
-Covered by DRG-604 D-06 and by the DRG-549 later-year row: while the escalator procedure is unaccepted, the priced renewal is one flat period. This section does not choose escalator semantics. DRG-533 is not accepted. Compounding stays unselected. Percent-of-original stays unselected. Percent-of-prior stays unselected.
+DRG-533 is Accepted on 2026-10-17, as recorded in [its ADR](../DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md) and merged by #684. Acceptance is the status of that document; its recommendations are not in force and it authorizes no implementation. The ADR says later renewal periods stay unpriced. The DRG-549 later-year row keeps one flat priced period. This section makes no further choice of escalator semantics: compounding, percent-of-original, and percent-of-prior stay unselected here.
 
 #### Whether a lock becomes time-bounded
 
@@ -220,9 +220,9 @@ Delta: AC-567-1, AC-567-2, and AC-567-3 are the inputs for which that record alr
 
 ### DRG-568
 
-Frame: [DRG-568 dependent](../cluster-d-renewal-automation-decision-frame.md#drg-568--multi-year-escalators-and-price-locks). DRG-604 D-06 already withholds later periods until the escalator procedure is accepted. DRG-549's later-year row already keeps one flat period.
+Frame: [DRG-568 dependent](../cluster-d-renewal-automation-decision-frame.md#drg-568--multi-year-escalators-and-price-locks). DRG-604 D-06 withholds later periods until the escalator procedure is accepted. The DRG-533 ADR is Accepted on this base, but still says its recommendations are not in force and later renewal periods stay unpriced. DRG-549's later-year row keeps one flat period.
 
-Delta: DRG-533 is not accepted, so this file does not read escalator semantics from the DRG-533 draft. AC-568-1 and AC-568-2 fix the expected priced shape at one period and leave both later-period bases unselected. AC-568-3 states that `ENABLE_12M_PRICE_PROTECTION` is stored as a marker and is not a cap (`capApplied` absent). AC-568-4 leaves a bound of 2027-08-31, inside the renewal 2027-04-01 through 2028-03-31, unpriced as a 5-month segment plus a 7-month segment. Whether a lock becomes time-bounded stays Proposed, with the owner slot blank. This file does not unblock DRG-568's implementation, and it does not amend ADR-023.
+Delta: This file records the accepted status of DRG-533 without treating its recommendations as in force or selecting escalator semantics for this proposal. AC-568-1 and AC-568-2 fix the expected priced shape at one period and leave both later-period bases unselected. AC-568-3 states that `ENABLE_12M_PRICE_PROTECTION` is stored as a marker and is not a cap (`capApplied` absent). AC-568-4 leaves a bound of 2027-08-31, inside the renewal 2027-04-01 through 2028-03-31, unpriced as a 5-month segment plus a 7-month segment. Whether a lock becomes time-bounded stays Proposed, with the owner slot blank. This file does not unblock DRG-568's implementation, and it does not amend ADR-023.
 
 ### DRG-606 RN1–RN5
 
