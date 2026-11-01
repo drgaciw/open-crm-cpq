@@ -35,7 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.kafka.listener.auto-startup=false",
         "opencrm.erp-sync.enabled=false",
         "opencrm.subscription-ramp.enabled=false",
-        "opencrm.outbox.relay.enabled=false"})
+        "opencrm.outbox.relay.enabled=false",
+        "opencrm.assets.legacy-acceptance-write-enabled=true"})
 class AssetCreatedReplayIntegrationTest {
     @BeforeEach void authorizeRead() { AssetReadTestCaller.signIn(); }
     @AfterEach void clearReadAuthorization() { AssetReadTestCaller.clear(); }
