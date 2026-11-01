@@ -1,6 +1,6 @@
 package com.opencrm.contract.asset;
 
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
+import com.opencrm.common.event.dto.AssetSupersededEvent;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +39,10 @@ class AssetSupersedeChainTest {
         assertThat(direction.name()).isEqualTo("direction");
         assertThat(direction.defaultValue()).isEqualTo("both");
 
-        projection.apply(AssetSupersededFixture.of(
-                "s1", A, ACCOUNT, LocalDate.parse("2026-03-01"), "amd-a", "1", B));
-        projection.apply(AssetSupersededFixture.of(
-                "s2", B, ACCOUNT, LocalDate.parse("2026-06-01"), "amd-b", "1", C));
+        projection.apply(new AssetSupersededEvent(
+                A, ACCOUNT, B, A, null, LocalDate.parse("2026-03-01"), "amd-a", "1"), "s1");
+        projection.apply(new AssetSupersededEvent(
+                B, ACCOUNT, C, B, null, LocalDate.parse("2026-06-01"), "amd-b", "1"), "s2");
 
         SupersedeChainDto fromB = api.supersedeChain(B, "both").getData();
         assertThat(fromB.getAssetId()).isEqualTo(B);

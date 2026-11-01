@@ -6,6 +6,7 @@ import com.opencrm.contract.documents.AmendmentDocumentService;
 import com.opencrm.contract.documents.Transition;
 import com.opencrm.contract.documents.events.AmendmentEventAppend;
 import com.opencrm.contract.documents.events.AmendmentEventWriter;
+import com.opencrm.contract.asset.AssetChangeApply;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionRatePeriod;
 import com.opencrm.contract.domain.documents.ActorType;
@@ -71,6 +72,8 @@ public class DocumentApplyOrchestrator {
     private final MeterRegistry meters;
     private final TransactionTemplate unitTransaction;
     private final EntityManager entityManager;
+    /** Absent in tests that construct the orchestrator directly. Production injects the DRG-655 mapper. */
+    private AssetChangeApply assetChanges;
 
     @Autowired
     public DocumentApplyOrchestrator(AmendmentDocumentRepository documents,
@@ -96,6 +99,11 @@ public class DocumentApplyOrchestrator {
         this.entityManager = entityManager;
         this.unitTransaction = new TransactionTemplate(transactions);
         this.unitTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    @Autowired(required = false)
+    void setAssetChanges(AssetChangeApply assetChanges) {
+        this.assetChanges = assetChanges;
     }
 
     public ApplyResult apply(ApplyCommand command) {
@@ -464,7 +472,11 @@ public class DocumentApplyOrchestrator {
             return true;
         }
         int revisionNo = document.getExecutedRevisionNo() == null ? document.getCurrentRevisionNo() : document.getExecutedRevisionNo();
-        DocumentApplyPeriods.write(subscription, revisionNo, lines, periods, rates, gateway);
+        var opened = DocumentApplyPeriods.write(subscription, revisionNo, lines, periods, rates, gateway);
+        if (assetChanges != null) {
+            assetChanges.onUnitApplied(subscription, lines, document.getId(), unit.getUnitNo(),
+                    command.correlationId(), opened);
+        }
         long nextRevision = Math.addExact(subscription.getCommercialRevision(), 1L);
         subscription.setCommercialRevision(nextRevision);
         subscriptions.save(subscription);

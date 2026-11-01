@@ -1,9 +1,5 @@
 package com.opencrm.contract.asset;
 
-import com.opencrm.common.event.EventContractRegistry;
-import com.opencrm.common.event.EventCorrelation;
-import com.opencrm.common.event.OutboxEventPublisher;
-import com.opencrm.common.event.dto.AssetCreatedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionRatePeriod;
@@ -18,25 +14,23 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /** Legacy acceptance-time writer; held off until an effective-activation implementation exists. */
 @Service
 @ConditionalOnProperty(prefix = "opencrm.assets", name = "legacy-acceptance-write-enabled", havingValue = "true")
 public class AssetActivation {
-    static final String AGGREGATE_TYPE = "Asset";
     private final AssetRepository assets;
     private final EntitlementLookup entitlements;
-    private final OutboxEventPublisher publisher;
+    private final AssetEventPublisher events;
     private final AssetAuditOutbox audit;
     /** Flushes the subscription row before the asset insert so the foreign key is visible. */
     private EntityManager entityManager;
 
     public AssetActivation(AssetRepository assets, EntitlementLookup entitlements,
-                           OutboxEventPublisher publisher, AssetAuditOutbox audit) {
+                           AssetEventPublisher events, AssetAuditOutbox audit) {
         this.assets = assets;
         this.entitlements = entitlements;
-        this.publisher = publisher;
+        this.events = events;
         this.audit = audit;
     }
 
@@ -95,17 +89,9 @@ public class AssetActivation {
                     .effectiveStart(start)
                     .effectiveEnd(end)
                     .build());
-            UUID eventId = UUID.randomUUID();
-            AssetCreatedEvent created = new AssetCreatedEvent(
-                    asset.getUuid(), accountId, contractLineId, subscription.getId(), entitlementId,
-                    productRef, first.getQuantity(), AssetStatus.ACTIVE.name(), start, end);
             String causation = event.getCorrelation() == null ? null : event.getCorrelation().getCausationId();
-            try (EventCorrelation.Scope ignored = EventCorrelation.begin(
-                    AssetAuditOutbox.envelopeCorrelation(correlationId), causation)) {
-                publisher.publish(AGGREGATE_TYPE, asset.getUuid(),
-                        EventContractRegistry.ASSET_CREATED_V1, created, eventId);
-            }
-            audit.stage(asset, eventId, correlationId);
+            AssetEventPublisher.Created created = events.publishCreated(asset, correlationId, causation);
+            audit.stage(asset, created.eventId(), correlationId);
             result.add(asset);
         }
         return result;
