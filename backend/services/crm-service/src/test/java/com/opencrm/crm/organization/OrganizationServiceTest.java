@@ -40,6 +40,9 @@ class OrganizationServiceTest {
     @Mock
     private CrmDomainEvents domainEvents;
 
+    @Mock
+    private AccountHierarchyService accountHierarchyService;
+
     @InjectMocks
     private OrganizationService organizationService;
 
@@ -92,7 +95,19 @@ class OrganizationServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getName()).isEqualTo("Acme Corp");
             verify(organizationRepository).save(organization);
+            verify(accountHierarchyService, never()).linkToParent(any(), any());
         }
+
+        @Test
+        void parentOnCreateIsHeldBeforeAnyWrite() {
+            createRequest.setParentOrganizationId(9L);
+            assertThatThrownBy(() -> organizationService.create(createRequest))
+                    .isInstanceOf(com.opencrm.common.exception.BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+            verify(organizationRepository, never()).save(any());
+            verify(domainEvents, never()).organizationCreated(any());
+        }
+
     }
 
     @Nested
@@ -200,6 +215,16 @@ class OrganizationServiceTest {
             assertThat(result).isNotNull();
             verify(organizationMapper).updateEntity(updateRequest, organization);
             verify(organizationRepository).save(organization);
+            verify(accountHierarchyService, never()).linkToParent(any(), any());
+        }
+
+        @Test
+        void parentOnUpdateIsHeldBeforeAnyWrite() {
+            updateRequest.setParentOrganizationId(9L);
+            assertThatThrownBy(() -> organizationService.update(AccountId.of("550e8400-e29b-41d4-a716-446655440000"), updateRequest))
+                    .isInstanceOf(com.opencrm.common.exception.BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+            verify(organizationRepository, never()).save(any());
         }
 
         @Test

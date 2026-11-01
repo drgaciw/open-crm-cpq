@@ -186,6 +186,23 @@ describe('OrganizationDetailComponent account UX', () => {
     );
   });
 
+  it('explains why an account with children cannot be archived', () => {
+    flushAccount();
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush({ parent: null, ancestors: [], children: [] });
+    fixture.detectChanges();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fixture.componentInstance.onDelete();
+    httpMock.expectOne((r) => r.method === 'DELETE' && r.url === '/api/v1/organizations/7')
+      .flush({ message: 'This account has active child accounts. Hierarchy management is unavailable; contact an administrator', errorCode: 'HIERARCHY_HAS_CHILDREN' },
+        { status: 400, statusText: 'Bad Request' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent)
+      .toContain('This account has active child accounts. Hierarchy management is unavailable; contact an administrator');
+    confirm.mockRestore();
+  });
+
   function flushAccount(): void {
     httpMock.expectOne('/api/v1/organizations/7').flush(account);
     httpMock

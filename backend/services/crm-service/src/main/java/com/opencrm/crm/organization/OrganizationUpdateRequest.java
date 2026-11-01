@@ -1,5 +1,6 @@
 package com.opencrm.crm.organization;
 
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -63,4 +64,13 @@ public class OrganizationUpdateRequest {
 
     @Size(max = 100, message = "Territory must not exceed 100 characters")
     private String territory;
+
+    /**
+     * When set, the organization is linked to this parent after the other fields are saved.
+     * Null leaves the current parent unchanged. Clear a parent with
+     * {@code PUT /api/v1/organizations/{id}/parent}.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias("parentId")
+    @Positive(message = "Parent organization id must be positive")
+    private Long parentOrganizationId;
 }

@@ -24,6 +24,7 @@ public interface OrganizationMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "parentOrganizationId", ignore = true)
     Organization toEntity(OrganizationCreateRequest request);
 
     /**
@@ -57,6 +58,7 @@ public interface OrganizationMapper {
     @Mapping(target = "updatedBy", ignore = true)
     @Mapping(target = "version", ignore = true)
     @Mapping(target = "deleted", ignore = true)
+    @Mapping(target = "parentOrganizationId", ignore = true)
     void updateEntity(OrganizationUpdateRequest request, @MappingTarget Organization entity);
 
     /**

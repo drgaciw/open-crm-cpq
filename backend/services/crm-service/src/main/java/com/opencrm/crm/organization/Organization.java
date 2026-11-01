@@ -18,7 +18,8 @@ import java.util.List;
 @Table(name = "organizations", indexes = {
     @Index(name = "idx_org_name", columnList = "name"),
     @Index(name = "idx_org_domain", columnList = "website_domain"),
-    @Index(name = "idx_org_industry", columnList = "industry")
+    @Index(name = "idx_org_industry", columnList = "industry"),
+    @Index(name = "idx_org_parent", columnList = "parent_organization_id")
 })
 @Getter
 @Setter
@@ -82,6 +83,13 @@ public class Organization extends BaseEntity {
 
     @Column(name = "territory")
     private String territory;
+
+    /**
+     * Parent organization row id. Null is a root account. Written only by {@link AccountHierarchyService}
+     * so a self-parent or an ancestor loop is rejected before the row changes.
+     */
+    @Column(name = "parent_organization_id")
+    private Long parentOrganizationId;
 
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL, orphanRemoval = true)
     @SQLRestriction("is_deleted = false")
