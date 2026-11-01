@@ -247,6 +247,76 @@ class DocumentApplyMidLoopConflictTest {
         assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
+    @Test
+    void crashRecoveryRejectsChangedAppliedUnitBeforeAnyPendingUnit() {
+        ApplyFixture fixture = crashedAfterFirstUnit();
+        fixture.units.get(0).setObservedCommercialRevision(99L);
+        // Even if a pending sibling sorts before the changed applied unit, it must not be applied.
+        fixture.units.get(0).setDependencyOrder(2);
+        fixture.units.get(1).setDependencyOrder(1);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(fixture.units.get(1).getStatus()).isEqualTo(ApplicationUnitStatus.PENDING);
+        assertThat(fixture.periods).isEmpty();
+        assertThat(fixture.ledger).hasSize(1);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+    }
+
+    @Test
+    void crashRecoveryResumesWhenAppliedUnitIsUnchanged() {
+        ApplyFixture fixture = crashedAfterFirstUnit();
+
+        ApplyResult result = fixture.apply();
+
+        assertThat(result.status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(fixture.units.get(1).getStatus()).isEqualTo(ApplicationUnitStatus.APPLIED);
+        assertThat(fixture.ledger).hasSize(2);
+    }
+
+    @Test
+    void crashRecoveryDoesNotReevaluateCommittedBlockedUnit() {
+        ApplyFixture fixture = new ApplyFixture();
+        Subscription first = fixture.subscription(1L, 4L, START, END);
+        Subscription second = fixture.subscription(2L, 7L, START, END);
+        var blocked = fixture.unit(1, first, 4L);
+        fixture.unit(2, second, 7L);
+        fixture.line(1, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        fixture.line(2, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        blocked.setApplyKeyDigest(DocumentApplyDigest.unitDigest(fixture.document.getId(), blocked,
+                fixture.lines.stream().filter(line -> line.unitNo() == 1).toList()));
+        blocked.setStatus(ApplicationUnitStatus.BLOCKED);
+
+        ApplyResult result = fixture.apply();
+
+        assertThat(result.status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+        assertThat(blocked.getStatus()).isEqualTo(ApplicationUnitStatus.BLOCKED);
+        assertThat(fixture.units.get(1).getStatus()).isEqualTo(ApplicationUnitStatus.APPLIED);
+        assertThat(fixture.periods).extracting(period -> period.getSubscriptionId()).containsExactly(2L);
+        assertThat(fixture.ledger).doesNotContainKey(fixture.document.getId() + ":1");
+    }
+
+    private static ApplyFixture crashedAfterFirstUnit() {
+        ApplyFixture fixture = new ApplyFixture();
+        Subscription first = fixture.subscription(1L, 4L, START, END);
+        Subscription second = fixture.subscription(2L, 7L, START, END);
+        var applied = fixture.unit(1, first, 4L);
+        fixture.unit(2, second, 7L);
+        fixture.line(1, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        fixture.line(2, ActionCode.ADD, null, BigDecimal.ONE, START, END, "pb-1");
+        String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), applied,
+                fixture.lines.stream().filter(line -> line.unitNo() == 1).toList());
+        applied.setStatus(ApplicationUnitStatus.APPLIED);
+        applied.setApplyKeyDigest(digest);
+        DocumentApplyLedgerEntry entry = ledgerRow(fixture, 1);
+        entry.setApplyKeyDigest(digest);
+        fixture.ledger.put(fixture.document.getId() + ":1", entry);
+        return fixture;
+    }
+
     private static ApplyFixture threeUnitsWithUnitTwoConflict() {
         ApplyFixture fixture = new ApplyFixture();
         Subscription first = fixture.subscription(1L, 4L, START, END);
