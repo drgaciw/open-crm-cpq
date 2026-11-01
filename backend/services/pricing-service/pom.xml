@@ -203,7 +203,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.14</version>
+                <version>0.8.16</version>
                 <configuration>
                     <!-- Generated protobuf/gRPC and MapStruct impls are not hand-written. Gate stays 0.80.
                          Skip Drools parser instrumentation (MethodTooLargeException on DRL6Lexer). -->
