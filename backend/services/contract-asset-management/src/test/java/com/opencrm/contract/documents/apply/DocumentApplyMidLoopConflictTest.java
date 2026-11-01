@@ -278,6 +278,48 @@ class DocumentApplyMidLoopConflictTest {
     }
 
     @Test
+    void recoveryFinalizesAnExecutedDocumentAfterAllUnitsCommitted() {
+        ApplyFixture fixture = crashedAfterFirstUnit();
+        var second = fixture.units.get(1);
+        String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), second,
+                fixture.lines.stream().filter(line -> line.unitNo() == 2).toList());
+        second.setStatus(ApplicationUnitStatus.APPLIED);
+        second.setApplyKeyDigest(digest);
+        DocumentApplyLedgerEntry entry = ledgerRow(fixture, 2);
+        entry.setApplyKeyDigest(digest);
+        fixture.ledger.put(fixture.document.getId() + ":2", entry);
+
+        ApplyResult result = fixture.apply();
+
+        assertThat(result.replayed()).isTrue();
+        assertThat(result.status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(fixture.document.getStatus()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_DOCUMENT_APPLIED)).isEqualTo(1);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_UNIT_APPLIED)).isZero();
+        assertThat(fixture.periods).isEmpty();
+        assertThat(fixture.apply().status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_DOCUMENT_APPLIED)).isEqualTo(1);
+    }
+
+    @Test
+    void recoveryRejectsPendingUnitWithMatchingLedger() {
+        ApplyFixture fixture = crashedAfterFirstUnit();
+        var pending = fixture.units.get(1);
+        String digest = DocumentApplyDigest.unitDigest(fixture.document.getId(), pending,
+                fixture.lines.stream().filter(line -> line.unitNo() == 2).toList());
+        DocumentApplyLedgerEntry entry = ledgerRow(fixture, 2);
+        entry.setApplyKeyDigest(digest);
+        fixture.ledger.put(fixture.document.getId() + ":2", entry);
+
+        DocumentApplyException ex = catchThrowableOfType(DocumentApplyException.class, fixture::apply);
+
+        assertThat(ex).isNotNull();
+        assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT");
+        assertThat(fixture.document.getStatus()).isEqualTo(AmendmentDocumentStatus.EXECUTED);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_DOCUMENT_APPLIED)).isZero();
+    }
+
+    @Test
     void crashRecoveryDoesNotReevaluateCommittedBlockedUnit() {
         ApplyFixture fixture = new ApplyFixture();
         Subscription first = fixture.subscription(1L, 4L, START, END);

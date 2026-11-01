@@ -115,6 +115,23 @@ public class DocumentApplyOrchestrator {
                     HttpStatus.CONFLICT, "DIGEST_CONFLICT");
         }
         if (sameDigestReplay(document, ordered, lines)) {
+            if (document.getStatus() == AmendmentDocumentStatus.EXECUTED) {
+                if (ordered.stream().anyMatch(unit -> unit.getStatus() != ApplicationUnitStatus.APPLIED)) {
+                    audit(document, command, "DIGEST_CONFLICT", "ledger exists for a unit that is not applied");
+                    throw new DocumentApplyException("ledger exists for a unit that is not applied",
+                            HttpStatus.CONFLICT, "DIGEST_CONFLICT");
+                }
+                // All unit transactions committed before the outcome transaction could run.
+                // The document update and its audit event share the same locked transaction.
+                unitTransaction.executeWithoutResult(status ->
+                        recordOutcome(document.getId(), AmendmentDocumentStatus.APPLIED, command));
+                AmendmentDocument current = documents.findById(document.getId()).orElseThrow();
+                if (current.getStatus() != AmendmentDocumentStatus.APPLIED) {
+                    throw new DocumentApplyException("could not finalize the applied document",
+                            HttpStatus.CONFLICT, "ILLEGAL_TRANSITION");
+                }
+                return new ApplyResult(AmendmentDocumentStatus.APPLIED, true);
+            }
             log.info("document apply replay documentId={} status={}", document.getId(), document.getStatus());
             return new ApplyResult(document.getStatus(), true);
         }

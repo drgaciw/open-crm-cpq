@@ -161,6 +161,60 @@ class DocumentApplyIntegrationTest {
                 """, Long.class, documentId)).isEqualTo(1L);
     }
 
+    @Test
+    void recoveryFinalizesCommittedUnitsAndWritesOneOutcomeEvent() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seedFullyAppliedUnits(tenant, documentId);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+        assertThat(orchestrator.apply(command).replayed()).isTrue();
+        assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                .isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("""
+                select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_DOCUMENT_APPLIED'
+                """, Long.class, documentId)).isEqualTo(1L);
+    }
+
+    @Test
+    void recoveryRollsBackOutcomeWhenAuditInsertFails() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seedFullyAppliedUnits(tenant, documentId);
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+        jdbc.execute("alter table amendment_document_events add constraint test_reject_recovery_event check "
+                + "(document_id <> '" + documentId + "'::uuid or event_type <> 'APPLY_DOCUMENT_APPLIED')");
+        try {
+            assertThatThrownBy(() -> orchestrator.apply(command)).isInstanceOf(RuntimeException.class);
+            assertThat(jdbc.queryForObject("select status from amendment_documents where id = ?", String.class, documentId))
+                    .isEqualTo("EXECUTED");
+            assertThat(jdbc.queryForObject("""
+                    select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_DOCUMENT_APPLIED'
+                    """, Long.class, documentId)).isZero();
+        } finally {
+            jdbc.execute("alter table amendment_document_events drop constraint test_reject_recovery_event");
+        }
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.APPLIED);
+    }
+
+    private void seedFullyAppliedUnits(UUID tenant, UUID documentId) {
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        var lines = gateway.lines(documentId, 1);
+        for (var unit : units.findByDocumentIdOrderByDependencyOrderAscUnitNoAsc(documentId)) {
+            String digest = DocumentApplyDigest.unitDigest(documentId, unit,
+                    lines.stream().filter(line -> line.unitNo() == unit.getUnitNo()).toList());
+            jdbc.update("update amendment_application_units set status = 'APPLIED', apply_key_digest = ? "
+                    + "where document_id = ? and unit_no = ?", digest, documentId, unit.getUnitNo());
+            jdbc.update("""
+                    insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                    values (?, ?, ?, ?, 'earlier')
+                    """, tenant, documentId, unit.getUnitNo(), digest);
+        }
+    }
+
     private void seed(UUID tenant, UUID documentId, UUID firstSubscription, UUID secondSubscription, boolean conflict) {
         UUID contractId = UUID.randomUUID();
         UUID lifecycleId = UUID.randomUUID();
