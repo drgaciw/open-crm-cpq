@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.http.MediaType;
 
 /**
  * DealClosed is pipeline state (won or lost). The payload carries no amount, currency, discount or approval,
@@ -57,6 +60,40 @@ class DealClosedEventTest extends BaseIntegrationTest {
         http.lose(created.id(), "timing");
 
         assertClosed(created.uuid(), "LOST", "timing");
+    }
+
+    @Test
+    void updateToWonFreezesEditedAmountAndPublishesThePersistedCloseTime() throws Exception {
+        assertUpdateCloses("WON", 100, "wonAt");
+    }
+
+    @Test
+    void updateToLostFreezesEditedAmountAndPublishesThePersistedCloseTime() throws Exception {
+        assertUpdateCloses("LOST", 0, "lostAt");
+    }
+
+    private void assertUpdateCloses(String stage, int probability, String timeField) throws Exception {
+        CrmOutboxHttp.Created created = http.createDeal("Closed by update");
+        String response = mockMvc.perform(put("/api/v1/deals/{id}", created.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stage\":\"" + stage + "\",\"amount\":1300,\"currency\":\"USD\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var deal = objectMapper.readTree(response).get("data");
+        assertThat(deal.get("stage").asString()).isEqualTo(stage);
+        assertThat(deal.get("probability").asInt()).isEqualTo(probability);
+        assertThat(deal.get(timeField).asString()).isNotBlank();
+        assertThat(deal.get("actualCloseDate").asString()).isNotBlank();
+        assertThat(deal.get("baseAmount").decimalValue()).isEqualByComparingTo("1300.00");
+
+        var written = rows.forAggregate(created.uuid(), CrmOutboxTopics.DEAL_CLOSED);
+        assertThat(written).hasSize(1);
+        assertThat(rows.forAggregate(created.uuid(), CrmOutboxTopics.DEAL_STAGE_CHANGED)).hasSize(1);
+        var payload = objectMapper.readTree(rows.payload(written.getFirst()));
+        assertThat(payload.get("outcome").asString()).isEqualTo(stage);
+        assertThat(payload.get("closedAt").asString()).isEqualTo(deal.get(timeField).asString());
+        if ("LOST".equals(stage)) {
+            assertThat(payload.hasNonNull("lostReason")).isFalse();
+        }
     }
 
     private void assertClosed(String dealUuid, String outcome, String lostReason) {

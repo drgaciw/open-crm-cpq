@@ -137,7 +137,16 @@ public class DealService {
 
         dealMapper.updateEntity(request, deal);
         if (!closed) {
-            currencyConverter.freezeIfNeeded(deal, previousAmount, previousCurrency);
+            if (deal.getStage() == DealStage.WON) {
+                deal.markWon();
+                currencyConverter.freeze(deal);
+            } else if (deal.getStage() == DealStage.LOST) {
+                // The update API historically accepts LOST without a reason; preserve that contract.
+                deal.markLost(null);
+                currencyConverter.freeze(deal);
+            } else {
+                currencyConverter.freezeIfNeeded(deal, previousAmount, previousCurrency);
+            }
         }
 
         // Update primary contact if provided
