@@ -1,6 +1,9 @@
 package com.opencrm.contract.asset;
 
+import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetCreatedEvent;
+import com.opencrm.common.event.dto.AssetSupersededEvent;
+import com.opencrm.common.event.dto.AssetTerminatedEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +21,8 @@ import java.util.Set;
 
 /**
  * Builds asset history, the supersede chain, and an account's installed base from facts.
- * {@link AssetCreatedEvent} is the published create fact. The other three kinds are shapes
- * this projection accepts. Nothing here publishes an event.
+ * Created, amended, superseded, and terminated facts are the published asset events.
+ * Nothing here publishes an event.
  */
 @Service
 @Transactional
@@ -50,6 +53,71 @@ public class AssetHistoryProjection {
                 event.subscriptionId(),
                 event.productRef(),
                 event.quantity()));
+    }
+
+    public void apply(AssetAmendedEvent event, String eventId) {
+        if (event == null || eventId == null || eventId.isBlank()) {
+            throw new IllegalArgumentException("AssetAmended and its event id are required");
+        }
+        LocalDate effective = event.effectiveDate() != null ? event.effectiveDate() : event.effectiveStart();
+        apply(new AssetHistoryFact(
+                eventId,
+                AssetHistoryKind.AMENDED,
+                event.assetId(),
+                event.accountId(),
+                effective,
+                event.effectiveEnd(),
+                event.sourceAmendmentId(),
+                event.sourceApplyUnit(),
+                null,
+                null,
+                event.contractLineId(),
+                event.subscriptionId(),
+                event.productRef(),
+                event.quantity()));
+    }
+
+    public void apply(AssetSupersededEvent event, String eventId) {
+        if (event == null || eventId == null || eventId.isBlank()) {
+            throw new IllegalArgumentException("AssetSuperseded and its event id are required");
+        }
+        String predecessor = blank(event.predecessorAssetId()) ? event.assetId() : event.predecessorAssetId();
+        apply(new AssetHistoryFact(
+                eventId,
+                AssetHistoryKind.SUPERSEDED,
+                event.assetId(),
+                event.accountId(),
+                event.effectiveDate(),
+                null,
+                event.sourceAmendmentId(),
+                event.sourceApplyUnit(),
+                predecessor,
+                event.successorAssetId(),
+                null,
+                null,
+                null,
+                null));
+    }
+
+    public void apply(AssetTerminatedEvent event, String eventId) {
+        if (event == null || eventId == null || eventId.isBlank()) {
+            throw new IllegalArgumentException("AssetTerminated and its event id are required");
+        }
+        apply(new AssetHistoryFact(
+                eventId,
+                AssetHistoryKind.TERMINATED,
+                event.assetId(),
+                event.accountId(),
+                event.effectiveDate(),
+                null,
+                event.sourceAmendmentId(),
+                event.sourceApplyUnit(),
+                null,
+                null,
+                event.contractLineId(),
+                event.subscriptionId(),
+                event.productRef(),
+                null));
     }
 
     public void apply(AssetHistoryFact fact) {

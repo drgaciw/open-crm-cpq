@@ -1,8 +1,8 @@
 package com.opencrm.contract.asset;
 
 import com.opencrm.common.event.dto.AssetCreatedEvent;
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
-import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
+import com.opencrm.common.event.dto.AssetSupersededEvent;
+import com.opencrm.common.event.dto.AssetTerminatedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -68,8 +68,9 @@ class InstalledBaseAsOfTest {
                     assertThat(asset.getEffectiveEnd()).isEqualTo(LocalDate.parse("2027-04-30"));
                 });
 
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-t", ASSET, ACCOUNT, LocalDate.parse("2026-08-01"), "amd-t", "1"));
+        projection.apply(new AssetTerminatedEvent(
+                ASSET, ACCOUNT, null, null, null, null, LocalDate.parse("2026-08-01"),
+                "amd-t", "1"), "evt-t");
 
         assertThat(api.installedBase(ACCOUNT, LocalDate.parse("2026-07-31")).getData())
                 .extracting(InstalledAssetDto::getAssetId).containsExactly(ASSET);
@@ -107,8 +108,9 @@ class InstalledBaseAsOfTest {
 
         projection.apply(created(ASSET, ACCOUNT, "line-1", 1L, "prod-old", "2", "2026-01-01", "2026-12-31"), "evt-a");
         projection.apply(created(SUCCESSOR, ACCOUNT, "line-2", 1L, "prod-new", "2", "2026-04-01", "2026-12-31"), "evt-b");
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"), "amd-s", "1", SUCCESSOR));
+        projection.apply(new AssetSupersededEvent(
+                ASSET, ACCOUNT, SUCCESSOR, ASSET, null, LocalDate.parse("2026-04-01"),
+                "amd-s", "1"), "evt-s");
 
         assertThat(api.installedBase(ACCOUNT, LocalDate.parse("2026-03-31")).getData())
                 .extracting(InstalledAssetDto::getAssetId).containsExactly(ASSET);

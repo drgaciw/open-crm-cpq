@@ -8,11 +8,13 @@ import com.opencrm.contract.repository.SubscriptionRatePeriodRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Add, Update, and Remove against rate periods. Amounts are copied. Nothing is repriced. */
+/** Add, Update, Remove, Terminate, Swap, and Upgrade against rate periods. Amounts are copied. Nothing is repriced. */
 final class DocumentApplyPeriods {
 
     private DocumentApplyPeriods() {
@@ -39,45 +41,51 @@ final class DocumentApplyPeriods {
             case "V4" -> "source accepted line is missing or retired";
             case "V9" -> "pinned pricebook version differs at apply";
             case "CO_TERM_MISSING" -> "the new period has no co-term end date";
-            case "ACTION_NOT_IN_SLICE" -> "the action is outside Add, Update, and Remove";
+            case "ACTION_NOT_IN_SLICE" -> "the action is outside Add, Update, Remove, Terminate, Swap, and Upgrade";
             default -> code;
         };
     }
 
-    static void write(Subscription subscription, int revisionNo, List<ApplyLine> lines,
-                      List<SubscriptionRatePeriod> periods, SubscriptionRatePeriodRepository rates,
-                      DocumentApplyGateway gateway) {
+    /** @return change-line id to the accepted-line id opened by that line, when one was opened */
+    static Map<UUID, String> write(Subscription subscription, int revisionNo, List<ApplyLine> lines,
+                                   List<SubscriptionRatePeriod> periods, SubscriptionRatePeriodRepository rates,
+                                   DocumentApplyGateway gateway) {
+        Map<UUID, String> opened = new LinkedHashMap<>();
         for (ApplyLine line : lines) {
             switch (line.action()) {
-                case ADD -> open(subscription, revisionNo, line, null, null, rates, gateway);
-                case UPDATE -> {
+                case ADD -> opened.put(line.id(),
+                        open(subscription, revisionNo, line, null, null, rates, gateway).getAcceptedLineUuid());
+                case UPDATE, UPGRADE, SWAP -> {
                     SubscriptionRatePeriod source = close(line, periods, rates);
-                    open(subscription, revisionNo, line, source, line.sourceAcceptedLineUuid(), rates, gateway);
+                    opened.put(line.id(), open(subscription, revisionNo, line, source, line.sourceAcceptedLineUuid(),
+                            rates, gateway).getAcceptedLineUuid());
                 }
-                case REMOVE -> close(line, periods, rates);
-                case NO_CHANGE, RENEW, UPGRADE, DOWNGRADE, SWAP, CONVERT_METRIC, SUSPEND, RESUME, TERMINATE ->
+                case REMOVE, TERMINATE -> close(line, periods, rates);
+                case NO_CHANGE, RENEW, DOWNGRADE, CONVERT_METRIC, SUSPEND, RESUME ->
                         throw new IllegalStateException("blocked actions are not written");
             }
         }
+        return opened;
     }
 
     private static String lineReason(ApplyLine line, List<SubscriptionRatePeriod> periods, String observedPricebook) {
         return switch (line.action()) {
-            case ADD, UPDATE, REMOVE -> sliceReason(line, periods, observedPricebook);
-            case NO_CHANGE, RENEW, UPGRADE, DOWNGRADE, SWAP, CONVERT_METRIC, SUSPEND, RESUME, TERMINATE ->
-                    "ACTION_NOT_IN_SLICE";
+            case ADD, UPDATE, REMOVE, UPGRADE, SWAP, TERMINATE -> sliceReason(line, periods, observedPricebook);
+            case NO_CHANGE, RENEW, DOWNGRADE, CONVERT_METRIC, SUSPEND, RESUME -> "ACTION_NOT_IN_SLICE";
         };
     }
 
     private static String sliceReason(ApplyLine line, List<SubscriptionRatePeriod> periods, String observedPricebook) {
-        if ((line.action() == ActionCode.UPDATE || line.action() == ActionCode.REMOVE)
+        if ((line.action() == ActionCode.UPDATE || line.action() == ActionCode.REMOVE
+                || line.action() == ActionCode.UPGRADE || line.action() == ActionCode.SWAP
+                || line.action() == ActionCode.TERMINATE)
                 && openSources(periods, line).isEmpty()) {
             return "V4";
         }
         if (observedPricebook != null && !observedPricebook.equals(line.pricebookVersion())) {
             return "V9";
         }
-        if (line.action() != ActionCode.REMOVE && line.effectiveTo() == null) {
+        if (line.action() != ActionCode.REMOVE && line.action() != ActionCode.TERMINATE && line.effectiveTo() == null) {
             return "CO_TERM_MISSING";
         }
         return null;
@@ -100,8 +108,9 @@ final class DocumentApplyPeriods {
         return first;
     }
 
-    private static void open(Subscription subscription, int revisionNo, ApplyLine line, SubscriptionRatePeriod source,
-                             String sourceLine, SubscriptionRatePeriodRepository rates, DocumentApplyGateway gateway) {
+    private static SubscriptionRatePeriod open(Subscription subscription, int revisionNo, ApplyLine line,
+                                                SubscriptionRatePeriod source, String sourceLine,
+                                                SubscriptionRatePeriodRepository rates, DocumentApplyGateway gateway) {
         LocalDate start = line.effectiveFrom();
         LocalDate anchor = source == null || source.getBillingAnchorDate() == null ? start : source.getBillingAnchorDate();
         BigDecimal price = source != null && source.getNetUnitPrice() != null ? source.getNetUnitPrice() : line.unitPrice();
@@ -126,6 +135,7 @@ final class DocumentApplyPeriods {
         // so the line id would stay null after commit.
         rates.saveAndFlush(created);
         gateway.bindAmendmentLine(created.getId(), line.id(), revisionNo);
+        return created;
     }
 
     private static List<SubscriptionRatePeriod> openSources(List<SubscriptionRatePeriod> periods, ApplyLine line) {

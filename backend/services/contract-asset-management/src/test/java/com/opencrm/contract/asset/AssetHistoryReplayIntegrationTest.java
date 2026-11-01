@@ -1,10 +1,10 @@
 package com.opencrm.contract.asset;
 
+import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetCreatedEvent;
+import com.opencrm.common.event.dto.AssetSupersededEvent;
+import com.opencrm.common.event.dto.AssetTerminatedEvent;
 import com.opencrm.contract.ContractAssetManagementApplication;
-import com.opencrm.contract.asset.fixtures.AssetAmendedFixture;
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
-import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Dropping the history projection and replaying the same events rebuilds the same history.
- * The amended, superseded, and terminated inputs are test-local fixtures. Nothing is published.
  */
 @Tag("integration")
 @Testcontainers
@@ -92,15 +91,15 @@ class AssetHistoryReplayIntegrationTest {
         projection.apply(new AssetCreatedEvent(
                 ASSET, ACCOUNT, "line-1", 9L, null, "prod-1", new BigDecimal("2"),
                 "ACTIVE", LocalDate.parse("2026-03-01"), LocalDate.parse("2027-02-28")), "evt-created");
-        projection.apply(AssetAmendedFixture.of(
-                "evt-amended", ASSET, ACCOUNT, LocalDate.parse("2026-04-01"),
-                "amd-1", "1", new BigDecimal("5")));
-        projection.apply(AssetSupersededFixture.of(
-                "evt-superseded", ASSET, ACCOUNT, LocalDate.parse("2026-07-01"),
-                "amd-2", "2", SUCCESSOR));
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-terminated", ASSET, ACCOUNT, LocalDate.parse("2026-09-01"),
-                "amd-3", "1"));
+        projection.apply(new AssetAmendedEvent(
+                ASSET, ACCOUNT, null, null, null, null, new BigDecimal("5"), null,
+                null, null, LocalDate.parse("2026-04-01"), "amd-1", "1"), "evt-amended");
+        projection.apply(new AssetSupersededEvent(
+                ASSET, ACCOUNT, SUCCESSOR, ASSET, null, LocalDate.parse("2026-07-01"),
+                "amd-2", "2"), "evt-superseded");
+        projection.apply(new AssetTerminatedEvent(
+                ASSET, ACCOUNT, null, null, null, null, LocalDate.parse("2026-09-01"),
+                "amd-3", "1"), "evt-terminated");
     }
 
     private long count(String sql) {
