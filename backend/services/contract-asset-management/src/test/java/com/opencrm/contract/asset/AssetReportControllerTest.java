@@ -1,8 +1,6 @@
 package com.opencrm.contract.asset;
 
 import com.opencrm.common.event.dto.AssetCreatedEvent;
-import com.opencrm.contract.asset.fixtures.AssetSupersededFixture;
-import com.opencrm.contract.asset.fixtures.AssetTerminatedFixture;
 import com.opencrm.contract.config.GlobalExceptionHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,12 +59,12 @@ class AssetReportControllerTest {
 
         projection.apply(created(ASSET, "10", "2026-06-15"), "evt-a");
         projection.apply(created(GONE, "4", "2026-12-31"), "evt-b");
-        projection.apply(AssetTerminatedFixture.of(
-                "evt-t", GONE, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-t", "1"));
+        AssetReportTestEvents.terminated(projection,
+                "evt-t", GONE, ACCOUNT, LocalDate.parse("2026-05-01"), "amd-t", "1");
         projection.apply(created(SWAPPED, "2", "2026-08-01"), "evt-c");
         projection.apply(created(NEXT, "2", "2026-08-01"), "evt-d");
-        projection.apply(AssetSupersededFixture.of(
-                "evt-s", SWAPPED, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-s", "1", NEXT));
+        AssetReportTestEvents.superseded(projection,
+                "evt-s", SWAPPED, ACCOUNT, LocalDate.parse("2026-05-20"), "amd-s", "1", NEXT);
 
         mvc.perform(get("/api/v1/assets/reports/upcoming-renewals")
                         .param("accountId", ACCOUNT)
