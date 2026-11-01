@@ -15,6 +15,12 @@ import com.opencrm.crm.lead.Lead;
 import com.opencrm.crm.lead.LeadRepository;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.security.Caller;
+import com.opencrm.security.SecurityUtils;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -45,16 +51,32 @@ public class AccountMergeService {
     private final AccountMergeRepository accountMergeRepository;
     private final OutboxEventPublisher outboxEventPublisher;
     private final EventActorResolver eventActorResolver;
+    private final AccountMergeReadiness readiness;
+    private final EntityManager entityManager;
 
     @CacheEvict(value = {"contacts", "organizations"}, allEntries = true)
     public AccountMergeResult merge(AccountMergeRequest request) {
+        requireAuthorizedHuman();
+        if (!readiness.isReady()) {
+            throw new BusinessException("Account merge is unavailable until identity and reconciliation are ready",
+                    HttpStatus.SERVICE_UNAVAILABLE, "ACCOUNT_MERGE_HOLD");
+        }
         if (request == null || request.getSurvivorId() == null || request.getMergedAwayId() == null) {
             throw new BusinessException(
                     "Survivor and merged-away organization ids are required", "MERGE_IDS_REQUIRED");
         }
 
-        Organization survivor = requireActive(request.getSurvivorId());
-        Organization mergedAway = requireActive(request.getMergedAwayId());
+        // Refreshing stale request-bound entities must never discard a caller's pending edits.
+        if (entityManager.unwrap(org.hibernate.Session.class).isDirty()) {
+            throw new BusinessException("Account merge cannot run with unflushed changes", HttpStatus.CONFLICT,
+                    "ACCOUNT_MERGE_DIRTY_CONTEXT");
+        }
+        long firstId = Math.min(request.getSurvivorId(), request.getMergedAwayId());
+        long secondId = Math.max(request.getSurvivorId(), request.getMergedAwayId());
+        Organization first = requireActive(firstId);
+        Organization second = firstId == secondId ? first : requireActive(secondId);
+        Organization survivor = request.getSurvivorId() == firstId ? first : second;
+        Organization mergedAway = request.getMergedAwayId() == firstId ? first : second;
         if (sameOrganization(survivor, mergedAway)) {
             throw new BusinessException(
                     "Cannot merge an organization into itself", "MERGE_SAME_ORGANIZATION");
@@ -128,8 +150,11 @@ public class AccountMergeService {
     }
 
     private Organization requireActive(Long id) {
-        Organization organization = organizationRepository.findById(id)
+        Organization organization = organizationRepository.findByIdForMerge(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
+        // A pessimistic query can return an already-managed, stale OSIV instance.
+        // The row lock is already held; refresh before consulting its state.
+        entityManager.refresh(organization);
         if (organization.isDeleted()) {
             throw new ResourceNotFoundException("Organization", id);
         }
@@ -141,6 +166,19 @@ public class AccountMergeService {
             return true;
         }
         return survivor.getUuid() != null && survivor.getUuid().equalsIgnoreCase(mergedAway.getUuid());
+    }
+
+    private static void requireAuthorizedHuman() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        Caller caller = SecurityUtils.getCurrentCaller().orElse(null);
+        if (!(auth instanceof JwtAuthenticationToken jwt)
+                || !(jwt.getToken().getClaims().get("scp") instanceof String scope) || scope.isBlank()
+                || !(caller instanceof Caller.User user)
+                || user.actorId() == null || user.actorId().isBlank()
+                || !user.hasAuthority("ROLE_SALES_OPS_ACCOUNT_MERGE")) {
+            throw new BusinessException("Account merge requires the sales operations role",
+                    HttpStatus.FORBIDDEN, "ACCOUNT_MERGE_FORBIDDEN");
+        }
     }
 
     private String decidedBy() {

@@ -60,8 +60,13 @@ class AccountMergeServiceTest {
     private OutboxEventPublisher outboxEventPublisher;
     @Mock
     private EventActorResolver eventActorResolver;
+    @Mock
+    private AccountMergeReadiness readiness;
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+    @Mock
+    private org.hibernate.Session session;
 
-    @InjectMocks
     private AccountMergeService accountMergeService;
 
     private Organization survivor;
@@ -69,8 +74,32 @@ class AccountMergeServiceTest {
 
     @BeforeEach
     void setUp() {
+        var jwt = org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test").header("alg", "none")
+                .subject("sales-ops").claim("scp", "user").build();
+        var auth = new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt,
+                List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_OPS_ACCOUNT_MERGE")));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        accountMergeService = new AccountMergeService(organizationRepository, contactRepository, leadRepository,
+                dealRepository, accountMergeRepository, outboxEventPublisher, eventActorResolver, readiness, entityManager);
+        org.mockito.Mockito.lenient().when(readiness.isReady()).thenReturn(true);
+        org.mockito.Mockito.lenient().when(entityManager.unwrap(org.hibernate.Session.class)).thenReturn(session);
         survivor = organization(1L, SURVIVOR_UUID);
         mergedAway = organization(2L, MERGED_AWAY_UUID);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
+    @Test
+    void acquiresBothOrganizationLocksInNumericOrderRegardlessOfSurvivor() {
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(2L)).thenReturn(Optional.of(mergedAway));
+        when(eventActorResolver.currentActor()).thenReturn(DECIDED_BY);
+        when(accountMergeRepository.save(any(AccountMerge.class))).thenAnswer(i -> i.getArgument(0));
+        accountMergeService.merge(AccountMergeRequest.builder().survivorId(2L).mergedAwayId(1L).build());
+        var order = inOrder(organizationRepository);
+        order.verify(organizationRepository).findByIdForMerge(1L);
+        order.verify(organizationRepository).findByIdForMerge(2L);
     }
 
     @Test
@@ -80,8 +109,8 @@ class AccountMergeServiceTest {
         Contact deleted = Contact.builder().id(11L).organization(mergedAway).deleted(true).build();
         Lead lead = Lead.builder().id(20L).organization(mergedAway).title("Inbound").build();
         Deal deal = Deal.builder().id(30L).organization(mergedAway).name("Renewal").build();
-        when(organizationRepository.findById(1L)).thenReturn(Optional.of(survivor));
-        when(organizationRepository.findById(2L)).thenReturn(Optional.of(mergedAway));
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(2L)).thenReturn(Optional.of(mergedAway));
         when(eventActorResolver.currentActor()).thenReturn(DECIDED_BY);
         when(contactRepository.findAllByOrganizationId(2L)).thenReturn(List.of(live, deleted));
         when(leadRepository.findAllByOrganization_Id(2L)).thenReturn(List.of(lead));
@@ -144,7 +173,7 @@ class AccountMergeServiceTest {
     @Test
     @DisplayName("rejects merging an organization into itself")
     void rejectsSelfMerge() {
-        when(organizationRepository.findById(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
 
         assertThatThrownBy(() -> accountMergeService.merge(request(1L, 1L)))
                 .isInstanceOf(BusinessException.class)
@@ -158,7 +187,7 @@ class AccountMergeServiceTest {
     @Test
     @DisplayName("rejects a missing survivor")
     void rejectsMissingSurvivor() {
-        when(organizationRepository.findById(1L)).thenReturn(Optional.empty());
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountMergeService.merge(request(1L, 2L)))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -170,8 +199,8 @@ class AccountMergeServiceTest {
     @Test
     @DisplayName("rejects a missing merged-away organization")
     void rejectsMissingMergedAway() {
-        when(organizationRepository.findById(1L)).thenReturn(Optional.of(survivor));
-        when(organizationRepository.findById(2L)).thenReturn(Optional.empty());
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(2L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountMergeService.merge(request(1L, 2L)))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -184,8 +213,8 @@ class AccountMergeServiceTest {
     @DisplayName("treats a soft-deleted organization as not found")
     void rejectsDeletedOrganization() {
         mergedAway.setDeleted(true);
-        when(organizationRepository.findById(1L)).thenReturn(Optional.of(survivor));
-        when(organizationRepository.findById(2L)).thenReturn(Optional.of(mergedAway));
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(2L)).thenReturn(Optional.of(mergedAway));
 
         assertThatThrownBy(() -> accountMergeService.merge(request(1L, 2L)))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -198,8 +227,8 @@ class AccountMergeServiceTest {
     @Test
     @DisplayName("does not publish when the actor is unknown")
     void rejectsBlankActor() {
-        when(organizationRepository.findById(1L)).thenReturn(Optional.of(survivor));
-        when(organizationRepository.findById(2L)).thenReturn(Optional.of(mergedAway));
+        when(organizationRepository.findByIdForMerge(1L)).thenReturn(Optional.of(survivor));
+        when(organizationRepository.findByIdForMerge(2L)).thenReturn(Optional.of(mergedAway));
         when(eventActorResolver.currentActor()).thenReturn("  ");
 
         assertThatThrownBy(() -> accountMergeService.merge(request(1L, 2L)))
