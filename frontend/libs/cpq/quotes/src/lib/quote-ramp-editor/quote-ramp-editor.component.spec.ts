@@ -703,6 +703,53 @@ describe('QuoteRampEditorComponent', () => {
     expect(getById).not.toHaveBeenCalled();
   });
 
+  it('ignores a delayed extension for a line that is no longer selected', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
+    fixture.detectChanges();
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    component.onLineChange(2);
+    fixture.detectChanges();
+    pending.next([step({ months: 36, unitPrice: 40 }), step({ sequence: 2, startMonth: 37, unitPrice: 42 })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.length).toBe(1);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(123);
+  });
+
+  it('does not overwrite edits made while an extension is pending', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.form.controls.extendDuration.setValue(48);
+    component.onExtend();
+    expect(component.canSave()).toBe(false);
+    component.form.controls.steps.at(0).controls.unitPrice.setValue(77);
+    pending.next([step({ months: 36, unitPrice: 40 }), step({ sequence: 2, startMonth: 37, unitPrice: 42 })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.length).toBe(1);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(77);
+    expect(text()).toContain('schedule changed while the preview was running');
+  });
+
+  it('ignores generated periods after the selected line changes', () => {
+    const pending = new Subject<RampStep[]>();
+    expandRampSchedule.mockReturnValue(pending.asObservable());
+    fixture.componentRef.setInput('lines', [line(), line({ id: 2, schedule: { steps: [step({ months: 36, unitPrice: 123 })] } })]);
+    fixture.detectChanges();
+    component.form.controls.escalator.setValue({ startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 12 });
+    component.onExpand();
+    component.onLineChange(2);
+    fixture.detectChanges();
+    pending.next([step({ months: 36, unitPrice: 40 })]);
+    fixture.detectChanges();
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(123);
+  });
+
   it('AC-532-9 shows the extend error and keeps the edited rows', () => {
     extendRampSchedule.mockReturnValue(
       throwError(() => ({ message: 'RAMP_TERM_MISMATCH', errorCode: 'RAMP_SCHEDULE_INVALID' })),
