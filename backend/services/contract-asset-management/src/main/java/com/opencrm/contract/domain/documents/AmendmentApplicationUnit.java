@@ -51,6 +51,16 @@ public class AmendmentApplicationUnit extends DocumentAuditedEntity {
     @Column(name = "apply_key_digest", length = 64)
     private String applyKeyDigest;
 
+    /** Evidence committed with the terminal unit; null marks an unverifiable legacy attempt. */
+    @Column(name = "attempt_revision_no")
+    private Integer attemptRevisionNo;
+
+    @Column(name = "attempt_pin_fingerprint", length = 67)
+    private String attemptPinFingerprint;
+
+    @Column(name = "block_reason", length = 64)
+    private String blockReason;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
     private ApplicationUnitStatus status;

@@ -6,6 +6,7 @@ import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealCurrencyConverter;
 import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealStage;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class QuoteAcceptedDealProcessorTest {
 
     @Mock
     private DealCurrencyConverter dealCurrencyConverter;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private QuoteAcceptedDealProcessor processor;

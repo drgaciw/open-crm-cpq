@@ -3,6 +3,7 @@ package com.opencrm.crm.organization;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.contact.ContactDto;
 import com.opencrm.crm.contact.ContactService;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +35,9 @@ class OrganizationServiceTest {
 
     @Mock
     private ContactService contactService;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private OrganizationService organizationService;
