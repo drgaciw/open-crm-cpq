@@ -78,7 +78,8 @@ class DocumentApplyIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
                 .isEqualTo(2L);
         assertThat(jdbc.queryForObject(
-                "select count(*) from subscription_rate_periods where amendment_document_line_id is not null", Long.class))
+                "select count(*) from subscription_rate_periods where amendment_document_line_id in "
+                        + "(select id from amendment_document_lines where document_id = ?)", Long.class, documentId))
                 .isEqualTo(2L);
         Long appliedEvents = jdbc.queryForObject(
                 "select count(*) from amendment_document_events where document_id = ? and event_type = ?",
@@ -90,6 +91,34 @@ class DocumentApplyIntegrationTest {
         assertThat(replay.replayed()).isTrue();
         assertThat(jdbc.queryForObject("select count(*) from document_apply_ledger where document_id = ?", Long.class, documentId))
                 .isEqualTo(2L);
+    }
+
+    @Test
+    void partialReplayPersistsAttemptDigestAndRejectsChangedAppliedUnit() {
+        UUID tenant = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        seed(tenant, documentId, UUID.randomUUID(), UUID.randomUUID(), false);
+        jdbc.update("""
+                insert into document_apply_ledger (tenant_id, document_id, unit_no, apply_key_digest, created_by)
+                values (?, ?, 2, ?, 'earlier')
+                """, tenant, documentId, "cd".repeat(32));
+        ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE",
+                "corr-int", Map.of());
+
+        assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
+        assertThat(jdbc.queryForObject("""
+                select apply_key_digest from amendment_application_units where document_id = ? and unit_no = 2
+                """, String.class, documentId)).matches("[0-9a-f]{64}");
+        assertThat(orchestrator.apply(command).replayed()).isTrue();
+
+        jdbc.update("update amendment_application_units set observed_commercial_revision = 99 where document_id = ? and unit_no = 1",
+                documentId);
+        assertThatThrownBy(() -> orchestrator.apply(command))
+                .isInstanceOfSatisfying(DocumentApplyException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("DIGEST_CONFLICT"));
+        assertThat(jdbc.queryForObject("""
+                select count(*) from amendment_document_events where document_id = ? and event_type = 'APPLY_REFUSED'
+                """, Long.class, documentId)).isEqualTo(1L);
     }
 
     private void seed(UUID tenant, UUID documentId, UUID firstSubscription, UUID secondSubscription, boolean conflict) {
