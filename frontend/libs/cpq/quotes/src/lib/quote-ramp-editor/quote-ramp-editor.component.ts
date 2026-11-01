@@ -467,7 +467,7 @@ export class QuoteRampEditorComponent {
   });
 
   readonly canSave = computed(() => {
-    if (!this.editable() || this.saving() || this.quoteId() == null) {
+    if (!this.editable() || this.saving() || this.expanding() || this.extending() || this.quoteId() == null) {
       return false;
     }
     const line = this.selectedLine();
@@ -486,7 +486,7 @@ export class QuoteRampEditorComponent {
 
   readonly canExpand = computed(() => {
     this.formRevision();
-    if (!this.editable() || this.expanding() || !this.lineAllowed() || this.quoteId() == null) {
+    if (!this.editable() || this.expanding() || this.extending() || !this.lineAllowed() || this.quoteId() == null) {
       return false;
     }
     const escalator = this.readEscalator();
@@ -522,7 +522,7 @@ export class QuoteRampEditorComponent {
 
   readonly canExtend = computed(() => {
     this.formRevision();
-    if (!this.editable() || this.extending() || !this.lineAllowed() || this.quoteId() == null) {
+    if (!this.editable() || this.extending() || this.expanding() || !this.lineAllowed() || this.quoteId() == null) {
       return false;
     }
     const duration = finiteOrNull(this.form.controls.extendDuration.value);
@@ -636,6 +636,7 @@ export class QuoteRampEditorComponent {
     if (quoteId == null || escalator == null) {
       return;
     }
+    const preview = this.previewContext();
     this.expanding.set(true);
     this.error.set(null);
     this.quoteService
@@ -647,11 +648,11 @@ export class QuoteRampEditorComponent {
       .subscribe({
         next: (steps) => {
           this.expanding.set(false);
-          this.replaceSteps(this.previewSteps(steps));
+          this.applyPreview(preview, steps);
         },
         error: (err: unknown) => {
           this.expanding.set(false);
-          this.error.set(httpErrorMessage(err));
+          if (this.isCurrentPreview(preview)) this.error.set(httpErrorMessage(err));
         },
       });
   }
@@ -667,6 +668,7 @@ export class QuoteRampEditorComponent {
       return;
     }
     const steps = this.readSteps(false);
+    const preview = this.previewContext();
     this.extending.set(true);
     this.error.set(null);
     this.quoteService
@@ -679,11 +681,11 @@ export class QuoteRampEditorComponent {
       .subscribe({
         next: (returned) => {
           this.extending.set(false);
-          this.replaceSteps(this.previewSteps(returned));
+          this.applyPreview(preview, returned);
         },
         error: (err: unknown) => {
           this.extending.set(false);
-          this.error.set(httpErrorMessage(err));
+          if (this.isCurrentPreview(preview)) this.error.set(httpErrorMessage(err));
         },
       });
   }
@@ -870,6 +872,28 @@ export class QuoteRampEditorComponent {
     this.error.set(null);
     this.syncLock();
     this.formRevision.update((revision) => revision + 1);
+  }
+
+  private previewContext() {
+    return {
+      quoteId: this.quoteId(),
+      lineId: this.selectedLineId(),
+      duration: this.durationInMonths(),
+      revision: this.formRevision(),
+    };
+  }
+
+  private isCurrentPreview(context: ReturnType<QuoteRampEditorComponent['previewContext']>): boolean {
+    return this.editable() && this.quoteId() === context.quoteId && this.selectedLineId() === context.lineId
+      && this.durationInMonths() === context.duration && this.formRevision() === context.revision;
+  }
+
+  private applyPreview(context: ReturnType<QuoteRampEditorComponent['previewContext']>, result: unknown): void {
+    if (this.isCurrentPreview(context)) {
+      this.replaceSteps(this.previewSteps(result));
+    } else if (this.editable() && this.quoteId() === context.quoteId && this.selectedLineId() === context.lineId) {
+      this.error.set('The schedule changed while the preview was running. Generate the preview again.');
+    }
   }
 
   private coveredMonths(): number {
