@@ -1,0 +1,32 @@
+{
+    "id": "lifecycle-intents-changeline-update-delta",
+    "story": "DRG-645",
+    "cluster": "lifecycle-intents",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "case": "update-delta",
+    "sources": [
+        "LifecycleChangeService.prepareLines",
+        "LifecycleChangeServiceTest.createStoresTwoLines",
+        "DRG-583 merge 47685ffbc7d52de46a4dcd980ecaf7b894c4a414"
+    ],
+    "inputs": {
+        "actionCode": "UPDATE",
+        "quantitySemantics": "DELTA",
+        "startQty": "10.0000",
+        "deltaQty": "5.0000",
+        "endQty": "15.0000",
+        "targetSubscriptionPresent": true
+    },
+    "expected": {
+        "stored": true,
+        "actionCode": "UPDATE",
+        "quantitySemantics": "DELTA",
+        "startQty": "10.0000",
+        "deltaQty": "5.0000",
+        "endQty": "15.0000",
+        "equation": "startQty + deltaQty = endQty",
+        "submitErrorCode": null,
+        "returnsPrice": false
+    }
+}
