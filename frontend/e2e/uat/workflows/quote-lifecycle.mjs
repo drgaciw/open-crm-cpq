@@ -32,65 +32,25 @@ const squash = (text) => (text ?? '').replace(/\s+/g, ' ').trim();
 const formatMoney = (amount, currency) =>
   Number(amount).toLocaleString('en-US', { style: 'currency', currency: currency || 'USD' });
 
-const isDuplicateSeed = (error) =>
-  error instanceof ApiCallError
-  && (error.status === 400 || error.status === 409)
-  && /DUPLICATE|already exists|already present/i.test(String(error.body ?? error.message));
-
-/**
- * Quotes fixture hard-codes CUST-GOLD-001; Calculate / pricing execute require that customer in
- * pricing-service. Idempotent: DUPLICATE_EXTERNAL_ID (HTTP 400) means already seeded.
- */
-async function ensureQuotePricingCustomer(ctx) {
-  try {
-    await ensure(ctx, 'pricingCustomer', {
-      externalId: 'CUST-GOLD-001',
-      name: 'UAT Gold Customer',
-      segment: 'ENTERPRISE',
-      region: 'NA',
-    });
-  } catch (error) {
-    if (isDuplicateSeed(error)) return;
-    throw error;
-  }
-}
-
-/**
- * Pricing resolveBatch always needs an effective default (or regional) price book. Prefer a
- * mutable default (effectiveDate null) so each UAT product can receive an entry before Calculate.
- */
+/** Seed a private mutable regional book; never change the environment's default. */
 async function ensureMutableDefaultPriceBook(ctx) {
-  const listed = await ctx.api.get(`${PRICE_BOOKS}?page=0&size=50`);
-  const books = listed?.content ?? [];
-  const existing = books.find((b) => b.isDefault && b.effectiveDate == null);
-  if (existing) return existing;
-  try {
-    return await ensure(ctx, 'priceBook', {
-      name: uniqueName(ctx.runId, 'calc-default-book'),
-      region: `U${String(ctx.runId).slice(-4)}`,
-      currency: 'USD',
-      isDefault: true,
-    });
-  } catch (error) {
-    if (!isDuplicateSeed(error)) throw error;
-    const again = await ctx.api.get(`${PRICE_BOOKS}?page=0&size=50`);
-    const found = (again?.content ?? []).find((b) => b.isDefault);
-    if (found) return found;
-    throw error;
-  }
+  return ensure(ctx, 'priceBook', {
+    name: uniqueName(ctx.runId, 'calc-book'),
+    region: `UAT-${ctx.runId}`,
+    currency: 'USD',
+    isDefault: false,
+  });
 }
 
 async function ensurePriceBookEntryForProduct(ctx, bookId, product) {
-  try {
-    await ctx.api.post(`${PRICE_BOOKS}/${bookId}/entries`, {
-      productExternalId: String(product.id),
-      listPrice: product.listPrice ?? 25,
-      currency: product.currency || 'USD',
-    });
-  } catch (error) {
-    if (isDuplicateSeed(error)) return;
-    throw error;
-  }
+  const path = `${PRICE_BOOKS}/${bookId}/entries`;
+  const entry = await ctx.api.post(path, {
+    productExternalId: String(product.id),
+    listPrice: product.listPrice ?? 25,
+    currency: product.currency || 'USD',
+  });
+  if (entry?.id === undefined) throw new Error('price book entry was created without an id');
+  ctx.api.track('priceBookEntry', entry.id, `${path}/${entry.id}`);
 }
 
 /** Page-level action banner — the header / line-item / document cards own separate banners. */
@@ -120,6 +80,7 @@ const quoteDto = (api, id) => api.get(`${API}/${id}`);
 /** One product per run; its numeric id is what the Submit configuration preflight parses. */
 const products = new Map();
 const priceBooks = new Map();
+const pricingCustomers = new Map();
 export async function productFor(ctx) {
   if (!products.has(ctx.runId)) {
     const product = await ensure(ctx, 'product');
@@ -133,9 +94,15 @@ export async function productFor(ctx) {
 
 /** A DRAFT quote with one line item whose productExternalId is a real numeric product id. */
 export async function draftWithLine(ctx, overrides = {}) {
-  await ensureQuotePricingCustomer(ctx);
   const product = await productFor(ctx);
-  const quote = await ensure(ctx, 'quote', overrides);
+  if (!pricingCustomers.has(ctx.runId)) {
+    pricingCustomers.set(ctx.runId, await ensure(ctx, 'pricingCustomer'));
+  }
+  const quote = await ensure(ctx, 'quote', {
+    customerExternalId: pricingCustomers.get(ctx.runId).externalId,
+    region: priceBooks.get(ctx.runId).region,
+    ...overrides,
+  });
   try {
     await ctx.api.post(`${API}/${quote.id}/line-items`, {
       productExternalId: String(product.id), productName: product.name, listPrice: 25, quantity: 2,
