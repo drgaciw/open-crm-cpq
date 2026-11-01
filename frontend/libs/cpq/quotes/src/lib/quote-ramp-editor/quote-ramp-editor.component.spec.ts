@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   QuoteLineItemDto,
   RampStep,
@@ -195,11 +195,13 @@ describe('QuoteRampEditorComponent', () => {
   let component: QuoteRampEditorComponent;
   let updateLineItem: ReturnType<typeof vi.fn>;
   let expandRampSchedule: ReturnType<typeof vi.fn>;
+  let extendRampSchedule: ReturnType<typeof vi.fn>;
   let getById: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     updateLineItem = vi.fn(() => of(line()));
     expandRampSchedule = vi.fn(() => of([]));
+    extendRampSchedule = vi.fn(() => of([]));
     getById = vi.fn();
 
     await TestBed.configureTestingModule({
@@ -211,6 +213,7 @@ describe('QuoteRampEditorComponent', () => {
           useValue: {
             updateLineItem,
             expandRampSchedule,
+            extendRampSchedule,
             getById,
           },
         },
@@ -571,6 +574,172 @@ describe('QuoteRampEditorComponent', () => {
     );
   });
 
+  it('AC-532-9 one Generate action fills all 3 rows of a 36-month yearly ramp', () => {
+    expandRampSchedule.mockReturnValue(
+      of({
+        steps: [
+          step({ sequence: 1, startMonth: 1, months: 12, unitPrice: 42.8 }),
+          step({ sequence: 2, startMonth: 13, months: 12, unitPrice: 45.796 }),
+          step({ sequence: 3, startMonth: 25, months: 12, unitPrice: 49.0017 }),
+        ],
+      }),
+    );
+    component.form.controls.escalator.setValue({
+      startPrice: 42.8,
+      mode: 'PERCENT',
+      amount: 7,
+      everyMonths: 12,
+    });
+    fixture.detectChanges();
+
+    const generate = fixture.nativeElement.querySelector(
+      '[data-testid="expand-escalator"]',
+    ) as HTMLButtonElement;
+    generate.click();
+    fixture.detectChanges();
+
+    expect(expandRampSchedule).toHaveBeenCalledTimes(1);
+    expect(updateLineItem).not.toHaveBeenCalled();
+    expect(component.form.controls.steps.length).toBe(3);
+    expect(component.form.controls.steps.at(0).controls.unitPrice.value).toBe(42.8);
+    expect(component.form.controls.steps.at(1).controls.startMonth.value).toBe(13);
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(49.0017);
+    expect(fixture.nativeElement.querySelector('[data-testid="preview-period-3"]')).toBeTruthy();
+  });
+
+  it('AC-532-9 extend is labelled, keyboard reachable, and disabled while the schedule is empty', () => {
+    expect(text()).toContain('No periods yet.');
+    const extend = fixture.nativeElement.querySelector(
+      '[data-testid="extend-escalator"]',
+    ) as HTMLButtonElement;
+    const duration = fixture.nativeElement.querySelector(
+      '[data-testid="extend-duration"]',
+    ) as HTMLInputElement;
+    expect(extend.tagName).toBe('BUTTON');
+    expect(extend.type).toBe('button');
+    expect(extend.getAttribute('aria-label')).toBe('Extend ramp periods');
+    expect(extend.disabled).toBe(true);
+    expect(duration.getAttribute('aria-label')).toBe('Extend to months');
+    expect(text()).toContain('Extend to months');
+    duration.focus();
+    expect(document.activeElement).toBe(duration);
+    component.onExtend();
+    expect(extendRampSchedule).not.toHaveBeenCalled();
+  });
+
+  it('AC-532-9 shows a term mismatch and does not extend when the new term is not longer', () => {
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 42.8 }]);
+    component.form.controls.escalator.setValue({
+      startPrice: 42.8,
+      mode: 'PERCENT',
+      amount: 7,
+      everyMonths: 12,
+    });
+    component.form.controls.extendDuration.setValue(36);
+    fixture.detectChanges();
+
+    expect(text()).toContain('RAMP_TERM_MISMATCH');
+    const extend = fixture.nativeElement.querySelector(
+      '[data-testid="extend-escalator"]',
+    ) as HTMLButtonElement;
+    expect(extend.disabled).toBe(true);
+    component.onExtend();
+    expect(extendRampSchedule).not.toHaveBeenCalled();
+    expect(updateLineItem).not.toHaveBeenCalled();
+  });
+
+  it('AC-532-9 extend appends rows from the service and leaves edited prices untouched', () => {
+    const pending = new Subject<RampStep[]>();
+    extendRampSchedule.mockReturnValue(pending.asObservable());
+    fill([
+      { startMonth: 1, months: 12, quantity: 50, unitPrice: 42.8 },
+      { startMonth: 13, months: 12, quantity: 50, unitPrice: 44 },
+      { startMonth: 25, months: 12, quantity: 50, unitPrice: 47 },
+    ]);
+    component.form.controls.escalator.setValue({
+      startPrice: 42.8,
+      mode: 'PERCENT',
+      amount: 7,
+      everyMonths: 12,
+    });
+    component.form.controls.extendDuration.setValue(60);
+    fixture.detectChanges();
+
+    const extend = fixture.nativeElement.querySelector(
+      '[data-testid="extend-escalator"]',
+    ) as HTMLButtonElement;
+    expect(extend.disabled).toBe(false);
+    extend.focus();
+    expect(document.activeElement).toBe(extend);
+    extend.click();
+    fixture.detectChanges();
+
+    expect(component.form.controls.steps.length).toBe(3);
+    expect(extendRampSchedule).toHaveBeenCalledWith(7, {
+      durationInMonths: 60,
+      steps: [
+        expect.objectContaining({ sequence: 1, unitPrice: 42.8, startMonth: 1, months: 12 }),
+        expect.objectContaining({ sequence: 2, unitPrice: 44, startMonth: 13, months: 12 }),
+        expect.objectContaining({ sequence: 3, unitPrice: 47, startMonth: 25, months: 12 }),
+      ],
+      escalator: { startPrice: 42.8, mode: 'PERCENT', amount: 7, everyMonths: 12 },
+    });
+    expect(updateLineItem).not.toHaveBeenCalled();
+
+    pending.next([
+      step({ sequence: 1, startMonth: 1, months: 12, unitPrice: 42.8 }),
+      step({ sequence: 2, startMonth: 13, months: 12, unitPrice: 44 }),
+      step({ sequence: 3, startMonth: 25, months: 12, unitPrice: 47 }),
+      step({ sequence: 4, startMonth: 37, months: 12, unitPrice: 50.29 }),
+      step({ sequence: 5, startMonth: 49, months: 12, unitPrice: 53.8103 }),
+    ]);
+    fixture.detectChanges();
+
+    expect(component.form.controls.steps.length).toBe(5);
+    expect(component.form.controls.steps.at(1).controls.unitPrice.value).toBe(44);
+    expect(component.form.controls.steps.at(2).controls.unitPrice.value).toBe(47);
+    expect(component.form.controls.steps.at(3).controls.unitPrice.value).toBe(50.29);
+    expect(updateLineItem).not.toHaveBeenCalled();
+    expect(getById).not.toHaveBeenCalled();
+  });
+
+  it('AC-532-9 shows the extend error and keeps the edited rows', () => {
+    extendRampSchedule.mockReturnValue(
+      throwError(() => ({ message: 'RAMP_TERM_MISMATCH', errorCode: 'RAMP_SCHEDULE_INVALID' })),
+    );
+    fill([
+      { startMonth: 1, months: 12, quantity: 50, unitPrice: 42.8 },
+      { startMonth: 13, months: 12, quantity: 50, unitPrice: 44 },
+      { startMonth: 25, months: 12, quantity: 50, unitPrice: 47 },
+    ]);
+    component.form.controls.escalator.setValue({
+      startPrice: 42.8,
+      mode: 'PERCENT',
+      amount: 7,
+      everyMonths: 12,
+    });
+    component.form.controls.extendDuration.setValue(60);
+    fixture.detectChanges();
+
+    component.onExtend();
+    fixture.detectChanges();
+
+    expect(text()).toContain('RAMP_TERM_MISMATCH');
+    expect(component.form.controls.steps.length).toBe(3);
+    expect(component.form.controls.steps.at(1).controls.unitPrice.value).toBe(44);
+    expect(updateLineItem).not.toHaveBeenCalled();
+  });
+
+  it('hides extend when the quote is not editable', () => {
+    fixture.componentRef.setInput('editable', false);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('[data-testid="extend-escalator"]')).toBeNull();
+    expect(compiled.querySelector('[data-testid="extend-duration"]')).toBeNull();
+    component.onExtend();
+    expect(extendRampSchedule).not.toHaveBeenCalled();
+  });
+
   it('hides authoring actions when the quote is not editable', () => {
     fixture.componentRef.setInput('editable', false);
     fixture.detectChanges();
@@ -641,5 +810,75 @@ describe('QuoteRampEditorComponent HTTP', () => {
     expect(fixture.componentInstance.form.controls.steps.at(2).controls.unitPrice.value).toBe(
       44.1,
     );
+  });
+
+  it('AC-532-9 POSTs ramp-schedule/extend and does not PUT the line or the quote term', () => {
+    TestBed.configureTestingModule({
+      imports: [QuoteRampEditorComponent],
+      providers: [
+        QuoteService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNoopAnimations(),
+      ],
+    });
+    const fixture = TestBed.createComponent(QuoteRampEditorComponent);
+    fixture.componentRef.setInput('quoteId', 7);
+    fixture.componentRef.setInput('lines', [line()]);
+    fixture.componentRef.setInput('durationInMonths', 36);
+    fixture.componentRef.setInput('editable', true);
+    fixture.detectChanges();
+
+    fixture.componentInstance.addPeriod({
+      startMonth: 1,
+      months: 36,
+      quantity: 50,
+      unitPrice: 42.8,
+    });
+    fixture.componentInstance.form.controls.escalator.setValue({
+      startPrice: 42.8,
+      mode: 'PERCENT',
+      amount: 7,
+      everyMonths: 12,
+    });
+    fixture.componentInstance.form.controls.extendDuration.setValue(48);
+    fixture.detectChanges();
+    fixture.componentInstance.onExtend();
+
+    const http = TestBed.inject(HttpTestingController);
+    const req = http.expectOne('/api/v1/quotes/7/ramp-schedule/extend');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      durationInMonths: 48,
+      steps: [
+        {
+          sequence: 1,
+          startMonth: 1,
+          months: 36,
+          quantity: 50,
+          priceBasis: 'ABSOLUTE',
+          unitPrice: 42.8,
+        },
+      ],
+      escalator: {
+        startPrice: 42.8,
+        mode: 'PERCENT',
+        amount: 7,
+        everyMonths: 12,
+      },
+    });
+    req.flush({
+      steps: [
+        step({ sequence: 1, startMonth: 1, months: 36, unitPrice: 42.8 }),
+        step({ sequence: 2, startMonth: 37, months: 12, unitPrice: 45.796 }),
+      ],
+    });
+    fixture.detectChanges();
+
+    http.expectNone((request) => request.method === 'PUT');
+    http.expectNone('/api/v1/quotes/7');
+    expect(fixture.componentInstance.form.controls.steps.length).toBe(2);
+    expect(fixture.componentInstance.form.controls.steps.at(0).controls.unitPrice.value).toBe(42.8);
+    expect(fixture.componentInstance.form.controls.steps.at(1).controls.startMonth.value).toBe(37);
   });
 });

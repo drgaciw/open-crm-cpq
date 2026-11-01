@@ -164,7 +164,7 @@
         <h3>Escalator</h3>
         <p class="hint" id="escalator-hint">
           Percent mode is percent points (5 means 5%). Amount mode adds that currency value.
-          This is not the step discount fraction. Generate does not save the quote.
+          This is not the step discount fraction. Generate and Extend do not save the quote.
         </p>
         <div class="escalator-row" formGroupName="escalator">
           <mat-form-field appearance="outline">
@@ -228,6 +228,39 @@
             </div>
           }
         </div>
+        @if (editable()) {
+          <div class="escalator-actions">
+            <mat-form-field appearance="outline">
+              <mat-label>Extend to months</mat-label>
+              <input
+                matInput
+                type="number"
+                min="1"
+                step="1"
+                formControlName="extendDuration"
+                data-testid="extend-duration"
+                aria-label="Extend to months"
+              />
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="extend-escalator"
+              aria-label="Extend ramp periods"
+              (click)="onExtend()"
+              [disabled]="!canExtend()"
+            >
+              @if (extending()) {
+                <mat-spinner diameter="20" />
+              } @else {
+                <span>Extend periods</span>
+              }
+            </button>
+          </div>
+          @if (extendIssue(); as issue) {
+            <p class="line-note" role="alert" data-testid="extend-issue">{{ issue }}</p>
+          }
+        }
       </form>
 
       <h3>Preview</h3>
