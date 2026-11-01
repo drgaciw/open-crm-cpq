@@ -1,13 +1,13 @@
 package com.opencrm.crm.organization;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.common.valueobject.AccountId;
 import com.opencrm.crm.contact.ContactDto;
 import com.opencrm.crm.contact.ContactService;
 import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,6 +26,17 @@ public class OrganizationService {
     private final OrganizationMapper organizationMapper;
     private final ContactService contactService;
     private final CrmDomainEvents domainEvents;
+
+    /** Resolve the legacy numeric API ID without exposing it as a cross-service account ID. */
+    @Transactional(readOnly = true)
+    public AccountId resolveAccountId(Long legacyId) {
+        Organization organization = organizationRepository.findById(legacyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", legacyId));
+        if (organization.isDeleted()) {
+            throw new ResourceNotFoundException("Organization", legacyId);
+        }
+        return AccountId.of(organization.getUuid());
+    }
 
     /**
      * Create a new organization.
@@ -47,19 +58,10 @@ public class OrganizationService {
     /**
      * Get organization by ID.
      */
-    @Cacheable(value = "organizations", key = "#id")
     @Transactional(readOnly = true)
-    public OrganizationDto getById(Long id) {
-        log.debug("Fetching organization by ID: {}", id);
-
-        Organization organization = organizationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
-
-        if (organization.isDeleted()) {
-            throw new ResourceNotFoundException("Organization", id);
-        }
-
-        return organizationMapper.toDto(organization);
+    public OrganizationDto getById(AccountId id) {
+        log.debug("Fetching organization by ID: {}", id.value());
+        return organizationMapper.toDto(requireActive(id));
     }
 
     /**
@@ -82,17 +84,11 @@ public class OrganizationService {
     /**
      * Update an existing organization.
      */
-    @CacheEvict(value = "organizations", key = "#id")
-    public OrganizationDto update(Long id, OrganizationUpdateRequest request) {
-        log.debug("Updating organization with ID: {}", id);
+    @CacheEvict(value = "organizations", key = "#id.value()")
+    public OrganizationDto update(AccountId id, OrganizationUpdateRequest request) {
+        log.debug("Updating organization with ID: {}", id.value());
 
-        // Find existing organization
-        Organization organization = organizationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
-
-        if (organization.isDeleted()) {
-            throw new ResourceNotFoundException("Organization", id);
-        }
+        Organization organization = requireActive(id);
 
         // Update entity with non-null fields
         organizationMapper.updateEntity(request, organization);
@@ -107,20 +103,14 @@ public class OrganizationService {
     /**
      * Soft delete an organization.
      */
-    @CacheEvict(value = "organizations", key = "#id")
-    public void delete(Long id) {
-        log.debug("Deleting organization with ID: {}", id);
+    @CacheEvict(value = "organizations", key = "#id.value()")
+    public void delete(AccountId id) {
+        log.debug("Deleting organization with ID: {}", id.value());
 
-        Organization organization = organizationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
-
-        if (organization.isDeleted()) {
-            throw new ResourceNotFoundException("Organization", id);
-        }
-
+        Organization organization = requireActive(id);
         organization.softDelete();
         organizationRepository.save(organization);
-        log.info("Soft deleted organization with ID: {}", id);
+        log.info("Soft deleted organization with ID: {}", id.value());
     }
 
     /**
@@ -155,18 +145,19 @@ public class OrganizationService {
      * Get contacts belonging to an organization.
      */
     @Transactional(readOnly = true)
-    public Page<ContactDto> getContacts(Long organizationId, Pageable pageable) {
-        log.debug("Fetching contacts for organization ID: {}", organizationId);
-
-        // Verify organization exists
-        Organization organization = organizationRepository.findById(organizationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
-
-        if (organization.isDeleted()) {
-            throw new ResourceNotFoundException("Organization", organizationId);
-        }
-
-        // Delegate to ContactService
+    public Page<ContactDto> getContacts(AccountId organizationId, Pageable pageable) {
+        log.debug("Fetching contacts for organization ID: {}", organizationId.value());
+        requireActive(organizationId);
         return contactService.getByOrganization(organizationId, pageable);
+    }
+
+    private Organization requireActive(AccountId id) {
+        String rawId = id.value();
+        Organization organization = organizationRepository.findByUuidIgnoreCase(rawId)
+            .orElseThrow(() -> new ResourceNotFoundException("Organization", rawId));
+        if (organization.isDeleted()) {
+            throw new ResourceNotFoundException("Organization", rawId);
+        }
+        return organization;
     }
 }

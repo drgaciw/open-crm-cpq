@@ -1,5 +1,6 @@
 package com.opencrm.crm.organization;
 
+import com.opencrm.common.valueobject.AccountId;
 import org.mapstruct.*;
 
 import java.util.List;
@@ -27,9 +28,20 @@ public interface OrganizationMapper {
 
     /**
      * Convert Organization entity to OrganizationDto.
+     * The legacy numeric {@code id} and public UUID remain unchanged on the wire.
      */
     @Mapping(target = "contactCount", expression = "java(entity.getContactCount() != null ? entity.getContactCount() : 0)")
     OrganizationDto toDto(Organization entity);
+
+    /**
+     * Shared-kernel identifier for this organization. Null until a UUID has been assigned.
+     */
+    default AccountId accountId(Organization entity) {
+        if (entity == null || entity.getUuid() == null) {
+            return null;
+        }
+        return AccountId.of(entity.getUuid());
+    }
 
     /**
      * Update Organization entity from OrganizationUpdateRequest.
