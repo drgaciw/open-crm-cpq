@@ -127,6 +127,97 @@ class LifecycleChangeServiceTest {
         verify(pricing, never()).evaluateContinuation(any());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"unbound", "unknown-status", "missing-rate", "negative-rate", "missing-amount",
+            "bad-amount", "inexact-rate", "oversized-rate", "missing-quantity", "wrong-quantity", "missing-pin",
+            "wrong-product", "policy-mismatch", "trace-mismatch", "missing-decision", "missing-policy",
+            "envelope-trace-mismatch", "invalid-configuration-hash", "duplicate-decision", "duplicate", "unknown-line", "missing-line"})
+    void invalidPricingResponseCannotMarkDraftPriced(String defect) {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        LifecycleChangeService service = service();
+        UUID id = service.create(twoLines(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> {
+            ApiResponse<ContinuationEvaluationView> response = priced(invocation.getArgument(0));
+            var lines = new ArrayList<>(response.getData().getLines());
+            var line = lines.getFirst();
+            switch (defect) {
+                case "unbound" -> line.setProcedureStatus("UNBOUND");
+                case "unknown-status" -> line.setProcedureStatus("OTHER");
+                case "missing-rate" -> line.setUnitRate(null);
+                case "negative-rate" -> line.setUnitRate("-1");
+                case "missing-amount" -> line.setAmount(null);
+                case "bad-amount" -> line.setAmount("NaN");
+                case "inexact-rate" -> line.setUnitRate("1.00001");
+                case "oversized-rate" -> line.setUnitRate("1e1000000");
+                case "missing-quantity" -> line.setEndQuantity(null);
+                case "wrong-quantity" -> line.setEndQuantity("999");
+                case "missing-pin" -> line.setPricebookVersion(null);
+                case "wrong-product" -> line.setProductExternalId("other");
+                case "policy-mismatch" -> line.setPolicyVersion("other");
+                case "trace-mismatch" -> line.setTraceId("other");
+                case "missing-decision" -> line.setPolicyDecisionId(null);
+                case "missing-policy" -> response.getData().setPolicyId(null);
+                case "envelope-trace-mismatch" -> response.setTraceId("other");
+                case "invalid-configuration-hash" -> line.setConfigurationHash("not-a-sha256");
+                case "duplicate-decision" -> lines.getLast().setPolicyDecisionId(line.getPolicyDecisionId());
+                case "duplicate" -> lines.add(line);
+                case "unknown-line" -> line.setLineRef("not-requested");
+                case "missing-line" -> lines.removeLast();
+                default -> throw new IllegalArgumentException(defect);
+            }
+            response.getData().setLines(lines);
+            return response;
+        });
+        assertThatThrownBy(() -> service.price(id, priceCommand(0L)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY));
+        assertThat(stored.get(id).getStatus()).isEqualTo(LifecycleChangeStatus.DRAFT);
+    }
+
+    @Test
+    void pricedResponseMayContainNegativeAmountAndNullConfigurationHash() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        LifecycleChangeService service = service();
+        UUID id = service.create(twoLines(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> {
+            ApiResponse<ContinuationEvaluationView> result = priced(invocation.getArgument(0));
+            result.getData().getLines().getFirst().setAmount("-10.0000");
+            return result;
+        });
+        assertThat(service.price(id, priceCommand(0L)).body().getStatus()).isEqualTo("PRICED");
+    }
+
+    @Test
+    void removeCanPriceZeroEndQuantityAndAWellFormedConfigurationHash() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        var request = twoLines();
+        request.getLines().getFirst().setActionCode("REMOVE");
+        request.getLines().getFirst().setDeltaQty("-10");
+        request.getLines().getFirst().setEndQty("0");
+        LifecycleChangeService service = service();
+        UUID id = service.create(request, null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> {
+            ApiResponse<ContinuationEvaluationView> result = priced(invocation.getArgument(0));
+            result.getData().getLines().getFirst().setConfigurationHash("ab".repeat(32));
+            return result;
+        });
+        var response = service.price(id, priceCommand(0L)).body();
+        assertThat(response.getStatus()).isEqualTo("PRICED");
+        assertThat(response.getLines().getFirst().getConfigurationHash()).isEqualTo("ab".repeat(32));
+    }
+
+    @Test
+    void anEmptyChangeCannotBecomePricedEvenWithAnEmptyPricingResponse() {
+        LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
+        var request = twoLines();
+        request.setLines(List.of());
+        LifecycleChangeService service = service();
+        UUID id = service.create(request, null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        assertThatThrownBy(() -> service.price(id, priceCommand(0L))).isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY));
+    }
+
     @Test
     void submitRechecksRevisionAfterPricing() {
         LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
@@ -593,6 +684,7 @@ class LifecycleChangeServiceTest {
             pricedLine.setPricebookVersion("pb-2026.10");
             pricedLine.setConfigurationHash(null);
             pricedLine.setProcedureStatus("PRICED");
+            pricedLine.setEndQuantity(String.valueOf(line.get("endQuantity")));
             pricedLine.setUnitRate("40.0000");
             pricedLine.setAmount("100.0000");
             return pricedLine;

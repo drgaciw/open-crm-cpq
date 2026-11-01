@@ -151,6 +151,139 @@ class LifecycleConcurrencyIntegrationTest {
         assertThat(current.getStatus()).isEqualTo(LifecycleChangeStatus.PRICED);
     }
 
+    @Test void invalidInitialPricingRollsBackAndLegacyPricedRowsCannotSubmit() {
+        UUID id = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> {
+            var result = priced(invocation.getArgument(0));
+            result.getData().getLines().getFirst().setProcedureStatus("UNBOUND");
+            return result;
+        });
+        assertThatThrownBy(() -> service.price(id, priceCommand(0))).isInstanceOf(BusinessException.class);
+        assertThat(changes.findById(id).orElseThrow().getVersion()).isZero();
+        assertThat(changes.findById(id).orElseThrow().getStatus()).isEqualTo(LifecycleChangeStatus.DRAFT);
+        doAnswer(invocation -> priced(invocation.getArgument(0))).when(pricing).evaluateContinuation(any());
+        service.price(id, priceCommand(0));
+        jdbc.update("update quote.lifecycle_changes set pricing_validation_version = null where id = ?", id);
+        assertThatThrownBy(() -> service.submit(id, new VersionedCommand(1L)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("reprice");
+        assertThat(changes.findById(id).orElseThrow().getVersion()).isEqualTo(1L);
+        assertThat(changes.findById(id).orElseThrow().getStatus()).isEqualTo(LifecycleChangeStatus.PRICED);
+    }
+
+    @Test void failedRepriceDemotesAndRejectsConcurrentSubmitOfOldEvidence() throws Exception {
+        UUID id = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        service.price(id, priceCommand(0));
+        CountDownLatch inPricing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            inPricing.countDown();
+            if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("pricing wait timed out");
+            var result = priced(invocation.getArgument(0));
+            result.getData().getLines().getFirst().setProcedureStatus("UNBOUND");
+            return result;
+        }).when(pricing).evaluateContinuation(any());
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var reprice = pool.submit(() -> priceAsUser(id, 1));
+            assertThat(inPricing.await(10, TimeUnit.SECONDS)).isTrue();
+            var submit = pool.submit(() -> submitAsUserResult(id, 1));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (System.nanoTime() < deadline && waitingVersionUpdates() == 0) Thread.sleep(20);
+            assertThat(waitingVersionUpdates()).isGreaterThan(0);
+            release.countDown();
+            assertThat(reprice.get(20, TimeUnit.SECONDS)).isInstanceOfSatisfying(BusinessException.class,
+                    error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY));
+            assertThat(submit.get(20, TimeUnit.SECONDS)).isInstanceOfSatisfying(BusinessException.class,
+                    error -> assertThat(error.getErrorCode()).isEqualTo("VERSION_CONFLICT"));
+            LifecycleChange current = changes.findById(id).orElseThrow();
+            assertThat(current.getStatus()).isEqualTo(LifecycleChangeStatus.DRAFT);
+            assertThat(current.getVersion()).isEqualTo(2L);
+            assertThat(current.getPricingValidationVersion()).isNull();
+            assertThat(jdbc.queryForObject("""
+                    select count(*) from quote.lifecycle_change_lines where lifecycle_change_id = ?
+                      and (policy_decision_id is not null or policy_id is not null or policy_version is not null
+                           or pricing_trace_id is not null or pricebook_version is not null
+                           or configuration_hash is not null or unit_price is not null or net_amount is not null)
+                    """, Long.class, id)).isZero();
+            doAnswer(invocation -> priced(invocation.getArgument(0))).when(pricing).evaluateContinuation(any());
+            assertThat(service.price(id, priceCommand(2)).body().getVersion()).isEqualTo(3L);
+            assertThat(service.submit(id, new VersionedCommand(3L)).body().getStatus()).isEqualTo("IN_APPROVAL");
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test void staleTargetDuringRepriceDemotesAndClearsEvidence() {
+        UUID id = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        service.price(id, priceCommand(0));
+        when(subscriptions.read(SUBSCRIPTION)).thenReturn(new SubscriptionTarget(SUBSCRIPTION, "ACTIVE", 5L));
+        assertThatThrownBy(() -> service.price(id, priceCommand(1)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("V3");
+        assertDraftWithoutPricing(id, 2);
+    }
+
+    @Test void unexpectedPricingClientFailureDemotesAndClearsEvidence() {
+        UUID id = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        service.price(id, priceCommand(0));
+        doThrow(new IllegalStateException("malformed pricing response")).when(pricing).evaluateContinuation(any());
+        assertThatThrownBy(() -> service.price(id, priceCommand(1)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY));
+        assertDraftWithoutPricing(id, 2);
+    }
+
+    @Test void failedRepriceDoesNotCommitUnrelatedCallerTransaction() {
+        UUID pricedId = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        service.price(pricedId, priceCommand(0));
+        doAnswer(invocation -> {
+            var result = priced(invocation.getArgument(0));
+            result.getData().getLines().getFirst().setProcedureStatus("UNBOUND");
+            return result;
+        }).when(pricing).evaluateContinuation(any());
+        var unrelatedId = new java.util.concurrent.atomic.AtomicReference<UUID>();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            unrelatedId.set(service.create(request(), null).body().getId());
+            assertThatThrownBy(() -> service.price(pricedId, priceCommand(1)))
+                    .isInstanceOf(BusinessException.class);
+            status.setRollbackOnly();
+        });
+        assertThat(changes.existsById(unrelatedId.get())).isFalse();
+        assertDraftWithoutPricing(pricedId, 2);
+    }
+
+    @Test void successfulPricingAlsoCommitsIndependentlyOfCallerTransaction() {
+        UUID target = service.create(request(), null).body().getId();
+        when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
+        var unrelatedId = new java.util.concurrent.atomic.AtomicReference<UUID>();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            unrelatedId.set(service.create(request(), null).body().getId());
+            assertThat(service.price(target, priceCommand(0)).body().getStatus()).isEqualTo("PRICED");
+            status.setRollbackOnly();
+        });
+        assertThat(changes.existsById(unrelatedId.get())).isFalse();
+        LifecycleChange current = changes.findById(target).orElseThrow();
+        assertThat(current.getStatus()).isEqualTo(LifecycleChangeStatus.PRICED);
+        assertThat(current.getVersion()).isEqualTo(1L);
+    }
+
+    private void assertDraftWithoutPricing(UUID id, long version) {
+        LifecycleChange current = changes.findById(id).orElseThrow();
+        assertThat(current.getStatus()).isEqualTo(LifecycleChangeStatus.DRAFT);
+        assertThat(current.getVersion()).isEqualTo(version);
+        assertThat(current.getPricingValidationVersion()).isNull();
+        assertThat(jdbc.queryForObject("""
+                select count(*) from quote.lifecycle_change_lines where lifecycle_change_id = ?
+                  and (policy_decision_id is not null or policy_id is not null or policy_version is not null
+                       or pricing_trace_id is not null or pricebook_version is not null
+                       or configuration_hash is not null or unit_price is not null or net_amount is not null)
+                """, Long.class, id)).isZero();
+    }
+
     @Test void simultaneousIdenticalSubmitCommandsCommitOnceAndReplay() throws Exception {
         UUID id = service.create(request(), null).body().getId();
         when(pricing.evaluateContinuation(any())).thenAnswer(invocation -> priced(invocation.getArgument(0)));
@@ -256,6 +389,11 @@ class LifecycleConcurrencyIntegrationTest {
         finally { TestCallers.clear(); }
     }
 
+    private Object submitAsUserResult(UUID id, long version) {
+        try { return submitAsUser(id, version); }
+        catch (BusinessException ex) { return ex; }
+    }
+
     private Object createAsUser(CreateLifecycleChangeRequest request, String key) {
         LifecycleCallers.signIn("seller", TENANT, "CPQ.User");
         try { return service.create(request, key); }
@@ -302,8 +440,10 @@ class LifecycleConcurrencyIntegrationTest {
         line.setLineRef(input.getFirst().get("lineRef").toString());
         line.setPolicyDecisionId("decision"); line.setPolicyId("policy"); line.setPolicyVersion("1");
         line.setTraceId("trace"); line.setProductExternalId("sku"); line.setPricebookVersion("pb");
-        line.setUnitRate("10"); line.setAmount("20");
+        line.setUnitRate("10"); line.setAmount("20"); line.setProcedureStatus("PRICED");
+        line.setEndQuantity(input.getFirst().get("endQuantity").toString());
         var result = new ContinuationEvaluationView(); result.setLines(List.of(line));
+        result.setPolicyId("policy"); result.setPolicyVersion("1"); result.setTraceId("trace");
         return ApiResponse.success(result);
     }
 }
