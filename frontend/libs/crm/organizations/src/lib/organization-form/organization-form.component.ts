@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, input, effect, signal, ChangeDetectionStrategy, Injector } from '@angular/core';
+import { Component, inject, OnInit, input, effect, signal, computed, untracked, DestroyRef, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Subscription } from 'rxjs';
 import { OrganizationType } from '@frontend/shared-models';
 import { ACCOUNT_INDUSTRIES } from '../account-industries';
 import { OrganizationService } from '../organization.service';
@@ -31,7 +32,7 @@ import { OrganizationService } from '../organization.service';
       <button mat-icon-button (click)="goBack()" aria-label="Go back">
         <mat-icon>arrow_back</mat-icon>
       </button>
-      <h1>{{ isEditMode ? 'Edit Account' : 'New Account' }}</h1>
+      <h1>{{ isEditMode() ? 'Edit Account' : 'New Account' }}</h1>
     </div>
 
     <mat-card class="form-card">
@@ -75,7 +76,7 @@ import { OrganizationService } from '../organization.service';
                   <mat-option [value]="accountType">{{ accountType }}</mat-option>
                 }
               </mat-select>
-              @if (isEditMode && !allowNoType()) {
+              @if (isEditMode() && !allowNoType()) {
                 <mat-hint>An existing type cannot be cleared.</mat-hint>
               }
             </mat-form-field>
@@ -144,11 +145,11 @@ import { OrganizationService } from '../organization.service';
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
             <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving()">
+                    [disabled]="form.invalid || saving() || !readyForSave()">
               @if (saving()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
-                {{ isEditMode ? 'Update' : 'Create' }}
+                {{ isEditMode() ? 'Update' : 'Create' }}
               }
             </button>
           </div>
@@ -174,14 +175,19 @@ export class OrganizationFormComponent implements OnInit {
   private readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
 
   id = input<string>();
 
   form!: FormGroup;
-  isEditMode = false;
+  readonly isEditMode = computed(() => !!this.id());
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
   readonly allowNoType = signal(true);
+  private readonly requestedId = signal<string | null>(null);
+  private readonly loadedId = signal<string | null>(null);
+  readonly readyForSave = computed(() => !this.id() || this.loadedId() === this.id());
+  private saveRequest: Subscription | null = null;
 
   industries = [...ACCOUNT_INDUSTRIES];
   accountTypes: OrganizationType[] = [
@@ -211,44 +217,61 @@ export class OrganizationFormComponent implements OnInit {
       type: [''],
     });
 
-    const idVal = this.id();
-    if (idVal) {
-      this.isEditMode = true;
-      this.allowNoType.set(false);
-      this.form.get('type')?.setValidators(Validators.required);
-      this.form.get('type')?.updateValueAndValidity({ emitEvent: false });
-      this.orgService.getById(Number(idVal));
-      // Patch form when data loads
-      effect(() => {
-        const org = this.orgService.selectedOrganization();
-        if (org && org.id === Number(idVal)) {
-          const hasType = !!org.type;
-          this.allowNoType.set(!hasType);
-          const type = this.form.get('type');
-          type?.setValidators(hasType ? Validators.required : null);
-          this.form.patchValue({ ...org, type: org.type ?? '' });
-          type?.updateValueAndValidity({ emitEvent: false });
-        }
-      }, { injector: this.injector });
-    }
+    const emptyForm = this.form.getRawValue();
+    effect(() => {
+      const idVal = this.id();
+      untracked(() => {
+        this.saveRequest?.unsubscribe();
+        this.saveRequest = null;
+        this.saving.set(false);
+        this.loadedId.set(null);
+        this.requestedId.set(idVal ?? null);
+        this.orgService.resetAccountDetail();
+        this.form.reset(emptyForm, { emitEvent: false });
+        this.allowNoType.set(!idVal);
+        const type = this.form.get('type');
+        type?.setValidators(idVal ? Validators.required : null);
+        type?.updateValueAndValidity({ emitEvent: false });
+        if (idVal) this.orgService.getById(Number(idVal));
+      });
+    }, { injector: this.injector });
+    effect(() => {
+      const idVal = this.id();
+      const requested = this.requestedId();
+      const org = this.orgService.selectedOrganization();
+      if (!idVal || requested !== idVal || !org || org.id !== Number(idVal) || this.loadedId() === idVal) return;
+      untracked(() => {
+        const hasType = !!org.type;
+        this.allowNoType.set(!hasType);
+        const type = this.form.get('type');
+        type?.setValidators(hasType ? Validators.required : null);
+        this.form.patchValue({ ...org, type: org.type ?? '' });
+        type?.updateValueAndValidity({ emitEvent: false });
+        this.loadedId.set(idVal);
+      });
+    }, { injector: this.injector });
+    this.destroyRef.onDestroy(() => {
+      this.saveRequest?.unsubscribe();
+      this.orgService.resetAccountDetail();
+    });
   }
 
   onSubmit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.saving() || !this.readyForSave()) return;
     this.saving.set(true);
 
     const data = this.payload();
     const idVal = this.id();
 
-    if (this.isEditMode && idVal) {
-      this.orgService.update(Number(idVal), data).subscribe({
-        next: () => this.router.navigate(['/organizations', idVal]),
-        error: () => this.saving.set(false),
+    if (idVal) {
+      this.saveRequest = this.orgService.update(Number(idVal), data).subscribe({
+        next: () => { if (this.id() === idVal) this.router.navigate(['/organizations', idVal]); },
+        error: () => { if (this.id() === idVal) this.saving.set(false); },
       });
     } else {
-      this.orgService.create(data).subscribe({
-        next: (org) => this.router.navigate(['/organizations', org.id]),
-        error: () => this.saving.set(false),
+      this.saveRequest = this.orgService.create(data).subscribe({
+        next: (org) => { if (!this.id()) this.router.navigate(['/organizations', org.id]); },
+        error: () => { if (!this.id()) this.saving.set(false); },
       });
     }
   }
@@ -264,7 +287,7 @@ export class OrganizationFormComponent implements OnInit {
 
   goBack(): void {
     const idVal = this.id();
-    if (this.isEditMode && idVal) {
+    if (this.isEditMode() && idVal) {
       this.router.navigate(['/organizations', idVal]);
     } else {
       this.router.navigate(['/organizations']);

@@ -4,6 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatSelect } from '@angular/material/select';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
 import { OrganizationFormComponent } from './organization-form.component';
 import { OrganizationService } from '../organization.service';
@@ -30,6 +32,7 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
             create: vi.fn(() => createSubject.asObservable()),
             update: vi.fn(() => createSubject.asObservable()),
             getById: vi.fn(),
+            resetAccountDetail: vi.fn(),
             selectedOrganization,
           },
         },
@@ -122,5 +125,82 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     expect(edit.componentInstance.form.get('name')?.value).toBe('');
     const typeSelect = edit.debugElement.query(By.css('mat-select[formControlName="type"]')).componentInstance as MatSelect;
     expect(typeSelect.options.toArray().map(option => option.value)).not.toContain('');
+  });
+});
+
+describe('OrganizationFormComponent reused edit route', () => {
+  let fixture: ComponentFixture<OrganizationFormComponent>;
+  let http: HttpTestingController;
+
+  const account = (id: number, name: string): OrganizationDto => ({
+    id, uuid: `uuid-${id}`, name, type: 'CUSTOMER', createdAt: '', updatedAt: '',
+  });
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [OrganizationFormComponent],
+      providers: [provideRouter([]), provideNoopAnimations(), provideHttpClient(), provideHttpClientTesting()],
+    }).compileComponents();
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(OrganizationFormComponent);
+    fixture.componentRef.setInput('id', '7');
+    fixture.detectChanges();
+  });
+
+  afterEach(() => http.verify({ ignoreCancelled: true }));
+
+  it('blocks a stale save immediately when the route ID changes and reloads the new account', () => {
+    http.expectOne('/api/v1/organizations/7').flush(account(7, 'First'));
+    fixture.detectChanges();
+    fixture.componentRef.setInput('id', '8');
+    fixture.componentInstance.onSubmit();
+    http.expectNone(request => request.method === 'PUT');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.form.get('name')?.value).toBe('');
+    http.expectOne('/api/v1/organizations/8').flush(account(8, 'Second'));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.form.get('name')?.value).toBe('Second');
+    fixture.componentInstance.onSubmit();
+    const update = http.expectOne('/api/v1/organizations/8');
+    expect(update.request.body.name).toBe('Second');
+    update.flush(account(8, 'Second'));
+  });
+
+  it('cancels an old load before accepting a new account', () => {
+    const old = http.expectOne('/api/v1/organizations/7');
+    fixture.componentRef.setInput('id', '8');
+    fixture.detectChanges();
+    expect(old.cancelled).toBe(true);
+    http.expectOne('/api/v1/organizations/8').flush(account(8, 'Second'));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.form.get('name')?.value).toBe('Second');
+  });
+
+  it('cancels an unfinished load when the editor is destroyed', () => {
+    const old = http.expectOne('/api/v1/organizations/7');
+    fixture.destroy();
+    expect(old.cancelled).toBe(true);
+  });
+
+  it('does not submit an edit after its account fails to load', () => {
+    http.expectOne('/api/v1/organizations/7').flush({ message: 'Unavailable' }, { status: 503, statusText: 'Unavailable' });
+    fixture.componentInstance.form.patchValue({ name: 'Typed while offline', type: 'CUSTOMER' });
+    fixture.detectChanges();
+    fixture.componentInstance.onSubmit();
+    http.expectNone(request => request.method === 'PUT');
+    expect((fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('cancels an old save callback when the route changes', () => {
+    http.expectOne('/api/v1/organizations/7').flush(account(7, 'First'));
+    fixture.detectChanges();
+    fixture.componentInstance.onSubmit();
+    const oldSave = http.expectOne(request => request.method === 'PUT' && request.url === '/api/v1/organizations/7');
+    fixture.componentRef.setInput('id', '8');
+    fixture.detectChanges();
+    expect(oldSave.cancelled).toBe(true);
+    http.expectOne('/api/v1/organizations/8').flush(account(8, 'Second'));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.form.get('name')?.value).toBe('Second');
   });
 });
