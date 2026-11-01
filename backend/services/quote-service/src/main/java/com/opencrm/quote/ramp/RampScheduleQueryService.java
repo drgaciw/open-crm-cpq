@@ -28,7 +28,34 @@ public class RampScheduleQueryService {
             throw RampScheduleException.notSupported();
         }
         int duration = request.getDurationInMonths() == null ? 0 : request.getDurationInMonths();
-        List<RampStepDto> steps = expander.expand(duration, request.getEscalator(), request.getQuantity());
+        List<RampStepDto> steps = expander.expand(duration, request.getEscalator(), request.getQuantity(),
+                properties.getMaxPeriods());
+        if (steps.size() > properties.getMaxPeriods()) {
+            throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
+        }
+        return RampScheduleDto.builder()
+                .steps(steps)
+                .escalator(request.getEscalator())
+                .build();
+    }
+
+    /**
+     * Preview an extension. Reads the quote so a missing id is a 404, and writes nothing.
+     * Existing steps stay as submitted; new steps continue from the last absolute unit.
+     */
+    @Transactional(readOnly = true)
+    public RampScheduleDto extend(Long quoteId, RampExtendRequest request) {
+        if (quoteRepository.findByIdAndDeletedFalse(quoteId).isEmpty()) {
+            throw new ResourceNotFoundException("Quote", quoteId);
+        }
+        if (!properties.isEnabled()) {
+            throw RampScheduleException.notSupported();
+        }
+        int duration = request.getDurationInMonths() == null ? 0 : request.getDurationInMonths();
+        List<RampStepDto> steps = expander.extend(
+                request.getSteps() == null ? List.of() : request.getSteps(),
+                duration,
+                request.getEscalator(), properties.getMaxPeriods());
         if (steps.size() > properties.getMaxPeriods()) {
             throw RampScheduleException.invalid(List.of(RampReasons.TOO_MANY_PERIODS));
         }
