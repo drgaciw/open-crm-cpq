@@ -96,7 +96,7 @@ export const detail = validateSpec({
     { title: 'Description', optional: true },
     { title: 'Contacts at this account', emptyText: 'No linked contacts yet.' },
     { title: 'Deals', emptyText: 'No deals linked to this account.' },
-    { title: 'Quotes', emptyText: 'No quotes linked to this account.' },
+    { title: 'Quotes', emptyText: 'No quotes found for this account ID.' },
   ],
 });
 

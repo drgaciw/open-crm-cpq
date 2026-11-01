@@ -202,7 +202,7 @@ import { OrganizationService } from '../organization.service';
             } @else if (orgService.relatedQuotesError()) {
               <p class="empty-text" role="alert">{{ orgService.relatedQuotesError() }}</p>
             } @else if (orgService.relatedQuotes().length === 0) {
-              <p class="empty-text">No quotes linked to this account.</p>
+              <p class="empty-text">No quotes found for this account ID.</p>
             } @else {
               <ul class="contact-list">
                 @for (quote of orgService.relatedQuotes(); track quote.id) {
@@ -213,6 +213,10 @@ import { OrganizationService } from '../organization.service';
                 }
               </ul>
             }
+            @if (orgService.relatedQuotesTruncated()) {
+              <p class="empty-text" role="status">Showing up to 250 matching quotes. Browse quotes for more.</p>
+            }
+            <p class="empty-text">Some quotes with older or differently formatted customer references may not appear. Browse all quotes.</p>
             <p class="section-links">
               <a routerLink="/quotes">Browse quotes</a>
               <a routerLink="/quotes/new">New quote</a>

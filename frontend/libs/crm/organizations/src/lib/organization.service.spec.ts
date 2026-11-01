@@ -145,24 +145,54 @@ describe('OrganizationService', () => {
     expect(service.relatedDeals().map((d) => d.id)).toEqual([3, 4]);
   });
 
-  it('loadRelatedQuotes calls /api/v1/quotes with the account uuid', () => {
-    const account = org({ id: 7, name: 'Acme', uuid: 'uuid-7' });
+  it('loads UUID-matching quote pages and ignores duplicate and legacy customer IDs', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    const account = org({ id: 7, name: 'Acme', uuid: uuid.toUpperCase() });
     service.loadRelatedQuotes(account);
-    const req = httpMock.expectOne(
-      (r) => r.url === '/api/v1/quotes' && r.params.get('customerExternalId') === 'uuid-7',
-    );
-    const page: SpringPageResponse<QuoteDto> = {
-      content: [
-        quote({ id: 9, name: 'Q-9', customerExternalId: 'uuid-7' }),
-        quote({ id: 10, name: 'Q-10', customerExternalId: 'other' }),
-      ],
-      number: 0,
-      size: 50,
-      totalElements: 2,
-      totalPages: 1,
-    };
-    req.flush(page);
-    expect(service.relatedQuotes().map((q) => q.id)).toEqual([9]);
+    const first = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '0');
+    expect(first.request.params.get('customerExternalId')).toBe(uuid);
+    expect(first.request.params.get('sort')).toBe('id,asc');
+    first.flush({ content: [quote({ id: 9, name: 'Q-9', customerExternalId: uuid }),
+      quote({ id: 10, name: 'Numeric', customerExternalId: '7' }),
+      quote({ id: 11, name: 'Name', customerExternalId: 'Acme' }),
+      quote({ id: 13, name: 'Uppercase', customerExternalId: uuid.toUpperCase() })], number: 0, size: 50, totalElements: 51, totalPages: 2 });
+    const second = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '1');
+    expect(second.request.params.get('customerExternalId')).toBe(uuid);
+    second.flush({ content: [quote({ id: 9, name: 'Q-9 duplicate', customerExternalId: uuid }),
+      quote({ id: 12, name: 'Later', customerExternalId: uuid })], number: 1, size: 50, totalElements: 51, totalPages: 2 });
+    expect(service.relatedQuotes().map((q) => q.id)).toEqual([9, 12]);
+    expect(service.relatedQuotesTruncated()).toBe(false);
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+  });
+
+  it('caps quote requests and flags a truncated result', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid }));
+    for (let page = 0; page < 5; page++) {
+      const request = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === String(page));
+      request.flush({ content: [quote({ id: page + 1, name: `Q-${page}`, customerExternalId: uuid })], number: page, size: 50, totalElements: 300, totalPages: 6 });
+    }
+    expect(service.relatedQuotesTruncated()).toBe(true);
+    expect(service.relatedQuotes()).toHaveLength(5);
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+  });
+
+  it('cancels remaining quote pages when the account changes', () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000';
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid }));
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '0')
+      .flush({ content: [], number: 0, size: 50, totalElements: 51, totalPages: 2 });
+    const pending = httpMock.expectOne((r) => r.url === '/api/v1/quotes' && r.params.get('page') === '1');
+    service.resetAccountDetail();
+    expect(pending.cancelled).toBe(true);
+    expect(service.relatedQuotes()).toEqual([]);
+    expect(service.relatedQuotesTruncated()).toBe(false);
+  });
+
+  it('refuses a non-UUID account identity instead of querying opaque customer IDs', () => {
+    service.loadRelatedQuotes(org({ id: 7, name: 'Acme', uuid: 'not-a-uuid' }));
+    httpMock.expectNone((r) => r.url === '/api/v1/quotes');
+    expect(service.relatedQuotesError()).toContain('account identifier');
   });
 
   it('hides hierarchy when the parent API is absent', () => {

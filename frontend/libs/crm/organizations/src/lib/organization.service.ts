@@ -102,6 +102,7 @@ export class OrganizationService {
     this.organizationContacts.set([]);
     this.relatedDeals.set([]);
     this.relatedQuotes.set([]);
+    this.relatedQuotesTruncated.set(false);
     this.relatedDealsError.set(null);
     this.relatedQuotesError.set(null);
     this.hierarchy.set(null);
@@ -133,6 +134,7 @@ export class OrganizationService {
   /** Quotes whose customerExternalId matches this account. */
   readonly relatedQuotes = signal<QuoteDto[]>([]);
   readonly relatedQuotesLoading = signal(false);
+  readonly relatedQuotesTruncated = signal(false);
   readonly relatedQuotesError = signal<string | null>(null);
 
   /** Null until a hierarchy response arrives. False when the parent API 404s. */
@@ -300,28 +302,40 @@ export class OrganizationService {
       });
   }
 
-  /**
-   * GET /api/v1/quotes?customerExternalId={account.uuid}
-   * Keeps rows that match the account uuid, id, or name so an unfiltered page is still useful.
-   */
+  /** The quote API compares customerExternalId case-sensitively. Query only the canonical lowercase
+   * account UUID; uppercase UUIDs and opaque legacy IDs need an authoritative mapping. */
   loadRelatedQuotes(account: OrganizationDto): void {
     this.relatedQuotesError.set(null);
+    this.relatedQuotes.set([]);
+    this.relatedQuotesTruncated.set(false);
+    const accountId = typeof account.uuid === 'string' ? account.uuid.toLowerCase() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(accountId)) {
+      this.relatedQuotesLoading.set(false);
+      this.relatedQuotesError.set('Quotes cannot be matched: the account identifier is unavailable.');
+      return;
+    }
     this.relatedQuotesLoading.set(true);
-    const keys = new Set(
-      [account.uuid, String(account.id), account.name].filter((value) => !!value),
-    );
-    const params = new HttpParams()
-      .set('page', '0')
-      .set('size', '50')
-      .set('customerExternalId', account.uuid);
-    this.http
-      .get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params })
-      .pipe(takeUntil(this.detailChanged), finalize(() => this.relatedQuotesLoading.set(false)))
+    const maxPages = 5;
+    const params = new HttpParams().set('page', '0').set('size', '50').set('sort', 'id,asc')
+      .set('customerExternalId', accountId);
+    this.http.get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params })
+      .pipe(
+        expand((page, index) => index + 1 < maxPages && index + 1 < (page.totalPages ?? 1)
+          ? this.http.get<SpringPageResponse<QuoteDto>>('/api/v1/quotes', { params: params.set('page', index + 1) })
+          : EMPTY, 1),
+        toArray(),
+        takeUntil(this.detailChanged),
+        finalize(() => this.relatedQuotesLoading.set(false)),
+      )
       .subscribe({
-        next: (body) => {
-          this.relatedQuotes.set(
-            asRows(body).filter((quote) => keys.has(quote.customerExternalId)),
-          );
+        next: (pages) => {
+          const byId = new Map<number, QuoteDto>();
+          for (const quote of pages.flatMap(asRows)) {
+            if (quote.customerExternalId === accountId && !byId.has(quote.id)) byId.set(quote.id, quote);
+          }
+          this.relatedQuotes.set([...byId.values()]);
+          const last = pages[pages.length - 1];
+          this.relatedQuotesTruncated.set(last != null && (last.totalPages ?? 1) > pages.length);
         },
         error: (err) => {
           this.relatedQuotes.set([]);

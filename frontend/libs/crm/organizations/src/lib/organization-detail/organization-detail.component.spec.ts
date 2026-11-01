@@ -13,7 +13,7 @@ describe('OrganizationDetailComponent account UX', () => {
 
   const account: OrganizationDto = {
     id: 7,
-    uuid: 'uuid-7',
+    uuid: '550e8400-e29b-41d4-a716-446655440000',
     name: 'Acme Account',
     industry: 'Technology',
     territory: 'West',
@@ -63,7 +63,7 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(oldContacts.cancelled).toBe(true);
     expect(oldDeals.cancelled).toBe(true);
     expect(oldHierarchy.cancelled).toBe(true);
-    httpMock.expectOne('/api/v1/organizations/8').flush({ ...account, id: 8, uuid: 'uuid-8', name: 'Other' });
+    httpMock.expectOne('/api/v1/organizations/8').flush({ ...account, id: 8, uuid: '550e8400-e29b-41d4-a716-446655440001', name: 'Other' });
     httpMock.expectOne((r) => r.url === '/api/v1/organizations/8/contacts').flush({ content: [] });
     httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
     httpMock.expectOne('/api/v1/organizations/8/hierarchy').flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
@@ -93,7 +93,7 @@ describe('OrganizationDetailComponent account UX', () => {
       ],
     });
     const quotes = httpMock.expectOne(
-      (r) => r.url === '/api/v1/quotes' && r.params.get('customerExternalId') === 'uuid-7',
+      (r) => r.url === '/api/v1/quotes' && r.params.get('customerExternalId') === '550e8400-e29b-41d4-a716-446655440000',
     );
     quotes.flush({
       content: [
@@ -101,7 +101,7 @@ describe('OrganizationDetailComponent account UX', () => {
           id: 9,
           uuid: 'q-9',
           name: 'Platform quote',
-          customerExternalId: 'uuid-7',
+          customerExternalId: '550e8400-e29b-41d4-a716-446655440000',
           status: 'DRAFT',
           durationInMonths: 12,
           createdAt: '',
@@ -125,6 +125,10 @@ describe('OrganizationDetailComponent account UX', () => {
     const browseQuotes = el.querySelector('a[href="/quotes"]');
     expect(dealLink?.textContent).toContain('Renewal');
     expect(quoteLink?.textContent).toContain('Platform quote');
+    TestBed.inject(OrganizationService).relatedQuotesTruncated.set(true);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="account-quotes"]')?.textContent).toContain('Showing up to 250 matching quotes');
+    expect(el.querySelector('[data-testid="account-quotes"]')?.textContent).toContain('Some quotes with older or differently formatted customer references may not appear');
     expect(browseDeals).toBeTruthy();
     expect(browseQuotes).toBeTruthy();
     expect(el.textContent).toContain('Archive');
@@ -138,6 +142,7 @@ describe('OrganizationDetailComponent account UX', () => {
     httpMock.expectNone('/api/v1/organizations/7/merge-candidates');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="account-merge"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="account-quotes"]')?.textContent).toContain('No quotes found for this account ID.');
     httpMock.expectNone((request) => request.method === 'POST' && request.url.endsWith('/merge'));
   });
 
