@@ -1,6 +1,11 @@
 package com.opencrm.quote.config;
 
+import com.opencrm.quote.client.AssetReadClient;
+import com.opencrm.quote.client.HttpAssetReadClient;
+import com.opencrm.quote.client.HttpRenewalPolicyClient;
+import com.opencrm.quote.client.RenewalPolicyClient;
 import com.opencrm.security.client.OutboundAuth;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +26,25 @@ public class RestClientConfig {
             @Value("${services.contract-asset-management.url:http://localhost:8087}") String baseUrl, OutboundAuth outboundAuth) {
         return RestClient.builder().baseUrl(baseUrl).requestFactory(createRequestFactory())
                 .requestInterceptor(outboundAuth.serviceToken()).build();
+    }
+
+    /** CAM {@code /api/v1/assets}: a rep's renewal, so the caller's token is relayed. */
+    @Bean("assetReadRestClient")
+    public RestClient assetReadRestClient(
+            @Value("${services.contract-asset-management.url:http://localhost:8087}") String baseUrl, OutboundAuth outboundAuth) {
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(createRequestFactory())
+                .requestInterceptor(outboundAuth.relayUserToken()).build();
+    }
+
+    @Bean
+    public AssetReadClient assetReadClient(@Qualifier("assetReadRestClient") RestClient assetReadRestClient) {
+        return new HttpAssetReadClient(assetReadRestClient);
+    }
+
+    @Bean
+    public RenewalPolicyClient renewalPolicyClient(
+            @Qualifier("subscriptionScheduleRestClient") RestClient subscriptionScheduleRestClient) {
+        return new HttpRenewalPolicyClient(subscriptionScheduleRestClient);
     }
 
     /** pricing {@code /api/v1/pricing/**}: user-initiated, so the caller's token is relayed. */

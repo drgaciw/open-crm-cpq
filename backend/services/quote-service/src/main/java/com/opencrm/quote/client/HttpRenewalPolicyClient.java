@@ -14,7 +14,8 @@ import java.util.UUID;
 
 /**
  * HTTP read of CAM {@code /internal/v1/renewal-policies}. The {@link RestClient} is supplied by the caller and
- * must already carry the service identity. This type is not a Spring bean and is not wired into a flow.
+ * must already carry the service identity. This type is not a {@code @Component}; {@code RestClientConfig} exposes
+ * the bean used by from-active-assets renewals.
  */
 public final class HttpRenewalPolicyClient implements RenewalPolicyClient {
 

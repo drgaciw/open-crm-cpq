@@ -59,6 +59,8 @@ class RestClientConfigAuthTest {
                 "http://pricing.test", "/api/v1/pricing/execute", "alice-token");
         expectBearer(config.approvalRoutingRestClient("http://routing.test", outboundAuth),
                 "http://routing.test", "/api/v1/approvals", "alice-token");
+        expectBearer(config.assetReadRestClient("http://cam.test", outboundAuth),
+                "http://cam.test", "/api/v1/assets", "alice-token");
     }
 
     @Test

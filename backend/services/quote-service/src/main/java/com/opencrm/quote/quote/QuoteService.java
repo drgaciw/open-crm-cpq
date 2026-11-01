@@ -956,6 +956,11 @@ public class QuoteService {
     }
 
     private void verifyContinuationPeriods(QuoteContinuationPolicy.Plan plan,PricingExecuteView pricing,List<QuoteLineItem> items) {
+        List<QuoteLineItem> recurring = items.stream().filter(line -> !line.isDeleted()).filter(AcceptedRampSnapshots::recurring).toList();
+        if (recurring.size() > 1) {
+            verifyEachContinuationLine(plan, pricing, recurring);
+            return;
+        }
         QuoteLineItem line=items.stream().filter(AcceptedRampSnapshots::recurring).findFirst().orElseThrow();
         List<PricingLineResultView> matches=pricing.getLineResults().stream().filter(r -> Objects.equals(r.getProductExternalId(),line.getProductExternalId())
                 && Objects.equals(r.getLineItemType(),line.getLineItemType())).toList();
@@ -968,6 +973,34 @@ public class QuoteService {
                     || actual.getNetUnitPrice() == null || actual.getNetUnitPrice().compareTo(expected.unitPrice()) != 0
                     || actual.getGrossPeriodAmount() != null || actual.getMigrationCredit() != null)
                 throw new BusinessException("Current pricing changes the inherited continuation unit rate; author a fresh commercial change","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+        }
+    }
+
+    /** One priced period per asset line. The single-line ramp path stays in {@link #verifyContinuationPeriods}. */
+    private void verifyEachContinuationLine(QuoteContinuationPolicy.Plan plan, PricingExecuteView pricing,
+                                            List<QuoteLineItem> recurring) {
+        if (pricing == null || pricing.getLineResults() == null || plan == null || plan.periods() == null
+                || plan.periods().size() != recurring.size()) {
+            throw new BusinessException("Current pricing cannot preserve the inherited continuation schedule","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+        }
+        Map<String, ArrayDeque<PricingLineResultView>> indexed = indexLineResults(pricing.getLineResults());
+        for (int i = 0; i < recurring.size(); i++) {
+            QuoteLineItem line = recurring.get(i);
+            QuoteContinuationPolicy.Period expected = plan.periods().get(i);
+            ArrayDeque<PricingLineResultView> queue = indexed.get(lineKey(line.getProductExternalId(), line.getLineItemType()));
+            PricingLineResultView match = queue == null || queue.isEmpty() ? null : queue.removeFirst();
+            if (match == null || match.getPricedPeriods() == null || match.getPricedPeriods().size() != 1) {
+                throw new BusinessException("Current pricing cannot preserve the inherited continuation schedule","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+            }
+            PricedPeriodView actual = match.getPricedPeriods().getFirst();
+            if (actual == null || !Objects.equals(actual.getSequence(), expected.sequence())
+                    || !Objects.equals(actual.getStartMonth(), expected.startMonth())
+                    || !Objects.equals(actual.getMonths(), expected.months())
+                    || !Objects.equals(actual.getQuantity(), expected.quantity())
+                    || actual.getNetUnitPrice() == null || actual.getNetUnitPrice().compareTo(expected.unitPrice()) != 0
+                    || actual.getGrossPeriodAmount() != null || actual.getMigrationCredit() != null) {
+                throw new BusinessException("Current pricing changes the inherited continuation unit rate; author a fresh commercial change","SUBSCRIPTION_CONTINUATION_RATE_CHANGED");
+            }
         }
     }
 
