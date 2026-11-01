@@ -1,0 +1,41 @@
+{
+  "id": "catalog-model-restructure-ineligible",
+  "story": "DRG-647",
+  "cluster": "catalog-model",
+  "status": "Proposed",
+  "owner_decision": "___ (drg, time)",
+  "case": "restructure-ineligible-successor",
+  "intent": "Restructure",
+  "sources": [
+    "docs/renewals-amendments/prereq/specs/catalog-model.md lifecycle-intent eligibility section",
+    "DRG-576",
+    "DRG-548"
+  ],
+  "inputs": {
+    "intent": "Restructure",
+    "fromSku": "SKU-PERP-F",
+    "toSku": "SKU-SAAS-E",
+    "relationshipType": "SUCCESSOR",
+    "productStatus": "ACTIVE",
+    "relationshipStatus": "ACTIVE",
+    "onDate": "2026-10-05",
+    "relationshipEffectiveFrom": "2026-01-01",
+    "relationshipEffectiveTo": "2026-12-31"
+  },
+  "expected": {
+    "allowed": false,
+    "productRejected": true,
+    "eligibleRelationshipTypes": [],
+    "relationshipTypeEligible": false,
+    "presentedRelationshipType": "SUCCESSOR",
+    "errorCode": "RESTRUCTURE_NOT_ELIGIBLE",
+    "fromSku": "SKU-PERP-F",
+    "toSku": "SKU-SAAS-E",
+    "onDate": "2026-10-05",
+    "reason": "SUCCESSOR is outside the eligible product-relationship types for Restructure. Eligible types: none. Product SKU-PERP-F to SKU-SAAS-E on 2026-10-05 is rejected.",
+    "relationshipCoversOnDate": true,
+    "productStatus": "ACTIVE",
+    "writesProduct": false,
+    "returnsPrice": false
+  }
+}

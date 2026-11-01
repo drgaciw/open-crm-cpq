@@ -91,3 +91,85 @@ Products stay mutable in place for commercial edits. The relationship and eligib
 7. **Owner decision — deprecated SKUs.** `DEPRECATED` is a landed status. Whether a deprecated SKU may be a renewal successor, a mid-term target, or neither is unset. AC-8 covers `RETIRED` only.
 8. **Owner decision — who may publish a relationship.** Product-team ownership is DRG-599's subject. This slice assumes product-service is the writer and quote-service is a reader. The dispute and hold flow is not specified here.
 9. **Owner decision — catalogue version gap.** DRG-421 is not landed as the version pin this API needs. If that work is still open, the owner says whether this slice is blocked or whether a relationship-level version is enough for the first slice.
+
+## Lifecycle-intent eligibility (DRG-647)
+
+**Status: Proposed.** **Owner decision: ___ (drg, time).** This section lists eligible product-relationship types for six lifecycle intents and the refusal each negative fixture expects. It does not accept the relationship type set in open question 1. It does not accept `conversions.md`. It does not authorize an API, a flag, a migration, or a deploy. Nothing in this section is adopted.
+
+Checked against `main` `bf41c230f6309964a25ef5c2c12e84c41b0c37de`. The six intent names are the tokens Cancel, Restructure, Suspend, Resume, Transfer, and Convert in [lifecycle-intents.md at that main sha](https://github.com/drgaciw/open-crm-cpq/blob/bf41c230f6309964a25ef5c2c12e84c41b0c37de/docs/renewals-amendments/prereq/specs/lifecycle-intents.md). Date words (action date, contract effective, service activation, customer acceptance) and the date fixtures are in the Dates section of [lifecycle-intents.md at DRG-646 head `04fb230f3939b3eff79816f273462f6e97a25251`](https://github.com/drgaciw/open-crm-cpq/blob/04fb230f3939b3eff79816f273462f6e97a25251/docs/renewals-amendments/prereq/specs/lifecycle-intents.md) ([PR #702](https://github.com/drgaciw/open-crm-cpq/pull/702)). This file does not edit `lifecycle-intents.md`. A back-link from that file to this section is a later follow-up, after both DRG-646 and DRG-647 have merged.
+
+The types considered are the six already named in the proposed contract above: `UPGRADE`, `DOWNGRADE`, `SWAP`, `SUCCESSOR`, `MAINTENANCE_FOR`, `ADD_ON_OF`. This section adds no seventh type.
+
+### Fixture table
+
+The fixtures are the expected values. The sentences under the table restate those values. Every row is **Status: Proposed**. **Owner decision: ___ (drg, time).**
+
+| Fixture | Intent | Product (fromSku → toSku) | Relationship type presented | Eligible product-relationship types | Expected |
+|---|---|---|---|---|---|
+| `fixtures/catalog-model/cancel-ineligible.json` | Cancel | `SKU-CORE-A` → `SKU-SAAS-B`, product `ACTIVE` | `UPGRADE`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `CANCEL_NOT_ELIGIBLE`. |
+| `fixtures/catalog-model/restructure-ineligible.json` | Restructure | `SKU-PERP-F` → `SKU-SAAS-E`, product `ACTIVE` | `SUCCESSOR`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `RESTRUCTURE_NOT_ELIGIBLE`. |
+| `fixtures/catalog-model/suspend-ineligible.json` | Suspend | `SKU-CORE-A` → `SKU-CORE-C`, product `ACTIVE` | `DOWNGRADE`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `SUSPEND_NOT_ELIGIBLE`. |
+| `fixtures/catalog-model/resume-ineligible.json` | Resume | `SKU-CORE-A` → `SKU-CORE-D`, product `ACTIVE` | `SWAP`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `RESUME_NOT_ELIGIBLE`. |
+| `fixtures/catalog-model/transfer-ineligible.json` | Transfer | `SKU-ADDON-H` → `SKU-BASE-G`, product `ACTIVE` | `ADD_ON_OF`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `TRANSFER_NOT_ELIGIBLE`. |
+| `fixtures/catalog-model/convert-ineligible.json` | Convert | `SKU-MAINT-M` → `SKU-PERP-F`, product `ACTIVE` | `MAINTENANCE_FOR`, relationship `ACTIVE`, effective `2026-01-01` through `2026-12-31` | (none) | `allowed: false`. Product rejected. Error code `CONVERT_NOT_ELIGIBLE`. |
+
+Each fixture sets `onDate` to `2026-10-05`. That date falls inside the relationship window, and the product status is `ACTIVE`, so the refusal is the intent rule in this section. The window is the effective-dating shape already in acceptance criterion 3. The `ACTIVE` product is the status shape already in acceptance criterion 8. Each refusal names the intent, the relationship type, `fromSku`, `toSku`, and `onDate`. The read writes no product and returns no price, which is the read already described in acceptance criterion 9.
+
+`ADD_ON_OF` on the Transfer row points from the add-on SKU to the base SKU, which is the direction already stated for that type. `MAINTENANCE_FOR` on the Convert row points from the maintenance SKU to the perpetual SKU, which is the direction already stated for that type. The refusal is the intent eligibility, and the direction matches the type.
+
+### Eligible types
+
+**Status: Proposed.** **Owner decision: ___ (drg, time).**
+
+| Intent | Eligible product-relationship types |
+|---|---|
+| Cancel | (none) |
+| Restructure | (none) |
+| Suspend | (none) |
+| Resume | (none) |
+| Transfer | (none) |
+| Convert | (none) |
+
+For each intent the eligible list is empty. `UPGRADE`, `DOWNGRADE`, `SWAP`, `SUCCESSOR`, `MAINTENANCE_FOR`, and `ADD_ON_OF` were considered. None of them is on an eligible list. A product presented with one of those types on one of these intents is rejected. The six fixtures are that rejection, one intent each.
+
+Cancel, Suspend, Resume, and Transfer, as named on [DRG-548](https://linear.app/drgamtd-workspace/issue/DRG-548), keep the same SKU: end the line, pause it, resume it, or move the owner. A from-SKU to to-SKU relationship does not authorize those four intents. **[S DRG-548]**
+
+Restructure, as named in `conversions.md`, is the agreement-level change that ends maintenance, surrenders the perpetual line, and adds the target subscription. That file says this catalogue is where an allowed source-to-target relationship would be declared, and it leaves the type unset (its open question 6, and open question 1 and open question 5 in this file). This section keeps the eligible list for Restructure empty until the owner names a type. The `SUCCESSOR` row in the fixture is rejected. **[S conversions.md]**
+
+Convert, as distinguished in `conversions.md` open question 10, is the metric change that stays on the same licence model. None of the six relationship types is a metric-only type. This section keeps the eligible list for Convert empty and adds no type for it. The `MAINTENANCE_FOR` row in the fixture is rejected. **[S conversions.md]**
+
+### Error codes
+
+**Status: Proposed.** **Owner decision: ___ (drg, time).**
+
+OQ-1, ruled by CPQ Decision 2026-10-27 (`decision-scores-2026-10-27.md`): reuse the existing `SCREAMING_SNAKE` style with no new prefix. The ruling gives `INTENT_PRODUCT_NOT_ELIGIBLE` and a per-intent code such as `CANCEL_NOT_ELIGIBLE` as the two shapes. It marks each code Proposed. The fixtures use the per-intent shape. The shared code is the alternative. The owner slot above is blank.
+
+| Intent | Error code on the negative fixture | Status |
+|---|---|---|
+| Cancel | `CANCEL_NOT_ELIGIBLE` | Proposed |
+| Restructure | `RESTRUCTURE_NOT_ELIGIBLE` | Proposed |
+| Suspend | `SUSPEND_NOT_ELIGIBLE` | Proposed |
+| Resume | `RESUME_NOT_ELIGIBLE` | Proposed |
+| Transfer | `TRANSFER_NOT_ELIGIBLE` | Proposed |
+| Convert | `CONVERT_NOT_ELIGIBLE` | Proposed |
+
+Alternative, also **Status: Proposed**, and not the code any fixture expects: one shared code `INTENT_PRODUCT_NOT_ELIGIBLE` for all six intents. **Owner decision: ___ (drg, time).**
+
+### Read
+
+The existing read stays a read. The proposed query gains an `intent` parameter. **Status: Proposed.** **Owner decision: ___ (drg, time).**
+
+```text
+GET allowed-transition?fromSku&toSku&type&onDate&catalogVersion&intent
+-> { allowed: false, errorCode, reason }
+```
+
+`onDate` is the caller's as-of date. These fixtures pass `2026-10-05` and do not fill it from `actionDate` or from a trigger date. Which trigger would fill `onDate` on a live read remains open question 5 of [lifecycle-intents.md at main `bf41c230f6309964a25ef5c2c12e84c41b0c37de`](https://github.com/drgaciw/open-crm-cpq/blob/bf41c230f6309964a25ef5c2c12e84c41b0c37de/docs/renewals-amendments/prereq/specs/lifecycle-intents.md). The comparison of a trigger with the action date is the Dates section at [DRG-646 head `04fb230f3939b3eff79816f273462f6e97a25251`](https://github.com/drgaciw/open-crm-cpq/blob/04fb230f3939b3eff79816f273462f6e97a25251/docs/renewals-amendments/prereq/specs/lifecycle-intents.md).
+
+### Owner decisions in this section
+
+1. **Owner decision — eligible types per intent.** Default: the eligible list is empty for Cancel, Restructure, Suspend, Resume, Transfer, and Convert. Alternative: the owner names a subset of `UPGRADE`, `DOWNGRADE`, `SWAP`, `SUCCESSOR`, `MAINTENANCE_FOR`, and `ADD_ON_OF` for an intent. **Status: Proposed.** **Owner decision: ___ (drg, time).**
+2. **Owner decision — error-code shape.** Default: the six per-intent codes in the table above. Alternative: `INTENT_PRODUCT_NOT_ELIGIBLE`. Both are `SCREAMING_SNAKE` with no new prefix. **Status: Proposed.** **Owner decision: ___ (drg, time).**
+3. **Owner decision — `intent` on the allowed-transition read.** Default: the read takes `intent` and returns `allowed: false` with the code and the reason when the presented type is outside the eligible list. **Status: Proposed.** **Owner decision: ___ (drg, time).**
+
+No row in this section is adopted. The owner slot stays `___ (drg, time)`.
