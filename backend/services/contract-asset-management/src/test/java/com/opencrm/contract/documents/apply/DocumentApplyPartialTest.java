@@ -59,13 +59,15 @@ class DocumentApplyPartialTest {
         assertThat(source).doesNotContain("retry");
 
         int periods = fixture.periods.size();
-        assertThatThrownBy(fixture::apply).isInstanceOf(DocumentApplyException.class);
+        ApplyResult replay = fixture.apply();
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.unitOutcomes().get(1).reason()).isEqualTo("V3");
         assertThat(fixture.units.get(0).getStatus()).isEqualTo(ApplicationUnitStatus.APPLIED);
         assertThat(fixture.units.get(1).getStatus()).isEqualTo(ApplicationUnitStatus.BLOCKED);
         assertThat(fixture.periods).hasSize(periods);
         assertThat(fixture.ledger).hasSize(1);
         assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_UNIT_BLOCKED)).isEqualTo(1);
-        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isEqualTo(1);
+        assertThat(fixture.eventsOfType(DocumentApplyOrchestrator.EVENT_REFUSED)).isZero();
     }
 
     private static Path orchestratorSource() {
