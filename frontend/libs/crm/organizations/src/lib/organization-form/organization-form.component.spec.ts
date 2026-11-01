@@ -57,4 +57,14 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     expect(submit.disabled).toBe(false);
     expect(submit.textContent).toContain('Create');
   });
+
+  it('uses Account copy and captures territory and owner', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('h1')?.textContent).toContain('New Account');
+    expect(el.textContent).toContain('Account Name');
+    expect(el.textContent).toContain('Territory');
+    expect(el.textContent).toContain('Owner');
+    expect(component.form.contains('territory')).toBe(true);
+    expect(component.form.contains('ownerId')).toBe(true);
+  });
 });
