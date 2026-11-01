@@ -143,6 +143,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
         String traceId = MDC.get(TRACE_ID_KEY);
 
+        if (isInactiveOrganizationReference(ex)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
+                    "The selected organization is missing or inactive. Choose an active organization.",
+                    "ORGANIZATION_REFERENCE_INACTIVE", traceId));
+        }
         String errorMessage = "Data integrity violation: The operation conflicts with existing data constraints.";
 
         // Log the full exception for debugging purposes
@@ -155,6 +160,15 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    private static boolean isInactiveOrganizationReference(Throwable error) {
+        for (Throwable cause = error; cause != null && cause.getCause() != cause; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql && "23514".equals(sql.getSQLState())
+                    && sql.getMessage() != null
+                    && sql.getMessage().startsWith("ERROR: organization_reference_active: ")) return true;
+        }
+        return false;
     }
 
     /**

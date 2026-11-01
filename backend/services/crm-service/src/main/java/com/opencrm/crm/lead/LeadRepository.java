@@ -39,6 +39,11 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
                            @Param("scoredAt") Instant scoredAt);
 
     /**
+     * Every lead row for the organization, including soft-deleted rows, so a merge can repoint the foreign key.
+     */
+    List<Lead> findAllByOrganization_Id(Long organizationId);
+
+    /**
      * Find lead by UUID.
      */
     @EntityGraph(attributePaths = {"contact", "organization"})
