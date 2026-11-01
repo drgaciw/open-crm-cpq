@@ -1,0 +1,117 @@
+{
+  "id": "scenario-3-conversion-figure",
+  "story": "DRG-640",
+  "cluster": "conversions",
+  "status": "provisional",
+  "scenario": "Scenario 3",
+  "currency": "USD",
+  "description": "Expected conversion, churn, and crossSell for each candidate figure. Provisional while the owner slot in specs/conversions.md is blank.",
+  "inputs": {
+    "maintenanceArr": 40000.00,
+    "parityArr": 99993.60,
+    "unusedPrepaidMaintenance": 20164.38,
+    "tradeInCap": 19998.72,
+    "year1Net": 59830.50,
+    "perpetualBook": 200000.00
+  },
+  "lines": {
+    "newSaas": "SaaS-3003 CL-30",
+    "terminatedMaintenance": "LM-2002 CL-11",
+    "surrenderedPerpetual": "LM-2002 CL-10"
+  },
+  "options": [
+    {
+      "id": "parity-arr",
+      "candidate": "parity ARR",
+      "formula": "AC-2 rounded ARR",
+      "conversion": 99993.60,
+      "churn": 0,
+      "crossSell": 0,
+      "newLine": {
+        "lineId": "SaaS-3003 CL-30",
+        "conversion": 99993.60,
+        "churn": 0,
+        "crossSell": 0
+      },
+      "sourceLines": [
+        {
+          "lineId": "LM-2002 CL-11",
+          "role": "terminated maintenance",
+          "churn": 0,
+          "crossSell": 0
+        },
+        {
+          "lineId": "LM-2002 CL-10",
+          "role": "surrendered perpetual",
+          "churn": 0,
+          "crossSell": 0
+        }
+      ],
+      "documentChurnSum": 0
+    },
+    {
+      "id": "year-1-net",
+      "candidate": "year-1 net",
+      "formula": "99993.60 - 20164.38 - 19998.72",
+      "conversion": 59830.50,
+      "churn": 0,
+      "crossSell": 0,
+      "newLine": {
+        "lineId": "SaaS-3003 CL-30",
+        "conversion": 59830.50,
+        "churn": 0,
+        "crossSell": 0
+      },
+      "sourceLines": [
+        {
+          "lineId": "LM-2002 CL-11",
+          "role": "terminated maintenance",
+          "churn": 0,
+          "crossSell": 0
+        },
+        {
+          "lineId": "LM-2002 CL-10",
+          "role": "surrendered perpetual",
+          "churn": 0,
+          "crossSell": 0
+        }
+      ],
+      "documentChurnSum": 0
+    },
+    {
+      "id": "delta-vs-maintenance-arr",
+      "candidate": "delta vs maintenance ARR",
+      "formula": "99993.60 - 40000.00",
+      "conversion": 59993.60,
+      "churn": 0,
+      "crossSell": 0,
+      "newLine": {
+        "lineId": "SaaS-3003 CL-30",
+        "conversion": 59993.60,
+        "churn": 0,
+        "crossSell": 0
+      },
+      "sourceLines": [
+        {
+          "lineId": "LM-2002 CL-11",
+          "role": "terminated maintenance",
+          "churn": 0,
+          "crossSell": 0
+        },
+        {
+          "lineId": "LM-2002 CL-10",
+          "role": "surrendered perpetual",
+          "churn": 0,
+          "crossSell": 0
+        }
+      ],
+      "documentChurnSum": 0
+    }
+  ],
+  "proposedDefault": {
+    "optionId": "delta-vs-maintenance-arr",
+    "status": "Proposed",
+    "ownerDecision": null,
+    "reason": "The ARR bridge proposes conversion as the net annualized run-rate movement, so the figure is parity ARR minus prior maintenance ARR, and the year-1 credits stay out of the run-rate."
+  }
+}
