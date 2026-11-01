@@ -25,7 +25,8 @@
                     "evt-2"
                 ]
             }
-        ]
+        ],
+        "tenant_id": "t-1"
     },
     "expected": {
         "same_tenant": {

@@ -13,14 +13,17 @@
             {
                 "id": "c-1",
                 "contract_state": "ACTIVE",
-                "precedence_flag": true
+                "precedence_flag": true,
+                "prior_contract_id": null
             },
             {
                 "id": "c-2",
                 "contract_state": "ACTIVE",
-                "precedence_flag": true
+                "precedence_flag": true,
+                "prior_contract_id": "c-1"
             }
-        ]
+        ],
+        "requested_contract_id": "c-1"
     },
     "expected": {
         "http_status": 409,
