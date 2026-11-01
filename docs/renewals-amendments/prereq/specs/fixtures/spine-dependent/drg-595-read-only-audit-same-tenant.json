@@ -1,0 +1,48 @@
+{
+    "issue": "DRG-595",
+    "ac_id": "AC-595-3",
+    "case": "read-only-audit-same-tenant",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "595-F5-A, 595-F6-A",
+    "input": {
+        "actor_user_id": "user-fin",
+        "role_label": "FINANCE",
+        "action": "READ_AUDIT",
+        "contracts": [
+            {
+                "id": "c-1",
+                "tenant_id": "t-1",
+                "audit_event_ids": [
+                    "evt-1"
+                ]
+            },
+            {
+                "id": "c-2",
+                "tenant_id": "t-2",
+                "audit_event_ids": [
+                    "evt-2"
+                ]
+            }
+        ]
+    },
+    "expected": {
+        "same_tenant": {
+            "contract_id": "c-1",
+            "allowed": true,
+            "audit_event_ids": [
+                "evt-1"
+            ],
+            "writes": 0,
+            "error_code": null
+        },
+        "other_tenant": {
+            "contract_id": "c-2",
+            "allowed": false,
+            "http_status": 403,
+            "error_code": "TENANT_MISMATCH",
+            "audit_event_ids": []
+        }
+    }
+}

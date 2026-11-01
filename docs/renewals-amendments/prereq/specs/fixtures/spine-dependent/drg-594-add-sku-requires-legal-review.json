@@ -1,0 +1,29 @@
+{
+    "issue": "DRG-594",
+    "ac_id": "AC-594-2",
+    "case": "add-sku-requires-legal-review",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "594-F1-A, 594-F2-A, 594-F6-A",
+    "input": {
+        "document_state_before": "DRAFT",
+        "lines": [
+            {
+                "action_code": "ADD",
+                "source_sku": null,
+                "target_sku": "SKU-B"
+            }
+        ],
+        "header_edits": []
+    },
+    "expected": {
+        "legal_review_required": true,
+        "transition_to_in_review": "refused",
+        "document_state": "DRAFT",
+        "http_status": 409,
+        "error_code": "LEGAL_REVIEW_REQUIRED",
+        "approval_row_written": false,
+        "approval_type_written": null
+    }
+}

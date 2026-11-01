@@ -1,0 +1,45 @@
+{
+    "issue": "DRG-598",
+    "ac_id": "AC-598-1",
+    "case": "nearest-end-dates-first",
+    "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "598-F1-A, 598-F2-A, 598-F7-A",
+    "input": {
+        "window": {
+            "end_date_on_or_before": "2026-12-31"
+        },
+        "order_by": "subscriptions.end_date",
+        "order": "ascending",
+        "subscriptions": [
+            {
+                "id": "sub-a",
+                "end_date": "2026-11-01",
+                "contract_id": null
+            },
+            {
+                "id": "sub-b",
+                "end_date": "2027-06-01",
+                "contract_id": null
+            },
+            {
+                "id": "sub-c",
+                "end_date": "2026-12-15",
+                "contract_id": null
+            }
+        ]
+    },
+    "expected": {
+        "manifest_ids": [
+            "sub-a",
+            "sub-c"
+        ],
+        "excluded_ids": [
+            "sub-b"
+        ],
+        "backfill_invoked": false,
+        "header_written": false,
+        "error_code": null
+    }
+}
