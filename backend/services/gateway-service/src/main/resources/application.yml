@@ -205,7 +205,7 @@ spring:
             - id: contract-asset-management
               uri: ${CONTRACT_ASSET_MANAGEMENT_URI:http://localhost:8087}
               predicates:
-                - Path=/api/v1/subscriptions/**
+                - Path=/api/v1/subscriptions/**,/api/v1/assets/**
               filters:
                 - CircuitBreaker=name=contractCircuitBreaker,fallbackUri=forward:/fallback/contract
 
@@ -465,7 +465,7 @@ spring:
             - id: contract-asset-management
               uri: http://localhost:8087
               predicates:
-                - Path=/api/v1/subscriptions/**
+                - Path=/api/v1/subscriptions/**,/api/v1/assets/**
 
             - id: cpq-contract-asset-management
               uri: http://localhost:8087

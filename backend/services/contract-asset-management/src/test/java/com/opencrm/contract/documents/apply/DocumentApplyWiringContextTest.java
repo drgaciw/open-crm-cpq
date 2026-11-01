@@ -10,6 +10,7 @@ import com.opencrm.contract.repository.documents.AmendmentDocumentRepository;
 import com.opencrm.contract.repository.documents.DocumentApplyLedgerRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -42,6 +43,7 @@ class DocumentApplyWiringContextTest {
             assertThat(loaded).hasSingleBean(DocumentApplyOrchestrator.class);
             assertThat(loaded).hasSingleBean(JdbcDocumentApplyGateway.class);
             assertThat(loaded).hasSingleBean(DocumentApplyController.class);
+            assertThat(loaded).hasSingleBean(EntityManager.class);
             assertThat(loaded.getBean(DocumentApplyOrchestrator.class)).isNotNull();
             assertThat(loaded.getBean(JdbcDocumentApplyGateway.class)).isNotNull();
             assertThat(loaded.getBean(DocumentApplyController.class)).isNotNull();
@@ -90,6 +92,11 @@ class DocumentApplyWiringContextTest {
         @Bean
         JdbcTemplate jdbcTemplate() {
             return mock(JdbcTemplate.class);
+        }
+
+        @Bean
+        EntityManager entityManager() {
+            return mock(EntityManager.class);
         }
 
         @Bean

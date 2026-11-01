@@ -163,6 +163,17 @@ export interface RampScheduleExpandRequest {
 }
 
 /**
+ * POST /api/v1/quotes/{quoteId}/ramp-schedule/extend
+ * Preview only. Does not persist the steps or the quote term.
+ * durationInMonths is the term after extension, not the months to add.
+ */
+export interface RampScheduleExtendRequest {
+  steps: RampStep[];
+  durationInMonths: number;
+  escalator: RampEscalator;
+}
+
+/**
  * Per-period price result. Present on the line only when the quote payload includes it.
  * netUnitPrice / netMonthly / periodAmount are the preview columns.
  */

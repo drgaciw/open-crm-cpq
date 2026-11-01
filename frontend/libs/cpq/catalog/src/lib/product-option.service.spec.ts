@@ -58,13 +58,15 @@ describe('ProductOptionService', () => {
     ]);
   });
 
-  it('createGroup POSTs OptionGroupCreateRequest', async () => {
+  it('createGroup POSTs OptionGroupCreateRequest including sortOrder', async () => {
+    // SPA must send sortOrder; omitted int failed Jackson creator-binding (INVALID_REQUEST_BODY).
     const body: OptionGroupCreateRequest = {
       productId: 12,
       name: 'Features',
       selectionType: 'MULTIPLE',
       minSelections: 0,
       maxSelections: 3,
+      sortOrder: 0,
     };
     const promise = firstValueFrom(service.createGroup(body));
     const req = httpMock.expectOne('/api/v1/product-options/groups');
@@ -74,16 +76,19 @@ describe('ProductOptionService', () => {
     await expect(promise).resolves.toMatchObject({ id: 2, name: 'Features' });
   });
 
-  it('addOption POSTs to groups/:id/options', async () => {
+  it('addOption POSTs OptionCreateRequest including sortOrder', async () => {
+    // SPA must send sortOrder; omitted int failed Jackson creator-binding (INVALID_REQUEST_BODY).
     const body: OptionCreateRequest = {
       name: 'SSO',
       priceAdjustment: 10,
       adjustmentType: 'ABSOLUTE',
+      sortOrder: 0,
     };
     const promise = firstValueFrom(service.addOption(5, body));
     const req = httpMock.expectOne('/api/v1/product-options/groups/5/options');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual(body);
+    expect(req.request.body.sortOrder).toBe(0);
     req.flush(
       group({
         id: 5,

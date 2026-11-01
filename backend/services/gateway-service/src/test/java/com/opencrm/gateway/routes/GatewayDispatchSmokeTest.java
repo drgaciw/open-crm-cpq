@@ -35,10 +35,11 @@ class GatewayDispatchSmokeTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void configuredRoutesDispatchToDistinctUpstreamsAndKeepApprovalHistoryAtQuoteBff(boolean dev) throws Exception {
-        HttpServer ai = upstream("ai"), documents = upstream("documents"), quote = upstream("quote");
+        HttpServer ai = upstream("ai"), documents = upstream("documents"), quote = upstream("quote"), contract = upstream("contract");
         try {
             var routes = configuredRoutes(dev, Map.of("ai-service", ai, "document-generation", documents,
-                    "cpq-document-generation", documents, "quote-service", quote, "cpq-quote-service", quote));
+                    "cpq-document-generation", documents, "quote-service", quote, "cpq-quote-service", quote,
+                    "contract-asset-management", contract));
             new ReactiveWebApplicationContextRunner()
                     .withConfiguration(AutoConfigurations.of(SslAutoConfiguration.class, WebFluxAutoConfiguration.class, GatewayAutoConfiguration.class))
                     .withBean("syntheticRoutes", RouteDefinitionLocator.class, () -> () -> Flux.fromIterable(routes))
@@ -55,10 +56,13 @@ class GatewayDispatchSmokeTest {
                             get(client, "/api/v1/cpq/documents/jobs", "documents:/api/v1/documents/jobs");
                             get(client, "/api/v1/quotes/synthetic-quote/approvals/history", "quote:/api/v1/quotes/synthetic-quote/approvals/history");
                             get(client, "/api/v1/cpq/quotes/synthetic-quote/approvals/history", "quote:/api/v1/quotes/synthetic-quote/approvals/history");
+                            get(client, "/api/v1/assets", "contract:/api/v1/assets");
+                            get(client, "/api/v1/assets/42", "contract:/api/v1/assets/42");
+                            get(client, "/api/v1/subscriptions/42", "contract:/api/v1/subscriptions/42");
                             client.get().uri("/api/v1/unmapped").exchange().expectStatus().isNotFound();
                         } finally { gateway.disposeNow(); }
                     });
-        } finally { ai.stop(0); documents.stop(0); quote.stop(0); }
+        } finally { ai.stop(0); documents.stop(0); quote.stop(0); contract.stop(0); }
     }
 
     private List<RouteDefinition> configuredRoutes(boolean dev, Map<String, HttpServer> upstreams) throws Exception {
@@ -69,7 +73,7 @@ class GatewayDispatchSmokeTest {
         environment.getPropertySources().addFirst(sources.get(dev ? 1 : 0));
         var all = Binder.get(environment).bind("spring.cloud.gateway.server.webflux.routes", Bindable.listOf(RouteDefinition.class)).get();
         var routes = all.stream().filter(r -> upstreams.containsKey(r.getId())).toList();
-        assertThat(routes).hasSize(5);
+        assertThat(routes).hasSize(6);
         for (RouteDefinition route : routes) {
             route.setUri(URI.create("http://127.0.0.1:" + upstreams.get(route.getId()).getAddress().getPort()));
             // The fixture isolates routing: Redis/auth/circuit breaker behavior has dedicated tests.
