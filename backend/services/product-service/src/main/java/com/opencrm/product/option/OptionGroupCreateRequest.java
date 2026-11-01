@@ -30,5 +30,9 @@ public class OptionGroupCreateRequest {
 
     private Integer maxSelections;
 
-    private int sortOrder;
+    /**
+     * Optional in SPA payloads. Jackson creator-binding rejects a missing primitive {@code int};
+     * use {@link Integer} so omitted {@code sortOrder} deserializes as null and maps to entity 0.
+     */
+    private Integer sortOrder;
 }

@@ -3,6 +3,7 @@ package com.opencrm.crm.organization;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.contact.ContactDto;
 import com.opencrm.crm.contact.ContactService;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -24,6 +25,7 @@ public class OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationMapper organizationMapper;
     private final ContactService contactService;
+    private final CrmDomainEvents domainEvents;
 
     /**
      * Create a new organization.
@@ -36,6 +38,7 @@ public class OrganizationService {
 
         // Save and return
         Organization saved = organizationRepository.save(organization);
+        domainEvents.organizationCreated(saved);
         log.info("Created organization with ID: {} and UUID: {}", saved.getId(), saved.getUuid());
 
         return organizationMapper.toDto(saved);

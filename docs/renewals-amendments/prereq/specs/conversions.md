@@ -107,3 +107,31 @@ Fixtures use Scenario 3 **[S sanity]**: 80 perpetual cores, historical book $200
 8. **Owner decision — dual-use window.** Scenario 3 uses six months (2026-07-01 through 2026-12-31). Whether the window is a policy field, a per-deal date, or forbidden for big-bang conversions is unset. DRG-341 already has a dual-entitlement window for the phased case.
 9. **Owner decision — approval trigger.** AC-3 surfaces a 25.6% discount and the credit amounts. Who must approve, and whether the cap breach blocks presentation, is an approvals decision (DRG-591 is parked and is not decided here).
 10. **Owner decision — `ConvertMetric` versus `Restructure`.** A metric change that stays on the same licence model is outside this policy. The owner confirms that `ConvertMetric` remains a different intent so this slice does not absorb it.
+
+## DRG-640 conversion figure decision frame
+
+**Status: Proposed.** This section lists the candidate figures for the Scenario 3 amount that `conversion` holds. It does not choose a price basis, write an ADR, or authorize implementation. **Owner decision: ___ (drg, time)**
+
+DRG-640 is a prerequisite under DRG-607, related to DRG-573 and to DRG-575 fork C2. `arr-bridge.md` open question 3 names the same three stories and does not choose among them. CPQ Decision on 2026-10-27 ruled that the frame is this section and that a default is proposed here with the owner slot left blank.
+
+### Scenario 3 fixture — expected values
+
+Fixture: [`fixtures/conversions/scenario-3-conversion-figure.json`](fixtures/conversions/scenario-3-conversion-figure.json) (`"status": "provisional"`).
+
+| Candidate | Formula | conversion on SaaS-3003 CL-30 | churn | crossSell |
+|---|---|---:|---:|---:|
+| parity ARR | AC-2 rounded ARR | 99993.60 | 0 | 0 |
+| year-1 net | 99993.60 − 20164.38 − 19998.72 | 59830.50 | 0 | 0 |
+| delta vs maintenance ARR | 99993.60 − 40000.00 | 59993.60 | 0 | 0 |
+
+**Default:** delta vs maintenance ARR. **Status: Proposed.** **Owner decision: ___ (drg, time)**
+
+Reason: the ARR bridge proposes `conversion` as the net annualized run-rate movement, so the figure is parity ARR minus prior maintenance ARR, and the year-1 credits stay out of the run-rate.
+
+### What the three figures are
+
+The parity ARR, the credits, and the year-1 net are the figures already stated in AC-2, AC-4, AC-5, and AC-6. The third candidate is parity ARR minus prior maintenance ARR. `churn` and `crossSell` are 0 on the new SaaS line (SaaS-3003 CL-30), on the terminated maintenance line (LM-2002 CL-11), and on the surrendered perpetual line (LM-2002 CL-10), for every row. The document-level sum of `churn` is 0.
+
+Parity ARR is the new SaaS run-rate after the AC-2 rounding (160 × 52.08 × 12 = 99993.60). Year-1 net subtracts the unused prepaid maintenance credit (20164.38) and the trade-in cap (19998.72); years 2 and 3 stay at the parity ARR when `parityRamp` is empty. Delta vs maintenance ARR subtracts the prior maintenance ARR of 40000.00 from the parity ARR. The perpetual book of 200000.00 is not ARR and is not part of the delta. The unrounded parity of 100000.00 is not a candidate; AC-2 holds the rounded unit and the ARR of 99993.60.
+
+The default is a proposal. The owner slot above is blank. Parity ARR and year-1 net remain candidates. This section does not edit `arr-bridge.md` and does not change the price basis, the 2.5 multiple, the credit stack, or the rounding side recorded in the open questions above.
