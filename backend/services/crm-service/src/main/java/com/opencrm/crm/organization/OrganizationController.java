@@ -26,6 +26,7 @@ import java.util.List;
 public class OrganizationController {
 
     private final OrganizationService organizationService;
+    private final AccountHierarchyService accountHierarchyService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -80,6 +81,34 @@ public class OrganizationController {
     ) {
         OrganizationDto organization = organizationService.update(organizationService.resolveAccountId(id), request);
         return ApiResponse.success(organization, "Organization updated successfully");
+    }
+
+    @PutMapping("/{id}/parent")
+    @Operation(summary = "Link organization to a parent",
+            description = "Sets or clears the parent account. Self-parent and ancestor cycles are rejected.")
+    public ApiResponse<AccountHierarchyDto> linkToParent(
+        @Parameter(description = "Organization ID")
+        @PathVariable Long id,
+        @Valid @RequestBody LinkToParentRequest request
+    ) {
+        AccountHierarchyDto hierarchy = accountHierarchyService.linkToParent(
+                organizationService.resolveAccountId(id), request.getParentOrganizationId());
+        String message = request.getParentOrganizationId() == null
+                ? "Organization unlinked from its parent"
+                : "Organization linked to parent";
+        return ApiResponse.success(hierarchy, message);
+    }
+
+    @GetMapping("/{id}/hierarchy")
+    @Operation(summary = "Resolve organization hierarchy",
+            description = "Returns the root-to-organization chain and ancestor account ids for inheritance.")
+    public ApiResponse<AccountHierarchyDto> resolveHierarchy(
+        @Parameter(description = "Organization ID")
+        @PathVariable Long id
+    ) {
+        AccountHierarchyDto hierarchy = accountHierarchyService.resolveHierarchy(
+                organizationService.resolveAccountId(id));
+        return ApiResponse.success(hierarchy);
     }
 
     @DeleteMapping("/{id}")

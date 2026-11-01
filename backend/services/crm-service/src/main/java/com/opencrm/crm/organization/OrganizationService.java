@@ -26,6 +26,7 @@ public class OrganizationService {
     private final OrganizationMapper organizationMapper;
     private final ContactService contactService;
     private final CrmDomainEvents domainEvents;
+    private final AccountHierarchyService accountHierarchyService;
 
     /** Resolve the legacy numeric API ID without exposing it as a cross-service account ID. */
     @Transactional(readOnly = true)
@@ -50,6 +51,9 @@ public class OrganizationService {
         // Save and return
         Organization saved = organizationRepository.save(organization);
         domainEvents.organizationCreated(saved);
+        if (request.getParentOrganizationId() != null) {
+            accountHierarchyService.linkToParent(AccountId.of(saved.getUuid()), request.getParentOrganizationId());
+        }
         log.info("Created organization with ID: {} and UUID: {}", saved.getId(), saved.getUuid());
 
         return organizationMapper.toDto(saved);
@@ -93,8 +97,11 @@ public class OrganizationService {
         // Update entity with non-null fields
         organizationMapper.updateEntity(request, organization);
 
-        // Save and return
+        // Save and return. A parent id is applied by the hierarchy service so cycles stay rejected.
         Organization updated = organizationRepository.save(organization);
+        if (request.getParentOrganizationId() != null) {
+            accountHierarchyService.linkToParent(AccountId.of(updated.getUuid()), request.getParentOrganizationId());
+        }
         log.info("Updated organization with ID: {}", updated.getId());
 
         return organizationMapper.toDto(updated);

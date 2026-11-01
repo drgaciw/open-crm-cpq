@@ -36,6 +36,8 @@ public class OrganizationDto {
     private OrganizationType type;
     private String ownerId;
     private String territory;
+    /** Parent organization row id. Null is a root account. */
+    private Long parentOrganizationId;
     private Integer contactCount;
     private Instant createdAt;
     private Instant updatedAt;
