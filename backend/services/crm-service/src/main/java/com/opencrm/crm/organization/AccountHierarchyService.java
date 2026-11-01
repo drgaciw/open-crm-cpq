@@ -6,10 +6,11 @@ import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.common.valueobject.AccountId;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.persistence.EntityManager;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +29,6 @@ import java.util.Set;
 @Slf4j
 @Service
 @Transactional
-@RequiredArgsConstructor
 public class AccountHierarchyService {
 
     /** Bounds a corrupt cycle that the seen-set did not catch. */
@@ -38,6 +38,28 @@ public class AccountHierarchyService {
     private final OutboxEventPublisher outboxEventPublisher;
     private final JdbcTemplate jdbc;
     private final EntityManager entityManager;
+    private final boolean readyForTests;
+
+    /** Production has no configuration or provider that can enable hierarchy. */
+    @Autowired
+    public AccountHierarchyService(OrganizationRepository organizationRepository, OutboxEventPublisher outboxEventPublisher,
+                                   JdbcTemplate jdbc, EntityManager entityManager) {
+        this(organizationRepository, outboxEventPublisher, jdbc, entityManager, false);
+    }
+
+    /** Package-private seam used only by the isolated hierarchy implementation tests. */
+    AccountHierarchyService(OrganizationRepository organizationRepository, OutboxEventPublisher outboxEventPublisher,
+                            JdbcTemplate jdbc, EntityManager entityManager, boolean readyForTests) {
+        this.organizationRepository = organizationRepository;
+        this.outboxEventPublisher = outboxEventPublisher;
+        this.jdbc = jdbc;
+        this.entityManager = entityManager;
+        this.readyForTests = readyForTests;
+    }
+
+    private void requireReady() {
+        if (!readyForTests) throw new BusinessException("Account hierarchy is not available", HttpStatus.SERVICE_UNAVAILABLE, "HIERARCHY_UNAVAILABLE");
+    }
     private static final long HIERARCHY_LOCK = 0x4849455241524348L;
 
     /** All parent writes and deletes serialize before reading hierarchy state. */
@@ -60,6 +82,7 @@ public class AccountHierarchyService {
      */
     @CacheEvict(value = "organizations", key = "#childId.value()")
     public AccountHierarchyDto linkToParent(AccountId childId, Long parentOrganizationId) {
+        requireReady();
         lockHierarchy();
         // A caller may share this transaction and have pending edits; flush them before refresh.
         // If validation later fails, the enclosing transaction rolls the flush back.
@@ -112,6 +135,7 @@ public class AccountHierarchyService {
      */
     @Transactional(readOnly = true)
     public AccountHierarchyDto resolveHierarchy(AccountId organizationId) {
+        requireReady();
         return describe(requireActive(organizationId));
     }
 

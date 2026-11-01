@@ -46,10 +46,22 @@ class AccountHierarchyServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountHierarchyService(organizationRepository, outboxEventPublisher, org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
+        service = new AccountHierarchyService(organizationRepository, outboxEventPublisher, org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class), org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class), true);
         root = organization(1L, ROOT_ID, "Root", null);
         parent = organization(2L, PARENT_ID, "Parent", 1L);
         child = organization(3L, CHILD_ID, "Child", null);
+    }
+
+    @Test
+    void productionServiceRejectsDirectReadAndWriteBeforeAnySideEffects() {
+        var jdbc = org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        var em = org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class);
+        var held = new AccountHierarchyService(organizationRepository, outboxEventPublisher, jdbc, em);
+        assertThatThrownBy(() -> held.linkToParent(AccountId.of(CHILD_ID), 1L))
+                .isInstanceOf(BusinessException.class).hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+        assertThatThrownBy(() -> held.resolveHierarchy(AccountId.of(CHILD_ID)))
+                .isInstanceOf(BusinessException.class).hasFieldOrPropertyWithValue("errorCode", "HIERARCHY_UNAVAILABLE");
+        org.mockito.Mockito.verifyNoInteractions(organizationRepository, outboxEventPublisher, jdbc, em);
     }
 
     @Test

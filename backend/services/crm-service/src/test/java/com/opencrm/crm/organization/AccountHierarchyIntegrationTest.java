@@ -14,7 +14,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Tag("integration")
+@org.springframework.context.annotation.Import(AccountHierarchyIntegrationTest.ReadyTestConfig.class)
 class AccountHierarchyIntegrationTest extends BaseIntegrationTest {
+    /** The only ready policy is constructed in test sources, never by production configuration. */
+    @org.springframework.boot.test.context.TestConfiguration
+    static class ReadyTestConfig {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        AccountHierarchyService readyHierarchy(OrganizationRepository repository,
+                com.opencrm.common.event.OutboxEventPublisher outbox,
+                JdbcTemplate jdbc, jakarta.persistence.EntityManager entityManager) {
+            return new AccountHierarchyService(repository, outbox, jdbc, entityManager, true);
+        }
+    }
+
     @Autowired MockMvc mvc;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper mapper;
     @Autowired JdbcTemplate jdbc;
