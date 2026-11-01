@@ -79,6 +79,8 @@ Security:
 
 - Select **Issue JSON Web Token (JWT)-based access tokens for named users**. Without this, MCP calls fail with `JWT Token is required` even after login.
 - Leave **Require Secret for Web Server Flow** off. Cursor signs in as a public client with PKCE and does not send the consumer secret.
+- Leave **Require Secret for Refresh Token Flow** off so Cursor can refresh tokens without a consumer secret.
+- Enable **Require Proof Key for Code Exchange (PKCE) extension for Supported Authorization Flows**.
 - Leave **JWT Bearer Flow** off. That flow needs a certificate and is not this setting.
 
 Flows that the CLI diagnosis showed were missing:
@@ -159,6 +161,7 @@ All of these must be true:
 - The External Client App used by Cursor has both callback `https://www.cursor.com/agents/mcp/oauth/callback` and scopes `mcp_api` and `refresh_token`.
 - **Issue JSON Web Token (JWT)-based access tokens for named users** is selected.
 - **Require Secret for Web Server Flow** is off.
+- **Require Secret for Refresh Token Flow** is off and PKCE is required.
 - Client-credentials **Run As** shows an existing username.
 - **Device Flow** is enabled.
 - An MCP server is active and its Server URL is the hosted sandbox URL, not the auth callback.
