@@ -22,6 +22,7 @@ class AssetReadAuthorizationTest {
     private final AssetHistoryStore history = mock(AssetHistoryStore.class);
     private final AssetQueryService query = new AssetQueryService(assets, mapper);
     private final AssetHistoryProjection projection = new AssetHistoryProjection(history);
+    private final AssetReportService reports = new AssetReportService(projection, history);
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
     @Test void anonymousDirectCallsAreDeniedBeforeDataAccess() { assertAllReadsDenied(); }
@@ -45,10 +46,12 @@ class AssetReadAuthorizationTest {
         projection.history("asset");
         projection.chain("asset", "both");
         projection.installedBase("account", LocalDate.of(2026, 1, 1));
+        reports.upcomingRenewals("account", LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null, null);
+        reports.churn("account", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
         verify(assets).findByDeletedFalse();
         verify(history).findByAssetId("asset");
         verify(history).findByEventType(AssetHistoryKind.SUPERSEDED);
-        verify(history).findByAccountId("account");
+        verify(history, times(3)).findByAccountId("account");
     }
     private void assertAllReadsDenied() {
         assertThatThrownBy(() -> query.list(null, null, null)).isInstanceOf(AccessDeniedException.class);
@@ -56,6 +59,10 @@ class AssetReadAuthorizationTest {
         assertThatThrownBy(() -> projection.history("asset")).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> projection.chain("asset", "both")).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> projection.installedBase("account", LocalDate.of(2026, 1, 1))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> reports.upcomingRenewals("account", LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null, null))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> reports.churn("account", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30)))
+                .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(assets, mapper, history);
     }
     private static void signIn(String role) {
