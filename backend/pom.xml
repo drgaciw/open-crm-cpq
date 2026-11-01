@@ -43,7 +43,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Spring -->
-        <spring-cloud.version>2025.1.1</spring-cloud.version>
+        <spring-cloud.version>2025.1.4</spring-cloud.version>
 
         <!-- Database -->
         <!-- Align with Spring Boot 4.0.9 BOM (spring-boot-flyway requires Flyway 11). -->
