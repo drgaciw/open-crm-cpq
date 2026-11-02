@@ -18,6 +18,12 @@ import {
   type QuoteDto,
 } from './quote.model';
 import type { DealCreateRequest, DealDto } from './deal.model';
+import {
+  SUBSCRIPTION_STATUSES,
+  type SubscriptionDto,
+  isSubscriptionStatus,
+} from './subscription.model';
+import type { AmendmentView, CreateAmendment } from './amendment.model';
 
 /**
  * TDD gate: FE shared-models field names stay aligned with backend Java DTOs used by
@@ -294,6 +300,112 @@ describe('Backend ↔ frontend contract parity (ALM surfaces)', () => {
         'ownerId',
         'type',
       ] satisfies (keyof DealCreateRequest)[],
+    );
+  });
+
+  it('SubscriptionDto covers CAM SubscriptionDto fields (CLM)', () => {
+    expectFeCoversBackend(
+      'SubscriptionDto',
+      javaFields(
+        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/dto/SubscriptionDto.java',
+      ),
+      [
+        'id',
+        'uuid',
+        'subscriptionNumber',
+        'customerId',
+        'quoteId',
+        'status',
+        'planName',
+        'startDate',
+        'endDate',
+        'renewalDate',
+        'mrr',
+        'arr',
+        'currencyCode',
+        'usageBand',
+        'erpSyncStatus',
+        'erpSubscriptionId',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof SubscriptionDto)[],
+    );
+    expect(SUBSCRIPTION_STATUSES).toEqual([
+      'PENDING',
+      'ACTIVE',
+      'SUSPENDED',
+      'CANCELLED',
+      'EXPIRED',
+    ]);
+    expect(isSubscriptionStatus('ACTIVE')).toBe(true);
+    expect(isSubscriptionStatus('TERMINATED')).toBe(false);
+  });
+
+  it('AmendmentView / CreateAmendment cover CAM amendment records (CLM)', () => {
+    // Java records use component declarations: Type name, — parse constructor params.
+    const viewSrc = readFileSync(
+      resolve(
+        REPO,
+        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/AmendmentView.java',
+      ),
+      'utf8',
+    );
+    const viewFields = [...viewSrc.matchAll(/\b(?:UUID|String|Integer|int|BigDecimal|List<[^>]+>)\s+(\w+)\s*[,)]/g)].map(
+      (m) => m[1],
+    );
+    expectFeCoversBackend(
+      'AmendmentView',
+      viewFields,
+      [
+        'id',
+        'contractId',
+        'provisionalNumber',
+        'amendmentSeq',
+        'amendmentNumber',
+        'status',
+        'version',
+        'contentDigest',
+        'approvalRef',
+        'signatureEnvelopeRef',
+        'tcvDelta',
+        'arrDelta',
+        'oneTimeTotal',
+        'creditTotal',
+        'revisions',
+        'lines',
+      ] satisfies (keyof AmendmentView)[],
+    );
+
+    const createSrc = readFileSync(
+      resolve(
+        REPO,
+        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/CreateAmendment.java',
+      ),
+      'utf8',
+    );
+    const createFields = [
+      ...createSrc.matchAll(
+        /\b(?:UUID|String|int|Integer|LocalDate|SignaturePolicy|List<[^>]+>)\s+(\w+)\s*[,)]/g,
+      ),
+    ].map((m) => m[1]);
+    expectFeCoversBackend(
+      'CreateAmendment',
+      [...new Set(createFields)],
+      [
+        'lifecycleChangeId',
+        'lifecycleChangeRevision',
+        'targetQuoteId',
+        'inputsSnapshotRef',
+        'signaturePolicy',
+        'actionDate',
+        'contractEffectiveDate',
+        'backdatingReasonCode',
+        'currency',
+        'lines',
+      ] satisfies (keyof CreateAmendment)[],
     );
   });
 });
