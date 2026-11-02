@@ -1,0 +1,23 @@
+{
+    "id": "reforecast-downsell",
+    "story": "DRG-600",
+    "cluster": "reforecast",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "label": "illustrative",
+    "figures": "illustrative numbers only; not a price and not a commercial term",
+    "case": "downsell",
+    "line_action": "update",
+    "rounding": {
+        "scale": 2,
+        "mode": "HALF_UP"
+    },
+    "inputs": {
+        "prior_tcv": "2500.00",
+        "new_tcv": "1800.125"
+    },
+    "expected": {
+        "raw_delta_tcv": "-699.875",
+        "forecast_delta_tcv": "-699.88"
+    }
+}
