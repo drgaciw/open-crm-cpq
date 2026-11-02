@@ -1,0 +1,23 @@
+{
+    "id": "reforecast-upsell",
+    "story": "DRG-600",
+    "cluster": "reforecast",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "label": "illustrative",
+    "figures": "illustrative numbers only; not a price and not a commercial term",
+    "case": "upsell",
+    "line_action": "update",
+    "rounding": {
+        "scale": 2,
+        "mode": "HALF_UP"
+    },
+    "inputs": {
+        "prior_tcv": "1000.00",
+        "new_tcv": "1008.325"
+    },
+    "expected": {
+        "raw_delta_tcv": "8.325",
+        "forecast_delta_tcv": "8.33"
+    }
+}
