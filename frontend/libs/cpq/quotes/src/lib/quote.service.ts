@@ -266,6 +266,7 @@ export class QuoteService {
       ? { ...line, schedule: { steps: result.steps, escalator: result.escalator }, pricedPeriods: [] }
       : line);
     this.selectedQuote.set({ ...current, durationInMonths: result.durationInMonths,
+      endDate: result.endDate === undefined ? current.endDate : result.endDate ?? undefined,
       version: result.quoteVersion, status: result.quoteStatus ?? current.status, rampScheduleStale: true, lineItems });
     this.lineItems.set(this.lineItems().map(line => line.id === lineId
       ? { ...line, schedule: { steps: result.steps, escalator: result.escalator }, pricedPeriods: [] }

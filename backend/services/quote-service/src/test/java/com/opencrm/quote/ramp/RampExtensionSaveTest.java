@@ -5,6 +5,9 @@ import com.opencrm.quote.lineitem.*;
 import com.opencrm.quote.quote.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +53,53 @@ class RampExtensionSaveTest {
         assertThat(quote.isRampScheduleStale()).isTrue();
         verify(guard).invalidateOnEdit(eq(quote), any());
         verify(quotes).saveAndFlush(quote);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2027-01-01,2028-12-31", "2027-01-31,2029-01-30", "2024-02-29,2026-02-27"})
+    void growingDatedTermUsesOriginalStartAnchor(String start, String expectedEnd) {
+        quote.setStartDate(LocalDate.parse(start));
+        quote.setEndDate(quote.getStartDate().plusMonths(12).minusDays(1));
+        savesTermAndScheduleTogetherAndReturnsFlushedVersion();
+        assertThat(quote.getStartDate()).isEqualTo(LocalDate.parse(start));
+        assertThat(quote.getEndDate()).isEqualTo(LocalDate.parse(expectedEnd));
+    }
+
+    @Test void sameTermCatchUpPreservesContinuationCalendarDates() {
+        quote.setDurationInMonths(2);
+        quote.setStartDate(LocalDate.of(2028, 2, 29));
+        quote.setEndDate(LocalDate.of(2028, 4, 29));
+        when(lines.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(line));
+        when(lines.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(7L)).thenReturn(List.of(line));
+        when(quotes.saveAndFlush(quote)).thenReturn(quote);
+        var request = request();
+        request.setDurationInMonths(2);
+        request.setSteps(List.of(RampStepDto.builder().sequence(1).startMonth(1).months(1).quantity(2)
+                .priceBasis(RampPriceBasis.ABSOLUTE).unitPrice(new BigDecimal("40")).build()));
+        service.extend(7L, request);
+        assertThat(quote.getEndDate()).isEqualTo(LocalDate.of(2028, 4, 29));
+    }
+
+    @Test void growingTermWithoutStartDoesNotInventAnAnchor() {
+        quote.setEndDate(LocalDate.of(2027, 12, 31));
+        savesTermAndScheduleTogetherAndReturnsFlushedVersion();
+        assertThat(quote.getStartDate()).isNull();
+        assertThat(quote.getEndDate()).isEqualTo(LocalDate.of(2027, 12, 31));
+    }
+
+    @Test void growingUndatedTermStaysUndated() {
+        savesTermAndScheduleTogetherAndReturnsFlushedVersion();
+        assertThat(quote.getStartDate()).isNull();
+        assertThat(quote.getEndDate()).isNull();
+    }
+
+    @Test void extensionResponseIncludesAuthoritativeEndDate() {
+        quote.setStartDate(LocalDate.of(2027, 1, 31));
+        quote.setEndDate(LocalDate.of(2028, 1, 30));
+        when(lines.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(line));
+        when(lines.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(7L)).thenReturn(List.of(line));
+        when(quotes.saveAndFlush(quote)).thenReturn(quote);
+        assertThat(service.extend(7L, request()).getEndDate()).isEqualTo(LocalDate.of(2029, 1, 30));
     }
 
     @Test void staleVersionRefusesBeforeMutation() {
