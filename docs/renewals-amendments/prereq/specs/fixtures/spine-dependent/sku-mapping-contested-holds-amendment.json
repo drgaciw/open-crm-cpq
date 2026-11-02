@@ -1,0 +1,35 @@
+{
+    "issue": "DRG-649",
+    "ac_id": "AC-649-3",
+    "case": "contested-holds-amendment",
+    "main_sha": "6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861",
+    "drg_599_section_sha": "352971f0f176a64d9925171e8b370f08906f9b37",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "649-F5-A",
+    "links": {
+        "parent_ac": "AC-599-2",
+        "parent_error_code": "MAPPING_CONTESTED",
+        "gate": "IN_REVIEW to EXECUTED"
+    },
+    "input": {
+        "document_state_before": "IN_REVIEW",
+        "hold_state": "MAPPING_HOLD",
+        "line": {
+            "action_code": "SWAP",
+            "source_sku": "SKU-A",
+            "target_sku": "SKU-B",
+            "relationship_version": "v3",
+            "dispute_state": "CONTESTED"
+        },
+        "requested_transition": "EXECUTED"
+    },
+    "expected": {
+        "transition_to_executed": "refused",
+        "document_state": "IN_REVIEW",
+        "hold_state": "MAPPING_HOLD",
+        "apply_allowed": false,
+        "http_status": 409,
+        "error_code": "MAPPING_CONTESTED"
+    }
+}

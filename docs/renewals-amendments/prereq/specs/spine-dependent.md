@@ -724,7 +724,7 @@ S7 orders nothing by end date. `contract_header_backfill_apply` takes a tenant i
 
 **Issue:** [DRG-599](https://linear.app/drgamtd-workspace/issue/DRG-599) (RA-65).
 
-**Issue text [S].** An amendment SKU mapping defines how a SKU on the original contract maps to the SKU or SKUs on an amendment. The product team owns it. Sales can dispute a mapping. A contested mapping holds the amendment: execution and apply wait until product resolves the dispute. Same-SKU add, update, and remove in the first slice do not use a mapping. Conditional rules stay on DRG-590. DRG-649 specifies the dispute flow in more depth later. This section stops at the same depth as the sections above.
+**Issue text [S].** An amendment SKU mapping defines how a SKU on the original contract maps to the SKU or SKUs on an amendment. The product team owns it. Sales can dispute a mapping. A contested mapping holds the amendment: execution and apply wait until product resolves the dispute. Same-SKU add, update, and remove in the first slice do not use a mapping. Conditional rules stay on DRG-590. Mapping-table ownership, the dispute flow, and the contested-mapping hold continue in the DRG-649 subsection below. The criteria in this opening stay at the same depth as the sections above.
 
 ### Acceptance criteria and fixtures
 
@@ -794,7 +794,7 @@ Product-service migrations on this tree have no `product_relationship` table **[
 | B | Add `REJECTED`. The hold remains. |
 | C | Sales clears the hold. |
 
-**Default:** Option A. No SLA and no notification sender are in this default. Those belong to DRG-649.
+**Default:** Option A. No SLA and no notification sender are in this default. Both stay open in the DRG-649 subsection (649-F3 and 649-F4).
 
 **Status:** Proposed
 
@@ -833,6 +833,159 @@ Product-service migrations on this tree have no `product_relationship` table **[
 |---|---|
 | A | The line pins the relationship version at pricing. A later contest holds documents that pinned that version and are not yet executed. Whether a contest raised after execution but before apply also holds apply remains unresolved: 599-F3 option A rechecks the pin before apply, while this option previously exempted executed documents. The owner must reconcile those choices; an immutable pin alone does not settle apply eligibility. |
 | B | Apply reads the live row. |
+
+**Default:** Option A.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+### DRG-649 — SKU mapping ownership, dispute flow, and the contested-mapping hold
+
+**Issue:** [DRG-649](https://linear.app/drgamtd-workspace/issue/DRG-649). Follow-up to this DRG-599 section. Prerequisite theme 5 under [DRG-607](https://linear.app/drgamtd-workspace/issue/DRG-607). Blocked by [DRG-648](https://linear.app/drgamtd-workspace/issue/DRG-648).
+
+#### Acceptance criteria and fixtures
+
+| AC | Fixture | Input | Expected |
+|---|---|---|---|
+| AC-649-1 | `fixtures/spine-dependent/sku-mapping-sales-write-refused.json` | Actor role `SALES` inserts a mapping version: source `SKU-A`, target `SKU-B`, effective from `2026-11-01`. No prior row. | Write refused. HTTP 403. `error_code` `MAPPING_WRITE_FORBIDDEN`. `row_created` false. `dispute_state` null. |
+| AC-649-2 | `fixtures/spine-dependent/sku-mapping-sales-opens-dispute.json` | Pinned relationship version `v3` is `ACTIVE`. Actor role `SALES` opens a dispute on `v3`. Document state `IN_REVIEW`. | `dispute_state` `CONTESTED`. `audit_recorded` true. `notification_sent` false. `sla_clock_started` false. Document state stays `IN_REVIEW`. `hold_state` `MAPPING_HOLD`. `apply_allowed` false. `error_code` null on the open call. |
+| AC-649-3 | `fixtures/spine-dependent/sku-mapping-contested-holds-amendment.json` | Document state `IN_REVIEW`. Line `SWAP` source `SKU-A` target `SKU-B` pinned to `v3`. `dispute_state` `CONTESTED`. `hold_state` `MAPPING_HOLD`. Actor requests transition to `EXECUTED`. | Transition refused. Document state stays `IN_REVIEW`. `hold_state` stays `MAPPING_HOLD`. `apply_allowed` false. HTTP 409. `error_code` `MAPPING_CONTESTED`. |
+
+`MAPPING_WRITE_FORBIDDEN`, `MAPPING_HOLD`, and the reuse of `MAPPING_CONTESTED` are Proposed names. AC-649-3 is the contested-mapping hold. It names hold state `MAPPING_HOLD` and error code `MAPPING_CONTESTED`. AC-599-2 already proposes `MAPPING_CONTESTED` at the `DRAFT` to `IN_REVIEW` gate. AC-649-3 checks the later gate in 599-F3 option A, immediately before `EXECUTED`.
+
+#### Where this sits
+
+This subsection extends the DRG-599 section. It does not copy it. Read these in place:
+
+- AC-599-1 through AC-599-4, and the parent fixtures `fixtures/spine-dependent/drg-599-*.json`.
+- 599-F1 through 599-F5.
+- The parent error codes `MAPPING_CONTESTED` (409) and `DISPUTE_RESOLVE_FORBIDDEN` (403).
+
+The DRG-599 section is on main `6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861`. It landed in #705 `bef7a606` and was clarified in #732 `352971f0`. Both commits are ancestors of that main sha. Both merged 2026-11-01.
+
+The sentence above the DRG-592 section still calls DRG-649 a later story. The closing list of this file still says this file does not replace DRG-649, and that dispute SLA, notifications, and the dispute UI stay in that follow-up. This subsection is that follow-up. 649-F3, 649-F4, and the absence of a dispute UI are the open choices those sentences name.
+
+#### Source check for ownership
+
+The Linear title of DRG-599 says "product-team owned, sales disputes". That title is not a source decision. The DRG-599 issue body and the Notion backlog row `3fbf7cb4e4df81afb618eeb1127ce55f` (last edited 2026-10-17T09:56:27Z) both open with the label "Call decision 2026-10-16 (#16)" and then restate ownership, dispute, and hold in issue prose. The only Linear comment by drg on DRG-599, at 2026-10-17T09:55:24Z, links PR #650 and does not state those words. A workspace search found no page that quotes drg word for word, with a clock time, on this ownership or this dispute flow. Every choice in this subsection stays **Status: Proposed**. **Owner decision: ___ (drg, time)** stays blank.
+
+#### Inputs
+
+- Actor role for a mapping write or a dispute open: `SALES` or `PRODUCT`, the same two roles as the parent inputs.
+- The relationship version pinned at pricing, and its `dispute_state`.
+- Document state at the gate under test (`IN_REVIEW` for AC-649-2 and AC-649-3).
+- For AC-649-1, source SKU, target SKU, and effective-from date. No price, term, or credit.
+
+#### Outputs
+
+- Whether the mapping write was stored.
+- The dispute state after an open.
+- Whether an audit record was written, whether a notification was sent, and whether an SLA clock started.
+- The document lifecycle state, `hold_state`, whether apply is allowed, and the error code.
+
+#### State and storage fields
+
+| Field | Home | On main `6ec091b1` |
+|---|---|---|
+| `hold_state` on the amendment document | Proposed marker, separate from the lifecycle state **[I]** | Absent. The parent state table does not name this field. |
+| Dispute audit record | Proposed append-only record: actor role, from state, to state, relationship version, time **[I]** | Absent. |
+| SLA clock | Proposed. Off under 649-F3 option A **[I]** | Absent. |
+| Notification sender | Proposed. Off under 649-F4 option A **[I]** | Absent. |
+
+The mapping row's home stays 599-F1. This subsection does not choose a table.
+
+#### Error codes
+
+| Code | HTTP | When | Fixture | Status |
+|---|---|---|---|---|
+| `MAPPING_WRITE_FORBIDDEN` | 403 | A sales actor inserts or replaces a mapping version | AC-649-1 | Proposed |
+| `MAPPING_CONTESTED` | 409 | A transition to `EXECUTED` rechecks a pinned version whose dispute state is `CONTESTED` | AC-649-3 | Proposed. Same code as the parent error-code table. |
+
+AC-649-2 expects `error_code` null. The open call succeeds. The hold is the document fields.
+
+#### As-is on main `6ec091b1`
+
+The parent as-is record still holds: product-service migrations have no `product_relationship` table, and `SWAP` is an action-code token. This subsection adds no migration. `specs/catalog-model.md` open question 8 leaves publish rights as DRG-599's subject. That file is not accepted here.
+
+#### Proposed choices
+
+##### 649-F1 Who may write a mapping version
+
+| Option | Meaning |
+|---|---|
+| A | Actor role `PRODUCT` may insert a version. Actor role `SALES` receives HTTP 403 `MAPPING_WRITE_FORBIDDEN`. The row is not stored. |
+| B | A second catalog-admin role may also write. This file does not name that role. |
+| C | `SALES` may store a row that stays unpublished until `PRODUCT` publishes it. |
+
+**Default:** Option A.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+##### 649-F2 How a dispute opens
+
+| Option | Meaning |
+|---|---|
+| A | `SALES` opens a dispute on a pinned version whose state is `ACTIVE`. The version becomes `CONTESTED`. One audit record is written. |
+| B | Only `PRODUCT` may open a dispute. The audit text records the sales request. |
+| C | Either role may open it. |
+
+**Default:** Option A. Who resolves it stays 599-F2 option A.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+##### 649-F3 Whether an SLA clock runs
+
+| Option | Meaning |
+|---|---|
+| A | No clock. A contested mapping does not expire and does not auto-resolve. |
+| B | A clock starts at open. The duration is an owner value. This file sets no duration. Expiry does not auto-resolve. |
+| C | Expiry auto-resolves the dispute. |
+
+**Default:** Option A.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+##### 649-F4 Whether a notification is sent
+
+| Option | Meaning |
+|---|---|
+| A | No sender. The audit record is the only side effect of an open. |
+| B | Opening notifies `PRODUCT`. Resolving notifies the sales actor who opened it. |
+| C | Opening notifies a queue. This file does not name the queue. |
+
+**Default:** Option A. No dispute UI is specified.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+##### 649-F5 What the hold state is called
+
+| Option | Meaning |
+|---|---|
+| A | The document lifecycle state stays as it is. A separate `hold_state` becomes `MAPPING_HOLD` while the pinned version is `CONTESTED`. `apply_allowed` is false. The transition that 599-F3 option A rechecks returns HTTP 409 `MAPPING_CONTESTED`. |
+| B | The lifecycle state itself becomes a new state `HELD`. |
+| C | Only `apply_allowed` is false. There is no `hold_state` field. |
+
+**Default:** Option A. AC-649-3 asserts this default at the pre-`EXECUTED` gate. AC-599-2 already asserts the `DRAFT` to `IN_REVIEW` gate. The open point inside 599-F3 and 599-F5, about a contest raised after execution and before apply, stays an owner decision in those forks.
+
+**Status:** Proposed
+
+**Owner decision:** ___ (drg, time)
+
+##### 649-F6 What the audit record contains
+
+| Option | Meaning |
+|---|---|
+| A | One record per open and per resolve attempt, including a refused sales resolve. Fields: actor role, from state, to state, relationship version, time. No price and no term. |
+| B | A record only when the write succeeds. |
 
 **Default:** Option A.
 
