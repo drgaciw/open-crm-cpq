@@ -31,10 +31,14 @@ The commercial-audit follow-up DRG-716 remains separate and unresolved.
   a failure after SQL flush rolls all of them and the root version back.
 - DATE-4: the saved end date reaches editor state and subsequent header edits;
   legacy omitted-field responses retain compatibility.
+- CI-1: the CRM close-event integration fixture supplies the accepted-quote
+  prerequisite for a Won transition, preserving its amount/time/event assertions
+  and the production guard's rejection of a win without an accepted quote.
 
 Exact allowlist:
 
 ```text
+backend/services/crm-service/src/test/java/com/opencrm/crm/outbox/DealClosedEventTest.java
 backend/services/quote-service/src/main/java/com/opencrm/quote/lineitem/QuoteLineItemService.java
 backend/services/quote-service/src/main/java/com/opencrm/quote/ramp/RampScheduleDto.java
 backend/services/quote-service/src/main/java/com/opencrm/quote/ramp/RampScheduleQueryService.java
@@ -80,6 +84,19 @@ and CRM production build all passed. The existing lockfile was unchanged;
 installation reported 48 inherited dependency audit findings (33 moderate,
 12 high, three critical). This correction does not remediate that baseline.
 Independent review found no blocking issue in the final code diff.
+
+The first full CI run, `41381833873` on `77353388`, failed in the existing CRM
+`DealClosedEventTest.updateToWonFreezesEditedAmountAndPublishesThePersistedCloseTime`:
+HTTP 200 was expected, but the accepted-quote win guard added by merged #762
+correctly returned 400 `OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE`. Other matrix jobs
+and the PR gate passed; the integration reactor stopped before quote-service.
+The same class already supplies accepted-quote metadata in its standalone win
+test. The bounded fixture repair supplies that prerequisite only for the Won
+update case; production lifecycle behavior and all existing assertions remain.
+The failure was reproduced locally on committed head `77353388` before the
+fixture change: five cases, one failure, the same 400 guard error. The local RED
+log and fixture diff are `.gitnexus/crm-closed-fixture-red.log` and
+`.gitnexus/crm-closed-fixture-test.patch`.
 
 Verification outcomes and exact-head CI belong in the PR body. Local logs are
 not published CI artifacts. This correction has service/component and PostgreSQL
