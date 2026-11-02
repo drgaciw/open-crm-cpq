@@ -108,6 +108,11 @@ class DealClosedEventTest extends BaseIntegrationTest {
 
     private void assertUpdateCloses(String stage, int probability, String timeField) throws Exception {
         CrmOutboxHttp.Created created = http.createDeal("Closed by update");
+        if ("WON".equals(stage)) {
+            jdbcTemplate.update(
+                    "UPDATE crm.deals SET accepted_quote_id = ? WHERE id = ?",
+                    "accepted-quote-" + created.id(), created.id());
+        }
         String response = mockMvc.perform(put("/api/v1/deals/{id}", created.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"stage\":\"" + stage + "\",\"amount\":1300,\"currency\":\"USD\"}"))

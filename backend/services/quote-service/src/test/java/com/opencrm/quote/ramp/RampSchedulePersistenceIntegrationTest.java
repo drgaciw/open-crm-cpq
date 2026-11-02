@@ -6,6 +6,7 @@ import com.opencrm.quote.client.ApprovalRoutingClient;
 import com.opencrm.common.event.OutboxEventPublisher;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -342,6 +343,60 @@ class RampSchedulePersistenceIntegrationTest {
 
     private record PersistedRamp(Long quoteId, Long lineId, Long version) {}
     private record ExtensionAttempt(boolean committed, String errorCode, Long version, String price) {}
+
+    @Test void datedExtensionReloadsConsistentCalendarTerm() {
+        Quote quote = quote("DATED-EXTEND");
+        quote.setStartDate(LocalDate.of(2027, 1, 31));
+        quote.setEndDate(LocalDate.of(2030, 1, 30));
+        Long id = service().addLineItem(quote.getId(), request(List.of(step(1, 1, 36, "40")))).getId();
+        entityManager.flush(); entityManager.clear();
+        Long version = quotes.findById(quote.getId()).orElseThrow().getVersion();
+        service().persistExtendedRamp(quote.getId(), id, 48, version,
+                RampScheduleDto.builder().steps(List.of(step(1, 1, 48, "42"))).build());
+        entityManager.clear();
+        Quote reloaded = quotes.findById(quote.getId()).orElseThrow();
+        assertThat(reloaded.getDurationInMonths()).isEqualTo(48);
+        assertThat(reloaded.getStartDate()).isEqualTo(LocalDate.of(2027, 1, 31));
+        assertThat(reloaded.getEndDate()).isEqualTo(LocalDate.of(2031, 1, 30));
+        assertThat(reloaded.getVersion()).isGreaterThan(version);
+        for (int duration : List.of(49, 50)) {
+            service().persistExtendedRamp(quote.getId(), id, duration, reloaded.getVersion(),
+                    RampScheduleDto.builder().steps(List.of(step(1, 1, duration, "42"))).build());
+            entityManager.clear();
+            reloaded = quotes.findById(quote.getId()).orElseThrow();
+            assertThat(reloaded.getEndDate()).isEqualTo(duration == 49
+                    ? LocalDate.of(2031, 2, 27) : LocalDate.of(2031, 3, 30));
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void datedExtensionRollsBackDatesWithTermScheduleAndVersion() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        PersistedRamp fixture = tx.execute(status -> {
+            Quote quote = quote("DATED-ROLLBACK");
+            quote.setStartDate(LocalDate.of(2027, 1, 31));
+            quote.setEndDate(LocalDate.of(2030, 1, 30));
+            Long id = service().addLineItem(quote.getId(), request(List.of(step(1, 1, 36, "40")))).getId();
+            entityManager.flush();
+            return new PersistedRamp(quote.getId(), id, quote.getVersion());
+        });
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            Quote saved = service().persistExtendedRamp(fixture.quoteId(), fixture.lineId(), 48, fixture.version(),
+                    RampScheduleDto.builder().steps(List.of(step(1, 1, 48, "42"))).build());
+            assertThat(saved.getEndDate()).isEqualTo(LocalDate.of(2031, 1, 30));
+            throw new IllegalStateException("rollback dated extension after flush");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("rollback dated extension after flush");
+        tx.executeWithoutResult(status -> {
+            Quote reloaded = quotes.findById(fixture.quoteId()).orElseThrow();
+            assertThat(reloaded.getDurationInMonths()).isEqualTo(36);
+            assertThat(reloaded.getStartDate()).isEqualTo(LocalDate.of(2027, 1, 31));
+            assertThat(reloaded.getEndDate()).isEqualTo(LocalDate.of(2030, 1, 30));
+            assertThat(reloaded.getVersion()).isEqualTo(fixture.version());
+            assertThat(lines.findById(fixture.lineId()).orElseThrow().getRampSteps())
+                    .extracting(QuoteRampStep::getMonths).containsExactly(36);
+        });
+    }
 
     private Quote quote(String number) {
         return quotes.saveAndFlush(Quote.builder().quoteNumber(number).name(number).customerExternalId("customer")

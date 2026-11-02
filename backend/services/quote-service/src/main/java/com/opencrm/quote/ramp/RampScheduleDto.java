@@ -21,4 +21,5 @@ public class RampScheduleDto {
     private Integer durationInMonths;
     private Long quoteVersion;
     private com.opencrm.quote.quote.QuoteStatus quoteStatus;
+    private java.time.LocalDate endDate;
 }

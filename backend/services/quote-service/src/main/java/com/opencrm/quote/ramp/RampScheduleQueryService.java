@@ -75,6 +75,7 @@ public class RampScheduleQueryService {
             schedule.setDurationInMonths(duration);
             schedule.setQuoteVersion(saved.getVersion());
             schedule.setQuoteStatus(saved.getStatus());
+            schedule.setEndDate(saved.getEndDate());
         }
         return schedule;
     }
