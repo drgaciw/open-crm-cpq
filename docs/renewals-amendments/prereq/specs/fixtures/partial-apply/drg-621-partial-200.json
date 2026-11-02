@@ -1,0 +1,48 @@
+{
+    "id": "drg-621-partial-200",
+    "story": "DRG-637",
+    "cluster": "partial-apply",
+    "ac": "AC1-200",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "reading_base": "6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861",
+    "source_merge": {
+        "pr": 688,
+        "sha": "71d080e7f257d80d4dd7fc83d71979d212087571"
+    },
+    "case": "later-unit-digest-conflict-after-an-applied-unit",
+    "preconditions": {
+        "document_status_before": "EXECUTED",
+        "asset_lifecycle_hold_is_the_path": false,
+        "hold_open_item": "OI-749-hold"
+    },
+    "inputs": {
+        "units": [
+            {
+                "unit_no": 1,
+                "result": "APPLIED"
+            },
+            {
+                "unit_no": 2,
+                "conflict": "DIGEST_CONFLICT"
+            }
+        ]
+    },
+    "expected": {
+        "http_status": 200,
+        "document_status": "PARTIALLY_APPLIED",
+        "unit_state_for_conflict": "BLOCKED",
+        "apply_blocked_unit_state": "BLOCKED",
+        "block_reason": "DIGEST_CONFLICT",
+        "audit_event_type": "APPLY_UNIT_BLOCKED",
+        "applied_unit_rolled_back": false
+    },
+    "pins": [
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/controller/DocumentApplyController.java:43-51",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:177-179",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:201",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:416-422",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:639-647",
+        "backend/services/contract-asset-management/src/test/java/com/opencrm/contract/documents/apply/DocumentApplyMidLoopConflictTest.java:108-118"
+    ]
+}
