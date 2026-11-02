@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { QuoteService } from './quote.service';
+import { QuoteHeaderEditComponent } from './quote-header-edit/quote-header-edit.component';
 import {
   QuoteDto,
   QuoteLineItemDto,
@@ -415,6 +416,45 @@ describe('QuoteService', () => {
     expect(service.selectedQuote()).toBe(after);
     service.applyRampExtension(7, 9, { ...result, durationInMonths: 12, quoteVersion: 3 });
     expect(service.selectedQuote()).toBe(after);
+  });
+
+  it('keeps the extended calendar end when the header is edited and saved next', async () => {
+    service.selectedQuote.set(quote({ id: 7, name: 'Ramp', customerExternalId: 'c', version: 3,
+      startDate: '2027-01-31', endDate: '2028-01-30' }));
+    const result = { steps: [], durationInMonths: 24, quoteVersion: 4, endDate: '2029-01-30' };
+    const extension = firstValueFrom(service.extendRampSchedule(7, {
+      steps: [], durationInMonths: 24, lineItemId: 9, expectedQuoteVersion: 3,
+    }));
+    httpMock.expectOne('/api/v1/quotes/7/ramp-schedule/extend').flush(result);
+    service.applyRampExtension(7, 9, await extension);
+    const fixture = TestBed.createComponent(QuoteHeaderEditComponent);
+    fixture.componentRef.setInput('quote', service.selectedQuote());
+    fixture.componentRef.setInput('editable', true);
+    fixture.componentInstance.startEdit();
+    fixture.componentInstance.form.controls.name.setValue('Renamed after extension');
+    fixture.componentInstance.onSave();
+    const request = httpMock.expectOne('/api/v1/quotes/7');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toMatchObject({ name: 'Renamed after extension',
+      durationInMonths: 24, startDate: '2027-01-31', endDate: '2029-01-30' });
+    request.flush(service.selectedQuote());
+    httpMock.expectOne('/api/v1/quotes/7').flush(service.selectedQuote());
+    fixture.destroy();
+  });
+
+  it('preserves an omitted end date from legacy extension responses', () => {
+    service.selectedQuote.set(quote({ id: 7, name: 'Ramp', customerExternalId: 'c', version: 3,
+      endDate: '2028-01-30' }));
+    service.applyRampExtension(7, 9, { steps: [], durationInMonths: 24, quoteVersion: 4 });
+    expect(service.selectedQuote()?.endDate).toBe('2028-01-30');
+  });
+
+  it('clears an end date explicitly returned as null by the server', () => {
+    service.selectedQuote.set(quote({ id: 7, name: 'Ramp', customerExternalId: 'c', version: 3,
+      endDate: '2028-01-30' }));
+    const result = { steps: [], durationInMonths: 24, quoteVersion: 4, endDate: null };
+    service.applyRampExtension(7, 9, result);
+    expect(service.selectedQuote()?.endDate).toBeUndefined();
   });
 
   it('extendRampSchedule POSTs the existing steps and new term and does not change quote signals', async () => {

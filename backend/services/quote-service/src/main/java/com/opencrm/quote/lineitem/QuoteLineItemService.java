@@ -214,6 +214,9 @@ public class QuoteLineItemService {
         try {
             // Lock and advance the root before touching any line row, including same-term catch-up.
             advanceQuoteVersion(quote);
+            if (durationInMonths > quote.getDurationInMonths() && quote.getStartDate() != null) {
+                quote.setEndDate(quote.getStartDate().plusMonths(durationInMonths).minusDays(1));
+            }
             quote.setDurationInMonths(durationInMonths);
             rampScheduleAttacher.attach(item, prepared);
             item.setPricingWaterfallJson(null);

@@ -182,6 +182,7 @@ export interface RampScheduleExtendResult extends RampSchedule {
   durationInMonths?: number;
   quoteVersion?: number;
   quoteStatus?: QuoteStatus;
+  endDate?: string | null;
 }
 
 /**
