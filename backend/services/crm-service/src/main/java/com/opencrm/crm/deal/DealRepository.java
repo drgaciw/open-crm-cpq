@@ -33,6 +33,11 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @EntityGraph(attributePaths = {"organization", "primaryContact"})
     Page<Deal> findByOrganization_IdAndDeletedFalse(Long organizationId, Pageable pageable);
 
+    /**
+     * Every deal row for the organization, including soft-deleted rows, so a merge can repoint the foreign key.
+     */
+    List<Deal> findAllByOrganization_Id(Long organizationId);
+
     @EntityGraph(attributePaths = {"organization", "primaryContact"})
     Page<Deal> findByOrganization_IdAndStageAndDeletedFalse(Long organizationId, DealStage stage, Pageable pageable);
 

@@ -38,7 +38,7 @@ services:
   # Containers use kafka:29092; services started on the host (mvnw / java -jar) use localhost:9092.
   kafka:
     profiles: [events]
-    image: apache/kafka:4.3.1
+    image: apache/kafka:4.4.0
     container_name: opencrm-kafka
     ports:
       - "9092:9092"

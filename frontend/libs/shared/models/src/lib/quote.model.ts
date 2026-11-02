@@ -145,6 +145,8 @@ export interface RampEscalator {
   mode: RampEscalatorMode;
   amount: number;
   everyMonths: number;
+  /** Omitted retains compound growth; false uses startPrice as the increment base. */
+  compounding?: boolean;
 }
 
 /** Line write body: steps, plus the escalator when the user generated or kept one. */
@@ -164,13 +166,22 @@ export interface RampScheduleExpandRequest {
 
 /**
  * POST /api/v1/quotes/{quoteId}/ramp-schedule/extend
- * Preview only. Does not persist the steps or the quote term.
+ * Without lineItemId and expectedQuoteVersion this previews only. Supplying both
+ * commits the selected schedule and quote term together.
  * durationInMonths is the term after extension, not the months to add.
  */
 export interface RampScheduleExtendRequest {
   steps: RampStep[];
   durationInMonths: number;
   escalator: RampEscalator;
+  lineItemId?: number;
+  expectedQuoteVersion?: number;
+}
+
+export interface RampScheduleExtendResult extends RampSchedule {
+  durationInMonths?: number;
+  quoteVersion?: number;
+  quoteStatus?: QuoteStatus;
 }
 
 /**

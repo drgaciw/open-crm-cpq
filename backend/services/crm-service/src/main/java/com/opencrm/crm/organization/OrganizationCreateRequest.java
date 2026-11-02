@@ -1,6 +1,7 @@
 package com.opencrm.crm.organization;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -65,4 +66,12 @@ public class OrganizationCreateRequest {
 
     @Size(max = 100, message = "Territory must not exceed 100 characters")
     private String territory;
+
+    /**
+     * Optional parent organization id. Applied by {@link AccountHierarchyService} after insert.
+     * Null leaves the new organization as a root.
+     */
+    @com.fasterxml.jackson.annotation.JsonAlias("parentId")
+    @Positive(message = "Parent organization id must be positive")
+    private Long parentOrganizationId;
 }

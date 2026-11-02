@@ -1,5 +1,6 @@
 package com.opencrm.common.event;
 
+import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
@@ -9,6 +10,7 @@ import com.opencrm.common.event.dto.DealClosedEvent;
 import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
+import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
@@ -157,6 +159,10 @@ public final class EventContractRegistry {
     public static final EventContract DEAL_CLOSED_V1 = published(
             "DealClosed", "crm-service", KafkaTopics.DEAL_CLOSED, DealClosedEvent.class);
 
+    /** DRG-482 / BC-12-02. One event when an account parent link is created or changed. */
+    public static final EventContract HIERARCHY_CHANGED_V1 = published(
+            "HierarchyChanged", "crm-service", KafkaTopics.HIERARCHY_CHANGED, HierarchyChangedEvent.class);
+
     /** DRG-654. One asset created per activated contract line. */
     public static final EventContract ASSET_CREATED_V1 = published(
             "AssetCreated", "contract-asset-management", KafkaTopics.ASSET_CREATED, AssetCreatedEvent.class);
@@ -180,6 +186,10 @@ public final class EventContractRegistry {
     /** DRG-483. One territory and segment assignment for an account. */
     public static final EventContract TERRITORY_ASSIGNED_V1 = published(
             "TerritoryAssigned", "crm-service", KafkaTopics.TERRITORY_ASSIGNED, TerritoryAssignedEvent.class);
+
+    /** DRG-484. CRM-owned rows are repointed in this service; other services consume the event. */
+    public static final EventContract ACCOUNTS_MERGED_V1 = published(
+            "AccountsMerged", "crm-service", KafkaTopics.ACCOUNTS_MERGED, AccountsMergedEvent.class);
 
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
@@ -207,7 +217,9 @@ public final class EventContractRegistry {
             ASSET_AMENDED_V1,
             ASSET_TERMINATED_V1,
             ASSET_SUPERSEDED_V1,
-            TERRITORY_ASSIGNED_V1);
+            HIERARCHY_CHANGED_V1,
+            TERRITORY_ASSIGNED_V1,
+            ACCOUNTS_MERGED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

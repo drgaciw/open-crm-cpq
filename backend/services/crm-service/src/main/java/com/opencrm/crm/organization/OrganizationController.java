@@ -82,6 +82,17 @@ public class OrganizationController {
         return ApiResponse.success(organization, "Organization updated successfully");
     }
 
+    // Explicit 404 keeps the existing client hidden while tenant authorization and event propagation are unavailable.
+    @PutMapping("/{id}/parent")
+    public ApiResponse<Void> unavailableParent(@PathVariable Long id) {
+        throw new com.opencrm.common.exception.ResourceNotFoundException("Account hierarchy", id);
+    }
+
+    @GetMapping("/{id}/hierarchy")
+    public ApiResponse<Void> unavailableHierarchy(@PathVariable Long id) {
+        throw new com.opencrm.common.exception.ResourceNotFoundException("Account hierarchy", id);
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete organization", description = "Soft deletes an organization by its ID")
     public ApiResponse<Void> delete(
