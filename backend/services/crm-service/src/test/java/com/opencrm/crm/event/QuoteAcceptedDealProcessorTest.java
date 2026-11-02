@@ -85,6 +85,25 @@ class QuoteAcceptedDealProcessorTest {
         assertThat(saved.getAmount()).isEqualByComparingTo("15000.00");
         assertThat(saved.getCurrency()).isEqualTo("EUR");
         assertThat(saved.getWonAt()).isEqualTo(acceptedAt);
+        assertThat(saved.getAcceptedQuoteId()).isEqualTo("quote-uuid-1");
+    }
+
+    @Test
+    @DisplayName("records the quote number when the acceptance has no quote uuid")
+    void applyWinFromQuote_recordsQuoteNumberWhenUuidMissing() {
+        when(dealRepository.findByUuid(deal.getUuid())).thenReturn(Optional.of(deal));
+        when(inbox.claimKey(QuoteAcceptedIdempotency.CLAIM_NAMESPACE, deal.getUuid() + ":Q-9")).thenReturn(true);
+        QuoteAcceptedCrmMessage message = QuoteAcceptedCrmMessage.builder()
+                .dealExternalId(deal.getUuid())
+                .quoteNumber("Q-9")
+                .quoteUuid("  ")
+                .build();
+
+        QuoteAcceptedOutcome outcome = processor.applyWinFromQuote(message, deal.getUuid());
+
+        assertThat(outcome).isEqualTo(QuoteAcceptedOutcome.APPLIED);
+        assertThat(deal.getAcceptedQuoteId()).isEqualTo("Q-9");
+        assertThat(deal.getStage()).isEqualTo(DealStage.WON);
     }
 
     @Test

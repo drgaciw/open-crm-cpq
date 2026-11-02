@@ -58,6 +58,10 @@ public class QuoteAcceptedDealProcessor {
 
     private void applyToDeal(Deal deal, QuoteAcceptedCrmMessage event) {
         DealStage previousStage = deal.getStage();
+        String quoteId = acceptedQuoteId(event);
+        if (quoteId != null) {
+            deal.setAcceptedQuoteId(quoteId);
+        }
         deal.markWon();
         if (event.getAcceptedAt() != null) {
             deal.setWonAt(event.getAcceptedAt());
@@ -79,6 +83,19 @@ public class QuoteAcceptedDealProcessor {
                 deal.getUuid(),
                 safeQuoteLabel(event),
                 amountLog);
+    }
+
+    /**
+     * The message already carries the quote id. Prefer the stable quote UUID, then the quote number.
+     */
+    private static String acceptedQuoteId(QuoteAcceptedCrmMessage event) {
+        if (event.getQuoteUuid() != null && !event.getQuoteUuid().isBlank()) {
+            return event.getQuoteUuid();
+        }
+        if (event.getQuoteNumber() != null && !event.getQuoteNumber().isBlank()) {
+            return event.getQuoteNumber();
+        }
+        return null;
     }
 
     private static String safeQuoteLabel(QuoteAcceptedCrmMessage event) {

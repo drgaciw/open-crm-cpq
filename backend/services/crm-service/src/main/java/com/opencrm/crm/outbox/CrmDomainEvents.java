@@ -4,6 +4,7 @@ import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.DealClosedEvent;
+import com.opencrm.common.event.dto.DealCreatedEvent;
 import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.crm.contact.Contact;
@@ -35,6 +36,23 @@ public class CrmDomainEvents {
                         organization.getName(),
                         organization.getType() == null ? null : organization.getType().name(),
                         occurredAt(organization.getCreatedAt())));
+    }
+
+    /**
+     * Records that a deal was created. DealCreated is OpportunityCreated (DRG-485).
+     * The registry constant is named in {@code publish} so the contract fitness scan sees this single emitter.
+     */
+    public void dealCreated(Deal deal) {
+        outboxEventPublisher.publish(
+                "Deal",
+                deal.getUuid(),
+                EventContractRegistry.DEAL_CREATED_V1,
+                new DealCreatedEvent(
+                        deal.getUuid(),
+                        organizationId(deal),
+                        deal.getName(),
+                        deal.getStage() == null ? null : deal.getStage().name(),
+                        occurredAt(deal.getCreatedAt())));
     }
 
     public void contactCreated(Contact contact) {

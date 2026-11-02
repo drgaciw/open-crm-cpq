@@ -53,6 +53,10 @@ class DealClosedEventTest extends BaseIntegrationTest {
     @DisplayName("winning a deal writes exactly one DealClosed row and no pricing or approval fields")
     void winWritesExactlyOneClosedRowWithoutPricing() throws Exception {
         CrmOutboxHttp.Created created = http.createDeal("Won deal");
+        jdbcTemplate.update(
+                "UPDATE crm.deals SET accepted_quote_id = ? WHERE id = ?",
+                "accepted-quote-" + created.id(),
+                created.id());
 
         http.win(created.id());
 

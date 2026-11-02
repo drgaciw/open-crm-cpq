@@ -7,6 +7,7 @@ import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
 import com.opencrm.common.event.dto.DealClosedEvent;
+import com.opencrm.common.event.dto.DealCreatedEvent;
 import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
@@ -158,6 +159,13 @@ public final class EventContractRegistry {
     public static final EventContract DEAL_CLOSED_V1 = published(
             "DealClosed", "crm-service", KafkaTopics.DEAL_CLOSED, DealClosedEvent.class);
 
+    /**
+     * DRG-485 / BC-13-01. DealCreated is OpportunityCreated. DealStageChanged and DealClosed remain the
+     * stage and close contracts; this is not a second StageAdvanced or OpportunityClosed.
+     */
+    public static final EventContract DEAL_CREATED_V1 = published(
+            "DealCreated", "crm-service", KafkaTopics.DEAL_CREATED, DealCreatedEvent.class);
+
     /** DRG-482 / BC-12-02. One event when an account parent link is created or changed. */
     public static final EventContract HIERARCHY_CHANGED_V1 = published(
             "HierarchyChanged", "crm-service", KafkaTopics.HIERARCHY_CHANGED, HierarchyChangedEvent.class);
@@ -207,6 +215,7 @@ public final class EventContractRegistry {
             CONTACT_CREATED_V1,
             DEAL_STAGE_CHANGED_V1,
             DEAL_CLOSED_V1,
+            DEAL_CREATED_V1,
             ASSET_CREATED_V1,
             ASSET_AUDIT_RECORDED_V1,
             ASSET_AMENDED_V1,

@@ -80,6 +80,14 @@ public class Deal extends BaseEntity {
     @Column(name = "lost_reason")
     private String lostReason;
 
+    /**
+     * Quote id recorded when an accepted quote is applied to this opportunity (DRG-485).
+     * Null until {@code QuoteAcceptedDealProcessor} applies that win. {@code DealService#win} refuses to close
+     * without it.
+     */
+    @Column(name = "accepted_quote_id", length = 255)
+    private String acceptedQuoteId;
+
     @Column(name = "won_at")
     private Instant wonAt;
 

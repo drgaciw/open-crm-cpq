@@ -70,6 +70,10 @@ class CrmEventActorHeadersTest extends BaseIntegrationTest {
         CrmOutboxHttp.Created contact = http.createContact("Actor", "actor-" + suffix + "@example.com");
         CrmOutboxHttp.Created deal = http.createDeal("Actor deal " + suffix);
         http.advance(deal.id());
+        jdbcTemplate.update(
+                "UPDATE crm.deals SET accepted_quote_id = ? WHERE id = ?",
+                "accepted-quote-" + deal.id(),
+                deal.id());
 
         assertThat(actorOf(organization.uuid(), CrmOutboxTopics.ORGANIZATION_CREATED)).isEqualTo(actor);
         assertThat(actorOf(contact.uuid(), CrmOutboxTopics.CONTACT_CREATED)).isEqualTo(actor);

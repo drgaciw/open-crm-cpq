@@ -127,6 +127,7 @@ class DealPipelineCurrencyIntegrationTest extends BaseIntegrationTest {
     void closedDealKeepsItsRate() throws Exception {
         rate("EUR", "USD", "1.10", Instant.now().minus(2, ChronoUnit.DAYS));
         long eur = createDeal("Euro deal", "1000", "EUR");
+        recordAcceptedQuote(eur);
         mockMvc.perform(post("/api/v1/deals/{id}/win", eur)).andExpect(status().isOk());
 
         rate("EUR", "USD", "1.50", Instant.now().minus(1, ChronoUnit.SECONDS));
@@ -142,6 +143,7 @@ class DealPipelineCurrencyIntegrationTest extends BaseIntegrationTest {
     void wonDealEditDoesNotRefreeze() throws Exception {
         rate("EUR", "USD", "1.10", Instant.now().minus(2, ChronoUnit.DAYS));
         long eur = createDeal("Euro deal", "1000", "EUR");
+        recordAcceptedQuote(eur);
         mockMvc.perform(post("/api/v1/deals/{id}/win", eur)).andExpect(status().isOk());
 
         jdbcTemplate.update("""
@@ -176,5 +178,11 @@ class DealPipelineCurrencyIntegrationTest extends BaseIntegrationTest {
         assertThat(afterReject.getCurrency()).isEqualTo("EUR");
         assertThat(afterReject.getBaseAmount()).isNull();
         assertThat(afterReject.getBaseCurrency()).isEqualTo("EUR");
+    }
+
+    private void recordAcceptedQuote(long dealId) {
+        Deal deal = dealRepository.findById(dealId).orElseThrow();
+        deal.setAcceptedQuoteId("accepted-quote-" + dealId);
+        dealRepository.saveAndFlush(deal);
     }
 }
