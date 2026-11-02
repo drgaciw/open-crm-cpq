@@ -1,0 +1,55 @@
+{
+    "id": "drg-621-zero-applied-409",
+    "story": "DRG-637",
+    "cluster": "partial-apply",
+    "ac": "AC1-409",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "reading_base": "6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861",
+    "source_merge": {
+        "pr": 688,
+        "sha": "71d080e7f257d80d4dd7fc83d71979d212087571"
+    },
+    "case": "every-unit-digest-conflict-and-zero-units-applied",
+    "preconditions": {
+        "document_status_before": "EXECUTED",
+        "applied_unit_count": 0
+    },
+    "inputs": {
+        "units": [
+            {
+                "unit_no": 1,
+                "ledger_digest": "conflict"
+            },
+            {
+                "unit_no": 2,
+                "ledger_digest": "conflict"
+            }
+        ]
+    },
+    "expected": {
+        "http_status": 409,
+        "error_code": "DIGEST_CONFLICT",
+        "document_status": "EXECUTED",
+        "unit_states": [
+            "PENDING",
+            "PENDING"
+        ],
+        "audit_event_type": "APPLY_UNIT_BLOCKED",
+        "audit_reason": "DIGEST_CONFLICT",
+        "audit_count": 2,
+        "apply_refused_count": 0,
+        "persisted_unit_state_when_a_unit_is_blocked_on_the_partial_path": "BLOCKED"
+    },
+    "pins": [
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:51",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:135-144",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:172-175",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:204-206",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/apply/DocumentApplyOrchestrator.java:294-296",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/events/AmendmentEventWriter.java:90-93",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/config/GlobalExceptionHandler.java:30-35",
+        "backend/services/contract-asset-management/src/main/java/com/opencrm/contract/domain/documents/ApplicationUnitStatus.java:4-8",
+        "backend/services/contract-asset-management/src/test/java/com/opencrm/contract/documents/apply/DocumentApplyMidLoopConflictTest.java:128-156"
+    ]
+}

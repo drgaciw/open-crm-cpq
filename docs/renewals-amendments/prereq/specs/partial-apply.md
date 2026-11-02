@@ -1,7 +1,7 @@
 # Partial application of mixed-line amendments: first-slice spec proposal
 
-**Status:** Proposal only. This file does not accept the spike's partial-apply rules, write an ADR, or authorize implementation, a flag change, or a deploy. Mid-term policy OQ5 (partial application) stays open. The acceptance criteria below are the proposed rules from DRG-565. They apply only if the owner adopts partial application.
-**Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `partial-apply`. **Date:** 2026-10-16.
+**Status:** Proposal only. This file does not accept the spike's partial-apply rules, write an ADR, or authorize implementation, a flag change, or a deploy. Mid-term policy OQ5 (partial application) stays open. The acceptance criteria below are the proposed rules from DRG-565. They apply only if the owner adopts partial application. The DRG-637 section records merged apply behaviour. It does not rewrite the rules in this file.
+**Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `partial-apply`. **Date:** 2026-10-16. **DRG-637 reading base:** `6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861`.
 
 **Source.** [DRG-565](https://linear.app/drgamtd-workspace/issue/DRG-565) (RA-31), which records the amendment-document spike §4 (`../../amendment-document-design-spike.md`). TMF622's `partial` order state is cited there as precedent, not as an API to copy.
 
@@ -76,6 +76,50 @@ These criteria describe the proposed rules. If the owner rejects partial applica
 12. **Rebase price change.** A rebase that changes a priced amount produces a new revision in a pre-execution state and requires approval again. A rebase that changes only the observed revision, with the same prices and digest of commercial fields, records the new observation. Which fields sit inside the digest is the spike's content-digest rule; this slice does not redefine it.
 13. **Mixed targets.** A document with a SaaS seat change, an on-prem capacity raise, and a services fee produces three units with three target types. One signature covers all three.
 
+## DRG-637 reconciliation
+
+Reading base for every file and line below: `main` `6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861`. DRG-621 merged as pull request #688, merge commit `71d080e7f257d80d4dd7fc83d71979d212087571`, at 2026-11-01T14:36:47Z (08:36 CT). Pull request #718, merge commit `cda0d3348b7a127f2dc9457499e3b6458770893a`, at 2026-11-01T15:08:30Z (09:08 CT), and pull request #741, merge commit `81ed9752aacf178ffe7e5d688efd11b13c3a6734`, at 2026-11-01T18:50:53Z (12:50 CT), are inputs to the open-items table. This section does not accept this file. Every open item is `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+
+### Expected values
+
+These rows are the DRG-621 branches as they stand at the reading base. The sentences under the table restate the same values. The fixtures restate them again. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+
+| id | fixture | precondition | expected |
+|---|---|---|---|
+| AC1-200 | [drg-621-partial-200.json](fixtures/partial-apply/drg-621-partial-200.json) | A later unit's digest conflicts after an earlier unit has applied, and the asset-lifecycle hold is not the path taken | HTTP 200. Document status `PARTIALLY_APPLIED`. The conflicting unit is persisted `BLOCKED` with reason `DIGEST_CONFLICT`. Audit event type `APPLY_UNIT_BLOCKED`. The applied unit stays applied |
+| AC1-409 | [drg-621-zero-applied-409.json](fixtures/partial-apply/drg-621-zero-applied-409.json) | Every unit's ledger digest conflicts and zero units are `APPLIED` | HTTP 409 `DIGEST_CONFLICT`. Document status stays `EXECUTED`. Unit rows stay `PENDING`. One `APPLY_UNIT_BLOCKED` audit per unit. No `APPLY_REFUSED` |
+| AC1-unit | same fixtures | A unit that the partial path blocks | The persisted unit state is `BLOCKED`. That value is the `APPLY_BLOCKED` unit state from the DRG-621 merge. The enum has no `APPLY_BLOCKED` constant |
+| AC1-audit | same fixtures | Either fixture's block or all-conflict audit | The event type string is `APPLY_UNIT_BLOCKED`, written by `appendApplyDecision` |
+
+### DRG-621 as merged
+
+AC1-200. `DocumentApplyController.apply` returns `ApiResponse.success` with the orchestrator status name (`DocumentApplyController.java` lines 43–51). That method has no `@ResponseStatus`, so a returned result is HTTP 200. Once a unit has applied, `DocumentApplyOrchestrator.apply` blocks the digest conflict and continues (lines 177–179), then returns the finalized result (line 201). `blockDigestConflict` persists `ApplicationUnitStatus.BLOCKED`, reason `DIGEST_CONFLICT`, and appends `EVENT_UNIT_BLOCKED` (lines 416–422). `outcome` returns `AmendmentDocumentStatus.PARTIALLY_APPLIED` when the applied count is greater than zero and less than the unit count (lines 639–647). `DocumentApplyMidLoopConflictTest.controllerBodyKeepsDocumentFieldsAndListsUnitOutcomes` expects HTTP 200 and `PARTIALLY_APPLIED` (`DocumentApplyMidLoopConflictTest.java` lines 108–118). The class comment states the same contract (lines 35–38).
+
+AC1-409. When every unit already has a conflicting ledger row, `classifyUnderLock` returns `ALL_LEDGER_CONFLICT` (lines 294–296), ahead of the asset-lifecycle hold (lines 298–299), and `apply` appends one `APPLY_UNIT_BLOCKED` row per unit, then throws `DocumentApplyException` with `HttpStatus.CONFLICT` and error code `DIGEST_CONFLICT` (lines 135–144). The in-loop digest conflict takes the same 409 when nothing has committed yet (lines 172–175). `GlobalExceptionHandler.handleBusinessException` in contract-asset-management writes the exception status (`backend/services/contract-asset-management/src/main/java/com/opencrm/contract/config/GlobalExceptionHandler.java` lines 30–35). `DocumentApplyException` carries that status (`DocumentApplyException.java` lines 7–10). `everyUnitConflictReturns409LeavesExecutedAndWritesBlockedChainAudit` expects `HttpStatus.CONFLICT`, document `EXECUTED`, both units `PENDING`, and `APPLY_UNIT_BLOCKED` with reason `DIGEST_CONFLICT` (`DocumentApplyMidLoopConflictTest.java` lines 128–156).
+
+AC1-unit. The orchestrator comment states that `BLOCKED` is the persisted form of the OQ5 `APPLY_BLOCKED` unit state (`DocumentApplyOrchestrator.java` lines 204–206). `ApplicationUnitStatus` is `PENDING`, `APPLIED`, `BLOCKED` (`ApplicationUnitStatus.java` lines 4–8). Document status `APPLY_BLOCKED` is `AmendmentDocumentStatus` line 14.
+
+AC1-audit. `EVENT_UNIT_BLOCKED` is the string `APPLY_UNIT_BLOCKED` (`DocumentApplyOrchestrator.java` line 51). The three append sites are the all-conflict loop (lines 139–141), the digest block (lines 421–422), and the period-block path (lines 517–518). `AmendmentEventWriter.appendApplyDecision` writes that chain row (lines 90–93).
+
+These four rows match pull request #688, merge `71d080e7f257d80d4dd7fc83d71979d212087571`. They do not replace rules 1–7 or acceptance criteria 1–13.
+
+### Open items
+
+Differences from the rules above, including #718 and #741, stay in this table. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+
+| id | input | merged observation at the reading base | spec sentence left in place | status | owner decision |
+|---|---|---|---|---|---|
+| OI-718-recovery | #718 `cda0d3348b7a127f2dc9457499e3b6458770893a`. The lines at head were last written by #722 `5b1261bf52304e8a9cefbf60e0c669bc39df7a5a` | When no unit is `PENDING` and the document is still `EXECUTED`, `classifyUnderLock` records `outcome(ordered)` and returns a replay (`DocumentApplyOrchestrator.java` lines 282–292, `recordOutcomeLocked` lines 591–606). `recoveryFinalizesCommittedUnitsAndWritesOneOutcomeEvent` expects document `APPLIED` and one `APPLY_DOCUMENT_APPLIED` when every unit is already `APPLIED` (`DocumentApplyIntegrationTest.java` lines 336–349) | Rule 5 and AC-9 name recovery as a rebase or a correcting amendment | Status: Proposed | ___ (drg, time) |
+| OI-718-committed-digest | #718 `cda0d3348b7a127f2dc9457499e3b6458770893a` | A committed unit whose digest or attempt evidence does not match returns `PreflightKind.CONFLICT` before a pending sibling runs (lines 270–275 and 331–352). `apply` then throws HTTP 409 `DIGEST_CONFLICT` (lines 127–129). `interruptedApplyRejectsChangedCommittedUnitBeforePendingSibling` leaves the pending sibling `PENDING` and keeps the one ledger row (`DocumentApplyIntegrationTest.java` lines 274–303) | Rule 6 and AC-7 say a stale observation fails that unit only | Status: Proposed | ___ (drg, time) |
+| OI-718-pending-ledger | #718 `cda0d3348b7a127f2dc9457499e3b6458770893a` | A `PENDING` unit whose ledger row already matches the digest is `PreflightKind.CONFLICT` (lines 277–279). Inside the loop, `PendingLedgerInconsistency` is thrown as HTTP 409 `DIGEST_CONFLICT` without the zero-applied check (lines 165–167, 431–440, and 496–497). `pendingMatchingLedgerDoesNotApplyEarlierSibling` leaves both units `PENDING` (`DocumentApplyIntegrationTest.java` lines 307–332) | Rule 7 and AC-10 say the same `(documentId, unitNo)` and the same digest are a no-op | Status: Proposed | ___ (drg, time) |
+| OI-718-409-width | #718 `cda0d3348b7a127f2dc9457499e3b6458770893a` | OI-718-committed-digest returns 409 when an `APPLIED` unit is already on the document. The DRG-621 in-loop comment still limits its own 409 to the case where nothing has committed (lines 172–175). AC1-409 is that DRG-621 branch | AC1 states 409 for the DRG-621 zero-applied digest conflict. It does not state the #718 409s | Status: Proposed | ___ (drg, time) |
+| OI-741-assets | #741 `81ed9752aacf178ffe7e5d688efd11b13c3a6734` | After rate periods are written, `applyUnit` calls `AssetChangeApply.onUnitApplied` in the unit transaction (`DocumentApplyOrchestrator.java` lines 522–527). The call is `MANDATORY` (`AssetChangeApply.java` lines 39–40 and 49–51). `UPDATE` amends, `REMOVE` and `TERMINATE` terminate, `SWAP` and `UPGRADE` supersede (lines 62–69). A missing asset returns without blocking (lines 19–21, 76–77, 112–113, 131–132, and 177–182) | Rule 2 names rate periods, end dates, the revision bump, and the ledger row as the unit write | Status: Proposed | ___ (drg, time) |
+| OI-741-actions | #741 `81ed9752aacf178ffe7e5d688efd11b13c3a6734` | `DocumentApplyPeriods` writes `TERMINATE`, `SWAP`, and `UPGRADE` with Add, Update, and Remove (line 17, lines 55–66, and lines 71–74). `TERMINATE` shares `REMOVE`'s close path and is not `CO_TERM_MISSING` when `effectiveTo` is null (lines 79–89) | The restructure row in the grouping table is create, then end-date maintenance, then entitlement revoke | Status: Proposed | ___ (drg, time) |
+| OI-722-attempt | #722 `5b1261bf52304e8a9cefbf60e0c669bc39df7a5a` | A non-pending replay also requires `attemptRevisionNo` and `attemptPinFingerprint` (lines 553–573). A pin mismatch fails `matchesTerminalAttempt` | Rule 7 names the content digest as the replay check | Status: Proposed | ___ (drg, time) |
+| OI-737-target | #737 `965ef54c11c45d881f6bc34eabe2b12ac679cc3d` | A subscription that is not on the document contract blocks the unit with `TARGET_CONTRACT_MISMATCH`, status `BLOCKED`, and audit `APPLY_UNIT_BLOCKED` (`DocumentApplyOrchestrator.java` lines 507–518). The detail string is `DocumentApplyPeriods.detail` (line 39) | AC-8 names a stale observed revision as the unit failure | Status: Proposed | ___ (drg, time) |
+| OI-749-hold | #749 `8f0a0cabab8947e1d5e25dea05bc9c12e6263e0a` | `AssetLifecycleReadiness.isReady` returns false (`AssetLifecycleReadiness.java` lines 12–14). Pending Add, Update, Remove, Terminate, Swap, Upgrade, or empty line evidence returns `ASSET_LIFECYCLE_HOLD` before the unit loop (`DocumentApplyOrchestrator.java` lines 298–316). The refusal is HTTP 503 `ASSET_LIFECYCLE_HOLD` (lines 319–327). Units stay `PENDING`. `productionReadinessIsHardHeld` and `allSupportedAssetMutationsAreHeld` expect that hold (`AssetLifecycleApplyHoldTest.java` lines 26–39). A document with no `PENDING` units still takes the replay branch before the hold (lines 282–292); `completedIdenticalReplayWorksWhileHoldIsActive` expects that replay (`AssetLifecycleApplyHoldTest.java` lines 58–64). `NO_CHANGE` alone is not held and becomes document `APPLY_BLOCKED` with `ACTION_NOT_IN_SLICE` (lines 49–54) | AC1-200 is the DRG-621 branch. This hold sits in front of that branch for the actions the test names | Status: Proposed | ___ (drg, time) |
+| OI-rule5-zero | DRG-621 merge `71d080e7f257d80d4dd7fc83d71979d212087571`, compared with rule 5 | AC1-409 leaves the document `EXECUTED` on a zero-applied digest conflict. `outcome` still returns document `APPLY_BLOCKED` when the applied count is zero on the success path (lines 644–645), which is HTTP 200 from the controller | Rule 5 and AC-8 say zero committed units become document `APPLY_BLOCKED` | Status: Proposed | ___ (drg, time) |
+
 ## Dependencies
 
 | Dependency | Why this slice needs it |
@@ -91,6 +135,8 @@ These criteria describe the proposed rules. If the owner rejects partial applica
 | ADR-035 and resolved OQ2 | CAM owns the document; apply waits for EXECUTED. This proposal does not reopen either decision |
 
 ## Open questions
+
+Questions 1–8 are unchanged. DRG-637 open items are in the reconciliation section. Each of those items is `Status: Proposed` with `Owner decision: ___ (drg, time)`.
 
 1. **Owner decision — allow partial apply.** Spike decision 5 and mid-term OQ5 are open. The alternative is all-or-nothing apply of the whole document, with no `PARTIALLY_APPLIED` state. This proposal specifies the partial rules and does not close the decision. Implementation of AC-2 through AC-13 waits on a yes.
 2. **Owner decision — APPLY_BLOCKED versus PARTIALLY_APPLIED.** The spike uses both. The cut proposed here is: partial when some units have committed, blocked when none have. That cut is part of the same owner decision.
