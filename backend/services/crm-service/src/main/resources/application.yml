@@ -143,6 +143,10 @@ opencrm:
     inbox:
       # processed_events (V5): dedupe store for quote acceptance, shared by the Redis and Kafka listeners.
       enabled: true
+  configuration:
+    # DRG-487. Direct configuration-engine root, never the gateway. Blank records the intended
+    # product and options on the guided session and does not call the configuration API.
+    base-url: ${CONFIGURATION_SERVICE_URL:}
 
 ---
 # Development profile
