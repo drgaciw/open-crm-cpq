@@ -1,0 +1,26 @@
+{
+    "issue": "DRG-649",
+    "ac_id": "AC-649-1",
+    "case": "sales-write-refused",
+    "main_sha": "6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861",
+    "drg_599_section_sha": "352971f0f176a64d9925171e8b370f08906f9b37",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "follows_proposed_option": "649-F1-A",
+    "input": {
+        "actor_role": "SALES",
+        "prior_row": null,
+        "mapping_write": {
+            "source_sku": "SKU-A",
+            "target_sku": "SKU-B",
+            "effective_from": "2026-11-01"
+        }
+    },
+    "expected": {
+        "write": "refused",
+        "http_status": 403,
+        "error_code": "MAPPING_WRITE_FORBIDDEN",
+        "row_created": false,
+        "dispute_state": null
+    }
+}
