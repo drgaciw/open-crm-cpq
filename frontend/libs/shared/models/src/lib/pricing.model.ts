@@ -512,6 +512,8 @@ export interface FinancialMetrics {
   arr?: number;
   tcv?: number;
   acv?: number;
+  /** Final-period run rate × 12. Omitted on a flat quote (Java NON_NULL). */
+  exitArr?: number;
   clv?: number;
   churnScore?: number;
   discountRate?: number;

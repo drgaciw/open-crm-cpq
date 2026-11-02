@@ -24,10 +24,19 @@ import {
   isSubscriptionStatus,
 } from './subscription.model';
 import type { AmendmentView, CreateAmendment } from './amendment.model';
+import type {
+  FinancialMetrics,
+  PriceBookDto,
+  PriceBookEntryDto,
+  PricingCustomerDto,
+  PricingResult,
+  RuleSetDto,
+} from './pricing.model';
 
 /**
  * TDD gate: FE shared-models field names stay aligned with backend Java DTOs used by
- * Asset Lifecycle Management (quotes, deals, assets/OHS/reports).
+ * Asset Lifecycle Management (quotes, deals, assets/OHS/reports) and Pricing Lifecycle
+ * Management (price books, customers, rule sets, PricingResult).
  *
  * Parses Java DTO source for `private <Type> <name>;` fields and asserts every backend
  * field exists on the corresponding TypeScript interface (via keyof compile-time + runtime
@@ -406,6 +415,145 @@ describe('Backend ↔ frontend contract parity (ALM surfaces)', () => {
         'currency',
         'lines',
       ] satisfies (keyof CreateAmendment)[],
+    );
+  });
+});
+
+describe('Backend ↔ frontend contract parity (PLM surfaces)', () => {
+  it('PriceBookDto covers pricebook-service PriceBookDto fields', () => {
+    expectFeCoversBackend(
+      'PriceBookDto',
+      javaFields('backend/services/pricebook-service/src/main/java/com/opencrm/pricebook/PriceBookDto.java'),
+      [
+        'id',
+        'uuid',
+        'name',
+        'region',
+        'currency',
+        'isDefault',
+        'effectiveDate',
+        'expirationDate',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof PriceBookDto)[],
+    );
+  });
+
+  it('PriceBookEntryDto covers pricebook-service entry fields', () => {
+    expectFeCoversBackend(
+      'PriceBookEntryDto',
+      javaFields(
+        'backend/services/pricebook-service/src/main/java/com/opencrm/pricebook/PriceBookEntryDto.java',
+      ),
+      [
+        'id',
+        'uuid',
+        'priceBookId',
+        'productExternalId',
+        'listPrice',
+        'floorPrice',
+        'currency',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof PriceBookEntryDto)[],
+    );
+  });
+
+  it('PricingCustomerDto covers pricing-service CustomerDto fields', () => {
+    expectFeCoversBackend(
+      'PricingCustomerDto',
+      javaFields(
+        'backend/services/pricing-service/src/main/java/com/opencrm/pricing/customer/CustomerDto.java',
+      ),
+      [
+        'id',
+        'uuid',
+        'externalId',
+        'name',
+        'type',
+        'segment',
+        'region',
+        'industry',
+        'churnScore',
+        'annualRevenue',
+        'metadata',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof PricingCustomerDto)[],
+    );
+  });
+
+  it('RuleSetDto covers pricing-service RuleSetDto fields', () => {
+    expectFeCoversBackend(
+      'RuleSetDto',
+      javaFields(
+        'backend/services/pricing-service/src/main/java/com/opencrm/pricing/ruleset/RuleSetDto.java',
+      ),
+      [
+        'id',
+        'uuid',
+        'name',
+        'description',
+        'status',
+        'ruleSetVersion',
+        'effectiveDate',
+        'expirationDate',
+        'engineType',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof RuleSetDto)[],
+    );
+  });
+
+  it('PricingResult / FinancialMetrics cover pricing-service waterfall DTOs', () => {
+    expectFeCoversBackend(
+      'PricingResult',
+      javaFields(
+        'backend/services/pricing-service/src/main/java/com/opencrm/pricing/waterfall/PricingResult.java',
+      ),
+      [
+        'success',
+        'lineResults',
+        'waterfall',
+        'financialMetrics',
+        'explanationCodes',
+        'approvalState',
+        'approvalTier',
+        'executionTimeMs',
+        'errorMessage',
+      ] satisfies (keyof PricingResult)[],
+    );
+
+    expectFeCoversBackend(
+      'FinancialMetrics',
+      javaFields(
+        'backend/services/pricing-service/src/main/java/com/opencrm/pricing/waterfall/FinancialMetrics.java',
+      ),
+      [
+        'arr',
+        'tcv',
+        'acv',
+        'exitArr',
+        'clv',
+        'churnScore',
+        'discountRate',
+        'totalDiscount',
+        'totalSurcharge',
+        'priceMultiplier',
+        'estimatedMarginPct',
+      ] satisfies (keyof FinancialMetrics)[],
     );
   });
 });
