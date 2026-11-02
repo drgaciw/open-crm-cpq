@@ -103,6 +103,84 @@ The backdated row uses the four dates already printed in AC-8. `serviceActivatio
 3. A null effective end date means open-ended coverage. The period is still open. It is not treated as ended. **Status: Proposed.** **Owner decision: ___ (drg, time).** Source: `DRG-624-rulings.md` ("ruling, pre-merge"), ruled by CPQ Decision 2026-10-27 (`decision-scores-2026-10-27.md`). [DRG-624](https://linear.app/drgamtd-workspace/issue/DRG-624) is In Progress. Pull request #686 is open and unmerged, so there is no merge sha to cite. Mark this rule to re-verify at DRG-624 merge. On this `main`, `V1_6__subscription_rate_schedule.sql` still declares `effective_end_date DATE NOT NULL`, and `DocumentApplyPeriods.openSources` still reads `getEffectiveEndDate()` with no null guard. This paragraph does not change that code and does not add a migration.
 4. A null start date stays open. **Status: Proposed.** Options: reject, or default to action date. This section does not pick one. No fixture gives an expected effective date for a null start. **Owner decision: ___ (drg, time).** DRG-624 left null start dates out of scope. [DRG-651](https://linear.app/drgamtd-workspace/issue/DRG-651) remains a follow-up and is not decided here. On this `main`, `start_date` is `DATE NOT NULL` in `V1_6__subscription_rate_schedule.sql`.
 
+## ChangeLine action codes and quantity semantics (DRG-645)
+
+S5 phase A is [DRG-583](https://linear.app/drgamtd-workspace/issue/DRG-583), pull request #691, merge commit `47685ffbc7d52de46a4dcd980ecaf7b894c4a414` (2026-11-01 09:27 CT). The tables in this section are read from quote-service at base `6ec091b1f9ca1262b87f8c890a1c52a2ec7cd861`, which contains that merge. This section adds the phase-B reading. It leaves the proposed contract, the Dates section, and the Cluster E frame as they stand. [DRG-552](https://linear.app/drgamtd-workspace/issue/DRG-552) text that disagrees with the store is an open item in the rule at the end of this section.
+
+The store is `lifecycle_change_lines` in `backend/services/quote-service/src/main/resources/db/migration/V1_14__lifecycle_changes.sql`. The writer is `prepareLines` and `submit` in `backend/services/quote-service/src/main/java/com/opencrm/quote/lifecycle/LifecycleChangeService.java`. Amendment-document checks in `backend/services/contract-asset-management/src/main/resources/db/migration/V1_7__contract_documents.sql` are a second vocabulary. They are cited where they differ. They are not treated as the phase-A store.
+
+### Expected-value table
+
+Rows first. The sentences under the later tables restate the same results. Quantities are the scale-4 text the service returns. `create` is `LifecycleChangeService.create`. `submit` is the first `submit` of that row, while status is still `DRAFT` or `PRICED`.
+
+| Fixture | Action | Semantics | startQty | deltaQty | endQty | Create | First submit |
+|---|---|---|---|---|---|---|---|
+| `fixtures/lifecycle-intents/changeline-update-delta.json` | `UPDATE` | `DELTA` | `10.0000` | `5.0000` | `15.0000` | Stored as sent. `10.0000 + 5.0000 = 15.0000`. Target subscription is present. | Action code is outside `UNSUPPORTED_AT_SUBMIT`. |
+| `fixtures/lifecycle-intents/changeline-absolute-unequal.json` | `ADD` | `ABSOLUTE` | `10.0000` | `1.0000` | `3.0000` | Stored as sent. `endQty` stays `3.0000`. `deltaQty` stays `1.0000`. | Action code is outside `UNSUPPORTED_AT_SUBMIT`. |
+| `fixtures/lifecycle-intents/changeline-swap.json` | `SWAP` | `DELTA` | `10.0000` | `5.0000` | `15.0000` | Stored. The token is in the action check. | `ACTION_NOT_SUPPORTED_IN_SLICE`. Status stays the pre-submit status. One audit row. |
+| `fixtures/lifecycle-intents/changeline-upgrade.json` | `UPGRADE` | `DELTA` | `10.0000` | `5.0000` | `15.0000` | Stored. | `ACTION_NOT_SUPPORTED_IN_SLICE`. Status stays the pre-submit status. One audit row. |
+| `fixtures/lifecycle-intents/changeline-downgrade.json` | `DOWNGRADE` | `DELTA` | `10.0000` | `5.0000` | `15.0000` | Stored. | `ACTION_NOT_SUPPORTED_IN_SLICE`. Status stays the pre-submit status. One audit row. |
+
+Two further create results have tests and no fixture file. Delta `UPDATE` with start `10.0000`, delta `5.0000`, end `12.0000` raises `VALIDATION_REJECTED`, writes no row, and writes no audit (`LifecycleChangeServiceTest` lines 307–320). Delta `UPDATE` with start `1.23456`, delta `0.0000`, end `1.23456` stores `1.2346`, `0.0000`, `1.2346` (lines 290–305). `money` rounds a quantity whose scale is above 4 with `HALF_UP`, then the Delta equation runs (`LifecycleChangeService.java` lines 611–625 and 289–290).
+
+The `UPDATE` / `DELTA` row is the pair asserted by `createStoresTwoLines` (lines 247–274) together with `updateLine` (lines 640–654). The unequal Absolute row is `absoluteDoesNotApplyTheDeltaEquation` (lines 322–336). The three submit rows are `unsupportedActionIsRejected` (lines 396–426).
+
+### Action-code table
+
+Read at the base sha above. DRG-583 merge `47685ffbc7d52de46a4dcd980ecaf7b894c4a414`.
+
+| Action code | Create stores it | Submit of a `DRAFT` or `PRICED` row | Where |
+|---|---|---|---|
+| `ADD` | Yes. A target subscription is optional. | The code is outside `UNSUPPORTED_AT_SUBMIT`. | `STORABLE_ACTIONS` lines 48–49; `prepareLines` lines 277–278; check lines 85–87 of `V1_14__lifecycle_changes.sql` |
+| `UPDATE` | Yes. A missing target subscription is `VALIDATION_REJECTED` and no row is written. | Outside `UNSUPPORTED_AT_SUBMIT`. | Same sites. Target rule lines 296–297. |
+| `REMOVE` | Yes. Same target rule as `UPDATE`. | Outside `UNSUPPORTED_AT_SUBMIT`. | Same sites. |
+| `SWAP` | Yes. `prepareLines` does not require a target for this token. | `ACTION_NOT_SUPPORTED_IN_SLICE`. | `UNSUPPORTED_AT_SUBMIT` line 50; `submit` lines 193–201; audit via `reject` lines 260–268. |
+| `UPGRADE` | Yes. Same as `SWAP`. | `ACTION_NOT_SUPPORTED_IN_SLICE`. | Same sites. |
+| `DOWNGRADE` | Yes. Same as `SWAP`. | `ACTION_NOT_SUPPORTED_IN_SLICE`. | Same sites. |
+
+A token outside those six, including `NO_CHANGE`, `RENEW`, `DELETE`, `CANCEL`, `SURRENDER`, `CONVERT`, `TERMINATE`, `SUSPEND`, `RESUME`, and `CONVERT_METRIC`, fails in `prepareLines` with `ACTION_NOT_SUPPORTED_IN_SLICE` (lines 277–278). That path throws before a row exists and does not call `reject`, so it writes no audit row. The SQL check lists only the six tokens (lines 85–87).
+
+`chk_amendment_line_action` on amendment document lines lists twelve tokens: `ADD`, `UPDATE`, `REMOVE`, `NO_CHANGE`, `RENEW`, `UPGRADE`, `DOWNGRADE`, `SWAP`, `CONVERT_METRIC`, `SUSPEND`, `RESUME`, `TERMINATE` (`V1_7__contract_documents.sql` lines 261–264). Phase A lifecycle storage uses the six-token check. The twelve-token list stays the amendment-document check.
+
+### Delta and Absolute quantity table
+
+Read at the same base sha. DRG-583 merge `47685ffbc7d52de46a4dcd980ecaf7b894c4a414`.
+
+| Semantics | Stored on `lifecycle_change_lines` | Identity the writer enforces | SQL |
+|---|---|---|---|
+| `DELTA` | Yes, `NUMERIC(19, 4)` for `start_qty`, `delta_qty`, and `end_qty` (lines 64–66). | After `money`, `startQty + deltaQty = endQty`. A miss is `VALIDATION_REJECTED`, no row, no audit (lines 289–290). `endQty < 0` is `VALIDATION_REJECTED` (lines 286–287). | `chk_lifecycle_change_lines_semantics` allows `DELTA` (line 88). `chk_lifecycle_change_lines_end_qty` is `end_qty >= 0` (line 89). The SQL has no `start + delta = end` predicate. |
+| `ABSOLUTE` | Yes, same three columns. | `endQty >= 0`. The writer stores the caller's `deltaQty`. It does not require `startQty + deltaQty = endQty`. It does not replace `deltaQty` with `endQty - startQty`. | Same two checks. |
+| Any other token, including `REPLACE` | No. | `VALIDATION_REJECTED`, message `Quantity semantics must be DELTA or ABSOLUTE` (lines 280–281). The error code is `VALIDATION_REJECTED`, which is a different code from `ACTION_NOT_SUPPORTED_IN_SLICE`. | The semantics check rejects the insert. |
+
+`chk_amendment_line_qty_semantics` allows `DELTA`, `ABSOLUTE`, and `REPLACE`, and `chk_amendment_line_qty` requires `start_qty + delta_qty = end_qty` for every semantics value (`V1_7__contract_documents.sql` lines 270 and 276). Those predicates belong to amendment document lines. The lifecycle table does not copy them.
+
+### Phase-B rules
+
+Each of Swap, Upgrade, and Downgrade explicitly stays `ACTION_NOT_SUPPORTED_IN_SLICE` on a first submit. That is AC-S5-3 in `docs/renewals-amendments/amendment-first-slice-requirements-and-acceptance.md` line 90, and it is the branch at `LifecycleChangeService.java` lines 193–201. The requirements slice (line 9) names Add, Update with Delta or Absolute, and Remove as the in-slice codes, and names RA-42 / DRG-576 as the reason Swap, Upgrade, and Downgrade have no catalog relationship. This section gives them no price, no term, and no catalog relationship.
+
+**Swap.** First submit of stored `SWAP` stays `ACTION_NOT_SUPPORTED_IN_SLICE`. Create still stores the token. Fixture `changeline-swap.json`.
+
+**Upgrade.** First submit of stored `UPGRADE` stays `ACTION_NOT_SUPPORTED_IN_SLICE`. Create still stores the token. Fixture `changeline-upgrade.json`.
+
+**Downgrade.** First submit of stored `DOWNGRADE` stays `ACTION_NOT_SUPPORTED_IN_SLICE`. Create still stores the token. Fixture `changeline-downgrade.json`.
+
+Accepting any of the three on submit, or giving one of them a meaning of its own, is unset. **Status: Proposed.** **Owner decision: ___ (drg, time).** The fixtures record the rejection phase A already performs. They do not fill that owner slot, and they do not select a commercial outcome.
+
+An `IN_APPROVAL` replay returns at lines 183–191, after `requireValidatedPricing`, and that branch does not read `UNSUPPORTED_AT_SUBMIT`. The move of the replay ahead of the action check is pull request #725. A first submit still rejects Swap, Upgrade, and Downgrade and does not set `IN_APPROVAL` (`unsupportedActionIsRejected`). A row that was already `IN_APPROVAL` and already carried one of those tokens is open item 6.
+
+### Open-items rule
+
+The tables match the phase-A store at the base sha. DRG-552 text that differs stays listed here. Nothing in this rule rewrites the proposed contract, the Dates section, the Cluster E frame, or the Java writer.
+
+1. The proposed contract in this file (the `ChangeLine` block) names action tokens `Delete`, `NoChange`, `Renew`, `Suspend`, `Resume`, `Terminate`, `Cancel`, `Surrender`, and `Convert`, and quantity semantics `Replace`. Phase A stores `ADD`, `UPDATE`, `REMOVE`, `SWAP`, `UPGRADE`, and `DOWNGRADE`, and semantics `DELTA` and `ABSOLUTE`. The proposed contract is unchanged.
+2. Acceptance criterion 5 in this file says Absolute, start 64, end 80 stores delta +16. Phase A stores the delta the caller sends. The unequal Absolute fixture stores start `10.0000`, delta `1.0000`, end `3.0000`. Criterion 5 is unchanged.
+3. Cluster E fork L3-A keeps `chk_amendment_line_qty`, so Absolute and Replace still satisfy `delta_qty = end_qty - start_qty` on amendment document lines. Lifecycle Absolute does not. The two checks remain two checks.
+4. Cluster E fork L4 derives `UPDATE` with `delta_qty = 0` as `TERMS_AND_CONDITIONS`. `category` (lines 327–335) returns `CANCELLATION` for `REMOVE`, `DOWNSELL` for `UPDATE` with a negative delta, and `UPSELL` for every other storable line, including `UPDATE` with delta 0, `ADD`, `SWAP`, `UPGRADE`, and `DOWNGRADE`. `LifecycleChangeServiceTest` does not assert `businessCategory`. The derivation table is not adopted here. **Status: Proposed.** **Owner decision: ___ (drg, time).**
+5. Cluster E fork L2-A describes a future submit that accepts only `ADD`, `UPDATE`, and `REMOVE`, and the frame text says there is no submit path. Phase A has `submit`. It stores `SWAP`, `UPGRADE`, and `DOWNGRADE`, and the first submit rejects them with an audit row. Create-time rejection of a token outside the six uses the same error code and writes no audit row. `chk_amendment_line_source_required` (`V1_7__contract_documents.sql` lines 281–284) requires `source_accepted_line_uuid` for `UPDATE`, `REMOVE`, `SWAP`, `UPGRADE`, and `DOWNGRADE`. `prepareLines` requires a target subscription for `UPDATE` and `REMOVE` only (lines 296–297). It does not require `sourceAcceptedLineUuid` for `SWAP`, `UPGRADE`, or `DOWNGRADE`.
+6. Follow-ups that touched quote-service lifecycle after merge `47685ffbc7d52de46a4dcd980ecaf7b894c4a414`. Listed by full commit SHA, on the base that this section was read from. Their behavior stays beside the tables. It is not folded into the action-code set or the Delta / Absolute identity.
+   - #725, commit `1eecf2c308b59fce1d11039c2a56f415d5a6f42f`, subject `fix(quote): gate lifecycle and enforce concurrency (#725)`. Adds the create lock, `READ_COMMITTED` on create, version reservation, and `assertCurrentTarget` (observed revision must match). It leaves `STORABLE_ACTIONS`, `UNSUPPORTED_AT_SUBMIT`, and the Delta equation on the same tokens. It moves the `IN_APPROVAL` replay to before the unsupported-action check.
+   - #729, commit `73a5f43b23fe11e49f6ac40fb4f4c9584df3ce55`, subject `fix(quote): reject invalid lifecycle pricing evidence (#729)`. Adds `requireValidatedPricing` and `V1_15__lifecycle_pricing_validation.sql`. A priced submit of `ADD`, `UPDATE`, or `REMOVE` now requires `pricingValidationVersion` 1. The action-code check and the quantity identity are unchanged. This section adds no migration.
+
 ## Dependencies
 
 | Dependency | Why this slice needs it |

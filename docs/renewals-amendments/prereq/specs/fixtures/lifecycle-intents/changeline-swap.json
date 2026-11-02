@@ -1,0 +1,32 @@
+{
+    "id": "lifecycle-intents-changeline-swap",
+    "story": "DRG-645",
+    "cluster": "lifecycle-intents",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "case": "swap-stays-unsupported-at-submit",
+    "sources": [
+        "LifecycleChangeService.submit UNSUPPORTED_AT_SUBMIT",
+        "LifecycleChangeServiceTest.unsupportedActionIsRejected",
+        "amendment-first-slice-requirements-and-acceptance.md AC-S5-3",
+        "DRG-583 merge 47685ffbc7d52de46a4dcd980ecaf7b894c4a414"
+    ],
+    "inputs": {
+        "actionCode": "SWAP",
+        "quantitySemantics": "DELTA",
+        "startQty": "10.0000",
+        "deltaQty": "5.0000",
+        "endQty": "15.0000",
+        "targetSubscriptionPresent": true
+    },
+    "expected": {
+        "stored": true,
+        "actionCode": "SWAP",
+        "phaseBRule": "ACTION_NOT_SUPPORTED_IN_SLICE",
+        "submitErrorCode": "ACTION_NOT_SUPPORTED_IN_SLICE",
+        "statusUnchanged": true,
+        "auditRows": 1,
+        "catalogRelationshipAssigned": false,
+        "returnsPrice": false
+    }
+}

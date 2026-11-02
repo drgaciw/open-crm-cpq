@@ -1,0 +1,33 @@
+{
+    "id": "lifecycle-intents-changeline-absolute-unequal",
+    "story": "DRG-645",
+    "cluster": "lifecycle-intents",
+    "status": "Proposed",
+    "owner_decision": "___ (drg, time)",
+    "case": "absolute-unequal",
+    "sources": [
+        "LifecycleChangeService.prepareLines",
+        "LifecycleChangeServiceTest.absoluteDoesNotApplyTheDeltaEquation",
+        "DRG-583 merge 47685ffbc7d52de46a4dcd980ecaf7b894c4a414"
+    ],
+    "inputs": {
+        "actionCode": "ADD",
+        "quantitySemantics": "ABSOLUTE",
+        "startQty": "10.0000",
+        "deltaQty": "1.0000",
+        "endQty": "3.0000",
+        "targetSubscriptionPresent": false
+    },
+    "expected": {
+        "stored": true,
+        "actionCode": "ADD",
+        "quantitySemantics": "ABSOLUTE",
+        "startQty": "10.0000",
+        "deltaQty": "1.0000",
+        "endQty": "3.0000",
+        "deltaRewritten": false,
+        "equationRequired": false,
+        "submitErrorCode": null,
+        "returnsPrice": false
+    }
+}
