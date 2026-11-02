@@ -328,13 +328,38 @@ class DealControllerIntegrationTest extends BaseIntegrationTest {
         Long dealId = objectMapper.readTree(createResult.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
 
+        recordAcceptedQuote(dealId);
+
         mockMvc.perform(post("/api/v1/deals/{id}/win", dealId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Deal marked as won"))
                 .andExpect(jsonPath("$.data.stage").value("WON"))
                 .andExpect(jsonPath("$.data.probability").value(100))
-                .andExpect(jsonPath("$.data.wonAt").exists());
+                .andExpect(jsonPath("$.data.wonAt").exists())
+                .andExpect(jsonPath("$.data.acceptedQuoteId").value("accepted-quote-" + dealId));
+    }
+
+    @Test
+    @DisplayName("Win without an accepted quote returns OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE")
+    void winDeal_withoutAcceptedQuote_returns400() throws Exception {
+        DealCreateRequest request = DealCreateRequest.builder()
+                .name("Open Deal")
+                .amount(new BigDecimal("75000"))
+                .build();
+
+        MvcResult createResult = mockMvc.perform(post("/api/v1/deals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andReturn();
+
+        Long dealId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        mockMvc.perform(post("/api/v1/deals/{id}/win", dealId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE"));
     }
 
     @Test
@@ -415,6 +440,8 @@ class DealControllerIntegrationTest extends BaseIntegrationTest {
 
         Long dealId = objectMapper.readTree(createResult.getResponse().getContentAsString())
                 .get("data").get("id").asLong();
+
+        recordAcceptedQuote(dealId);
 
         // Mark as won
         mockMvc.perform(post("/api/v1/deals/{id}/win", dealId));
@@ -580,5 +607,11 @@ class DealControllerIntegrationTest extends BaseIntegrationTest {
         // Verify deal is soft-deleted
         mockMvc.perform(get("/api/v1/deals/{id}", dealId))
                 .andExpect(status().isNotFound());
+    }
+
+    private void recordAcceptedQuote(Long dealId) {
+        Deal deal = dealRepository.findById(dealId).orElseThrow();
+        deal.setAcceptedQuoteId("accepted-quote-" + dealId);
+        dealRepository.saveAndFlush(deal);
     }
 }

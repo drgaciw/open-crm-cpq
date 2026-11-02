@@ -38,6 +38,8 @@ public class DealDto {
     private Long sourceLeadId;
     private DealType type;
     private String lostReason;
+    /** Quote id recorded by an accepted quote. Null until that acceptance is applied. */
+    private String acceptedQuoteId;
     private Instant wonAt;
     private Instant lostAt;
     private String nextStep;
