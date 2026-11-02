@@ -10,6 +10,7 @@
 > the host-authored original when it is synced.
 
 **Target UI:** Angular CRM at `http://127.0.0.1:4200` (proxies `/api` → gateway `:8080`).  
+**Target CRM API:** `crm-service` at `http://127.0.0.1:8081` (Part III-B API UAT).  
 **Owning service:** `contract-asset-management` (`:8087`) via gateway paths `/api/v1/assets/**`.  
 **Related CRM surfaces:** Quotes, Deals, Organizations (no dedicated Assets nav today).
 
@@ -112,11 +113,51 @@ Null source `startDate` / missing effective-from blocks apply with free-form
 | CRM shell | — | — | `asset-lifecycle.ui.quotes-shell` | UAT-ALM-01/04 | CRM UI |
 | Auth | INV-ALM-AUTH-01 | — | HTTP 401/403 without role | UAT-ALM-02 | Security |
 
+---
+
+## Part III-B: Executable UAT scenarios (against CRM API `:8081`)
+
+Runner: `frontend/e2e/uat-asset-lifecycle-crm-api.mjs`  
+`UAT_BASE_URL=http://127.0.0.1:8081` (CAM/quote siblings default `:8087` / `:8084`).
+
+### UAT-ALM-01 — CRM deals / organizations list APIs
+**Steps:** `GET /api/v1/deals`, `GET /api/v1/organizations` on `:8081`.  
+**Expect:** HTTP 200.
+
+### UAT-ALM-02 — CRM asset boundary + CAM OHS
+**Steps:** `GET /api/v1/assets?...` on CRM `:8081` then on CAM `:8087`.  
+**Expect:** CRM → **404** `RESOURCE_NOT_FOUND` (not 500). CAM → live (2xx/4xx auth/validation), not 503.
+
+### UAT-ALM-03 — Asset reports on CAM sibling
+**Steps:** CAM `upcoming-renewals` and `churn` report GETs.  
+**Expect:** Live CAM response (not 503).
+
+### UAT-ALM-04 — Deal create on CRM (+ quote DRAFT when quote-service up)
+**Steps:** Create a UAT-prefixed deal on CRM; attempt DRAFT quote on `:8084`.  
+**Expect:** Deal created; quote DRAFT or documented GAP/auth for create contract.
+
+### UAT-ALM-05 — Renewal-from-assets API surface
+**Steps:** Probe quote-service / CAM renewal-from-assets paths.  
+**Expect:** Reachable surface **or** GAP (`AssetRenewalDrafts` / `QuoteContinuation`).
+
+### UAT-ALM-06 — Installed-base absent on CRM
+**Steps:** Confirm CRM has no Assets API (404).  
+**Expect:** Boundary 404 (OHS is CAM-only).
+
+### UAT-ALM-07 — S4 hold observable
+**Steps:** Confirm `AssetLifecycleReadiness` refuses readiness while CAM is up.  
+**Expect:** Hold armed; mutate applies refuse `ASSET_LIFECYCLE_HOLD`.
+
+### UAT-ALM-08 — Null start date apply block
+**Steps:** Assert `DocumentApplyNullStartDateTest` covers `START_DATE_MISSING`.  
+**Expect:** Gate present in-tree; Maven unit suite green.
+
 ### Entry criteria
-- CRM UI `:4200`, gateway `:8080`, quote-service, CAM `:8087` reachable through the proxy.
+- Browser path: CRM UI `:4200`, gateway `:8080`, quote-service, CAM `:8087` reachable through the proxy.
+- API path: CRM `:8081` UP; CAM `:8087` and quote-service `:8084` reachable as siblings.
 - UAT run id prefix `UAT-<runId>-`.
 
 ### Exit criteria
-- All `UAT-ALM-01`–`08` PASS, BLOCKED (env), or GAP (documented missing UI) with zero unexplained FAIL.
+- All `UAT-ALM-01`–`08` PASS, BLOCKED (env), or GAP (documented missing UI/API) with zero unexplained FAIL — for the chosen target (`:4200` or `:8081`).
 - DRG-651 unit tests green.
 - Evidence report under `frontend/.ci-tmp/uat-full/`.
