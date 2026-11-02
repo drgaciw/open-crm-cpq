@@ -41,6 +41,7 @@ final class DocumentApplyPeriods {
             case "V4" -> "source accepted line is missing or retired";
             case "V9" -> "pinned pricebook version differs at apply";
             case "CO_TERM_MISSING" -> "the new period has no co-term end date";
+            case "START_DATE_MISSING" -> "the change line or source period has no start date";
             case "ACTION_NOT_IN_SLICE" -> "the action is outside Add, Update, Remove, Terminate, Swap, and Upgrade";
             default -> code;
         };
@@ -76,11 +77,20 @@ final class DocumentApplyPeriods {
     }
 
     private static String sliceReason(ApplyLine line, List<SubscriptionRatePeriod> periods, String observedPricebook) {
-        if ((line.action() == ActionCode.UPDATE || line.action() == ActionCode.REMOVE
+        if (line.effectiveFrom() == null) {
+            return "START_DATE_MISSING";
+        }
+        if (line.action() == ActionCode.UPDATE || line.action() == ActionCode.REMOVE
                 || line.action() == ActionCode.UPGRADE || line.action() == ActionCode.SWAP
-                || line.action() == ActionCode.TERMINATE)
-                && openSources(periods, line).isEmpty()) {
-            return "V4";
+                || line.action() == ActionCode.TERMINATE) {
+            List<SubscriptionRatePeriod> sources = openSources(periods, line);
+            if (sources.isEmpty()) {
+                return "V4";
+            }
+            // A null source start is not "before" the effective date. Block; do not close or retire.
+            if (sources.stream().anyMatch(period -> period.getStartDate() == null)) {
+                return "START_DATE_MISSING";
+            }
         }
         if (observedPricebook != null && !observedPricebook.equals(line.pricebookVersion())) {
             return "V9";
@@ -144,9 +154,14 @@ final class DocumentApplyPeriods {
                 .filter(period -> line.sourceAcceptedLineUuid() != null
                         && line.sourceAcceptedLineUuid().equals(period.getAcceptedLineUuid()))
                 // A null effective end is open-ended coverage, so it still matches.
+                // A null change-line start is not a date to compare; sliceReason blocks it first.
                 .filter(period -> {
+                    LocalDate effectiveFrom = line.effectiveFrom();
+                    if (effectiveFrom == null) {
+                        return false;
+                    }
                     LocalDate effectiveEnd = period.getEffectiveEndDate();
-                    return effectiveEnd == null || !effectiveEnd.isBefore(line.effectiveFrom());
+                    return effectiveEnd == null || !effectiveEnd.isBefore(effectiveFrom);
                 })
                 .toList();
     }
