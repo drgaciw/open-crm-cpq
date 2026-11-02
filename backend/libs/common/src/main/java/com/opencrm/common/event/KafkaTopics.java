@@ -70,4 +70,7 @@ public final class KafkaTopics {
 
     /** DRG-484. One organization merged into an explicitly chosen survivor. */
     public static final String ACCOUNTS_MERGED = "cpq.crm.account.merged";
+
+    /** DRG-487 / BC-13-03. Advisory solution derived from a guided selling session. */
+    public static final String SOLUTION_DERIVED = "cpq.crm.opportunity.solution-derived";
 }
