@@ -10,6 +10,15 @@ import { CurrencyPipe } from '@angular/common';
 import { DealService } from '../deal.service';
 import { DEFAULT_BASE_CURRENCY, DealDto, DealStage } from '@frontend/shared-models';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
+import { dealActionErrorMessage } from '../deal-action-error';
+import {
+  DEAL_STAGE_ORDER,
+  canAdvanceDeal,
+  canCloseDeal,
+  dealStageColor,
+  dealStageLabel,
+  isOpenDealStage,
+} from '../deal-stage';
 
 interface KanbanColumn {
   stage: DealStage;
@@ -35,7 +44,7 @@ interface KanbanColumn {
       <button mat-icon-button (click)="router.navigate(['/deals'])" aria-label="Back to deals list">
         <mat-icon>arrow_back</mat-icon>
       </button>
-      <h1>Deal Pipeline</h1>
+      <h1>Opportunity pipeline</h1>
       @if (pipelineTotals(); as totals) {
         <div class="pipeline-totals" aria-label="Pipeline summary">
           <span class="total-chip">{{ totals.count }} open</span>
@@ -48,7 +57,7 @@ interface KanbanColumn {
       }
       <span class="spacer"></span>
       <button mat-raised-button color="primary" (click)="router.navigate(['/deals/new'])">
-        <mat-icon>add</mat-icon> New Deal
+        <mat-icon>add</mat-icon> New opportunity
       </button>
     </div>
 
@@ -189,45 +198,42 @@ export class DealKanbanComponent implements OnInit {
 
   readonly actionLoading = signal(false);
 
-  private readonly stageConfig: { stage: DealStage; label: string; color: string }[] = [
-    { stage: 'PROSPECTING', label: 'Prospecting', color: '#2196f3' },
-    { stage: 'QUALIFICATION', label: 'Qualification', color: '#ff9800' },
-    { stage: 'NEEDS_ANALYSIS', label: 'Needs Analysis', color: '#00bcd4' },
-    { stage: 'PROPOSAL', label: 'Proposal', color: '#9c27b0' },
-    { stage: 'NEGOTIATION', label: 'Negotiation', color: '#f44336' },
-    { stage: 'WON', label: 'Won', color: '#4caf50' },
-    { stage: 'LOST', label: 'Lost', color: '#757575' },
-  ];
+  /**
+   * Currency for every total on the board. Prefer the base currency already on the deal,
+   * then the pipeline summary, then the catalog default. Never inferred by summing `amount`.
+   */
+  baseCurrency = computed(() => {
+    const fromDeal = this.service.deals().find((deal) => deal.baseCurrency)?.baseCurrency;
+    if (fromDeal) {
+      return fromDeal;
+    }
+    const fromSummary = this.service.pipelineSummary()?.find((stage) => stage.baseCurrency)?.baseCurrency;
+    return fromSummary ?? DEFAULT_BASE_CURRENCY;
+  });
 
-  /** ADR-032: currency of every total on the board, from GET /deals/pipeline. */
-  baseCurrency = computed(
-    () => this.service.pipelineSummary()?.find((s) => s.baseCurrency)?.baseCurrency ?? DEFAULT_BASE_CURRENCY,
-  );
-
-  /** Single-pass O(stages + deals) bucketing (salvage #436); avoids filter-per-stage. */
+  /** Single-pass O(stages + deals) bucketing; column totals add base amounts only. */
   columns = computed<KanbanColumn[]>(() => {
     const deals = this.service.deals();
     const base = this.baseCurrency();
     const stageMap = new Map<DealStage, { deals: DealDto[]; totalValue: number; unconverted: number }>();
-    for (const cfg of this.stageConfig) {
-      stageMap.set(cfg.stage, { deals: [], totalValue: 0, unconverted: 0 });
+    for (const stage of DEAL_STAGE_ORDER) {
+      stageMap.set(stage, { deals: [], totalValue: 0, unconverted: 0 });
     }
     for (const d of deals) {
       const bucket = stageMap.get(d.stage);
       if (bucket) {
         bucket.deals.push(d);
-        // ADR-032: add base amounts only; never add amounts in different currencies.
-        if (d.baseAmount != null && d.baseCurrency === base) {
-          bucket.totalValue += d.baseAmount;
-        } else if (d.amount != null) {
-          bucket.unconverted += 1;
-        }
+        const contribution = baseAmountContribution(d, base);
+        bucket.totalValue += contribution.amount;
+        bucket.unconverted += contribution.unconverted;
       }
     }
-    return this.stageConfig.map((cfg) => {
-      const bucket = stageMap.get(cfg.stage)!;
+    return DEAL_STAGE_ORDER.map((stage) => {
+      const bucket = stageMap.get(stage) ?? { deals: [], totalValue: 0, unconverted: 0 };
       return {
-        ...cfg,
+        stage,
+        label: dealStageLabel(stage),
+        color: dealStageColor(stage),
         deals: bucket.deals,
         totalValue: bucket.totalValue,
         unconverted: bucket.unconverted,
@@ -235,17 +241,27 @@ export class DealKanbanComponent implements OnInit {
     });
   });
 
-  /** Open-pipeline totals from GET /deals/pipeline (excludes WON/LOST when API does). */
+  /**
+   * Open-pipeline header from deal DTO base-currency fields (BC-13-05).
+   * `amount` in the deal currency is never added, so mixed currencies cannot be summed.
+   */
   pipelineTotals = computed(() => {
-    const summary = this.service.pipelineSummary();
-    if (!summary?.length) return null;
-    const open = summary.filter((s) => s.stage !== 'WON' && s.stage !== 'LOST');
-    const source = open.length ? open : summary;
+    const base = this.baseCurrency();
+    const open = this.service.deals().filter((deal) => isOpenDealStage(deal.stage));
+    let amount = 0;
+    let weighted = 0;
+    let unconverted = 0;
+    for (const deal of open) {
+      const contribution = baseAmountContribution(deal, base);
+      amount += contribution.amount;
+      weighted += contribution.weighted;
+      unconverted += contribution.unconverted;
+    }
     return {
-      count: source.reduce((n, s) => n + (s.count ?? 0), 0),
-      amount: source.reduce((n, s) => n + (s.totalAmount ?? 0), 0),
-      weighted: source.reduce((n, s) => n + (s.weightedAmount ?? 0), 0),
-      unconverted: source.reduce((n, s) => n + (s.unconvertedCount ?? 0), 0),
+      count: open.length,
+      amount,
+      weighted,
+      unconverted,
     };
   });
 
@@ -263,21 +279,18 @@ export class DealKanbanComponent implements OnInit {
   }
 
   canAdvance(stage: DealStage): boolean {
-    return stage !== 'WON' && stage !== 'LOST' && stage !== 'NEGOTIATION';
+    return canAdvanceDeal(stage);
   }
 
   canClose(stage: DealStage): boolean {
-    return stage !== 'WON' && stage !== 'LOST';
+    return canCloseDeal(stage);
   }
 
   onAdvance(deal: DealDto): void {
     this.actionLoading.set(true);
     this.service.advanceStage(deal.id).subscribe({
-      next: () => {
-        this.actionLoading.set(false);
-        this.refreshBoard();
-      },
-      error: () => this.actionLoading.set(false),
+      next: (updated) => this.commitStage(updated),
+      error: (err) => this.failStage(err, 'Could not advance this opportunity'),
     });
   }
 
@@ -285,11 +298,8 @@ export class DealKanbanComponent implements OnInit {
     if (!confirm(`Mark "${deal.name}" as Won?`)) return;
     this.actionLoading.set(true);
     this.service.markWon(deal.id).subscribe({
-      next: () => {
-        this.actionLoading.set(false);
-        this.refreshBoard();
-      },
-      error: () => this.actionLoading.set(false),
+      next: (updated) => this.commitStage(updated),
+      error: (err) => this.failStage(err, 'Could not mark this opportunity as Won'),
     });
   }
 
@@ -299,17 +309,43 @@ export class DealKanbanComponent implements OnInit {
       if (!reason) return;
       this.actionLoading.set(true);
       this.service.markLost(deal.id, reason).subscribe({
-        next: () => {
-          this.actionLoading.set(false);
-          this.refreshBoard();
-        },
-        error: () => this.actionLoading.set(false),
+        next: (updated) => this.commitStage(updated),
+        error: (err) => this.failStage(err, 'Could not mark this opportunity as Lost'),
       });
     });
+  }
+
+  private commitStage(updated: DealDto): void {
+    this.service.applyStageChange(updated);
+    this.actionLoading.set(false);
+    this.refreshBoard();
+  }
+
+  private failStage(err: unknown, fallback: string): void {
+    this.actionLoading.set(false);
+    this.service.error.set(dealActionErrorMessage(err, fallback));
   }
 
   private refreshBoard(): void {
     this.service.list(0, 200, 'createdAt,desc');
     this.service.loadPipelineSummary();
   }
+}
+
+/** Adds base-currency fields only. A transaction `amount` never enters the total. */
+function baseAmountContribution(
+  deal: DealDto,
+  baseCurrency: string,
+): { amount: number; weighted: number; unconverted: number } {
+  if (deal.baseAmount != null && deal.baseCurrency === baseCurrency) {
+    return {
+      amount: deal.baseAmount,
+      weighted: deal.baseWeightedAmount ?? 0,
+      unconverted: 0,
+    };
+  }
+  if (deal.amount != null) {
+    return { amount: 0, weighted: 0, unconverted: 1 };
+  }
+  return { amount: 0, weighted: 0, unconverted: 0 };
 }

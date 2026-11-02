@@ -10,21 +10,7 @@ import {
   PaginationMeta,
   SpringPageResponse,
 } from '@frontend/shared-models';
-
-/** Local H1 helper: message [CODE] when errorCode present (Wave U3). */
-function httpErrorMessage(err: unknown, fallback: string): string {
-  const e = err as {
-    errorCode?: string;
-    error?: { message?: string; errorCode?: string };
-    message?: string;
-  } | null;
-  const code = e?.errorCode || e?.error?.errorCode;
-  const message = e?.error?.message || e?.message || fallback;
-  if (code) {
-    return `${message} [${code}]`;
-  }
-  return message;
-}
+import { dealActionErrorMessage } from './deal-action-error';
 
 @Injectable({ providedIn: 'root' })
 export class DealService {
@@ -42,12 +28,23 @@ export class DealService {
 
   readonly isEmpty = computed(() => this.deals().length === 0 && !this.loading());
 
-  list(page = 0, size = 20, sort = 'createdAt,desc', stage?: DealStage): void {
+  /**
+   * GET /api/v1/deals. Server query params are page, size, sort, stage, and organizationId.
+   * Owner is not a parameter on this API; the list filters owner on the loaded page.
+   */
+  list(
+    page = 0,
+    size = 20,
+    sort = 'createdAt,desc',
+    stage?: DealStage,
+    organizationId?: number,
+  ): void {
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
       .set('page', page).set('size', size).set('sort', sort);
     if (stage) params = params.set('stage', stage);
+    if (organizationId != null) params = params.set('organizationId', String(organizationId));
 
     this.http.get<SpringPageResponse<DealDto>>(this.basePath, { params })
       .pipe(finalize(() => this.loading.set(false)))
@@ -62,9 +59,29 @@ export class DealService {
           }
         },
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          this.error.set(dealActionErrorMessage(err, 'An error occurred'));
         }
       });
+  }
+
+  /**
+   * Writes a stage transition into the shared list and the open detail.
+   * List and kanban both read {@link deals}, so they stay on the same client state.
+   */
+  applyStageChange(updated: DealDto): void {
+    this.deals.update((rows) => {
+      const index = rows.findIndex((row) => row.id === updated.id);
+      if (index < 0) {
+        return rows;
+      }
+      const next = rows.slice();
+      next[index] = { ...rows[index], ...updated };
+      return next;
+    });
+    const selected = this.selectedDeal();
+    if (selected && selected.id === updated.id) {
+      this.selectedDeal.set({ ...selected, ...updated });
+    }
   }
 
   getById(id: number): void {
@@ -75,7 +92,7 @@ export class DealService {
       .subscribe({
         next: (d) => this.selectedDeal.set(d),
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          this.error.set(dealActionErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -110,7 +127,7 @@ export class DealService {
           }
         },
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          this.error.set(dealActionErrorMessage(err, 'An error occurred'));
         }
       });
   }
@@ -135,7 +152,7 @@ export class DealService {
     this.http.get<PipelineSummaryDto[]>(`${this.basePath}/pipeline`).subscribe({
       next: (summary) => this.pipelineSummary.set(summary),
       error: (err) => {
-        this.error.set(httpErrorMessage(err, 'An error occurred'));
+        this.error.set(dealActionErrorMessage(err, 'An error occurred'));
       },
     });
   }
