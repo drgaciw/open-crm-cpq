@@ -3,7 +3,7 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { signal, computed } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { DealKanbanComponent } from './deal-kanban.component';
 import { DealService } from '../deal.service';
 import { DealDto, PipelineSummaryDto } from '@frontend/shared-models';
@@ -26,6 +26,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
   let markWonSpy: ReturnType<typeof vi.fn>;
   let markLostSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let applyStageChange: ReturnType<typeof vi.fn>;
 
   const deals = signal<DealDto[]>([
     deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000, currency: 'USD', baseAmount: 1000, baseCurrency: 'USD' }),
@@ -48,6 +49,12 @@ describe('DealKanbanComponent pipeline wiring', () => {
     markWonSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'WON' })));
     markLostSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'LOST' })));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    applyStageChange = vi.fn();
+    pipelineSummary.set([
+      { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD', unconvertedCount: 0 },
+      { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500, baseCurrency: 'USD', unconvertedCount: 0 },
+      { stage: 'WON', count: 3, totalAmount: 9000, weightedAmount: 9000, baseCurrency: 'USD', unconvertedCount: 0 },
+    ]);
     deals.set([
       deal({ id: 1, name: 'A', stage: 'PROSPECTING', amount: 1000, currency: 'USD', baseAmount: 1000, baseCurrency: 'USD' }),
       deal({ id: 2, name: 'B', stage: 'PROPOSAL', amount: 5000, currency: 'USD', baseAmount: 5000, baseCurrency: 'USD' }),
@@ -68,6 +75,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
       advanceStage: advanceSpy,
       markWon: markWonSpy,
       markLost: markLostSpy,
+      applyStageChange,
     };
 
     await TestBed.configureTestingModule({
@@ -94,13 +102,38 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(loadPipelineSpy).toHaveBeenCalled();
   });
 
-  it('pipelineTotals sums open stages from loadPipelineSummary', () => {
+  it('pipelineTotals sum open deals from base-currency DTO fields', () => {
     const totals = component.pipelineTotals();
     expect(totals).toEqual({
-      count: 2,
-      amount: 6000,
-      weighted: 2600,
+      count: 4,
+      amount: 6250,
+      weighted: 0,
       unconverted: 0,
+    });
+  });
+
+  it('pipeline header does not add mixed transaction amounts', () => {
+    deals.set([
+      deal({
+        id: 1, name: 'USD', stage: 'PROSPECTING', amount: 100, currency: 'USD',
+        baseAmount: 100, baseCurrency: 'USD', baseWeightedAmount: 10,
+      }),
+      deal({
+        id: 2, name: 'EUR', stage: 'PROPOSAL', amount: 999999, currency: 'EUR',
+        baseAmount: 200, baseCurrency: 'USD', baseWeightedAmount: 50,
+      }),
+      deal({ id: 3, name: 'GBP', stage: 'NEGOTIATION', amount: 500, currency: 'GBP' }),
+      deal({
+        id: 4, name: 'Won', stage: 'WON', amount: 800, currency: 'USD',
+        baseAmount: 800, baseCurrency: 'USD', baseWeightedAmount: 800,
+      }),
+    ]);
+
+    expect(component.pipelineTotals()).toEqual({
+      count: 3,
+      amount: 300,
+      weighted: 60,
+      unconverted: 1,
     });
   });
 
@@ -136,17 +169,23 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(prospecting?.unconverted).toBe(1);
   });
 
-  it('ADR-032: base currency comes from the pipeline summary', () => {
-    pipelineSummary.set([{ stage: 'PROSPECTING', count: 1, totalAmount: 10, weightedAmount: 1, baseCurrency: 'EUR', unconvertedCount: 2 }]);
+  it('ADR-032: base currency comes from the deal, then the pipeline summary', () => {
+    expect(component.baseCurrency()).toBe('USD');
+
+    deals.set([
+      deal({ id: 9, name: 'No base', stage: 'PROSPECTING', amount: 10, currency: 'GBP' }),
+    ]);
+    pipelineSummary.set([
+      { stage: 'PROSPECTING', count: 1, totalAmount: 10, weightedAmount: 1, baseCurrency: 'EUR', unconvertedCount: 2 },
+    ]);
 
     expect(component.baseCurrency()).toBe('EUR');
-    expect(component.pipelineTotals()?.unconverted).toBe(2);
-
-    pipelineSummary.set([
-      { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD', unconvertedCount: 0 },
-      { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500, baseCurrency: 'USD', unconvertedCount: 0 },
-      { stage: 'WON', count: 3, totalAmount: 9000, weightedAmount: 9000, baseCurrency: 'USD', unconvertedCount: 0 },
-    ]);
+    expect(component.pipelineTotals()).toEqual({
+      count: 1,
+      amount: 0,
+      weighted: 0,
+      unconverted: 1,
+    });
   });
 
   it('onAdvance wires advanceStage and refreshes board + summary', () => {
@@ -156,6 +195,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
     component.onAdvance(deal({ id: 1, name: 'A', stage: 'PROSPECTING' }));
 
     expect(advanceSpy).toHaveBeenCalledWith(1);
+    expect(applyStageChange).toHaveBeenCalledWith(expect.objectContaining({ id: 1, stage: 'QUALIFICATION' }));
     expect(listSpy).toHaveBeenCalledWith(0, 200, 'createdAt,desc');
     expect(loadPipelineSpy).toHaveBeenCalled();
     expect(component.actionLoading()).toBe(false);
@@ -169,6 +209,24 @@ describe('DealKanbanComponent pipeline wiring', () => {
 
     expect(markWonSpy).toHaveBeenCalledWith(2);
     expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('onWin shows an actionable error when the quote is not accepted', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    listSpy.mockClear();
+    markWonSpy.mockReturnValueOnce(throwError(() => ({
+      errorCode: 'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE',
+    })));
+
+    component.onWin(deal({ id: 2, name: 'B', stage: 'PROPOSAL' }));
+    fixture.detectChanges();
+
+    const banner = (fixture.nativeElement as HTMLElement).querySelector('.error-banner');
+    expect(banner?.textContent).toContain('Accept the quote');
+    expect(banner?.textContent).toContain('OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE');
+    expect(applyStageChange).not.toHaveBeenCalled();
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(deals().find((row) => row.id === 2)?.stage).toBe('PROPOSAL');
   });
 
   it('onLose opens dialog and calls markLost with reason', () => {

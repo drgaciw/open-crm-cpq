@@ -26,6 +26,7 @@ describe('DealListComponent action wiring', () => {
   let markWonSpy: ReturnType<typeof vi.fn>;
   let markLostSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let applyStageChange: ReturnType<typeof vi.fn>;
 
   const pagination = signal<PaginationMeta>({
     page: 0,
@@ -44,6 +45,7 @@ describe('DealListComponent action wiring', () => {
     markWonSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'WON' })));
     markLostSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'LOST' })));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+    applyStageChange = vi.fn();
     error.set(null);
 
     const serviceMock = {
@@ -58,6 +60,7 @@ describe('DealListComponent action wiring', () => {
       advanceStage: advanceSpy,
       markWon: markWonSpy,
       markLost: markLostSpy,
+      applyStageChange,
     };
 
     await TestBed.configureTestingModule({
@@ -98,8 +101,8 @@ describe('DealListComponent action wiring', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('app-page-header')).toBeTruthy();
     expect(el.querySelector('app-empty-state')).toBeTruthy();
-    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No deals yet');
-    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Deal');
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No opportunities yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create opportunity');
   });
 
   it('hides Create Deal action when a stage filter is active and empty', () => {
@@ -110,7 +113,7 @@ describe('DealListComponent action wiring', () => {
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
-    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching deals');
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No matching opportunities');
     expect(el.querySelector('.empty-state-action')).toBeNull();
   });
 
@@ -141,7 +144,7 @@ describe('DealListComponent action wiring', () => {
     listSpy.mockClear();
     error.set('Failed to load deals [DEALS_UNAVAILABLE]');
     component.onRetry();
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined);
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc');
   });
 
   it('loading spinner wrapper exposes role=status and aria-live=polite', () => {
@@ -182,7 +185,8 @@ describe('DealListComponent action wiring', () => {
     component.onAdvance(deal({ id: 11, name: 'Pipe', stage: 'PROSPECTING' }));
 
     expect(advanceSpy).toHaveBeenCalledWith(11);
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined);
+    expect(applyStageChange).toHaveBeenCalledWith(expect.objectContaining({ stage: 'QUALIFICATION' }));
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc');
     expect(component.actionLoading()).toBe(false);
   });
 
@@ -225,5 +229,64 @@ describe('DealListComponent action wiring', () => {
     advanceSpy.mockReturnValueOnce(throwError(() => new Error('fail')));
     component.onAdvance(deal({ id: 11, name: 'Pipe', stage: 'PROSPECTING' }));
     expect(component.actionLoading()).toBe(false);
+    expect(error()).toContain('fail');
+  });
+
+  it('filters owner on the loaded page without a new request', () => {
+    deals.set([
+      deal({ id: 1, name: 'Ada deal', stage: 'PROSPECTING', ownerId: 'ada' }),
+      deal({ id: 2, name: 'Grace deal', stage: 'PROSPECTING', ownerId: 'grace' }),
+    ]);
+    loading.set(false);
+    error.set(null);
+    listSpy.mockClear();
+
+    component.onOwnerFilter('ada');
+    fixture.detectChanges();
+
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(component.visibleDeals().map((row) => row.id)).toEqual([1]);
+    expect(component.hasActiveFilters()).toBe(true);
+  });
+
+  it('sends organizationId to GET /api/v1/deals', () => {
+    listSpy.mockClear();
+    component.onOrganizationFilter('15');
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, 15);
+  });
+
+  it('filters organization name on the loaded page', () => {
+    deals.set([
+      deal({ id: 1, name: 'Ada deal', stage: 'PROSPECTING', organizationName: 'Northwind' }),
+      deal({ id: 2, name: 'Grace deal', stage: 'PROSPECTING', organizationName: 'Contoso' }),
+    ]);
+    loading.set(false);
+    listSpy.mockClear();
+
+    component.onOrganizationFilter('north');
+    fixture.detectChanges();
+
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(component.visibleDeals().map((row) => row.id)).toEqual([1]);
+  });
+
+  it('onWin surfaces OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE and leaves the list in place', () => {
+    deals.set([deal({ id: 12, name: 'Close me', stage: 'NEGOTIATION' })]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    listSpy.mockClear();
+    markWonSpy.mockReturnValueOnce(throwError(() => ({
+      error: { message: 'blocked', errorCode: 'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE' },
+    })));
+
+    component.onWin(deal({ id: 12, name: 'Close me', stage: 'NEGOTIATION' }));
+    fixture.detectChanges();
+
+    expect(applyStageChange).not.toHaveBeenCalled();
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(error()).toContain('OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE');
+    expect(error()).toContain('Accept the quote');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')?.textContent)
+      .toContain('Accept the quote');
+    expect(deals()[0].stage).toBe('NEGOTIATION');
   });
 });

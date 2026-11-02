@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { DealService } from './deal.service';
+import { dealActionErrorMessage } from './deal-action-error';
 import { DealDto, PipelineSummaryDto, SpringPageResponse } from '@frontend/shared-models';
 
 function deal(partial: Partial<DealDto> & Pick<DealDto, 'id' | 'name' | 'stage'>): DealDto {
@@ -104,6 +105,43 @@ describe('DealService', () => {
       { status: 503, statusText: 'Service Unavailable' },
     );
     expect(service.error()).toBe('Failed to load deals [DEALS_UNAVAILABLE]');
+  });
+
+  it('list sends organizationId with stage', () => {
+    service.list(0, 20, 'createdAt,desc', 'NEGOTIATION', 15);
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/deals' &&
+        r.params.get('stage') === 'NEGOTIATION' &&
+        r.params.get('organizationId') === '15',
+    );
+    req.flush({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 });
+    expect(service.deals()).toEqual([]);
+  });
+
+  it('applyStageChange updates the shared deals signal and the selected deal', () => {
+    service.deals.set([
+      deal({ id: 1, name: 'A', stage: 'PROSPECTING', organizationName: 'Acme' }),
+      deal({ id: 2, name: 'B', stage: 'PROPOSAL' }),
+    ]);
+    service.selectedDeal.set(deal({ id: 1, name: 'A', stage: 'PROSPECTING', organizationName: 'Acme' }));
+
+    service.applyStageChange(deal({ id: 1, name: 'A', stage: 'QUALIFICATION' }));
+
+    expect(service.deals().map((row) => row.stage)).toEqual(['QUALIFICATION', 'PROPOSAL']);
+    expect(service.deals()[0].organizationName).toBe('Acme');
+    expect(service.selectedDeal()?.stage).toBe('QUALIFICATION');
+    expect(service.selectedDeal()?.organizationName).toBe('Acme');
+  });
+
+  it('dealActionErrorMessage explains OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE', () => {
+    const message = dealActionErrorMessage(
+      { errorCode: 'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE', message: 'blocked' },
+      'Could not mark this opportunity as Won',
+    );
+    expect(message).toContain('Accept the quote');
+    expect(message).toContain('[OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE]');
+    expect(message).not.toContain('blocked');
   });
 
   it('getById error.set appends errorCode as message [CODE]', () => {

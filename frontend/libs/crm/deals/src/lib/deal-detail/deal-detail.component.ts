@@ -8,9 +8,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDialog } from '@angular/material/dialog';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { DealStage, STAGE_COLORS, STAGE_LABELS } from '@frontend/shared-models';
+import { DealDto, DealStage } from '@frontend/shared-models';
 import { DealService } from '../deal.service';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
+import { dealActionErrorMessage } from '../deal-action-error';
+import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-detail',
@@ -68,10 +70,13 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
 
       <div class="detail-grid">
         <mat-card>
-          <mat-card-header><mat-card-title>Deal Information</mat-card-title></mat-card-header>
+          <mat-card-header><mat-card-title>Opportunity</mat-card-title></mat-card-header>
           <mat-card-content>
             <div class="info-grid">
-              <div class="info-item"><span class="label">Amount</span><span class="value">{{ deal.amount ? (deal.amount | currency:(deal.currency || 'USD'):'symbol':'1.0-0') : '—' }}</span></div>
+              <div class="info-item"><span class="label">Amount</span><span class="value">{{ deal.amount !== null && deal.amount !== undefined ? (deal.amount | currency:(deal.currency || 'USD'):'symbol':'1.0-0') : '—' }}</span></div>
+              <div class="info-item" data-testid="deal-currency"><span class="label">Currency</span><span class="value">{{ deal.currency || '—' }}</span></div>
+              <div class="info-item" data-testid="deal-stage"><span class="label">Stage</span><span class="value">{{ stageLabel(deal.stage) }}</span></div>
+              <div class="info-item" data-testid="deal-owner"><span class="label">Owner</span><span class="value">{{ deal.ownerId || '—' }}</span></div>
               @if (deal.amount && deal.baseCurrency && deal.baseCurrency !== deal.currency) {
                 <div class="info-item" data-testid="base-amount"><span class="label">Amount ({{ deal.baseCurrency }})</span><span class="value">{{ deal.baseAmount | currency:deal.baseCurrency:'symbol':'1.0-0' }} at {{ deal.fxRate }} ({{ deal.fxSource }}, {{ deal.fxRateAsOf | date:'mediumDate' }})</span></div>
               } @else if (deal.amount && !deal.baseCurrency) {
@@ -97,10 +102,10 @@ import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason
                 </div>
               }
               @if (deal.organizationId) {
-                <div class="rel-item">
+                <div class="rel-item" data-testid="deal-organization">
                   <mat-icon>business</mat-icon>
                   <a [routerLink]="['/organizations', deal.organizationId]" class="link">
-                    {{ deal.organizationName }}
+                    {{ deal.organizationName || ('Organization ' + deal.organizationId) }}
                   </a>
                 </div>
               }
@@ -168,21 +173,20 @@ export class DealDetailComponent implements OnInit {
   id = input.required<string>();
   readonly actionLoading = signal(false);
 
-  stageColor(stage: string): string {
-    return STAGE_COLORS[stage] ?? '#666';
+  stageColor(stage: DealStage): string {
+    return dealStageColor(stage);
   }
 
-  stageLabel(stage: string): string {
-    return STAGE_LABELS[stage] ?? stage;
+  stageLabel(stage: DealStage): string {
+    return dealStageLabel(stage);
   }
 
-  /** API advances one step; NEGOTIATION must use win/lose. */
   canAdvance(stage: DealStage): boolean {
-    return stage !== 'WON' && stage !== 'LOST' && stage !== 'NEGOTIATION';
+    return canAdvanceDeal(stage);
   }
 
   canClose(stage: DealStage): boolean {
-    return stage !== 'WON' && stage !== 'LOST';
+    return canCloseDeal(stage);
   }
 
   ngOnInit(): void {
@@ -208,11 +212,8 @@ export class DealDetailComponent implements OnInit {
   onAdvance(): void {
     this.actionLoading.set(true);
     this.service.advanceStage(Number(this.id())).subscribe({
-      next: (d) => {
-        this.service.selectedDeal.set(d);
-        this.actionLoading.set(false);
-      },
-      error: () => this.actionLoading.set(false),
+      next: (updated) => this.commitStage(updated),
+      error: (err) => this.failStage(err, 'Could not advance this opportunity'),
     });
   }
 
@@ -220,11 +221,8 @@ export class DealDetailComponent implements OnInit {
     if (!confirm('Mark this deal as Won?')) return;
     this.actionLoading.set(true);
     this.service.markWon(Number(this.id())).subscribe({
-      next: (d) => {
-        this.service.selectedDeal.set(d);
-        this.actionLoading.set(false);
-      },
-      error: () => this.actionLoading.set(false),
+      next: (updated) => this.commitStage(updated),
+      error: (err) => this.failStage(err, 'Could not mark this opportunity as Won'),
     });
   }
 
@@ -234,12 +232,22 @@ export class DealDetailComponent implements OnInit {
       if (!reason) return;
       this.actionLoading.set(true);
       this.service.markLost(Number(this.id()), reason).subscribe({
-        next: (d) => {
-          this.service.selectedDeal.set(d);
-          this.actionLoading.set(false);
-        },
-        error: () => this.actionLoading.set(false),
+        next: (updated) => this.commitStage(updated),
+        error: (err) => this.failStage(err, 'Could not mark this opportunity as Lost'),
       });
     });
+  }
+
+  private commitStage(updated: DealDto): void {
+    const current = this.service.selectedDeal();
+    const merged = current && current.id === updated.id ? { ...current, ...updated } : updated;
+    this.service.applyStageChange(merged);
+    this.service.selectedDeal.set(merged);
+    this.actionLoading.set(false);
+  }
+
+  private failStage(err: unknown, fallback: string): void {
+    this.actionLoading.set(false);
+    this.service.error.set(dealActionErrorMessage(err, fallback));
   }
 }
