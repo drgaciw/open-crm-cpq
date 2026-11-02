@@ -20,6 +20,8 @@ export const PROBES = [
   { key: 'pricing', method: 'GET', path: '/api/v1/rule-sets?page=0&size=1', gates: 'rule sets, pricing customers' },
   { key: 'pricebook', method: 'GET', path: '/api/v1/price-books?page=0&size=1', gates: 'price books' },
   { key: 'approvalsBff', method: 'GET', path: '/api/v1/quotes/approvals/pending', gates: 'approvals inbox list' },
+  // CAM installed-base OHS (DRG-656/659). 401/403 still mean "up"; gateway 503 fallback means down.
+  { key: 'assets', method: 'GET', path: '/api/v1/assets?accountId=preflight&asOf=2020-01-01', gates: 'asset lifecycle, installed base, asset reports' },
   { key: 'configValidate', method: 'POST', path: '/api/v1/configuration/validate', body: [], gates: 'quote Submit and everything after it' },
   { key: 'pricingExecute', method: 'POST', path: '/api/v1/pricing/execute', body: {}, gates: 'quote Calculate, pricing simulator' },
 ];
