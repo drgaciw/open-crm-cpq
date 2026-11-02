@@ -136,6 +136,27 @@ class CsrfProtectionFilterTest {
     }
 
     @Test
+    @DisplayName("POST with cookie from http://127.0.0.1:4200 is allowed when listed")
+    void allowsLoopbackIpFrontendOrigin() {
+        CsrfProtectionFilter filter = new CsrfProtectionFilter(
+                List.of("http://localhost:4200", "http://127.0.0.1:4200"));
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/quotes")
+                        .header(HttpHeaders.COOKIE, "SESSION=abc")
+                        .header(HttpHeaders.ORIGIN, "http://127.0.0.1:4200")
+                        .build());
+
+        AtomicBoolean chainInvoked = new AtomicBoolean(false);
+        filter.filter(exchange, ex -> {
+            chainInvoked.set(true);
+            return Mono.empty();
+        }).block();
+        assertTrue(chainInvoked.get());
+        assertTrue(exchange.getResponse().getStatusCode() == null
+                || !exchange.getResponse().getStatusCode().isError());
+    }
+
+    @Test
     @DisplayName("explicit FRONTEND_URL-style origin is allowed; sibling subdomain is not")
     void allowsExplicitOriginOnly() {
         CsrfProtectionFilter filter = new CsrfProtectionFilter(
@@ -202,9 +223,11 @@ class CsrfProtectionFilterTest {
         String yaml = Files.readString(APPLICATION_YAML);
         assertFalse(yaml.contains("*.azurewebsites.net"),
                 "gateway application.yml must not list https://*.azurewebsites.net");
-        assertTrue(yaml.contains("FRONTEND_URL") || yaml.contains("CORS_ALLOWED_ORIGINS"),
-                "gateway CORS/CSRF origins must be env-driven");
+        assertTrue(yaml.contains("CORS_ALLOWED_ORIGINS"),
+                "gateway CORS/CSRF origins must be env-driven via CORS_ALLOWED_ORIGINS");
         assertTrue(yaml.contains("http://localhost:4200"),
                 "local default http://localhost:4200 must remain");
+        assertTrue(yaml.contains("http://127.0.0.1:4200"),
+                "local default must also allow http://127.0.0.1:4200 (UAT/browser loopback)");
     }
 }

@@ -64,6 +64,45 @@ export function isQuoteStatus(value: unknown): value is QuoteStatus {
  */
 export type QuoteDealType = 'NEW' | 'AMENDMENT' | 'RENEWAL' | 'EXPANSION';
 
+/**
+ * Mirrors: com.opencrm.quote.quote.QuoteContinuationRequest.Operation
+ * Distinct from QuoteDealType — EXTENSION stays dealType RENEWAL on the quote.
+ */
+export type QuoteContinuationOperation = 'AMENDMENT' | 'EXPANSION' | 'RENEWAL' | 'EXTENSION';
+
+export const QUOTE_CONTINUATION_OPERATIONS: readonly QuoteContinuationOperation[] = [
+  'AMENDMENT',
+  'EXPANSION',
+  'RENEWAL',
+  'EXTENSION',
+] as const;
+
+/** Mirrors: com.opencrm.quote.quote.QuoteContinuationRequest.RenewalSourceMode */
+export type RenewalSourceMode = 'FROM_ACTIVE_ASSETS';
+
+/**
+ * Mirrors: com.opencrm.quote.quote.QuoteContinuationRequest
+ * Sent to POST /api/v1/quotes/continuations (renewal-from-assets uses renewalSourceMode).
+ */
+export interface QuoteContinuationRequest {
+  operation: QuoteContinuationOperation;
+  targetSubscriptionNumber: string;
+  sourceSubscriptionLineUuid?: string;
+  observedRevision: number;
+  customerExternalId: string;
+  currency: string;
+  quantity?: number;
+  effectiveDate?: string;
+  termMonths?: number;
+  upliftPercent?: number;
+  name?: string;
+  renewalSourceMode?: RenewalSourceMode;
+  contractLineId?: string;
+  renewalPolicyAccountId?: string;
+  renewalPolicyAgreementId?: string;
+  renewalAssetIds?: string[];
+}
+
 export const QUOTE_DEAL_TYPE_LABELS: Record<QuoteDealType, string> = {
   NEW: 'New',
   AMENDMENT: 'Amendment',
@@ -280,6 +319,12 @@ export interface QuoteDto {
   durationInMonths: number;
   startDate?: string;
   endDate?: string;
+  /** Continuation target subscription number when this quote is a typed continuation. */
+  targetSubscriptionNumber?: string;
+  observedRevision?: number;
+  subscriptionEffectiveDate?: string;
+  /** Null on quotes that are not typed continuations. */
+  continuationOperation?: QuoteContinuationOperation;
   subtotal?: number;
   totalDiscount?: number;
   totalTax?: number;

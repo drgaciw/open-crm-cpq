@@ -173,6 +173,30 @@ export default {
       return 'DocumentApplyNullStartDateTest asserts START_DATE_MISSING';
     });
 
+    // Type safety — FE shared-models cover CAM/quote/deal DTO fields
+    await runCheck(ctx, 'asset-lifecycle.type-safety.contract-parity', async () => {
+      const { readFileSync, existsSync } = await import('node:fs');
+      const model = '/workspace/frontend/libs/shared/models/src/lib/asset.model.ts';
+      const parity = '/workspace/frontend/libs/shared/models/src/lib/backend-fe-contract-parity.spec.ts';
+      const quote = '/workspace/frontend/libs/shared/models/src/lib/quote.model.ts';
+      for (const path of [model, parity, quote]) {
+        if (!existsSync(path)) throw defect(`type-safety artifact missing: ${path}`);
+      }
+      const assetSrc = readFileSync(model, 'utf8');
+      if (!assetSrc.includes('export interface AssetDto') || !assetSrc.includes('InstalledAssetDto')) {
+        throw defect('asset.model.ts missing AssetDto / InstalledAssetDto');
+      }
+      const quoteSrc = readFileSync(quote, 'utf8');
+      if (!quoteSrc.includes('QuoteContinuationRequest') || !quoteSrc.includes('FROM_ACTIVE_ASSETS')) {
+        throw defect('quote.model.ts missing QuoteContinuationRequest / FROM_ACTIVE_ASSETS');
+      }
+      const paritySrc = readFileSync(parity, 'utf8');
+      if (!paritySrc.includes('Backend ↔ frontend contract parity')) {
+        throw defect('backend-fe-contract-parity.spec.ts missing ALM parity suite');
+      }
+      return 'Asset/Quote continuation FE models + backend-fe-contract-parity.spec present';
+    });
+
     // Extra: create naming hygiene for any follow-on asset seed
     await runCheck(ctx, 'asset-lifecycle.fixture.prefix', async () => {
       const name = uniqueName(ctx.runId, 'alm');

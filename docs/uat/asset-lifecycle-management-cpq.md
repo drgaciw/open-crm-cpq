@@ -157,7 +157,13 @@ Runner: `frontend/e2e/uat-asset-lifecycle-crm-api.mjs`
 - API path: CRM `:8081` UP; CAM `:8087` and quote-service `:8084` reachable as siblings.
 - UAT run id prefix `UAT-<runId>-`.
 
+### Type safety (backend ↔ frontend)
+- FE models in `frontend/libs/shared/models` mirror Java DTOs (`Mirrors: com.opencrm…` comments).
+- ALM gate: `backend-fe-contract-parity.spec.ts` asserts Quote/Deal/Asset/continuation/report field names cover the corresponding backend DTO sources.
+- Run: `npx nx test shared-models -- -t "Backend"`.
+
 ### Exit criteria
 - All `UAT-ALM-01`–`08` PASS, BLOCKED (env), or GAP (documented missing UI/API) with zero unexplained FAIL — for the chosen target (`:4200` or `:8081`).
 - DRG-651 unit tests green.
+- Backend↔frontend ALM contract-parity tests green.
 - Evidence report under `frontend/.ci-tmp/uat-full/`.
