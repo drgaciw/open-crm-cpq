@@ -14,7 +14,16 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DealService } from '../deal.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { ContactService } from '@frontend/crm-contacts';
-import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models';
+import {
+  OrganizationDto,
+  ContactDto,
+  DealCreateRequest,
+  DealStage,
+  DealType,
+  DealUpdateRequest,
+} from '@frontend/shared-models';
+import { dealActionErrorMessage } from '../deal-action-error';
+import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-form',
@@ -28,16 +37,24 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
   template: `
     <div class="form-header">
       <button mat-icon-button (click)="goBack()" aria-label="Go back"><mat-icon>arrow_back</mat-icon></button>
-      <h1>{{ isEditMode ? 'Edit Deal' : 'New Deal' }}</h1>
+      <h1>{{ isEditMode ? 'Edit opportunity' : 'New opportunity' }}</h1>
     </div>
+
+    @if (saveError() || dealService.error()) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ saveError() || dealService.error() }}</span>
+        <button mat-button type="button" (click)="dismissError()">Dismiss</button>
+      </div>
+    }
 
     <mat-card class="form-card">
       <mat-card-content>
         <form [formGroup]="form" (ngSubmit)="onSubmit()">
-          <h3 class="section-title">Deal Information</h3>
+          <h3 class="section-title">Opportunity</h3>
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Deal Name</mat-label>
+              <mat-label>Name</mat-label>
               <input matInput formControlName="name">
               @if (form.get('name')?.hasError('required')) { <mat-error>Required</mat-error> }
             </mat-form-field>
@@ -45,30 +62,48 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
 
           <div class="form-row three-col">
             <mat-form-field appearance="outline">
-              <mat-label>Amount ($)</mat-label>
+              <mat-label>Amount</mat-label>
               <input matInput type="number" formControlName="amount" min="0">
               @if (form.get('amount')?.hasError('min')) { <mat-error>Amount cannot be negative</mat-error> }
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label>Stage</mat-label>
-              <mat-select formControlName="stage">
-                @for (s of stageOptions; track s.value) {
-                  <mat-option [value]="s.value">{{ s.label }}</mat-option>
+              <mat-label>Currency</mat-label>
+              <input matInput formControlName="currency" maxlength="3" autocomplete="off">
+              @if (form.get('currency')?.hasError('pattern')) { <mat-error>Use a 3-letter currency code</mat-error> }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Type</mat-label>
+              <mat-select formControlName="type">
+                @for (type of typeOptions; track type.value) {
+                  <mat-option [value]="type.value">{{ type.label }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Probability (%)</mat-label>
-              <input matInput type="number" formControlName="probability" min="0" max="100">
-            </mat-form-field>
           </div>
 
-          <div class="form-row">
-            <mat-form-field appearance="outline" style="max-width: 300px;">
+          @if (isEditMode) {
+            <div class="form-row">
+              <mat-form-field appearance="outline" style="max-width: 300px;">
+                <mat-label>Stage</mat-label>
+                <mat-select formControlName="stage">
+                  @for (s of stageOptions; track s.value) {
+                    <mat-option [value]="s.value">{{ s.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          }
+
+          <div class="form-row two-col">
+            <mat-form-field appearance="outline">
               <mat-label>Expected Close Date</mat-label>
               <input matInput [matDatepicker]="picker" formControlName="expectedCloseDate">
               <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Owner</mat-label>
+              <input matInput formControlName="ownerId" autocomplete="off">
             </mat-form-field>
           </div>
 
@@ -128,11 +163,22 @@ import { OrganizationDto, ContactDto, DealStage } from '@frontend/shared-models'
     .three-col > * { flex: 1; }
     .full-width { width: 100%; }
     .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
+    .error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #ffebee;
+      color: #c62828;
+      max-width: 900px;
+    }
   `],
 })
 export class DealFormComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly dealService = inject(DealService);
+  readonly dealService = inject(DealService);
   private readonly orgService = inject(OrganizationService);
   private readonly contactService = inject(ContactService);
   private readonly router = inject(Router);
@@ -143,13 +189,13 @@ export class DealFormComponent implements OnInit {
   isEditMode = false;
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
+  readonly saveError = signal<string | null>(null);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
   filteredContacts = signal<ContactDto[]>([]);
   filteredOrgs = signal<OrganizationDto[]>([]);
 
   constructor() {
-    // F1: effect() created once in constructor to reactively update filteredContacts
     effect(() => {
       const contacts = this.contactService.contacts();
       if (contacts.length > 0 || !this.contactService.loading()) {
@@ -157,7 +203,6 @@ export class DealFormComponent implements OnInit {
       }
     });
 
-    // F1: effect() created once in constructor to reactively update filteredOrgs
     effect(() => {
       const orgs = this.orgService.organizations();
       if (orgs.length > 0 || !this.orgService.loading()) {
@@ -166,23 +211,25 @@ export class DealFormComponent implements OnInit {
     });
   }
 
-  stageOptions: { value: DealStage; label: string }[] = [
-    { value: 'PROSPECTING', label: 'Prospecting' },
-    { value: 'QUALIFICATION', label: 'Qualification' },
-    { value: 'NEEDS_ANALYSIS', label: 'Needs Analysis' },
-    { value: 'PROPOSAL', label: 'Proposal' },
-    { value: 'NEGOTIATION', label: 'Negotiation' },
-    { value: 'WON', label: 'Won' },
-    { value: 'LOST', label: 'Lost' },
-  ];
+  stageOptions: { value: DealStage; label: string }[] = DEAL_STAGE_ORDER.map((stage) => ({
+    value: stage,
+    label: dealStageLabel(stage),
+  }));
+
+  typeOptions: { value: DealType; label: string }[] = DEAL_TYPES.map((type) => ({
+    value: type,
+    label: dealTypeLabel(type),
+  }));
 
   ngOnInit(): void {
     this.form = this.fb.group({
       name: ['', Validators.required],
       amount: [null, [Validators.min(0)]],
-      stage: ['PROSPECTING'],
-      probability: [10, [Validators.min(0), Validators.max(100)]],
+      currency: ['USD', [Validators.required, Validators.pattern(/^[A-Za-z]{3}$/)]],
+      type: ['NEW_BUSINESS' satisfies DealType, Validators.required],
+      stage: ['PROSPECTING' satisfies DealStage],
       expectedCloseDate: [null],
+      ownerId: [''],
       contactSearch: [''],
       orgSearch: [''],
       description: [''],
@@ -196,9 +243,15 @@ export class DealFormComponent implements OnInit {
         const d = this.dealService.selectedDeal();
         if (d) {
           this.form.patchValue({
-            name: d.name, amount: d.amount, stage: d.stage, probability: d.probability,
+            name: d.name,
+            amount: d.amount,
+            currency: d.currency ?? 'USD',
+            type: d.type ?? 'NEW_BUSINESS',
+            stage: d.stage,
             expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
-            contactSearch: d.primaryContactName ?? '', orgSearch: d.organizationName ?? '',
+            ownerId: d.ownerId ?? '',
+            contactSearch: d.primaryContactName ?? '',
+            orgSearch: d.organizationName ?? '',
             description: d.description,
           });
           if (d.primaryContactId) this.selectedContactId = d.primaryContactId;
@@ -227,36 +280,59 @@ export class DealFormComponent implements OnInit {
   onContactSelected(c: ContactDto): void { this.selectedContactId = c.id; }
   onOrgSelected(o: OrganizationDto): void { this.selectedOrgId = o.id; }
 
+  dismissError(): void {
+    this.saveError.set(null);
+    this.dealService.error.set(null);
+  }
+
   onSubmit(): void {
     if (this.form.invalid) return;
     this.saving.set(true);
-    const { contactSearch, orgSearch, expectedCloseDate, stage, ...formValue } = this.form.value;
+    this.saveError.set(null);
+    const closeDate = this.form.value.expectedCloseDate as Date | null;
+    const expectedCloseDate = closeDate ? closeDate.toISOString().split('T')[0] : undefined;
+    const currency = String(this.form.value.currency ?? 'USD').toUpperCase();
+    const ownerId = String(this.form.value.ownerId ?? '').trim();
 
     const idVal = this.id();
     if (this.isEditMode && idVal) {
-      // Update request: include stage
-      const data = {
-        ...formValue,
-        stage,
-        expectedCloseDate: expectedCloseDate ? expectedCloseDate.toISOString().split('T')[0] : null,
-        primaryContactId: this.selectedContactId,
-        organizationId: this.selectedOrgId,
+      const data: DealUpdateRequest = {
+        name: this.form.value.name,
+        amount: this.form.value.amount ?? undefined,
+        currency,
+        stage: this.form.value.stage as DealStage,
+        type: this.form.value.type as DealType,
+        expectedCloseDate,
+        description: this.form.value.description || undefined,
+        ownerId: ownerId || undefined,
+        primaryContactId: this.selectedContactId ?? undefined,
+        organizationId: this.selectedOrgId ?? undefined,
       };
       this.dealService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/deals', idVal]),
-        error: () => this.saving.set(false),
+        error: (err) => {
+          this.saving.set(false);
+          this.saveError.set(dealActionErrorMessage(err, 'Could not update this opportunity'));
+        },
       });
     } else {
-      // Create request: exclude stage (backend doesn't accept it on create)
-      const data = {
-        ...formValue,
-        expectedCloseDate: expectedCloseDate ? expectedCloseDate.toISOString().split('T')[0] : null,
-        primaryContactId: this.selectedContactId,
-        organizationId: this.selectedOrgId,
+      const data: DealCreateRequest = {
+        name: this.form.value.name,
+        amount: this.form.value.amount ?? undefined,
+        currency,
+        type: this.form.value.type as DealType,
+        expectedCloseDate,
+        description: this.form.value.description || undefined,
+        ownerId: ownerId || undefined,
+        primaryContactId: this.selectedContactId ?? undefined,
+        organizationId: this.selectedOrgId ?? undefined,
       };
       this.dealService.create(data).subscribe({
         next: (d) => this.router.navigate(['/deals', d.id]),
-        error: () => this.saving.set(false),
+        error: (err) => {
+          this.saving.set(false);
+          this.saveError.set(dealActionErrorMessage(err, 'Could not create this opportunity'));
+        },
       });
     }
   }

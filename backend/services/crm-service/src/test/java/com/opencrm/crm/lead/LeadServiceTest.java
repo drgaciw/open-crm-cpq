@@ -10,6 +10,7 @@ import com.opencrm.crm.deal.DealRepository;
 import com.opencrm.crm.deal.DealStage;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,6 +58,9 @@ class LeadServiceTest {
 
     @Mock
     private DealCurrencyConverter dealCurrencyConverter;
+
+    @Mock
+    private CrmDomainEvents domainEvents;
 
     @InjectMocks
     private LeadService leadService;
@@ -534,6 +538,7 @@ class LeadServiceTest {
             assertThat(lead.getStatus()).isEqualTo(LeadStatus.CONVERTED);
             assertThat(lead.getConvertedDealId()).isEqualTo(10L);
             verify(dealRepository).save(any(Deal.class));
+            verify(domainEvents).dealCreated(savedDeal);
             // ADR-032 D-03: a deal created from a lead gets its base amount frozen like any other new deal.
             verify(dealCurrencyConverter).freeze(any(Deal.class));
         }

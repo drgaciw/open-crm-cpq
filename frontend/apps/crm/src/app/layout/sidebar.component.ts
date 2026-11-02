@@ -32,7 +32,7 @@ import { MatIconModule } from '@angular/material/icon';
       </a>
       <a mat-list-item routerLink="/deals" routerLinkActive="active-link">
         <mat-icon matListItemIcon>handshake</mat-icon>
-        <span matListItemTitle>Deals</span>
+        <span matListItemTitle>Opportunities</span>
       </a>
 
       <h3 class="nav-group">CPQ</h3>

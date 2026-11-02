@@ -11,6 +11,7 @@ import com.opencrm.crm.deal.DealStage;
 import com.opencrm.crm.deal.DealType;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
+import com.opencrm.crm.outbox.CrmDomainEvents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,6 +38,7 @@ public class LeadService {
     private final DealRepository dealRepository;
     private final LeadMapper leadMapper;
     private final DealCurrencyConverter dealCurrencyConverter;
+    private final CrmDomainEvents domainEvents;
     private final com.opencrm.crm.lead.scoring.LeadScoreAdvisor leadScoreAdvisor;
 
     /**
@@ -290,6 +292,7 @@ public class LeadService {
 
         dealCurrencyConverter.freeze(deal);
         Deal savedDeal = dealRepository.save(deal);
+        domainEvents.dealCreated(savedDeal);
         log.info("Created deal ID {} from lead ID {}", savedDeal.getId(), id);
 
         // Mark lead as converted

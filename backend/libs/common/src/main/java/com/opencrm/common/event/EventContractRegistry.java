@@ -7,6 +7,7 @@ import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
 import com.opencrm.common.event.dto.DealClosedEvent;
+import com.opencrm.common.event.dto.DealCreatedEvent;
 import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
@@ -18,6 +19,7 @@ import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
+import com.opencrm.common.event.dto.TerritoryAssignedEvent;
 import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetAuditEvent;
 import com.opencrm.common.event.dto.AssetCreatedEvent;
@@ -159,6 +161,13 @@ public final class EventContractRegistry {
     public static final EventContract DEAL_CLOSED_V1 = published(
             "DealClosed", "crm-service", KafkaTopics.DEAL_CLOSED, DealClosedEvent.class);
 
+    /**
+     * DRG-485 / BC-13-01. DealCreated is OpportunityCreated. DealStageChanged and DealClosed remain the
+     * stage and close contracts; this is not a second StageAdvanced or OpportunityClosed.
+     */
+    public static final EventContract DEAL_CREATED_V1 = published(
+            "DealCreated", "crm-service", KafkaTopics.DEAL_CREATED, DealCreatedEvent.class);
+
     /** DRG-482 / BC-12-02. One event when an account parent link is created or changed. */
     public static final EventContract HIERARCHY_CHANGED_V1 = published(
             "HierarchyChanged", "crm-service", KafkaTopics.HIERARCHY_CHANGED, HierarchyChangedEvent.class);
@@ -182,6 +191,10 @@ public final class EventContractRegistry {
     /** DRG-655. ChangeLine Swap or Upgrade, published after the successor row is saved. */
     public static final EventContract ASSET_SUPERSEDED_V1 = published(
             "AssetSuperseded", "contract-asset-management", KafkaTopics.ASSET_SUPERSEDED, AssetSupersededEvent.class);
+
+    /** DRG-483. One territory and segment assignment for an account. */
+    public static final EventContract TERRITORY_ASSIGNED_V1 = published(
+            "TerritoryAssigned", "crm-service", KafkaTopics.TERRITORY_ASSIGNED, TerritoryAssignedEvent.class);
 
     /** DRG-484. CRM-owned rows are repointed in this service; other services consume the event. */
     public static final EventContract ACCOUNTS_MERGED_V1 = published(
@@ -212,12 +225,14 @@ public final class EventContractRegistry {
             CONTACT_CREATED_V1,
             DEAL_STAGE_CHANGED_V1,
             DEAL_CLOSED_V1,
+            DEAL_CREATED_V1,
             ASSET_CREATED_V1,
             ASSET_AUDIT_RECORDED_V1,
             ASSET_AMENDED_V1,
             ASSET_TERMINATED_V1,
             ASSET_SUPERSEDED_V1,
             HIERARCHY_CHANGED_V1,
+            TERRITORY_ASSIGNED_V1,
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1);
 

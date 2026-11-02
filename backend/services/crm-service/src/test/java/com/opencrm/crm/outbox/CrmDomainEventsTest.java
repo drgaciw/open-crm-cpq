@@ -3,8 +3,10 @@ package com.opencrm.crm.outbox;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.DealClosedEvent;
+import com.opencrm.common.event.dto.DealCreatedEvent;
 import com.opencrm.crm.deal.Deal;
 import com.opencrm.crm.deal.DealStage;
+import com.opencrm.crm.organization.Organization;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -40,5 +42,30 @@ class CrmDomainEventsTest {
         ArgumentCaptor<DealClosedEvent> payload = ArgumentCaptor.forClass(DealClosedEvent.class);
         verify(publisher).publish(eq("Deal"), eq("deal-2"), eq(EventContractRegistry.DEAL_CLOSED_V1), payload.capture());
         assertThat(payload.getValue().getClosedAt()).isEqualTo(lostAt);
+    }
+
+    @Test
+    void dealCreatedPublishesOpportunityCreated() {
+        OutboxEventPublisher publisher = mock(OutboxEventPublisher.class);
+        Instant createdAt = Instant.parse("2026-01-02T03:04:05Z");
+        Organization organization = Organization.builder().uuid("org-1").name("Acme").build();
+        Deal deal = Deal.builder()
+                .uuid("deal-3")
+                .name("New opportunity")
+                .stage(DealStage.PROSPECTING)
+                .organization(organization)
+                .createdAt(createdAt)
+                .build();
+
+        new CrmDomainEvents(publisher).dealCreated(deal);
+
+        ArgumentCaptor<DealCreatedEvent> payload = ArgumentCaptor.forClass(DealCreatedEvent.class);
+        verify(publisher).publish(eq("Deal"), eq("deal-3"), eq(EventContractRegistry.DEAL_CREATED_V1), payload.capture());
+        DealCreatedEvent event = payload.getValue();
+        assertThat(event.getDealId()).isEqualTo("deal-3");
+        assertThat(event.getOrganizationId()).isEqualTo("org-1");
+        assertThat(event.getName()).isEqualTo("New opportunity");
+        assertThat(event.getStage()).isEqualTo("PROSPECTING");
+        assertThat(event.getCreatedAt()).isEqualTo(createdAt);
     }
 }

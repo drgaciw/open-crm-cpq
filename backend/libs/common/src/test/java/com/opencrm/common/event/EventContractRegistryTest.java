@@ -96,12 +96,14 @@ class EventContractRegistryTest {
         expected.put("cpq.crm.contact.created", "ContactCreated v1, crm-service, PUBLISHED");
         expected.put("cpq.crm.deal.stage.changed", "DealStageChanged v1, crm-service, PUBLISHED");
         expected.put("cpq.crm.deal.closed", "DealClosed v1, crm-service, PUBLISHED");
+        expected.put("cpq.crm.deal.created", "DealCreated v1, crm-service, PUBLISHED");
         expected.put("cpq.asset.created", "AssetCreated v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.asset.audit", "AssetAuditRecorded v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.asset.amended", "AssetAmended v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.asset.terminated", "AssetTerminated v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.asset.superseded", "AssetSuperseded v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.crm.account.hierarchy-changed", "HierarchyChanged v1, crm-service, PUBLISHED");
+        expected.put("cpq.crm.account.territory-assigned", "TerritoryAssigned v1, crm-service, PUBLISHED");
         expected.put("cpq.crm.account.merged", "AccountsMerged v1, crm-service, PUBLISHED");
         expected.put("cpq.crm.opportunity.solution-derived", "SolutionDerived v1, crm-service, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();

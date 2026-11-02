@@ -48,6 +48,8 @@ public final class KafkaTopics {
     public static final String CONTACT_CREATED = "cpq.crm.contact.created";
     public static final String DEAL_STAGE_CHANGED = "cpq.crm.deal.stage.changed";
     public static final String DEAL_CLOSED = "cpq.crm.deal.closed";
+    /** DRG-485. OpportunityCreated. Deal is the opportunity. */
+    public static final String DEAL_CREATED = "cpq.crm.deal.created";
 
     /** DRG-654. Installed-base asset created from an activated contract line. */
     public static final String ASSET_CREATED = "cpq.asset.created";
@@ -62,6 +64,9 @@ public final class KafkaTopics {
 
     /** DRG-482 / BC-12-02. Account parent link created or changed. */
     public static final String HIERARCHY_CHANGED = "cpq.crm.account.hierarchy-changed";
+
+    /** DRG-483. Territory and segment assigned to an account (organization). */
+    public static final String TERRITORY_ASSIGNED = "cpq.crm.account.territory-assigned";
 
     /** DRG-484. One organization merged into an explicitly chosen survivor. */
     public static final String ACCOUNTS_MERGED = "cpq.crm.account.merged";
