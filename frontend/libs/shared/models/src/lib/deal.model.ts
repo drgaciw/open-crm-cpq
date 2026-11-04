@@ -68,6 +68,8 @@ export interface DealDto {
   sourceLeadId?: number;
   type?: DealType;
   lostReason?: string;
+  /** Quote accepted for this deal, absent until applied. */
+  acceptedQuoteId?: string;
   wonAt?: string;
   lostAt?: string;
   nextStep?: string;

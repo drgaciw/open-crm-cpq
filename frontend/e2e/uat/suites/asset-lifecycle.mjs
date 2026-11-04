@@ -89,6 +89,10 @@ export default {
       throw blocked('The browser suite does not run the null-start test or verify ledger state; run the backend test separately');
     });
 
+    await runCheck(ctx, 'asset-lifecycle.type-safety.contract-parity', async () => {
+      throw blocked('Browser UAT does not execute backend/frontend contract tests or establish serialized type parity');
+    });
+
     // Extra: create naming hygiene for any follow-on asset seed
     await runCheck(ctx, 'asset-lifecycle.fixture.prefix', async () => {
       const name = uniqueName(ctx.runId, 'alm');

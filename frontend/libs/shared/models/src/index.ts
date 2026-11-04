@@ -14,5 +14,6 @@ export * from './lib/product.model';
 export * from './lib/product-option.model';
 export * from './lib/product-attribute.model';
 export * from './lib/quote.model';
+export * from './lib/asset.model';
 export * from './lib/pricing.model';
 export * from './lib/approval.model';
