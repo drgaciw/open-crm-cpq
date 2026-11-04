@@ -39,19 +39,20 @@ Today:
 
 The user delegated the product choices for account identity and merge authorization. The recommended boundaries below are recorded to guide this proposal, but they cannot substitute for the missing authoritative tenant source or a verified consumer implementation. Until those dependencies exist, tenant-sensitive capabilities introduced by this proposal must remain held; existing operations require a separate audit.
 
-### D-01: crm-service is the system of record for account → tenant
-crm-service owns a mapping from an account (`organizations`, by uuid) to at most one current tenant id. Other services never write it. They read it as downstream consumers.
+### D-01: Proposed ownership of account → tenant
+CRM would own a link from an account (`organizations`, by public UUID) to at most one current tenant id; other services would consume it without writing it. This proposed link is not itself proof of the tenant, of the account-to-tenant relationship, or of a caller’s access. No verified authority is established by this ADR.
 
-### D-02: One audited write path
+### D-02: Proposed audited write path
+The following is a candidate design, not an existing endpoint or store. A role check alone is insufficient; scoped authorization and independent verification remain prerequisites.
 - The mapping is set or changed only by an admin-scoped command, `PUT /api/v1/organizations/{id}/tenant`, role-gated per ADR-016 decision 7.
 - It is never taken from the caller's `tid`, from a request body on ordinary organization create or update, or as a side effect of any other command.
 - Every change writes an audit row to **`organization_tenant_assignment_history`**: organization id, old tenant, new tenant, actor `oid`, time and reason. This table is the interim store until BC-20-01 exists.
 - The current mapping lives in **`organization_tenant_assignments`**, following the V9 `organization_territory_assignments` pattern.
 
-### D-03: Published language
-Every change emits **`AccountTenantAssigned` v1** through the crm outbox (ADR-018), in the same transaction as the mapping change.
+### D-03: Proposed published language
+Once its missing revision and authority contracts are specified, every change would emit **`AccountTenantAssigned` v1** through the crm outbox (ADR-018), in the same transaction as the mapping change.
 
-Schema registry entry (`EventContractRegistry`):
+Illustrative fields for a future registry entry (`EventContractRegistry`); this incomplete list is not an implemented or accepted event schema:
 
 | Field | Type | Notes |
 |---|---|---|
@@ -63,12 +64,12 @@ Schema registry entry (`EventContractRegistry`):
 
 - Topic: per the existing crm `KafkaTopics` convention.
 - The payload tolerates unknown properties (ADR-018 D5).
-- crm-service also offers a read-only lookup, `{organizationUuid, tenantId, assignedAt}`, in the Open Host Service style used for GetSegment (DRG-713). An unmapped account returns `tenantId: null`.
+- The proposal also includes a read-only CRM lookup, `{organizationUuid, tenantId, assignedAt}`, in the Open Host Service style used for GetSegment (DRG-713). An unmapped account returns `tenantId: null`.
 
 ### D-04: How consumers learn the tenant (option for drg)
 - **(a) Local projection: recommended by CPQ Decision.**
   - Consumers (quote-service first) keep a small table keyed by account uuid, fed by `AccountTenantAssigned` through the inbox (ADR-018 D6).
-  - Quote creation does not depend on crm-service being up.
+  - Draft capture could avoid a synchronous CRM dependency only where its unresolved state cannot cause tenant-sensitive effects; consequential writes still need an authoritative, revision-bound check.
   - Cost: one table per consumer, and eventual consistency (an account mapped a moment ago may read as null).
 - **(b) Synchronous read.**
   - The consumer calls the crm lookup on quote create and clone.
@@ -77,22 +78,22 @@ Schema registry entry (`EventContractRegistry`):
 
 Under either option:
 - An unresolved or unverified mapping must not authorize quote acceptance, contract transitions, account merges, or other tenant-scoped effects. Harmless draft capture may retain an explicit unresolved state only if it cannot cause those effects; there is no fail-open switch for tenant-sensitive operations.
-- `tid` is never used as a fallback once `opencrm.tenant.source=account` is selected.
+- If an account-source mode is implemented and enabled, it must not fall back to `tid`. The named mode is proposed, not an existing configuration switch.
 
-### D-05: Merge and hierarchy (recommended options)
+### D-05: Delegated merge and hierarchy boundaries
 - **Merge across tenants: block.** Both accounts must have verified current assignments to the same tenant; unknown, conflicting, or changing assignments block the merge. Check and bind the mapping revisions under a defined concurrency protocol, and record an audited reason.
-- **Hierarchy: recommended no inheritance in v1.** A child account gets no tenant from its parent; each account is mapped explicitly. The alternative is default inheritance from the parent.
+- **Hierarchy: no inheritance in v1.** A child account gets no tenant from its parent; each account must have its own verified assignment. Enforce this at every entry point.
 
 ### D-06: Relation to ADR-016 and the `tid` interim (DRG-632)
 - ADR-016 is unchanged. `tid` keeps identifying the issuer's tenant for authentication only.
-- This ADR supersedes the 2026-10-23 interim **as a source of customer tenant**.
-- Quote rows record where their tenant came from (`TID`, `ACCOUNT`, or NULL for older rows), so downstream consumers (DRG-631, DRG-662) can treat non-`ACCOUNT` values as unresolved.
-- The switch from `tid` to the account source is an owner-run configuration change, and it is off by default.
+- This proposal does not supersede the 2026-10-23 interim. A separately accepted decision and verified implementation are required before replacing it as the customer-tenant source.
+- A future design should record the provenance of quote tenant values (`TID`, `ACCOUNT`, or unknown for older rows), so downstream consumers can treat unverified values as unresolved. This provenance is not claimed to exist today.
+- Any future switch from `tid` to a verified account source requires an accepted rollout plan and validation; no such switch is authorized by this proposal.
 
 ### D-07: Path to BC-19 (DRG-306)
 - A tenant id is an opaque reference. CRM can own the account-to-tenant link, but it cannot treat an arbitrary entered reference as verified. The authority, evidence, and validation mechanism are unresolved until a trustworthy source is available.
 - When BC-19 lands, crm-service may validate assignments against provisioned tenants. The event and consumer contracts must be reviewed for compatibility with that authority before enablement.
-- Moving ownership of tenants themselves to BC-19 would be a later ADR. Ownership of the account → tenant link stays with crm-service.
+- Moving ownership of tenants themselves to BC-19 would require a later decision; this proposal recommends retaining the account → tenant link in CRM.
 
 ## Open decisions and prerequisites
 
@@ -105,10 +106,10 @@ Before acceptance, specify a trusted tenant authority and scoped administrative 
 5. **Acceptance of this ADR.** It remains Proposed and authorizes no code until the prerequisites above are resolved and accepted.
 
 ## Consequences
-- **Good:** one write path and one audit trail for tenant, next to the account aggregate that already handles merge and hierarchy.
-- **Good:** consumers get the tenant without inventing their own source; DRG-631 and DRG-662 can follow.
+- **Potential benefit:** one audited write path for the link alongside the CRM account aggregate, if the proposal is accepted and implemented.
+- **Potential benefit:** consumers could use a verified tenant binding after its authority and delivery guarantees are implemented; the mapping alone cannot supply verification.
 - **Cost:** two crm tables and a new event, plus a quote-side projection (option a) or a runtime dependency (option b).
-- **Risk:** accounts start unmapped. Tenants stay null until drg runs a backfill (owner-gated, S7-class, G04) or admins map accounts.
+- **Risk:** accounts would remain unresolved until a verified source and an authorized, audited mapping or backfill process exist. An administrator entering a value does not establish its validity.
 - **Risk:** the `tid` values already stored on quotes are per-deployment only and must not be read as customer tenants.
 
 ## Alternatives considered
