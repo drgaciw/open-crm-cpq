@@ -13,9 +13,8 @@ export default [
     id: 'H-CPQ-P-001',
     claim: 'New Product dialog: List price has min(0) with the message "List price must be at least 0", but its mat-form-field has no mat-error block, so a negative price disables Create without telling the user why (FIX-UAT1-CATALOG-LISTPRICE-MIN-NOT-SHOWN).',
     file: `${CATALOG}/product-create-dialog/product-create-dialog.component.ts`,
-    triage: 'browserCheckable',
-    checkId: 'catalog.field.List price.validator.min',
-    class: 'functional',
+    triage: 'falsePositive',
+    note: 'Was true on the 2026-09 UAT branch. The list-price field now renders that mat-error, and catalog.field.List price.validator.min expects "List price must be at least 0".',
   },
   {
     id: 'H-CPQ-P-002',
@@ -118,7 +117,7 @@ export default [
   },
   {
     id: 'H-CPQ-P-015',
-    claim: 'New Product dialog: SKU/Name maxLength schema messages exist and mat-error blocks iterate errors(), but filling past the limit leaves Create disabled with no visible mat-error (same Signal Forms / mat-error gap as H-CPQ-P-001 for List price min).',
+    claim: 'New Product dialog: SKU/Name maxLength schema messages exist and mat-error blocks iterate errors(), but filling past the limit leaves Create disabled with no visible mat-error.',
     file: `${CATALOG}/product-create-dialog/product-create-dialog.component.ts`,
     triage: 'browserCheckable',
     checkId: 'catalog.field.SKU.validator.maxLength',

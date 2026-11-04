@@ -20,6 +20,7 @@ Stack alignment: **Java 25 / Spring Boot 4** microservices behind the gateway, *
 | Doc / runner | Role |
 | :--- | :--- |
 | [2026-09-19-JEV-LOCAL-UAT.md](2026-09-19-JEV-LOCAL-UAT.md) | Historical Jev + Playwright local UAT evidence |
+| [COMPREHENSIVE-JEV-PLAYWRIGHT-UAT-PLAN.md](COMPREHENSIVE-JEV-PLAYWRIGHT-UAT-PLAN.md) | Historical 2026-09-19 coverage contract; current runners are under `frontend/e2e/` |
 | `frontend/e2e/uat-crm-smoke.mjs` | Deterministic CRM smoke |
 | `frontend/e2e/uat-jev-local.mjs` | LLM-driven (Jev) browser agent UAT |
 | `frontend/e2e/chaos-crm.mjs` | Network/fault injection chaos |
