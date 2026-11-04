@@ -132,6 +132,11 @@ export interface ProductCreateFormModel {
               [formField]="productForm.listPrice"
               step="0.01"
             />
+            @if (productForm.listPrice().touched() && productForm.listPrice().invalid()) {
+              @for (err of productForm.listPrice().errors(); track err.kind) {
+                <mat-error>{{ err.message }}</mat-error>
+              }
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="half">

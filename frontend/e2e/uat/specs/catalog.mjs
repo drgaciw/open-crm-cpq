@@ -78,8 +78,7 @@ export const list = validateSpec({
         {
           label: 'List price', kind: 'number', sample: '49.5', normalize: 'number',
           persist: { create: true, update: true, apiPath: 'listPrice' },
-          // min(0) carries a message in the schema, but the template has no mat-error block for it.
-          validators: [{ kind: 'min', sample: '-5', expectError: null, hypothesis: 'H-CPQ-P-001' }],
+          validators: [{ kind: 'min', sample: '-5', expectError: 'List price must be at least 0' }],
         },
         {
           // maxLength(3) is exercised by a hand-written check that *types* (H-CPQ-P-005):
