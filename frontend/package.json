@@ -10,7 +10,8 @@
     "e2e:jev": "node e2e/uat-jev-local.mjs",
     "e2e:chaos": "node e2e/chaos-crm.mjs",
     "e2e:test": "node --test \"e2e/lib/*.test.mjs\" \"e2e/uat/**/*.test.mjs\"",
-    "e2e:uat": "node --env-file-if-exists=../.env e2e/uat-full.mjs"
+    "e2e:uat": "node --env-file-if-exists=../.env e2e/uat-full.mjs",
+    "e2e:uat:asset-lifecycle-crm-api": "node e2e/uat-asset-lifecycle-crm-api.mjs"
   },
   "private": true,
   "dependencies": {

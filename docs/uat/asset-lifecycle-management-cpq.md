@@ -19,3 +19,9 @@ Run the browser suite with `cd frontend && npm run e2e:uat -- --suite asset-life
 The intended lifecycle acceptance remains broader: idempotent asset creation on authoritative activation; effective-dated amendments, termination, and supersession; correct history and as-of reads; renewal and churn semantics; and audit/outbox consistency. These need real, authorized fixtures, observable mutations and replay tests before sign-off. The S4 hold and acceptance-time writer hold are containment, not evidence those features are complete. See the repository's hold runbooks before any mutation.
 
 `DocumentApplyNullStartDateTest` can be run separately with the appropriate Java/Maven environment; a source file's presence does not establish that the test ran, passed, or covered a live deployment. Record its command and result separately, including whether integration tests and browser UAT actually ran.
+
+## CRM API runner
+
+Run `cd frontend && npm run e2e:uat:asset-lifecycle-crm-api` against an authorized test deployment; configure `UAT_BASE_URL`, `UAT_CAM_BASE_URL` and `UAT_QUOTE_BASE_URL` for CRM, CAM and quote-service. Optional service-specific bearer tokens are `UAT_CRM_BEARER_TOKEN`, `UAT_CAM_BEARER_TOKEN` and `UAT_QUOTE_BEARER_TOKEN`. Use distinct trusted service origins for credentials. Do not include tokens in evidence or logs. Fixture writes are disabled by default. Setting `UAT_ALLOW_WRITES=true` creates CRM and quote data and does not delete it; use only a disposable, explicitly authorized test environment and clean up according to its procedures.
+
+The runner records rejected reads and unexercised S4 and null-start checks as BLOCKED. A successful shaped read establishes only the observed response, not complete lifecycle behavior. The two node tests for the runner use synthetic responses and are not live UAT.
