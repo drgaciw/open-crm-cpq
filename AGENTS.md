@@ -47,7 +47,7 @@ This project is indexed by GitNexus as **open-crm-cpq** (28744 symbols, 61640 re
 
 GitNexus block above is **code-intelligence only**. For what to build vs hold, read:
 
-- [AGENT.md](AGENT.md) — landed vs target; dual-read / NgRx / Activities holds
+- [AGENT.md](AGENT.md) — landed vs target; dual-read / NgRx holds and Activities status
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — index
 - [docs/adr/README.md](docs/adr/README.md) — ADRs (GLM-5 is **not** runtime; ADR-006 **Accepted**; dual-read ADR-005 still **Proposed**)
 
