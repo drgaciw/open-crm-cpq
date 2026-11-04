@@ -118,3 +118,17 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - Chrome DevTools MCP needs Google Chrome stable; hosts with only Chromium should rely on Playwright and the Cursor browser for UI automation.
 - CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them).
 - Sibling-service reuse gap analyses and harvest backlogs live under `docs/plans/`; `docs/plans/00-harvest-index.md` is the agentic index for that work.
+
+## Cursor Cloud specific instructions
+
+The image Java is 21. This repo needs Temurin 25 at `/usr/lib/jvm/temurin-25-jdk-amd64` (`/etc/profile.d/opencrm-dev.sh` and `/usr/local/bin/java`). There is no systemd: start `dockerd` (fuse-overlayfs, iptables-legacy) before `docker compose`.
+
+Boot stack for CRM work:
+
+- Postgres 16 and Redis 7 from `backend/` (`POSTGRES_USER`/`POSTGRES_PASSWORD` = `postgres`/`postgres`, which matches the `dev` profile password default). `backend/.env.example` uses different credentials and is not loaded by Compose unless you pass it.
+- `crm-service` `:8081` and `gateway-service` `:8080` with `--spring.profiles.active=dev`.
+- `npx nx serve crm --host=0.0.0.0 --port=4200` from `frontend/`. Redirect stdin from `/dev/null`. A TTY makes Nx wait on the analytics prompt (`frontend/nx.json` has no `analytics` flag).
+
+Gateway mutations need `Origin: http://localhost:4200` and the `XSRF-TOKEN` cookie from `GET /api/v1/csrf` (`X-XSRF-TOKEN`). Quote, pricing, and the other CPQ services are not part of this stack; the account detail quotes panel returns 500 until quote-service is up.
+
+`mvn -DskipTests install` fails the JaCoCo check. Install local snapshots with `./mvnw -B -DskipTests -Djacoco.skip=true install -pl services/crm-service,services/gateway-service -am` from `backend/` before a single-module test such as `LeadServiceTest`.
