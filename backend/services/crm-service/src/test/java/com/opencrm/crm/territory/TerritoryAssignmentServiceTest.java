@@ -5,6 +5,7 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.TerritoryAssignedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.crm.api.v1.segment.OrganizationSegmentResponse;
 import com.opencrm.crm.organization.Organization;
 import com.opencrm.crm.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
