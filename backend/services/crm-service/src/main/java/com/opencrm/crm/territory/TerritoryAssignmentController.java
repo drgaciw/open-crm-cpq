@@ -1,6 +1,7 @@
 package com.opencrm.crm.territory;
 
 import com.opencrm.common.dto.ApiResponse;
+import com.opencrm.crm.api.v1.segment.OrganizationSegmentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,7 +20,7 @@ import java.util.List;
 
 /**
  * Territory and segment assignment for an organization (the account).
- * GetSegment is the read pricing, product, and contract callers will use later.
+ * GetSegment is the v1 Open Host Service. DRG-422 and DRG-441 must call that endpoint only.
  */
 @RestController
 @RequestMapping("/api/v1/organizations")
@@ -59,8 +60,13 @@ public class TerritoryAssignmentController {
 
     @GetMapping("/{id}/segment")
     @Operation(summary = "GetSegment",
-            description = "Reads the segment assigned to the organization. "
-                    + "An unassigned organization returns assigned=false and a null segment.")
+            description = "Open Host Service v1. GET /api/v1/organizations/{id}/segment. "
+                    + "Published type com.opencrm.crm.api.v1.segment.OrganizationSegmentResponse. "
+                    + "Fields: organizationId (account UUID), territory, segment, ruleId, assigned. "
+                    + "An existing unassigned organization returns HTTP 200 with assigned=false and a null segment. "
+                    + "An unknown organization returns HTTP 404. "
+                    + "Consumers DRG-422 and DRG-441 must use only this endpoint. "
+                    + "See docs/api/get-segment.md.")
     public ApiResponse<OrganizationSegmentResponse> getSegment(
             @Parameter(description = "Organization ID") @PathVariable Long id) {
         return ApiResponse.success(territoryAssignmentService.getSegment(id));
