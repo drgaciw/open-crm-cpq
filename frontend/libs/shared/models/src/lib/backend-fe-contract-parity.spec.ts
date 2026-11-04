@@ -18,6 +18,12 @@ import {
   type QuoteDto,
 } from './quote.model';
 import type { DealCreateRequest, DealDto } from './deal.model';
+import {
+  SUBSCRIPTION_STATUSES,
+  type SubscriptionDto,
+  isSubscriptionStatus,
+} from './subscription.model';
+import type { AmendmentView, CreateAmendment } from './amendment.model';
 
 /**
  * Limited source field-name check for Java DTOs used by
@@ -47,8 +53,20 @@ function javaFields(relativePath: string): string[] {
 }
 
 function expectFeCoversBackend(label: string, backendFields: string[], feKeys: string[]) {
+  expect(backendFields.length, `${label}: no backend fields extracted`).toBeGreaterThan(0);
   const missing = backendFields.filter((f) => !feKeys.includes(f));
   expect(missing, `${label}: FE missing backend fields ${missing.join(', ')}`).toEqual([]);
+}
+
+function javaRecordFields(relativePath: string): string[] {
+  const src = readFileSync(resolve(REPO, relativePath), 'utf8');
+  const declaration = src.match(/\bpublic\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{/);
+  if (!declaration) throw new Error(`${relativePath}: record header could not be extracted`);
+  return declaration[1].split(',').map((component) => {
+    const match = component.trim().match(/^[\w.]+(?:<\s*[\w.]+\s*>)?\s+(\w+)$/);
+    if (!match) throw new Error(`${relativePath}: unsupported record component ${component.trim()}`);
+    return match[1];
+  });
 }
 
 describe('Java source field-name checks (ALM surfaces)', () => {
@@ -300,6 +318,96 @@ describe('Java source field-name checks (ALM surfaces)', () => {
         'ownerId',
         'type',
       ] satisfies (keyof DealCreateRequest)[],
+    );
+  });
+
+  it('SubscriptionDto covers CAM SubscriptionDto fields (CLM)', () => {
+    expectFeCoversBackend(
+      'SubscriptionDto',
+      javaFields(
+        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/dto/SubscriptionDto.java',
+      ),
+      [
+        'id',
+        'uuid',
+        'subscriptionNumber',
+        'customerId',
+        'quoteId',
+        'status',
+        'planName',
+        'startDate',
+        'endDate',
+        'renewalDate',
+        'mrr',
+        'arr',
+        'currencyCode',
+        'usageBand',
+        'erpSyncStatus',
+        'erpSubscriptionId',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'updatedBy',
+        'version',
+      ] satisfies (keyof SubscriptionDto)[],
+    );
+    expect(SUBSCRIPTION_STATUSES).toEqual([
+      'PENDING',
+      'ACTIVE',
+      'SUSPENDED',
+      'CANCELLED',
+      'EXPIRED',
+    ]);
+    expect(isSubscriptionStatus('ACTIVE')).toBe(true);
+    expect(isSubscriptionStatus('TERMINATED')).toBe(false);
+  });
+
+  it('AmendmentView / CreateAmendment cover CAM amendment records (CLM)', () => {
+    const viewFields = javaRecordFields(
+      'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/AmendmentView.java',
+    );
+    expect(viewFields).toContain('status'); // enum-typed record components must not be skipped
+    expectFeCoversBackend(
+      'AmendmentView',
+      viewFields,
+      [
+        'id',
+        'contractId',
+        'provisionalNumber',
+        'amendmentSeq',
+        'amendmentNumber',
+        'status',
+        'version',
+        'contentDigest',
+        'approvalRef',
+        'signatureEnvelopeRef',
+        'tcvDelta',
+        'arrDelta',
+        'oneTimeTotal',
+        'creditTotal',
+        'revisions',
+        'lines',
+      ] satisfies (keyof AmendmentView)[],
+    );
+
+    const createFields = javaRecordFields(
+      'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/CreateAmendment.java',
+    );
+    expectFeCoversBackend(
+      'CreateAmendment',
+      createFields,
+      [
+        'lifecycleChangeId',
+        'lifecycleChangeRevision',
+        'targetQuoteId',
+        'inputsSnapshotRef',
+        'signaturePolicy',
+        'actionDate',
+        'contractEffectiveDate',
+        'backdatingReasonCode',
+        'currency',
+        'lines',
+      ] satisfies (keyof CreateAmendment)[],
     );
   });
 });
