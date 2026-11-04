@@ -53,8 +53,20 @@ function javaFields(relativePath: string): string[] {
 }
 
 function expectFeCoversBackend(label: string, backendFields: string[], feKeys: string[]) {
+  expect(backendFields.length, `${label}: no backend fields extracted`).toBeGreaterThan(0);
   const missing = backendFields.filter((f) => !feKeys.includes(f));
   expect(missing, `${label}: FE missing backend fields ${missing.join(', ')}`).toEqual([]);
+}
+
+function javaRecordFields(relativePath: string): string[] {
+  const src = readFileSync(resolve(REPO, relativePath), 'utf8');
+  const declaration = src.match(/\bpublic\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{/);
+  if (!declaration) throw new Error(`${relativePath}: record header could not be extracted`);
+  return declaration[1].split(',').map((component) => {
+    const match = component.trim().match(/^[\w.]+(?:<\s*[\w.]+\s*>)?\s+(\w+)$/);
+    if (!match) throw new Error(`${relativePath}: unsupported record component ${component.trim()}`);
+    return match[1];
+  });
 }
 
 describe('Java source field-name checks (ALM surfaces)', () => {
@@ -351,17 +363,10 @@ describe('Java source field-name checks (ALM surfaces)', () => {
   });
 
   it('AmendmentView / CreateAmendment cover CAM amendment records (CLM)', () => {
-    // Java records use component declarations: Type name, — parse constructor params.
-    const viewSrc = readFileSync(
-      resolve(
-        REPO,
-        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/AmendmentView.java',
-      ),
-      'utf8',
+    const viewFields = javaRecordFields(
+      'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/AmendmentView.java',
     );
-    const viewFields = [...viewSrc.matchAll(/\b(?:UUID|String|Integer|int|BigDecimal|List<[^>]+>)\s+(\w+)\s*[,)]/g)].map(
-      (m) => m[1],
-    );
+    expect(viewFields).toContain('status'); // enum-typed record components must not be skipped
     expectFeCoversBackend(
       'AmendmentView',
       viewFields,
@@ -385,21 +390,12 @@ describe('Java source field-name checks (ALM surfaces)', () => {
       ] satisfies (keyof AmendmentView)[],
     );
 
-    const createSrc = readFileSync(
-      resolve(
-        REPO,
-        'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/CreateAmendment.java',
-      ),
-      'utf8',
+    const createFields = javaRecordFields(
+      'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/documents/CreateAmendment.java',
     );
-    const createFields = [
-      ...createSrc.matchAll(
-        /\b(?:UUID|String|int|Integer|LocalDate|SignaturePolicy|List<[^>]+>)\s+(\w+)\s*[,)]/g,
-      ),
-    ].map((m) => m[1]);
     expectFeCoversBackend(
       'CreateAmendment',
-      [...new Set(createFields)],
+      createFields,
       [
         'lifecycleChangeId',
         'lifecycleChangeRevision',
