@@ -22,7 +22,7 @@ async function exercise(allowWrites) {
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const child = spawn(process.execPath, [runner], {env:{...process.env,UAT_BASE_URL:base,UAT_CAM_BASE_URL:base,UAT_QUOTE_BASE_URL:base,UAT_ALLOW_WRITES:String(allowWrites)}});
+  const child = spawn(process.execPath, [runner], {env:{...process.env,UAT_BASE_URL:base,UAT_CAM_BASE_URL:base,UAT_QUOTE_BASE_URL:base,UAT_ALLOW_WRITES:String(allowWrites),UAT_CRM_BEARER_TOKEN:'',UAT_CAM_BEARER_TOKEN:'',UAT_QUOTE_BEARER_TOKEN:''}});
   let output=''; child.stdout.on('data', chunk => output += chunk); child.stderr.on('data', chunk => output += chunk);
   const code = await new Promise((resolve,reject) => {child.on('error',reject); child.on('close',resolve)});
   await new Promise(resolve => server.close(resolve));
@@ -42,4 +42,14 @@ test('an unauthorized quote create cannot pass as a draft', async () => {
   assert.equal(code,0,output);
   assert.ok(requests.some(([method,path]) => method === 'POST' && path === '/api/v1/quotes'));
   assert.match(output, /asset-lifecycle\.quote\.draft-create \[BLOCKED\]/);
+});
+
+test('shared origin rejects mismatched service credentials before making requests', async () => {
+  const base = 'http://127.0.0.1:1';
+  const child = spawn(process.execPath, [runner], {env:{...process.env,UAT_BASE_URL:base,UAT_CAM_BASE_URL:base,UAT_QUOTE_BASE_URL:base,UAT_CRM_BEARER_TOKEN:'crm-secret',UAT_CAM_BEARER_TOKEN:'',UAT_QUOTE_BEARER_TOKEN:''}});
+  let output=''; child.stdout.on('data', c => output += c); child.stderr.on('data', c => output += c);
+  const code = await new Promise((resolve,reject) => { child.on('error',reject); child.on('close',resolve); });
+  assert.notEqual(code,0);
+  assert.match(output,/Shared origin requires identical explicit service credentials or none/);
+  assert.doesNotMatch(output,/crm-secret/);
 });

@@ -21,7 +21,13 @@ const CRM_BASE = (process.env.UAT_BASE_URL || 'http://127.0.0.1:8081').replace(/
 const CAM_BASE = (process.env.UAT_CAM_BASE_URL || siblingPort(CRM_BASE, 8087)).replace(/\/$/, '');
 const QUOTE_BASE = (process.env.UAT_QUOTE_BASE_URL || siblingPort(CRM_BASE, 8084)).replace(/\/$/, '');
 const ALLOW_WRITES = process.env.UAT_ALLOW_WRITES === 'true';
-const TOKENS = new Map([[CRM_BASE, process.env.UAT_CRM_BEARER_TOKEN], [CAM_BASE, process.env.UAT_CAM_BEARER_TOKEN], [QUOTE_BASE, process.env.UAT_QUOTE_BEARER_TOKEN]]);
+const TOKENS = new Map();
+for (const [base, token] of [[CRM_BASE, process.env.UAT_CRM_BEARER_TOKEN], [CAM_BASE, process.env.UAT_CAM_BEARER_TOKEN], [QUOTE_BASE, process.env.UAT_QUOTE_BEARER_TOKEN]]) {
+  const credential = token || '';
+  if (TOKENS.has(base) && TOKENS.get(base) !== credential) throw new Error('Shared origin requires identical explicit service credentials or none');
+  TOKENS.set(base, credential);
+}
+
 const RUN_ID = `crm${Date.now().toString(36).slice(-6)}`;
 const EVIDENCE_DIR = resolve(HERE, '..', '.ci-tmp', 'uat-full');
 
@@ -232,10 +238,11 @@ async function main() {
 
   // UAT-ALM-06 — Installed-base on CRM is intentionally absent (boundary)
   await runCheck('asset-lifecycle.crm.installed-base-absent', async () => {
-    const { status } = await http(CRM_BASE, 'GET', '/api/v1/assets');
-    if (status === 404) {
+    const { status, json } = await http(CRM_BASE, 'GET', '/api/v1/assets');
+    if (status === 404 && json?.errorCode === 'RESOURCE_NOT_FOUND') {
       return 'CRM has no Assets API (OHS is CAM-only) — expected GAP closed as boundary';
     }
+    if (status === 404) throw blocked('404 without CRM RESOURCE_NOT_FOUND body; ownership not verified');
     if (status === 500) throw new Error('CRM /api/v1/assets still 500');
     throw gap(`CRM unexpectedly exposes /api/v1/assets with HTTP ${status}`);
   });
