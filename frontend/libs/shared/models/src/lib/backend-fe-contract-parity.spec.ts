@@ -20,8 +20,9 @@ import {
 import type { DealCreateRequest, DealDto } from './deal.model';
 
 /**
- * TDD gate: FE shared-models field names stay aligned with backend Java DTOs used by
- * Asset Lifecycle Management (quotes, deals, assets/OHS/reports).
+ * Limited source field-name check for Java DTOs used by
+ * Asset Lifecycle Management (quotes, deals, assets/OHS/reports). This does not validate
+ * serialized JSON names, types, nullability, enum values or full wire compatibility.
  *
  * Parses Java DTO source for `private <Type> <name>;` fields and asserts every backend
  * field exists on the corresponding TypeScript interface (via keyof compile-time + runtime
@@ -32,12 +33,16 @@ const REPO = resolve(__dirname, '../../../../../../');
 
 function javaFields(relativePath: string): string[] {
   const src = readFileSync(resolve(REPO, relativePath), 'utf8');
+  if (/\b(?:public|protected|private)\s+record\s+\w+/.test(src)) {
+    throw new Error(`${relativePath}: Java records require a serialization-aware contract test`);
+  }
   const fields: string[] = [];
   const re = /private\s+(?:static\s+)?(?:final\s+)?[\w.<>,\s?]+\s+(\w+)\s*[;=]/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(src)) !== null) {
     fields.push(match[1]);
   }
+  if (fields.length === 0) throw new Error(`${relativePath}: no private fields extracted; record or unsupported Java syntax requires a different parser`);
   return fields;
 }
 
@@ -46,7 +51,7 @@ function expectFeCoversBackend(label: string, backendFields: string[], feKeys: s
   expect(missing, `${label}: FE missing backend fields ${missing.join(', ')}`).toEqual([]);
 }
 
-describe('Backend ↔ frontend contract parity (ALM surfaces)', () => {
+describe('Java source field-name checks (ALM surfaces)', () => {
   it('AssetDto covers CAM AssetDto fields', () => {
     const backend = javaFields(
       'backend/services/contract-asset-management/src/main/java/com/opencrm/contract/asset/AssetDto.java',
@@ -164,7 +169,7 @@ describe('Backend ↔ frontend contract parity (ALM surfaces)', () => {
     const backend = javaFields(
       'backend/services/quote-service/src/main/java/com/opencrm/quote/quote/QuoteDto.java',
     );
-    const feKeys: (keyof QuoteDto | string)[] = [
+    const feKeys: (keyof QuoteDto)[] = [
       'id',
       'uuid',
       'quoteNumber',
@@ -260,6 +265,7 @@ describe('Backend ↔ frontend contract parity (ALM surfaces)', () => {
         'sourceLeadId',
         'type',
         'lostReason',
+        'acceptedQuoteId',
         'wonAt',
         'lostAt',
         'nextStep',
