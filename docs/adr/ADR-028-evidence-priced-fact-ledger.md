@@ -1,8 +1,8 @@
 # ADR-028: Evidence-priced fact ledger for machine-written CRM data
 
-**Status:** Proposed on 2026-10-15. Not accepted.
+**Status:** Accepted on 2026-11-03 by the project owner ([delegation log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)). Proposed on 2026-10-15.
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drg amtd), 2026-11-03.
 **Relates to:** [ADR-015](ADR-015-jev-advisory-decision-support.md) (JEV advisory), [ADR-016](ADR-016-identity-authentication-service-trust.md) (actor), [ADR-029](ADR-029-durable-agent-work-queue.md) (work queue), [ADR-031](ADR-031-extensible-field-registry-and-saved-views.md) (agent-filled fields), BC-20-01 audit.
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `ContactFact` model and `docs/plan/contact-intelligence-agent.md` §5 (MIT), at `6d4793d`.
 **Does not authorize:** any code, table or endpoint.

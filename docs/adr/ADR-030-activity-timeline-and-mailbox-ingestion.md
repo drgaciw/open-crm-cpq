@@ -1,8 +1,8 @@
 # ADR-030: Activity timeline and mailbox/calendar ingestion (lifts the Activities hold)
 
-**Status:** Proposed on 2026-10-15. Not accepted. **The Activities hold in ARCHITECTURE.md §2 and §9 stays in force until this ADR is Accepted and §9 is edited.**
+**Status:** Accepted on 2026-11-03 by the project owner ([delegation log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)). Proposed on 2026-10-15. **The Activities hold in ARCHITECTURE.md was lifted 2026-11-03 ([delegation log, 7:24 PM CT entry](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)).**
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drg amtd), 2026-11-03.
 **Relates to:** ARCHITECTURE.md §2, §9 (Activities hold), [ADR-016](ADR-016-identity-authentication-service-trust.md) (identity), [ADR-033](ADR-033-crm-record-archive-purge-suppression.md) (suppression), BC-19-04 consent, BC-20-05 retention.
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `Activity`, `MailboxSync`, `EmailThread`, `CalendarEvent` models and `docs/plan/gmail-calendar-plan.md`, at `6d4793d`.
 **Does not authorize:** any code, path, OAuth app registration or schema.

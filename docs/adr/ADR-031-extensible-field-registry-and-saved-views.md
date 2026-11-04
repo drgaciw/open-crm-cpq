@@ -1,8 +1,8 @@
 # ADR-031: Extensible field registry and saved views for CRM records
 
-**Status:** Proposed on 2026-10-15. Not accepted.
+**Status:** Accepted on 2026-11-03 by the project owner ([delegation log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)). Proposed on 2026-10-15.
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drg amtd), 2026-11-03.
 **Relates to:** [ADR-006](ADR-006-entities-never-at-api-boundary.md) (DTOs), [ADR-008](ADR-008-postgres-schema-per-service.md) (schema per service), [ADR-028](ADR-028-evidence-priced-fact-ledger.md) (agent-filled values).
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `FieldDefinition`, `FieldOption`, `FieldValue`, `SavedView` and `docs/plan/dynamic-fields.md`, at `6d4793d`.
 **Does not authorize:** any code or migration.

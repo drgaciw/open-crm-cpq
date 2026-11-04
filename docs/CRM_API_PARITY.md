@@ -141,12 +141,12 @@ Lead/Deal search previously put a Spring `Page` inside `data`. Batch 0 (`feat/fo
 
 ## Activities (deferred)
 
-**Decision:** Do **not** implement an Activities API or gateway route for Spring CRM cutover.
+**Decision:** The Activities hold was lifted on 2026-11-03. [ADR-030](adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) assigns ownership to `crm-service` but does not itself authorize code, schema or paths. The inventory below describes the current implementation, not a continuing hold.
 
 | Layer | State |
 |-------|--------|
 | `crm-service` | No `Activity*` entity, controller, or Flyway table |
-| Gateway | **No** `/api/v1/activities/**` predicate (freeze) — [CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md), [CRM_CUTOVER_CHECKLIST.md](./CRM_CUTOVER_CHECKLIST.md) |
+| Gateway | **No** `/api/v1/activities/**` predicate yet — [CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md), [CRM_CUTOVER_CHECKLIST.md](./CRM_CUTOVER_CHECKLIST.md) |
 | FE | No activities HTTP client under `frontend/libs/crm` |
 | Legacy | `cpq_beta/crm/api/activities.py` (`get_activities` for CRM Deal / CRM Lead) — Phase 2 / Frappe inventory only |
 | App comment | `CrmServiceApplication` notes activities are planned and gateway must not route until implemented |
@@ -154,7 +154,7 @@ Lead/Deal search previously put a Spring `Page` inside `data`. Batch 0 (`feat/fo
 **Cutover checklist cross-links:**
 
 - Pre-cutover: gateway CRM paths are only leads/deals/contacts/organizations — **no phantom** `/api/v1/activities/**`.
-- Phase 2: pick one vertical (e.g. read-only activities feed), design migration + real controller/schema, **then** add the gateway predicate.
+- When separately authorized, deliver the gateway predicate, real controller/schema, and frontend client together as specified by ADR-030.
 
 **Do not:** stub routes, invent FE callers, or add gateway paths “for future use.” Treat a phantom activities route as a cutover defect.
 

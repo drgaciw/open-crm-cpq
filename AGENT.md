@@ -1,7 +1,7 @@
 # Open CRM/CPQ - AI Agent Development Guide
 
 **Steering (read first):** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/adr/README.md](docs/adr/README.md) · forge waves [23](docs/forge/23-wave-n-architecture.md)–[35](docs/forge/35-wave-w-architecture.md).  
-**Do not** treat `MODERNIZATION_PLAN.md` or the phase tables below as “what to build this week.” They are **target-state** roadmaps. Forge **holds** (do not implement unless a wave plan says so): Activities API, CI #238, agent Kafka #241, dual-read YAML flip, NgRx, contract-asset FE, full SpEL, Kafka S2B-9, gateway domain validation, product-validate deletion, WhatsApp #430 undo, R2 price-book list-row delete, Jev/OpenRouter model **selection** as runtime (ADR-014). Narrow exception: [ADR-015](docs/adr/ADR-015-jev-advisory-decision-support.md) authorizes advisory + shadow Jev **code** in domain services, flag-off with a no-op transport — it never gates a decision, and enabling a flag beyond local/offline is itself held behind the ADR-015 gates.
+**Do not** treat `MODERNIZATION_PLAN.md` or the phase tables below as “what to build this week.” They are **target-state** roadmaps. Forge **holds** (do not implement unless a wave plan says so): CI #238, agent Kafka #241, dual-read YAML flip, NgRx, contract-asset FE, full SpEL, Kafka S2B-9, gateway domain validation, product-validate deletion, WhatsApp #430 undo, R2 price-book list-row delete, Jev/OpenRouter model **selection** as runtime (ADR-014). Narrow exception: [ADR-015](docs/adr/ADR-015-jev-advisory-decision-support.md) authorizes advisory + shadow Jev **code** in domain services, flag-off with a no-op transport — it never gates a decision, and enabling a flag beyond local/offline is itself held behind the ADR-015 gates.
 
 ## Project Overview
 
@@ -16,7 +16,7 @@
 | AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`) | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md): Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending**; supersedes GLM-5 ADR-002 |
 | Rules | None | Drools DRL on pricing-service; CE `ProductRuleEvaluationCore`; OpenL **not** required for forge | OpenL Tablets + full Drools |
 
-**Current implementation status (2026-09-13):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities API **does not exist** — do not invent `/api/v1/activities/**`. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
+**Current implementation status (2026-09-13):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities API **does not exist**; its hold was lifted on 2026-11-03 under [ADR-030](docs/adr/ADR-030-activity-timeline-and-mailbox-ingestion.md), which does not authorize implementation by itself. Do not add a phantom route. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
 
 ---
 
@@ -230,7 +230,7 @@ Before marking any task as complete, verify:
 | CI | Jenkins primary; GHA manual — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | — |
 | DB | Shared PostgreSQL, separate schemas | — |
 | Search | CRM/quote list+PageInfo over gateway; **not** Elasticsearch in tree | Elasticsearch 8 (target) |
-| Activities | **No** schema/controller | Do not invent `/api/v1/activities/**` |
+| Activities | **No** schema/controller | Hold lifted; [ADR-030](docs/adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) design and DRG-520 |
 | GraphQL | **Not** in tree | Optional later |
 | PDF | Quote-service Thymeleaf/OpenHTML documents API | — |
 

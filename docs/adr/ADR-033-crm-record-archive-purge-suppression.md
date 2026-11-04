@@ -1,8 +1,8 @@
 # ADR-033: CRM record archive, retention purge and suppression list
 
-**Status:** Proposed on 2026-10-15. Not accepted.
+**Status:** Accepted on 2026-11-03 by the project owner ([delegation log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)). Proposed on 2026-10-15.
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drg amtd), 2026-11-03.
 **Relates to:** BC-19-04 (consent and privacy record), BC-20-05 (retention and legal hold), [ADR-030](ADR-030-activity-timeline-and-mailbox-ingestion.md) (auto-capture). Does **not** touch the R2 price-book list-row delete hold.
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `apps/api/src/archive/*`, `SuppressedContact`, `SuppressedDomain`, at `6d4793d`.
 **Does not authorize:** any code or migration.
