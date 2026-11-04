@@ -1,4 +1,4 @@
-# ADR-035: crm-service owns the account-to-tenant mapping
+# ADR-036: crm-service owns the account-to-tenant mapping
 
 **Status:** Proposed on 2026-11-03. Not accepted.
 **Date:** 2026-11-03
@@ -13,7 +13,7 @@
 - DRG-306 / BC-19-02 (tenant provisioning)
 
 **Source:** DRG-630 brief, which CPQ Decision passed with 86 on 2026-11-03 and ruled to be an ADR.
-**Does not authorize:** any code, table, endpoint or flag.
+**Does not authorize:** any code, table, endpoint or flag. This proposal is incomplete and does not establish a trusted customer-tenant authority.
 
 ---
 
@@ -33,9 +33,11 @@ Three things depend on a real per-customer tenant:
 Today:
 - The customer account is a crm-service aggregate (`organizations`, with hierarchy, territory/segment and merge). It has no tenant.
 - quote-service knows the account only by `quotes.customer_external_id`.
-- No tenant service exists, because BC-19-02 / DRG-306 is in Backlog.
+- No tenant service exists, because BC-19-02 / DRG-306 is in Backlog. An admin-entered identifier alone is not evidence of a verified customer tenant or of the caller’s access to it.
 
-## Decision
+## Candidate decision (not yet accepted)
+
+The user delegated the product choices for account identity and merge authorization. The recommended boundaries below are recorded to guide this proposal, but they cannot substitute for the missing authoritative tenant source or a verified consumer implementation. Until those dependencies exist, all tenant-sensitive operations remain held.
 
 ### D-01: crm-service is the system of record for account → tenant
 crm-service owns a mapping from an account (`organizations`, by uuid) to at most one current tenant id. Other services never write it. They read it as downstream consumers.
@@ -70,15 +72,15 @@ Schema registry entry (`EventContractRegistry`):
   - Cost: one table per consumer, and eventual consistency (an account mapped a moment ago may read as null).
 - **(b) Synchronous read.**
   - The consumer calls the crm lookup on quote create and clone.
-  - No projection table, and always current.
-  - Adds a runtime dependency on the write path, needs service-token auth (ADR-016 D5), a timeout and a fail-open path.
+  - No projection table; the response is current only at the instant it is read. A subsequent write still needs a revision-bound concurrency protocol.
+  - Adds a runtime dependency on the write path, needs service-token auth (ADR-016 D5), a timeout and fail-closed handling for tenant-sensitive operations.
 
 Under either option:
-- An unresolved tenant stores `NULL` and is made visible with a warning log and a counter. Creation does not fail, unless an optional reject flag is set (default off).
+- An unresolved or unverified mapping must not authorize quote acceptance, contract transitions, account merges, or other tenant-scoped effects. Harmless draft capture may retain an explicit unresolved state only if it cannot cause those effects; there is no fail-open switch for tenant-sensitive operations.
 - `tid` is never used as a fallback once `opencrm.tenant.source=account` is selected.
 
 ### D-05: Merge and hierarchy (recommended options)
-- **Merge across tenants: recommended to block.** An account merge whose source and survivor carry different tenants is refused, with an audited reason. The alternative, letting the survivor's tenant win, is open for drg.
+- **Merge across tenants: block.** Both accounts must have verified current assignments to the same tenant; unknown, conflicting, or changing assignments block the merge. Check and bind the mapping revisions under a defined concurrency protocol, and record an audited reason.
 - **Hierarchy: recommended no inheritance in v1.** A child account gets no tenant from its parent; each account is mapped explicitly. The alternative is default inheritance from the parent.
 
 ### D-06: Relation to ADR-016 and the `tid` interim (DRG-632)
@@ -88,16 +90,19 @@ Under either option:
 - The switch from `tid` to the account source is an owner-run configuration change, and it is off by default.
 
 ### D-07: Path to BC-19 (DRG-306)
-- The tenant id is an opaque reference owned by crm-service until BC-19-02 provides ProvisionTenant and TenantProvisioned.
-- When BC-19 lands, crm-service validates assignments against provisioned tenants. Consumers and the event contract do not change.
+- A tenant id is an opaque reference. CRM can own the account-to-tenant link, but it cannot treat an arbitrary entered reference as verified. The authority, evidence, and validation mechanism are unresolved until a trustworthy source is available.
+- When BC-19 lands, crm-service may validate assignments against provisioned tenants. The event and consumer contracts must be reviewed for compatibility with that authority before enablement.
 - Moving ownership of tenants themselves to BC-19 would be a later ADR. Ownership of the account → tenant link stays with crm-service.
 
-## Open decisions for drg
+## Open decisions and prerequisites
+
+Before acceptance, specify a trusted tenant authority and scoped administrative and service authorization; a transactional per-account revision and tombstones; snapshot/bootstrap and replay; duplicate, gap and out-of-order handling; and an atomic consumer inbox/projection transaction. Specify how revisions are bound to consequential writes, how existing TID-derived rows are reconciled without rewriting history, and how chained merges and late events preserve lineage. The proposed event and lookup schemas above are incomplete until these are resolved.
+
 1. **Tenant id format.** A UUID we mint, or an external customer id? Open; there is no recommendation.
-2. **Merge rule.** Block cross-tenant merges (recommended), or let the survivor win?
-3. **Inheritance.** No inheritance in v1 (recommended), or a child inherits from its parent?
-4. **Consumption.** Option (a) local projection (recommended by CPQ Decision), or (b) synchronous read?
-5. **Acceptance of this ADR.** Until drg accepts it, it stays Proposed and authorizes no code.
+2. **Merge rule.** Block mismatched or unresolved verified tenants; define the atomic concurrency protocol and lineage.
+3. **Inheritance.** No inheritance in v1; enforce it at every entry point.
+4. **Consumption.** Design revisioned projections and an authoritative write-boundary check; specify failure and recovery semantics before selecting an implementation.
+5. **Acceptance of this ADR.** It remains Proposed and authorizes no code until the prerequisites above are resolved and accepted.
 
 ## Consequences
 - **Good:** one write path and one audit trail for tenant, next to the account aggregate that already handles merge and hierarchy.
