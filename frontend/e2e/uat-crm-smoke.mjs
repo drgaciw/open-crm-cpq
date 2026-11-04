@@ -21,11 +21,14 @@ function fail(name, detail) {
 }
 
 async function main() {
-  const browser = await chromium.launch({
+  const launchOpts = {
     headless: true,
-    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  };
+  if (process.env.CHROMIUM_PATH) {
+    launchOpts.executablePath = process.env.CHROMIUM_PATH;
+  }
+  const browser = await chromium.launch(launchOpts);
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.setDefaultTimeout(45000);
 

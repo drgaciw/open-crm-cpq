@@ -11,8 +11,8 @@ import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttrib
 
 /**
  * Security configuration for API Gateway.
- * Dev profile: all endpoints open (no auth), but CSRF protection is active.
- * Production: JWT authentication enforced with CSRF protection.
+ * Dev profile: all endpoints open (no auth); Spring CSRF disabled (Origin checks via
+ * {@link CsrfProtectionFilter}). Production: JWT + cookie CSRF.
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -20,16 +20,16 @@ public class SecurityConfig {
 
     /**
      * Dev profile: permit all requests without authentication.
-     * CSRF protection is enabled to match production security posture.
+     * Spring CSRF is disabled here — cookie XSRF tokens are never issued locally,
+     * which blocked browser POSTs from {@code nx serve crm} (403 Access Denied).
+     * Origin/Referer checks for cookie-bearing mutating requests remain in
+     * {@link CsrfProtectionFilter}. Production ({@code !dev}) keeps cookie CSRF.
      */
     @Bean
     @Profile("dev")
     public SecurityWebFilterChain devSecurityFilterChain(ServerHttpSecurity http) {
         return http
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
-                )
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges.anyExchange().permitAll())
                 .build();
     }
