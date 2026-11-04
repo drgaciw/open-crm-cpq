@@ -15,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -43,6 +44,28 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Void> response = ApiResponse.error(
                 ex.getMessage(),
+                "RESOURCE_NOT_FOUND",
+                traceId
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * Handles Spring MVC unmapped routes (e.g. {@code GET /api/v1/assets} on CRM).
+     * Without this handler, {@link NoResourceFoundException} falls through to the generic
+     * 500 path and UAT against {@code :8081} cannot distinguish "wrong service" from a crash.
+     *
+     * @param ex the exception
+     * @return 404 Not Found response
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        logger.warn("No handler for request: {} [traceId={}]", ex.getResourcePath(), traceId);
+
+        ApiResponse<Void> response = ApiResponse.error(
+                "No resource found for path " + ex.getResourcePath(),
                 "RESOURCE_NOT_FOUND",
                 traceId
         );
