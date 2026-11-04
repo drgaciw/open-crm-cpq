@@ -143,4 +143,19 @@ describe('ProductCreateDialogComponent', () => {
     await component.onSubmit();
     expect(createSpy).not.toHaveBeenCalled();
   });
+
+  it('shows listPrice min mat-error when value is below 0', () => {
+    fillForm({
+      sku: 'SKU-1',
+      name: 'Priced',
+      productType: 'HARDWARE',
+      category: 'ADD_ON',
+      listPrice: -1,
+    });
+    component.productForm.listPrice().markAsTouched();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('List price must be at least 0');
+  });
 });
