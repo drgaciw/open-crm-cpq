@@ -37,7 +37,7 @@ Today:
 
 ## Candidate decision (not yet accepted)
 
-The user delegated the product choices for account identity and merge authorization. The recommended boundaries below are recorded to guide this proposal, but they cannot substitute for the missing authoritative tenant source or a verified consumer implementation. Until those dependencies exist, all tenant-sensitive operations remain held.
+The user delegated the product choices for account identity and merge authorization. The recommended boundaries below are recorded to guide this proposal, but they cannot substitute for the missing authoritative tenant source or a verified consumer implementation. Until those dependencies exist, tenant-sensitive capabilities introduced by this proposal must remain held; existing operations require a separate audit.
 
 ### D-01: crm-service is the system of record for account → tenant
 crm-service owns a mapping from an account (`organizations`, by uuid) to at most one current tenant id. Other services never write it. They read it as downstream consumers.
