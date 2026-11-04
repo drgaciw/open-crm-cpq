@@ -26,7 +26,7 @@ Agents using this repo must:
 2. Treat **target** as destination, not permission to implement.
 3. Refuse **holds** unless a new wave plan explicitly un-holds them.
 
-**Do not:** invent `/api/v1/activities/**`; flip `approvals.legacy-local-read-enabled`; enable NgRx; treat GLM-5 as live runtime; Accept ADR-005; ship subscriptions FE; delete product `POST /validate`; put CSRF on domain services.
+**Do not:** flip `approvals.legacy-local-read-enabled`; enable NgRx; treat GLM-5 as live runtime; Accept ADR-005; ship subscriptions FE; delete product `POST /validate`; put CSRF on domain services.
 
 ---
 
@@ -93,7 +93,7 @@ PostgreSQL 16 :5432 (opencrm, schema-per-service)      Redis 7 :6379      Kafka 
 | `/api/v1/documents/**` | document-generation | FE quote docs use **quote-service** documents API |
 | `/api/v1/subscriptions/**` | contract-asset | **no FE** |
 | `/api/v1/erp/**` | gateway stub → `forward:/fallback/erp/unavailable` (S2A-7 reservation) | — |
-| `/api/v1/activities/**` | **does not exist** | do not invent |
+| `/api/v1/activities/**` | not yet landed (hold lifted 2026-11-03, ADR-030; DRG-520) | crm-service |
 
 **Disambiguate:** `/api/v1/rules` (pricing DRL) ≠ `/api/v1/configuration/rules` (product config rules). `/api/v1/quotes/approvals` ≠ `/api/v1/approvals`. The **validate route must stay ordered before** `configuration/**` (SCG first-match would keep agents on the product `List<String>` path).
 
@@ -273,7 +273,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | Identity | Entra ID login at the gateway BFF; every service a resource server ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md) steps 0–3) | Actor integrity and role checks (step 4); go-live gate: app registrations, workload identities, consent (step 5) |
 | Search | CRM/quote list + `PageInfo` over gateway | Elasticsearch 8 **not in tree** |
 | Comms | Gateway stubs `/api/v1/emails/**` etc. → `communication-service` (**not** in Maven reactor) | Twilio / SendGrid / WhatsApp hub. **#430 on `main` — do not undo** |
-| Activities | **No** schema, controller, or FE | Do **not** invent `/api/v1/activities/**` |
+| Activities | **No** schema, controller, or FE yet | Unheld 2026-11-03 per ADR-030 (DRG-520) |
 
 **Forge status:** Waves **A–W COMPLETE** on `main`; hygiene N′ COMPLETE; Wave **T skipped** (do not name T1/T2). Not early stage.
 
@@ -296,7 +296,7 @@ Observations from code that plans should account for (none authorize change by t
 
 | Hold | Why |
 |------|-----|
-| Activities API / `/api/v1/activities/**` | No schema/controller |
+| Activities API / `/api/v1/activities/**` | Lifted 2026-11-03 ([log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)) |
 | CI #238 | Runners |
 | Agent Kafka #241 | Stack B2 / S2A-2 |
 | Dual-read YAML/env flip | **HIGH**; ADR-005 Proposed |

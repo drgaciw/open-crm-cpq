@@ -1,8 +1,8 @@
 # ADR-029: Durable agent work queue on PostgreSQL
 
-**Status:** Proposed on 2026-10-15. Not accepted.
+**Status:** Accepted on 2026-11-03 by the project owner ([delegation log](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82)). Proposed on 2026-10-15.
 **Date:** 2026-10-15
-**Deciders:** Project owner (pending).
+**Deciders:** Project owner (drg amtd), 2026-11-03.
 **Relates to:** ARCHITECTURE.md §9 (agent Kafka #241 held), [ADR-025](ADR-025-saga-process-manager.md) (persisted process manager on PostgreSQL), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (events), reserved ADR-021 (AI topology — this ADR does not take that number or decide topology).
 **Source pattern:** [trycompai/crm](https://github.com/trycompai/crm) `AgentTask` model and `lib/tasks.ts` (`README.md` l.88–93), at `6d4793d`.
 **Does not authorize:** any code, table or scheduler.
