@@ -57,7 +57,7 @@ dual-read, Activities, or other held feature is enabled by this reconciliation.
 
 Full file-by-file blob identities, latest upstream modifying commits, snapshot
 diffs, and normal merge previews were retained in the local housekeeping archive
-under `C:/Users/dgorn/worktree-housekeeping-20261104/`.
+under `C:/Users/<username>/worktree-housekeeping-20261104/`.
 
 ## Validation and limits
 
