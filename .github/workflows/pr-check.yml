@@ -75,7 +75,7 @@ jobs:
 
   oms-browser:
     name: OMS Browser Acceptance (PR gate, Chromium + PostgreSQL)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [backend-unit]
     timeout-minutes: 60
     steps:
