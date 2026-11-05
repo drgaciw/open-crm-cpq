@@ -76,6 +76,8 @@ class RampHttpConcurrencyIntegrationTest {
         @Bean QuoteLineItemService lineService(QuoteLineItemRepository l, QuoteRepository q, RampScheduleAttacher a, RampScheduleGuard g) { return new QuoteLineItemService(l,q,a,g); }
         @Bean com.opencrm.quote.client.PricingServiceClient pricing() { return mock(com.opencrm.quote.client.PricingServiceClient.class); }
         @Bean com.opencrm.quote.quote.QuoteContinuationService continuation() { return mock(com.opencrm.quote.quote.QuoteContinuationService.class); }
+        // QuoteService autowires this; a mock's owns(...) is false, so these ramp tests keep the legacy (non-OMS) path.
+        @Bean com.opencrm.quote.snapshot.AcceptedSnapshotService acceptedSnapshots() { return mock(com.opencrm.quote.snapshot.AcceptedSnapshotService.class); }
         @Bean QuoteService quotesService(QuoteRepository q, QuoteLineItemRepository l, com.opencrm.quote.client.PricingServiceClient p,
                 RampScheduleGuard g, ObjectMapper mapper) {
             var qm=org.mapstruct.factory.Mappers.getMapper(QuoteMapper.class);

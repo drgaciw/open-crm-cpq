@@ -68,7 +68,8 @@ class RampCompoundingMigrationIntegrationTest {
                 assertThat(row.wasNull()).isFalse();
             }
         }
-        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.16"));
+        // Latest quote-service migration after this PR (V1_17 snapshots, V1_18 leases, V1_19 revision requests).
+        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.19"));
 
         String rollback;
         try (var migration = getClass().getResourceAsStream("/db/migration/V1_16__ramp_escalator_compounding.sql")) {
