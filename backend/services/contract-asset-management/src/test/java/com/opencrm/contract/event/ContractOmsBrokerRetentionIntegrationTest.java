@@ -1,4 +1,6 @@
 package com.opencrm.contract.event;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import com.opencrm.common.event.OmsKafkaListenerFactories;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -54,7 +56,7 @@ class ContractOmsBrokerRetentionIntegrationTest {
     }
 
 
-    @Test void fatalSourceFailureSurvivesTenAttemptsAndConsumerRestartWithoutSkipping() throws Exception {
+    @Test void fatalSourceFailureDeadLettersAfterBoundedRetryAndResumesWithoutSkipping() throws Exception {
         String topic="oms-source-retention-"+UUID.randomUUID(),group="oms-retention-"+UUID.randomUUID();
         var producer=new DefaultKafkaProducerFactory<String,String>(Map.of(
             ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,kafka.bootstrap(),
@@ -65,12 +67,13 @@ class ContractOmsBrokerRetentionIntegrationTest {
         var registry=mock(OmsSourceRegistry.class);
         var trust=mock(OmsBrokerTrust.class);
         var source=new OmsSourceConsumer(new ObjectMapper(),registry,trust);
-        var allow=new AtomicBoolean();var attempts=new AtomicInteger();
-        var retained=new CountDownLatch(15);var completed=new CountDownLatch(2);
+        var attempts=new AtomicInteger();
+        var completed=new CountDownLatch(1);
         var hashes=new CopyOnWriteArrayList<String>();
         doAnswer(invocation->{
-            if(!allow.get()){attempts.incrementAndGet();retained.countDown();throw new ClassCastException("Simulated registry failure classified fatal by default");}
-            hashes.add(invocation.getArgument(1));completed.countDown();return null;
+            String hash=invocation.getArgument(1);
+            if("first".equals(hash)){attempts.incrementAndGet();throw new ClassCastException("Simulated registry failure classified fatal by default");}
+            hashes.add(hash);completed.countDown();return null;
         }).when(registry).register(anyString(),anyString());
         var consumerFactory=new DefaultKafkaConsumerFactory<Object,Object>(Map.of(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,kafka.bootstrap(),
@@ -79,25 +82,43 @@ class ContractOmsBrokerRetentionIntegrationTest {
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG,true,
             ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,StringDeserializer.class,
             ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,StringDeserializer.class));
-        var factory=new ContractOmsKafkaConfiguration().omsRetainingKafkaListenerContainerFactory(consumerFactory);
+        var factory=new ContractOmsKafkaConfiguration().omsRetainingKafkaListenerContainerFactory(consumerFactory,template);
         var listener=factory.createContainer(topic);listener.getContainerProperties().setGroupId(group);
         listener.getContainerProperties().setMessageListener((MessageListener<Object,Object>)record->{
             try{source.accept((String)record.value());}catch(RuntimeException failure){throw failure;}catch(Exception failure){throw new IllegalStateException(failure);}
         });
         try(var admin=Admin.create(Map.of("bootstrap.servers",kafka.bootstrap()))){
-            admin.createTopics(List.of(new NewTopic(topic,1,(short)1))).all().get(15,TimeUnit.SECONDS);
+            admin.createTopics(List.of(new NewTopic(topic,1,(short)1),new NewTopic(topic+OmsKafkaListenerFactories.DLT_SUFFIX,1,(short)1))).all().get(15,TimeUnit.SECONDS);
             template.send(topic,"quote","{\"snapshot\":{\"scopeId\":\"pilot\"},\"snapshotHash\":\"first\"}").get(15,TimeUnit.SECONDS);
             template.send(topic,"quote","{\"snapshot\":{\"scopeId\":\"pilot\"},\"snapshotHash\":\"second\"}").get(15,TimeUnit.SECONDS);
             listener.start();
-            assertTrue(retained.await(40,TimeUnit.SECONDS),"Fatal failures must remain retryable beyond default ten attempts");
-            assertTrue(attempts.get()>=15);assertTrue(hashes.isEmpty());
-            listener.stop();
+            assertTrue(completed.await(40,TimeUnit.SECONDS),"second source must resume after the first is dead-lettered");
+            assertEquals(OmsKafkaListenerFactories.MAX_DELIVERY_ATTEMPTS,attempts.get(),"first source gets exactly the bounded number of deliveries");
+            assertEquals(List.of("second"),hashes);
+            var dead=drain(kafka.bootstrap(),topic+OmsKafkaListenerFactories.DLT_SUFFIX,1);
+            assertEquals(1,dead.size());
+            assertTrue(dead.get(0).contains("\"snapshotHash\":\"first\""),"dead letter must carry the original failed record");
             var offsets=admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata().get(10,TimeUnit.SECONDS);
-            assertTrue(offsets.values().stream().allMatch(offset->offset.offset()==0),"Failed source offset cannot advance even when global factory auto-commit=true");
-            allow.set(true);listener.start();
-            assertTrue(completed.await(20,TimeUnit.SECONDS));
-            assertEquals(List.of("first","second"),hashes);
-            verify(trust,atLeast(17)).requireScope("pilot");
+            assertTrue(offsets.values().stream().allMatch(offset->offset.offset()==2L),"dead-lettered and processed offsets must both be committed");
+            verify(trust,atLeast(OmsKafkaListenerFactories.MAX_DELIVERY_ATTEMPTS)).requireScope("pilot");
         }finally{listener.stop();producer.destroy();}
+    }
+
+    private static List<String> drain(String bootstrap, String topic, int expected) {
+        var props = new HashMap<String,Object>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "dlt-" + UUID.randomUUID());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        var out = new ArrayList<String>();
+        try (var consumer = new KafkaConsumer<String,String>(props)) {
+            consumer.subscribe(List.of(topic));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (out.size() < expected && System.nanoTime() < deadline) {
+                consumer.poll(Duration.ofMillis(500)).forEach(record -> out.add(record.value()));
+            }
+        }
+        return out;
     }
 }

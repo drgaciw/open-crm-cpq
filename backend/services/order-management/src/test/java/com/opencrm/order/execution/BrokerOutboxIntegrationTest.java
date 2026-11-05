@@ -83,7 +83,7 @@ class BrokerOutboxIntegrationTest {
         }
     }
 
-    @Test void realConsumerRetainsOffsetBeyondTenFailuresThenResumesInOrder() throws Exception {
+    @Test void realConsumerDeadLettersAfterBoundedRetryThenResumesInOrder() throws Exception {
         String topic = "oms-retention-" + UUID.randomUUID();
         String group = "retention-" + UUID.randomUUID();
         var producer = new DefaultKafkaProducerFactory<String,String>(Map.of(
@@ -96,13 +96,11 @@ class BrokerOutboxIntegrationTest {
         properties.setGroupId(group);
         properties.setAckMode(ContainerProperties.AckMode.RECORD);
         var attempts = new AtomicInteger();
-        var allow = new AtomicBoolean();
-        var retained = new CountDownLatch(15);
-        var completed = new CountDownLatch(2);
+        var completed = new CountDownLatch(1);
         var received = new CopyOnWriteArrayList<String>();
         properties.setMessageListener((MessageListener<String,String>) record -> {
-            if (!allow.get()) {
-                attempts.incrementAndGet(); retained.countDown();
+            if ("first".equals(record.value())) {
+                attempts.incrementAndGet();
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
             }
             received.add(record.value()); completed.countDown();
@@ -114,21 +112,39 @@ class BrokerOutboxIntegrationTest {
             ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
             ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false));
         var listener = new KafkaMessageListenerContainer<>(factory, properties);
-        listener.setCommonErrorHandler(new KafkaDeliveryRetentionConfiguration().kafkaDeliveryRetentionErrorHandler());
+        listener.setCommonErrorHandler(new KafkaDeliveryRetentionConfiguration().kafkaDeliveryRetentionErrorHandler(template));
         try (var admin = org.apache.kafka.clients.admin.Admin.create(Map.of("bootstrap.servers", KAFKA.bootstrap()))) {
-            admin.createTopics(List.of(new org.apache.kafka.clients.admin.NewTopic(topic, 1, (short)1))).all().get(15,TimeUnit.SECONDS);
+            admin.createTopics(List.of(
+                new org.apache.kafka.clients.admin.NewTopic(topic, 1, (short)1),
+                new org.apache.kafka.clients.admin.NewTopic(topic + OmsKafkaListenerFactories.DLT_SUFFIX, 1, (short)1))).all().get(15,TimeUnit.SECONDS);
             template.send(topic, "same", "first").get(15,TimeUnit.SECONDS);
             template.send(topic, "same", "second").get(15,TimeUnit.SECONDS);
             listener.start();
-            assertTrue(retained.await(40,TimeUnit.SECONDS), "must retry beyond Spring's default ten attempts");
-            assertTrue(attempts.get()>=15);
-            assertTrue(received.isEmpty());
+            assertTrue(completed.await(40,TimeUnit.SECONDS), "second record must resume after the first is dead-lettered");
+            assertEquals(OmsKafkaListenerFactories.MAX_DELIVERY_ATTEMPTS, attempts.get(), "first record gets exactly the bounded number of deliveries");
+            assertEquals(List.of("second"), received);
+            assertEquals(List.of("first"), drain(KAFKA.bootstrap(), topic + OmsKafkaListenerFactories.DLT_SUFFIX, 1));
             var offsets = admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata().get(10,TimeUnit.SECONDS);
-            assertTrue(offsets.values().stream().allMatch(offset -> offset.offset()==0), "failed record must not be committed");
-            allow.set(true);
-            assertTrue(completed.await(15,TimeUnit.SECONDS));
-            assertEquals(List.of("first", "second"), received);
+            assertTrue(offsets.values().stream().allMatch(offset -> offset.offset()==2L), "dead-lettered and processed offsets must both be committed");
         } finally { listener.stop(); producer.destroy(); }
+    }
+
+    private static List<String> drain(String bootstrap, String topic, int expected) {
+        var props = new HashMap<String,Object>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "dlt-" + UUID.randomUUID());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        var out = new ArrayList<String>();
+        try (var consumer = new KafkaConsumer<String,String>(props)) {
+            consumer.subscribe(List.of(topic));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (out.size() < expected && System.nanoTime() < deadline) {
+                consumer.poll(Duration.ofMillis(500)).forEach(record -> out.add(record.value()));
+            }
+        }
+        return out;
     }
 
     @Test void actualBrokerAckIsRequiredAndExpiredLeaseReplaysIdenticalEvent() throws Exception {
