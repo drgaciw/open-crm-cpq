@@ -72,9 +72,11 @@ dependents, five processes in the older integration index). That class remains
 unchanged. The newly restored test was initially absent from the graph; text
 confirmation found only its original test definition and JUnit reflective usage.
 The exact-worktree index was refreshed at `0a3f0f8e` before the final gate. Raw
-all-scope analysis identified two files, six restored test symbols, and 22
-affected processes with CRITICAL risk. Class impact identified 513 nodes,
-313 direct dependents, and 54 processes. Both raw reports have neither partial
+all-scope analysis identified two files and six restored test symbols with
+CRITICAL risk. Repeated complete runs reported 22 or 44 affected processes;
+class impact reported 213-513 nodes, 88-313 direct dependents, and 25-54
+processes. This observed graph count variability remains a verification limit;
+the CRITICAL verdict was consistent. The raw reports have neither partial
 nor truncated results. The broad graph reach includes reflective class lookup
 and generic assertions; the actual source delta remains a test and this report.
 The CRITICAL verdict is disclosed, not relabeled as low. An earlier stale-index
