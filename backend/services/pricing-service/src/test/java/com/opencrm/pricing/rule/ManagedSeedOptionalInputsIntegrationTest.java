@@ -43,7 +43,9 @@ class ManagedSeedOptionalInputsIntegrationTest {
     void seedExistingDatabaseThroughAppliedV7() {
         var dataSource = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         latest = Flyway.configure().dataSource(dataSource).schemas("pricing").defaultSchema("pricing")
-                .locations("classpath:db/migration").cleanDisabled(false).load();
+                .locations("classpath:db/migration").cleanDisabled(false)
+                // Tests delete the V9 history row and re-run it; later migrations (V10+) are already applied.
+                .outOfOrder(true).load();
         latest.clean();
         Flyway.configure().dataSource(dataSource).schemas("pricing").defaultSchema("pricing")
                 .locations("classpath:db/migration").target("7").load().migrate();
