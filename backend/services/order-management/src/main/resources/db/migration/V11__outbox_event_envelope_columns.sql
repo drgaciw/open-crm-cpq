@@ -12,6 +12,8 @@
 -- actor:           who caused it: user:<sub> or service:<name> (ADR-016).
 ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'PENDING';
 UPDATE outbox_events SET status = 'PUBLISHED' WHERE published = TRUE AND status <> 'PUBLISHED';
+-- An unpublished row whose retries are exhausted (exhausted_at set by OutboxDeliveryStore) is FAILED, not PENDING.
+UPDATE outbox_events SET status = 'FAILED' WHERE published = FALSE AND exhausted_at IS NOT NULL AND status <> 'FAILED';
 ALTER TABLE outbox_events DROP CONSTRAINT IF EXISTS ck_outbox_events_status;
 ALTER TABLE outbox_events
     ADD CONSTRAINT ck_outbox_events_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED', 'SKIPPED'));
