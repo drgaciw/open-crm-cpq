@@ -1,0 +1,28 @@
+/// <reference types='vitest' />
+import { defineConfig } from 'vite';
+import angular from '@analogjs/vite-plugin-angular';
+import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
+import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
+
+export default defineConfig(() => ({
+  root: import.meta.dirname,
+  cacheDir: '../../../.cache/vite-orders',
+  plugins: [angular(), nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
+  test: {
+    name: 'cpq-orders',
+    watch: false,
+    maxWorkers: 1,
+    globals: true,
+    environment: 'jsdom',
+    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    setupFiles: ['src/test-setup.ts'],
+    reporters: ['default'],
+    // TestBed compile under shared/symlink node_modules can exceed Vitest defaults.
+    hookTimeout: 30000,
+    testTimeout: 30000,
+    coverage: {
+      reportsDirectory: '../../../coverage/libs/cpq/orders',
+      provider: 'v8' as const,
+    },
+  },
+}));

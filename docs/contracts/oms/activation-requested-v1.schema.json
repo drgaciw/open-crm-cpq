@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opencrm:oms:activation-requested-v1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "operationKey",
+    "orderId",
+    "scopeId",
+    "customerId",
+    "quoteId",
+    "acceptedRevision",
+    "line",
+    "evidenceReference",
+    "completedAt"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string"
+    },
+    "operationKey": {
+      "type": "string"
+    },
+    "orderId": {
+      "type": "string"
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "customerId": {
+      "type": "string"
+    },
+    "quoteId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "acceptedRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "line": {
+      "$ref": "accepted-snapshot-v1.schema.json#/properties/lines/items"
+    },
+    "evidenceReference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

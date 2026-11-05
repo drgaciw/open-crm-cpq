@@ -209,6 +209,7 @@ def main() -> int:
         "backend-integration",
         "cpq-beta-python",
         "frontend",
+        "oms-browser",
         "security-audit",
     ]
     for stage in run_core_stages:
@@ -249,6 +250,7 @@ def main() -> int:
         "CPQ Beta Python",
         "Frontend",
         "Backend Integration",
+        "OMS Browser Acceptance",
         "Security Audit",
     }
     found = jenkins_stage_names(jenkins)

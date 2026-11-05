@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opencrm:oms:accepted-snapshot-event-v1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "snapshot",
+    "snapshotHash"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot": {
+      "$ref": "accepted-snapshot-v1.schema.json"
+    },
+    "snapshotHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "description": "cpq.oms.quote-accepted.v1. Hash the exact compact raw nested snapshot UTF-8 JSON, including unknown additive fields, before typed deserialization. Do not hash a reserialized DTO."
+}

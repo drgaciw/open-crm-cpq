@@ -44,6 +44,12 @@ public class QuoteAcceptedEventConsumer {
     private final KafkaInbox inbox;
     private final AcceptedQuoteSubscriptionService acceptedQuotes;
 
+    @Autowired(required = false)
+    private LegacyOwnershipPolicy ownershipPolicy;
+
+    @Autowired(required = false)
+    private OmsSourceRegistry sourceRegistry;
+
     /** Set when the context scans {@link AmendmentRoutingFlag}. Absent means the code default, OFF. */
     @Autowired(required = false)
     private AmendmentRoutingFlag injectedRoutingFlag;
@@ -71,6 +77,20 @@ public class QuoteAcceptedEventConsumer {
             return;
         }
         QuoteAcceptedEvent event = parse(record.value());
+        if (ownershipPolicy != null && !ownershipPolicy.legacyAllowed(objectMapper.valueToTree(event))) {
+            return;
+        }
+        if (sourceRegistry != null) {
+            try {
+                if (!sourceRegistry.permitsLegacy(event.getQuoteId())) {
+                    return;
+                }
+            } catch (RuntimeException error) {
+                throw error;
+            } catch (Exception error) {
+                throw new IllegalStateException("Cannot verify quote source ownership", error);
+            }
+        }
         log.info("Received quote accepted event for quote: {}", event.getQuoteId());
         route(event);
     }

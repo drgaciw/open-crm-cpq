@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opencrm:oms:activation-acknowledged-v1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "operationKey",
+    "orderId",
+    "scopeId",
+    "subscriptionId",
+    "status",
+    "evidenceReference",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operationKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "orderId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scopeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subscriptionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidenceReference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

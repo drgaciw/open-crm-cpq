@@ -30,6 +30,7 @@ public final class CpqGatewayRoutes {
      * (agent-critical prefixes including price books).
      */
     public static final List<String> AGENT_CONTRACT_ROUTE_IDS = List.of(
+            "order-management",
             "crm-service",
             "pricing-service",
             "pricebook-service",
@@ -47,6 +48,7 @@ public final class CpqGatewayRoutes {
      * and default-profile-only communication/ai routes (absent from the {@code dev} profile).
      */
     public static final List<String> DEFAULT_PROFILE_OWNER_ROUTE_IDS = List.of(
+            "order-management",
             "crm-service",
             "pricing-service",
             "pricebook-service",
@@ -68,6 +70,7 @@ public final class CpqGatewayRoutes {
      * (owners + CPQ aliases). Removing any of these from yaml must fail unit tests.
      */
     public static final List<String> DEFAULT_PROFILE_ROUTE_IDS = List.of(
+            "order-management",
             "crm-service",
             "pricing-service",
             "cpq-pricing-service",

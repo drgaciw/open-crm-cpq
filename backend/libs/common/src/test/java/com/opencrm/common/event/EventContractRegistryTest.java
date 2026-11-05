@@ -74,6 +74,7 @@ class EventContractRegistryTest {
     @DisplayName("the wire: topic, owner and status of every contract are pinned")
     void wireIsPinned() {
         Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("cpq.oms.quote-accepted.v1", "OmsAcceptedSnapshot v1, quote-service, PUBLISHED");
         expected.put("cpq.subscription.ramp.applied", "RampApplied v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.quote.status.accepted", "QuoteAccepted v1, quote-service, PUBLISHED");
         expected.put("cpq.discount.approval.required", "DiscountApprovalRequired v1, pricing-service, PUBLISHED");

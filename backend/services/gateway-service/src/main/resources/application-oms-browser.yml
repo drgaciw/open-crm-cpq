@@ -1,0 +1,25 @@
+# Optional production same-origin browser login; no secrets or fallback credentials.
+oms:
+  browser-login-enabled: true
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          oms:
+            provider: oms
+            client-id: ${OMS_OIDC_CLIENT_ID}
+            client-secret: ${OMS_OIDC_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: ${OMS_OIDC_REDIRECT_URI}
+            scope: ${OMS_OIDC_SCOPES:openid,profile}
+        provider:
+          oms:
+            issuer-uri: ${OMS_OIDC_ISSUER_URI}
+server:
+  reactive:
+    session:
+      cookie:
+        secure: true
+        http-only: true
+        same-site: lax

@@ -73,6 +73,9 @@ public class QuoteService {
     private QuoteContinuationService continuationService;
 
     @org.springframework.beans.factory.annotation.Autowired
+    private com.opencrm.quote.snapshot.AcceptedSnapshotService acceptedSnapshotService;
+
+    @org.springframework.beans.factory.annotation.Autowired
     public void setContinuationService(QuoteContinuationService continuationService) {
         this.continuationService = continuationService;
     }
@@ -293,6 +296,9 @@ public class QuoteService {
 
         quote.setStatus(QuoteStatus.APPROVED);
         quote.setApprovalState(ApprovalState.APPROVED);
+        if (acceptedSnapshotService != null && acceptedSnapshotService.owns(quote)) {
+            quote.setOmsApprovalReference(java.util.UUID.randomUUID().toString());
+        }
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} approved", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
@@ -405,7 +411,11 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} accepted", saved.getQuoteNumber());
 
+        if (acceptedSnapshotService != null && acceptedSnapshotService.owns(saved)) {
+            acceptedSnapshotService.capture(saved, lineItems);
+        }
         QuoteAcceptedEvent kafkaEvent = QuoteAcceptedKafkaEventFactory.from(saved, lineItems);
+        kafkaEvent.setFulfillmentOwner(saved.getFulfillmentOwner());
         // ADR-018 D8 dual run: best-effort Redis publish after commit; the outbox row below is the reliable channel.
         // D9: this is the only emitter of cpq.quote.status.accepted (the unwired acceptQuote path was removed).
         eventPublisher.publishQuoteAccepted(QuoteAcceptedCrmMessageFactory.from(saved, lineItems));
@@ -557,6 +567,11 @@ public class QuoteService {
         String previousFingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote);
         boolean previouslyRequired = com.opencrm.quote.ramp.RampPricingSnapshot.read(quote.getPricingWaterfallJson()).hasNonNull("rampGovernance");
         ApprovalState previousApproval = quote.getApprovalState();
+        if ((quote.getStatus() == QuoteStatus.ACCEPTED && "OMS".equals(quote.getFulfillmentOwner()))
+                || (quote.getOmsApprovalReference() != null && !EDITABLE_STATUSES.contains(quote.getStatus()))) {
+            throw new BusinessException("Cannot reprice an accepted OMS quote", "QUOTE_NOT_EDITABLE");
+        }
+
         List<QuoteLineItem> lineItems = quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(id);
         if (lineItems.isEmpty()) {
             throw new BusinessException("Quote must have at least one line item", "QUOTE_NO_LINE_ITEMS");

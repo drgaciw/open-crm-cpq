@@ -1,0 +1,4357 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OMS pilot",
+    "version": "1.0.1",
+    "description": "OMS pilot implementation contract. Additive fields are tolerated; unsupported schema versions remain invalid. Manual evidence records real external observations; local receipts never prove external completion. See README.md and state-permissions.md for identity, authority and migrations."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/orders": {
+      "get": {
+        "operationId": "get_orders",
+        "summary": "GET /orders",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Order"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive substring of order number or quote number."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalReference",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "Exact match against fulfillment external/allocation/shipment references, finance acknowledgment references or order audit evidence references, within authorized accounts."
+          },
+          {
+            "name": "hasExceptions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true: at least one OPEN exception; false: no OPEN exceptions."
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/from-quote": {
+      "post": {
+        "operationId": "post_orders_from_quote",
+        "summary": "POST /orders/from-quote",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary new-intake backlog saturation; retain the same operation key and retry after recovery. Existing durable conversion receipts still replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FromQuote"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:submit"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "get_orders_id",
+        "summary": "GET /orders/{id}",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/{id}/fulfillment-plan": {
+      "get": {
+        "operationId": "get_orders_id_fulfillment_plan",
+        "summary": "GET /orders/{id}/fulfillment-plan",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Task"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/{id}/plan": {
+      "get": {
+        "operationId": "get_orders_id_plan",
+        "summary": "GET /orders/{id}/plan",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Task"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/{id}/timeline": {
+      "get": {
+        "operationId": "get_orders_id_timeline",
+        "summary": "GET /orders/{id}/timeline",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Timeline"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/{id}/finance-requests": {
+      "get": {
+        "operationId": "get_orders_id_finance_requests",
+        "summary": "GET /orders/{id}/finance-requests",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FinanceRequest"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      },
+      "post": {
+        "operationId": "post_orders_id_finance_requests",
+        "summary": "POST /orders/{id}/finance-requests",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinancePrepare"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:finance"
+        ]
+      }
+    },
+    "/orders/{id}/submit": {
+      "post": {
+        "operationId": "post_orders_id_submit",
+        "summary": "POST /orders/{id}/submit",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:submit"
+        ]
+      }
+    },
+    "/orders/{id}/holds": {
+      "post": {
+        "operationId": "post_orders_id_holds",
+        "summary": "POST /orders/{id}/holds",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Hold"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:hold"
+        ]
+      }
+    },
+    "/orders/{id}/cancellation-requests": {
+      "post": {
+        "operationId": "post_orders_id_cancellation_requests",
+        "summary": "POST /orders/{id}/cancellation-requests",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cancellation"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:cancel"
+        ]
+      }
+    },
+    "/orders/{id}/evidence": {
+      "post": {
+        "operationId": "post_orders_id_evidence",
+        "summary": "POST /orders/{id}/evidence",
+        "responses": {
+          "202": {
+            "description": "PENDING causal evidence or CONFLICT observation retained; no completion implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EvidenceReceipt"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "APPLIED fulfillment receipt, or updated Order for FINANCE_ACK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/EvidenceReceipt"
+                        },
+                        {
+                          "$ref": "#/components/schemas/Order"
+                        }
+                      ]
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Evidence"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:evidence OR oms:finance when kind=FINANCE_ACK"
+        ]
+      }
+    },
+    "/orders/{id}/reconcile": {
+      "post": {
+        "operationId": "post_orders_id_reconcile",
+        "summary": "POST /orders/{id}/reconcile",
+        "responses": {
+          "202": {
+            "description": "Durably accepted; external effects remain separately evidenced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Receipt"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:recover"
+        ]
+      }
+    },
+    "/orders/{id}/tasks/{taskId}/retry": {
+      "post": {
+        "operationId": "post_orders_id_tasks_taskId_retry",
+        "summary": "POST /orders/{id}/tasks/{taskId}/retry",
+        "responses": {
+          "202": {
+            "description": "Durably accepted; external effects remain separately evidenced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Receipt"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:recover"
+        ]
+      }
+    },
+    "/orders/{id}/replacement-requests": {
+      "post": {
+        "operationId": "post_orders_id_replacement_requests",
+        "summary": "POST /orders/{id}/replacement-requests",
+        "responses": {
+          "202": {
+            "description": "Source correction requested durably; old order cancelled without external effects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReplacementReceipt"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:submit",
+          "oms:cancel"
+        ]
+      }
+    },
+    "/orders/{id}/finance-acknowledgments": {
+      "post": {
+        "operationId": "post_orders_id_finance_acknowledgments",
+        "summary": "POST /orders/{id}/finance-acknowledgments",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceAcknowledgment"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:finance"
+        ]
+      }
+    },
+    "/orders/{id}/operations/{key}": {
+      "get": {
+        "operationId": "get_orders_id_operations_key",
+        "summary": "GET /orders/{id}/operations/{key}",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/order-exceptions": {
+      "get": {
+        "operationId": "get_order_exceptions",
+        "summary": "GET /order-exceptions",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Exception"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "maximum": 1000000
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/order-exceptions/{id}/assign": {
+      "post": {
+        "operationId": "post_order_exceptions_id_assign",
+        "summary": "POST /order-exceptions/{id}/assign",
+        "responses": {
+          "202": {
+            "description": "Recovery command committed; receipt is not external completion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Assignment"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:assign"
+        ]
+      }
+    },
+    "/order-exceptions/{id}/resolve": {
+      "post": {
+        "operationId": "post_order_exceptions_id_resolve",
+        "summary": "POST /order-exceptions/{id}/resolve",
+        "responses": {
+          "202": {
+            "description": "Recovery command committed; receipt is not external completion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resolution"
+              }
+            }
+          }
+        },
+        "x-required-permissions": [
+          "oms:recover"
+        ]
+      }
+    },
+    "/order-exceptions/{id}/operations/{key}": {
+      "get": {
+        "operationId": "get_order_exceptions_id_operations_key",
+        "summary": "GET /order-exceptions/{id}/operations/{key}",
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication (framework response)"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version or operation identity conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-required-permissions": [
+          "oms:read"
+        ]
+      }
+    },
+    "/orders/{id}/fulfillment-evidence": {
+      "post": {
+        "operationId": "post_orders_id_fulfillment_evidence",
+        "summary": "Record immutable fulfillment observation",
+        "x-required-permissions": [
+          "oms:evidence"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EvidenceReceipt"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "PENDING or CONFLICT fact retained without quantity completion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/EvidenceReceipt"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FulfillmentEvidence"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get_orders_id_fulfillment_evidence",
+        "summary": "List original fulfillment observations and current application states",
+        "x-required-permissions": [
+          "oms:read"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EvidenceView"
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/allocations": {
+      "get": {
+        "operationId": "get_orders_id_allocations",
+        "summary": "List allocation lots and available quantities",
+        "x-required-permissions": [
+          "oms:read"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Allocation"
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/evidence/{evidenceId}/adjudications": {
+      "post": {
+        "operationId": "post_orders_id_evidence_evidenceId_adjudications",
+        "summary": "Disavow an unapplied conflicting observation",
+        "x-required-permissions": [
+          "oms:recover",
+          "oms:evidence"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adjudication"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/evidence-adjudications": {
+      "get": {
+        "operationId": "get_orders_id_evidence_adjudications",
+        "summary": "List immutable evidence adjudications",
+        "x-required-permissions": [
+          "oms:read"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdjudicationView"
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/order-outbox/exhausted": {
+      "get": {
+        "operationId": "get_order_outbox_exhausted",
+        "summary": "List exhausted unpublished deliveries without payloads or errors",
+        "x-required-permissions": [
+          "oms:read"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "maximum": 1000000
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExhaustedEvent"
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/outbox/{eventId}/recover": {
+      "post": {
+        "operationId": "post_orders_id_outbox_eventId_recover",
+        "summary": "Requeue same exhausted event; preserves UUID/payload and refuses a live lease",
+        "x-required-permissions": [
+          "oms:recover"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/tasks/{taskId}/no-effect": {
+      "post": {
+        "operationId": "post_orders_id_tasks_taskId_no_effect",
+        "summary": "Record authoritative no-effect proof for latest unknown dispatch generation; no dispatch",
+        "x-required-permissions": [
+          "oms:recover"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoEffect"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/operations/{key}/abandon": {
+      "post": {
+        "operationId": "post_orders_id_operations_key_abandon",
+        "summary": "Reserve absent client command identity; cannot abandon external task effects",
+        "x-required-permissions": [
+          "oms:recover"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful DTO response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer authentication"
+          },
+          "403": {
+            "description": "Required permission denied"
+          },
+          "404": {
+            "description": "Resource unavailable in authorized scope/account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version, identity, or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Semantic rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actuator/prometheus": {
+      "get": {
+        "operationId": "get_oms_prometheus",
+        "summary": "Read cached deployment-scoped operational metrics",
+        "servers": [
+          {
+            "url": "/"
+          }
+        ],
+        "x-required-permissions": [
+          "oms:monitor"
+        ],
+        "description": "Verified JWT scope_id must equal the deployment scope. This service endpoint is outside /api/v1 and does not grant account data access. Operational deployment exposure is separately configured.",
+        "responses": {
+          "200": {
+            "description": "Prometheus exposition; stale or missing samples are signalled by gauges",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/openmetrics-text": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Missing monitor permission or wrong deployment scope"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Command": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey"
+        ]
+      },
+      "FromQuote": {
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string",
+            "description": "Canonical UUID or registered quote number alias"
+          },
+          "acceptedRevision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "snapshotId",
+          "quoteId",
+          "acceptedRevision"
+        ]
+      },
+      "Hold": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "active"
+        ]
+      },
+      "Cancellation": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "lineId",
+          "quantity"
+        ]
+      },
+      "Snapshot": {
+        "$ref": "accepted-snapshot-v1.schema.json"
+      },
+      "Evidence": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ALLOCATION",
+              "RELEASE",
+              "SHIPMENT",
+              "DELIVERY",
+              "PROVISION",
+              "SERVICE",
+              "FINANCE_ACK"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "externalReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "allocationReference": {
+            "type": "string"
+          },
+          "shipmentReference": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional existing finance request key; used only by canonical FINANCE_ACK."
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "lineId",
+          "kind",
+          "quantity",
+          "externalReference",
+          "occurredAt"
+        ],
+        "description": "Manual external facts, not simulated adapter success. ALLOCATION requires expiresAt; its externalReference identifies the allocation lot. SHIPMENT/RELEASE require that lot identifier as allocationReference; DELIVERY requires shipmentReference. Expired observations are retained as CONFLICT; a new valid allocation must expire in the future. Canonical FINANCE_ACK implies ACKNOWLEDGED and uses finance authority."
+      },
+      "FinancePrepare": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lineId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "lineId"
+        ]
+      },
+      "FinanceAcknowledgment": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "externalReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional; when supplied must equal the existing stable finance request key."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ACKNOWLEDGED",
+              "REJECTED",
+              "UNKNOWN"
+            ]
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "lineId",
+          "quantity",
+          "externalReference",
+          "occurredAt",
+          "outcome"
+        ],
+        "description": "Manual authoritative downstream evidence. All outcomes require positive quantity and real external reference/time. Only ACKNOWLEDGED increments cumulative acknowledged quantity; REJECTED/UNKNOWN retain immutable observations and open exceptions."
+      },
+      "Assignment": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current exception version, not order version."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "owner"
+        ]
+      },
+      "Resolution": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current exception version, not order version."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "RECONCILE",
+              "RETRY",
+              "WAIVE"
+            ]
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "action"
+        ],
+        "description": "RECONCILE closes only findings disproven by durable state; RETRY delegates executor fences. WAIVE is permitted only for informational REVIEW_NOTE, never unknown effects or failed obligations."
+      },
+      "Line": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ordered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "shipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delivered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "allocated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "ordered",
+          "cancelled",
+          "shipped",
+          "delivered",
+          "remaining",
+          "allocated",
+          "status"
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string"
+          },
+          "quoteNumber": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "financeStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "REQUESTED",
+              "PARTIAL",
+              "ACKNOWLEDGED",
+              "REJECTED",
+              "UNKNOWN"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Line"
+            }
+          },
+          "holds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "orderNumber",
+          "quoteId",
+          "quoteNumber",
+          "customerId",
+          "scopeId",
+          "status",
+          "financeStatus",
+          "version",
+          "snapshot",
+          "lines",
+          "holds"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "templateVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dispatchedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "lineId",
+          "kind",
+          "status",
+          "templateVersion",
+          "dispatchedAt"
+        ]
+      },
+      "Timeline": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "evidenceReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actor",
+          "at",
+          "action",
+          "reason",
+          "version",
+          "evidenceReference"
+        ]
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "operationKey": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "NOT_FOUND",
+              "ABANDONED",
+              "UNKNOWN",
+              "PENDING"
+            ],
+            "description": "SUCCEEDED is a durable local command receipt, not external completion. ABANDONED reserves an absent client command identity and rejects late delivery. NOT_FOUND/UNKNOWN/PENDING never authorize a new key. UNKNOWN/PENDING are reserved conservative client states; current durable lookups return SUCCEEDED, NOT_FOUND or ABANDONED."
+          },
+          "orderVersion": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operationKey",
+          "orderId",
+          "status",
+          "orderVersion"
+        ]
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "status"
+        ]
+      },
+      "Exception": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "nextAction": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "firstOccurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastOccurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "category",
+          "severity",
+          "reason",
+          "nextAction",
+          "status",
+          "taskId",
+          "owner",
+          "firstOccurredAt",
+          "lastOccurredAt",
+          "version",
+          "orderNumber",
+          "customerId"
+        ]
+      },
+      "FinanceRequest": {
+        "type": "object",
+        "properties": {
+          "requestKey": {
+            "type": "string"
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "acknowledgedQuantity": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PARTIAL",
+              "ACKNOWLEDGED",
+              "REJECTED",
+              "UNKNOWN"
+            ]
+          },
+          "payload": {
+            "type": "string",
+            "description": "Frozen request JSON: source line billing terms, tax evidence, prerequisite milestones and integer grossCents/discountCents/taxCents/totalCents. Request creation does not mean invoice or acknowledgment."
+          }
+        },
+        "required": [
+          "requestKey",
+          "lineId",
+          "quantity",
+          "acknowledgedQuantity",
+          "status",
+          "payload"
+        ]
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "totalElements": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "page",
+          "size",
+          "totalElements",
+          "totalPages",
+          "hasNext",
+          "hasPrevious"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "description": "Application errors use ApiResponse. errorCode/traceId are optional; supported canonical handlers emit OMS_<HTTP status>. Authentication middleware may return an empty or framework error response."
+      },
+      "FulfillmentEvidence": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ALLOCATION",
+              "RELEASE",
+              "SHIPMENT",
+              "DELIVERY",
+              "PROVISION",
+              "SERVICE"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "externalReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "allocationReference": {
+            "type": "string"
+          },
+          "shipmentReference": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "lineId",
+          "kind",
+          "quantity",
+          "externalReference",
+          "occurredAt"
+        ],
+        "description": "Manual external facts, not simulated adapter success. ALLOCATION requires expiresAt; its externalReference identifies the allocation lot. SHIPMENT/RELEASE require that lot identifier as allocationReference; DELIVERY requires shipmentReference. Expired observations are retained as CONFLICT; a new valid allocation must expire in the future."
+      },
+      "EvidenceReceipt": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "PENDING",
+              "CONFLICT"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "orderId",
+          "evidenceId",
+          "status",
+          "version"
+        ]
+      },
+      "EvidenceView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "externalReference": {
+            "type": "string"
+          },
+          "allocationReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipmentReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "PENDING",
+              "CONFLICT"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "lineId",
+          "kind",
+          "quantity",
+          "externalReference",
+          "allocationReference",
+          "shipmentReference",
+          "occurredAt",
+          "expiresAt",
+          "actor",
+          "reason",
+          "status",
+          "detail"
+        ]
+      },
+      "Allocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lineId": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "consumed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "released": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "lineId",
+          "reference",
+          "quantity",
+          "consumed",
+          "released",
+          "available",
+          "expiresAt"
+        ]
+      },
+      "ReplacementReceipt": {
+        "type": "object",
+        "properties": {
+          "operationKey": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "orderVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "const": "SUCCEEDED"
+          }
+        },
+        "required": [
+          "operationKey",
+          "orderId",
+          "eventId",
+          "orderVersion",
+          "status"
+        ]
+      },
+      "NoEffect": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "evidenceReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "evidenceReference",
+          "occurredAt"
+        ]
+      },
+      "Adjudication": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "authorityReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "reason",
+          "operationKey",
+          "authorityReference",
+          "occurredAt"
+        ],
+        "description": "Append-only disavowal of unapplied CONFLICT evidence; authority time cannot predate the observation. Does not retract applied evidence or change quantities. Requires both recovery and evidence permissions."
+      },
+      "AdjudicationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "authorityReference": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "evidenceId",
+          "authorityReference",
+          "occurredAt",
+          "actor",
+          "reason",
+          "recordedAt"
+        ]
+      },
+      "ExhaustedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "exhaustedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "orderId",
+          "eventType",
+          "attempts",
+          "exhaustedAt"
+        ]
+      }
+    }
+  }
+}

@@ -49,6 +49,7 @@ public class JevProperties {
     private UseCase discountTierShadow = new UseCase("tier-v1-thresholds", 0.0);
     private UseCase quoteTierSuggestion = new UseCase("quote-tier-v1", 0.6);
     private DuplicateHints duplicateHints = new DuplicateHints();
+    private UseCase omsExceptionTriage = new UseCase("oms-exception-triage-v1", 0.9);
 
     public static class UseCase {
         private boolean enabled = false;
@@ -117,6 +118,7 @@ public class JevProperties {
     public static final String DISCOUNT_TIER_SHADOW = "discount-tier-shadow";
     public static final String QUOTE_TIER_SUGGESTION = "quote-tier-suggestion";
     public static final String DUPLICATE_HINTS = "duplicate-hints";
+    public static final String OMS_EXCEPTION_TRIAGE = "oms-exception-triage";
 
     /** @return the use case settings, or null for a name ADR-015 does not authorise */
     public UseCase useCase(String name) {
@@ -124,8 +126,13 @@ public class JevProperties {
                 LEAD_SCORE, leadScore,
                 DISCOUNT_TIER_SHADOW, discountTierShadow,
                 QUOTE_TIER_SUGGESTION, quoteTierSuggestion,
-                DUPLICATE_HINTS, duplicateHints).get(name);
+                DUPLICATE_HINTS, duplicateHints,
+                OMS_EXCEPTION_TRIAGE, omsExceptionTriage).get(name);
     }
+
+    public UseCase getOmsExceptionTriage() { return omsExceptionTriage; }
+
+    public void setOmsExceptionTriage(UseCase settings) { this.omsExceptionTriage = settings; }
 
     public boolean isEnabled() {
         return enabled;

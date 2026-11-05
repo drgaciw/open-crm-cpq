@@ -52,6 +52,7 @@ public class QuoteAcceptedEvent {
     private String customerId;
     private BigDecimal totalAmount;
     private String currencyCode;
+    private String fulfillmentOwner;
 
     private QuoteSnapshot quote;
     private CustomerSnapshot customer;

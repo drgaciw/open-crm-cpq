@@ -204,7 +204,12 @@ public final class EventContractRegistry {
     public static final EventContract SOLUTION_DERIVED_V1 = published(
             "SolutionDerived", "crm-service", KafkaTopics.SOLUTION_DERIVED, SolutionDerivedEvent.class);
 
+    public static final EventContract OMS_ACCEPTED_SNAPSHOT_V1 = published(
+            "OmsAcceptedSnapshot", "quote-service", KafkaTopics.OMS_QUOTE_ACCEPTED,
+            com.opencrm.common.event.dto.OmsAcceptedSnapshotEvent.class);
+
     private static final List<EventContract> ALL = List.of(
+            OMS_ACCEPTED_SNAPSHOT_V1,
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
             RAMP_APPLIED_V1,

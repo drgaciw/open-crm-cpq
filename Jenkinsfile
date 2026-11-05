@@ -152,6 +152,17 @@ pipeline {
       }
     }
 
+    stage('OMS Browser Acceptance') {
+      steps {
+        sh 'bash scripts/ci/run-core.sh oms-browser'
+      }
+      post {
+        always {
+          junit allowEmptyResults: true, testResults: 'backend/services/order-management/target/surefire-reports/*OrderLiveBrowserUat*.xml'
+        }
+      }
+    }
+
     stage('AI Assist') {
       when {
         expression { return env.AI_CI_ENABLED == 'true' }
@@ -211,6 +222,7 @@ pipeline {
     always {
       archiveArtifacts artifacts: 'ci-reports/**/*.md', allowEmptyArchive: true
       archiveArtifacts artifacts: 'backend/**/target/surefire-reports/*.xml', allowEmptyArchive: true
+      archiveArtifacts artifacts: '**/target/restore-drill-report.json,**/target/oms-browser-*.json,**/target/oms-browser-*.png,**/target/oms-browser-*.log', allowEmptyArchive: true
     }
     success {
       script {

@@ -41,8 +41,33 @@ Introduce Jev into domain services as **advisory, shadow-mode decision support**
 | Discount approval tier (shadow only) | `approval-routing` | existing threshold rule | `choice` over `MANAGER` / `DIRECTOR` / `VP_SALES` |
 | Suggested quote approval tier | `quote-service` | the user's selection | `choice` over `DEAL_DESK` / `SALES_VP` / `CFO` |
 | Duplicate organization/contact hint | `crm-service` | the user | `noul` "same real-world entity?" |
+| OMS exception investigation (shadow only; 2026-09-21 extension) | `order-management` | existing OMS rules and operator | `choice` over seven investigation-only codes; no recovery command |
 
 Any further use case requires an amendment to this table.
+
+### OMS extension, 2026-09-21
+
+The project owner's instruction to proceed with the [OMS Jev plan](../plans/oms-jev-integration-plan.md)
+authorizes disabled exception-triage code and offline validation. Only `oms-exception-triage` is
+added here; urgency, escalation use cases, UI exposure and live canary remain gated by evaluation.
+The [OMS wave extension](../forge/39-oms-jev-shadow.md) records the implemented boundary.
+
+Reconciliation and operator recovery commit before optional bounded evaluation begins. The adapter
+may write only advisory claims, scoped bindings and the service-local decision log. Raw evidence,
+identifiers and free-text reasons never enter Jev state. OMS commands, permission checks, ownership,
+evidence requirements, quantities, money, retries and Kafka delivery are unchanged. Findings from
+other creation paths are observed on reconciliation; this is not complete or durable advisory coverage.
+
+Cross-replica claims deduplicate a subject/version/features/evaluator configuration once. Abandoned
+claims are not retried automatically; advisory work is best-effort. Exact local order/exception versions
+and a 15-minute expiry are retained for a future read API, which must revalidate current state and scope.
+No advisory API or UI is exposed by this delivery. Outcomes remain unknown rather than treating the
+existing recovery action as an independently chosen investigation label.
+
+Offline fake-transport results establish integration behavior, not model accuracy. Actual held-out
+predictions, expert labels and an aggregate deployment budget are still needed before live rollout.
+The shared transport currently records the configured model; verification of the evaluator actually
+used by a facade remains a canary prerequisite. No live provider or production flag is enabled here.
 
 ## Scope and boundaries
 

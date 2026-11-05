@@ -11,6 +11,8 @@ package com.opencrm.common.event;
  */
 public final class KafkaTopics {
 
+    public static final String OMS_QUOTE_ACCEPTED = "cpq.oms.quote-accepted.v1";
+
     private KafkaTopics() {
         // Utility class
     }

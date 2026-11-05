@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "dataKind": "synthetic",
+  "evaluator": {
+    "model": "scripted-example-v1",
+    "rubricVersion": "oms-exception-triage-v1",
+    "predictionSource": "scripted",
+    "threshold": 0.9,
+    "thresholdFrozenBeforeTest": true
+  },
+  "labelReview": { "independent": false, "reviewer": "example-author" },
+  "pilotCategories": ["FINANCE_UNKNOWN", "PENDING_DELIVERY"],
+  "cases": [
+    {
+      "id": "example-1", "lineage": "synthetic-order-1", "split": "test",
+      "category": "FINANCE_UNKNOWN", "expected": "CHECK_FINANCE_ACK", "baseline": "CHECK_FINANCE_ACK",
+      "prediction": { "status": "OK", "answer": "CHECK_FINANCE_ACK", "confidence": 0.95 }
+    },
+    {
+      "id": "example-2", "lineage": "synthetic-order-2", "split": "test",
+      "category": "PENDING_DELIVERY", "expected": "CHECK_DELIVERY_STATUS", "baseline": "CHECK_DELIVERY_STATUS",
+      "prediction": { "status": "ERROR", "answer": null, "confidence": null }
+    }
+  ]
+}

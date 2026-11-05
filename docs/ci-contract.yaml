@@ -79,6 +79,18 @@ scripts_ci:
       jenkins_stage: Backend Integration
       blocking: true
       requires_docker: true
+    - id: oms-browser
+      script: scripts/ci/oms-browser.sh
+      run_core_arg: oms-browser
+      gha_job: oms-browser
+      jenkins_stage: OMS Browser Acceptance
+      blocking: true
+      requires_docker: true
+      notes: >-
+        npm ci --legacy-peer-deps; pinned Playwright Chromium install --with-deps;
+        node scripts/ci/oms-browser.mjs --fixtures; explicit Maven OrderLiveBrowserUat
+        with integration tags enabled. Linux agents need browser OS dependencies and
+        package-install capability. Requires the runner and live test; no missing-Docker skip.
     - id: security-audit
       script: scripts/ci/security-audit.sh
       run_core_arg: security-audit
@@ -146,6 +158,10 @@ github_actions:
       needs: []
       run: bash scripts/ci/run-core.sh frontend
       notes: actions/setup-node 22.22.3 (Angular 22 min)
+    oms-browser:
+      needs: [shared-libraries, backend-unit]
+      run: bash scripts/ci/run-core.sh oms-browser
+      notes: Java 25, Node 22.22.3, Docker and Chromium; fixture checks then real PostgreSQL-backed browser acceptance
     security-audit:
       needs: []
       run: bash scripts/ci/run-core.sh security-audit
@@ -153,6 +169,9 @@ github_actions:
   needs_graph:
     # Integration gates only on shared-libraries + backend-unit (not frontend or cpq-beta)
     backend-integration:
+      - shared-libraries
+      - backend-unit
+    oms-browser:
       - shared-libraries
       - backend-unit
 
@@ -217,6 +236,8 @@ jenkins:
     - name: Backend Integration
       run: bash scripts/ci/run-core.sh backend-integration
       parity_note: Does not wait on frontend or cpq-beta (matches GHA needs)
+    - name: OMS Browser Acceptance
+      run: bash scripts/ci/run-core.sh oms-browser
     - name: AI Assist
       when: AI_CI_ENABLED=true
       jenkins_only: true
@@ -226,6 +247,8 @@ jenkins:
   post:
     always:
       - archiveArtifacts ci-reports/**/*.md
+      - archiveArtifacts '**/target/restore-drill-report.json'
+      - archiveArtifacts '**/target/oms-browser-*.json,**/target/oms-browser-*.png,**/target/oms-browser-*.log'
     failure:
       - ai log_analysis when AI_CI_ENABLED=true
 

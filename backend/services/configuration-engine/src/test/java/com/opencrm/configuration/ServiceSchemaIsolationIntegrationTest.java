@@ -36,7 +36,7 @@ class ServiceSchemaIsolationIntegrationTest {
     /** Flyway versions applied to schema contract. Count is this list, not a floor. */
     private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12",
-            "1.13", "1.14", "1.15");
+            "1.13", "1.14", "1.15", "1.16", "1.17", "1.18");
 
     /** Every base table in schema contract, including assets and the asset history. */
     private static final List<String> CONTRACT_TABLES = List.of(
@@ -53,6 +53,10 @@ class ServiceSchemaIsolationIntegrationTest {
             "contracts",
             "document_apply_ledger",
             "flyway_schema_history",
+            "oms_accepted_sources",
+            "oms_activation_inbox",
+            "oms_activation_operations",
+            "oms_quote_identities",
             "outbox_events",
             "processed_events",
             "renewal_eligibility_publications",
@@ -63,11 +67,11 @@ class ServiceSchemaIsolationIntegrationTest {
     // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
     // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
     private static final List<Service> SERVICES = List.of(
-            new Service("configuration-engine", "configuration", "configuration_sessions", 4),
+            new Service("configuration-engine", "configuration", "configuration_sessions", 5),
             // V1_1 tables, V1_2 governance types, V1_3 JEV decision log (ADR-015), V1_4 relay, V1_5 inbox, V1_6 envelope, V1_7 SKIPPED,
             // V1_8 superseded status, V1_9 ramp approval binding
-            new Service("approval-routing", "approval", "approval_requests", 9),
-            new Service("document-generation", "document", "document_generation_jobs", 4),
+            new Service("approval-routing", "approval", "approval_requests", 10),
+            new Service("document-generation", "document", "document_generation_jobs", 5),
             // V1_1 to V1_5 as above, V1_6 rate schedule, V1_7 contract documents, V1_7_1 renewal receipts,
             // V1_7_2 frozen line membership, V1_8 header backfill functions,
             // V1_10 unpriced revision storage (S3). That file is one Flyway version and creates two tables.

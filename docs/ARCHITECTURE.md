@@ -9,7 +9,15 @@ Reverse-engineered from the working tree on **2026-09-19** (all claims verified 
 
 ---
 
-## 1. System overview
+## Authorized OMS pilot work
+
+The narrow [OMS wave](forge/36-oms-pilot.md) adds a new order-management service/schema and
+Angular orders workspace on an isolated integration branch. Its [contract](contracts/oms-pilot-v1.md)
+and [manual operating runbook](runbooks/oms-pilot.md) govern the work. Intake and side-effecting
+workers default disabled; this authorization does not lift unrelated holds below. Integration-branch
+implementation is not a claim of deployment or production acceptance.
+
+## 1. Purpose
 
 **Open CRM/CPQ** is an enterprise CRM and Configure-Price-Quote platform modernized from a Frappe-based Python/Vue 3 application (`cpq_beta/`, read-only reference) into a cloud-native microservices system:
 

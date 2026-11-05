@@ -225,6 +225,15 @@
       "gatewayRouteId": "erp-stub",
       "erpStub": true,
       "agents": ["011", "016"]
+    },
+    {
+      "matrixId": "OMS-ORDERS-GET",
+      "method": "GET",
+      "path": "/api/v1/orders",
+      "examplePath": "/api/v1/orders",
+      "gatewayRouteId": "order-management",
+      "erpStub": false,
+      "agents": []
     }
   ]
 }

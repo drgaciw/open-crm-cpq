@@ -1,0 +1,43 @@
+rule_files: [operations-alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: oms_outbox_exhausted
+        values: '1+0x3'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OmsOutboxExhausted
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations: {summary: "OMS exhausted delivery requires attributable recovery"}
+  - interval: 1m
+    input_series:
+      - series: oms_operations_sample_age_seconds
+        values: '180+0x3'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OmsMetricsStale
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: "OMS operational metrics are stale, failing or unconfigured"}
+  - interval: 1m
+    input_series:
+      - series: oms_reconciliation_since_completion_seconds
+        values: '90000+0x7'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OmsReconciliationStale
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations: {summary: "OMS reconciliation is overdue or its health sample is stale; inspect scanner and database"}
+  - interval: 1m
+    input_series:
+      - series: 'up{job="oms-pilot"}'
+        values: '0+0x4'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OmsScrapeUnavailable
+        exp_alerts:
+          - exp_labels: {severity: critical, job: oms-pilot}
+            exp_annotations: {summary: "OMS authenticated monitoring endpoint is unavailable"}
