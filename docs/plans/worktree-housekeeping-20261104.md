@@ -87,3 +87,13 @@ Windows left empty `C:/Users/dgorn/cpq-wt/cpq-drg-645` and `C:/Users/dgorn/cpq-w
 ## Ongoing housekeeping
 
 Keep a ten-worktree cap. Reuse the retained integration worktrees rather than allocating a checkout for every component. After a PR lands, compare source changes against the squash commit before treating branch-only commit counts as outstanding work. Verify the remote ref and archive meaningful local files before removal. Keep backups local until merge review and relevant verification are complete; do not commit caches or replace evolved upstream code with historical snapshots.
+
+## Final source verification
+
+All 47 original named refs, including main, were verified remotely by ancestry against the initial snapshot. The three housekeeping aggregates preserve legacy and squash-landed source history without deleting historical branches.
+
+PR #795 includes the original AI boundary test and a four-line gateway test-fixture repair. Untouched main reproduced two failures in six CSRF bootstrap tests because the lightweight ReactiveWebApplicationContextRunner lacked Boot conversion and read the origin CSV as one list item. Installing ApplicationConversionService in the fixture makes all six pass; production filters and every token/origin/status assertion remain unchanged. The root merge was graph-checked using the fresh linked-worktree index and explicit root worktree binding: no partial or truncated precommit result; risk remains CRITICAL. A broad depth-three test-class impact query hit GitNexus internal chunk limits and remains partial; a bounded depth-one rerun and the modified runner method analysis completed. Do not describe that broad query as clean.
+
+The main checkout dependency directory was restored with npm ci from its committed lockfile. With matching declared versions, focused quote-service tests passed 19 tests and OMS orders passed 28 tests in four files; the standalone OMS evaluator passed 10 Python tests. The restored AI boundary test passed three targeted Maven tests. These focused checks are not whole-frontend CI or browser UAT.
+
+The substantive OMS pilot integration has a separate branch and review. It reconciles existing migration checksums, shared event and security contracts, legacy default ownership, and explicit disabled rollout flags. Its compilation/unit evidence and remaining Docker/runtime checks are tracked with that integration; this housekeeping PR does not claim OMS has merged to main.
