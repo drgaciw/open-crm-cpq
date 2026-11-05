@@ -31,7 +31,7 @@ class QuoteAcceptedEventAmendmentFieldsTest {
             .registerModule(new JavaTimeModule());
 
     @Test
-    @DisplayName("AC-S6-1a: old strict parser ignores amendmentDocumentId and applicationUnitNo")
+    @DisplayName("AC-S6-1a: old strict parser ignores amendmentDocumentId, tenantId and applicationUnitNo")
     void oldStrictParserIgnoresNewFields() throws Exception {
         String extended = """
                 {
@@ -41,6 +41,7 @@ class QuoteAcceptedEventAmendmentFieldsTest {
                   "totalAmount": 10.00,
                   "currencyCode": "USD",
                   "amendmentDocumentId": "11111111-1111-4111-8111-0000000000a1",
+                  "tenantId": "tid-interim-deployment",
                   "futureTopLevelField": true,
                   "lineItems": [
                     {
@@ -65,7 +66,7 @@ class QuoteAcceptedEventAmendmentFieldsTest {
     }
 
     @Test
-    @DisplayName("AC-S6-1: current class round-trips the new fields and omits them when null")
+    @DisplayName("AC-S6-1 / DRG-631: current class round-trips additive fields and omits them when null")
     void currentClassRoundTripsAmendmentFieldsAndOmitsNulls() throws Exception {
         QuoteAcceptedEvent event = new QuoteAcceptedEvent();
         event.setQuoteId("q-1");
@@ -78,6 +79,7 @@ class QuoteAcceptedEventAmendmentFieldsTest {
         assertThat(without).doesNotContain("tenantId");
 
         event.setAmendmentDocumentId("11111111-1111-4111-8111-0000000000a1");
+        event.setTenantId("tid-interim-deployment");
         event.setLineItems(List.of(QuoteAcceptedEvent.LineItemSnapshot.builder()
                 .lineUuid("line-1")
                 .quantity(2)
@@ -87,24 +89,27 @@ class QuoteAcceptedEventAmendmentFieldsTest {
         String json = STRICT.writeValueAsString(event);
         assertThat(json).contains("\"amendmentDocumentId\":\"11111111-1111-4111-8111-0000000000a1\"");
         assertThat(json).contains("\"applicationUnitNo\":4");
-        assertThat(json).doesNotContain("tenantId");
+        assertThat(json).contains("\"tenantId\":\"tid-interim-deployment\"");
 
         QuoteAcceptedEvent read = STRICT.readValue(json, QuoteAcceptedEvent.class);
         assertThat(read.getAmendmentDocumentId()).isEqualTo("11111111-1111-4111-8111-0000000000a1");
+        assertThat(read.getTenantId()).isEqualTo("tid-interim-deployment");
         assertThat(read.getLineItems().getFirst().getApplicationUnitNo()).isEqualTo(4);
         assertThat(read.getEventType()).isEqualTo("QuoteAccepted");
         assertThat(read.getEventVersion()).isEqualTo(1);
         assertThat(QuoteAcceptedEvent.EVENT_TYPE).isEqualTo("QuoteAccepted");
         assertThat(QuoteAcceptedEvent.EVENT_VERSION).isEqualTo(1);
+        assertThat(namesOf(QuoteAcceptedEvent.class)).contains("tenantId");
     }
 
     @Test
-    @DisplayName("identity equality ignores the additive amendment fields")
+    @DisplayName("identity equality ignores the additive amendment and tenant fields")
     void equalityStaysOnTheExistingIdentityFields() {
         Instant acceptedAt = Instant.parse("2026-10-18T00:00:00Z");
         QuoteAcceptedEvent left = identity(acceptedAt);
         QuoteAcceptedEvent right = identity(acceptedAt);
         right.setAmendmentDocumentId("11111111-1111-4111-8111-0000000000a1");
+        right.setTenantId("tid-interim-deployment");
         right.setLineItems(List.of(QuoteAcceptedEvent.LineItemSnapshot.builder()
                 .lineUuid("line-1")
                 .applicationUnitNo(9)
@@ -125,6 +130,7 @@ class QuoteAcceptedEventAmendmentFieldsTest {
             QuoteAcceptedEvent event = FIXTURES.readValue(Files.readString(dir.resolve(name)), QuoteAcceptedEvent.class);
             assertThat(event.getQuoteId()).as(name).isNotBlank();
             assertThat(event.getAmendmentDocumentId()).as(name).isNull();
+            assertThat(event.getTenantId()).as(name).isNull();
             if (event.getLineItems() != null) {
                 assertThat(event.getLineItems()).as(name).allSatisfy(line ->
                         assertThat(line.getApplicationUnitNo()).isNull());

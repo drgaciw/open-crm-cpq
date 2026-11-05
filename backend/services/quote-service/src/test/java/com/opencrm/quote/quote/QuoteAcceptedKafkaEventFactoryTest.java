@@ -163,6 +163,7 @@ class QuoteAcceptedKafkaEventFactoryTest {
         QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(quote, List.of(line));
 
         assertThat(event.getAmendmentDocumentId()).isNull();
+        assertThat(event.getTenantId()).isNull();
         assertThat(event.getLineItems()).singleElement()
                 .extracting(QuoteAcceptedEvent.LineItemSnapshot::getApplicationUnitNo)
                 .isNull();
@@ -194,5 +195,40 @@ class QuoteAcceptedKafkaEventFactoryTest {
         assertThat(event.getAmendmentDocumentId()).isEqualTo("22222222-2222-4222-8222-222222222222");
         assertThat(event.getLineItems().getFirst().getApplicationUnitNo()).isEqualTo(3);
         assertThat(event.getEventVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void publishesQuoteTenantIdOntoQuoteAcceptedEvent() {
+        // DRG-631: interim Entra tid on Quote (DRG-632) is published additively on v1.
+        Quote quote = Quote.builder()
+                .uuid("quote-uuid-tenant")
+                .quoteNumber("Q-TENANT")
+                .currency("USD")
+                .totalAmount(new BigDecimal("10.00"))
+                .tenantId("tid-interim-deployment")
+                .build();
+
+        QuoteAcceptedEvent event = QuoteAcceptedKafkaEventFactory.from(quote, List.of());
+
+        assertThat(event.getTenantId()).isEqualTo("tid-interim-deployment");
+        assertThat(event.getEventType()).isEqualTo(EventContractRegistry.QUOTE_ACCEPTED_V1.eventType());
+        assertThat(event.getEventVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void blankOrWhitespaceQuoteTenantIsOmittedFromTheEvent() {
+        Quote blank = Quote.builder()
+                .uuid("quote-uuid-blank-tenant")
+                .quoteNumber("Q-BLANK")
+                .tenantId("   ")
+                .build();
+        Quote empty = Quote.builder()
+                .uuid("quote-uuid-empty-tenant")
+                .quoteNumber("Q-EMPTY")
+                .tenantId("")
+                .build();
+
+        assertThat(QuoteAcceptedKafkaEventFactory.from(blank, List.of()).getTenantId()).isNull();
+        assertThat(QuoteAcceptedKafkaEventFactory.from(empty, List.of()).getTenantId()).isNull();
     }
 }
