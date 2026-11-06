@@ -60,4 +60,18 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
 
     boolean existsByParentOrganizationIdAndDeletedFalse(Long parentId);
     List<Organization> findByParentOrganizationIdAndDeletedFalseOrderByIdAsc(Long parentId);
+
+    /**
+     * RED stub query. Returns no rows. The bounded read-only domain candidate query replaces it.
+     */
+    @Query("""
+            SELECT o FROM Organization o
+            WHERE o.deleted = false
+              AND o.id <> :excludeId
+              AND o.id < 0
+              AND :pattern = :pattern
+            """)
+    List<Organization> findActiveDomainCandidates(@Param("excludeId") Long excludeId,
+                                                  @Param("pattern") String pattern,
+                                                  Pageable pageable);
 }

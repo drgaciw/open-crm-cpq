@@ -76,4 +76,36 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
      * Count contacts by organization (excluding deleted).
      */
     long countByOrganizationIdAndDeletedFalse(Long organizationId);
+
+    /**
+     * RED stub query. Returns no rows. The bounded read-only email candidate query replaces it.
+     */
+    @Query("""
+            SELECT c FROM Contact c
+            WHERE c.deleted = false
+              AND c.status = :status
+              AND c.id <> :excludeId
+              AND c.id < 0
+              AND :normalizedEmail = :normalizedEmail
+            """)
+    List<Contact> findActiveByNormalizedEmail(@Param("excludeId") Long excludeId,
+                                              @Param("normalizedEmail") String normalizedEmail,
+                                              @Param("status") ContactStatus status,
+                                              Pageable pageable);
+
+    /**
+     * RED stub query. Returns no rows. The bounded read-only same-organization query replaces it.
+     */
+    @Query("""
+            SELECT c FROM Contact c
+            WHERE c.deleted = false
+              AND c.status = :status
+              AND c.id <> :excludeId
+              AND c.organization.id = :organizationId
+              AND c.id < 0
+            """)
+    List<Contact> findActiveInOrganization(@Param("excludeId") Long excludeId,
+                                           @Param("organizationId") Long organizationId,
+                                           @Param("status") ContactStatus status,
+                                           Pageable pageable);
 }
