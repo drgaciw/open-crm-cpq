@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -29,11 +30,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * PostgreSQL coverage for the registry. The Flyway version is not allocated, so this test
- * applies {@link CustomFieldSchema} itself and deletes only the rows it creates.
+ * applies {@link CustomFieldSchema} itself.
+ * <p>
+ * Cleanup deletes only ids returned by this test's own SQL inserts and successful API calls.
+ * GET-seeded standard definitions, including {@code name}, are not owned and are not deleted.
+ * {@link BaseIntegrationTest} still truncates the shared CRM record tables. That is not a
+ * zero-residue guarantee and not a concurrency test.
  */
 @Tag("integration")
 @Tag("docker")
 class FieldRegistryPostgresTest extends BaseIntegrationTest {
+
+    private static final String SENTINEL_TEXT = "sentinel-keep";
+    private static final String CONTROL_TEXT = "control-keep";
 
     @Autowired
     private MockMvc mockMvc;
@@ -41,41 +50,101 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final String SENTINEL_KEY = "unrelated_sentinel";
-    private static final String SENTINEL_TEXT = "sentinel-keep";
+    private final Set<Long> primaryValueIds = new HashSet<>();
+    private final Set<Long> primaryOptionIds = new HashSet<>();
+    private final Set<Long> primaryDefinitionIds = new HashSet<>();
 
-    private long organizationId;
-    private long contactId;
-    private long dealId;
-    private long sentinelOrganizationId;
-    private long sentinelDefinitionId;
-    private long sentinelOptionId;
-    private long sentinelValueId;
-    private Set<Long> definitionsAtStart = Set.of();
-    private Set<Long> optionsAtStart = Set.of();
-    private Set<Long> valuesAtStart = Set.of();
+    private Long organizationId;
+    private Long contactId;
+    private Long dealId;
+    private Long sentinelOrganizationId;
+    private Long sentinelDefinitionId;
+    private Long sentinelOptionId;
+    private Long sentinelValueId;
+    private String sentinelKey;
+    private Long controlOrganizationId;
+    private Long controlDefinitionId;
+    private Long controlOptionId;
+    private Long controlValueId;
+    private String controlKey;
 
     @BeforeEach
     void schemaAndRecords() {
+        primaryValueIds.clear();
+        primaryOptionIds.clear();
+        primaryDefinitionIds.clear();
+        organizationId = null;
+        contactId = null;
+        dealId = null;
+        sentinelOrganizationId = null;
+        sentinelDefinitionId = null;
+        sentinelOptionId = null;
+        sentinelValueId = null;
+        sentinelKey = null;
+        controlOrganizationId = null;
+        controlDefinitionId = null;
+        controlOptionId = null;
+        controlValueId = null;
+        controlKey = null;
+
         CustomFieldSchema.apply(jdbcTemplate);
-        organizationId = insertOrganization();
+        organizationId = insertOrganization("Acme");
         contactId = insertContact(organizationId);
         dealId = insertDeal(organizationId);
-        ensureUnrelatedSentinel();
-        definitionsAtStart = ids("crm.field_definition");
-        optionsAtStart = ids("crm.field_option");
-        valuesAtStart = ids("crm.field_value");
+        insertFreshSentinel();
     }
 
     @AfterEach
     void removeRowsThisTestCreated() {
         SecurityContextHolder.clearContext();
+        Throwable assertionFailure = null;
         try {
-            deleteOnlyIdsCreatedByThisTest();
-        } finally {
-            jdbcTemplate.update("DELETE FROM crm.deals WHERE id = ?", dealId);
-            jdbcTemplate.update("DELETE FROM crm.contacts WHERE id = ?", contactId);
-            jdbcTemplate.update("DELETE FROM crm.organizations WHERE id = ?", organizationId);
+            deleteIds("crm.field_value", primaryValueIds);
+            deleteIds("crm.field_option", primaryOptionIds);
+            deleteIds("crm.field_definition", primaryDefinitionIds);
+            assertIdsAbsent("crm.field_value", primaryValueIds);
+            assertIdsAbsent("crm.field_option", primaryOptionIds);
+            assertIdsAbsent("crm.field_definition", primaryDefinitionIds);
+            assertSurvived("crm.field_value", sentinelValueId);
+            assertSurvived("crm.field_option", sentinelOptionId);
+            assertSurvived("crm.field_definition", sentinelDefinitionId);
+            assertSurvived("crm.organizations", sentinelOrganizationId);
+            assertSurvived("crm.field_value", controlValueId);
+            assertSurvived("crm.field_option", controlOptionId);
+            assertSurvived("crm.field_definition", controlDefinitionId);
+            assertSurvived("crm.organizations", controlOrganizationId);
+        } catch (Throwable ex) {
+            assertionFailure = ex;
+        }
+        Throwable cleanupFailure = null;
+        try {
+            disposeCaptured(controlValueId, controlOptionId, controlDefinitionId, controlOrganizationId);
+            controlValueId = null;
+            controlOptionId = null;
+            controlDefinitionId = null;
+            controlOrganizationId = null;
+            disposeCaptured(sentinelValueId, sentinelOptionId, sentinelDefinitionId, sentinelOrganizationId);
+            sentinelValueId = null;
+            sentinelOptionId = null;
+            sentinelDefinitionId = null;
+            sentinelOrganizationId = null;
+            deleteIfPresent("crm.deals", dealId);
+            deleteIfPresent("crm.contacts", contactId);
+            deleteIfPresent("crm.organizations", organizationId);
+            dealId = null;
+            contactId = null;
+            organizationId = null;
+        } catch (Throwable ex) {
+            cleanupFailure = ex;
+        }
+        if (assertionFailure != null) {
+            if (cleanupFailure != null) {
+                assertionFailure.addSuppressed(cleanupFailure);
+            }
+            rethrow(assertionFailure);
+        }
+        if (cleanupFailure != null) {
+            rethrow(cleanupFailure);
         }
     }
 
@@ -88,15 +157,18 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                         .content(textField("region_code", "Region", "spoofed-creator")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
-        String created = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(textField("region_code", "Region", null)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.createdBy").value("person-create"))
-                .andExpect(jsonPath("$.data.updatedBy").value("person-create"))
-                .andReturn().getResponse().getContentAsString();
+                .andReturn();
+        String created = createdResult.getResponse().getContentAsString();
         long id = idOf(created);
+        primaryDefinitionIds.add(id);
+        insertLateControl();
+        jsonPath("$.data.createdBy").value("person-create").match(createdResult);
+        jsonPath("$.data.updatedBy").value("person-create").match(createdResult);
         assertActors(id, "person-create", "person-create", false);
 
         authenticatePerson("person-relabel");
@@ -137,24 +209,30 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         assertActors(id, "person-create", "person-archive", true);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM crm.field_definition WHERE id = ?", Integer.class, id)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT organization_id FROM crm.field_value WHERE id = ?", Long.class, controlValueId))
+                .isEqualTo(controlOrganizationId);
     }
 
     @Test
     void tenantsAreIsolatedAndStandardFieldsCannotBeDeletedOrRetyped() throws Exception {
         authenticatePerson("person-create");
-        String created = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(textField("region_code", "Region A", null)))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        long id = idOf(created);
+                .andReturn();
+        long id = idOf(createdResult.getResponse().getContentAsString());
+        primaryDefinitionIds.add(id);
 
-        mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult otherTenant = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.B)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(textField("region_code", "Region B", null)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+        primaryDefinitionIds.add(idOf(otherTenant.getResponse().getContentAsString()));
         mockMvc.perform(get("/api/v1/field-definitions/" + id).param("tenant", FixtureTenants.B))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/field-definitions")
@@ -193,46 +271,48 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     @Test
     void optionRenameKeepsTheValueAndAgentsCannotWriteValues() throws Exception {
         authenticatePerson("person-create");
-        String created = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"entity":"ORGANIZATION","key":"segment","label":"Segment","type":"SELECT","required":false,"showOnRecord":true,"showOnList":true,"position":40,"agentFilled":true,"agentBrief":"Segment the account","options":[{"label":"Red","position":1},{"label":"Blue","position":2}]}
                                 """))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
+                .andReturn();
+        String created = createdResult.getResponse().getContentAsString();
         long definitionId = idOf(created);
-        long optionId = optionId(created, "Red");
+        primaryDefinitionIds.add(definitionId);
+        long redOptionId = optionId(created, "Red");
+        long blueOptionId = optionId(created, "Blue");
+        primaryOptionIds.add(redOptionId);
+        primaryOptionIds.add(blueOptionId);
 
         mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + optionId + ",\"createdBy\":\"spoofed\"}"))
+                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + redOptionId + ",\"createdBy\":\"spoofed\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + optionId + "}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.optionId").value(optionId))
-                .andExpect(jsonPath("$.data.createdBy").value("person-create"));
+        MvcResult valueResult = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"optionId\":" + redOptionId + "}");
+        jsonPath("$.data.optionId").value((int) redOptionId).match(valueResult);
+        jsonPath("$.data.createdBy").value("person-create").match(valueResult);
 
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/options/" + optionId)
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/options/" + redOptionId)
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"label\":\"Crimson\",\"position\":1,\"version\":0}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.options[?(@.label=='Crimson')].id").value((int) optionId));
+                .andExpect(jsonPath("$.data.options[?(@.label=='Crimson')].id").value((int) redOptionId));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT option_id FROM crm.field_value WHERE definition_id = ?", Long.class, definitionId))
-                .isEqualTo(optionId);
+                .isEqualTo(redOptionId);
 
         authenticateService();
         mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + optionId + "}"))
+                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + redOptionId + "}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("AGENT_FIELD_VALUE_FORBIDDEN"));
         assertThat(jdbcTemplate.queryForObject(
@@ -246,18 +326,15 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("FIELD_TYPE_INCOMPATIBLE"));
 
-        String emailField = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult emailResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(textField("billing_email", "Billing email", null)))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        long emailId = idOf(emailField);
-        mockMvc.perform(put("/api/v1/field-definitions/" + emailId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"text\":\"billing@example.com\"}"))
-                .andExpect(status().isOk());
+                .andReturn();
+        long emailId = idOf(emailResult.getResponse().getContentAsString());
+        primaryDefinitionIds.add(emailId);
+        putOwnedValue(emailId, "{\"organizationId\":" + organizationId + ",\"text\":\"billing@example.com\"}");
         mockMvc.perform(put("/api/v1/field-definitions/" + emailId)
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -282,15 +359,16 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     @Test
     void numericOverflowIsRejectedBeforeARowIsWritten() throws Exception {
         authenticatePerson("person-create");
-        String created = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"entity":"ORGANIZATION","key":"headcount","label":"Headcount","type":"NUMBER","required":false,"showOnRecord":true,"showOnList":false,"position":40,"agentFilled":false}
                                 """))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        long definitionId = idOf(created);
+                .andReturn();
+        long definitionId = idOf(createdResult.getResponse().getContentAsString());
+        primaryDefinitionIds.add(definitionId);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT numeric_precision FROM information_schema.columns
                 WHERE table_schema = 'crm' AND table_name = 'field_value' AND column_name = 'numeric'
@@ -307,29 +385,21 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM crm.field_value WHERE definition_id = ?", Integer.class, definitionId)).isZero();
 
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":0}"))
-                .andExpect(status().isOk());
+        MvcResult zero = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"numeric\":0}");
+        long valueId = idOf(zero.getResponse().getContentAsString());
         assertThat(storedNumeric(definitionId)).isEqualByComparingTo("0");
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":1e+19}"))
-                .andExpect(status().isOk());
+        MvcResult positiveExponent = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"numeric\":1e+19}");
+        assertThat(idOf(positiveExponent.getResponse().getContentAsString())).isEqualTo(valueId);
         assertThat(storedNumeric(definitionId)).isEqualByComparingTo("1E+19");
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":99999999999999999999.9999}"))
-                .andExpect(status().isOk());
+        MvcResult positiveBoundary = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"numeric\":99999999999999999999.9999}");
+        assertThat(idOf(positiveBoundary.getResponse().getContentAsString())).isEqualTo(valueId);
         assertThat(storedNumeric(definitionId)).isEqualByComparingTo("99999999999999999999.9999");
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":-99999999999999999999.9999}"))
-                .andExpect(status().isOk());
+        MvcResult negativeBoundary = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"numeric\":-99999999999999999999.9999}");
+        assertThat(idOf(negativeBoundary.getResponse().getContentAsString())).isEqualTo(valueId);
         assertThat(storedNumeric(definitionId)).isEqualByComparingTo("-99999999999999999999.9999");
     }
 
@@ -348,22 +418,74 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 """, String.class)).contains("text", "numeric", "date", "bool", "option_id", "user_id");
 
         authenticatePerson("person-create");
-        String created = mockMvc.perform(post("/api/v1/field-definitions")
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(textField("po_box", "PO Box", null)))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        long definitionId = idOf(created);
+                .andReturn();
+        long definitionId = idOf(createdResult.getResponse().getContentAsString());
+        primaryDefinitionIds.add(definitionId);
         mockMvc.perform(delete("/api/v1/field-definitions/" + definitionId).param("tenant", FixtureTenants.A))
                 .andExpect(status().isInternalServerError());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM crm.field_definition WHERE id = ?", Integer.class, definitionId)).isEqualTo(1);
-        mockMvc.perform(put("/api/v1/field-definitions/" + idOf(created) + "/values")
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"organizationId\":999999999,\"text\":\"missing\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    private void insertFreshSentinel() {
+        sentinelKey = freshKey("s_");
+        sentinelOrganizationId = insertOrganization("Sentinel " + sentinelKey);
+        sentinelDefinitionId = insertDefinition(FixtureTenants.B, sentinelKey, "Unrelated", SENTINEL_TEXT);
+        sentinelOptionId = insertOption(sentinelDefinitionId, "Sentinel option");
+        sentinelValueId = insertTextValue(sentinelDefinitionId, sentinelOrganizationId, SENTINEL_TEXT);
+    }
+
+    private void insertLateControl() {
+        controlKey = freshKey("c_");
+        controlOrganizationId = insertOrganization("Control " + controlKey);
+        controlDefinitionId = insertDefinition(FixtureTenants.A, controlKey, "Late control", CONTROL_TEXT);
+        controlOptionId = insertOption(controlDefinitionId, "Control option");
+        controlValueId = insertTextValue(controlDefinitionId, controlOrganizationId, CONTROL_TEXT);
+    }
+
+    private long insertDefinition(String tenant, String key, String label, String brief) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO crm.field_definition (
+                    tenant, entity, "key", label, type, required, show_on_record, show_on_list, position,
+                    agent_filled, agent_brief, created_by, updated_by
+                ) VALUES (?, 'organization', ?, ?, 'text', false, true, false, 900, false, ?, 'sentinel', 'sentinel')
+                RETURNING id
+                """, Long.class, tenant, key, label, brief);
+    }
+
+    private long insertOption(long definitionId, String label) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO crm.field_option (definition_id, label, position, created_by, updated_by)
+                VALUES (?, ?, 1, 'sentinel', 'sentinel') RETURNING id
+                """, Long.class, definitionId, label);
+    }
+
+    private long insertTextValue(long definitionId, long ownerOrganizationId, String text) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO crm.field_value (definition_id, organization_id, "text", created_by, updated_by)
+                VALUES (?, ?, ?, 'sentinel', 'sentinel') RETURNING id
+                """, Long.class, definitionId, ownerOrganizationId, text);
+    }
+
+    private MvcResult putOwnedValue(long definitionId, String content) throws Exception {
+        MvcResult result = mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(content))
+                .andExpect(status().isOk())
+                .andReturn();
+        primaryValueIds.add(idOf(result.getResponse().getContentAsString()));
+        return result;
     }
 
     private void assertActors(long id, String createdBy, String updatedBy, boolean archived) {
@@ -391,68 +513,17 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value("FIELD_VALUE_INVALID"));
     }
 
-    private void ensureUnrelatedSentinel() {
-        sentinelOrganizationId = jdbcTemplate.queryForObject(
-                "INSERT INTO crm.organizations (uuid, name, created_by) VALUES (?, 'Unrelated Sentinel', 'sentinel') RETURNING id",
-                Long.class, UUID.randomUUID().toString());
-        Long existing = jdbcTemplate.query("""
-                SELECT id FROM crm.field_definition
-                WHERE tenant = ? AND entity = 'organization' AND "key" = ?
-                """, rs -> rs.next() ? rs.getLong(1) : null, FixtureTenants.B, SENTINEL_KEY);
-        if (existing == null) {
-            sentinelDefinitionId = jdbcTemplate.queryForObject("""
-                    INSERT INTO crm.field_definition (
-                        tenant, entity, "key", label, type, required, show_on_record, show_on_list, position,
-                        agent_filled, created_by, updated_by
-                    ) VALUES (?, 'organization', ?, 'Unrelated', 'text', false, true, false, 900, false, 'sentinel', 'sentinel')
-                    RETURNING id
-                    """, Long.class, FixtureTenants.B, SENTINEL_KEY);
-            sentinelOptionId = jdbcTemplate.queryForObject("""
-                    INSERT INTO crm.field_option (definition_id, label, position, created_by, updated_by)
-                    VALUES (?, 'Sentinel option', 1, 'sentinel', 'sentinel') RETURNING id
-                    """, Long.class, sentinelDefinitionId);
-        } else {
-            sentinelDefinitionId = existing;
-            sentinelOptionId = jdbcTemplate.queryForObject(
-                    "SELECT id FROM crm.field_option WHERE definition_id = ? ORDER BY id LIMIT 1",
-                    Long.class, sentinelDefinitionId);
+    private void assertSurvived(String table, Long id) {
+        if (id == null) {
+            return;
         }
-        sentinelValueId = jdbcTemplate.queryForObject("""
-                INSERT INTO crm.field_value (definition_id, organization_id, "text", created_by, updated_by)
-                VALUES (?, ?, ?, 'sentinel', 'sentinel') RETURNING id
-                """, Long.class, sentinelDefinitionId, sentinelOrganizationId, SENTINEL_TEXT);
-    }
-
-    private void assertUnrelatedRowsSurvived() {
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT \"key\" FROM crm.field_definition WHERE id = ?", String.class, sentinelDefinitionId))
-                .isEqualTo(SENTINEL_KEY);
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT label FROM crm.field_option WHERE id = ?", String.class, sentinelOptionId))
-                .isEqualTo("Sentinel option");
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT \"text\" FROM crm.field_value WHERE id = ?", String.class, sentinelValueId))
-                .isEqualTo(SENTINEL_TEXT);
-    }
-
-    private void deleteOnlyIdsCreatedByThisTest() {
-        Set<Long> definitions = createdSince(definitionsAtStart, ids("crm.field_definition"));
-        Set<Long> options = createdSince(optionsAtStart, ids("crm.field_option"));
-        Set<Long> values = createdSince(valuesAtStart, ids("crm.field_value"));
-        assertThat(definitions).doesNotContain(sentinelDefinitionId);
-        assertThat(options).doesNotContain(sentinelOptionId);
-        assertThat(values).doesNotContain(sentinelValueId);
-        deleteIds("crm.field_value", values);
-        deleteIds("crm.field_option", options);
-        deleteIds("crm.field_definition", definitions);
-        assertIdsAbsent("crm.field_value", values);
-        assertIdsAbsent("crm.field_option", options);
-        assertIdsAbsent("crm.field_definition", definitions);
-        assertUnrelatedRowsSurvived();
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE id = ?", Integer.class, id);
+        assertThat(count).isEqualTo(1);
     }
 
     private void assertIdsAbsent(String table, Set<Long> createdIds) {
-        if (createdIds.isEmpty()) {
+        if (createdIds == null || createdIds.isEmpty()) {
             return;
         }
         String placeholders = String.join(",", java.util.Collections.nCopies(createdIds.size(), "?"));
@@ -463,21 +534,15 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         assertThat(remaining).isZero();
     }
 
-    private BigDecimal storedNumeric(long definitionId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT \"numeric\" FROM crm.field_value WHERE definition_id = ?",
-                BigDecimal.class,
-                definitionId);
-    }
-
-    private static Set<Long> createdSince(Set<Long> before, Set<Long> after) {
-        Set<Long> created = new HashSet<>(after);
-        created.removeAll(before);
-        return created;
+    private void disposeCaptured(Long valueId, Long optionId, Long definitionId, Long ownerOrganizationId) {
+        deleteIfPresent("crm.field_value", valueId);
+        deleteIfPresent("crm.field_option", optionId);
+        deleteIfPresent("crm.field_definition", definitionId);
+        deleteIfPresent("crm.organizations", ownerOrganizationId);
     }
 
     private void deleteIds(String table, Set<Long> createdIds) {
-        if (createdIds.isEmpty()) {
+        if (createdIds == null || createdIds.isEmpty()) {
             return;
         }
         String placeholders = String.join(",", java.util.Collections.nCopies(createdIds.size(), "?"));
@@ -486,14 +551,24 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 createdIds.toArray());
     }
 
-    private Set<Long> ids(String table) {
-        return new HashSet<>(jdbcTemplate.queryForList("SELECT id FROM " + table, Long.class));
+    private void deleteIfPresent(String table, Long id) {
+        if (id == null) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM " + table + " WHERE id = ?", id);
     }
 
-    private long insertOrganization() {
+    private BigDecimal storedNumeric(long definitionId) {
         return jdbcTemplate.queryForObject(
-                "INSERT INTO crm.organizations (uuid, name, created_by) VALUES (?, 'Acme', 'test') RETURNING id",
-                Long.class, UUID.randomUUID().toString());
+                "SELECT \"numeric\" FROM crm.field_value WHERE definition_id = ?",
+                BigDecimal.class,
+                definitionId);
+    }
+
+    private long insertOrganization(String name) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO crm.organizations (uuid, name, created_by) VALUES (?, ?, 'test') RETURNING id",
+                Long.class, UUID.randomUUID().toString(), name);
     }
 
     private long insertContact(long organization) {
@@ -506,6 +581,14 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         return jdbcTemplate.queryForObject(
                 "INSERT INTO crm.deals (uuid, name, organization_id, stage, created_by) VALUES (?, 'Expansion', ?, 'PROSPECTING', 'test') RETURNING id",
                 Long.class, UUID.randomUUID().toString(), organization);
+    }
+
+    private static String freshKey(String prefix) {
+        String key = prefix + UUID.randomUUID().toString().replace("-", "");
+        if (!key.matches("^[a-z][a-z0-9_]{0,62}$")) {
+            throw new IllegalStateException("Generated field key is not allowed");
+        }
+        return key;
     }
 
     private static String textField(String key, String label, String spoofedActor) {
@@ -565,5 +648,15 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 .claim("azp", "enrichment-agent")
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
+    }
+
+    private static void rethrow(Throwable failure) {
+        if (failure instanceof RuntimeException runtime) {
+            throw runtime;
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        throw new IllegalStateException(failure);
     }
 }
