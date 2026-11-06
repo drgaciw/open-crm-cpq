@@ -1,6 +1,6 @@
 -- Guarded rollback for V1_16. Not a Flyway migration. Refuses while any row exists.
 -- Run in the CAM schema (contract unless DB_SCHEMA says otherwise).
--- Must run after V1_17 rollback if subscriptions.contract_line_id still references contract_lines.
+-- Refuses until the V1_17 rollback has removed subscriptions.contract_line_id.
 
 DO $$
 DECLARE
@@ -9,6 +9,14 @@ BEGIN
     IF to_regclass(current_schema() || '.contract_lines') IS NULL THEN
         RAISE NOTICE 'contract_lines is already absent in %', current_schema();
         RETURN;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'subscriptions'
+          AND column_name = 'contract_line_id'
+    ) THEN
+        RAISE EXCEPTION 'refusing to drop contract_lines: subscriptions.contract_line_id still present; run the V1_17 rollback first';
     END IF;
     EXECUTE 'SELECT count(*) FROM contract_lines' INTO rows;
     IF rows > 0 THEN
