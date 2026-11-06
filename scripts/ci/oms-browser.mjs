@@ -45,21 +45,21 @@ server = await createServer({
       const result = await response;
       if (result.status() !== expected) throw new Error(`${suffix}: expected ${expected}, got ${result.status()}: ${await result.text().catch(()=>'response body unavailable')}`);
       commands.push({ path: suffix, status: result.status() });
-      // Read the body before the UI settles: the app re-renders and navigates on success, and by the time the UI waits
-      // finish Chromium can no longer return this response's body (Network.getResponseBody "No data found").
-      const body = suffix === '/orders/from-quote' ? await result.json() : undefined;
+      // The response body is not read: Chromium cannot return it once the app has re-rendered (Network.getResponseBody
+      // "No data found"), so callers take what they need from the UI, for example the new order's URL.
       await page.waitForFunction(() => !document.body.textContent.includes('Recording command…') && !document.body.textContent.includes('Loading order, execution plan'));
       if (suffix !== '/orders/from-quote') await page.getByRole('heading', { name: 'Accepted commercial snapshot', exact: true }).waitFor();
-      return body;
     };
     await page.goto(base + 'orders');
     await page.getByText('Create order from accepted quote', { exact: true }).click();
     await page.getByLabel('Snapshot ID', { exact: true }).fill('11111111-1111-4111-8111-111111111111');
     await page.getByLabel('Quote ID', { exact: true }).fill('Q-OMS-001');
     await page.getByLabel('Accepted revision', { exact: true }).fill('1');
-    const converted = await post('Create order', '/orders/from-quote');
-    const id = converted.data.id;
-    await page.waitForURL(`**/orders/${id}`);
+    await post('Create order', '/orders/from-quote');
+    // The app opens the new order's detail page; its id is the last path segment.
+    await page.waitForURL(url => /\/orders\/[^/]+$/.test(new URL(url).pathname));
+    const id = new URL(page.url()).pathname.split('/').pop();
+    assert.ok(id, 'new order id from detail URL');
     await page.getByLabel('Command reason', { exact: true }).fill('Synthetic integrated pilot acceptance');
     await post('Submit order', '/submit');
     // Let the real server commit a hold, then lose its response. Reload must recover its receipt.
