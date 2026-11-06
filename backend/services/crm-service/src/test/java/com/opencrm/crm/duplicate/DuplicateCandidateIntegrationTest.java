@@ -209,6 +209,27 @@ class DuplicateCandidateIntegrationTest extends BaseIntegrationTest {
         assertThat(ids).doesNotContain(source.getId());
     }
 
+    @Test
+    @DisplayName("AC4: laterSameNameDuplicateIsNotHiddenByFiftyEarlierContacts")
+    void laterSameNameDuplicateIsNotHiddenByFiftyEarlierContacts() throws Exception {
+        Organization organization = saveOrganization("Name Cap", "namecap.example", null);
+        Contact source = saveContact("  Ann   Marie ", "Smith", "source@namecap.example", organization, ContactStatus.ACTIVE);
+        List<Long> earlier = new ArrayList<>();
+        for (int i = 0; i < 55; i++) {
+            earlier.add(saveContact("Pat", "Unrelated" + i, "unrelated-" + i + "@namecap.example",
+                    organization, ContactStatus.ACTIVE).getId());
+        }
+        Contact later = saveContact("ann marie", " smith ", "later@namecap.example", organization, ContactStatus.ACTIVE);
+
+        assertThat(earlier).hasSize(55);
+        assertThat(later.getId()).isGreaterThan(earlier.get(54));
+        assertThat(DomainNormalizer.normalizeName(source.getFirstName(), source.getLastName()))
+                .isEqualTo("ann marie smith");
+        assertThat(DomainNormalizer.normalizeName(later.getFirstName(), later.getLastName()))
+                .isEqualTo("ann marie smith");
+        assertThat(candidateIds(contactCandidates(source.getId()))).containsExactly(later.getId());
+    }
+
     private long createViaApi(String name, String websiteDomain, String website) throws Exception {
         OrganizationCreateRequest request = OrganizationCreateRequest.builder()
                 .name(name)
