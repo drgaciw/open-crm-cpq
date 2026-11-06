@@ -20,6 +20,12 @@ public interface DocumentApplyGateway {
      */
     boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId);
 
+    /**
+     * When {@code subscriptions.contract_id} is set, compare {@code subscriptions.tenant_id} to
+     * {@code contracts.tenant_id}. Returns {@code TENANT_UNSET}, {@code TENANT_MISMATCH}, or null.
+     */
+    String contractTenantBlock(long subscriptionId);
+
     List<ApplyLine> lines(UUID documentId, int revisionNo);
 
     void bindAmendmentLine(long periodId, UUID lineId, int revisionNo);

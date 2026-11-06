@@ -7,6 +7,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * Subscription entity - authoritative source for subscription/asset state.
@@ -26,6 +27,11 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "subscription_number", nullable = false, unique = true)
     private String subscriptionNumber;
+
+    /**
+     * RED stub field for DRG-662 — real mapping/immutability lands in the green commit.
+     */
+    private UUID tenantId;
     
     @Column(name = "customer_id", nullable = false)
     private String customerId;
