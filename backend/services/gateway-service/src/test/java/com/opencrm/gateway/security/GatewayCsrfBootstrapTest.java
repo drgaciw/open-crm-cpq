@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -21,6 +22,9 @@ class GatewayCsrfBootstrapTest {
 
     private static ReactiveWebApplicationContextRunner runner(boolean dev) {
         ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
+                // Match Boot's comma-separated @Value collection binding for the origin allowlist.
+                .withInitializer(context -> context.getBeanFactory()
+                        .setConversionService(new ApplicationConversionService()))
                 .withUserConfiguration(GatewaySecurityChainTest.Echo.class, SecurityConfig.class,
                         GatewayLoginConfiguration.class, GatewaySessionConfiguration.class,
                         CsrfController.class, CsrfProtectionFilter.class)
