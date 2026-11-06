@@ -10,14 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * DRG-666 AC1 — Docker-free guard for the additive subscription_model migration.
- * Next free CAM slot after sibling DRG-665 (V1_16/V1_17) is V1_18 at this launch.
+ * CAM slot V1_19 — leaves V1_16..V1_18 for sibling drafts DRG-662 / DRG-665.
  */
 @Tag("unit")
 class SubscriptionModelMigrationScriptTest {
 
     @Test
     void v118AddsNullableSubscriptionModelWithAdrEnumCheck() throws IOException {
-        String sql = script("db/migration/V1_18__subscription_model.sql");
+        String sql = script("db/migration/V1_19__subscription_model.sql");
         String body = sql.replaceAll("(?m)--.*$", "");
 
         assertThat(body).contains("ADD COLUMN subscription_model");

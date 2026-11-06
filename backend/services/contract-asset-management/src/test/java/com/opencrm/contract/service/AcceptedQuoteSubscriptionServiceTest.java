@@ -103,7 +103,8 @@ class AcceptedQuoteSubscriptionServiceTest {
         line.setLineItemType("SERVICE");
         line.setProductType(type);
         assertThatThrownBy(() -> service.apply(event)).isInstanceOf(NonRetryableEventException.class)
-                .hasMessageContaining("unsupported");
+                .hasMessageContaining(SubscriptionIngestAuditor.AUDIT_CODE)
+                .hasMessageContaining(SubscriptionIngestAuditor.REASON_UNKNOWN_MODEL);
         verify(subscriptions, never()).save(any());
     }
 

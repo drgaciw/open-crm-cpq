@@ -31,11 +31,11 @@ class SubscriptionModelDryRunTest {
     @SuppressWarnings("unchecked")
     void countsLegacyRowsByClassifiedModelWithoutUpdating() {
         when(jdbc.query(anyString(), any(RowMapper.class))).thenReturn(List.of(
-                Map.entry("SAAS_FLAT_RATE", 3L),
-                Map.entry("ONPREM_SUBSCRIPTION", 2L),
-                Map.entry("SUPPORT_BASIC", 1L),
-                Map.entry("SAAS_USAGE_METERED", 4L),
-                Map.entry(null, 5L)));
+                new java.util.AbstractMap.SimpleEntry<>("SAAS_FLAT_RATE", 3L),
+                new java.util.AbstractMap.SimpleEntry<>("ONPREM_SUBSCRIPTION", 2L),
+                new java.util.AbstractMap.SimpleEntry<>("SUPPORT_BASIC", 1L),
+                new java.util.AbstractMap.SimpleEntry<>("SAAS_USAGE_METERED", 4L),
+                new java.util.AbstractMap.SimpleEntry<>(null, 5L)));
 
         SubscriptionModelDryRun dryRun = new SubscriptionModelDryRun(jdbc);
         Map<String, Long> counts = dryRun.classifyLegacyCounts();
