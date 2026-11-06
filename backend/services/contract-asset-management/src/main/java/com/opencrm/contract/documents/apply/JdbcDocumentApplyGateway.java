@@ -79,6 +79,36 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
     }
 
     @Override
+    public String contractTenantBlock(long subscriptionId) {
+        List<TenantLink> rows = jdbc.query("""
+                select s.contract_id, s.tenant_id as subscription_tenant, c.tenant_id as contract_tenant
+                from subscriptions s
+                left join contracts c on c.id = s.contract_id
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> new TenantLink(
+                rs.getObject("contract_id", UUID.class),
+                rs.getObject("subscription_tenant", UUID.class),
+                rs.getObject("contract_tenant", UUID.class)), subscriptionId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        TenantLink link = rows.getFirst();
+        if (link.contractId() == null) {
+            return null;
+        }
+        if (link.subscriptionTenant() == null) {
+            return "TENANT_UNSET";
+        }
+        if (link.contractTenant() == null || !link.subscriptionTenant().equals(link.contractTenant())) {
+            return "TENANT_MISMATCH";
+        }
+        return null;
+    }
+
+    private record TenantLink(UUID contractId, UUID subscriptionTenant, UUID contractTenant) {
+    }
+
+    @Override
     public List<ApplyLine> lines(UUID documentId, int revisionNo) {
         return jdbc.query("""
                 select id, line_no, application_unit_no, action_code, source_accepted_line_uuid, end_qty,

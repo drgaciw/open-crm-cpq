@@ -547,11 +547,16 @@ public class DocumentApplyOrchestrator {
 
     /**
      * Missing subscription stays on the V3 path via {@link DocumentApplyPeriods#blockReason}.
+     * Linked-contract tenant gaps ({@code TENANT_UNSET}/{@code TENANT_MISMATCH}) take precedence.
      * Contract-less targets are {@code TARGET_CONTRACT_UNSET}; wrong contract/tenant stay mismatch.
      */
     private Optional<String> membershipBlock(Subscription subscription, AmendmentDocument document) {
         if (subscription == null) {
             return Optional.empty();
+        }
+        String tenantBlock = gateway.contractTenantBlock(subscription.getId());
+        if (tenantBlock != null) {
+            return Optional.of(tenantBlock);
         }
         TargetContractMembership membership = gateway.targetContractMembership(
                 subscription.getId(), document.getContractId(), document.getTenantId());

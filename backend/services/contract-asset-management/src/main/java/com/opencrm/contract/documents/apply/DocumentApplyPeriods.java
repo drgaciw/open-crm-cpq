@@ -38,6 +38,8 @@ final class DocumentApplyPeriods {
         return switch (code) {
             case "TARGET_CONTRACT_UNSET" -> "target subscription has no contract link";
             case "TARGET_CONTRACT_MISMATCH" -> "target subscription is not linked to the document contract in its tenant";
+            case "TENANT_MISMATCH" -> "subscription tenant_id does not equal the linked contract tenant_id";
+            case "TENANT_UNSET" -> "subscription has contract_id but tenant_id is null";
             case "V3" -> "observed commercial revision does not match the subscription";
             case "V4" -> "source accepted line is missing or retired";
             case "V9" -> "pinned pricebook version differs at apply";

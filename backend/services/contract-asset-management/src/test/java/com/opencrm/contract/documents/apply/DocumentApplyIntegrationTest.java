@@ -628,7 +628,7 @@ class DocumentApplyIntegrationTest {
         jdbc.update("update subscriptions set contract_id = ? where uuid = ?", foreignContract, target.toString());
         assertThat(orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())).status())
                 .isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
-        assertBlockedTarget(documentId, target);
+        assertBlockedTarget(documentId, target, "TENANT_MISMATCH");
     }
 
     @Test
@@ -638,7 +638,7 @@ class DocumentApplyIntegrationTest {
         jdbc.update("update contracts set tenant_id = ? where id = (select contract_id from amendment_documents where id = ?)", UUID.randomUUID(), documentId);
         assertThat(orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())).status())
                 .isEqualTo(AmendmentDocumentStatus.APPLY_BLOCKED);
-        assertBlockedTarget(documentId, target);
+        assertBlockedTarget(documentId, target, "TENANT_MISMATCH");
     }
 
     @Test
@@ -770,8 +770,8 @@ class DocumentApplyIntegrationTest {
                     """, documentId, tenant, quoteId, HASH);
             insertSubscription(firstSubscription);
             insertSubscription(secondSubscription);
-            jdbc.update("update subscriptions set contract_id = ? where uuid in (?, ?)",
-                    contractId, firstSubscription.toString(), secondSubscription.toString());
+            jdbc.update("update subscriptions set contract_id = ?, tenant_id = ? where uuid in (?, ?)",
+                    contractId, tenant, firstSubscription.toString(), secondSubscription.toString());
             insertUnit(documentId, tenant, 1, firstSubscription);
             insertUnit(documentId, tenant, 2, secondSubscription);
             insertLine(documentId, tenant, 1, firstSubscription);
