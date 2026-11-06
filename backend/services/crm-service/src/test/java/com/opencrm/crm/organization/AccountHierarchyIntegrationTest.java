@@ -142,11 +142,14 @@ class AccountHierarchyIntegrationTest extends BaseIntegrationTest {
     @Test void replayedLinkWritesNoSecondAuditOrOutbox() {
         long parent=create("Parent"), child=create("Child");
         hierarchy.linkToParent(account(child), parent);
+        String childUuid = account(child).value();
         long auditsAfterLink = jdbc.queryForObject(
                 "select count(*) from crm.account_hierarchy_changes where child_organization_id=?", Long.class, child);
+        // OutboxEventPublisher still stores the Kafka topic in event_type (ADR-018 D4 expand).
         long outboxAfterLink = jdbc.queryForObject(
-                "select count(*) from crm.outbox_events where event_type=? and aggregate_id=(select uuid from crm.organizations where id=?)",
-                Long.class, "HierarchyChanged", child);
+                "select count(*) from crm.outbox_events where aggregate_id=? and (topic=? or event_type=?)",
+                Long.class, childUuid, com.opencrm.common.event.KafkaTopics.HIERARCHY_CHANGED,
+                com.opencrm.common.event.KafkaTopics.HIERARCHY_CHANGED);
         assertThat(auditsAfterLink).isEqualTo(1);
         assertThat(outboxAfterLink).isEqualTo(1);
 
@@ -156,8 +159,9 @@ class AccountHierarchyIntegrationTest extends BaseIntegrationTest {
                 "select count(*) from crm.account_hierarchy_changes where child_organization_id=?", Long.class, child))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject(
-                "select count(*) from crm.outbox_events where event_type=? and aggregate_id=(select uuid from crm.organizations where id=?)",
-                Long.class, "HierarchyChanged", child))
+                "select count(*) from crm.outbox_events where aggregate_id=? and (topic=? or event_type=?)",
+                Long.class, childUuid, com.opencrm.common.event.KafkaTopics.HIERARCHY_CHANGED,
+                com.opencrm.common.event.KafkaTopics.HIERARCHY_CHANGED))
                 .isEqualTo(1);
     }
 
