@@ -45,12 +45,20 @@ public class AcceptedQuoteSubscriptionService {
     /** Absent when tests construct this service directly, so those tests keep the previous subscription behaviour. */
     private AssetActivation assetActivation;
 
+    /** Optional so unit tests that omit it keep prior behaviour until ingest classification is wired. */
+    private SubscriptionIngestAuditor ingestAuditor;
+
     /**
      * Additive collaborator. Spring sets it on the bean. The generated constructor is unchanged.
      */
     @Autowired(required = false)
     public void setAssetActivation(AssetActivation assetActivation) {
         this.assetActivation = assetActivation;
+    }
+
+    @Autowired(required = false)
+    public void setIngestAuditor(SubscriptionIngestAuditor ingestAuditor) {
+        this.ingestAuditor = ingestAuditor;
     }
 
     public void apply(QuoteAcceptedEvent event) {
