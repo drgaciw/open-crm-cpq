@@ -141,7 +141,7 @@ class QuoteAcceptedEventRoutingTest {
         consumer.handleQuoteAccepted(delivery);
         consumer.handleQuoteAccepted(delivery);
 
-        verify(acceptedQuotes, times(1)).apply(any());
+        verify(acceptedQuotes, times(1)).apply(any(), any());
         assertThat(meters.counter(AmendmentRoutingFlag.ROUTED_LEGACY).count()).isEqualTo(1.0);
         assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
     }
@@ -174,7 +174,7 @@ class QuoteAcceptedEventRoutingTest {
             pool.shutdownNow();
         }
 
-        verify(acceptedQuotes, times(1)).apply(any());
+        verify(acceptedQuotes, times(1)).apply(any(), any());
         assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
     }
 
@@ -189,7 +189,7 @@ class QuoteAcceptedEventRoutingTest {
         }
 
         ArgumentCaptor<QuoteAcceptedEvent> applied = ArgumentCaptor.forClass(QuoteAcceptedEvent.class);
-        verify(acceptedQuotes, times(3)).apply(applied.capture());
+        verify(acceptedQuotes, times(3)).apply(applied.capture(), any());
         assertThat(applied.getAllValues()).allSatisfy(event -> {
             assertThat(event.getAmendmentDocumentId()).isNull();
             assertThat(event.getQuoteId()).isNotBlank();
@@ -245,7 +245,7 @@ class QuoteAcceptedEventRoutingTest {
 
     private QuoteAcceptedEvent captureSingleApply() {
         ArgumentCaptor<QuoteAcceptedEvent> applied = ArgumentCaptor.forClass(QuoteAcceptedEvent.class);
-        verify(acceptedQuotes, times(1)).apply(applied.capture());
+        verify(acceptedQuotes, times(1)).apply(applied.capture(), any());
         return applied.getValue();
     }
 

@@ -59,6 +59,7 @@ final class ApplyFixture {
     final List<AmendmentEventAppend> events = new ArrayList<>();
     final List<LineBind> binds = new ArrayList<>();
     final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    final DocumentApplyGateway gateway;
     final DocumentApplyOrchestrator orchestrator;
     final AssetLifecycleReadiness readiness;
     private final AtomicLong periodIds = new AtomicLong(100);
@@ -89,8 +90,9 @@ final class ApplyFixture {
         SubscriptionRatePeriodRepository rates = mock(SubscriptionRatePeriodRepository.class);
         AmendmentEventWriter writer = mock(AmendmentEventWriter.class);
         AmendmentDocumentService documentService = mock(AmendmentDocumentService.class);
-        DocumentApplyGateway gateway = mock(DocumentApplyGateway.class);
+        gateway = mock(DocumentApplyGateway.class);
         when(gateway.targetBelongsToContract(anyLong(), any(), any())).thenReturn(true);
+        when(gateway.contractTenantBlock(anyLong())).thenReturn(null);
 
         when(documents.findById(any())).thenAnswer(invocation -> {
             UUID id = invocation.getArgument(0);

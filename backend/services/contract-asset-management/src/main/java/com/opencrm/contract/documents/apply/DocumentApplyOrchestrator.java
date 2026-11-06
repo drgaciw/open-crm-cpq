@@ -504,10 +504,19 @@ public class DocumentApplyOrchestrator {
         List<SubscriptionRatePeriod> periods = subscription == null ? List.of()
                 : rates.findBySubscriptionIdAndDeletedFalseOrderByStartDateAscAcceptedLineUuidAscSequenceAsc(subscription.getId());
         String observedPricebook = command.observedPricebookByUnit().get(unit.getUnitNo());
-        String block = subscription != null && !gateway.targetBelongsToContract(
-                subscription.getId(), document.getContractId(), document.getTenantId())
-                ? "TARGET_CONTRACT_MISMATCH"
-                : DocumentApplyPeriods.blockReason(unit, subscription, lines, periods, observedPricebook);
+        String block = null;
+        if (subscription != null) {
+            block = gateway.contractTenantBlock(subscription.getId());
+            if (block == null && !gateway.targetBelongsToContract(
+                    subscription.getId(), document.getContractId(), document.getTenantId())) {
+                block = "TARGET_CONTRACT_MISMATCH";
+            }
+            if (block == null) {
+                block = DocumentApplyPeriods.blockReason(unit, subscription, lines, periods, observedPricebook);
+            }
+        } else {
+            block = DocumentApplyPeriods.blockReason(unit, null, lines, periods, observedPricebook);
+        }
         if (block != null) {
             unit.setStatus(ApplicationUnitStatus.BLOCKED);
             unit.setBlockReason(block);
