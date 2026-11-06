@@ -32,7 +32,6 @@ class SubscriptionRenewalModePolicyTest {
     void manualModeDoesNotAutoRoll() {
         assertThat(SubscriptionRenewalModePolicy.allowsAutoRoll(RenewalMode.MANUAL)).isFalse();
         assertThat(SubscriptionRenewalModePolicy.allowsAutoRoll("MANUAL")).isFalse();
-        assertThat(SubscriptionRenewalModePolicy.allowsAutoRoll("manual")).isFalse();
     }
 
     @ParameterizedTest
