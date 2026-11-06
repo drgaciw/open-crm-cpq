@@ -78,15 +78,17 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
     long countByOrganizationIdAndDeletedFalse(Long organizationId);
 
     /**
-     * RED stub query. Returns no rows. The bounded read-only email candidate query replaces it.
+     * Active contacts with the same trimmed, lowercased email. Read-only: no {@code @Modifying}.
+     * The caller passes a 50-row page.
      */
+    @EntityGraph(attributePaths = {"organization"})
     @Query("""
             SELECT c FROM Contact c
             WHERE c.deleted = false
               AND c.status = :status
               AND c.id <> :excludeId
-              AND c.id < 0
-              AND :normalizedEmail = :normalizedEmail
+              AND c.email IS NOT NULL
+              AND LOWER(TRIM(c.email)) = :normalizedEmail
             """)
     List<Contact> findActiveByNormalizedEmail(@Param("excludeId") Long excludeId,
                                               @Param("normalizedEmail") String normalizedEmail,
@@ -94,15 +96,16 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
                                               Pageable pageable);
 
     /**
-     * RED stub query. Returns no rows. The bounded read-only same-organization query replaces it.
+     * Active contacts in one organization, capped by the caller at 50 rows. Name equality is applied
+     * in memory because stored names are not normalized. Read-only: no {@code @Modifying}.
      */
+    @EntityGraph(attributePaths = {"organization"})
     @Query("""
             SELECT c FROM Contact c
             WHERE c.deleted = false
               AND c.status = :status
               AND c.id <> :excludeId
               AND c.organization.id = :organizationId
-              AND c.id < 0
             """)
     List<Contact> findActiveInOrganization(@Param("excludeId") Long excludeId,
                                            @Param("organizationId") Long organizationId,
