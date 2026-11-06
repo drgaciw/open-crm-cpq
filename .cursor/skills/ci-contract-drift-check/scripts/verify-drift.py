@@ -152,6 +152,37 @@ def nightly_schedule_errors(contract: str, gha: str) -> list[str]:
     return []
 
 
+def toolchain_node_errors(contract: str, gha: str) -> list[str]:
+    """Assert setup-node in .github/workflows/ci.yml matches docs/ci-contract.yaml toolchain.node_version."""
+    toolchain = mapping_body(contract, "toolchain")
+    m = re.search(r"^\s*node_version:\s*['\"]?([^'\"\s#]+)['\"]?", toolchain, re.MULTILINE)
+    if not m:
+        return ["docs/ci-contract.yaml missing toolchain.node_version"]
+    expected_version = m.group(1).strip()
+
+    errors: list[str] = []
+    step_matches = list(re.finditer(
+        r"-\s+uses:\s*actions/setup-node@[^\n]+(?:\n(?!\s*-\s|\S)\s+[^\n]+)*",
+        gha,
+    ))
+    found_any = False
+    for step_match in step_matches:
+        step_text = step_match.group(0)
+        v_match = re.search(r"node-version:\s*['\"]?([^'\"\s\n]+)['\"]?", step_text)
+        if v_match:
+            found_any = True
+            actual_version = v_match.group(1).strip()
+            if actual_version != expected_version:
+                errors.append(
+                    f"GHA ci.yml setup-node node-version '{actual_version}' != contract toolchain.node_version '{expected_version}'"
+                )
+
+    if not found_any:
+        errors.append("GHA ci.yml missing setup-node steps with node-version to verify against toolchain.node_version")
+
+    return errors
+
+
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -236,6 +267,7 @@ def main() -> int:
     errors.extend(pr_gate_errors(repo, contract))
     errors.extend(main_gate_errors(repo, contract))
     errors.extend(nightly_schedule_errors(contract, gha))
+    errors.extend(toolchain_node_errors(contract, gha))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")
