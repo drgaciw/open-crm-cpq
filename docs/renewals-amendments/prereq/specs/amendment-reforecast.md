@@ -8,11 +8,13 @@
 
 <https://github.com/drgaciw/open-crm-cpq/blob/2275e65c1f3ad97740ead9e76510a9650b102b09/docs/renewals-amendments/crm-forecasting-requirements-maturity-review.md>
 
-The definitions spec on the same commit, `docs/renewals-amendments/crm-forecast-definitions-spec.md`, is drafted there (review section 8). Linear [DRG-588](https://linear.app/drgamtd-workspace/issue/DRG-588/crm-forecasting-requirements-maturity-review-separate-from-amendment) still says that definitions spec is "not started". Both documents are unmerged. Same pin, same warning: the source can change.
+The definitions spec on the same commit, `docs/renewals-amendments/crm-forecast-definitions-spec.md`, is drafted there (review section 8). Both that file and the maturity review remain unmerged. Same pin, same warning: the source can change.
 
 <https://github.com/drgaciw/open-crm-cpq/blob/2275e65c1f3ad97740ead9e76510a9650b102b09/docs/renewals-amendments/crm-forecast-definitions-spec.md>
 
-**Open item for drg.** Before this spec can be Done, the DRG-588 document must land on `main`, or drg must accept the branch citation. This spec stays a draft.
+**Main-tree DRG-588 frame (docs only):** [`../story-drg-588-crm-forecast-definitions-spec.md`](../story-drg-588-crm-forecast-definitions-spec.md) records Adopted FQ1–FQ3 and leaves FQ4–FQ10 as Status: Proposed. It does not design, replace, or gate this DRG-600 spec.
+
+**Open item for drg.** Before this DRG-600 spec can be Done, the owner must accept the main-tree FQ citations (or the unmerged branch citation). This spec stays a draft.
 
 ## Expected values
 
