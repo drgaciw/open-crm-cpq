@@ -121,7 +121,8 @@ class AgentTaskQueueIntegrationTest {
     @Test
     void fullFlywayChainCreatesAdrColumnsWithOpaqueTextTenant() throws Exception {
         List<String> scripts = jdbc.queryForList(
-                "SELECT script FROM ai.flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
+                "SELECT script FROM ai.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank",
+                String.class);
         long files = Files.list(Path.of("src/main/resources/db/migration")).filter(path -> path.toString().endsWith(".sql")).count();
         assertThat(scripts).contains("V1__create_ai_schema.sql", "V2__remove_assumed_audit_model.sql");
         assertThat(scripts).anyMatch(script -> script.contains("agent_task"));
