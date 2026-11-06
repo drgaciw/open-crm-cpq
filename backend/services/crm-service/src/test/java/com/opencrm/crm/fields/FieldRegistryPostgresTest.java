@@ -13,7 +13,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,26 +41,42 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private static final String SENTINEL_KEY = "unrelated_sentinel";
+    private static final String SENTINEL_TEXT = "sentinel-keep";
+
     private long organizationId;
     private long contactId;
     private long dealId;
+    private long sentinelOrganizationId;
+    private long sentinelDefinitionId;
+    private long sentinelOptionId;
+    private long sentinelValueId;
+    private Set<Long> definitionsAtStart = Set.of();
+    private Set<Long> optionsAtStart = Set.of();
+    private Set<Long> valuesAtStart = Set.of();
 
     @BeforeEach
     void schemaAndRecords() {
         CustomFieldSchema.apply(jdbcTemplate);
-        deleteFieldRows();
         organizationId = insertOrganization();
         contactId = insertContact(organizationId);
         dealId = insertDeal(organizationId);
+        ensureUnrelatedSentinel();
+        definitionsAtStart = ids("crm.field_definition");
+        optionsAtStart = ids("crm.field_option");
+        valuesAtStart = ids("crm.field_value");
     }
 
     @AfterEach
     void removeRowsThisTestCreated() {
         SecurityContextHolder.clearContext();
-        deleteFieldRows();
-        jdbcTemplate.update("DELETE FROM crm.deals WHERE id = ?", dealId);
-        jdbcTemplate.update("DELETE FROM crm.contacts WHERE id = ?", contactId);
-        jdbcTemplate.update("DELETE FROM crm.organizations WHERE id = ?", organizationId);
+        try {
+            deleteOnlyIdsCreatedByThisTest();
+        } finally {
+            jdbcTemplate.update("DELETE FROM crm.deals WHERE id = ?", dealId);
+            jdbcTemplate.update("DELETE FROM crm.contacts WHERE id = ?", contactId);
+            jdbcTemplate.update("DELETE FROM crm.organizations WHERE id = ?", organizationId);
+        }
     }
 
     @Test
@@ -261,6 +280,60 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     }
 
     @Test
+    void numericOverflowIsRejectedBeforeARowIsWritten() throws Exception {
+        authenticatePerson("person-create");
+        String created = mockMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"entity":"ORGANIZATION","key":"headcount","label":"Headcount","type":"NUMBER","required":false,"showOnRecord":true,"showOnList":false,"position":40,"agentFilled":false}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long definitionId = idOf(created);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT numeric_precision FROM information_schema.columns
+                WHERE table_schema = 'crm' AND table_name = 'field_value' AND column_name = 'numeric'
+                """, Integer.class)).isEqualTo(24);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT numeric_scale FROM information_schema.columns
+                WHERE table_schema = 'crm' AND table_name = 'field_value' AND column_name = 'numeric'
+                """, Integer.class)).isEqualTo(4);
+
+        rejectNumber(definitionId, "1e+20");
+        rejectNumber(definitionId, "-1e+20");
+        rejectNumber(definitionId, "123456789012345678901");
+        rejectNumber(definitionId, "1.23456");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crm.field_value WHERE definition_id = ?", Integer.class, definitionId)).isZero();
+
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":0}"))
+                .andExpect(status().isOk());
+        assertThat(storedNumeric(definitionId)).isEqualByComparingTo("0");
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":1e+19}"))
+                .andExpect(status().isOk());
+        assertThat(storedNumeric(definitionId)).isEqualByComparingTo("1E+19");
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":99999999999999999999.9999}"))
+                .andExpect(status().isOk());
+        assertThat(storedNumeric(definitionId)).isEqualByComparingTo("99999999999999999999.9999");
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":-99999999999999999999.9999}"))
+                .andExpect(status().isOk());
+        assertThat(storedNumeric(definitionId)).isEqualByComparingTo("-99999999999999999999.9999");
+    }
+
+    @Test
     void typedColumnsAreNotJsonAndAMissingRecordIsNotCreated() throws Exception {
         List<String> types = jdbcTemplate.queryForList("""
                 SELECT data_type FROM information_schema.columns
@@ -309,10 +382,112 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         }
     }
 
-    private void deleteFieldRows() {
-        jdbcTemplate.update("DELETE FROM crm.field_value");
-        jdbcTemplate.update("DELETE FROM crm.field_option");
-        jdbcTemplate.update("DELETE FROM crm.field_definition");
+    private void rejectNumber(long definitionId, String numeric) throws Exception {
+        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"organizationId\":" + organizationId + ",\"numeric\":" + numeric + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("FIELD_VALUE_INVALID"));
+    }
+
+    private void ensureUnrelatedSentinel() {
+        sentinelOrganizationId = jdbcTemplate.queryForObject(
+                "INSERT INTO crm.organizations (uuid, name, created_by) VALUES (?, 'Unrelated Sentinel', 'sentinel') RETURNING id",
+                Long.class, UUID.randomUUID().toString());
+        Long existing = jdbcTemplate.query("""
+                SELECT id FROM crm.field_definition
+                WHERE tenant = ? AND entity = 'organization' AND "key" = ?
+                """, rs -> rs.next() ? rs.getLong(1) : null, FixtureTenants.B, SENTINEL_KEY);
+        if (existing == null) {
+            sentinelDefinitionId = jdbcTemplate.queryForObject("""
+                    INSERT INTO crm.field_definition (
+                        tenant, entity, "key", label, type, required, show_on_record, show_on_list, position,
+                        agent_filled, created_by, updated_by
+                    ) VALUES (?, 'organization', ?, 'Unrelated', 'text', false, true, false, 900, false, 'sentinel', 'sentinel')
+                    RETURNING id
+                    """, Long.class, FixtureTenants.B, SENTINEL_KEY);
+            sentinelOptionId = jdbcTemplate.queryForObject("""
+                    INSERT INTO crm.field_option (definition_id, label, position, created_by, updated_by)
+                    VALUES (?, 'Sentinel option', 1, 'sentinel', 'sentinel') RETURNING id
+                    """, Long.class, sentinelDefinitionId);
+        } else {
+            sentinelDefinitionId = existing;
+            sentinelOptionId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM crm.field_option WHERE definition_id = ? ORDER BY id LIMIT 1",
+                    Long.class, sentinelDefinitionId);
+        }
+        sentinelValueId = jdbcTemplate.queryForObject("""
+                INSERT INTO crm.field_value (definition_id, organization_id, "text", created_by, updated_by)
+                VALUES (?, ?, ?, 'sentinel', 'sentinel') RETURNING id
+                """, Long.class, sentinelDefinitionId, sentinelOrganizationId, SENTINEL_TEXT);
+    }
+
+    private void assertUnrelatedRowsSurvived() {
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT \"key\" FROM crm.field_definition WHERE id = ?", String.class, sentinelDefinitionId))
+                .isEqualTo(SENTINEL_KEY);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT label FROM crm.field_option WHERE id = ?", String.class, sentinelOptionId))
+                .isEqualTo("Sentinel option");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT \"text\" FROM crm.field_value WHERE id = ?", String.class, sentinelValueId))
+                .isEqualTo(SENTINEL_TEXT);
+    }
+
+    private void deleteOnlyIdsCreatedByThisTest() {
+        Set<Long> definitions = createdSince(definitionsAtStart, ids("crm.field_definition"));
+        Set<Long> options = createdSince(optionsAtStart, ids("crm.field_option"));
+        Set<Long> values = createdSince(valuesAtStart, ids("crm.field_value"));
+        assertThat(definitions).doesNotContain(sentinelDefinitionId);
+        assertThat(options).doesNotContain(sentinelOptionId);
+        assertThat(values).doesNotContain(sentinelValueId);
+        deleteIds("crm.field_value", values);
+        deleteIds("crm.field_option", options);
+        deleteIds("crm.field_definition", definitions);
+        assertIdsAbsent("crm.field_value", values);
+        assertIdsAbsent("crm.field_option", options);
+        assertIdsAbsent("crm.field_definition", definitions);
+        assertUnrelatedRowsSurvived();
+    }
+
+    private void assertIdsAbsent(String table, Set<Long> createdIds) {
+        if (createdIds.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(createdIds.size(), "?"));
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE id IN (" + placeholders + ")",
+                Integer.class,
+                createdIds.toArray());
+        assertThat(remaining).isZero();
+    }
+
+    private BigDecimal storedNumeric(long definitionId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT \"numeric\" FROM crm.field_value WHERE definition_id = ?",
+                BigDecimal.class,
+                definitionId);
+    }
+
+    private static Set<Long> createdSince(Set<Long> before, Set<Long> after) {
+        Set<Long> created = new HashSet<>(after);
+        created.removeAll(before);
+        return created;
+    }
+
+    private void deleteIds(String table, Set<Long> createdIds) {
+        if (createdIds.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(createdIds.size(), "?"));
+        jdbcTemplate.update(
+                "DELETE FROM " + table + " WHERE id IN (" + placeholders + ")",
+                createdIds.toArray());
+    }
+
+    private Set<Long> ids(String table) {
+        return new HashSet<>(jdbcTemplate.queryForList("SELECT id FROM " + table, Long.class));
     }
 
     private long insertOrganization() {

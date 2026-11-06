@@ -69,9 +69,38 @@ class FieldRulesTest {
         assertThatThrownBy(() -> FieldRules.requireValue(FieldType.EMAIL, FieldRules.StoredValue.text("not-an-email")))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> FieldRules.requireValue(FieldType.NUMBER, FieldRules.StoredValue.numeric(new BigDecimal("1.23456"))))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VALUE_INVALID"));
         assertThatThrownBy(() -> FieldRules.requireValue(FieldType.TEXT, FieldRules.StoredValue.numeric(BigDecimal.ONE)))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void numeric24Scale4AcceptsTwentyIntegerDigitsAndRejectsOverflow() {
+        BigDecimal positiveBoundary = new BigDecimal("99999999999999999999.9999");
+        BigDecimal negativeBoundary = positiveBoundary.negate();
+        assertThat(acceptedNumber(positiveBoundary)).isEqualByComparingTo(positiveBoundary);
+        assertThat(acceptedNumber(negativeBoundary)).isEqualByComparingTo(negativeBoundary);
+        assertThat(acceptedNumber(BigDecimal.ZERO)).isEqualByComparingTo("0.0000");
+        assertThat(acceptedNumber(new BigDecimal("0E+20"))).isEqualByComparingTo("0.0000");
+        assertThat(acceptedNumber(new BigDecimal("1E+19"))).isEqualByComparingTo("1E+19");
+        assertThat(acceptedNumber(new BigDecimal("-1E+19"))).isEqualByComparingTo("-1E+19");
+
+        assertInvalidNumber(new BigDecimal("123456789012345678901"));
+        assertInvalidNumber(new BigDecimal("1E+20"));
+        assertInvalidNumber(new BigDecimal("-1E+20"));
+        assertInvalidNumber(new BigDecimal("1.23456"));
+        assertInvalidNumber(new BigDecimal("1E-5"));
+    }
+
+    private static BigDecimal acceptedNumber(BigDecimal value) {
+        return FieldRules.requireValue(FieldType.NUMBER, FieldRules.StoredValue.numeric(value)).numeric();
+    }
+
+    private static void assertInvalidNumber(BigDecimal value) {
+        assertThatThrownBy(() -> FieldRules.requireValue(FieldType.NUMBER, FieldRules.StoredValue.numeric(value)))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VALUE_INVALID"));
     }
 
     @Test

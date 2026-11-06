@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -146,6 +147,42 @@ class FieldRegistryServiceTest {
                 .build()))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
                         assertThat(ex.getErrorCode()).isEqualTo("FIELD_TYPE_INCOMPATIBLE"));
+    }
+
+    @Test
+    void anOverflowingNumberIsRejectedBeforeTheValueIsWritten() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+                .entity(FieldEntityKind.ORGANIZATION)
+                .key("headcount")
+                .label("Headcount")
+                .type(FieldType.NUMBER)
+                .required(false)
+                .showOnRecord(true)
+                .showOnList(false)
+                .position(40)
+                .agentFilled(false)
+                .build());
+
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .numeric(new BigDecimal("1E+20"))
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VALUE_INVALID"));
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .numeric(new BigDecimal("-1E+20"))
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VALUE_INVALID"));
+        assertThat(store.values).isEmpty();
+
+        FieldValueResponse saved = service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .numeric(new BigDecimal("1E+19"))
+                .build());
+        assertThat(saved.getNumeric()).isEqualByComparingTo("1E+19");
+        assertThat(store.values).hasSize(1);
     }
 
     @Test

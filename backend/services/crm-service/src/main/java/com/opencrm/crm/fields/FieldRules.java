@@ -164,13 +164,24 @@ public final class FieldRules {
         if (value == null) {
             throw bad("Number value is required", "FIELD_VALUE_INVALID");
         }
+        if (value.signum() == 0) {
+            return StoredValue.numeric(BigDecimal.ZERO.setScale(NUMBER_SCALE));
+        }
         BigDecimal normalized = value.stripTrailingZeros();
-        int scale = Math.max(normalized.scale(), 0);
-        int precision = normalized.precision();
-        if (scale > NUMBER_SCALE || precision > NUMBER_PRECISION) {
+        int scale = normalized.scale();
+        if (scale > NUMBER_SCALE || integerDigits(normalized) > (NUMBER_PRECISION - NUMBER_SCALE)) {
             throw bad("Number value must fit numeric(24,4)", "FIELD_VALUE_INVALID");
         }
         return StoredValue.numeric(normalized.setScale(NUMBER_SCALE));
+    }
+
+    /**
+     * Digits to the left of the decimal point. {@code precision - scale} is a long subtraction so a
+     * negative scale (for example {@code 1E+20}) cannot overflow an int and look smaller than it is.
+     * {@code NUMERIC(24,4)} has 20 of those digits.
+     */
+    private static long integerDigits(BigDecimal value) {
+        return (long) value.precision() - (long) value.scale();
     }
 
     private static StoredValue date(StoredValue incoming) {
