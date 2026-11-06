@@ -5,6 +5,7 @@ import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.repository.SubscriptionRepository;
+import com.opencrm.contract.service.SubscriptionRenewalModePolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,9 @@ public class RenewalScheduler {
     }
 
     private void publishOnce(Subscription subscription) {
+        // DRG-664: read renewal_mode. Eligibility publication is unchanged; AUTO_ROLL does not
+        // invent an unattended term roll in this slice (fail-safe = today's behaviour).
+        SubscriptionRenewalModePolicy.allowsAutoRoll(subscription);
         String key = SubscriptionRenewalEligibleEvent.dedupeKey(subscription.getId().toString(),
                 subscription.getEndDate(), subscription.getRenewalDate());
         if (jdbc.update(CLAIM, key, subscription.getId(), subscription.getEndDate(), subscription.getRenewalDate()) == 0) {
