@@ -23,8 +23,11 @@ class AccountHierarchyIntegrationTest extends BaseIntegrationTest {
         @org.springframework.context.annotation.Primary
         AccountHierarchyService readyHierarchy(OrganizationRepository repository,
                 com.opencrm.common.event.OutboxEventPublisher outbox,
-                JdbcTemplate jdbc, jakarta.persistence.EntityManager entityManager) {
-            return new AccountHierarchyService(repository, outbox, jdbc, entityManager, true);
+                JdbcTemplate jdbc, jakarta.persistence.EntityManager entityManager,
+                AccountHierarchyChangeRepository hierarchyChanges,
+                com.opencrm.common.event.EventActorResolver eventActorResolver) {
+            return new AccountHierarchyService(
+                    repository, outbox, jdbc, entityManager, hierarchyChanges, eventActorResolver, true);
         }
     }
 
@@ -133,6 +136,29 @@ class AccountHierarchyIntegrationTest extends BaseIntegrationTest {
             assertThat((link.get(20,TimeUnit.SECONDS)?1:0)+(archive.get(20,TimeUnit.SECONDS)?1:0)).isEqualTo(1);
             assertThat(jdbc.queryForObject("select count(*) from crm.organizations c join crm.organizations p on p.id=c.parent_organization_id where c.id=? and not c.is_deleted and p.is_deleted",Long.class,child)).isZero();
         } finally {pool.shutdownNow();}
+    }
+
+    /** Replay / no-op link must not write a second audit row or HierarchyChanged outbox event (DoD event-replay IT). */
+    @Test void replayedLinkWritesNoSecondAuditOrOutbox() {
+        long parent=create("Parent"), child=create("Child");
+        hierarchy.linkToParent(account(child), parent);
+        long auditsAfterLink = jdbc.queryForObject(
+                "select count(*) from crm.account_hierarchy_changes where child_organization_id=?", Long.class, child);
+        long outboxAfterLink = jdbc.queryForObject(
+                "select count(*) from crm.outbox_events where event_type=? and aggregate_id=(select uuid from crm.organizations where id=?)",
+                Long.class, "HierarchyChanged", child);
+        assertThat(auditsAfterLink).isEqualTo(1);
+        assertThat(outboxAfterLink).isEqualTo(1);
+
+        hierarchy.linkToParent(account(child), parent);
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from crm.account_hierarchy_changes where child_organization_id=?", Long.class, child))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "select count(*) from crm.outbox_events where event_type=? and aggregate_id=(select uuid from crm.organizations where id=?)",
+                Long.class, "HierarchyChanged", child))
+                .isEqualTo(1);
     }
 
 }
