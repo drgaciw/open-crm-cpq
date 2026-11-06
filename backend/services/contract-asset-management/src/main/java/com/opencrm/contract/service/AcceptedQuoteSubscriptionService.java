@@ -14,6 +14,7 @@ import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.repository.AppliedQuoteAcceptanceRepository;
 import com.opencrm.contract.repository.SubscriptionRatePeriodRepository;
 import com.opencrm.contract.repository.SubscriptionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +31,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.TreeMap;
+import java.util.UUID;
 
 /** Applies the immutable sale in the listener transaction without an external ERP call. */
 @Service
@@ -45,6 +47,9 @@ public class AcceptedQuoteSubscriptionService {
     /** Absent when tests construct this service directly, so those tests keep the previous subscription behaviour. */
     private AssetActivation assetActivation;
 
+    /** Optional. Absent in tests that do not bind a registry; invalid-tenant counter is then skipped. */
+    private MeterRegistry tenantMeters;
+
     /**
      * Additive collaborator. Spring sets it on the bean. The generated constructor is unchanged.
      */
@@ -53,7 +58,24 @@ public class AcceptedQuoteSubscriptionService {
         this.assetActivation = assetActivation;
     }
 
+    @Autowired(required = false)
+    public void setTenantMeters(MeterRegistry tenantMeters) {
+        this.tenantMeters = tenantMeters;
+    }
+
+    /** Test seam for DRG-662 counters. */
+    public void bindTenantMeters(MeterRegistry meters) {
+        this.tenantMeters = meters;
+    }
+
     public void apply(QuoteAcceptedEvent event) {
+        apply(event, null);
+    }
+
+    /**
+     * @param provenanceTenantId top-level QuoteAccepted {@code tenantId} only (DRG-631). Never from a nested body field.
+     */
+    public void apply(QuoteAcceptedEvent event, String provenanceTenantId) {
         AcceptedRampValidator.require(event.getCustomerId() != null && !event.getCustomerId().isBlank(), "Accepted customer is missing");
         AcceptedRampValidator.require(event.getEventType() == null || QuoteAcceptedEvent.EVENT_TYPE.equals(event.getEventType()), "Unsupported accepted event type");
         AcceptedRampValidator.require(event.getEventVersion() == null || event.getEventVersion() == QuoteAcceptedEvent.EVENT_VERSION, "Unsupported accepted event version");
@@ -113,12 +135,14 @@ public class AcceptedQuoteSubscriptionService {
                     || months > 0 && start.plusMonths(months).minusDays(1).equals(end)), "Invalid explicit accepted legacy term");
         }
         BigDecimal arr = priced == null ? legacyArr(event) : priced.firstMrr().multiply(BigDecimal.valueOf(12));
+        UUID tenantId = SubscriptionTenant.resolve(provenanceTenantId, tenantMeters);
         Subscription subscription = Subscription.builder().subscriptionNumber(number).customerId(event.getCustomerId())
                 .quoteId(event.getQuoteId()).status(SubscriptionStatus.PENDING)
                 .planName(priced == null ? legacyPlan(event) : priced.planName())
                 .startDate(start).endDate(end).renewalDate(end.minusDays(30)).arr(arr)
                 .mrr(arr == null ? null : AcceptedRampValidator.money(arr.divide(BigDecimal.valueOf(12), 8, java.math.RoundingMode.HALF_UP)))
-                .currencyCode(event.getCurrencyCode()).erpSyncStatus(ErpSyncStatus.QUEUED).build();
+                .currencyCode(event.getCurrencyCode()).erpSyncStatus(ErpSyncStatus.QUEUED)
+                .tenantId(tenantId).build();
         subscriptions.save(subscription);
         List<SubscriptionRatePeriod> periods = priced == null ? List.of(SubscriptionRatePeriod.builder()
                 .acceptedLineUuid("legacy-aggregate").acceptedQuoteId(event.getQuoteId()).productName(subscription.getPlanName())
