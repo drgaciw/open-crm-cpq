@@ -48,6 +48,9 @@ public class IdentityRelayFilter implements GlobalFilter, Ordered {
     private static final List<String> STRIPPED_PREFIXES = List.of(
             "x-user-", "x-actor", "x-auth-", "x-forwarded-user", "x-remote-user", "x-ms-client-principal");
 
+    /** The OMS browser-login registration (application-oms-browser.yml); see {@link #accessToken}. */
+    private static final String OMS_REGISTRATION_ID = "oms";
+
     private final ReactiveOAuth2AuthorizedClientManager authorizedClients;
     private final String loginPath;
 
@@ -98,7 +101,10 @@ public class IdentityRelayFilter implements GlobalFilter, Ordered {
         if (principal instanceof JwtAuthenticationToken bearer) {
             return Mono.just(bearer.getToken().getTokenValue());
         }
-        if (principal instanceof OAuth2AuthenticationToken session && authorizedClients != null) {
+        // The OMS session belongs to the OMS registration, which this login's token store does not hold. Its token is
+        // relayed by OrderTokenRelay instead, so this filter leaves it alone rather than failing before that relay runs.
+        if (principal instanceof OAuth2AuthenticationToken session && authorizedClients != null
+                && !OMS_REGISTRATION_ID.equals(session.getAuthorizedClientRegistrationId())) {
             String registrationId = session.getAuthorizedClientRegistrationId();
             OAuth2AuthorizeRequest request = OAuth2AuthorizeRequest.withClientRegistrationId(registrationId)
                     .principal(session)

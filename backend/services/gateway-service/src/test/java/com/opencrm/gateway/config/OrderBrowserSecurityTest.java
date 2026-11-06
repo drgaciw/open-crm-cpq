@@ -48,6 +48,8 @@ class OrderBrowserSecurityTest {
      client.post().uri(path).cookie("SESSION",session.getValue()).exchange().expectStatus().isForbidden();
      client.post().uri(path).cookie("XSRF-TOKEN",token.getValue()).header("X-XSRF-TOKEN",token.getValue()).exchange().expectStatus().isUnauthorized();
      client.post().uri(path).cookie("SESSION",session.getValue()).cookie("XSRF-TOKEN",token.getValue()).header("X-XSRF-TOKEN",token.getValue()).exchange().expectStatus().isOk();
+     // A bearer-authenticated mutation is not a browser-forgeable request, so it needs no CSRF token.
+     client.post().uri(path).header("Authorization","Bearer test").exchange().expectStatus().isOk();
     }
     for(String path:java.util.List.of("/api/v1/order-outbox-evil","/api/v1/order-outboxes/123")) client.get().uri(path).exchange().expectStatus().isOk();
     var read=client.get().uri("/api/v1/orders").header("Authorization","Bearer test").exchange().expectStatus().isOk().returnResult(String.class);

@@ -46,6 +46,10 @@ public class ApprovalService {
     private final boolean legacyLocalReadEnabled;
     private final com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard;
 
+    /** Optional, as in QuoteService: present when the OMS cohort is wired; decides whether a routed approval is OMS-owned. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.opencrm.quote.snapshot.AcceptedSnapshotService acceptedSnapshotService;
+
     public ApprovalService(
             ApprovalRequestRepository approvalRepository,
             QuoteRepository quoteRepository,
@@ -240,6 +244,11 @@ public class ApprovalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
         quote.setStatus(status);
         quote.setApprovalState(state);
+        // A routed approval is an authoritative approval too: an OMS-owned quote needs the reference that snapshot
+        // capture checks, exactly as QuoteService.approve sets it. Without it the accepted snapshot cannot be released.
+        if (state == ApprovalState.APPROVED && acceptedSnapshotService != null && acceptedSnapshotService.owns(quote)) {
+            quote.setOmsApprovalReference(java.util.UUID.randomUUID().toString());
+        }
         quoteRepository.save(quote);
     }
 
