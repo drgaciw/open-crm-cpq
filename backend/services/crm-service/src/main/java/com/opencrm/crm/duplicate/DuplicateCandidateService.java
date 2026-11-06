@@ -30,6 +30,9 @@ public class DuplicateCandidateService {
     private static final Pageable CANDIDATE_PAGE = PageRequest.of(
             0, MAX_CANDIDATES, Sort.by(Sort.Direction.ASC, "id"));
 
+    /** Name query already orders by id. The page size is the cap after the name predicate. */
+    private static final Pageable NAME_CANDIDATE_PAGE = PageRequest.of(0, MAX_CANDIDATES);
+
     private final OrganizationRepository organizationRepository;
     private final ContactRepository contactRepository;
 
@@ -123,7 +126,7 @@ public class DuplicateCandidateService {
 
     private List<DuplicateCandidateDto> nameMatches(Long sourceId, Long organizationId, String name) {
         List<Contact> rows = contactRepository.findActiveInOrganization(
-                sourceId, organizationId, ContactStatus.ACTIVE, CANDIDATE_PAGE);
+                sourceId, organizationId, ContactStatus.ACTIVE, name, NAME_CANDIDATE_PAGE);
         List<DuplicateCandidateDto> matches = new ArrayList<>();
         for (Contact row : rows) {
             if (matches.size() == MAX_CANDIDATES) {

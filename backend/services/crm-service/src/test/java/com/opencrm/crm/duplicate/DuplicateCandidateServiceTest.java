@@ -182,7 +182,7 @@ class DuplicateCandidateServiceTest {
             assertThat(candidate.getReason()).isEqualTo(DuplicateMatchReason.EMAIL);
             assertThat(candidate.getMatchedValue()).isEqualTo("ann@acme.com");
         });
-        verify(contactRepository, never()).findActiveInOrganization(any(), any(), any(), any());
+        verify(contactRepository, never()).findActiveInOrganization(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -194,7 +194,7 @@ class DuplicateCandidateServiceTest {
         when(contactRepository.findById(1L)).thenReturn(Optional.of(source));
         when(contactRepository.findActiveByNormalizedEmail(eq(1L), eq("ann+news@acme.com"), eq(ContactStatus.ACTIVE), any()))
                 .thenReturn(List.of(other));
-        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), any()))
+        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("ann smith"), any()))
                 .thenReturn(List.of(other));
 
         assertThat(service.contactCandidates(1L)).isEmpty();
@@ -211,7 +211,8 @@ class DuplicateCandidateServiceTest {
         when(contactRepository.findById(1L)).thenReturn(Optional.of(source));
         when(contactRepository.findActiveByNormalizedEmail(eq(1L), eq("a@acme.com"), eq(ContactStatus.ACTIVE), any()))
                 .thenReturn(List.of());
-        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), any()))
+        when(contactRepository.findActiveInOrganization(
+                eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("ann marie smith"), any()))
                 .thenReturn(List.of(match, source));
 
         assertThat(service.contactCandidates(1L)).singleElement().satisfies(candidate -> {
@@ -221,7 +222,8 @@ class DuplicateCandidateServiceTest {
             assertThat(candidate.getCandidateType()).isEqualTo(DuplicateCandidateType.CONTACT);
         });
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(contactRepository).findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), pageable.capture());
+        verify(contactRepository).findActiveInOrganization(
+                eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("ann marie smith"), pageable.capture());
         assertThat(pageable.getValue().getPageSize()).isEqualTo(50);
     }
 
@@ -233,11 +235,11 @@ class DuplicateCandidateServiceTest {
         Contact source = contact(1L, "Ann", "Smith", null, acme, ContactStatus.ACTIVE);
         Contact elsewhere = contact(2L, "Ann", "Smith", null, other, ContactStatus.ACTIVE);
         when(contactRepository.findById(1L)).thenReturn(Optional.of(source));
-        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), any()))
+        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("ann smith"), any()))
                 .thenReturn(List.of(elsewhere));
 
         assertThat(service.contactCandidates(1L)).isEmpty();
-        verify(contactRepository).findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), any());
+        verify(contactRepository).findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("ann smith"), any());
         verify(contactRepository, never()).findActiveByNormalizedEmail(any(), any(), any(), any());
     }
 
@@ -251,7 +253,7 @@ class DuplicateCandidateServiceTest {
         when(contactRepository.findById(1L)).thenReturn(Optional.of(source));
         when(contactRepository.findActiveByNormalizedEmail(eq(1L), eq("jane@gmail.com"), eq(ContactStatus.ACTIVE), any()))
                 .thenReturn(List.of());
-        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), any()))
+        when(contactRepository.findActiveInOrganization(eq(1L), eq(10L), eq(ContactStatus.ACTIVE), eq("jane doe"), any()))
                 .thenReturn(List.of(elsewhere));
 
         assertThat(service.contactCandidates(1L)).isEmpty();
@@ -272,7 +274,7 @@ class DuplicateCandidateServiceTest {
 
         assertThat(service.contactCandidates(1L)).extracting(DuplicateCandidateDto::getCandidateId)
                 .containsExactly(2L);
-        verify(contactRepository, never()).findActiveInOrganization(any(), any(), any(), any());
+        verify(contactRepository, never()).findActiveInOrganization(any(), any(), any(), any(), any());
     }
 
     @Test

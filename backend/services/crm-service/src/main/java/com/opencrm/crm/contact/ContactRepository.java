@@ -96,8 +96,9 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
                                               Pageable pageable);
 
     /**
-     * Active contacts in one organization, capped by the caller at 50 rows. Name equality is applied
-     * in memory because stored names are not normalized. Read-only: no {@code @Modifying}.
+     * Active contacts in one organization whose normalized first and last name equal
+     * {@code normalizedName}. The predicate trims, lowercases, and collapses internal whitespace
+     * before the caller's page, which is at most 50 rows ordered by id. Read-only: no {@code @Modifying}.
      */
     @EntityGraph(attributePaths = {"organization"})
     @Query("""
@@ -106,9 +107,20 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
               AND c.status = :status
               AND c.id <> :excludeId
               AND c.organization.id = :organizationId
+              AND concat(
+                    function('regexp_replace',
+                        function('regexp_replace', lower(c.firstName), '^[[:space:]]+|[[:space:]]+$', '', 'g'),
+                        '[[:space:]]+', ' ', 'g'),
+                    ' ',
+                    function('regexp_replace',
+                        function('regexp_replace', lower(c.lastName), '^[[:space:]]+|[[:space:]]+$', '', 'g'),
+                        '[[:space:]]+', ' ', 'g')
+                  ) = :normalizedName
+            ORDER BY c.id ASC
             """)
     List<Contact> findActiveInOrganization(@Param("excludeId") Long excludeId,
                                            @Param("organizationId") Long organizationId,
                                            @Param("status") ContactStatus status,
+                                           @Param("normalizedName") String normalizedName,
                                            Pageable pageable);
 }
