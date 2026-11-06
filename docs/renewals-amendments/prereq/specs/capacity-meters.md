@@ -2,6 +2,7 @@
 
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `capacity-meters`. **Date:** 2026-10-16.
+**Decision brief (Proposed):** [`../story-drg-569-capacity-true-up-decision-brief.md`](../story-drg-569-capacity-true-up-decision-brief.md) lists owner forks OQ1–OQ11 (measurement, window, tolerance, pack, overage, backdating, true-down, rounding, dry-run, rung order, storage) for CPQ Decision scoring. That brief does not adopt any fork and does not authorize an implementation brief or product code.
 
 **Sources.** [DRG-557](https://linear.app/drgamtd-workspace/issue/DRG-557) (RA-23, meter model and TrueUp intent), [DRG-569](https://linear.app/drgamtd-workspace/issue/DRG-569) (RA-35, true-up pricing semantics), [DRG-570](https://linear.app/drgamtd-workspace/issue/DRG-570) (RA-36, provenance, dispute, frozen snapshot), [DRG-641](https://linear.app/drgamtd-workspace/issue/DRG-641) (Proposed parameter defaults and worked examples for the DRG-569 knobs). Worked numbers are the illustrative Scenario 2 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data). The amendment spike's `delta_qty = max(0, peak − entitled)` is a sketch that picks Peak with no tolerance or backdating; this proposal does not adopt that sketch as the policy.
 
