@@ -61,6 +61,7 @@ final class ApplyFixture {
     final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     final DocumentApplyOrchestrator orchestrator;
     final AssetLifecycleReadiness readiness;
+    final DocumentApplyGateway gateway;
     private final AtomicLong periodIds = new AtomicLong(100);
     private final ReentrantLock documentLock = new ReentrantLock();
     private final java.util.concurrent.atomic.AtomicInteger lockCalls = new java.util.concurrent.atomic.AtomicInteger();
@@ -89,8 +90,8 @@ final class ApplyFixture {
         SubscriptionRatePeriodRepository rates = mock(SubscriptionRatePeriodRepository.class);
         AmendmentEventWriter writer = mock(AmendmentEventWriter.class);
         AmendmentDocumentService documentService = mock(AmendmentDocumentService.class);
-        DocumentApplyGateway gateway = mock(DocumentApplyGateway.class);
-        when(gateway.targetBelongsToContract(anyLong(), any(), any())).thenReturn(true);
+        gateway = mock(DocumentApplyGateway.class);
+        when(gateway.targetContractMembership(anyLong(), any(), any())).thenReturn(TargetContractMembership.MATCHED);
 
         when(documents.findById(any())).thenAnswer(invocation -> {
             UUID id = invocation.getArgument(0);

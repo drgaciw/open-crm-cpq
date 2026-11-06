@@ -16,9 +16,10 @@ public interface DocumentApplyGateway {
     /**
      * Caller holds the subscription row lock. Only the exact document contract is accepted; successor
      * chains need a separate authorization contract. This check does not establish link provenance.
-     * A matching contract row remains share-locked until commit.
+     * A matching contract row remains share-locked until commit. Null {@code contract_id} on the
+     * subscription is {@link TargetContractMembership#UNSET}, not a mismatch and not an inferred link.
      */
-    boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId);
+    TargetContractMembership targetContractMembership(long subscriptionId, UUID contractId, UUID tenantId);
 
     List<ApplyLine> lines(UUID documentId, int revisionNo);
 

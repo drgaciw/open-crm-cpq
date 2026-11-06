@@ -504,10 +504,9 @@ public class DocumentApplyOrchestrator {
         List<SubscriptionRatePeriod> periods = subscription == null ? List.of()
                 : rates.findBySubscriptionIdAndDeletedFalseOrderByStartDateAscAcceptedLineUuidAscSequenceAsc(subscription.getId());
         String observedPricebook = command.observedPricebookByUnit().get(unit.getUnitNo());
-        String block = subscription != null && !gateway.targetBelongsToContract(
-                subscription.getId(), document.getContractId(), document.getTenantId())
-                ? "TARGET_CONTRACT_MISMATCH"
-                : DocumentApplyPeriods.blockReason(unit, subscription, lines, periods, observedPricebook);
+        String block = membershipBlock(subscription, document)
+                .orElseGet(() -> DocumentApplyPeriods.blockReason(
+                        unit, subscription, lines, periods, observedPricebook));
         if (block != null) {
             unit.setStatus(ApplicationUnitStatus.BLOCKED);
             unit.setBlockReason(block);
@@ -544,6 +543,23 @@ public class DocumentApplyOrchestrator {
                 null, "apply:unit:" + unit.getUnitNo()));
         meters.counter(UNITS_METRIC, "result", "applied").increment();
         return true;
+    }
+
+    /**
+     * Missing subscription stays on the V3 path via {@link DocumentApplyPeriods#blockReason}.
+     * Contract-less targets are {@code TARGET_CONTRACT_UNSET}; wrong contract/tenant stay mismatch.
+     */
+    private Optional<String> membershipBlock(Subscription subscription, AmendmentDocument document) {
+        if (subscription == null) {
+            return Optional.empty();
+        }
+        TargetContractMembership membership = gateway.targetContractMembership(
+                subscription.getId(), document.getContractId(), document.getTenantId());
+        return switch (membership) {
+            case MATCHED -> Optional.empty();
+            case UNSET -> Optional.of("TARGET_CONTRACT_UNSET");
+            case MISMATCH -> Optional.of("TARGET_CONTRACT_MISMATCH");
+        };
     }
 
     private static int attemptRevision(AmendmentDocument document) {
