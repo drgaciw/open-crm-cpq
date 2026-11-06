@@ -4390,9 +4390,9 @@ mdurl@^2.0.0:
   integrity sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w==
 
 mime@^4.0.1:
-  version "4.0.1"
-  resolved "https://registry.npmjs.org/mime/-/mime-4.0.1.tgz"
-  integrity sha512-5lZ5tyrIfliMXzFtkYyekWbtRXObT9OWa8IwQ5uxTBDHucNNwniRqo0yInflj+iYi5CBa6qxadGzGarDfuEOxA==
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/mime/-/mime-4.1.2.tgz#b5ffeeebd449031c39d830a26c2e90d619a84888"
+  integrity sha512-ikRzZ2RwbUVDyL9SsU0f2Phcmav4yq5r8faH5ZZKHtOZrMBLnrQOrj0uvqZ5R1uQnj+RO7Wcklw/lAf81mP9LQ==
 
 mimic-fn@^2.1.0:
   version "2.1.0"

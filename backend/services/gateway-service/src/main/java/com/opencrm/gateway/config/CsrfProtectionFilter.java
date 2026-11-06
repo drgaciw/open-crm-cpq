@@ -42,7 +42,7 @@ public class CsrfProtectionFilter implements WebFilter {
     private final List<String> allowedOrigins;
 
     public CsrfProtectionFilter(
-            @Value("${security.csrf.allowed-origins:http://localhost:4200,http://127.0.0.1:4200}") List<String> allowedOrigins) {
+            @Value("${security.csrf.allowed-origins:http://localhost:4200}") List<String> allowedOrigins) {
         this.allowedOrigins = sanitizeAllowedOrigins(allowedOrigins);
     }
 
