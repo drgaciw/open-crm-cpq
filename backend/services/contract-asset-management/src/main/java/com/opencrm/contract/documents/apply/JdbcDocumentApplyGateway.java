@@ -60,6 +60,12 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
                 """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId, contractId, tenantId).isEmpty();
     }
 
+    /** RED stub for DRG-663 — always allows. */
+    @Override
+    public String contractCustomerAccountBlock(long subscriptionId) {
+        return null;
+    }
+
     @Override
     public List<ApplyLine> lines(UUID documentId, int revisionNo) {
         return jdbc.query("""

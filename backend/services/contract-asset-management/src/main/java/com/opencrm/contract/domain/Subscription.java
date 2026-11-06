@@ -7,6 +7,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * Subscription entity - authoritative source for subscription/asset state.
@@ -29,6 +30,12 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "customer_id", nullable = false)
     private String customerId;
+
+    /**
+     * RED stub field for DRG-663 — real mapping lands in the green commit.
+     * Typed CRM account key; stays NULL at QuoteAccepted ingest (external String customerId).
+     */
+    private UUID customerAccountId;
     
     @Column(name = "quote_id", nullable = false)
     private String quoteId;
