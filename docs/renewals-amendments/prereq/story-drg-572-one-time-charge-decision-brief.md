@@ -14,7 +14,7 @@
 | [story-drg-572-one-time-retroactive-charge-lines-decision-frame.md](story-drg-572-one-time-retroactive-charge-lines-decision-frame.md) ([#654](https://github.com/drgaciw/open-crm-cpq/pull/654), merged) | Historical forks 1–7. Dispositions already indexed. Do **not** re-litigate Adopted rows |
 | [`specs/lifecycle-intents.md`](specs/lifecycle-intents.md) | Proposed intent vocabulary. Unaccepted |
 | CAM `V1_7` `amendment_document_lines` | Landed `charge_type` / `effective_from` — **no** service-period columns yet |
-| ADR-017 / ADR-024–027 | Stay **Proposed**. This brief does not accept them as a billing receiver |
+| ADR-017 / ADR-024–027 | **Accepted on 2026-10-17** on main (each ADR file's status line). This brief does not accept them as a billing receiver |
 
 **Related Wave-2 drafts (cite only; do not adopt open OQs):**
 
@@ -42,7 +42,7 @@
 
 ## Problem (RA-38)
 
-Lifecycle changes need non-recurring lines whose service period can precede the change's effective date (back-maintenance, reinstatement fees, true-up arrears). Continuation today is one recurring line with one `effectiveDate`. CAM `V1_7` already stores `charge_type` and `effective_from` but has **no** `service_period_*` columns, so Scenario 2's "window 2026-04-01..2026-09-30 / effective 2026-10-01" cannot be recorded as designed. No billing service exists under `backend/services/`; ADR-017 / ADR-024–027 stay Proposed.
+Lifecycle changes need non-recurring lines whose service period can precede the change's effective date (back-maintenance, reinstatement fees, true-up arrears). Continuation today is one recurring line with one `effectiveDate`. CAM `V1_7` already stores `charge_type` and `effective_from` but has **no** `service_period_*` columns, so Scenario 2's "window 2026-04-01..2026-09-30 / effective 2026-10-01" cannot be recorded as designed. No billing service exists under `backend/services/`; ADR-017 / ADR-024–027 are Accepted on 2026-10-17 on main.
 
 Linear DRG-572 (`Linear read` 2026-11-06): Medium; **In Review**; attachments include decision frame [#654](https://github.com/drgaciw/open-crm-cpq/pull/654).
 
@@ -99,7 +99,7 @@ Until blocking **OQ-572-*** rows close (or the owner defers them with words and 
 - No product code, Flyway/schema, feature flags, topics, gateway routes, billing receivers, or deploys for one-time service periods.
 - No CAM migration number in **V1_16–V1_21**.
 - No S4 / dual-read / Jev / ramp / asset-write hold bypass.
-- Do not accept ADR-017 / ADR-024–027 or invent an outbound billing operation.
+- ADR-017 / ADR-024–027 are Accepted as design records. Each file's "Does not authorize" line excludes code (ADR-024 and ADR-025 also exclude schema and topics), so this brief does not treat their acceptance as approval of a billing receiver or of an outbound billing operation.
 - Do not adopt open OQs from #835 / #843 / #839 / #848 / #850.
 - Do not widen first-slice commercial scope to include retroactive ONE_TIME lines.
 
