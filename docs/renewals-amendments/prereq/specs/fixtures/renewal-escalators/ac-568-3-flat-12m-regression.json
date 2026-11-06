@@ -1,0 +1,27 @@
+{
+  "status": "proposed",
+  "id": "renewal-escalators.ac-568-3",
+  "ac": "568-3",
+  "story": "DRG-568",
+  "relatedStories": ["DRG-532"],
+  "mainSha": "0a3f0f8e7552aaf5b9fc1321c357e2fe4e32b225",
+  "scenario": {
+    "label": "12-month renewal with no escalator stays one flat period",
+    "termMonths": 12,
+    "escalator": null,
+    "exitNet": "50.00",
+    "upliftPercentPoints": "8",
+    "quantity": 50,
+    "landedTest": "QuoteContinuationPolicyTest.renewalUsesExitRateAndEightPercentUplift"
+  },
+  "expected": {
+    "segmentCount": 1,
+    "months": [12],
+    "unit": "54.00",
+    "tcv": "32400.00",
+    "note": "Today's QuoteContinuationPolicy.money scale-2 path; unchanged by DRG-568 docs"
+  },
+  "flag": {
+    "opencrm.pricing.ramp.enabled": false
+  }
+}
