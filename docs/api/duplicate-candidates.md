@@ -4,6 +4,10 @@ Published read-only duplicate suggestions for organizations and contacts. Versio
 
 Merge is `POST /api/v1/organizations/merge` (BC-12-04). A user calls that command explicitly. This API never calls it.
 
+## Current authorization hold
+
+Candidate review requires an authenticated delegated human with `ROLE_SALES_OPS_ACCOUNT_MERGE`. Other authenticated callers receive 403. Even an authorized human receives `DUPLICATE_CANDIDATES_HOLD` (503), before any candidate data is read, until trusted tenant and account authorization exists. There is no runtime switch to lift this hold. The matching behavior below describes the intended contract after that prerequisite is met.
+
 ## Requests
 
 `GET /api/v1/organizations/{id}/duplicate-candidates`

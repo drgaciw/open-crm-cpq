@@ -35,8 +35,10 @@ public class DuplicateCandidateService {
 
     private final OrganizationRepository organizationRepository;
     private final ContactRepository contactRepository;
+    private final DuplicateCandidateAccess access;
 
     public List<DuplicateCandidateDto> organizationCandidates(Long id) {
+        access.requireReviewAccess();
         Organization source = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
         if (source.isDeleted()) {
@@ -70,6 +72,7 @@ public class DuplicateCandidateService {
     }
 
     public List<DuplicateCandidateDto> contactCandidates(Long id) {
+        access.requireReviewAccess();
         Contact source = contactRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Contact", id));
         if (source.isDeleted()) {

@@ -37,11 +37,14 @@ class DuplicateCandidateControllerTest {
     @Mock
     private DuplicateCandidateService duplicateCandidateService;
 
+    @Mock
+    private DuplicateCandidateAccess access;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        DuplicateCandidateController controller = new DuplicateCandidateController(duplicateCandidateService);
+        DuplicateCandidateController controller = new DuplicateCandidateController(duplicateCandidateService, access);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter())

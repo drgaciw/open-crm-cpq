@@ -41,11 +41,14 @@ class DuplicateCandidateServiceTest {
     @Mock
     private ContactRepository contactRepository;
 
+    @Mock
+    private DuplicateCandidateAccess access;
+
     private DuplicateCandidateService service;
 
     @BeforeEach
     void setUp() {
-        service = new DuplicateCandidateService(organizationRepository, contactRepository);
+        service = new DuplicateCandidateService(organizationRepository, contactRepository, access);
     }
 
     @Test

@@ -26,11 +26,13 @@ public class DuplicateCandidateController {
                     + "and never count as a same-company signal for contacts.";
 
     private final DuplicateCandidateService duplicateCandidateService;
+    private final DuplicateCandidateAccess access;
 
     @GetMapping("/api/v1/organizations/{id}/duplicate-candidates")
     @Operation(summary = "Suggest duplicate organizations", description = SUGGESTION_DESCRIPTION)
     public ApiResponse<List<DuplicateCandidateDto>> organizationCandidates(
             @Parameter(description = "Organization row id") @PathVariable Long id) {
+        access.requireReviewAccess();
         return ApiResponse.success(duplicateCandidateService.organizationCandidates(id));
     }
 
@@ -38,6 +40,7 @@ public class DuplicateCandidateController {
     @Operation(summary = "Suggest duplicate contacts", description = SUGGESTION_DESCRIPTION)
     public ApiResponse<List<DuplicateCandidateDto>> contactCandidates(
             @Parameter(description = "Contact row id") @PathVariable Long id) {
+        access.requireReviewAccess();
         return ApiResponse.success(duplicateCandidateService.contactCandidates(id));
     }
 }

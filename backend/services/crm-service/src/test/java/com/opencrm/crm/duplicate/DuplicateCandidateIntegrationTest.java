@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -31,6 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @DisplayName("DRG-517 duplicate candidate integration")
 class DuplicateCandidateIntegrationTest extends BaseIntegrationTest {
+
+    // These tests cover matching only; security and the production hold are tested separately.
+    @MockitoBean
+    private DuplicateCandidateAccess access;
 
     @Autowired
     private MockMvc mockMvc;
