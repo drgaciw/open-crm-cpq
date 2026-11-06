@@ -11,13 +11,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** DRG-662 AC1: CAM V1_16 adds nullable subscriptions.tenant_id with header rollback. */
+/** DRG-662 AC1: CAM V1_18 adds nullable subscriptions.tenant_id with header rollback. */
 @Tag("unit")
 class SubscriptionTenantMigrationTest {
 
     @Test
-    void v116AddsNullableUuidTenantWithRollbackComment() throws IOException {
-        String migration = resource("db/migration/V1_16__subscription_tenant_id.sql");
+    void v118AddsNullableUuidTenantWithRollbackComment() throws IOException {
+        String migration = resource("db/migration/V1_18__subscription_tenant_id.sql");
         String executable = migration.replaceAll("(?m)--.*$", "");
 
         assertThat(executable).contains("ALTER TABLE subscriptions");
@@ -30,6 +30,7 @@ class SubscriptionTenantMigrationTest {
                 .containsExactly("ALTER TABLE subscriptions DROP COLUMN IF EXISTS tenant_id;");
         assertThat(migration).contains("Entra");
         assertThat(migration).doesNotContain("V1_13__");
+        assertThat(migration).doesNotContain("V1_16__");
     }
 
     private static List<String> headerRollbackStatements(String sql) {
