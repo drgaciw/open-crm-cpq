@@ -59,7 +59,7 @@
     "eslint-config-prettier": "^10.0.0",
     "jsdom": "^27.1.0",
     "nx": "23.2.1",
-    "playwright": "1.55.0",
+    "playwright": "1.65.0",
     "prettier": "~3.6.2",
     "tailwindcss": "^4.1.18",
     "tslib": "^2.3.0",
