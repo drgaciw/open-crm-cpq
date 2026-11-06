@@ -1,10 +1,17 @@
 package com.opencrm.contract.documents;
 
 import com.opencrm.contract.ContractAssetManagementApplication;
+import com.opencrm.contract.domain.documents.ChargeType;
+import com.opencrm.contract.domain.documents.ContractLine;
+import com.opencrm.contract.domain.documents.ContractLineStatus;
+import com.opencrm.contract.repository.documents.ContractLineRepository;
+import com.opencrm.contract.service.ContractLineOpenCommand;
+import com.opencrm.contract.service.ContractLineOpenService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -12,11 +19,15 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * DRG-665 — Flyway applies contract_lines and nullable subscriptions.contract_line_id;
@@ -45,6 +56,8 @@ class ContractLinesSchemaIntegrationTest {
     }
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired ContractLineOpenService openService;
+    @Autowired ContractLineRepository lineRepository;
 
     @Test
     void contractLinesTableAndNullableSubscriptionFkExist() {
@@ -106,4 +119,61 @@ class ContractLinesSchemaIntegrationTest {
         assertThat(storedTenant).isNotEqualTo(smuggledTenant);
     }
 
+    @Test
+    void openServicePersistsLineThroughJpaWithTenantFromContract() {
+        UUID contractTenant = UUID.randomUUID();
+        UUID contractId = UUID.randomUUID();
+        insertContract(contractId, contractTenant, "C-665-JPA");
+
+        ContractLine opened = openService.open(new ContractLineOpenCommand(
+                contractId,
+                UUID.randomUUID(),
+                1,
+                "line-665-jpa",
+                "quote-665",
+                "SKU-JPA",
+                "Plan JPA",
+                new BigDecimal("2.5000"),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31),
+                ChargeType.RECURRING,
+                "it"));
+
+        List<ContractLine> stored = lineRepository.findByTenantIdAndContractId(contractTenant, contractId);
+        assertThat(stored).hasSize(1);
+        ContractLine line = stored.get(0);
+        assertThat(line.getId()).isEqualTo(opened.getId());
+        assertThat(line.getTenantId()).isEqualTo(contractTenant);
+        assertThat(line.getStatus()).isEqualTo(ContractLineStatus.PENDING);
+        assertThat(line.getQuantity()).isEqualByComparingTo("2.5");
+        assertThat(line.getChargeType()).isEqualTo(ChargeType.RECURRING);
+        assertThat(line.getCreatedAt()).isNotNull();
+        assertThat(line.getVersion()).isZero();
+        assertThat(lineRepository.findByTenantIdAndAcceptedLineUuid(contractTenant, "line-665-jpa"))
+                .map(ContractLine::getId)
+                .contains(opened.getId());
+    }
+
+    @Test
+    void triggerRejectsLineWhoseContractDoesNotExist() {
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO contract_lines (
+                    tenant_id, contract_id, line_no, accepted_line_uuid, product_external_id,
+                    quantity, status, effective_from, charge_type, created_by, version)
+                VALUES (?, ?, 1, 'line-orphan', 'SKU-1', 1, 'PENDING', DATE '2026-01-01',
+                        'RECURRING', 'it', 0)
+                """, UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("has no parent contract");
+    }
+
+    private void insertContract(UUID contractId, UUID tenantId, String contractNumber) {
+        jdbc.update("""
+                INSERT INTO contracts (
+                    id, tenant_id, contract_number, customer_account_id, term_model,
+                    start_date, end_date, status, last_executed_seq, created_by, version)
+                VALUES (?, ?, ?, ?, 'TERMED', DATE '2026-01-01', DATE '2026-12-31',
+                        'ACTIVE', 0, 'it', 0)
+                """, contractId, tenantId, contractNumber, UUID.randomUUID());
+    }
 }

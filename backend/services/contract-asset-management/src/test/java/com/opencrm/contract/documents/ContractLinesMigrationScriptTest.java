@@ -47,6 +47,32 @@ class ContractLinesMigrationScriptTest {
         assertThat(sql.toLowerCase()).contains("rollback");
     }
 
+    @Test
+    void v117RollbackRefusesWhileSubscriptionsCarryContractLineLinks() throws IOException {
+        String rollback = script("db/rollback/V1_17__drop_subscriptions_contract_line_id.sql");
+        String body = rollback.replaceAll("(?m)--.*$", "");
+
+        assertThat(body).contains("contract_line_id IS NOT NULL");
+        assertThat(body).contains("refusing to drop subscriptions.contract_line_id");
+        assertThat(body).contains("DROP COLUMN contract_line_id");
+        assertThat(body).contains("version = '1.17'");
+        assertThat(body).doesNotContain("DROP TABLE");
+    }
+
+    @Test
+    void v116RollbackRefusesWhileV117LinkColumnRemainsOrRowsExist() throws IOException {
+        String rollback = script("db/rollback/V1_16__drop_contract_lines.sql");
+        String body = rollback.replaceAll("(?m)--.*$", "");
+
+        assertThat(body).contains("refusing to drop contract_lines: subscriptions.contract_line_id still present");
+        assertThat(body).contains("refusing to drop contract_lines: % row(s) present");
+        assertThat(body).contains("DROP TABLE contract_lines");
+        assertThat(body).contains("version = '1.16'");
+        assertThat(body.indexOf("subscriptions.contract_line_id still present"))
+                .as("V1_17 guard must run before the table is dropped")
+                .isLessThan(body.indexOf("DROP TABLE contract_lines"));
+    }
+
     private static String script(String path) throws IOException {
         try (var in = ContractLinesMigrationScriptTest.class.getClassLoader().getResourceAsStream(path)) {
             assertThat(in).as("expected resource %s", path).isNotNull();

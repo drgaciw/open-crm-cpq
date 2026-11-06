@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -101,6 +102,20 @@ class ContractLineTenantProvenanceTest {
                 "tester")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contract");
+    }
+
+    @Test
+    void openRejectsMissingCommandOrContractIdWithoutTouchingRepositories() {
+        assertThatThrownBy(() -> service.open(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contract id is required");
+        assertThatThrownBy(() -> service.open(new ContractLineOpenCommand(
+                null, TENANT, 1, "line-1", null, "SKU-1", null, BigDecimal.ONE,
+                LocalDate.of(2026, 1, 1), null, ChargeType.RECURRING, "tester")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contract id is required");
+
+        verifyNoInteractions(contracts, lines);
     }
 
     private static ContractHeader header(UUID tenantId) {
