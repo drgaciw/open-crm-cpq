@@ -29,8 +29,14 @@ public class Subscription extends BaseEntity {
     private String subscriptionNumber;
 
     /**
-     * RED stub field for DRG-662 — real mapping/immutability lands in the green commit.
+     * tenantId is the Entra `tid` claim: a per-deployment value (single issuer per deployment, ADR-016 / DRG-632), deliberately weak interim. It is NOT a real per-tenant id.
+     *
+     * <p>Set once at creation from QuoteAccepted top-level {@code tenantId} (DRG-631).
+     * Null when absent/non-GUID. Must equal {@code contracts.tenant_id} when
+     * {@code contract_id} is set. No public setter after creation ({@code updatable = false}).
      */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "tenant_id", updatable = false)
     private UUID tenantId;
     
     @Column(name = "customer_id", nullable = false)
