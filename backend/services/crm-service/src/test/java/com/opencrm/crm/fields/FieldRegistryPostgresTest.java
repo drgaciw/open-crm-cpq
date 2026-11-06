@@ -113,6 +113,10 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
             assertSurvived("crm.field_option", controlOptionId);
             assertSurvived("crm.field_definition", controlDefinitionId);
             assertSurvived("crm.organizations", controlOrganizationId);
+            assertFixtureContents(sentinelDefinitionId, sentinelKey, sentinelOptionId, "Sentinel option",
+                    sentinelValueId, SENTINEL_TEXT);
+            assertFixtureContents(controlDefinitionId, controlKey, controlOptionId, "Control option",
+                    controlValueId, CONTROL_TEXT);
         } catch (Throwable ex) {
             assertionFailure = ex;
         }
@@ -520,6 +524,25 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM " + table + " WHERE id = ?", Integer.class, id);
         assertThat(count).isEqualTo(1);
+    }
+
+    private void assertFixtureContents(Long definitionId, String expectedKey, Long optionId, String expectedLabel,
+                                       Long valueId, String expectedText) {
+        if (definitionId != null) {
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT \"key\" FROM crm.field_definition WHERE id = ?", String.class, definitionId))
+                    .isEqualTo(expectedKey);
+        }
+        if (optionId != null) {
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT label FROM crm.field_option WHERE id = ?", String.class, optionId))
+                    .isEqualTo(expectedLabel);
+        }
+        if (valueId != null) {
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT \"text\" FROM crm.field_value WHERE id = ?", String.class, valueId))
+                    .isEqualTo(expectedText);
+        }
     }
 
     private void assertIdsAbsent(String table, Set<Long> createdIds) {
