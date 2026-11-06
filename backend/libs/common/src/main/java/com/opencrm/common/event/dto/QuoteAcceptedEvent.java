@@ -32,7 +32,9 @@ import java.util.Map;
  * never as "no lines".
  *
  * <p>S6 adds optional {@code amendmentDocumentId} and per-line {@code applicationUnitNo}. Both are null when absent
- * and omitted from JSON. There is no tenant on this event. {@code EVENT_TYPE} and {@code EVENT_VERSION} stay at v1.
+ * and omitted from JSON. DRG-631 adds optional {@code tenantId} (Quote's interim Entra {@code tid}, per-deployment —
+ * not a real customer tenant; see DRG-632 / ADR-036). Null when absent and omitted from JSON.
+ * {@code EVENT_TYPE} and {@code EVENT_VERSION} stay at v1.
  */
 @Data
 @NoArgsConstructor
@@ -65,6 +67,14 @@ public class QuoteAcceptedEvent {
     /** Amendment document this acceptance belongs to, when the quote was produced for one. Null on legacy events. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String amendmentDocumentId;
+
+    /**
+     * Quote tenant copied from {@code quotes.tenant_id}. Interim Entra {@code tid} (per-deployment, ADR-016 /
+     * DRG-632); not a verified customer tenant. Null when the quote has no tenant (service token / dev) or on
+     * payloads written before DRG-631. Omitted from JSON when null.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String tenantId;
 
     public QuoteAcceptedEvent(
             String quoteId,

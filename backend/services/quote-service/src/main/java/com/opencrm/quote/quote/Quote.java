@@ -42,7 +42,7 @@ public class Quote extends BaseEntity {
     private String customerExternalId;
 
     /**
-     * tenantId is the Entra `tid` claim: a per-deployment value (single issuer per deployment, ADR-016), chosen by the owner on 2026-10-23 as a deliberately weak interim. It is NOT a real per-tenant id, and the planned event follow-up inherits this limit.
+     * tenantId is the Entra `tid` claim: a per-deployment value (single issuer per deployment, ADR-016), chosen by the owner on 2026-10-23 as a deliberately weak interim. It is NOT a real per-tenant id. DRG-631 publishes this same value on QuoteAccepted and inherits this limit.
      */
     @Column(name = "tenant_id", length = 128, updatable = false)
     private String tenantId;
