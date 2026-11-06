@@ -60,10 +60,36 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
                 """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId, contractId, tenantId).isEmpty();
     }
 
-    /** RED stub for DRG-663 — always allows. */
     @Override
     public String contractCustomerAccountBlock(long subscriptionId) {
+        List<AccountLink> rows = jdbc.query("""
+                select s.contract_id,
+                       s.customer_account_id as subscription_account,
+                       c.customer_account_id as contract_account
+                from subscriptions s
+                left join contracts c on c.id = s.contract_id
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> new AccountLink(
+                rs.getObject("contract_id", UUID.class),
+                rs.getObject("subscription_account", UUID.class),
+                rs.getObject("contract_account", UUID.class)), subscriptionId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        AccountLink link = rows.getFirst();
+        if (link.contractId() == null) {
+            return null;
+        }
+        if (link.subscriptionAccount() == null) {
+            return "CUSTOMER_ACCOUNT_UNSET";
+        }
+        if (link.contractAccount() == null || !link.subscriptionAccount().equals(link.contractAccount())) {
+            return "CUSTOMER_ACCOUNT_MISMATCH";
+        }
         return null;
+    }
+
+    private record AccountLink(UUID contractId, UUID subscriptionAccount, UUID contractAccount) {
     }
 
     @Override

@@ -12,6 +12,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +27,8 @@ class SubscriptionCustomerAccountDryRunTest {
 
     @Test
     void reportsParseFailuresAndMismatchesWithoutUpdating() {
-        when(jdbc.queryForObject(anyString(), any(Class.class))).thenReturn(7L, 2L);
+        when(jdbc.queryForObject(anyString(), eq(Long.class), any())).thenReturn(7L);
+        when(jdbc.queryForObject(anyString(), eq(Long.class))).thenReturn(2L);
 
         SubscriptionCustomerAccountDryRun dryRun = new SubscriptionCustomerAccountDryRun(jdbc);
         Map<String, Long> report = dryRun.report();
@@ -34,9 +36,11 @@ class SubscriptionCustomerAccountDryRunTest {
         assertThat(report.get("UUID_PARSE_FAILURES")).isEqualTo(7L);
         assertThat(report.get("MISMATCHES")).isEqualTo(2L);
 
-        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(jdbc, org.mockito.Mockito.atLeast(2)).queryForObject(sql.capture(), any(Class.class));
-        for (String statement : sql.getAllValues()) {
+        org.mockito.ArgumentCaptor<String> parseSql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> mismatchSql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(parseSql.capture(), eq(Long.class), any());
+        verify(jdbc).queryForObject(mismatchSql.capture(), eq(Long.class));
+        for (String statement : java.util.List.of(parseSql.getValue(), mismatchSql.getValue())) {
             String lower = statement.toLowerCase();
             assertThat(lower).doesNotContain("update ");
             assertThat(lower).doesNotContain("insert ");

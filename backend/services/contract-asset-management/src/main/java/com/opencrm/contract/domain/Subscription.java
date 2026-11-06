@@ -32,9 +32,11 @@ public class Subscription extends BaseEntity {
     private String customerId;
 
     /**
-     * RED stub field for DRG-663 — real mapping lands in the green commit.
-     * Typed CRM account key; stays NULL at QuoteAccepted ingest (external String customerId).
+     * Typed CRM account uuid (DRG-663). Stays NULL at QuoteAccepted ingest —
+     * {@code customerId} is a String external id and must not be parsed into this column.
+     * When {@code contract_id} is set, must equal {@code contracts.customer_account_id}.
      */
+    @Column(name = "customer_account_id")
     private UUID customerAccountId;
     
     @Column(name = "quote_id", nullable = false)
