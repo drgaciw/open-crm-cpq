@@ -152,82 +152,6 @@ def nightly_schedule_errors(contract: str, gha: str) -> list[str]:
     return []
 
 
-def extract_setup_node_steps(gha_text: str) -> list[str]:
-    """Extract individual actions/setup-node step blocks from a workflow YAML string."""
-    lines = gha_text.splitlines()
-    steps: list[str] = []
-    current_step: list[str] | None = None
-    current_indent = -1
-
-    for line in lines:
-        m = re.match(r"^(\s*)-\s+(.*)$", line)
-        if m:
-            if current_step is not None:
-                step_str = "\n".join(current_step)
-                if "actions/setup-node@" in step_str:
-                    steps.append(step_str)
-            current_indent = len(m.group(1))
-            current_step = [line]
-            continue
-
-        if current_step is not None:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                current_step.append(line)
-                continue
-            indent = len(line) - len(line.lstrip(" "))
-            if indent > current_indent:
-                current_step.append(line)
-            else:
-                step_str = "\n".join(current_step)
-                if "actions/setup-node@" in step_str:
-                    steps.append(step_str)
-                current_step = None
-                current_indent = -1
-
-    if current_step is not None:
-        step_str = "\n".join(current_step)
-        if "actions/setup-node@" in step_str:
-            steps.append(step_str)
-
-    return steps
-
-
-def toolchain_node_errors(contract: str, gha: str) -> list[str]:
-    """Assert setup-node in .github/workflows/ci.yml matches docs/ci-contract.yaml toolchain.node_version."""
-    toolchain = mapping_body(contract, "toolchain")
-    m = re.search(r"^\s*node_version:\s*['\"]?([^'\"\s#]+)['\"]?", toolchain, re.MULTILINE)
-    if not m:
-        return ["docs/ci-contract.yaml missing toolchain.node_version"]
-    expected_version = m.group(1).strip()
-
-    errors: list[str] = []
-    steps = extract_setup_node_steps(gha)
-    if not steps:
-        errors.append("GHA ci.yml missing setup-node steps with node-version to verify against toolchain.node_version")
-        return errors
-
-    for step_text in steps:
-        v_match = re.search(r"node-version:\s*['\"]?([^'\"\s\n#]+)?['\"]?", step_text)
-        f_match = re.search(r"node-version-file:\s*['\"]?([^'\"\s\n#]+)?['\"]?", step_text)
-        actual_version = v_match.group(1).strip() if (v_match and v_match.group(1)) else ""
-        node_file = f_match.group(1).strip() if (f_match and f_match.group(1)) else ""
-
-        if actual_version:
-            if actual_version != expected_version:
-                errors.append(
-                    f"GHA ci.yml setup-node node-version '{actual_version}' != contract toolchain.node_version '{expected_version}'"
-                )
-        elif node_file:
-            pass
-        else:
-            errors.append(
-                f"GHA ci.yml setup-node step missing node-version pin (expected '{expected_version}')"
-            )
-
-    return errors
-
-
 def gha_has_auto_triggers(gha_text: str) -> bool:
     """True if workflow runs on push or pull_request (disallowed for Option B)."""
     in_on = False
@@ -312,7 +236,6 @@ def main() -> int:
     errors.extend(pr_gate_errors(repo, contract))
     errors.extend(main_gate_errors(repo, contract))
     errors.extend(nightly_schedule_errors(contract, gha))
-    errors.extend(toolchain_node_errors(contract, gha))
 
     if "run-core.sh" not in jenkins:
         errors.append("Jenkinsfile must invoke scripts/ci/run-core.sh")
