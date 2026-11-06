@@ -74,7 +74,7 @@ Legacy review preserves evolved upstream implementations rather than replacing t
 
 ## Verification and limits
 
-Frontend focused quote-service unit tests: 19 passed. Recovered AI ownership-boundary tests: 3 passed. Detailed source integration verification and final cleanup outcomes are recorded below when complete.
+Frontend focused quote-service unit tests: 19 passed. Recovered AI ownership-boundary tests: 5 passed. Detailed source integration verification and final cleanup outcomes are recorded below when complete.
 
 Docker-dependent integration tests and browser/chaos UAT are separate from unit-test results. Browser/chaos scripts are not wired into CI. Whole-frontend CI builds/lints/tests all Nx projects but has no frontend typecheck target; PR-check runs no frontend stage. The full CI matrix and primary Jenkins pipeline do include frontend. CPQ services were not started or restarted during housekeeping.
 
@@ -94,6 +94,6 @@ All 47 original named refs, including main, were verified remotely by ancestry a
 
 PR #795 includes the original AI boundary test and a four-line gateway test-fixture repair. Untouched main reproduced two failures in six CSRF bootstrap tests because the lightweight ReactiveWebApplicationContextRunner lacked Boot conversion and read the origin CSV as one list item. Installing ApplicationConversionService in the fixture makes all six pass; production filters and every token/origin/status assertion remain unchanged. The root merge was graph-checked using the fresh linked-worktree index and explicit root worktree binding: no partial or truncated precommit result; risk remains CRITICAL. A broad depth-three test-class impact query hit GitNexus internal chunk limits and remains partial; a bounded depth-one rerun and the modified runner method analysis completed. Do not describe that broad query as clean.
 
-The main checkout dependency directory was restored with npm ci from its committed lockfile. With matching declared versions, focused quote-service tests passed 19 tests and OMS orders passed 28 tests in four files; the standalone OMS evaluator passed 10 Python tests. The restored AI boundary test passed three targeted Maven tests. These focused checks are not whole-frontend CI or browser UAT.
+The main checkout dependency directory was restored with npm ci from its committed lockfile. With matching declared versions, focused quote-service tests passed 19 tests and OMS orders passed 28 tests in four files; the standalone OMS evaluator passed 10 Python tests. The restored AI boundary test passed five targeted Maven tests. These focused checks are not whole-frontend CI or browser UAT.
 
 The substantive OMS pilot integration has a separate branch and review. It reconciles existing migration checksums, shared event and security contracts, legacy default ownership, and explicit disabled rollout flags. Its compilation/unit evidence and remaining Docker/runtime checks are tracked with that integration; this housekeeping PR does not claim OMS has merged to main.
