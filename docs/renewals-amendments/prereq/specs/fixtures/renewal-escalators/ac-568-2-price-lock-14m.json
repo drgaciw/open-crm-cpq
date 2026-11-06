@@ -1,0 +1,80 @@
+{
+  "status": "proposed",
+  "id": "renewal-escalators.ac-568-2",
+  "ac": "568-2",
+  "story": "DRG-568",
+  "relatedStories": ["DRG-533", "DRG-532"],
+  "mainSha": "0a3f0f8e7552aaf5b9fc1321c357e2fe4e32b225",
+  "adr": {
+    "path": "docs/renewals-amendments/prereq/DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md",
+    "blobSha": "4922b07b4ce374b8ee9f88ecec593c5699b82fea",
+    "sections": [
+      "D-04 — Renewal segment schedule",
+      "D-03 — Rounding"
+    ]
+  },
+  "reuse": {
+    "semantics": "DRG-533 ADR D-04 explicit lock segments; post-lock percent once on locked unit",
+    "generator": "Equal-block RampEscalatorExpander is NOT used for the 5+9 split",
+    "whyNotExpander": "14 months with everyMonths=12 is not the lock split; lock ends mid-term on a month boundary"
+  },
+  "scenario": {
+    "label": "14-month AI Assist promotional lock through 2027-03-31",
+    "renewalStart": "2026-11-01",
+    "renewalEnd": "2027-12-31",
+    "termMonths": 14,
+    "quantity": 50,
+    "lockInclusiveThrough": "2027-03-31",
+    "lockedUnit": "20.0000",
+    "postLockMode": "UpliftPct",
+    "postLockPercentPoints": "7",
+    "postLockUnit": "21.4000"
+  },
+  "expected": {
+    "segmentCount": 2,
+    "segments": [
+      {
+        "from": "2026-11-01",
+        "to": "2027-03-31",
+        "months": 5,
+        "mode": "lock",
+        "unit": "20.0000",
+        "periodAmount": "5000.00"
+      },
+      {
+        "from": "2027-04-01",
+        "to": "2027-12-31",
+        "months": 9,
+        "mode": "UpliftPct",
+        "unit": "21.4000",
+        "periodAmount": "9630.00"
+      }
+    ],
+    "boundaryBelongsToNewSegment": "2027-04-01",
+    "acRequiresTotal": false,
+    "lineTotalForReconciliationOnly": "14630.00"
+  },
+  "ownerForks": [
+    {
+      "id": "OF-568-4",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "Post-lock percent applied once to locked unit"
+    },
+    {
+      "id": "OF-568-5",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "Unequal lengths as explicit segments only"
+    },
+    {
+      "id": "OF-568-9",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "Product enablement of time-bounded locks"
+    }
+  ],
+  "flag": {
+    "opencrm.pricing.ramp.enabled": false
+  }
+}

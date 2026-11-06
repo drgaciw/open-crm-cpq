@@ -144,7 +144,9 @@ Residual criteria (the automation path still has no price for these inputs):
 
 ### DRG-568 — multi-year escalators and time-bounded locks
 
-DRG-533 is Accepted on 2026-10-17, as recorded in [its ADR](../DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md) and merged by #684. Acceptance is the status of that document; its recommendations are not in force and it authorizes no implementation. The ADR says later renewal periods stay unpriced. The DRG-549 later-year row keeps one flat priced period. This section makes no further choice of escalator semantics: compounding, percent-of-original, and percent-of-prior stay unselected here.
+DRG-533 is Accepted on 2026-10-17, as recorded in [its ADR](../DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md) and merged by #684. DRG-532 is Done. Story design and Linear ACs 568-1..568-7 (including Y3 unit **49.0017** and the 14-month lock split) live in [../story-drg-568-renewal-escalators-and-price-locks.md](../story-drg-568-renewal-escalators-and-price-locks.md) and [renewal-escalators-locks.md](renewal-escalators-locks.md) with fixtures under `fixtures/renewal-escalators/`. Those Linear AC ids **supersede** the interim identically numbered rows below for implementation planning. Owner forks in that story note stay **Proposed**. `opencrm.pricing.ramp.enabled` stays false. **DRG-534 is not in scope.**
+
+**Automation-path hold while the ramp flag is off (interim rows; superseded for story ACs).** Until a separately authorized, flag-gated implementation wires the DRG-532 generator into renewal, the priced renewal on this tree remains one flat period. The rows below record that hold; they are not the Linear 568-1..568-7 contract.
 
 #### Whether a lock becomes time-bounded
 
@@ -156,10 +158,10 @@ The price-protection marker is not a cap.
 
 | ID | Given | Expected |
 |---|---|---|
-| AC-568-1 | Term length 36 months. An annual 7 percent escalator is copied as intent only. Exit net 40.0000. Account percent 7. Basis left to DRG-604 D-01. | Priced period count 1. Period-1 unit 42.8000, the worked example per DRG-604 Accepted (#623). Period-2 unit absent. Period-3 unit absent. Compound flag absent. |
-| AC-568-2 | The AC-568-1 input. | Stored percent-of-original choice absent. Stored percent-of-prior choice absent. Year-2 unit absent. Year-3 unit absent. The ticket illustrations 45.80, 45.7960, 49.01, 49.00, and 49.0017 are not expected values. |
-| AC-568-3 | Rules rung returns `ENABLE_12M_PRICE_PROTECTION`. No rung sets `maxIncreasePct`. Exit net 40.0000. Account percent 7. | Marker stored as `ENABLE_12M_PRICE_PROTECTION`. `capApplied` absent. Priced period count 1. The marker does not change the unit. The marker is not a cap. |
-| AC-568-4 | Flat renewal 2027-04-01 through 2028-03-31 (12 months). Promotional unit 20.00 with bound 2027-08-31 inclusive, inside that renewal. | Priced period count 1. A 5-month segment at 20.00 from 2027-04-01 through 2027-08-31 is absent. A following 7-month segment at 21.40 from 2027-09-01 through 2028-03-31 is absent. Those two segments sum to 12 months. The time bound stays Proposed, as the slot above. |
+| AC-568-HOLD-1 (was AC-568-1; superseded by Linear AC-568-1 in renewal-escalators-locks.md) | Term length 36 months. An annual 7 percent escalator is copied as intent only. Exit net 40.0000. Account percent 7. Basis left to DRG-604 D-01. Flag off. | Priced period count 1 on the live continuation path. Period-1 unit 42.8000. Later units are not written by `QuoteContinuationPolicy` while the flag is off. |
+| AC-568-HOLD-2 (was AC-568-2; superseded) | The AC-568-HOLD-1 input. Flag off. | Live path does not store compound / percent-of-prior choices. Story fixtures assert 45.7960 / 49.0017 for the generator reuse contract, not for today's flat writer. |
+| AC-568-HOLD-3 (was AC-568-3) | Rules rung returns `ENABLE_12M_PRICE_PROTECTION`. No rung sets `maxIncreasePct`. Exit net 40.0000. Account percent 7. | Marker stored as `ENABLE_12M_PRICE_PROTECTION`. `capApplied` absent. Priced period count 1. The marker does not change the unit. The marker is not a cap. Status: Proposed (OF-568-8). |
+| AC-568-HOLD-4 (was AC-568-4; superseded by Linear AC-568-2 lock fixture) | Flat renewal while flag off. | Live path remains one flat period. Time-bounded lock enablement stays Proposed (OF-568-9). |
 
 ---
 
@@ -210,9 +212,9 @@ Delta: AC-567-1, AC-567-2, and AC-567-3 are the inputs for which that record alr
 
 ### DRG-568
 
-Frame: [DRG-568 dependent](../cluster-d-renewal-automation-decision-frame.md#drg-568--multi-year-escalators-and-price-locks). DRG-604 D-06 withholds later periods until the escalator procedure is accepted. The DRG-533 ADR is Accepted on this base, but still says its recommendations are not in force and later renewal periods stay unpriced. DRG-549's later-year row keeps one flat period.
+Frame: [DRG-568 dependent](../cluster-d-renewal-automation-decision-frame.md#drg-568--multi-year-escalators-and-price-locks). DRG-532 is Done and DRG-533 is Accepted. Linear ACs 568-1..568-7, fixtures (Y3 **49.0017**), reuse of the DRG-532 generator, and Proposed owner forks are in [../story-drg-568-renewal-escalators-and-price-locks.md](../story-drg-568-renewal-escalators-and-price-locks.md) and [renewal-escalators-locks.md](renewal-escalators-locks.md).
 
-Delta: This file records the accepted status of DRG-533 without treating its recommendations as in force or selecting escalator semantics for this proposal. AC-568-1 and AC-568-2 fix the expected priced shape at one period and leave both later-period bases unselected. AC-568-3 states that `ENABLE_12M_PRICE_PROTECTION` is stored as a marker and is not a cap (`capApplied` absent). AC-568-4 leaves a bound of 2027-08-31, inside the renewal 2027-04-01 through 2028-03-31, unpriced as a 5-month segment plus a 7-month segment. Whether a lock becomes time-bounded stays Proposed, with the owner slot blank. This file does not unblock DRG-568's implementation, and it does not amend ADR-023.
+Delta: This file keeps the **flag-off automation hold** (one flat priced period on the live continuation path; marker ≠ cap; lock enablement Proposed). It does not flip `opencrm.pricing.ramp.enabled`, does not implement DRG-534, and does not amend ADR-023. Story AC ids 568-1..568-7 in the dedicated spec supersede the interim HOLD rows above for implementation planning.
 
 ### DRG-606 RN1–RN5
 
