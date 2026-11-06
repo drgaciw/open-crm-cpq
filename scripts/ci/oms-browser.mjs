@@ -45,9 +45,12 @@ server = await createServer({
       const result = await response;
       if (result.status() !== expected) throw new Error(`${suffix}: expected ${expected}, got ${result.status()}: ${await result.text().catch(()=>'response body unavailable')}`);
       commands.push({ path: suffix, status: result.status() });
+      // Read the body before the UI settles: the app re-renders and navigates on success, and by the time the UI waits
+      // finish Chromium can no longer return this response's body (Network.getResponseBody "No data found").
+      const body = suffix === '/orders/from-quote' ? await result.json() : undefined;
       await page.waitForFunction(() => !document.body.textContent.includes('Recording command…') && !document.body.textContent.includes('Loading order, execution plan'));
       if (suffix !== '/orders/from-quote') await page.getByRole('heading', { name: 'Accepted commercial snapshot', exact: true }).waitFor();
-      return suffix === '/orders/from-quote' ? result.json() : undefined;
+      return body;
     };
     await page.goto(base + 'orders');
     await page.getByText('Create order from accepted quote', { exact: true }).click();
