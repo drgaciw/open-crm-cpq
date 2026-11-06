@@ -18,9 +18,9 @@ import java.util.Map;
  * Frozen pre-extension parser for AC-S6-1a.
  *
  * <p>Copy of {@code QuoteAcceptedEvent} as it stood on main before the optional
- * {@code amendmentDocumentId} and per-line {@code applicationUnitNo} fields. This class must not
- * gain those fields. A strict mapper feeds it an extended payload; {@code ignoreUnknown} is what
- * lets an old consumer read the new event.
+ * {@code amendmentDocumentId}, {@code tenantId} and per-line {@code applicationUnitNo} fields. This
+ * class must not gain those fields. A strict mapper feeds it an extended payload; {@code ignoreUnknown}
+ * is what lets an old consumer read the new event.
  */
 @Data
 @NoArgsConstructor
