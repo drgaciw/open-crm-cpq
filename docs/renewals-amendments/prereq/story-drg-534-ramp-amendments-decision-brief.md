@@ -69,7 +69,7 @@ Every row is `Status: Proposed`. Recommended default is marked **Recommended (Pr
 | OQ7 | Re-approval vs auto-bind when fingerprint changes but inside policy | New binding always; auto-bind allowed when worst period is inside policy (no mandatory human) | Mandatory human re-approval on every fingerprint change; silent edit of prior binding (rejected by AC-3) | Yes — AC-3 human/auto |
 | D-elapsed | Elapsed = `end_date` ≤ `asOfDate` | Adopt that definition | Elapsed = fully billed; elapsed = start before asOf | Yes — AC-1 boundary |
 | D-regen | Future regeneration start | Last elapsed stored absolute; **not in this slice** | Regenerate from percent in this slice | No for AC-1..4 stored-step |
-| D-exitArr | `exitArr` after period-3 → 55.0000 | 33000.00 | Other rounding / ARR definition | Secondary to AC-2 |
+| D-exitArr | `exitArr` after period-3 30000.00 → 33000.00 | 33000.00 | Other rounding / ARR definition | Secondary to AC-2 |
 | OQ1 | Escalator semantics (DRG-533 D-01..D-03) | Leave to DRG-533 owner forks; AC-8 keeps amendments as stored steps | Force regeneration here | No for AC-1..4 |
 | ADR-F1..F7 | Compound, scale, lock uplift, segments, named-seat, month locks, protection marker | Keep as Proposed in Defaults table; not selected here | See DRG-533 ADR | No for AC-1..4 |
 | OQ8 | Ramp / ACV flags | Stay off / legacy | Enable ramp; change ACV version | Yes — AC-9; out of slice |
