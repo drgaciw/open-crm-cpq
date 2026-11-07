@@ -12,7 +12,7 @@
 |---|---|
 | [cluster-f-fulfilment-decision-frame.md](cluster-f-fulfilment-decision-frame.md) | Historical S1–S7 fork catalogue for DRG-558 (and C1–C4 / F1–F9 for DRG-578). Frame text retains pre-decision wording; see its Current authority header. |
 | [delegated-renewals-amendments-decisions-2026-10-17.md](delegated-renewals-amendments-decisions-2026-10-17.md) §Fulfilment | Under owner delegation, assigned dispositions to Cluster F S1–S7 (and related fulfilment contracts). **Does not** authorize Java/TS, migrations, `EventContractRegistry` rows, or flags. |
-| [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md) (draft #809) | Activation Decision brief. Its **OQ9** leaves the full PendingActive…Terminated set waiting on **this** DRG-558 Decision. |
+| [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md) (merged in #809; decisions Proposed) | Activation Decision brief. Its **OQ9** leaves the full PendingActive…Terminated set waiting on **this** DRG-558 Decision. |
 | [adr-reconcile-adr-024-027.md](adr-reconcile-adr-024-027.md) | Effect row lists eight candidate commitment names as specification input for DRG-558. |
 
 **This note authorizes no code, schema migration, job, data rewrite, feature flag, topic, registry entry, gateway route, or deploy.** An implementation brief for DRG-558 (or any product story that stores commitment states / emits a fulfilment-required event) is **blocked** until CPQ Decision scores and the owner closes the forks below (or explicitly defers a named fork with words and a time). Holds in [AGENT.md](../../../AGENT.md) and [ARCHITECTURE.md §17](../../ARCHITECTURE.md) stay in force: no dual-read flip, no Jev enablement, no contract-asset FE work from this brief.
@@ -29,7 +29,7 @@
 
 ## Context (why DRG-558 needs its own Decision brief)
 
-DRG-558 asks for (1) a fulfilment step after commercial apply when licence regeneration / entitlement change is required, and (2) an explicit commitment status vocabulary from `PendingActive` through `Terminated` (plus grace / expiry / supersession names). Cluster F and the 2026-10-17 delegated record already wrote **policy dispositions**. Product readiness still fails the same gates as DRG-460/469: no entitlement ledger on `main`, no commitment-status column or table, no fulfilment-required event registered, and activation Decision forks still open on draft #809.
+DRG-558 asks for (1) a fulfilment step after commercial apply when licence regeneration / entitlement change is required, and (2) an explicit commitment status vocabulary from `PendingActive` through `Terminated` (plus grace / expiry / supersession names). Cluster F and the 2026-10-17 delegated record already wrote **policy dispositions**. Product readiness still fails the same gates as DRG-460/469: no entitlement ledger on `main`, no commitment-status column or table, no fulfilment-required event registered, and activation Decision forks remain open in the brief merged by #809.
 
 Scoring DRG-558 separately from DRG-578 keeps operation-selection (provision / modify / revoke / …) out of this brief. Scoring it separately from DRG-460 keeps activation AC (quantity, term, minimal status, `ListEntitlements`) from silently absorbing the full commitment machine.
 
