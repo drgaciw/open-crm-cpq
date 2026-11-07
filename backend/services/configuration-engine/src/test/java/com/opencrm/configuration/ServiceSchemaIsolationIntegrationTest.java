@@ -36,7 +36,7 @@ class ServiceSchemaIsolationIntegrationTest {
     /** Flyway versions applied to schema contract. Count is this list, not a floor. */
     private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12",
-            "1.13", "1.14", "1.15");
+            "1.13", "1.14", "1.15", "1.16", "1.17");
 
     /** Every base table in schema contract, including assets and the asset history. */
     private static final List<String> CONTRACT_TABLES = List.of(
@@ -50,6 +50,7 @@ class ServiceSchemaIsolationIntegrationTest {
             "applied_quote_acceptances",
             "asset_history",
             "assets",
+            "contract_lines",
             "contracts",
             "document_apply_ledger",
             "flyway_schema_history",
