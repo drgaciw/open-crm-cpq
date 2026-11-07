@@ -246,12 +246,12 @@ Operation names under that proposal, for on-prem lines only: `PROVISION`, `MODIF
 | ADR-024 through ADR-027, Proposed | DRG-465 and DRG-466 wait on owner acceptance before any service. | Not accepted here. No transport is decided. |
 | DRG-465, Backlog, parent DRG-290 | Product-to-item decomposition. The issue text names an `OrderDecomposed` event. | Not the action key. The event is not decided. Not started. |
 | DRG-466, Backlog | Fulfilment orchestrator. Stays a dependency. | Compensation text is alternative B of C3 and of F5. No event and no transport from DRG-466 is decided. |
-| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. |
+| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. Related Decision brief (Proposed): [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md). |
 | DRG-495, Backlog | Licence determination. The issue text names `LicenseRequired`. | That event is not decided. Pause behaviour stays inside Proposed ADR-027. Not started. |
 | DRG-576, Backlog | Catalog product relationship and lifecycle-eligibility model. | Optional qualifier only (F3, F4). |
 | DRG-556, DRG-557, Backlog | Perpetual-plus-maintenance, and capacity meters. | A perpetual commercial renewal is outside this proposal. Maintenance renewal and true-up stay on those issues. |
 | DRG-574, Backlog | Surrender and revocation after a dual-use window. | Caller of `REVOKE` only if its own proposal is later accepted (F8). `Surrendered` is not settled. |
-| DRG-558, In Review | Commitment names while an operation is outstanding. | Options in the next section. No state is settled. |
+| DRG-558, In Review | Commitment names while an operation is outstanding. | Options in the next section. No state is settled. Related Decision brief (Proposed): [story-drg-558-entitlement-state-decision-brief.md](story-drg-558-entitlement-state-decision-brief.md). |
 | DRG-341 | Dual-entitlement window. | Window length is not set here (F9). |
 | OQ18, S3 / DRG-581 | Digest library. | A future request may copy the digest the reconcile text already stores as replay data (D-R3). This frame does not build the library and does not start S3. |
 | Accepted proration ADR | Charge formula. | Not reopened (C4). |
@@ -383,7 +383,7 @@ Under that proposal the eight names are unsettled candidates for a later on-prem
 | DRG-429, Backlog | `ReconfigureFrom(hash)` starts a configuration session from a frozen item. | Related on the issue. It does not set a commitment status and does not select a fulfilment operation. |
 | DRG-547, Backlog | Research-gap intake that harvested this issue. | Source context. Not a design. |
 | DRG-466, Backlog | Orchestrator dependency for the cluster. | Stays a dependency. No event and no transport is decided. |
-| DRG-460, Backlog | Names `EntitlementProvisioned`. | Alternative inside S2-C. Not decided. |
+| DRG-460, Backlog | Names `EntitlementProvisioned`. | Alternative inside S2-C. Not decided. Related activation Decision brief (Proposed): [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md). |
 | OQ5 option A, OQ6 | Partial apply, and no revision after `EXECUTED`. | S2 and cluster C3. OQ6 `SUPERSEDED` is not a commitment state. |
 | OQ7 | Thin header backfill, no synthetic history. | No backfill of commitment periods. OQ7 is not confirmed here. |
 | S6, ADR-026, ADR-017 | Where an event or a call could later live. | Forks C2 and S2. No event and no transport is decided. |

@@ -66,6 +66,20 @@ opencrm:
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 
+ai:
+  agent-task:
+    dispatcher:
+      enabled: false
+      claim-limit: 10
+      lease: 30s
+      poll-interval: 5s
+    default-max-attempts: 5
+    default-priority: 0
+    retry:
+      initial-backoff: 1s
+      multiplier: 2
+      max-backoff: 15m
+
 logging:
   level:
     com.opencrm.ai: DEBUG

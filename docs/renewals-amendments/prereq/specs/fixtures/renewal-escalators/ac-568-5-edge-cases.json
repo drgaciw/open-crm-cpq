@@ -1,0 +1,102 @@
+{
+  "status": "proposed",
+  "id": "renewal-escalators.ac-568-5",
+  "ac": "568-5",
+  "story": "DRG-568",
+  "relatedStories": ["DRG-533", "DRG-532"],
+  "mainSha": "0a3f0f8e7552aaf5b9fc1321c357e2fe4e32b225",
+  "cases": [
+    {
+      "id": "568-5-zero-escalator",
+      "given": {
+        "period1Unit": "42.8000",
+        "percentPoints": "0",
+        "termMonths": 36,
+        "everyMonths": 12
+      },
+      "expected": {
+        "units": ["42.8000", "42.8000", "42.8000"]
+      }
+    },
+    {
+      "id": "568-5-negative-amount-refused",
+      "given": {
+        "startPrice": "42.80",
+        "mode": "PERCENT",
+        "amount": "-7",
+        "everyMonths": 12
+      },
+      "expected": {
+        "refuse": true,
+        "reason": "RAMP_NEGATIVE_VALUE"
+      }
+    },
+    {
+      "id": "568-5-leap-year-month-end-no-drift",
+      "given": {
+        "termStart": "2028-01-31",
+        "everyMonths": 12,
+        "termMonths": 36
+      },
+      "expected": {
+        "segmentStarts": ["2028-01-31", "2029-01-31", "2030-01-31"],
+        "drift": false,
+        "rule": "ADR-023 D-04 anniversary from term start"
+      }
+    },
+    {
+      "id": "568-5-whole-month-boundary-no-day-stub",
+      "given": {
+        "boundary": "whole-month renewal segment boundary"
+      },
+      "expected": {
+        "dayStub": false,
+        "proration": "none at whole-month renewal boundary"
+      }
+    },
+    {
+      "id": "568-5-escalator-not-stacked-on-uplift",
+      "given": {
+        "exitNet": "40.0000",
+        "upliftPercentPoints": "7",
+        "escalatorPercentPoints": "7"
+      },
+      "expected": {
+        "period1Unit": "42.8000",
+        "period1Not": "45.7960",
+        "note": "Period 1 is the single uplift unit; escalator applies from period 2"
+      }
+    },
+    {
+      "id": "568-5-segment-totals-reconcile",
+      "ref": "ac-568-1",
+      "expected": {
+        "sumPeriodAmountsEqualsTcv": true,
+        "tcv": "330234.48"
+      }
+    },
+    {
+      "id": "568-5-mid-month-lock-out-of-first-slice",
+      "given": {
+        "lockEnd": "2027-03-15"
+      },
+      "expected": {
+        "inFirstSlice": false,
+        "dayProration": false,
+        "ownerFork": "OF-568-7",
+        "status": "Proposed"
+      }
+    }
+  ],
+  "ownerForks": [
+    {
+      "id": "OF-568-7",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "Month-boundary locks only in first slice"
+    }
+  ],
+  "flag": {
+    "opencrm.pricing.ramp.enabled": false
+  }
+}
