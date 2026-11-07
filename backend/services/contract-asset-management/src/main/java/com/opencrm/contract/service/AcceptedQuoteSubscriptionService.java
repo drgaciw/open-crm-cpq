@@ -66,6 +66,9 @@ public class AcceptedQuoteSubscriptionService {
     @Autowired(required = false)
     public void setIngestAuditor(SubscriptionIngestAuditor ingestAuditor) {
         this.ingestAuditor = ingestAuditor;
+    }
+
+    @Autowired(required = false)
     public void setTenantMeters(MeterRegistry tenantMeters) {
         this.tenantMeters = tenantMeters;
     }
