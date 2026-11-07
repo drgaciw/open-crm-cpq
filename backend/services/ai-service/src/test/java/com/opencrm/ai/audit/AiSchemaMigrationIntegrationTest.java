@@ -22,7 +22,7 @@ class AiSchemaMigrationIntegrationTest {
                 var sql = connection.createStatement()) {
             sql.executeUpdate("INSERT INTO ai.agent_audit_log(agent_id,session_id,event_type) VALUES ('before','s','INVOCATION')");
             var flyway = Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                    .schemas("ai").defaultSchema("ai").locations("classpath:db/migration").load();
+                    .schemas("ai").defaultSchema("ai").locations("classpath:db/migration").target("2").load();
             assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
             sql.executeUpdate("INSERT INTO ai.agent_audit_log(agent_id,session_id,event_type) VALUES ('after','s','INVOCATION')");
             try (var result = sql.executeQuery("SELECT agent_id,model FROM ai.agent_audit_log ORDER BY agent_id")) {
