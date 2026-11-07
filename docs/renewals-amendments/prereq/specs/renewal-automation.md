@@ -4,6 +4,8 @@
 
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `renewal-automation`. **Date:** 2026-10-29. **Base:** `main` at `bf41c230f6309964a25ef5c2c12e84c41b0c37de`.
 
+This file is the dev-ready spec for the `renewal-automation` line on [DRG-607](https://linear.app/drgamtd-workspace/issue/DRG-607). The checklist membership record is [story-drg-644-renewal-automation-cluster-line.md](../story-drg-644-renewal-automation-cluster-line.md) ([DRG-644](https://linear.app/drgamtd-workspace/issue/DRG-644)). This file does not edit Linear and does not tick the checklist box.
+
 **Issues.** [DRG-643](https://linear.app/drgamtd-workspace/issue/DRG-643). One section each for [DRG-555](https://linear.app/drgamtd-workspace/issue/DRG-555), [DRG-593](https://linear.app/drgamtd-workspace/issue/DRG-593), [DRG-596](https://linear.app/drgamtd-workspace/issue/DRG-596), [DRG-567](https://linear.app/drgamtd-workspace/issue/DRG-567), and [DRG-568](https://linear.app/drgamtd-workspace/issue/DRG-568).
 
 **Sources, linked and not copied.** The [delegated decision record](../delegated-renewals-amendments-decisions-2026-10-17.md#renewal-automation) is the adopted baseline and overrides historical forks in the cluster-d frame. [DRG-606](https://linear.app/drgamtd-workspace/issue/DRG-606) RN1–RN5 in [renewal-policy-spec.md](../renewal-policy-spec.md) §1.6. Forks in [cluster-d-renewal-automation-decision-frame.md](../cluster-d-renewal-automation-decision-frame.md). Mode catalog in [drg-549-renewal-pricing-resolution-design-frame.md](../drg-549-renewal-pricing-resolution-design-frame.md). Uplift basis, the D-04 overlay, and a null percent: per DRG-604 Accepted (#623), [adr-renewal-uplift-basis-and-precedence.md](../adr-renewal-uplift-basis-and-precedence.md).

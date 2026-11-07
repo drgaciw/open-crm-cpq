@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.filter.annotation.TypeExcludeFilters;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -22,6 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 // Name the application explicitly. The slice configuration in this package is not a second
 // @SpringBootConfiguration, so an implicit lookup stays unambiguous as well.
+// Keep security's management-port App off the scan so its DataSource/JPA excludes cannot wipe entityManagerFactory
+// when a reactor mvn test puts security target/test-classes on the classpath (DRG-675).
+@TypeExcludeFilters(ExcludeSecurityManagementPortAppFilter.class)
 @SpringBootTest(classes = PriceBookServiceApplication.class, properties = {
     "spring.jpa.hibernate.ddl-auto=create-drop",
     "spring.jpa.properties.hibernate.hbm2ddl.create_namespaces=true",
