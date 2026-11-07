@@ -1,7 +1,7 @@
 # Custom Jenkins controller for OpenCRM CPQ monorepo CI
 # Build context: infra/jenkins (see docker-compose.jenkins.yml)
 # Jenkins WAR stays on image JDK 21 (2.492.3 supports 17/21, not 25/27).
-FROM jenkins/jenkins:2.492.3-lts-jdk21
+FROM jenkins/jenkins:2.580.2-lts-jdk21
 
 USER root
 
