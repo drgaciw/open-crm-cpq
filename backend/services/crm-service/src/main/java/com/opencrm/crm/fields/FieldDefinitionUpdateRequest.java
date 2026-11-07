@@ -40,9 +40,4 @@ public class FieldDefinitionUpdateRequest {
     @NotNull(message = "Version is required")
     @Min(value = 0, message = "Version must be zero or greater")
     private Long version;
-
-    private String createdBy;
-    private String updatedBy;
-    private String actor;
-    private String archivedBy;
 }
