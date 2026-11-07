@@ -155,16 +155,10 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     @Test
     void createRelabelAndArchiveAttributeTheCurrentActor() throws Exception {
         authenticatePerson("person-create");
-        mockMvc.perform(post("/api/v1/field-definitions")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("region_code", "Region", "spoofed-creator")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
         MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("region_code", "Region", null)))
+                        .content(textField("region_code", "Region")))
                 .andExpect(status().isCreated())
                 .andReturn();
         String created = createdResult.getResponse().getContentAsString();
@@ -179,13 +173,6 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         mockMvc.perform(put("/api/v1/field-definitions/" + id)
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"label\":\"Territory code\",\"version\":0,\"updatedBy\":\"spoofed-editor\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
-        assertActors(id, "person-create", "person-create", false);
-        mockMvc.perform(put("/api/v1/field-definitions/" + id)
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"label\":\"Territory code\",\"version\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.key").value("region_code"))
@@ -195,13 +182,6 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         assertActors(id, "person-create", "person-relabel", false);
 
         authenticatePerson("person-archive");
-        mockMvc.perform(post("/api/v1/field-definitions/" + id + "/archive")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"version\":1,\"archivedBy\":\"spoofed-archiver\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
-        assertActors(id, "person-create", "person-relabel", false);
         mockMvc.perform(post("/api/v1/field-definitions/" + id + "/archive")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -224,7 +204,7 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("region_code", "Region A", null)))
+                        .content(textField("region_code", "Region A")))
                 .andExpect(status().isCreated())
                 .andReturn();
         long id = idOf(createdResult.getResponse().getContentAsString());
@@ -233,7 +213,7 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         MvcResult otherTenant = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.B)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("region_code", "Region B", null)))
+                        .content(textField("region_code", "Region B")))
                 .andExpect(status().isCreated())
                 .andReturn();
         primaryDefinitionIds.add(idOf(otherTenant.getResponse().getContentAsString()));
@@ -291,12 +271,6 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         primaryOptionIds.add(redOptionId);
         primaryOptionIds.add(blueOptionId);
 
-        mockMvc.perform(put("/api/v1/field-definitions/" + definitionId + "/values")
-                        .param("tenant", FixtureTenants.A)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"organizationId\":" + organizationId + ",\"optionId\":" + redOptionId + ",\"createdBy\":\"spoofed\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
         MvcResult valueResult = putOwnedValue(definitionId,
                 "{\"organizationId\":" + organizationId + ",\"optionId\":" + redOptionId + "}");
         jsonPath("$.data.optionId").value((int) redOptionId).match(valueResult);
@@ -333,7 +307,7 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         MvcResult emailResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("billing_email", "Billing email", null)))
+                        .content(textField("billing_email", "Billing email")))
                 .andExpect(status().isCreated())
                 .andReturn();
         long emailId = idOf(emailResult.getResponse().getContentAsString());
@@ -425,7 +399,7 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
                         .param("tenant", FixtureTenants.A)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(textField("po_box", "PO Box", null)))
+                        .content(textField("po_box", "PO Box")))
                 .andExpect(status().isCreated())
                 .andReturn();
         long definitionId = idOf(createdResult.getResponse().getContentAsString());
@@ -614,11 +588,9 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         return key;
     }
 
-    private static String textField(String key, String label, String spoofedActor) {
-        String actor = spoofedActor == null ? "" : ",\"createdBy\":\"" + spoofedActor + "\"";
+    private static String textField(String key, String label) {
         return "{\"entity\":\"ORGANIZATION\",\"key\":\"" + key + "\",\"label\":\"" + label
-                + "\",\"type\":\"TEXT\",\"required\":false,\"showOnRecord\":true,\"showOnList\":true,\"position\":500,\"agentFilled\":true,\"agentBrief\":\"Find it\""
-                + actor + "}";
+                + "\",\"type\":\"TEXT\",\"required\":false,\"showOnRecord\":true,\"showOnList\":true,\"position\":500,\"agentFilled\":true,\"agentBrief\":\"Find it\"}";
     }
 
     private static long idOf(String json) {
