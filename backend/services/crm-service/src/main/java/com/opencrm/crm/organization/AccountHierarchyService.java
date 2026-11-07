@@ -1,5 +1,6 @@
 package com.opencrm.crm.organization;
 
+import com.opencrm.common.event.EventActorResolver;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
@@ -38,22 +39,31 @@ public class AccountHierarchyService {
     private final OutboxEventPublisher outboxEventPublisher;
     private final JdbcTemplate jdbc;
     private final EntityManager entityManager;
+    private final AccountHierarchyChangeRepository hierarchyChangeRepository;
+    private final EventActorResolver eventActorResolver;
     private final boolean readyForTests;
 
     /** Production has no configuration or provider that can enable hierarchy. */
     @Autowired
     public AccountHierarchyService(OrganizationRepository organizationRepository, OutboxEventPublisher outboxEventPublisher,
-                                   JdbcTemplate jdbc, EntityManager entityManager) {
-        this(organizationRepository, outboxEventPublisher, jdbc, entityManager, false);
+                                   JdbcTemplate jdbc, EntityManager entityManager,
+                                   AccountHierarchyChangeRepository hierarchyChangeRepository,
+                                   EventActorResolver eventActorResolver) {
+        this(organizationRepository, outboxEventPublisher, jdbc, entityManager,
+                hierarchyChangeRepository, eventActorResolver, false);
     }
 
     /** Package-private seam used only by the isolated hierarchy implementation tests. */
     AccountHierarchyService(OrganizationRepository organizationRepository, OutboxEventPublisher outboxEventPublisher,
-                            JdbcTemplate jdbc, EntityManager entityManager, boolean readyForTests) {
+                            JdbcTemplate jdbc, EntityManager entityManager,
+                            AccountHierarchyChangeRepository hierarchyChangeRepository,
+                            EventActorResolver eventActorResolver, boolean readyForTests) {
         this.organizationRepository = organizationRepository;
         this.outboxEventPublisher = outboxEventPublisher;
         this.jdbc = jdbc;
         this.entityManager = entityManager;
+        this.hierarchyChangeRepository = hierarchyChangeRepository;
+        this.eventActorResolver = eventActorResolver;
         this.readyForTests = readyForTests;
     }
 
@@ -112,6 +122,17 @@ public class AccountHierarchyService {
 
         child.setParentOrganizationId(parentOrganizationId);
         Organization saved = organizationRepository.save(child);
+        Instant decidedAt = Instant.now();
+        String decidedBy = decidedBy();
+        // Same transaction as the parent write and HierarchyChanged outbox (no REQUIRES_NEW).
+        hierarchyChangeRepository.save(AccountHierarchyChange.builder()
+                .childOrganizationId(saved.getId())
+                .childAccountId(saved.getUuid())
+                .previousParentOrganizationId(previousParentOrganizationId)
+                .newParentOrganizationId(parentOrganizationId)
+                .decidedBy(decidedBy)
+                .decidedAt(decidedAt)
+                .build());
         List<String> ancestorIds = ancestorsNearestFirst.stream()
                 .map(Organization::getUuid)
                 .toList();
@@ -125,8 +146,8 @@ public class AccountHierarchyService {
                         parentAccountId,
                         previousParentOrganizationId,
                         ancestorIds,
-                        Instant.now()));
-        log.info("Linked organization {} to parent {}", saved.getUuid(), parentOrganizationId);
+                        decidedAt));
+        log.info("Linked organization {} to parent {} decided by {}", saved.getUuid(), parentOrganizationId, decidedBy);
         return toDto(saved, ancestorsNearestFirst);
     }
 
@@ -230,5 +251,17 @@ public class AccountHierarchyService {
 
     private static BusinessException cycle(String message) {
         return new BusinessException(message, "HIERARCHY_CYCLE");
+    }
+
+    /**
+     * Same source pattern as {@code AccountMergeService.decidedBy()}; duplicated intentionally
+     * (DRG-714 allowlist — do not extract a shared helper in this PR).
+     */
+    private String decidedBy() {
+        String actor = eventActorResolver.currentActor();
+        if (actor == null || actor.isBlank()) {
+            throw new BusinessException("Account hierarchy change requires an actor", "HIERARCHY_ACTOR_REQUIRED");
+        }
+        return actor;
     }
 }

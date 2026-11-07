@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, input, ChangeDetectionStrategy, signal, effect, Injector, untracked } from '@angular/core';
+import { Component, inject, OnInit, input, ChangeDetectionStrategy, signal, effect, Injector, untracked, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -341,6 +342,7 @@ export class OrganizationDetailComponent implements OnInit {
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
 
   id = input.required<string>();
   readonly parentIdDraft = signal('');
@@ -414,7 +416,7 @@ export class OrganizationDetailComponent implements OnInit {
   onDelete(): void {
     const org = this.orgService.selectedOrganization();
     if (org && confirm(`Archive "${org.name}"? The account will be hidden from lists.`)) {
-      this.orgService.delete(org.id).subscribe({
+      this.orgService.delete(org.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => { if (Number(this.id()) === org.id) this.router.navigate(['/organizations']); },
         error: (error: { error?: { errorCode?: string } }) => {
           if (Number(this.id()) !== org.id) return;

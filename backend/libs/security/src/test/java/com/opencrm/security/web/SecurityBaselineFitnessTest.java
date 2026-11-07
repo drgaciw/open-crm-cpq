@@ -33,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       {@code dev} profile only;</li>
  *   <li>decision 5: every HTTP client a service builds takes an {@code OutboundAuth} interceptor, unless it calls an
  *       external API (allowlisted); services do not call the gateway (allowlisted: the ai-service agent tools);</li>
- *   <li>decision 6: actors come from the verified token. No request parameter, header or request body carries an
- *       identity, and no code records a hard-coded actor such as {@code "system"};</li>
+ *   <li>decision 6: actors come from the verified token. Request parameters, headers and bodies cannot supply an
+ *       actor, and no code records a hard-coded actor such as {@code "system"};</li>
  *   <li>decision 9: every servlet service depends on {@code libs/security}, so none runs without the baseline;</li>
  *   <li>owner decision 4: every service ships the Prometheus registry and exposes only {@code health}, {@code info}
  *       and {@code prometheus} (the gateway also {@code gateway}, read-only);</li>
@@ -84,7 +84,7 @@ class SecurityBaselineFitnessTest {
     /** Names that say who acted. Decision 6: they come from the token, never from the request. */
     private static final Set<String> IDENTITY_NAMES = Set.of("approver", "approverid", "approvedby", "requester",
             "requesterid", "requestedby", "actor", "actorid", "decidedby", "acceptedby", "rejectedby", "userid",
-            "createdby", "updatedby", "generatedby", "changedby", "submittedby", "performedby");
+            "createdby", "updatedby", "archivedby", "generatedby", "changedby", "submittedby", "performedby");
     private static final Pattern REQUEST_INPUT = Pattern.compile(
             "@Request(?:Param|Header)\\b(\\s*\\(([^)]*)\\))?\\s+(?:final\\s+)?[\\w.<>?]+\\s+(\\w+)\\s*[,)]");
     private static final Pattern QUOTED = Pattern.compile("\"([^\"]*)\"");

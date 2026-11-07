@@ -1,7 +1,7 @@
 # Custom Jenkins controller for OpenCRM CPQ monorepo CI
 # Build context: infra/jenkins (see docker-compose.jenkins.yml)
 # Jenkins WAR stays on image JDK 21 (2.492.3 supports 17/21, not 25/27).
-FROM jenkins/jenkins:2.492.3-lts-jdk21
+FROM jenkins/jenkins:2.580.2-lts-jdk21
 
 USER root
 
@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     docker.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 22.22.3 (Angular 22 min; matches GHA setup-node). Pin — do not float on nodesource latest.
-ARG NODE_VERSION=22.22.3
+# Node.js 22.23.4 (Angular 22 min; matches GHA setup-node). Pin — do not float on nodesource latest.
+ARG NODE_VERSION=22.23.4
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
