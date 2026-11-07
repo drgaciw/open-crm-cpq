@@ -37,7 +37,7 @@ importers:
         version: 3.0.4(typescript@5.9.3)(vue@3.5.45(typescript@5.9.3))
       socket.io-client:
         specifier: ^4.7.2
-        version: 4.8.3(supports-color@7.2.0)
+        version: 4.8.4(supports-color@7.2.0)
       sortablejs:
         specifier: ^1.15.0
         version: 1.15.7
@@ -2783,8 +2783,8 @@ packages:
     resolution: {integrity: sha512-RQsvleCbF8cVHEv+xuDGaA4pOizFqJ0GgjtMSRo6oP8pnN7WsigHgVGey6aILRBKv4W2YOMHLqbKdnB6hpB9fw==}
     engines: {node: '>=20.0.0'}
 
-  socket.io-client@4.8.3:
-    resolution: {integrity: sha512-uP0bpjWrjQmUt5DTHq9RuoCBdFJF10cdX9X+a368j/Ft0wmaVgxlrjvK3kjvgCODOMMOz9lcaRzxmso0bTWZ/g==}
+  socket.io-client@4.8.4:
+    resolution: {integrity: sha512-7wjKAvVXYOJsbmUgkWbnhPD4bFpkqrUR0++XOjpGFmqDqsqV1CI93VTraeExLxpjxEqrWgFoSRZu1ihjLWfkAA==}
     engines: {node: '>=10.0.0'}
 
   socket.io-parser@4.2.6:
@@ -5319,7 +5319,7 @@ snapshots:
       radix-vue: 1.9.17(vue@3.5.45(typescript@5.9.3))
       reka-ui: 2.9.5(vue@3.5.45(typescript@5.9.3))
       slugify: 1.6.9
-      socket.io-client: 4.8.3(supports-color@7.2.0)
+      socket.io-client: 4.8.4(supports-color@7.2.0)
       tippy.js: 6.3.7
       typescript: 5.9.3
       unplugin-auto-import: 19.3.0(@vueuse/core@10.11.1(vue@3.5.45(typescript@5.9.3)))
@@ -6232,7 +6232,7 @@ snapshots:
 
   smob@1.6.2: {}
 
-  socket.io-client@4.8.3(supports-color@7.2.0):
+  socket.io-client@4.8.4(supports-color@7.2.0):
     dependencies:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3(supports-color@7.2.0)
