@@ -215,7 +215,7 @@ Vitest: `cd frontend && NX_DAEMON=false npx nx test <proj> --skip-nx-cache`.
 [ADR-003](adr/ADR-003-ci-llm-integration.md) **Accepted**. SSOT: [docs/ci-contract.yaml](ci-contract.yaml) → `scripts/ci/run-core.sh`.
 
 - **Jenkins primary** on PR/push (multibranch, status context `jenkins/opencrm-cpq-ci`); GHA `.github/workflows/ci.yml` is **`workflow_dispatch` manual fallback only**.
-- Toolchain: Temurin **25** (Maven), Node **22.22.3**, Jenkins WAR `2.492.3-lts-jdk21`; service runtime image `eclipse-temurin:25-jre-alpine`.
+- Toolchain: Temurin **25** (Maven), Node **22.23.4**, Jenkins WAR `2.492.3-lts-jdk21`; service runtime image `eclipse-temurin:25-jre-alpine`.
 - Stages: Toolchain (runs blocking non-AI `verify-drift.py`) → Shared Libraries → Parallel fast checks (Backend Unit `-Punit-tests` Docker-free, CPQ Beta Python, Frontend) → Backend Integration (needs Docker/Testcontainers) → optional **AI Assist** (Jenkins-only, `AI_CI_ENABLED=true`, advisory unless `AI_CI_BLOCKING=true`) → Security Audit (non-blocking).
 - Drift prevention rules live in `ci-contract.yaml` (change stage scripts + run-core arms together; no GHA push/PR triggers without cutover doc update; no ai-assist in GHA without ADR amendment).
 
