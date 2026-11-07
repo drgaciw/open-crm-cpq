@@ -203,6 +203,45 @@ describe('OrganizationDetailComponent account UX', () => {
     confirm.mockRestore();
   });
 
+  it('does not update state or show an error when a delete request fails after the component is destroyed', () => {
+    flushAccount();
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush(
+      { message: 'Not found' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    fixture.detectChanges();
+
+    const orgService = TestBed.inject(OrganizationService);
+    const errorBefore = orgService.error();
+    const selectedIdBefore = orgService.selectedOrganization()?.id;
+    const loadingBefore = orgService.loading();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      fixture.componentInstance.onDelete();
+      const pendingDelete = httpMock.expectOne(
+        (r) => r.method === 'DELETE' && r.url === '/api/v1/organizations/7',
+      );
+      fixture.destroy();
+      if (!pendingDelete.cancelled) {
+        pendingDelete.flush(
+          { message: 'Archive failed', errorCode: 'ARCHIVE_FAILED' },
+          { status: 500, statusText: 'Server Error' },
+        );
+      }
+      expect(orgService.error()).toBe(errorBefore);
+      expect(orgService.error()).toBeNull();
+      expect(orgService.selectedOrganization()?.id).toBe(selectedIdBefore);
+      expect(orgService.loading()).toBe(loadingBefore);
+      expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Could not archive this account');
+      expect(fixture.nativeElement.textContent).not.toContain('Archive failed');
+    } finally {
+      confirm.mockRestore();
+    }
+  });
+
   function flushAccount(): void {
     httpMock.expectOne('/api/v1/organizations/7').flush(account);
     httpMock
