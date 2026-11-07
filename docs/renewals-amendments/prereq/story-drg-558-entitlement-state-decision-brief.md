@@ -90,7 +90,7 @@ Cited on [DRG-558](https://linear.app/drgamtd-workspace/issue/DRG-558) and in [c
 | Snow / Flexera license manager | Base→upgrade quantity mapping, including metric changes (e.g. installations→processors) | Option material for quantity/metric conversion evidence. Does not settle commitment names. |
 | TM Forum TMF637 `ProductStatusType` | `created`, `pendingActive`, `active`, `suspended`, `pendingTerminate`, `terminated`, `cancelled`, `aborted` (illustrative) | Option material for OQ1-B (TMF extras). Issue already calls these illustrative. |
 
-Research vocabulary for `CommitmentLine.status` (`PendingActive`…`Superseded`) is likewise **not** an accepted model until the owner closes OQ1 with words+time for the product path.
+The [delegated fulfilment decision](delegated-renewals-amendments-decisions-2026-10-17.md#fulfilment) has already adopted nine commitment projections: the eight research names from `PendingActive` through `Superseded`, plus `Surrendered`. That policy decision remains in force. This brief does not authorize an enum, schema, or implementation; the product-specific gates below remain open.
 
 ## Implementation brief gate (explicit)
 
