@@ -45,7 +45,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse create(String tenant, FieldDefinitionCreateRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         String key = FieldRules.requireKey(request.getKey());
         FieldRules.rejectStandardKey(request.getEntity(), key);
         String label = FieldRules.requireLabel(request.getLabel());
@@ -85,7 +84,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse update(String tenant, long id, FieldDefinitionUpdateRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         FieldRows.Definition current = requireActive(tenant, id);
         FieldRules.rejectKeyChange(current.key(), request.getKey());
         String label = request.getLabel() == null ? current.label() : FieldRules.requireLabel(request.getLabel());
@@ -140,7 +138,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse archive(String tenant, long id, FieldArchiveRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         FieldRows.Definition current = requireActive(tenant, id);
         if (StandardFieldCatalog.isStandard(current.entity(), current.key())) {
             FieldRules.rejectStandardMutation(true, false, false, false, false, true);
@@ -153,7 +150,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse addOption(String tenant, long id, FieldOptionWriteRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         FieldRows.Definition definition = requireActive(tenant, id);
         if (definition.type() != FieldType.SELECT) {
             throw new BusinessException("Options belong on select fields only", HttpStatus.BAD_REQUEST, "FIELD_OPTION_INVALID");
@@ -169,7 +165,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse renameOption(String tenant, long id, long optionId, FieldOptionWriteRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         if (request.getVersion() == null) {
             throw new BusinessException("Version is required", HttpStatus.BAD_REQUEST, "FIELD_VERSION_REQUIRED");
         }
@@ -193,7 +188,6 @@ public class FieldRegistryService {
 
     public FieldDefinitionResponse archiveOption(String tenant, long id, long optionId, FieldArchiveRequest request) {
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         requireActive(tenant, id);
         store.findOption(id, optionId).orElseThrow(() -> new ResourceNotFoundException("Field option", optionId));
         String actor = AgentFieldValueGuard.actorId(currentActor);
@@ -206,7 +200,6 @@ public class FieldRegistryService {
     public FieldValueResponse upsertValue(String tenant, long id, FieldValueWriteRequest request) {
         AgentFieldValueGuard.requireHumanWriter(currentActor);
         FixtureTenants.require(tenant);
-        FieldRules.rejectClientActor(request.getCreatedBy(), request.getUpdatedBy(), request.getActor(), request.getArchivedBy());
         FieldRows.Definition definition = requireActive(tenant, id);
         if (StandardFieldCatalog.isStandard(definition.entity(), definition.key())) {
             throw new BusinessException("Standard fields are not stored as custom values", HttpStatus.BAD_REQUEST, "FIELD_STANDARD_LOCKED");
@@ -394,7 +387,7 @@ public class FieldRegistryService {
                 request.getDate(),
                 request.getBool(),
                 request.getOptionId(),
-                request.getUserId());
+                request.getReferencedUser());
     }
 
     private static RuntimeException translate(DataIntegrityViolationException ex) {

@@ -56,9 +56,4 @@ public class FieldDefinitionCreateRequest {
 
     @Valid
     private List<FieldOptionWriteRequest> options;
-
-    private String createdBy;
-    private String updatedBy;
-    private String actor;
-    private String archivedBy;
 }

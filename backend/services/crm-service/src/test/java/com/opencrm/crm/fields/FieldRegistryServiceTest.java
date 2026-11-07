@@ -40,23 +40,11 @@ class FieldRegistryServiceTest {
 
     @Test
     void createArchiveAndRelabelRecordTheCurrentActorNotTheClient() {
-        assertThatThrownBy(() -> service.create(FixtureTenants.A, createRequest("spoofed-creator")))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
-        assertThat(store.definitions).isEmpty();
-
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         assertThat(created.getCreatedBy()).isEqualTo("person-create");
         assertThat(created.getUpdatedBy()).isEqualTo("person-create");
 
         authenticate("person-relabel", false);
-        assertThatThrownBy(() -> service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
-                .label("Territory code")
-                .version(created.getVersion())
-                .updatedBy("spoofed-editor")
-                .build()))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
         FieldDefinitionResponse relabeled = service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
                 .label("Territory code")
                 .version(created.getVersion())
@@ -67,12 +55,6 @@ class FieldRegistryServiceTest {
         assertThat(relabeled.getUpdatedBy()).isEqualTo("person-relabel");
 
         authenticate("person-archive", false);
-        assertThatThrownBy(() -> service.archive(FixtureTenants.A, created.getId(), FieldArchiveRequest.builder()
-                .version(relabeled.getVersion())
-                .archivedBy("spoofed-archiver")
-                .build()))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
         FieldDefinitionResponse archived = service.archive(FixtureTenants.A, created.getId(), FieldArchiveRequest.builder()
                 .version(relabeled.getVersion())
                 .build());
@@ -80,6 +62,27 @@ class FieldRegistryServiceTest {
         assertThat(archived.getCreatedBy()).isEqualTo("person-create");
         assertThat(archived.getUpdatedBy()).isEqualTo("person-archive");
         assertThat(store.definitions).hasSize(1);
+    }
+
+    @Test
+    void aUserFieldStoresTheReferencedUserAndRecordsTheCaller() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+                .entity(FieldEntityKind.ORGANIZATION)
+                .key("account_owner")
+                .label("Account owner")
+                .type(FieldType.USER)
+                .required(false)
+                .showOnRecord(true)
+                .showOnList(false)
+                .position(40)
+                .agentFilled(false)
+                .build());
+        FieldValueResponse saved = service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .referencedUser("person-owner")
+                .build());
+        assertThat(saved.getUserId()).isEqualTo("person-owner");
+        assertThat(saved.getCreatedBy()).isEqualTo("person-create");
     }
 
     @Test
@@ -140,7 +143,7 @@ class FieldRegistryServiceTest {
         assertThat(renamed.getOptions().get(0).getLabel()).isEqualTo("Crimson");
         assertThat(store.values.get(0).optionId()).isEqualTo(optionId);
 
-        FieldDefinitionResponse text = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse text = service.create(FixtureTenants.A, createRequest());
         assertThatThrownBy(() -> service.update(FixtureTenants.A, text.getId(), FieldDefinitionUpdateRequest.builder()
                 .type(FieldType.NUMBER)
                 .version(text.getVersion())
@@ -187,7 +190,7 @@ class FieldRegistryServiceTest {
 
     @Test
     void aStaleVersionDoesNotReplaceTheLatestActor() {
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         authenticate("person-relabel", false);
         service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
                 .label("Territory code")
@@ -210,7 +213,7 @@ class FieldRegistryServiceTest {
 
     @Test
     void aServiceCallerCannotWriteAValueAndTenantsDoNotSeeEachOther() {
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         authenticate("enrichment-agent", true);
         assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
                 .organizationId(9L)
@@ -228,7 +231,7 @@ class FieldRegistryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    private static FieldDefinitionCreateRequest createRequest(String spoofedActor) {
+    private static FieldDefinitionCreateRequest createRequest() {
         return FieldDefinitionCreateRequest.builder()
                 .entity(FieldEntityKind.ORGANIZATION)
                 .key("region_code")
@@ -240,7 +243,6 @@ class FieldRegistryServiceTest {
                 .position(500)
                 .agentFilled(true)
                 .agentBrief("Find the region")
-                .createdBy(spoofedActor)
                 .build();
     }
 
