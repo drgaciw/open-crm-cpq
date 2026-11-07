@@ -246,7 +246,7 @@ Operation names under that proposal, for on-prem lines only: `PROVISION`, `MODIF
 | ADR-024 through ADR-027, Proposed | DRG-465 and DRG-466 wait on owner acceptance before any service. | Not accepted here. No transport is decided. |
 | DRG-465, Backlog, parent DRG-290 | Product-to-item decomposition. The issue text names an `OrderDecomposed` event. | Not the action key. The event is not decided. Not started. |
 | DRG-466, Backlog | Fulfilment orchestrator. Stays a dependency. | Compensation text is alternative B of C3 and of F5. No event and no transport from DRG-466 is decided. |
-| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. |
+| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. Related Decision brief (Proposed): [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md). |
 | DRG-495, Backlog | Licence determination. The issue text names `LicenseRequired`. | That event is not decided. Pause behaviour stays inside Proposed ADR-027. Not started. |
 | DRG-576, Backlog | Catalog product relationship and lifecycle-eligibility model. | Optional qualifier only (F3, F4). |
 | DRG-556, DRG-557, Backlog | Perpetual-plus-maintenance, and capacity meters. | A perpetual commercial renewal is outside this proposal. Maintenance renewal and true-up stay on those issues. |
