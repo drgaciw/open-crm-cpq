@@ -51,13 +51,31 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
     }
 
     @Override
-    public boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId) {
-        if (contractId == null || tenantId == null) return false;
-        return !jdbc.query("""
-                select c.id from subscriptions s join contracts c on c.id = s.contract_id
-                where s.id = ? and s.is_deleted = false and c.id = ? and c.tenant_id = ?
+    public TargetContractMembership targetContractMembership(long subscriptionId, UUID contractId, UUID tenantId) {
+        if (contractId == null || tenantId == null) {
+            return TargetContractMembership.MISMATCH;
+        }
+        // Outer join cannot take FOR SHARE of contracts; read the link first, then share-lock a match.
+        List<UUID> linked = jdbc.query("""
+                select s.contract_id from subscriptions s
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId);
+        if (linked.isEmpty()) {
+            return TargetContractMembership.MISMATCH;
+        }
+        UUID linkedContractId = linked.getFirst();
+        if (linkedContractId == null) {
+            return TargetContractMembership.UNSET;
+        }
+        if (!linkedContractId.equals(contractId)) {
+            return TargetContractMembership.MISMATCH;
+        }
+        boolean matched = !jdbc.query("""
+                select c.id from contracts c
+                where c.id = ? and c.tenant_id = ?
                 for share of c
-                """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId, contractId, tenantId).isEmpty();
+                """, (rs, row) -> rs.getObject(1, UUID.class), contractId, tenantId).isEmpty();
+        return matched ? TargetContractMembership.MATCHED : TargetContractMembership.MISMATCH;
     }
 
     @Override

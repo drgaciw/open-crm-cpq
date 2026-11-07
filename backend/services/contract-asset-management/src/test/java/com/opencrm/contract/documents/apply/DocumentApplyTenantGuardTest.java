@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -57,5 +58,25 @@ class DocumentApplyTenantGuardTest {
         assertThat(fixture.events).anyMatch(event ->
                 DocumentApplyOrchestrator.EVENT_UNIT_BLOCKED.equals(event.eventType())
                         && "TENANT_UNSET".equals(event.reasonCode()));
+    }
+
+    @Test
+    void tenantMismatchTakesPrecedenceOverUnsetMembership() {
+        ApplyFixture fixture = new ApplyFixture();
+        Subscription subscription = fixture.subscription(1L, 2L, START, END);
+        fixture.unit(1, subscription, 2L);
+        fixture.line(1, ActionCode.ADD, null, BigDecimal.ONE, DAY, END, "pb-1");
+        when(fixture.gateway.contractTenantBlock(anyLong())).thenReturn("TENANT_MISMATCH");
+        when(fixture.gateway.targetContractMembership(anyLong(), any(), any()))
+                .thenReturn(TargetContractMembership.UNSET);
+
+        ApplyResult result = fixture.apply();
+
+        assertThat(result.status()).isEqualTo(AmendmentDocumentStatus.APPLY_BLOCKED);
+        assertThat(fixture.units.get(0).getBlockReason()).isEqualTo("TENANT_MISMATCH");
+        assertThat(fixture.events.stream()
+                .filter(event -> DocumentApplyOrchestrator.EVENT_UNIT_BLOCKED.equals(event.eventType()))
+                .map(event -> event.reasonCode()))
+                .containsExactly("TENANT_MISMATCH");
     }
 }

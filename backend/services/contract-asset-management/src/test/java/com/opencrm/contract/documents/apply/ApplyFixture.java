@@ -91,7 +91,7 @@ final class ApplyFixture {
         AmendmentEventWriter writer = mock(AmendmentEventWriter.class);
         AmendmentDocumentService documentService = mock(AmendmentDocumentService.class);
         gateway = mock(DocumentApplyGateway.class);
-        when(gateway.targetBelongsToContract(anyLong(), any(), any())).thenReturn(true);
+        when(gateway.targetContractMembership(anyLong(), any(), any())).thenReturn(TargetContractMembership.MATCHED);
         when(gateway.contractTenantBlock(anyLong())).thenReturn(null);
 
         when(documents.findById(any())).thenAnswer(invocation -> {
