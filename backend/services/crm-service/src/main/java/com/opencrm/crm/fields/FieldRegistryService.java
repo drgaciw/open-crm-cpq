@@ -52,6 +52,9 @@ public class FieldRegistryService {
         FieldRules.requirePosition(request.getPosition());
         String brief = FieldRules.normalizeBrief(request.getAgentBrief());
         List<FieldOptionWriteRequest> options = request.getOptions() == null ? List.of() : request.getOptions();
+        for (FieldOptionWriteRequest option : options) {
+            FieldRules.rejectClientActor(option.getCreatedBy(), option.getUpdatedBy(), option.getActor(), option.getArchivedBy());
+        }
         FieldRules.requireSelectOptions(request.getType(), options.stream().map(FieldOptionWriteRequest::getLabel).toList());
         String actor = AgentFieldValueGuard.actorId(currentActor);
         FieldRows.Definition saved;
