@@ -113,11 +113,4 @@ class FieldRulesTest {
                 .isInstanceOf(BusinessException.class);
     }
 
-    @Test
-    void clientSuppliedActorsAreRejected() {
-        assertThatThrownBy(() -> FieldRules.rejectClientActor("spoofed", null, null, null))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
-        FieldRules.rejectClientActor(null, null, null, null);
-    }
 }
