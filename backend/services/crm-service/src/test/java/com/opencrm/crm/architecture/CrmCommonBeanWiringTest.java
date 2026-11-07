@@ -1,7 +1,9 @@
 package com.opencrm.crm.architecture;
 
+import com.opencrm.common.event.EventActorResolver;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.OutboxEventRepository;
+import com.opencrm.common.event.OutboxRelayPublisher;
 import com.opencrm.crm.BaseIntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.metamodel.EntityType;
@@ -27,11 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Context-load guard for the {@code com.opencrm.common} types CRM pulls in by component scan,
  * entity scan, and repository scan. AccountId and Money are value types and must not be beans.
  *
- * <p>Boot auto-configurations under {@code com.opencrm.common.event} (outbox health, metrics, actor)
- * register additional beans through {@code AutoConfiguration.imports}. Those {@code @Bean} methods are
- * owned outside this story. This test checks the scan set, which is the set the CRM application
- * pulls in itself: {@code OutboxEventPublisher}, {@code OutboxEventRepository}, and the
- * {@code OutboxEvent} entity.
+ * <p>Boot auto-configurations under {@code com.opencrm.common.event} also register beans through
+ * {@code AutoConfiguration.imports}. The scanned set stays the outbox trio; the auto-config set is
+ * asserted separately against the DRG-699 per-service inventory
+ * ({@code docs/plans/drg-699-common-autoconfig-inventory.md}).
  */
 @DisplayName("CRM common bean wiring")
 class CrmCommonBeanWiringTest extends BaseIntegrationTest {
@@ -39,6 +40,20 @@ class CrmCommonBeanWiringTest extends BaseIntegrationTest {
     private static final String PUBLISHER = "com.opencrm.common.event.OutboxEventPublisher";
     private static final String REPOSITORY = "com.opencrm.common.event.OutboxEventRepository";
     private static final String ENTITY = "com.opencrm.common.event.OutboxEvent";
+
+    /**
+     * CRM default profile (relay off, inbox on, Kafka + outbox repository present). Matches the
+     * APPLY rows for crm-service in the DRG-699 inventory.
+     */
+    private static final Set<String> CRM_EVENT_AUTOCONFIG_BEANS = Set.of(
+            "com.opencrm.common.event.DeadLetterMetrics",
+            "com.opencrm.common.event.EventCorrelationRecordInterceptor",
+            "com.opencrm.common.event.KafkaInbox",
+            "com.opencrm.common.event.KafkaInboxAutoConfiguration$KafkaInboxPurge",
+            "com.opencrm.common.event.OutboxBacklogProbe",
+            "com.opencrm.common.event.OutboxHealthIndicator",
+            "com.opencrm.common.event.OutboxMetrics",
+            "org.springframework.kafka.listener.DefaultErrorHandler");
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -53,7 +68,7 @@ class CrmCommonBeanWiringTest extends BaseIntegrationTest {
         Set<String> scanned = new TreeSet<>();
         for (String name : configurable.getBeanFactory().getBeanDefinitionNames()) {
             BeanDefinition definition = configurable.getBeanFactory().getBeanDefinition(name);
-            // @Bean methods belong to Boot auto-configurations, which this story does not own.
+            // @Bean methods belong to Boot auto-configurations; covered by the auto-config test below.
             if (definition.getFactoryMethodName() != null) {
                 continue;
             }
@@ -93,6 +108,21 @@ class CrmCommonBeanWiringTest extends BaseIntegrationTest {
         assertThat(applicationContext.getBeansOfType(OutboxEventRepository.class)).hasSize(1);
     }
 
+    @Test
+    @DisplayName("common.event auto-configurations wire exactly the CRM inventory allowlist")
+    void eventAutoConfigurationsWireTheCrmInventoryAllowlist() {
+        assertThat(beansFromCommonEventAutoConfigurations())
+                .as("beans from com.opencrm.common.event.*AutoConfiguration @Bean methods")
+                .containsExactlyInAnyOrderElementsOf(CRM_EVENT_AUTOCONFIG_BEANS);
+
+        assertThat(applicationContext.getBeansOfType(EventActorResolver.class))
+                .as("security supersedes EventActorAutoConfiguration; exactly one resolver")
+                .hasSize(1);
+        assertThat(applicationContext.getBeansOfType(OutboxRelayPublisher.class))
+                .as("OutboxRelayAutoConfiguration stays off (opencrm.outbox.relay.enabled unset)")
+                .isEmpty();
+    }
+
     private static void addDomainType(Set<String> scanned, Object value) {
         if (value instanceof Class<?> type && isDomainCommonType(type)) {
             scanned.add(type.getName());
@@ -121,5 +151,43 @@ class CrmCommonBeanWiringTest extends BaseIntegrationTest {
         return !type.isAnnotationPresent(AutoConfiguration.class)
                 && !type.isAnnotationPresent(Configuration.class)
                 && !type.isAnnotationPresent(ConfigurationProperties.class);
+    }
+
+    /**
+     * Bean types produced by {@code @Bean} methods whose factory bean is a
+     * {@code com.opencrm.common.event.*AutoConfiguration}. Property holders and the
+     * auto-configuration classes themselves are excluded.
+     */
+    private Set<String> beansFromCommonEventAutoConfigurations() {
+        ConfigurableApplicationContext configurable = (ConfigurableApplicationContext) applicationContext;
+        Set<String> wired = new TreeSet<>();
+        for (String name : configurable.getBeanFactory().getBeanDefinitionNames()) {
+            BeanDefinition definition = configurable.getBeanFactory().getBeanDefinition(name);
+            String factoryBeanName = definition.getFactoryBeanName();
+            if (factoryBeanName == null || definition.getFactoryMethodName() == null) {
+                continue;
+            }
+            Class<?> factoryType = applicationContext.getType(factoryBeanName);
+            if (factoryType == null) {
+                continue;
+            }
+            Class<?> factoryUser = ClassUtils.getUserClass(factoryType);
+            if (!factoryUser.getName().startsWith("com.opencrm.common.event.")
+                    || !factoryUser.getSimpleName().endsWith("AutoConfiguration")) {
+                continue;
+            }
+            Class<?> beanType = applicationContext.getType(name);
+            if (beanType == null) {
+                continue;
+            }
+            Class<?> userType = ClassUtils.getUserClass(beanType);
+            if (userType.isAnnotationPresent(ConfigurationProperties.class)
+                    || userType.isAnnotationPresent(AutoConfiguration.class)
+                    || userType.isAnnotationPresent(Configuration.class)) {
+                continue;
+            }
+            wired.add(userType.getName());
+        }
+        return wired;
     }
 }
