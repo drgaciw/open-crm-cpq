@@ -1,0 +1,75 @@
+{
+  "status": "proposed",
+  "id": "renewal-escalators.ac-568-1",
+  "ac": "568-1",
+  "story": "DRG-568",
+  "relatedStories": ["DRG-533", "DRG-532", "DRG-604"],
+  "mainSha": "0a3f0f8e7552aaf5b9fc1321c357e2fe4e32b225",
+  "adr": {
+    "path": "docs/renewals-amendments/prereq/DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md",
+    "blobSha": "4922b07b4ce374b8ee9f88ecec593c5699b82fea",
+    "sections": [
+      "D-01 — Where a renewal escalator starts",
+      "D-02 — Compounding",
+      "D-03 — Rounding"
+    ]
+  },
+  "reuse": {
+    "semantics": "DRG-533 Accepted ADR D-01..D-03",
+    "generator": "RampEscalatorExpander.expand (DRG-532 Done)",
+    "period1Rule": "Pass uplift unit 42.8000 as startPrice; do not reapply renewal percent for period 1"
+  },
+  "scenario": {
+    "label": "36-month renewal, 7% annual compound-on-prior, 200 seats",
+    "termMonths": 36,
+    "everyMonths": 12,
+    "quantity": 200,
+    "exitNet": "40.0000",
+    "upliftPercentPoints": "7",
+    "period1Unit": "42.8000",
+    "escalator": {
+      "startPrice": "42.80",
+      "mode": "PERCENT",
+      "amount": "7",
+      "everyMonths": 12,
+      "compounding": true
+    },
+    "rounding": {
+      "unitScale": 4,
+      "amountScale": 2,
+      "mode": "HALF_UP"
+    }
+  },
+  "expected": {
+    "segmentCount": 3,
+    "units": ["42.8000", "45.7960", "49.0017"],
+    "year3Unit": "49.0017",
+    "startMonths": [1, 13, 25],
+    "months": [12, 12, 12],
+    "periodAmounts": ["102720.00", "109910.40", "117604.08"],
+    "tcv": "330234.48"
+  },
+  "notExpected": {
+    "note": "ADR fork 2 alternatives — not the default asserted by AC-568-1",
+    "scale2PerStepYear3Unit": "49.01",
+    "scale2PerStepTcv": "330264.00",
+    "unroundedCompoundThenScale2Year3Unit": "49.00"
+  },
+  "ownerForks": [
+    {
+      "id": "OF-568-1",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "ADR body wording vs Accepted; confirm scale-4 final"
+    },
+    {
+      "id": "OF-568-2",
+      "status": "Proposed",
+      "ownerDecision": "___ (drg, time)",
+      "topic": "Unit scale 4 vs scale-2 illustration"
+    }
+  ],
+  "flag": {
+    "opencrm.pricing.ramp.enabled": false
+  }
+}
