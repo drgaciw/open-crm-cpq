@@ -8,7 +8,8 @@ import io.github.resilience4j.springboot3.timelimiter.autoconfigure.TimeLimiterA
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.ssl.SslAutoConfiguration;
 import org.springframework.boot.context.properties.bind.Bindable;
@@ -32,48 +33,115 @@ import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Retains the packaged route's real circuit breaker around a slow, successful upstream. */
+/** Retains each packaged route family's real circuit breaker around a slow, successful upstream. */
 @Tag("unit")
 class GatewayCircuitBreakerTimeoutTest {
 
+    private static final Map<String, String> ROUTE_BREAKERS = Map.ofEntries(
+            Map.entry("crm-service", "crmCircuitBreaker"),
+            Map.entry("pricing-service", "pricingCircuitBreaker"),
+            Map.entry("cpq-pricing-service", "pricingCircuitBreaker"),
+            Map.entry("pricebook-service", "pricebookCircuitBreaker"),
+            Map.entry("cpq-pricebook-service", "pricebookCircuitBreaker"),
+            Map.entry("configuration-validate", "configurationCircuitBreaker"),
+            Map.entry("cpq-configuration-validate", "configurationCircuitBreaker"),
+            Map.entry("product-service", "productCircuitBreaker"),
+            Map.entry("cpq-product-service", "productCircuitBreaker"),
+            Map.entry("quote-service", "quoteCircuitBreaker"),
+            Map.entry("cpq-quote-service", "quoteCircuitBreaker"),
+            Map.entry("configuration-engine", "configurationCircuitBreaker"),
+            Map.entry("cpq-configuration-engine", "configurationCircuitBreaker"),
+            Map.entry("approval-routing", "approvalCircuitBreaker"),
+            Map.entry("cpq-approval-routing", "approvalCircuitBreaker"),
+            Map.entry("document-generation", "documentCircuitBreaker"),
+            Map.entry("cpq-document-generation", "documentCircuitBreaker"),
+            Map.entry("contract-asset-management", "contractCircuitBreaker"),
+            Map.entry("cpq-contract-asset-management", "contractCircuitBreaker"),
+            Map.entry("communication-service", "communicationCircuitBreaker"),
+            Map.entry("ai-service", "aiCircuitBreaker")
+    );
+
+    private static final Map<String, Duration> BREAKER_BUDGETS = Map.ofEntries(
+            Map.entry("quoteCircuitBreaker", Duration.ofSeconds(45)),
+            Map.entry("pricingCircuitBreaker", Duration.ofSeconds(35)),
+            Map.entry("crmCircuitBreaker", Duration.ofSeconds(30)),
+            Map.entry("pricebookCircuitBreaker", Duration.ofSeconds(35)),
+            Map.entry("productCircuitBreaker", Duration.ofSeconds(30)),
+            Map.entry("configurationCircuitBreaker", Duration.ofSeconds(35)),
+            Map.entry("approvalCircuitBreaker", Duration.ofSeconds(30)),
+            Map.entry("documentCircuitBreaker", Duration.ofSeconds(45)),
+            Map.entry("contractCircuitBreaker", Duration.ofSeconds(30)),
+            Map.entry("communicationCircuitBreaker", Duration.ofSeconds(30)),
+            Map.entry("aiCircuitBreaker", Duration.ofSeconds(45))
+    );
+
+    static Stream<Arguments> routeFamilies() {
+        return ROUTE_BREAKERS.keySet().stream().sorted().map(Arguments::of);
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"quote-service", "cpq-quote-service", "pricing-service", "cpq-pricing-service"})
-    void calculationThatExceedsOneSecondStillReturnsItsSuccessfulResponse(String routeId) throws Exception {
+    @MethodSource("routeFamilies")
+    void slowSuccessfulUpstreamWithinDeadlinePassesThrough(String routeId) throws Exception {
         throughGateway(routeId, Duration.ofMillis(1600), null, client ->
                 client.post().uri(path(routeId)).exchange().expectStatus().isOk()
                         .expectBody(String.class).isEqualTo("calculated"));
     }
 
-    @Test
-    void quoteAndPricingHaveFiniteBudgetsAlignedWithTheQuoteClient() throws Exception {
-        configuredRunner().run(context -> {
-            assertThat(context).hasNotFailed();
-            TimeLimiterRegistry registry = context.getBean(TimeLimiterRegistry.class);
-            assertThat(registry.timeLimiter("quoteCircuitBreaker").getTimeLimiterConfig().getTimeoutDuration())
-                    .isEqualTo(Duration.ofSeconds(45));
-            assertThat(registry.timeLimiter("pricingCircuitBreaker").getTimeLimiterConfig().getTimeoutDuration())
-                    .isEqualTo(Duration.ofSeconds(35));
-            // Unrelated service budgets keep the existing library default.
-            assertThat(registry.timeLimiter("crmCircuitBreaker").getTimeLimiterConfig().getTimeoutDuration())
-                    .isEqualTo(Duration.ofSeconds(1));
-        });
-    }
-
     @ParameterizedTest
-    @ValueSource(strings = {"quote-service", "cpq-quote-service", "pricing-service", "cpq-pricing-service"})
-    void configuredShortBudgetStillReturnsTheUnavailableFallbackForAnOverBudgetPost(String routeId) throws Exception {
+    @MethodSource("routeFamilies")
+    void configuredShortBudgetStillReturnsTheUnavailableFallbackForAnOverBudgetPost(String routeId)
+            throws Exception {
         throughGateway(routeId, Duration.ofSeconds(2), Duration.ofMillis(150), client ->
                 client.post().uri(path(routeId)).exchange().expectStatus().isEqualTo(503)
                         .expectBody().jsonPath("$.success").isEqualTo(false)
-                        .jsonPath("$.message").value(message -> assertThat(message.toString()).contains("currently unavailable")));
+                        .jsonPath("$.message").value(message ->
+                                assertThat(message.toString()).contains("currently unavailable")));
+    }
+
+    @Test
+    void everyBreakerHasANamedFiniteBudget() throws Exception {
+        configuredRunner().run(context -> {
+            assertThat(context).hasNotFailed();
+            TimeLimiterRegistry registry = context.getBean(TimeLimiterRegistry.class);
+            BREAKER_BUDGETS.forEach((breaker, expected) ->
+                    assertThat(registry.timeLimiter(breaker).getTimeLimiterConfig().getTimeoutDuration())
+                            .as(breaker)
+                            .isEqualTo(expected));
+        });
     }
 
     private static String path(String routeId) {
-        String prefix = routeId.startsWith("cpq-") ? "/api/v1/cpq/" : "/api/v1/";
-        return prefix + (routeId.contains("quote") ? "quotes/1/calculate" : "pricing/execute");
+        boolean cpq = routeId.startsWith("cpq-");
+        String prefix = cpq ? "/api/v1/cpq/" : "/api/v1/";
+        return switch (routeId) {
+            case "crm-service" -> prefix + "leads/1";
+            case "pricing-service", "cpq-pricing-service" -> prefix + "pricing/execute";
+            case "pricebook-service", "cpq-pricebook-service" -> prefix + "price-books/1";
+            case "configuration-validate" -> "/api/v1/configuration/validate";
+            case "cpq-configuration-validate" -> "/api/v1/cpq/configuration/validate";
+            case "product-service", "cpq-product-service" -> prefix + "products/1";
+            case "quote-service", "cpq-quote-service" -> prefix + "quotes/1/calculate";
+            case "configuration-engine", "cpq-configuration-engine" -> prefix + "configurations/1";
+            case "approval-routing", "cpq-approval-routing" -> prefix + "approvals/1";
+            case "document-generation", "cpq-document-generation" -> prefix + "documents/1";
+            case "contract-asset-management", "cpq-contract-asset-management" -> prefix + "subscriptions/1";
+            case "communication-service" -> prefix + "emails/1";
+            case "ai-service" -> prefix + "ai/agents";
+            default -> throw new IllegalArgumentException("Unknown route family: " + routeId);
+        };
+    }
+
+    private static String breakerFor(String routeId) {
+        String breaker = ROUTE_BREAKERS.get(routeId);
+        if (breaker == null) {
+            throw new IllegalArgumentException("Unknown route breaker: " + routeId);
+        }
+        return breaker;
     }
 
     private static ReactiveWebApplicationContextRunner configuredRunner() throws Exception {
@@ -87,7 +155,8 @@ class GatewayCircuitBreakerTimeoutTest {
         }
         return new ReactiveWebApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(SslAutoConfiguration.class, WebFluxAutoConfiguration.class,
-                        BulkheadAutoConfiguration.class, CircuitBreakerAutoConfiguration.class, TimeLimiterAutoConfiguration.class,
+                        BulkheadAutoConfiguration.class, CircuitBreakerAutoConfiguration.class,
+                        TimeLimiterAutoConfiguration.class,
                         Resilience4JAutoConfiguration.class, ReactiveResilience4JAutoConfiguration.class,
                         GatewayAutoConfiguration.class, GatewayResilience4JCircuitBreakerAutoConfiguration.class))
                 .withUserConfiguration(FallbackController.class)
@@ -114,20 +183,27 @@ class GatewayCircuitBreakerTimeoutTest {
             environment.getPropertySources().addFirst(source);
             var configured = Binder.get(environment).bind("spring.cloud.gateway.server.webflux.routes",
                     Bindable.listOf(RouteDefinition.class)).get();
-            RouteDefinition route = configured.stream().filter(r -> r.getId().equals(routeId)).findFirst().orElseThrow();
+            RouteDefinition route = configured.stream().filter(r -> r.getId().equals(routeId)).findFirst()
+                    .orElseThrow();
             route.setUri(URI.create("http://127.0.0.1:" + upstream.port()));
-            assertThat(route.getFilters()).anySatisfy(filter -> assertThat(filter.getName()).isEqualTo("CircuitBreaker"));
+            assertThat(route.getFilters()).anySatisfy(filter -> {
+                assertThat(filter.getName()).isEqualTo("CircuitBreaker");
+                assertThat(filter.getArgs()).containsEntry("name", breakerFor(routeId));
+                assertThat(filter.getArgs().get("name").toString()).doesNotStartWith("name=");
+            });
             var runner = configuredRunner()
                     .withBean("syntheticRoutes", RouteDefinitionLocator.class, () -> () -> Flux.just(route));
             if (shortBudget != null) {
-                String breaker = routeId.contains("quote") ? "quoteCircuitBreaker" : "pricingCircuitBreaker";
+                String breaker = breakerFor(routeId);
                 runner = runner.withPropertyValues(
-                        "resilience4j.timelimiter.configs." + breaker + ".timeout-duration=" + shortBudget.toMillis() + "ms");
+                        "resilience4j.timelimiter.configs." + breaker + ".timeout-duration="
+                                + shortBudget.toMillis() + "ms");
             }
             runner.run(context -> {
                 assertThat(context).hasNotFailed();
                 var gateway = reactor.netty.http.server.HttpServer.create().host("127.0.0.1").port(0)
-                        .handle(new ReactorHttpHandlerAdapter(WebHttpHandlerBuilder.applicationContext(context).build())).bindNow();
+                        .handle(new ReactorHttpHandlerAdapter(
+                                WebHttpHandlerBuilder.applicationContext(context).build())).bindNow();
                 try {
                     assertion.accept(WebTestClient.bindToServer().baseUrl("http://127.0.0.1:" + gateway.port())
                             .responseTimeout(Duration.ofSeconds(10)).build());
@@ -135,7 +211,8 @@ class GatewayCircuitBreakerTimeoutTest {
                     // silently missing these named limits and ignoring the fallback argument.
                     assertThat(context.getBean(TimeLimiterRegistry.class).getAllTimeLimiters())
                             .extracting(io.github.resilience4j.timelimiter.TimeLimiter::getName)
-                            .noneMatch(name -> name.startsWith("name="));
+                            .noneMatch(name -> name.startsWith("name="))
+                            .contains(breakerFor(routeId));
                 } finally {
                     gateway.disposeNow();
                 }
