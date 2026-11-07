@@ -41,6 +41,14 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "customer_id", nullable = false)
     private String customerId;
+
+    /**
+     * Typed CRM account uuid (DRG-663). Stays NULL at QuoteAccepted ingest —
+     * {@code customerId} is a String external id and must not be parsed into this column.
+     * When {@code contract_id} is set, must equal {@code contracts.customer_account_id}.
+     */
+    @Column(name = "customer_account_id")
+    private UUID customerAccountId;
     
     @Column(name = "quote_id", nullable = false)
     private String quoteId;

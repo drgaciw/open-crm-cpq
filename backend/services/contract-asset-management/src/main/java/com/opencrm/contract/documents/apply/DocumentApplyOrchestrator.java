@@ -558,6 +558,10 @@ public class DocumentApplyOrchestrator {
         if (tenantBlock != null) {
             return Optional.of(tenantBlock);
         }
+        String accountBlock = gateway.contractCustomerAccountBlock(subscription.getId());
+        if (accountBlock != null) {
+            return Optional.of(accountBlock);
+        }
         TargetContractMembership membership = gateway.targetContractMembership(
                 subscription.getId(), document.getContractId(), document.getTenantId());
         return switch (membership) {
