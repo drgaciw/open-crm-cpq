@@ -2,6 +2,7 @@
 
 **Status:** Proposal only. This file does not accept escalator semantics, amend ADR-023, or authorize implementation, a flag change, or a deploy. `opencrm.pricing.ramp.enabled` stays default off. Turning it on is outside this proposal and outside ADR-023's acceptance.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `ramp-amendments`. **Date:** 2026-10-16. **Aligned:** 2026-10-27 (DRG-639).
+**Decision brief (Proposed):** [`../story-drg-534-ramp-amendments-decision-brief.md`](../story-drg-534-ramp-amendments-decision-brief.md) lists owner forks OQ2–OQ7 and blank Defaults slots for CPQ Decision scoring. That brief does not adopt any fork and does not authorize an implementation brief or product code.
 
 **Sources.** [DRG-534](https://linear.app/drgamtd-workspace/issue/DRG-534) (amend a ramped contract: lock elapsed periods, edit future periods, re-govern). [DRG-533](https://linear.app/drgamtd-workspace/issue/DRG-533) ADR as on main `bf41c230f6309964a25ef5c2c12e84c41b0c37de`: [`DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md`](../DRAFT-adr-renewal-segment-schedule-escalators-price-locks.md), blob `4922b07b4ce374b8ee9f88ecec593c5699b82fea`. The sections this spec depends on are named under "DRG-533 ADR sections". Accepted constraints: `../../../adr/ADR-023-price-ramp-schedule-model.md` (D-01, D-04, D-05, D-06, D-08). Related landed-scope stories that this slice does not reopen: DRG-336, DRG-338, DRG-339.
 
