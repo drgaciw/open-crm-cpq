@@ -153,6 +153,26 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
     }
 
     @Test
+    void aNestedOptionCannotSupplyAnAuditActorOrCreateRows() throws Exception {
+        authenticatePerson("person-create");
+        String key = freshKey("o_");
+
+        mockMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"entity\":\"ORGANIZATION\",\"key\":\"" + key
+                                + "\",\"label\":\"Segment\",\"type\":\"SELECT\",\"required\":false,"
+                                + "\"showOnRecord\":true,\"showOnList\":true,\"position\":1,\"agentFilled\":false,"
+                                + "\"options\":[{\"label\":\"Blue\",\"position\":1,\"actor\":\"spoofed\"}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACTOR_FORBIDDEN"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crm.field_definition WHERE tenant = ? AND \"key\" = ?",
+                Integer.class, FixtureTenants.A, key)).isZero();
+    }
+
+    @Test
     void createRelabelAndArchiveAttributeTheCurrentActor() throws Exception {
         authenticatePerson("person-create");
         mockMvc.perform(post("/api/v1/field-definitions")

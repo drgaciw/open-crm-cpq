@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,6 +81,101 @@ class FieldRegistryServiceTest {
         assertThat(archived.getCreatedBy()).isEqualTo("person-create");
         assertThat(archived.getUpdatedBy()).isEqualTo("person-archive");
         assertThat(store.definitions).hasSize(1);
+    }
+
+    @Test
+    void creationRejectsAnActorInsideAnOptionBeforeWritingAnyRows() {
+        for (Consumer<FieldOptionWriteRequest> spoof : optionActors()) {
+            FieldOptionWriteRequest invalid = FieldOptionWriteRequest.builder().label("Blue").position(2).build();
+            spoof.accept(invalid);
+            FieldDefinitionCreateRequest request = FieldDefinitionCreateRequest.builder()
+                    .entity(FieldEntityKind.ORGANIZATION)
+                    .key("segment")
+                    .label("Segment")
+                    .type(FieldType.SELECT)
+                    .required(false)
+                    .showOnRecord(true)
+                    .showOnList(true)
+                    .position(30)
+                    .agentFilled(false)
+                    .options(List.of(FieldOptionWriteRequest.builder().label("Red").position(1).build(), invalid))
+                    .build();
+            assertClientActorRejected(() -> service.create(FixtureTenants.A, request));
+        }
+        assertThat(store.definitions).isEmpty();
+        assertThat(store.options).isEmpty();
+    }
+
+    @Test
+    void eachMutationRejectsClientAuditActorsBeforeWriting() {
+        List<Consumer<FieldDefinitionCreateRequest>> createActors = List.of(
+                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
+                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
+        for (Consumer<FieldDefinitionCreateRequest> spoof : createActors) {
+            FieldDefinitionCreateRequest request = createRequest(null);
+            spoof.accept(request);
+            assertClientActorRejected(() -> service.create(FixtureTenants.A, request));
+        }
+
+        List<Consumer<FieldDefinitionUpdateRequest>> updateActors = List.of(
+                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
+                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
+        for (Consumer<FieldDefinitionUpdateRequest> spoof : updateActors) {
+            FieldDefinitionUpdateRequest request = new FieldDefinitionUpdateRequest();
+            spoof.accept(request);
+            assertClientActorRejected(() -> service.update(FixtureTenants.A, 99L, request));
+        }
+
+        List<Consumer<FieldArchiveRequest>> archiveActors = List.of(
+                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
+                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
+        for (Consumer<FieldArchiveRequest> spoof : archiveActors) {
+            FieldArchiveRequest request = new FieldArchiveRequest();
+            spoof.accept(request);
+            assertClientActorRejected(() -> service.archive(FixtureTenants.A, 99L, request));
+            assertClientActorRejected(() -> service.archiveOption(FixtureTenants.A, 99L, 1L, request));
+        }
+
+        for (Consumer<FieldOptionWriteRequest> spoof : optionActors()) {
+            FieldOptionWriteRequest request = new FieldOptionWriteRequest();
+            spoof.accept(request);
+            assertClientActorRejected(() -> service.addOption(FixtureTenants.A, 99L, request));
+            assertClientActorRejected(() -> service.renameOption(FixtureTenants.A, 99L, 1L, request));
+        }
+
+        List<Consumer<FieldValueWriteRequest>> valueActors = List.of(
+                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
+                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
+        for (Consumer<FieldValueWriteRequest> spoof : valueActors) {
+            FieldValueWriteRequest request = new FieldValueWriteRequest();
+            spoof.accept(request);
+            assertClientActorRejected(() -> service.upsertValue(FixtureTenants.A, 99L, request));
+        }
+        assertThat(store.definitions).isEmpty();
+        assertThat(store.options).isEmpty();
+        assertThat(store.values).isEmpty();
+    }
+
+    @Test
+    void aUserFieldValueDoesNotBecomeTheAuditActor() {
+        FieldDefinitionResponse definition = service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+                .entity(FieldEntityKind.ORGANIZATION)
+                .key("reviewer")
+                .label("Reviewer")
+                .type(FieldType.USER)
+                .required(false)
+                .showOnRecord(true)
+                .showOnList(false)
+                .position(31)
+                .agentFilled(false)
+                .build());
+
+        FieldValueResponse value = service.upsertValue(FixtureTenants.A, definition.getId(),
+                FieldValueWriteRequest.builder().organizationId(9L).userId("reviewed-person").build());
+
+        assertThat(value.getUserId()).isEqualTo("reviewed-person");
+        assertThat(value.getCreatedBy()).isEqualTo("person-create");
+        assertThat(value.getUpdatedBy()).isEqualTo("person-create");
     }
 
     @Test
@@ -242,6 +338,16 @@ class FieldRegistryServiceTest {
                 .agentBrief("Find the region")
                 .createdBy(spoofedActor)
                 .build();
+    }
+
+    private static void assertClientActorRejected(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
+        assertThatThrownBy(action).isInstanceOfSatisfying(BusinessException.class, ex ->
+                assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
+    }
+
+    private static List<Consumer<FieldOptionWriteRequest>> optionActors() {
+        return List.of(request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
+                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
     }
 
     private static void authenticate(String id, boolean service) {
