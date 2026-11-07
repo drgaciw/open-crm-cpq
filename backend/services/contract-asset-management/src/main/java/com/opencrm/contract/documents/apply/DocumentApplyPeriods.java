@@ -36,6 +36,7 @@ final class DocumentApplyPeriods {
 
     static String detail(String code) {
         return switch (code) {
+            case "TARGET_CONTRACT_UNSET" -> "target subscription has no contract link";
             case "TARGET_CONTRACT_MISMATCH" -> "target subscription is not linked to the document contract in its tenant";
             case "TENANT_MISMATCH" -> "subscription tenant_id does not equal the linked contract tenant_id";
             case "TENANT_UNSET" -> "subscription has contract_id but tenant_id is null";
