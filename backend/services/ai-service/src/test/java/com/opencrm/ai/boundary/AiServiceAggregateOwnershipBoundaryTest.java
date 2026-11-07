@@ -26,7 +26,7 @@ class AiServiceAggregateOwnershipBoundaryTest {
   }
 
   @Test
-  void mainSourcesDeclareOnlyAiAuditLogEntity() throws IOException {
+  void mainSourcesDeclareOnlyAiServiceEntities() throws IOException {
     Path aiSources = Path.of("src/main/java/com/opencrm/ai");
     List<Path> entitySources;
     try (Stream<Path> paths = Files.walk(aiSources)) {
@@ -36,8 +36,12 @@ class AiServiceAggregateOwnershipBoundaryTest {
           .toList();
     }
 
-    assertEquals(1, entitySources.size());
-    assertTrue(entitySources.get(0).toString().replace('\\', '/').endsWith("AiAuditLog.java"));
+    assertEquals(
+        List.of("AgentTask.java", "AiAuditLog.java"),
+        entitySources.stream()
+            .map(path -> path.getFileName().toString())
+            .sorted()
+            .toList());
   }
 
   @Test
