@@ -55,7 +55,7 @@
         <springdoc.version>2.3.0</springdoc.version>
         <jjwt.version>0.12.3</jjwt.version>
         <commons-lang3.version>3.21.0</commons-lang3.version>
-        <commons-io.version>2.15.1</commons-io.version>
+        <commons-io.version>2.22.0</commons-io.version>
 
         <!-- Rules Engines -->
         <drools.version>10.2.0</drools.version>
