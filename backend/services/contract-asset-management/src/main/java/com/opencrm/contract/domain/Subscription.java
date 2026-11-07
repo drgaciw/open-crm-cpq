@@ -56,6 +56,11 @@ public class Subscription extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.PENDING;
+
+    /** ADR §2.2 charge model (DRG-666). Null on legacy rows until an owner-gated S7 backfill. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_model", length = 32)
+    private SubscriptionModel subscriptionModel;
     
     @Column(name = "plan_name", nullable = false)
     private String planName;
