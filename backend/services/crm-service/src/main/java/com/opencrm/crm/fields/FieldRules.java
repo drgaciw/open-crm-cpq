@@ -87,12 +87,6 @@ public final class FieldRules {
         }
     }
 
-    public static void rejectClientActor(String createdBy, String updatedBy, String actor, String archivedBy) {
-        if (createdBy != null || updatedBy != null || actor != null || archivedBy != null) {
-            throw bad("Actor is taken from the current caller", "CLIENT_ACTOR_FORBIDDEN");
-        }
-    }
-
     public static StoredValue requireValue(FieldType type, StoredValue incoming) {
         StoredValue present = incoming == null ? StoredValue.EMPTY : incoming;
         return switch (type) {

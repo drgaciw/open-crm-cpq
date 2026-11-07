@@ -285,6 +285,11 @@ class DocumentApplyNullStartReplayIntegrationTest {
                 }
 
                 @Override
+                public String contractCustomerAccountBlock(long subscriptionId) {
+                    return jdbc.contractCustomerAccountBlock(subscriptionId);
+                }
+
+                @Override
                 public List<ApplyLine> lines(UUID documentId, int revisionNo) {
                     List<ApplyLine> lines = jdbc.lines(documentId, revisionNo);
                     if (!PRESENT_NULL_EFFECTIVE_FROM.get()) {

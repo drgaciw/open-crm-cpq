@@ -18,7 +18,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,23 +40,11 @@ class FieldRegistryServiceTest {
 
     @Test
     void createArchiveAndRelabelRecordTheCurrentActorNotTheClient() {
-        assertThatThrownBy(() -> service.create(FixtureTenants.A, createRequest("spoofed-creator")))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
-        assertThat(store.definitions).isEmpty();
-
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         assertThat(created.getCreatedBy()).isEqualTo("person-create");
         assertThat(created.getUpdatedBy()).isEqualTo("person-create");
 
         authenticate("person-relabel", false);
-        assertThatThrownBy(() -> service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
-                .label("Territory code")
-                .version(created.getVersion())
-                .updatedBy("spoofed-editor")
-                .build()))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
         FieldDefinitionResponse relabeled = service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
                 .label("Territory code")
                 .version(created.getVersion())
@@ -68,12 +55,6 @@ class FieldRegistryServiceTest {
         assertThat(relabeled.getUpdatedBy()).isEqualTo("person-relabel");
 
         authenticate("person-archive", false);
-        assertThatThrownBy(() -> service.archive(FixtureTenants.A, created.getId(), FieldArchiveRequest.builder()
-                .version(relabeled.getVersion())
-                .archivedBy("spoofed-archiver")
-                .build()))
-                .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
         FieldDefinitionResponse archived = service.archive(FixtureTenants.A, created.getId(), FieldArchiveRequest.builder()
                 .version(relabeled.getVersion())
                 .build());
@@ -84,98 +65,24 @@ class FieldRegistryServiceTest {
     }
 
     @Test
-    void creationRejectsAnActorInsideAnOptionBeforeWritingAnyRows() {
-        for (Consumer<FieldOptionWriteRequest> spoof : optionActors()) {
-            FieldOptionWriteRequest invalid = FieldOptionWriteRequest.builder().label("Blue").position(2).build();
-            spoof.accept(invalid);
-            FieldDefinitionCreateRequest request = FieldDefinitionCreateRequest.builder()
-                    .entity(FieldEntityKind.ORGANIZATION)
-                    .key("segment")
-                    .label("Segment")
-                    .type(FieldType.SELECT)
-                    .required(false)
-                    .showOnRecord(true)
-                    .showOnList(true)
-                    .position(30)
-                    .agentFilled(false)
-                    .options(List.of(FieldOptionWriteRequest.builder().label("Red").position(1).build(), invalid))
-                    .build();
-            assertClientActorRejected(() -> service.create(FixtureTenants.A, request));
-        }
-        assertThat(store.definitions).isEmpty();
-        assertThat(store.options).isEmpty();
-    }
-
-    @Test
-    void eachMutationRejectsClientAuditActorsBeforeWriting() {
-        List<Consumer<FieldDefinitionCreateRequest>> createActors = List.of(
-                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
-                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
-        for (Consumer<FieldDefinitionCreateRequest> spoof : createActors) {
-            FieldDefinitionCreateRequest request = createRequest(null);
-            spoof.accept(request);
-            assertClientActorRejected(() -> service.create(FixtureTenants.A, request));
-        }
-
-        List<Consumer<FieldDefinitionUpdateRequest>> updateActors = List.of(
-                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
-                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
-        for (Consumer<FieldDefinitionUpdateRequest> spoof : updateActors) {
-            FieldDefinitionUpdateRequest request = new FieldDefinitionUpdateRequest();
-            spoof.accept(request);
-            assertClientActorRejected(() -> service.update(FixtureTenants.A, 99L, request));
-        }
-
-        List<Consumer<FieldArchiveRequest>> archiveActors = List.of(
-                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
-                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
-        for (Consumer<FieldArchiveRequest> spoof : archiveActors) {
-            FieldArchiveRequest request = new FieldArchiveRequest();
-            spoof.accept(request);
-            assertClientActorRejected(() -> service.archive(FixtureTenants.A, 99L, request));
-            assertClientActorRejected(() -> service.archiveOption(FixtureTenants.A, 99L, 1L, request));
-        }
-
-        for (Consumer<FieldOptionWriteRequest> spoof : optionActors()) {
-            FieldOptionWriteRequest request = new FieldOptionWriteRequest();
-            spoof.accept(request);
-            assertClientActorRejected(() -> service.addOption(FixtureTenants.A, 99L, request));
-            assertClientActorRejected(() -> service.renameOption(FixtureTenants.A, 99L, 1L, request));
-        }
-
-        List<Consumer<FieldValueWriteRequest>> valueActors = List.of(
-                request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
-                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
-        for (Consumer<FieldValueWriteRequest> spoof : valueActors) {
-            FieldValueWriteRequest request = new FieldValueWriteRequest();
-            spoof.accept(request);
-            assertClientActorRejected(() -> service.upsertValue(FixtureTenants.A, 99L, request));
-        }
-        assertThat(store.definitions).isEmpty();
-        assertThat(store.options).isEmpty();
-        assertThat(store.values).isEmpty();
-    }
-
-    @Test
-    void aUserFieldValueDoesNotBecomeTheAuditActor() {
-        FieldDefinitionResponse definition = service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+    void aUserFieldStoresTheReferencedUserAndRecordsTheCaller() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
                 .entity(FieldEntityKind.ORGANIZATION)
-                .key("reviewer")
-                .label("Reviewer")
+                .key("account_owner")
+                .label("Account owner")
                 .type(FieldType.USER)
                 .required(false)
                 .showOnRecord(true)
                 .showOnList(false)
-                .position(31)
+                .position(40)
                 .agentFilled(false)
                 .build());
-
-        FieldValueResponse value = service.upsertValue(FixtureTenants.A, definition.getId(),
-                FieldValueWriteRequest.builder().organizationId(9L).userId("reviewed-person").build());
-
-        assertThat(value.getUserId()).isEqualTo("reviewed-person");
-        assertThat(value.getCreatedBy()).isEqualTo("person-create");
-        assertThat(value.getUpdatedBy()).isEqualTo("person-create");
+        FieldValueResponse saved = service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .referencedUser("person-owner")
+                .build());
+        assertThat(saved.getUserId()).isEqualTo("person-owner");
+        assertThat(saved.getCreatedBy()).isEqualTo("person-create");
     }
 
     @Test
@@ -236,7 +143,7 @@ class FieldRegistryServiceTest {
         assertThat(renamed.getOptions().get(0).getLabel()).isEqualTo("Crimson");
         assertThat(store.values.get(0).optionId()).isEqualTo(optionId);
 
-        FieldDefinitionResponse text = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse text = service.create(FixtureTenants.A, createRequest());
         assertThatThrownBy(() -> service.update(FixtureTenants.A, text.getId(), FieldDefinitionUpdateRequest.builder()
                 .type(FieldType.NUMBER)
                 .version(text.getVersion())
@@ -283,7 +190,7 @@ class FieldRegistryServiceTest {
 
     @Test
     void aStaleVersionDoesNotReplaceTheLatestActor() {
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         authenticate("person-relabel", false);
         service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
                 .label("Territory code")
@@ -306,7 +213,7 @@ class FieldRegistryServiceTest {
 
     @Test
     void aServiceCallerCannotWriteAValueAndTenantsDoNotSeeEachOther() {
-        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest(null));
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
         authenticate("enrichment-agent", true);
         assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
                 .organizationId(9L)
@@ -324,7 +231,7 @@ class FieldRegistryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    private static FieldDefinitionCreateRequest createRequest(String spoofedActor) {
+    private static FieldDefinitionCreateRequest createRequest() {
         return FieldDefinitionCreateRequest.builder()
                 .entity(FieldEntityKind.ORGANIZATION)
                 .key("region_code")
@@ -336,18 +243,7 @@ class FieldRegistryServiceTest {
                 .position(500)
                 .agentFilled(true)
                 .agentBrief("Find the region")
-                .createdBy(spoofedActor)
                 .build();
-    }
-
-    private static void assertClientActorRejected(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
-        assertThatThrownBy(action).isInstanceOfSatisfying(BusinessException.class, ex ->
-                assertThat(ex.getErrorCode()).isEqualTo("CLIENT_ACTOR_FORBIDDEN"));
-    }
-
-    private static List<Consumer<FieldOptionWriteRequest>> optionActors() {
-        return List.of(request -> request.setCreatedBy("spoofed"), request -> request.setUpdatedBy("spoofed"),
-                request -> request.setActor("spoofed"), request -> request.setArchivedBy("spoofed"));
     }
 
     private static void authenticate(String id, boolean service) {

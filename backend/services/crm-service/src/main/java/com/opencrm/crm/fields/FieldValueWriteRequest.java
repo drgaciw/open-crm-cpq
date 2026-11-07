@@ -22,10 +22,10 @@ public class FieldValueWriteRequest {
     private LocalDate date;
     private Boolean bool;
     private Long optionId;
-    private String userId;
 
-    private String createdBy;
-    private String updatedBy;
-    private String actor;
-    private String archivedBy;
+    /**
+     * The user a USER field points at. This is the stored value, not the caller.
+     * The caller is {@link com.opencrm.security.CurrentActor}.
+     */
+    private String referencedUser;
 }
