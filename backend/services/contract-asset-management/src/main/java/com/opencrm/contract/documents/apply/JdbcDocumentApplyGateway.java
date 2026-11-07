@@ -51,13 +51,93 @@ public class JdbcDocumentApplyGateway implements DocumentApplyGateway {
     }
 
     @Override
-    public boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId) {
-        if (contractId == null || tenantId == null) return false;
-        return !jdbc.query("""
-                select c.id from subscriptions s join contracts c on c.id = s.contract_id
-                where s.id = ? and s.is_deleted = false and c.id = ? and c.tenant_id = ?
+    public TargetContractMembership targetContractMembership(long subscriptionId, UUID contractId, UUID tenantId) {
+        if (contractId == null || tenantId == null) {
+            return TargetContractMembership.MISMATCH;
+        }
+        // Outer join cannot take FOR SHARE of contracts; read the link first, then share-lock a match.
+        List<UUID> linked = jdbc.query("""
+                select s.contract_id from subscriptions s
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId);
+        if (linked.isEmpty()) {
+            return TargetContractMembership.MISMATCH;
+        }
+        UUID linkedContractId = linked.getFirst();
+        if (linkedContractId == null) {
+            return TargetContractMembership.UNSET;
+        }
+        if (!linkedContractId.equals(contractId)) {
+            return TargetContractMembership.MISMATCH;
+        }
+        boolean matched = !jdbc.query("""
+                select c.id from contracts c
+                where c.id = ? and c.tenant_id = ?
                 for share of c
-                """, (rs, row) -> rs.getObject(1, UUID.class), subscriptionId, contractId, tenantId).isEmpty();
+                """, (rs, row) -> rs.getObject(1, UUID.class), contractId, tenantId).isEmpty();
+        return matched ? TargetContractMembership.MATCHED : TargetContractMembership.MISMATCH;
+    }
+
+    @Override
+    public String contractTenantBlock(long subscriptionId) {
+        List<TenantLink> rows = jdbc.query("""
+                select s.contract_id, s.tenant_id as subscription_tenant, c.tenant_id as contract_tenant
+                from subscriptions s
+                left join contracts c on c.id = s.contract_id
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> new TenantLink(
+                rs.getObject("contract_id", UUID.class),
+                rs.getObject("subscription_tenant", UUID.class),
+                rs.getObject("contract_tenant", UUID.class)), subscriptionId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        TenantLink link = rows.getFirst();
+        if (link.contractId() == null) {
+            return null;
+        }
+        if (link.subscriptionTenant() == null) {
+            return "TENANT_UNSET";
+        }
+        if (link.contractTenant() == null || !link.subscriptionTenant().equals(link.contractTenant())) {
+            return "TENANT_MISMATCH";
+        }
+        return null;
+    }
+
+    private record TenantLink(UUID contractId, UUID subscriptionTenant, UUID contractTenant) {
+    }
+
+    @Override
+    public String contractCustomerAccountBlock(long subscriptionId) {
+        List<AccountLink> rows = jdbc.query("""
+                select s.contract_id,
+                       s.customer_account_id as subscription_account,
+                       c.customer_account_id as contract_account
+                from subscriptions s
+                left join contracts c on c.id = s.contract_id
+                where s.id = ? and s.is_deleted = false
+                """, (rs, row) -> new AccountLink(
+                rs.getObject("contract_id", UUID.class),
+                rs.getObject("subscription_account", UUID.class),
+                rs.getObject("contract_account", UUID.class)), subscriptionId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        AccountLink link = rows.getFirst();
+        if (link.contractId() == null) {
+            return null;
+        }
+        if (link.subscriptionAccount() == null) {
+            return "CUSTOMER_ACCOUNT_UNSET";
+        }
+        if (link.contractAccount() == null || !link.subscriptionAccount().equals(link.contractAccount())) {
+            return "CUSTOMER_ACCOUNT_MISMATCH";
+        }
+        return null;
+    }
+
+    private record AccountLink(UUID contractId, UUID subscriptionAccount, UUID contractAccount) {
     }
 
     @Override

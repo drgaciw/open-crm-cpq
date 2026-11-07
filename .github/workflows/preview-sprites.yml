@@ -1,0 +1,131 @@
+# Private per-PR Fly Sprites (Alchemy). Scaffold only.
+#
+# Both jobs are `if: false`. workflow_dispatch does not enable them.
+# Do not switch this workflow to pull_request_target: that event runs the
+# base workflow with repository secrets, and a PR checkout would execute
+# untrusted code with FLY_API_TOKEN.
+#
+# Enablement is a separate owner GO. See infra/alchemy/README.md.
+
+name: Preview Sprites
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-sprite-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy preview Sprite
+    # DISABLED pending owner GO. Removing this line is the enablement, not
+    # adding workflow_dispatch. Intended condition after that GO:
+    # if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse forks and non-PR stages
+        env:
+          STAGE: pr-${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
+            echo "refusing fork PR" >&2
+            exit 1
+          fi
+          if [[ ! "${STAGE}" =~ ^pr-[1-9][0-9]*$ ]]; then
+            echo "refusing stage ${STAGE}" >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            infra/alchemy/package-lock.json
+      - name: Build the Angular UI
+        working-directory: frontend
+        run: |
+          npm ci --legacy-peer-deps
+          npx nx build crm --configuration=production
+      - name: Install Alchemy preview package
+        working-directory: infra/alchemy
+        run: npm ci
+      - name: Deploy the private Sprite
+        working-directory: infra/alchemy
+        env:
+          # Job is if:false, so this secret is not exposed. Keep it on this
+          # step only. Never move it to a workflow-level env or a fork job.
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          OPENCRM_UI_DIST: ${{ github.workspace }}/frontend/dist/apps/crm
+          STAGE: pr-${{ github.event.pull_request.number }}
+        run: npx alchemy deploy --config alchemy.run.ts --stage "${STAGE}" --yes
+      - name: Upload this PR's Alchemy state
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencrm-alchemy-state-pr-${{ github.event.pull_request.number }}
+          path: infra/alchemy/.alchemy/state/opencrm-cpq-preview/pr-${{ github.event.pull_request.number }}
+          if-no-files-found: error
+          retention-days: 30
+
+  destroy:
+    name: Destroy preview Sprite
+    # DISABLED pending owner GO. Intended condition after that GO:
+    # if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - name: Refuse forks and non-PR stages
+        env:
+          STAGE: pr-${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]]; then
+            echo "refusing fork PR" >&2
+            exit 1
+          fi
+          if [[ ! "${STAGE}" =~ ^pr-[1-9][0-9]*$ ]]; then
+            echo "refusing stage ${STAGE}" >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: infra/alchemy/package-lock.json
+      - name: Install Alchemy preview package
+        working-directory: infra/alchemy
+        run: npm ci
+      - name: Restore only this PR's state
+        working-directory: infra/alchemy
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stage="pr-${{ github.event.pull_request.number }}"
+          bash scripts/fetch-pr-state.sh "${stage}" ".alchemy/state/opencrm-cpq-preview/${stage}"
+      - name: Destroy only this PR's stage
+        working-directory: infra/alchemy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          STAGE: pr-${{ github.event.pull_request.number }}
+        run: npx alchemy destroy --config alchemy.run.ts --stage "${STAGE}" --yes
