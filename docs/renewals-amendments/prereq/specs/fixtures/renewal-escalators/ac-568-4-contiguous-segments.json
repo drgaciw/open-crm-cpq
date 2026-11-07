@@ -1,0 +1,50 @@
+{
+  "status": "proposed",
+  "id": "renewal-escalators.ac-568-4",
+  "ac": "568-4",
+  "story": "DRG-568",
+  "relatedStories": ["DRG-533", "DRG-532"],
+  "mainSha": "0a3f0f8e7552aaf5b9fc1321c357e2fe4e32b225",
+  "rules": [
+    "No gaps between adjacent segments",
+    "No overlaps between adjacent segments",
+    "First segment from equals renewal start",
+    "Last segment to equals renewal end",
+    "Boundary date belongs to the new segment (ADR-023 D-04 / ADR D-04)"
+  ],
+  "cases": [
+    {
+      "ref": "ac-568-1",
+      "renewalStartMonthIndex": 1,
+      "renewalEndMonthIndex": 36,
+      "segments": [
+        {"fromMonth": 1, "toMonth": 12},
+        {"fromMonth": 13, "toMonth": 24},
+        {"fromMonth": 25, "toMonth": 36}
+      ],
+      "expected": {
+        "gaps": 0,
+        "overlaps": 0,
+        "coversRenewalExactly": true
+      }
+    },
+    {
+      "ref": "ac-568-2",
+      "renewalStart": "2026-11-01",
+      "renewalEnd": "2027-12-31",
+      "segments": [
+        {"from": "2026-11-01", "to": "2027-03-31"},
+        {"from": "2027-04-01", "to": "2027-12-31"}
+      ],
+      "expected": {
+        "gaps": 0,
+        "overlaps": 0,
+        "coversRenewalExactly": true,
+        "dayAfterFirstTo": "2027-04-01"
+      }
+    }
+  ],
+  "flag": {
+    "opencrm.pricing.ramp.enabled": false
+  }
+}

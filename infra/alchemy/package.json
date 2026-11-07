@@ -1,0 +1,29 @@
+{
+  "name": "@opencrm/alchemy-preview",
+  "private": true,
+  "type": "module",
+  "description": "Code-only Alchemy stack for private per-PR Fly Sprites. Does not deploy.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --test \"src/**/*.test.ts\"",
+    "build": "node --experimental-strip-types scripts/bundle-preview.ts"
+  },
+  "dependencies": {
+    "@alchemy.run/fly": "2.0.0-beta.85",
+    "@effect/platform-node": "4.1.2",
+    "alchemy": "2.0.0-beta.85",
+    "effect": "4.1.2",
+    "rolldown": "1.2.13"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1"
+  }
+}
