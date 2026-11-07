@@ -27,6 +27,17 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "subscription_number", nullable = false, unique = true)
     private String subscriptionNumber;
+
+    /**
+     * tenantId is the Entra `tid` claim: a per-deployment value (single issuer per deployment, ADR-016 / DRG-632), deliberately weak interim. It is NOT a real per-tenant id.
+     *
+     * <p>Set once at creation from QuoteAccepted top-level {@code tenantId} (DRG-631).
+     * Null when absent/non-GUID. Must equal {@code contracts.tenant_id} when
+     * {@code contract_id} is set. No public setter after creation ({@code updatable = false}).
+     */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "tenant_id", updatable = false)
+    private UUID tenantId;
     
     @Column(name = "customer_id", nullable = false)
     private String customerId;
@@ -41,11 +52,23 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "quote_id", nullable = false)
     private String quoteId;
+
+    /**
+     * Optional link to a canonical {@code contract_lines} row (DRG-665).
+     * Nullable while QuoteAccepted remains the interim origin; not populated by that path yet.
+     */
+    @Column(name = "contract_line_id")
+    private UUID contractLineId;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.PENDING;
+
+    /** ADR §2.2 charge model (DRG-666). Null on legacy rows until an owner-gated S7 backfill. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_model", length = 32)
+    private SubscriptionModel subscriptionModel;
     
     @Column(name = "plan_name", nullable = false)
     private String planName;
