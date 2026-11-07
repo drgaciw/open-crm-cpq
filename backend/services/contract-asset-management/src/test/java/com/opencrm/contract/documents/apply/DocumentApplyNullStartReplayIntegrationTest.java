@@ -222,8 +222,8 @@ class DocumentApplyNullStartReplayIntegrationTest {
                     values (?, ?, ?, ?, 'ACTIVE', 'Plan', '2026-01-01', '2026-12-31', 0, 'test')
                     """, subscriptionUuid.toString(), "SUB-" + subscriptionUuid, subscriptionUuid.toString(),
                     "Q-" + subscriptionUuid);
-            jdbc.update("update subscriptions set contract_id = ? where uuid = ?",
-                    contractId, subscriptionUuid.toString());
+            jdbc.update("update subscriptions set contract_id = ?, tenant_id = ? where uuid = ?",
+                    contractId, tenant, subscriptionUuid.toString());
             jdbc.update("""
                     insert into amendment_application_units (
                         document_id, unit_no, tenant_id, dependency_order, target_type, target_ref,
@@ -275,8 +275,18 @@ class DocumentApplyNullStartReplayIntegrationTest {
                 }
 
                 @Override
-                public boolean targetBelongsToContract(long subscriptionId, UUID contractId, UUID tenantId) {
-                    return jdbc.targetBelongsToContract(subscriptionId, contractId, tenantId);
+                public TargetContractMembership targetContractMembership(long subscriptionId, UUID contractId, UUID tenantId) {
+                    return jdbc.targetContractMembership(subscriptionId, contractId, tenantId);
+                }
+
+                @Override
+                public String contractTenantBlock(long subscriptionId) {
+                    return jdbc.contractTenantBlock(subscriptionId);
+                }
+
+                @Override
+                public String contractCustomerAccountBlock(long subscriptionId) {
+                    return jdbc.contractCustomerAccountBlock(subscriptionId);
                 }
 
                 @Override
