@@ -1,6 +1,7 @@
 package com.opencrm.ai.boundary;
 
 import com.opencrm.ai.audit.entity.AiAuditLog;
+import com.opencrm.ai.task.AgentTask;
 import jakarta.persistence.Table;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,7 +29,15 @@ class AiServiceAggregateOwnershipBoundaryTest {
   }
 
   @Test
-  void mainSourcesDeclareOnlyAiAuditLogEntity() throws IOException {
+  void agentTaskEntityMapsToAiSchemaOnly() {
+    Table table = AgentTask.class.getAnnotation(Table.class);
+    assertNotNull(table);
+    assertEquals("agent_task", table.name());
+    assertEquals("ai", table.schema());
+  }
+
+  @Test
+  void mainSourcesDeclareOnlyAiSchemaEntities() throws IOException {
     Path aiSources = Path.of("src/main/java/com/opencrm/ai");
     List<Path> entitySources;
     try (Stream<Path> paths = Files.walk(aiSources)) {
@@ -36,8 +47,10 @@ class AiServiceAggregateOwnershipBoundaryTest {
           .toList();
     }
 
-    assertEquals(1, entitySources.size());
-    assertTrue(entitySources.get(0).toString().replace('\\', '/').endsWith("AiAuditLog.java"));
+    Set<String> names = entitySources.stream()
+        .map(path -> path.getFileName().toString())
+        .collect(Collectors.toSet());
+    assertEquals(Set.of("AiAuditLog.java", "AgentTask.java"), names);
   }
 
   @Test
