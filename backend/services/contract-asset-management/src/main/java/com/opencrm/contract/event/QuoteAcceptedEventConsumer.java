@@ -77,10 +77,11 @@ public class QuoteAcceptedEventConsumer {
     }
 
     /**
-     * After claim and parse. Flag off or no event tenant selects legacy apply. There is no document path:
-     * {@link AmendmentRoutingFlag#DOCUMENT_PATH_SELECTED} stays at zero, which is the alert condition
-     * "document path selected". Provenance {@code tenantId} (DRG-631 top-level only) is passed for
-     * subscription row stamping (DRG-662); routing decide stays LEGACY and flags stay owner-gated off.
+     * After claim and parse. Always selects legacy apply: the document path is not built, so
+     * {@link AmendmentRoutingFlag#decide} returns only {@link AmendmentRoutingDecision#LEGACY} even when the
+     * event carries {@code tenantId} (DRG-631). {@link AmendmentRoutingFlag#DOCUMENT_PATH_SELECTED} stays at
+     * zero, which is the alert condition "document path selected". Provenance {@code tenantId}
+     * (DRG-631 top-level only) is passed for subscription row stamping (DRG-662); flags stay owner-gated off.
      */
     private void route(QuoteAcceptedEvent event, String provenanceTenantId) {
         AmendmentRoutingDecision decision = routingFlag().decide(event);

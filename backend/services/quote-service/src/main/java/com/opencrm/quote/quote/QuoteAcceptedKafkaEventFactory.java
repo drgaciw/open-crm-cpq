@@ -23,8 +23,9 @@ final class QuoteAcceptedKafkaEventFactory {
     }
 
     /**
-     * Optional pass-through for S6. A null document id and a null unit map leave the event unchanged from
-     * {@link #from(Quote, List)}. This method does not read a tenant from the quote.
+     * Optional pass-through for S6. A null document id and a null unit map leave the amendment fields unchanged from
+     * {@link #from(Quote, List)}. DRG-631 always copies {@link Quote#getTenantId()} onto the event (blank → null);
+     * that value is the interim Entra {@code tid}, not a real customer tenant.
      */
     static QuoteAcceptedEvent from(Quote quote, List<QuoteLineItem> lineItems,
             String amendmentDocumentId, Map<String, Integer> applicationUnitNoByLineUuid) {
@@ -85,6 +86,7 @@ final class QuoteAcceptedKafkaEventFactory {
                 .map(line -> lineItemSnapshot(quote, line, applicationUnitNoByLineUuid))
                 .toList());
         event.setAmendmentDocumentId(blankToNull(amendmentDocumentId));
+        event.setTenantId(blankToNull(quote.getTenantId()));
         if (quote.getTargetSubscriptionNumber() != null) {
             if (quote.getDealType() == DealType.NEW || quote.getObservedRevision() == null || quote.getObservedRevision() < 0
                     || quote.getSubscriptionEffectiveDate() == null) {
