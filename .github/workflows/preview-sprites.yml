@@ -34,7 +34,7 @@ jobs:
       contents: read
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Refuse forks and non-PR stages
         env:
           STAGE: pr-${{ github.event.pull_request.number }}
@@ -91,7 +91,7 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}
       - name: Refuse forks and non-PR stages
