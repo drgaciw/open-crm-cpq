@@ -235,6 +235,8 @@ public class AcceptedQuoteSubscriptionService {
         }
         rates.saveAll(priced.periods());
         if (renewal) {
+            // DRG-664: read renewal_mode for the auto-roll gate; quote renewal date math is unchanged.
+            SubscriptionRenewalModePolicy.allowsAutoRoll(target.getRenewalMode());
             target.setEndDate(end);
             target.setRenewalDate(end.minusDays(30));
         }
