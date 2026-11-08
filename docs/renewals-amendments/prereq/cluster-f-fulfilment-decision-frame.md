@@ -110,7 +110,7 @@ Shared consequence of C1–C4: this accepted documentation frame unblocks no imp
 
 ## DRG-578 — Action-aware fulfilment decomposition
 
-**Issue:** [DRG-578](https://linear.app/drgamtd-workspace/issue/DRG-578/action-aware-fulfilment-decomposition-for-amendments-and-renewals). **Status:** In Review, for draft #655. **Relation read:** `blockedBy` DRG-577 (Done). The issue body also names DRG-465, DRG-466, DRG-558, DRG-460, DRG-495, DRG-574, DRG-556, DRG-557, and DRG-577. Those links are not `relatedTo` rows on the issue. DRG-466 stays a dependency.
+**Issue:** [DRG-578](https://linear.app/drgamtd-workspace/issue/DRG-578/action-aware-fulfilment-decomposition-for-amendments-and-renewals). **Status:** In Review, for draft #655. **Relation read:** `blockedBy` DRG-577 (Done). The issue body also names DRG-465, DRG-466, DRG-558, DRG-460, DRG-495, DRG-574, DRG-556, DRG-557, and DRG-577. Those links are not `relatedTo` rows on the issue. DRG-466 stays a dependency. Related Decision brief (Proposed): [story-drg-578-fulfilment-decompose-decision-brief.md](story-drg-578-fulfilment-decompose-decision-brief.md).
 
 ### Problem
 
@@ -246,12 +246,12 @@ Operation names under that proposal, for on-prem lines only: `PROVISION`, `MODIF
 | ADR-024 through ADR-027, Proposed | DRG-465 and DRG-466 wait on owner acceptance before any service. | Not accepted here. No transport is decided. |
 | DRG-465, Backlog, parent DRG-290 | Product-to-item decomposition. The issue text names an `OrderDecomposed` event. | Not the action key. The event is not decided. Not started. |
 | DRG-466, Backlog | Fulfilment orchestrator. Stays a dependency. | Compensation text is alternative B of C3 and of F5. No event and no transport from DRG-466 is decided. |
-| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. Related Decision brief (Proposed): [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md). |
+| DRG-460, Backlog | Provision entitlements. The issue text names `EntitlementProvisioned`. | That event is not decided. Not started. Related Decision brief (Proposed): [story-drg-460-469-activation-decision-brief.md](story-drg-460-469-activation-decision-brief.md), draft [#809](https://github.com/drgaciw/open-crm-cpq/pull/809). |
 | DRG-495, Backlog | Licence determination. The issue text names `LicenseRequired`. | That event is not decided. Pause behaviour stays inside Proposed ADR-027. Not started. |
 | DRG-576, Backlog | Catalog product relationship and lifecycle-eligibility model. | Optional qualifier only (F3, F4). |
 | DRG-556, DRG-557, Backlog | Perpetual-plus-maintenance, and capacity meters. | A perpetual commercial renewal is outside this proposal. Maintenance renewal and true-up stay on those issues. |
 | DRG-574, Backlog | Surrender and revocation after a dual-use window. | Caller of `REVOKE` only if its own proposal is later accepted (F8). `Surrendered` is not settled. |
-| DRG-558, In Review | Commitment names while an operation is outstanding. | Options in the next section. No state is settled. Related Decision brief (Proposed): [story-drg-558-entitlement-state-decision-brief.md](story-drg-558-entitlement-state-decision-brief.md). |
+| DRG-558, In Review | Commitment names while an operation is outstanding. | Options in the next section. No state is settled. Related Decision brief (Proposed): [story-drg-558-entitlement-state-decision-brief.md](story-drg-558-entitlement-state-decision-brief.md), draft [#817](https://github.com/drgaciw/open-crm-cpq/pull/817). |
 | DRG-341 | Dual-entitlement window. | Window length is not set here (F9). |
 | OQ18, S3 / DRG-581 | Digest library. | A future request may copy the digest the reconcile text already stores as replay data (D-R3). This frame does not build the library and does not start S3. |
 | Accepted proration ADR | Charge formula. | Not reopened (C4). |

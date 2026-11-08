@@ -10,7 +10,9 @@ import java.util.Objects;
 
 /**
  * Per-tenant document-path flag. The property defaults empty, so the code default is OFF.
- * {@code QuoteAcceptedEvent} carries no tenant, so {@link #decide} is always {@link AmendmentRoutingDecision#LEGACY}.
+ * {@code QuoteAcceptedEvent} may carry an optional interim {@code tenantId} (DRG-631 / Entra {@code tid}),
+ * but {@link #decide} is still always {@link AmendmentRoutingDecision#LEGACY}: the document path and a
+ * {@code DOCUMENT_PATH} decision are not built. Do not enable {@link #PROPERTY} here.
  *
  * <p>Alert condition {@code document path selected}: {@link #DOCUMENT_PATH_SELECTED} must stay at zero.
  * No p95 target is stated for this step.
@@ -58,8 +60,10 @@ public class AmendmentRoutingFlag {
     }
 
     /**
-     * Flag off, or no event tenant, selects the legacy path. This event has no tenant, so the result is legacy
-     * whether or not {@code amendmentDocumentId} is present. The id is not parsed and no document is loaded.
+     * Selects the legacy path. The event may carry {@code tenantId} (DRG-631), and
+     * {@link #isDocumentPathEnabledFor(String)} can evaluate it, but {@link AmendmentRoutingDecision} has only
+     * {@link AmendmentRoutingDecision#LEGACY}, so the result stays legacy whether or not {@code amendmentDocumentId}
+     * or a listed tenant is present. The id is not parsed and no document is loaded.
      */
     public AmendmentRoutingDecision decide(QuoteAcceptedEvent event) {
         Objects.requireNonNull(event, "event");

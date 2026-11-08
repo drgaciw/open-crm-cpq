@@ -2,6 +2,7 @@
 
 **Status:** Proposal only. This file does not accept a policy, write an ADR, or authorize implementation, a flag change, or a deploy.
 **Project:** OPEN-CRM-CPQ (Linear team DRG). **Cluster:** `maintenance`. **Date:** 2026-10-16.
+**Decision brief (Proposed, DRG-571):** [`../story-drg-571-maintenance-pricing-decision-brief.md`](../story-drg-571-maintenance-pricing-decision-brief.md) lists owner forks `OQ-571-1`…`OQ-571-7` (basis, recalc, uplift, precedence, reinstatement, recalc quantity, legacy `rule-003` gate) for CPQ Decision scoring. That brief cites Adopted Cluster B DRG-571 cells without reopening them, cites DRG-556 without implementing linkage, and does not authorize an implementation brief, product code, or schema.
 
 **Sources.** [DRG-556](https://linear.app/drgamtd-workspace/issue/DRG-556) (RA-22, perpetual licence plus maintenance linkage), [DRG-571](https://linear.app/drgamtd-workspace/issue/DRG-571) (RA-37, maintenance pricing, recalculation, reinstatement). Worked numbers are illustrative Scenarios 2 and 4 in `../../cpq-pricing-policy-sanity-check.md` (example figures, not customer data).
 
