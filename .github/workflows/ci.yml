@@ -34,7 +34,7 @@ jobs:
         run: python3 scripts/ci/report-test-failures.py
       - name: Upload shared library test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shared-library-test-reports
           path: backend/libs/**/target/surefire-reports/*.xml
@@ -58,7 +58,7 @@ jobs:
         run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-unit-test-reports
           path: backend/**/target/surefire-reports/*.xml
@@ -83,7 +83,7 @@ jobs:
         run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-integration-test-reports
           path: backend/**/target/surefire-reports/*.xml
