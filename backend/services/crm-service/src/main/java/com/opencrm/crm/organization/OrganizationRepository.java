@@ -60,4 +60,25 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
 
     boolean existsByParentOrganizationIdAndDeletedFalse(Long parentId);
     List<Organization> findByParentOrganizationIdAndDeletedFalseOrderByIdAsc(Long parentId);
+
+    /**
+     * Active organizations whose stored domain, or website when the domain is blank, contains
+     * {@code pattern}. The caller passes a 50-row page and keeps exact normalized matches.
+     * Read-only: no {@code @Modifying}.
+     */
+    @Query("""
+            SELECT o FROM Organization o
+            WHERE o.deleted = false
+              AND o.id <> :excludeId
+              AND (
+                LOWER(o.websiteDomain) LIKE :pattern ESCAPE '\\'
+                OR (
+                  (o.websiteDomain IS NULL OR TRIM(o.websiteDomain) = '')
+                  AND LOWER(o.website) LIKE :pattern ESCAPE '\\'
+                )
+              )
+            """)
+    List<Organization> findActiveDomainCandidates(@Param("excludeId") Long excludeId,
+                                                  @Param("pattern") String pattern,
+                                                  Pageable pageable);
 }

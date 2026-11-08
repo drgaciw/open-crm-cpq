@@ -81,6 +81,13 @@ public class Subscription extends BaseEntity {
     
     @Column(name = "renewal_date")
     private LocalDate renewalDate;
+
+    /**
+     * DRG-664. Null on legacy rows: fail-safe, no auto-roll (same as {@link RenewalMode#MANUAL}).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "renewal_mode", length = 16)
+    private RenewalMode renewalMode;
     
     @Column(name = "mrr", precision = 19, scale = 2)
     private BigDecimal mrr;
