@@ -2,6 +2,8 @@
 
 **Status:** Decisions adopted under owner delegation on 2026-10-17; effective on merge of the [delegated decision record](delegated-renewals-amendments-decisions-2026-10-17.md). Implementation remains separately gated.
 
+**Decision brief (Proposed, DRG-571 only):** [`story-drg-571-maintenance-pricing-decision-brief.md`](story-drg-571-maintenance-pricing-decision-brief.md) re-lists DRG-571 owner forks as Proposed `OQ-571-1`…`OQ-571-7` for CPQ Decision scoring with blank `Owner decision: ___ (drg, time)` slots. That brief cites Adopted Cluster B DRG-571 cells without reopening them, cites [DRG-556](https://linear.app/drgamtd-workspace/issue/DRG-556) linkage without implementing it, does not invent a landed `PercentOfRelatedLine` schema, does not mark Linear DRG-571 Done, and does not authorize product code, Flyway (including reserved CAM `V1_16`–`V1_21`), or flags.
+
 **Current authority:** The linked record assigns a disposition to every fork in this frame and supplies overriding contracts. All proposal labels, owner-confirmation requests, defaults and open-question wording below are the historical pre-decision frame at `285ffef8e08274600090d8ba077a0c92f489c062`. They are retained as rationale/alternatives, not additional current owner gates. Evidence and implementation claims retain their original dates and limits.
 
 ## Historical decision frame

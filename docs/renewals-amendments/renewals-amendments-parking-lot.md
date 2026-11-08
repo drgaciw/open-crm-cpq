@@ -36,7 +36,9 @@ Relevant existing content: the P2 capacity-meter policy and the Scenario 2 capac
 
 ## PL-6 CRM forecasting requirements maturity review (PARKED, not an active dev story)
 
-Status: **PARKED. Not an active development story.** Recorded 2026-10-16. Tracked as RA-54 / DRG-588 ("[PARKED]"). Sits next to the on-prem self-reported usage items (PL-1 to PL-5, RA-53 / DRG-587).
+Status: **PARKED as a development story.** Review unparked for documentation 2026-10-23. Tracked as RA-54 / DRG-588. Sits next to the on-prem self-reported usage items (PL-1 to PL-5, RA-53 / DRG-587).
+
+**Main-tree draft (2026-11-06):** forecast definitions decision frame at [`prereq/story-drg-588-crm-forecast-definitions-spec.md`](prereq/story-drg-588-crm-forecast-definitions-spec.md) — Adopted FQ1–FQ3; FQ4–FQ10 Status: Proposed; product code / schema / flag NO-GO. The full maturity review file is still only on branch `docs/crm-forecasting-maturity-review-2026-10-23` (not on `main`).
 
 **Distinction (explicit):** this is a review of *overall CRM forecasting requirements* and how mature they are. It is SEPARATE from the net-new automatic re-forecast-on-amendment-save functionality already discussed for the renewals and amendments work. That re-forecast behavior is its own feature; this item does not design, replace, or block it.
 

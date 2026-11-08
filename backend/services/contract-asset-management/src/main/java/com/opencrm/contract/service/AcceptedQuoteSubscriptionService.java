@@ -9,11 +9,13 @@ import com.opencrm.contract.asset.AssetActivation;
 import com.opencrm.contract.domain.AppliedQuoteAcceptance;
 import com.opencrm.contract.domain.ErpSyncStatus;
 import com.opencrm.contract.domain.Subscription;
+import com.opencrm.contract.domain.SubscriptionModel;
 import com.opencrm.contract.domain.SubscriptionRatePeriod;
 import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.repository.AppliedQuoteAcceptanceRepository;
 import com.opencrm.contract.repository.SubscriptionRatePeriodRepository;
 import com.opencrm.contract.repository.SubscriptionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,10 +28,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.TreeMap;
+import java.util.UUID;
 
 /** Applies the immutable sale in the listener transaction without an external ERP call. */
 @Service
@@ -45,6 +50,11 @@ public class AcceptedQuoteSubscriptionService {
     /** Absent when tests construct this service directly, so those tests keep the previous subscription behaviour. */
     private AssetActivation assetActivation;
 
+    /** Optional so unit tests that omit it keep prior behaviour until ingest classification is wired. */
+    private SubscriptionIngestAuditor ingestAuditor;
+    /** Optional. Absent in tests that do not bind a registry; invalid-tenant counter is then skipped. */
+    private MeterRegistry tenantMeters;
+
     /**
      * Additive collaborator. Spring sets it on the bean. The generated constructor is unchanged.
      */
@@ -53,7 +63,29 @@ public class AcceptedQuoteSubscriptionService {
         this.assetActivation = assetActivation;
     }
 
+    @Autowired(required = false)
+    public void setIngestAuditor(SubscriptionIngestAuditor ingestAuditor) {
+        this.ingestAuditor = ingestAuditor;
+    }
+
+    @Autowired(required = false)
+    public void setTenantMeters(MeterRegistry tenantMeters) {
+        this.tenantMeters = tenantMeters;
+    }
+
+    /** Test seam for DRG-662 counters. */
+    public void bindTenantMeters(MeterRegistry meters) {
+        this.tenantMeters = meters;
+    }
+
     public void apply(QuoteAcceptedEvent event) {
+        apply(event, null);
+    }
+
+    /**
+     * @param provenanceTenantId top-level QuoteAccepted {@code tenantId} only (DRG-631). Never from a nested body field.
+     */
+    public void apply(QuoteAcceptedEvent event, String provenanceTenantId) {
         AcceptedRampValidator.require(event.getCustomerId() != null && !event.getCustomerId().isBlank(), "Accepted customer is missing");
         AcceptedRampValidator.require(event.getEventType() == null || QuoteAcceptedEvent.EVENT_TYPE.equals(event.getEventType()), "Unsupported accepted event type");
         AcceptedRampValidator.require(event.getEventVersion() == null || event.getEventVersion() == QuoteAcceptedEvent.EVENT_VERSION, "Unsupported accepted event version");
@@ -88,20 +120,7 @@ public class AcceptedQuoteSubscriptionService {
             return;
         }
         boolean typedRates = validator.hasTypedRates(event);
-        if (!typedRates && event.getLineItems() != null) {
-            for (var line : event.getLineItems()) {
-                String productType = line.getProductType();
-                String kind = line.getLineItemType() == null ? "" : line.getLineItemType().trim().toUpperCase(Locale.ROOT);
-                boolean nonrecurring = List.of("FEE", "TAX", "DISCOUNT").contains(kind);
-                AcceptedRampValidator.require(productType == null || productType.isBlank()
-                        || nonrecurring || AcceptedRampValidator.fixedProduct(productType)
-                        || List.of("SAAS_FLAT_RATE", "ONPREM_SUBSCRIPTION", "SUPPORT_BASIC", "SUPPORT_PREMIUM", "SUPPORT_ENTERPRISE")
-                        .contains(productType.trim().toUpperCase(Locale.ROOT)),
-                        "Historical aggregate fallback cannot accept an explicit unsupported product classification");
-                AcceptedRampValidator.require(nonrecurring || !"ONE_TIME".equalsIgnoreCase(line.getBillingFrequency() == null
-                        ? "" : line.getBillingFrequency().trim()), "ONE_TIME accepted line cannot become a subscription");
-            }
-        }
+        SubscriptionModel subscriptionModel = classifyNewSaleModel(event);
         AcceptedRampValidator.Validated priced = typedRates ? validator.validate(event, null, 0) : null;
         LocalDate start = priced == null ? LocalDate.now() : priced.startDate();
         LocalDate end = priced == null ? start.plusYears(1) : priced.endDate();
@@ -113,12 +132,15 @@ public class AcceptedQuoteSubscriptionService {
                     || months > 0 && start.plusMonths(months).minusDays(1).equals(end)), "Invalid explicit accepted legacy term");
         }
         BigDecimal arr = priced == null ? legacyArr(event) : priced.firstMrr().multiply(BigDecimal.valueOf(12));
+        UUID tenantId = SubscriptionTenant.resolve(provenanceTenantId, tenantMeters);
         Subscription subscription = Subscription.builder().subscriptionNumber(number).customerId(event.getCustomerId())
                 .quoteId(event.getQuoteId()).status(SubscriptionStatus.PENDING)
+                .subscriptionModel(subscriptionModel)
                 .planName(priced == null ? legacyPlan(event) : priced.planName())
                 .startDate(start).endDate(end).renewalDate(end.minusDays(30)).arr(arr)
                 .mrr(arr == null ? null : AcceptedRampValidator.money(arr.divide(BigDecimal.valueOf(12), 8, java.math.RoundingMode.HALF_UP)))
-                .currencyCode(event.getCurrencyCode()).erpSyncStatus(ErpSyncStatus.QUEUED).build();
+                .currencyCode(event.getCurrencyCode()).erpSyncStatus(ErpSyncStatus.QUEUED)
+                .tenantId(tenantId).build();
         subscriptions.save(subscription);
         List<SubscriptionRatePeriod> periods = priced == null ? List.of(SubscriptionRatePeriod.builder()
                 .acceptedLineUuid("legacy-aggregate").acceptedQuoteId(event.getQuoteId()).productName(subscription.getPlanName())
@@ -213,6 +235,8 @@ public class AcceptedQuoteSubscriptionService {
         }
         rates.saveAll(priced.periods());
         if (renewal) {
+            // DRG-664: read renewal_mode for the auto-roll gate; quote renewal date math is unchanged.
+            SubscriptionRenewalModePolicy.allowsAutoRoll(target.getRenewalMode());
             target.setEndDate(end);
             target.setRenewalDate(end.minusDays(30));
         }
@@ -230,6 +254,58 @@ public class AcceptedQuoteSubscriptionService {
         if (assetActivation != null) {
             assetActivation.onActivated(event, subscription, periods);
         }
+    }
+
+    /**
+     * DRG-666: classify ADR §2.2 {@code subscription_model} at NEW ingest. Unknown product types on
+     * recurring lines are rejected all-or-nothing with a durable audit row; blank types stay null
+     * (legacy aggregate). ONE_TIME billing remains a separate non-retryable refusal.
+     */
+    private SubscriptionModel classifyNewSaleModel(QuoteAcceptedEvent event) {
+        if (event.getLineItems() == null) {
+            return null;
+        }
+        List<String> mappedTypes = new ArrayList<>();
+        for (var line : event.getLineItems()) {
+            if (line == null) {
+                continue;
+            }
+            String kind = line.getLineItemType() == null ? "" : line.getLineItemType().trim().toUpperCase(Locale.ROOT);
+            boolean nonrecurring = List.of("FEE", "TAX", "DISCOUNT").contains(kind);
+            AcceptedRampValidator.require(nonrecurring || !"ONE_TIME".equalsIgnoreCase(line.getBillingFrequency() == null
+                    ? "" : line.getBillingFrequency().trim()), "ONE_TIME accepted line cannot become a subscription");
+            if (nonrecurring) {
+                continue;
+            }
+            String productType = line.getProductType();
+            if (productType == null || productType.isBlank()) {
+                continue;
+            }
+            String normalized = productType.trim().toUpperCase(Locale.ROOT);
+            Optional<SubscriptionModel> mapped = SubscriptionModelClassifier.map(normalized);
+            if (mapped.isEmpty()) {
+                rejectUnknownSubscriptionModel(event.getQuoteId(), normalized);
+            }
+            mappedTypes.add(normalized);
+        }
+        if (mappedTypes.isEmpty()) {
+            return null;
+        }
+        return SubscriptionModelClassifier.classifyLines(mappedTypes)
+                .orElseGet(() -> {
+                    rejectUnknownSubscriptionModel(event.getQuoteId(), mappedTypes.getFirst());
+                    return null;
+                });
+    }
+
+    private void rejectUnknownSubscriptionModel(String quoteId, String productType) {
+        String detail = "Unknown subscription model for product type " + productType;
+        if (ingestAuditor != null) {
+            ingestAuditor.record(quoteId, SubscriptionIngestAuditor.AUDIT_CODE,
+                    SubscriptionIngestAuditor.REASON_UNKNOWN_MODEL, productType, detail);
+        }
+        throw new NonRetryableEventException(SubscriptionIngestAuditor.AUDIT_CODE + "/"
+                + SubscriptionIngestAuditor.REASON_UNKNOWN_MODEL + ": " + detail);
     }
 
     private int anchoredOffset(LocalDate anchor, LocalDate start) {

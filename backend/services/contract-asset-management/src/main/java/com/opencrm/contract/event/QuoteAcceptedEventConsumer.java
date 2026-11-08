@@ -1,6 +1,7 @@
 package com.opencrm.contract.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.event.KafkaInbox;
 import com.opencrm.common.event.KafkaTopics;
@@ -70,17 +71,19 @@ public class QuoteAcceptedEventConsumer {
             log.info("Skipping already-processed quote accepted event {}", KafkaInbox.eventIdOf(record));
             return;
         }
-        QuoteAcceptedEvent event = parse(record.value());
-        log.info("Received quote accepted event for quote: {}", event.getQuoteId());
-        route(event);
+        ParsedAcceptance parsed = parse(record.value());
+        log.info("Received quote accepted event for quote: {}", parsed.event().getQuoteId());
+        route(parsed.event(), parsed.provenanceTenantId());
     }
 
     /**
-     * After claim and parse. Flag off or no event tenant selects legacy apply. There is no document path:
-     * {@link AmendmentRoutingFlag#DOCUMENT_PATH_SELECTED} stays at zero, which is the alert condition
-     * "document path selected".
+     * After claim and parse. Always selects legacy apply: the document path is not built, so
+     * {@link AmendmentRoutingFlag#decide} returns only {@link AmendmentRoutingDecision#LEGACY} even when the
+     * event carries {@code tenantId} (DRG-631). {@link AmendmentRoutingFlag#DOCUMENT_PATH_SELECTED} stays at
+     * zero, which is the alert condition "document path selected". Provenance {@code tenantId}
+     * (DRG-631 top-level only) is passed for subscription row stamping (DRG-662); flags stay owner-gated off.
      */
-    private void route(QuoteAcceptedEvent event) {
+    private void route(QuoteAcceptedEvent event, String provenanceTenantId) {
         AmendmentRoutingDecision decision = routingFlag().decide(event);
         MeterRegistry registry = meters();
         if (registry != null) {
@@ -100,7 +103,7 @@ public class QuoteAcceptedEventConsumer {
         boolean documentIdPresent = event.getAmendmentDocumentId() != null
                 && !event.getAmendmentDocumentId().isBlank();
         log.info("routed_legacy quoteId={} amendmentDocumentIdPresent={}", event.getQuoteId(), documentIdPresent);
-        acceptedQuotes.apply(event);
+        acceptedQuotes.apply(event, provenanceTenantId);
     }
 
     private AmendmentRoutingFlag routingFlag() {
@@ -120,15 +123,31 @@ public class QuoteAcceptedEventConsumer {
         return injectedMeters;
     }
 
-    private QuoteAcceptedEvent parse(String payload) {
+    /**
+     * Reads only the top-level {@code tenantId} field (DRG-631 provenance). Nested spoof fields are ignored.
+     * Avoids depending on a libs/common DTO getter (CAM allowlist).
+     */
+    private ParsedAcceptance parse(String payload) {
         try {
-            QuoteAcceptedEvent event = objectMapper.readValue(payload, QuoteAcceptedEvent.class);
+            JsonNode root = objectMapper.readTree(payload);
+            if (root == null || root.isNull()) {
+                throw new NonRetryableEventException("Quote accepted event lacks quoteId: " + payload);
+            }
+            String provenanceTenantId = null;
+            JsonNode tenantNode = root.get("tenantId");
+            if (tenantNode != null && !tenantNode.isNull() && tenantNode.isTextual()) {
+                provenanceTenantId = tenantNode.asText();
+            }
+            QuoteAcceptedEvent event = objectMapper.treeToValue(root, QuoteAcceptedEvent.class);
             if (event == null || event.getQuoteId() == null || event.getQuoteId().isBlank()) {
                 throw new NonRetryableEventException("Quote accepted event lacks quoteId: " + payload);
             }
-            return event;
+            return new ParsedAcceptance(event, provenanceTenantId);
         } catch (JsonProcessingException e) {
             throw new NonRetryableEventException("Unreadable quote accepted event", e);
         }
+    }
+
+    private record ParsedAcceptance(QuoteAcceptedEvent event, String provenanceTenantId) {
     }
 }
