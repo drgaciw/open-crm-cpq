@@ -99,5 +99,3 @@ POST /api/v1/ai/agents/{agentId}/invoke
 POST /api/v1/ai/agents/{agentId}/stream
 POST /api/v1/ai/orchestrations/{workflowId}/invoke   # e.g. deal-desk
 ```
-
-Session state: Redis `ai:session:{sessionId}` (24h TTL) via `RedisStateManager`.
