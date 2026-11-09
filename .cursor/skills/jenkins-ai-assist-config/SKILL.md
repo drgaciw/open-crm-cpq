@@ -48,5 +48,5 @@ Consult **`jenkins-ai-gate-curator`** before `AI_CI_BLOCKING=true`.
 
 ## Related
 
-- [infra/jenkins/ai-assist/ai_client.py](infra/jenkins/ai-assist/ai_client.py)
+- [infra/jenkins/ai-assist/ai_client.py](../../../infra/jenkins/ai-assist/ai_client.py)
 - Playbook: `ai-advisory-on`
