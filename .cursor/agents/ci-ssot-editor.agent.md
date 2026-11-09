@@ -19,7 +19,6 @@ Follow **`ci-stage-ssot-edit`**.
 
 ## Co-change checklist (same PR)
 
-3. [Jenkinsfile](Jenkinsfile) — stage + `run-core.sh` invocation
 4. [.github/workflows/ci.yml](.github/workflows/ci.yml) — job + `needs` graph
 5. [docs/ci-contract.yaml](docs/ci-contract.yaml) — `scripts_ci.stages` + `jenkins`/`github_actions`
 6. ADR-003 amendment if ai-assist scope changes
