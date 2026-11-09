@@ -19,7 +19,7 @@ For multi-step design, use **sequential thinking** MCP.
 
 ## Reference template
 
-Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](infra/jenkins/jenkins/casc/multibranch.yaml.example) into your JCasC bundle or merge into [jenkins.yaml](infra/jenkins/jenkins/casc/jenkins.yaml).
+Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](../../../infra/jenkins/jenkins/casc/multibranch.yaml.example) into your JCasC bundle or merge into [jenkins.yaml](../../../infra/jenkins/jenkins/casc/jenkins.yaml).
 
 ## Credentials
 
