@@ -21,7 +21,7 @@ From repository root:
 python .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
 ```
 
-Optional contract verify commands from [docs/ci-contract.yaml](docs/ci-contract.yaml):
+Optional contract verify commands from [docs/ci-contract.yaml](../../../docs/ci-contract.yaml):
 
 ```bash
 bash scripts/ci/run-core.sh toolchain
