@@ -28,7 +28,7 @@ Confirm `JENKINS_NUM_EXECUTORS=0` on controller service.
 
 ## Pipeline agent
 
-[Jenkinsfile](Jenkinsfile) uses `agent { label "${env.JENKINS_AGENT_LABEL ?: 'any'}" }` — set label in prod.
+[Jenkinsfile](../../../Jenkinsfile) uses `agent { label "${env.JENKINS_AGENT_LABEL ?: 'any'}" }` — set label in prod.
 
 ## Security
 
