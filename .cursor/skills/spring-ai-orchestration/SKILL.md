@@ -56,7 +56,7 @@ export OPENCRM_GATEWAY_BASE_URL=http://localhost:8080
 | `GET /api/v1/ai/orchestrations` | List workflows |
 | `POST /api/v1/ai/orchestrations/{workflowId}/invoke` | Workflow (e.g. `deal-desk`) |
 
-Port **8086** (gateway: `/api/v1/ai/**`).
+Port **8090** (gateway: `/api/v1/ai/**`).
 
 ## Critical agent IDs
 
