@@ -10,7 +10,7 @@ description: >-
 
 ## When to use
 
-- Any change to [Jenkinsfile](Jenkinsfile), [.github/workflows/ci.yml](.github/workflows/ci.yml), [scripts/ci/](scripts/ci/), or [docs/ci-contract.yaml](docs/ci-contract.yaml).
+- Any change to [Jenkinsfile](../../../Jenkinsfile), [.github/workflows/ci.yml](../../../.github/workflows/ci.yml), [scripts/ci/](../../../scripts/ci/), or [docs/ci-contract.yaml](../../../docs/ci-contract.yaml).
 - After `ci-ssot-editor` completes a stage add/remove/reorder.
 
 ## Run verification
