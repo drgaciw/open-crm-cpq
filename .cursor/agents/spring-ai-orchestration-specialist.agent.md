@@ -132,7 +132,6 @@ When a task touches **both** lanes (e.g. QuoteAcceptedListener invokes deal-desk
 
 1. **Direct invocation** — `AgentRouter` REST or in-process; share context via Redis session
 2. **Event-driven** — Redis pub/sub (`quote:accepted` live; others planned in `agent-prd.md` §2.6)
-3. **Orchestrator** — cpq-agent-037 sequences 024 → 025 → 031 → 030 with 036 audit
 
 ## Feature flag (check first)
 
