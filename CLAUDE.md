@@ -72,7 +72,7 @@ Frontend — Nx + Angular 22, Vitest:
 ```bash
 cd frontend
 npm ci --legacy-peer-deps      # the flag is mandatory; npm + package-lock.json only
-npm run test:crm               # crm-* + shared libs
+npm run test:crm               # crm-* + shared-models + shared-data-access
 npm run test:cpq               # cpq-* libs
 npx nx serve crm               # :4200, proxies /api -> gateway :8080
 npx nx test crm-leads -- -t "name"   # single spec
