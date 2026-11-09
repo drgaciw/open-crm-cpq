@@ -82,7 +82,7 @@ Port **8090** (gateway: `/api/v1/ai/**`).
 
 ```bash
 mvn -f backend/pom.xml -pl services/ai-service test -Dtest=CpqAgentToolsTest
-mvn -pl backend/services/ai-service test -Dtest=AgentRouterFeatureFlagTest
+mvn -f backend/pom.xml -pl services/ai-service test -Dtest=AgentRouterFeatureFlagTest
 mvn -pl backend/services/ai-service test -Dtest=*AgentTest
 ```
 
