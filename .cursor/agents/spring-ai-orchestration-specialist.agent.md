@@ -48,7 +48,7 @@ Orchestrate the full CPQ agent ecosystem (37 PRD agents + extended implementatio
 ## Routing decision tree
 
 1. **Does the task span CRM + quote + pricing + gateway events?** → `cpq-lifecycle-tracer`
-2. **Is it a multi-step deal-desk / approval / post-pricing flow?** → `deal-desk` workflow → cpq-agent-037 (+ cluster 01/02/03)
+2. **Is it a multi-step deal-desk / approval / post-pricing flow?** → `deal-desk` workflow → cpq-agent-037
 3. **Is it one agent's behavior, prompt, or tool?** → identify agent ID from registry → edit Java + PRD in `agents/`
 4. **Is it infrastructure** (feature flag, ChatClient, ToolRegistry, Redis listener)? → handle in ai-service config/orchestration layer
 5. **Unsure which agent owns it?** → read `agents/HANDOFFS.md` handoff matrix or `.cursor/skills/spring-ai-orchestration/playbooks.md`
