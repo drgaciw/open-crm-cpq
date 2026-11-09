@@ -22,7 +22,7 @@ Confirm `JENKINS_NUM_EXECUTORS=0` on controller service.
 
 1. Jenkins → **Manage Jenkins** → **Nodes** → create **build-agent-1**
 2. Copy inbound agent secret
-3. Mount secret: `/run/secrets/agent_secret` (see [docker-compose.build-agent.yml](infra/jenkins/docker-compose.build-agent.yml))
+3. Mount secret: `/run/secrets/agent_secret` (see [docker-compose.build-agent.yml](../../../infra/jenkins/docker-compose.build-agent.yml))
 4. Labels: `linux docker maven node22`
 5. Set `JENKINS_AGENT_LABEL` in pipeline env to match
 
