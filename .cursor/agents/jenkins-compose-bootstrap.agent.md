@@ -17,8 +17,6 @@ Get a **first green build** on the dev stack per [infra/jenkins/README.md](../..
 
 Follow **`jenkins-quickstart`** (`.cursor/skills/jenkins-quickstart/SKILL.md`).
 
-5. Confirm stages through Security Audit (audit may be UNSTABLE).
-
 ## Handoffs
 
 | Scenario | Delegate |
