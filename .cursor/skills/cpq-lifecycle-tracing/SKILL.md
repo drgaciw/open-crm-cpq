@@ -39,7 +39,7 @@ mvn -f backend/pom.xml -pl libs/common test -Dtest=PublishedEventContractTest
 mvn -f backend/pom.xml -pl services/crm-service test -Dtest="*IntegrationTest"
 ```
 
-Adjust `-pl` paths if running from `backend/` directory.
+Omit `-f backend/pom.xml` if running from `backend/` directory.
 
 ## Symbols to inspect by symptom
 
