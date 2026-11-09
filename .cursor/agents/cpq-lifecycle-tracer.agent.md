@@ -64,7 +64,7 @@ Guarded transitions only — never skip states unless an explicit API supports i
 3. **Trace the flow** — Use `gitnexus_query` / `gitnexus_context` / process resources for ordered execution paths; open source only after graph confirms the route.
 4. **Verify contracts** — Event DTOs, external IDs (`dealExternalId`), idempotency keys, correlation IDs. Compare producer and consumer payloads.
 5. **Reproduce narrowly** — Prefer targeted Maven tests over full-suite runs:
-   - CRM lifecycle: `mvn -pl backend/services/crm-service test -Dtest=LeadToDealLifecycleTest`
+   - CRM lifecycle: `mvn -f backend/pom.xml -pl services/crm-service test -Dtest=LeadToDealLifecycleTest`
    - Event contracts: `mvn -pl backend/libs/common test -Dtest=PublishedEventContractTest`
    - Adjust module/test name to match the failing seam.
 6. **Fix minimally** — One seam at a time. Preserve state-machine guards and idempotency.
