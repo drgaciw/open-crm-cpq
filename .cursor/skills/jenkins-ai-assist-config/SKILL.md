@@ -37,7 +37,7 @@ Archived under `ci-reports/`:
 
 ## Stages
 
-Via [Jenkinsfile](Jenkinsfile) when `AI_CI_ENABLED=true`:
+Via [Jenkinsfile](../../../Jenkinsfile) when `AI_CI_ENABLED=true`:
 
 - `code_review`, `test_suggestions` (main pipeline)
 - `log_analysis` (post failure)
