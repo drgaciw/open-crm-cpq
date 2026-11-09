@@ -34,7 +34,7 @@ Lead (CRM) → qualify → convert → Deal (CRM)
 
 | Service | Port | Gateway prefix | Primary lifecycle role |
 |---------|------|----------------|------------------------|
-| crm-service | 8081 | `/api/v1/crm/**` | Lead, Deal, Contact, Organization |
+| crm-service | 8081 | `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` | Lead, Deal, Contact, Organization |
 | pricing-service | 8082 | `/api/v1/pricing/**` | Pricing waterfall, rules, audit |
 | configuration-engine | 8083 | `/api/v1/configuration/**` | Product configuration validation |
 | quote-service | 8084 | `/api/v1/quotes/**` | Quote state machine, approvals, PDF |
