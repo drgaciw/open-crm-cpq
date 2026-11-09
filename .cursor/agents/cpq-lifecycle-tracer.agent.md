@@ -38,7 +38,7 @@ Lead (CRM) → qualify → convert → Deal (CRM)
 | pricing-service | 8082 | `/api/v1/pricing/**` | Pricing waterfall, rules, audit |
 | configuration-engine | 8088 | `/api/v1/configurations/**` | Product configuration validation |
 | quote-service | 8084 | `/api/v1/quotes/**` | Quote state machine, approvals, PDF |
-| ai-service | 8086 | `/api/v1/ai/**` | Agent tools, workflow orchestration |
+| ai-service | 8090 | `/api/v1/ai/**` | Agent tools, workflow orchestration |
 | gateway-service | 8080 | entry point | Routes, circuit breakers |
 
 ## State machines to respect
