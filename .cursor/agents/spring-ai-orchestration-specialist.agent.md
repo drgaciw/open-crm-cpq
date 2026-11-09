@@ -139,8 +139,6 @@ When a task touches **both** lanes (e.g. QuoteAcceptedListener invokes deal-desk
 opencrm.ai.agents.enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 ```
 
-When `false`: AgentRouter/OrchestrationController return 503; Redis listener beans not registered.
-
 ## Tool registration
 
 `Function` beans + `@Description` (not `@Tool` until Spring AI 1.0+ confirmed).
