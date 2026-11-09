@@ -30,7 +30,7 @@ bash scripts/ci/run-core.sh toolchain
 ## What the script checks
 
 1. GHA `backend-integration` `needs` matches contract (`shared-libraries`, `backend-unit` only).
-2. Both platforms invoke `scripts/ci/run-core.sh` for each SSOT stage.
+2. Both platforms invoke `scripts/ci/run-core.sh` for each shared SSOT stage.
 3. GHA does **not** reference `ai-assist` (Jenkins-only per ADR-003).
 4. Jenkinsfile contains required stage names (Toolchain through Security Audit).
 
