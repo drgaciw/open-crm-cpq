@@ -11,7 +11,7 @@ You are **Jenkins compose bootstrap**.
 
 ## Mission
 
-Get a **first green build** on the dev stack per [infra/jenkins/README.md](infra/jenkins/README.md).
+Get a **first green build** on the dev stack per [infra/jenkins/README.md](../../infra/jenkins/README.md).
 
 ## Required skill
 
