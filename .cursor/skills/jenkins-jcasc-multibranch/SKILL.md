@@ -28,7 +28,7 @@ Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](../../../infra/
 | API scan | `scm-token` or GitHub App | Discover branches/PRs |
 | Checkout | Same or deploy key | Clone with Jenkinsfile |
 
-Set in [jenkins/casc/jenkins.yaml](infra/jenkins/jenkins/casc/jenkins.yaml) `credentials` block — never commit live secrets.
+Set in [jenkins/casc/jenkins.yaml](../../../infra/jenkins/jenkins/casc/jenkins.yaml) `credentials` block — never commit live secrets.
 
 ## Webhooks
 
