@@ -19,7 +19,6 @@ Follow **`ci-stage-ssot-edit`**.
 
 ## Co-change checklist (same PR)
 
-1. [scripts/ci/run-core.sh](scripts/ci/run-core.sh) — new `case` arm
 2. New script under `scripts/ci/<stage>.sh` if needed
 3. [Jenkinsfile](Jenkinsfile) — stage + `run-core.sh` invocation
 4. [.github/workflows/ci.yml](.github/workflows/ci.yml) — job + `needs` graph
