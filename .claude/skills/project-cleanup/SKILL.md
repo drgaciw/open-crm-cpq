@@ -151,7 +151,7 @@ Categorize findings as **MUST FIX (blocking)**, **SHOULD FIX**, **SUGGESTION**, 
 
 ## 5. Command Checklists
 
-Use the relevant block for the detected ecosystem. All commands are read-only unless noted.
+Use the relevant block for the detected ecosystem.
 
 ### Git status, branches, worktrees
 
