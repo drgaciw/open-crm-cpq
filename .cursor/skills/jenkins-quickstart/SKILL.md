@@ -40,7 +40,7 @@ Verify: http://localhost:8080/login
 
 ## First build (AI off)
 
-1. Job: JCasC seed `opencrm-cpq-ci` **or** Pipeline from SCM → `Jenkinsfile` at repo root.
+1. Job: JCasC multibranch `opencrm-cpq` **or** Pipeline from SCM → `Jenkinsfile` at repo root.
 2. Set `AI_CI_ENABLED=false` in env/JCasC for first run.
 3. Expect: Toolchain → Shared Libraries → parallel fast checks → Backend Integration → Security Audit (may be UNSTABLE).
 
