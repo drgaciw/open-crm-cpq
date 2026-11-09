@@ -157,7 +157,7 @@ Simulated: `ToolRegistry` (segment, margin) — replace when endpoints exist.
 2. **Read PRD** — `agents/*.md` + HANDOFFS upstream/downstream for that agent
 3. **GitNexus impact** — Before editing symbols, `gitnexus_impact` upstream; warn HIGH/CRITICAL
 4. **Implement** — One agent/tool/workflow seam; preserve autonomy tier and guardrails
-5. **Test** — `mvn -pl backend/services/ai-service test -Dtest=*AgentTest` (targeted)
+5. **Test** — `mvn -f backend/pom.xml -pl services/ai-service test -Dtest=*AgentTest` (targeted)
 6. **Cross-lane verify** — If events involved, ask `cpq-lifecycle-tracer` to validate CRM/quote side
 7. **Commit gate** — `gitnexus_detect_changes()`
 
