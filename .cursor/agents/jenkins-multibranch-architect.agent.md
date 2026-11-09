@@ -16,7 +16,7 @@ Follow **`jenkins-jcasc-multibranch`** — includes mandatory Context7 Jenkins d
 ## Reference files
 
 - [infra/jenkins/jenkins/casc/jenkins.yaml](../../infra/jenkins/jenkins/casc/jenkins.yaml) — current multibranch job
-- [infra/jenkins/jenkins/casc/multibranch.yaml.example](infra/jenkins/jenkins/casc/multibranch.yaml.example) — template
+- [infra/jenkins/jenkins/casc/multibranch.yaml.example](../../infra/jenkins/jenkins/casc/multibranch.yaml.example) — template
 - [docs/ci-contract.yaml](docs/ci-contract.yaml) — stage parity
 
 ## Deliverables
