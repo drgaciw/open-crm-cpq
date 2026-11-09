@@ -62,6 +62,8 @@ mvn -Dtest=LeadServiceTest -pl services/crm-service test           # single clas
 mvn -Dtest=LeadServiceTest#methodName -pl services/crm-service test # single method
 ```
 
+When a backend `mvn` command reports `command not found`, rerun its arguments with `./mvnw` from `backend/`.
+
 `*IntegrationTest` classes extend `BaseIntegrationTest` and start a **PostgreSQL Testcontainer** —
 they need Docker. CI splits these into separate `backend-unit` and `backend-integration` jobs.
 
