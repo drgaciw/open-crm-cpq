@@ -19,7 +19,7 @@ Follow **`jenkins-prod-build-agent`**.
 
 ## Reference files
 
-- [infra/jenkins/docker-compose.build-agent.yml](infra/jenkins/docker-compose.build-agent.yml)
+- [infra/jenkins/docker-compose.build-agent.yml](../../infra/jenkins/docker-compose.build-agent.yml)
 - [infra/jenkins/README.md](infra/jenkins/README.md) — Production build agent section
 
 ## Checklist
