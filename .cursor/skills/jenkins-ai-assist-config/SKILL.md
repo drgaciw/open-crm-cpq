@@ -25,7 +25,7 @@ Prod: vault → Jenkins credential only.
 ## Guardrails (ADR-003)
 
 - **Do not** set `LLM_ENDPOINT` to `http://ai-service:8086` — product AgentRouter, not chat API.
-- **Do not** add `ai-assist` to [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Do not** add `ai-assist` to [.github/workflows/ci.yml](../../../.github/workflows/ci.yml).
 
 ## Reports
 
