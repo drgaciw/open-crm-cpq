@@ -17,17 +17,6 @@ Get a **first green build** on the dev stack per [infra/jenkins/README.md](../..
 
 Follow **`jenkins-quickstart`** (`.cursor/skills/jenkins-quickstart/SKILL.md`).
 
-## Operational loop
-
-Preferred (repo root):
-
-```bash
-bash infra/jenkins/scripts/quickstart.sh
-# Windows: pwsh -File infra/jenkins/scripts/quickstart.ps1
-```
-
-Or manually:
-
 1. `cp env/jenkins.env.example env/jenkins.env` — set `JENKINS_ADMIN_PASSWORD`.
 2. `docker compose -f docker-compose.jenkins.yml --env-file env/jenkins.env up -d --build`
 3. Verify `http://localhost:8080/login` healthy.
