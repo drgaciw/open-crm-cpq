@@ -17,7 +17,6 @@ Get a **first green build** on the dev stack per [infra/jenkins/README.md](../..
 
 Follow **`jenkins-quickstart`** (`.cursor/skills/jenkins-quickstart/SKILL.md`).
 
-3. Verify `http://localhost:8080/login` healthy.
 4. Configure job (JCasC seed or Pipeline from SCM); keep **`AI_CI_ENABLED=false`** for first run.
 5. Confirm stages through Security Audit (audit may be UNSTABLE).
 
