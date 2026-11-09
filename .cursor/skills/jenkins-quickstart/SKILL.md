@@ -52,7 +52,7 @@ bash scripts/ci/run-core.sh toolchain
 
 ## Checklist
 
-See [infra/jenkins/README.md](infra/jenkins/README.md) — **First green build checklist**.
+See [infra/jenkins/README.md](../../../infra/jenkins/README.md) — **First green build checklist**.
 
 ## Related
 
