@@ -84,6 +84,7 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
               }
               <div class="info-item"><span class="label">Probability</span><span class="value">{{ deal.probability ? deal.probability + '%' : '—' }}</span></div>
               <div class="info-item"><span class="label">Expected Close</span><span class="value">{{ deal.expectedCloseDate ? (deal.expectedCloseDate | date:'mediumDate') : '—' }}</span></div>
+              <div class="info-item" data-testid="deal-term"><span class="label">Term</span><span class="value">{{ deal.termMonths ? deal.termMonths + (deal.termMonths === 1 ? ' month' : ' months') : '—' }}</span></div>
               <div class="info-item"><span class="label">Created</span><span class="value">{{ deal.createdAt | date:'mediumDate' }}</span></div>
             </div>
           </mat-card-content>

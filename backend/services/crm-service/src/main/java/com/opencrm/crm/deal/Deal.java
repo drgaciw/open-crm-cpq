@@ -60,6 +60,10 @@ public class Deal extends BaseEntity {
     @Column(name = "expected_close_date")
     private LocalDate expectedCloseDate;
 
+    /** DRG-636: contract term in months. Amount stays TCV as entered (SQ1); null when not given. */
+    @Column(name = "term_months")
+    private Integer termMonths;
+
     @Column(name = "actual_close_date")
     private LocalDate actualCloseDate;
 
