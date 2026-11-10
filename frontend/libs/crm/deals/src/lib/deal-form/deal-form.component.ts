@@ -107,6 +107,14 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
             </mat-form-field>
           </div>
 
+          <div class="form-row">
+            <mat-form-field appearance="outline" style="max-width: 300px;">
+              <mat-label>Term (months)</mat-label>
+              <input matInput type="number" formControlName="termMonths" min="1" step="1" data-testid="deal-term-months">
+              @if (form.get('termMonths')?.invalid) { <mat-error>Enter a whole number of months, 1 or more</mat-error> }
+            </mat-form-field>
+          </div>
+
           <h3 class="section-title">Relationships</h3>
           <div class="form-row two-col">
             <mat-form-field appearance="outline">
@@ -229,6 +237,7 @@ export class DealFormComponent implements OnInit {
       type: ['NEW_BUSINESS' satisfies DealType, Validators.required],
       stage: ['PROSPECTING' satisfies DealStage],
       expectedCloseDate: [null],
+      termMonths: [null, [Validators.min(1), Validators.pattern(/^\d+$/)]],
       ownerId: [''],
       contactSearch: [''],
       orgSearch: [''],
@@ -249,6 +258,7 @@ export class DealFormComponent implements OnInit {
             type: d.type ?? 'NEW_BUSINESS',
             stage: d.stage,
             expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
+            termMonths: d.termMonths ?? null,
             ownerId: d.ownerId ?? '',
             contactSearch: d.primaryContactName ?? '',
             orgSearch: d.organizationName ?? '',
@@ -293,6 +303,7 @@ export class DealFormComponent implements OnInit {
     const expectedCloseDate = closeDate ? closeDate.toISOString().split('T')[0] : undefined;
     const currency = String(this.form.value.currency ?? 'USD').toUpperCase();
     const ownerId = String(this.form.value.ownerId ?? '').trim();
+    const termMonths = this.form.value.termMonths ?? undefined;
 
     const idVal = this.id();
     if (this.isEditMode && idVal) {
@@ -303,6 +314,7 @@ export class DealFormComponent implements OnInit {
         stage: this.form.value.stage as DealStage,
         type: this.form.value.type as DealType,
         expectedCloseDate,
+        termMonths,
         description: this.form.value.description || undefined,
         ownerId: ownerId || undefined,
         primaryContactId: this.selectedContactId ?? undefined,
@@ -322,6 +334,7 @@ export class DealFormComponent implements OnInit {
         currency,
         type: this.form.value.type as DealType,
         expectedCloseDate,
+        termMonths,
         description: this.form.value.description || undefined,
         ownerId: ownerId || undefined,
         primaryContactId: this.selectedContactId ?? undefined,

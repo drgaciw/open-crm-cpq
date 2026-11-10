@@ -62,6 +62,8 @@ export interface DealDto {
   fxSource?: string;
   probability?: number;
   expectedCloseDate?: string;
+  /** DRG-636: contract term in months; absent when not given. */
+  termMonths?: number;
   actualCloseDate?: string;
   description?: string;
   ownerId?: string;
@@ -94,6 +96,7 @@ export interface DealCreateRequest {
   amount?: number;               // @PositiveOrZero
   currency?: string;             // defaults to "USD"
   expectedCloseDate?: string;
+  termMonths?: number;           // @Positive
   description?: string;
   ownerId?: string;
   type?: DealType;               // defaults to NEW_BUSINESS
@@ -111,6 +114,7 @@ export interface DealUpdateRequest {
   amount?: number;
   currency?: string;
   expectedCloseDate?: string;
+  termMonths?: number;           // @Positive
   description?: string;
   ownerId?: string;
   type?: DealType;

@@ -103,6 +103,27 @@ describe('DealFormComponent amount validation (chaos)', () => {
     expect(payload['probability']).toBeUndefined();
   });
 
+  it('create sends the term in months when given and omits it when blank (DRG-636)', () => {
+    component.form.patchValue({ name: 'Three year licence', amount: 360000, termMonths: 36 });
+    component.onSubmit();
+    expect((create.mock.calls[0][0] as Record<string, unknown>)['termMonths']).toBe(36);
+
+    component.form.patchValue({ termMonths: null });
+    component.onSubmit();
+    expect((create.mock.calls[1][0] as Record<string, unknown>)['termMonths']).toBeUndefined();
+  });
+
+  it('rejects a zero, negative or fractional term and accepts a whole one (DRG-636)', () => {
+    component.form.patchValue({ name: 'Term check' });
+    for (const bad of [0, -12, 1.5]) {
+      component.form.patchValue({ termMonths: bad });
+      expect(component.form.get('termMonths')?.invalid).toBe(true);
+    }
+    component.form.patchValue({ termMonths: 12 });
+    expect(component.form.get('termMonths')?.valid).toBe(true);
+    expect(component.form.valid).toBe(true);
+  });
+
   it('shows an actionable banner when create fails', () => {
     create.mockReturnValueOnce(throwError(() => ({
       error: { message: 'nope', errorCode: 'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE' },
