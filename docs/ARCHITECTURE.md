@@ -13,7 +13,7 @@ Reverse-engineered from the working tree on **2026-09-19** (all claims verified 
 
 **Open CRM/CPQ** is an enterprise CRM and Configure-Price-Quote platform modernized from a Frappe-based Python/Vue 3 application (`cpq_beta/`, read-only reference) into a cloud-native microservices system:
 
-- **11 Spring Boot 4.0.6 / Java 25 services** in a Maven reactor, behind a single **Spring Cloud Gateway** edge.
+- **11 Spring Boot 4.1.2 / Java 25 services** in a Maven reactor, behind a single **Spring Cloud Gateway** edge.
 - **Angular 22 Nx workspace** SPA (`frontend/apps/crm`) that talks **only** to the gateway via `frontend/proxy.conf.json` (`/api` → `:8080`).
 - **PostgreSQL 16** (single database `opencrm`, schema-per-service) + **Redis 7** (cache, rate limiting).
 - **Kafka** for async integration (document jobs, catalog lifecycle, quote-accepted) with a **transactional outbox** in `libs/common`.
@@ -34,7 +34,7 @@ Agents using this repo must:
 
 | Path | Role |
 |------|------|
-| `backend/pom.xml` | Maven reactor — Spring Boot **4.0.6** parent, Java **25**, Spring Cloud **2025.1.1** |
+| `backend/pom.xml` | Maven reactor — Spring Boot **4.1.2** parent, Java **25**, Spring Cloud **2025.1.4** |
 | `backend/libs/{common,security,rules-engine}` | Shared Maven modules (published language — [ADR-011](adr/ADR-011-shared-maven-libs-published-language.md)) |
 | `backend/services/*` | 11 microservices (see §4) |
 | `backend/docker-compose.yml` | Local Postgres 16, Redis 7 + crm/pricebook/pricing/product/quote/gateway images |
@@ -263,7 +263,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 
 | Dimension | Landed (forge, 2026-09) | Target / held |
 |-----------|-------------------------|---------------|
-| Backend | Spring Boot **4.0.6** / Java **25** reactor — 11 services (§4) | Azure AKS; remaining identity & comms. **Do not** downgrade Boot |
+| Backend | Spring Boot **4.1.2** / Java **25** reactor — 11 services (§4) | Azure AKS; remaining identity & comms. **Do not** downgrade Boot |
 | Frontend | Angular **22** Nx `apps/crm` + libs. **Signals + HttpClient** ([ADR-007](adr/ADR-007-frontend-signals-no-state-library.md)) | NgRx 19+ **held**; customer-portal / admin-console **not** in tree |
 | Database | PostgreSQL 16 + Redis 7 (compose); **one DB `opencrm`, schemas per service** ([ADR-008](adr/ADR-008-postgres-schema-per-service.md)) | Same + production Azure. pgvector commented until needed |
 | Infrastructure | Docker Compose local; **Jenkins primary CI**; GHA manual fallback — [ADR-003](adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
@@ -371,7 +371,7 @@ Plans: [23](forge/23-wave-n-architecture.md)–[35](forge/35-wave-w-architecture
 
 | Path | Role |
 |------|------|
-| `backend/pom.xml` | Reactor, Boot **4.0.6**, Java **25** |
+| `backend/pom.xml` | Reactor, Boot **4.1.2**, Java **25** |
 | `backend/docker-compose.yml` | Postgres 16, Redis 7, service ports |
 | `backend/scripts/init-db.sql` | Schemas `crm`, `cpq`, `pricing`, `product`, `quote`, `communication`, `ai` |
 | `backend/libs/common/` | `BaseEntity`, `ApiResponse`, `Money`/`Percentage`, events + outbox, `ConfigurationValidationResult` |

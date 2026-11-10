@@ -9,7 +9,7 @@
 
 | Dimension | Legacy (Frappe) | Landed (forge, 2026-08) | Target (not all landed) |
 |-----------|-----------------|-------------------------|-------------------------|
-| Backend | Frappe Framework (Python) | Spring Boot 4.0.6 parent / Java 25 microservices (crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service) | Azure AKS / remaining identity & comms |
+| Backend | Frappe Framework (Python) | Spring Boot 4.1.2 parent / Java 25 microservices (crm, gateway, product, pricing, pricebook, quote, configuration-engine, approval-routing, document-generation, contract-asset, ai-service) | Azure AKS / remaining identity & comms |
 | Frontend | Vue 3 / Frappe UI | Angular **22** Nx CRM app + CPQ libs (catalog, quotes, approvals, price-books, pricing-customers, rule-sets, product-bundles, simulator); **signals + HttpClient**, **not** NgRx | NgRx 19+ (**held**); customer-portal / admin-console apps |
 | Database | MariaDB 10.6 | PostgreSQL 16 + pgvector (compose); schemas per service | Same + production Azure |
 | Infrastructure | Docker / GitHub Actions | Docker Compose local; **Jenkins primary CI** (GHA `workflow_dispatch` fallback) — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | Azure AKS / Terraform / Helm |
@@ -243,7 +243,7 @@ Before marking any task as complete, verify:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **Index** — adr + forge waves + matrix + CI |
 | [docs/adr/README.md](docs/adr/README.md) | ADR catalog |
 | `MODERNIZATION_PLAN.md` | **Target** 16-month plan — not current forge SSOT |
-| `backend/pom.xml` | Maven reactor (Spring Boot parent **4.0.6**, Java 25) |
+| `backend/pom.xml` | Maven reactor (Spring Boot parent **4.1.2**, Java 25) |
 | `backend/docker-compose.yml` | Local PostgreSQL 16, Redis 7 |
 | `backend/libs/common/` | BaseEntity, ApiResponse, BusinessException |
 | `backend/libs/security/` | UserContext, SecurityUtils |
