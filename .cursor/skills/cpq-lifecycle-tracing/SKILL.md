@@ -30,16 +30,16 @@ Pair with the **`cpq-lifecycle-tracer`** subagent for isolated deep dives.
 
 ```bash
 # CRM crown-jewel lifecycle
-mvn -pl backend/services/crm-service test -Dtest=LeadToDealLifecycleTest
+mvn -f backend/pom.xml -pl services/crm-service test -Dtest=LeadToDealLifecycleTest
 
 # Published event contract (QuoteAccepted v1)
-mvn -pl backend/libs/common test -Dtest=PublishedEventContractTest
+mvn -f backend/pom.xml -pl libs/common test -Dtest=PublishedEventContractTest
 
 # CRM integration slice
-mvn -pl backend/services/crm-service test -Dtest="*IntegrationTest"
+mvn -f backend/pom.xml -pl services/crm-service test -Dtest="*IntegrationTest"
 ```
 
-Adjust `-pl` paths if running from `backend/` directory.
+Omit `-f backend/pom.xml` if running from `backend/` directory.
 
 ## Symbols to inspect by symptom
 

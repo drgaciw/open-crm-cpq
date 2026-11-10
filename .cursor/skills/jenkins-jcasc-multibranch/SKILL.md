@@ -19,7 +19,7 @@ For multi-step design, use **sequential thinking** MCP.
 
 ## Reference template
 
-Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](infra/jenkins/jenkins/casc/multibranch.yaml.example) into your JCasC bundle or merge into [jenkins.yaml](infra/jenkins/jenkins/casc/jenkins.yaml).
+Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](../../../infra/jenkins/jenkins/casc/multibranch.yaml.example) into your JCasC bundle or merge into [jenkins.yaml](../../../infra/jenkins/jenkins/casc/jenkins.yaml).
 
 ## Credentials
 
@@ -28,7 +28,7 @@ Copy/adapt [infra/jenkins/jenkins/casc/multibranch.yaml.example](infra/jenkins/j
 | API scan | `scm-token` or GitHub App | Discover branches/PRs |
 | Checkout | Same or deploy key | Clone with Jenkinsfile |
 
-Set in [jenkins/casc/jenkins.yaml](infra/jenkins/jenkins/casc/jenkins.yaml) `credentials` block — never commit live secrets.
+Set in [jenkins/casc/jenkins.yaml](../../../infra/jenkins/jenkins/casc/jenkins.yaml) `credentials` block — never commit live secrets.
 
 ## Webhooks
 

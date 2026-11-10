@@ -9,19 +9,15 @@ model: inherit
 
 You are **Jenkins multibranch architect**.
 
-## Mission
-
-Replace or supplement the single-branch `pipelineJob` seed with **multibranch PR CI** aligned with GHA PR triggers.
-
 ## Required skill
 
 Follow **`jenkins-jcasc-multibranch`** — includes mandatory Context7 Jenkins doc lookup before YAML changes.
 
 ## Reference files
 
-- [infra/jenkins/jenkins/casc/jenkins.yaml](infra/jenkins/jenkins/casc/jenkins.yaml) — current seed job
-- [infra/jenkins/jenkins/casc/multibranch.yaml.example](infra/jenkins/jenkins/casc/multibranch.yaml.example) — template
-- [docs/ci-contract.yaml](docs/ci-contract.yaml) — stage parity
+- [infra/jenkins/jenkins/casc/jenkins.yaml](../../infra/jenkins/jenkins/casc/jenkins.yaml) — current multibranch job
+- [infra/jenkins/jenkins/casc/multibranch.yaml.example](../../infra/jenkins/jenkins/casc/multibranch.yaml.example) — template
+- [docs/ci-contract.yaml](../../docs/ci-contract.yaml) — stage parity
 
 ## Deliverables
 
