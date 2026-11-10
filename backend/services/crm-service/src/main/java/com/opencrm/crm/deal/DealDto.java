@@ -32,6 +32,8 @@ public class DealDto {
     private String currency;
     private Integer probability;
     private LocalDate expectedCloseDate;
+    /** DRG-636: contract term in months; null when not given. */
+    private Integer termMonths;
     private LocalDate actualCloseDate;
     private String description;
     private String ownerId;

@@ -56,8 +56,6 @@ These use **two-digit** IDs in code (distinct from zero-padded 001–037 PRD IDs
 | cpq-agent-02 | Constitutional Guardian | `ConstitutionalGuardianAgent` | `agent.orchestration` |
 | cpq-agent-03 | Commercial Architect | `CommercialArchitectAgent` | `agent.orchestration` |
 
-Invoked alongside **cpq-agent-037** in the `deal-desk` workflow.
-
 ## Extended implementation agents (beyond PRD-37)
 
 | ID | Title | Java class | Package |
@@ -101,5 +99,3 @@ POST /api/v1/ai/agents/{agentId}/invoke
 POST /api/v1/ai/agents/{agentId}/stream
 POST /api/v1/ai/orchestrations/{workflowId}/invoke   # e.g. deal-desk
 ```
-
-Session state: Redis `ai:session:{sessionId}` (24h TTL) via `RedisStateManager`.

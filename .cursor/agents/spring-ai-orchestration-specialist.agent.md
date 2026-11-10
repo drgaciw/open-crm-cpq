@@ -48,7 +48,7 @@ Orchestrate the full CPQ agent ecosystem (37 PRD agents + extended implementatio
 ## Routing decision tree
 
 1. **Does the task span CRM + quote + pricing + gateway events?** → `cpq-lifecycle-tracer`
-2. **Is it a multi-step deal-desk / approval / post-pricing flow?** → `deal-desk` workflow → cpq-agent-037 (+ cluster 01/02/03)
+2. **Is it a multi-step deal-desk / approval / post-pricing flow?** → `deal-desk` workflow → cpq-agent-037
 3. **Is it one agent's behavior, prompt, or tool?** → identify agent ID from registry → edit Java + PRD in `agents/`
 4. **Is it infrastructure** (feature flag, ChatClient, ToolRegistry, Redis listener)? → handle in ai-service config/orchestration layer
 5. **Unsure which agent owns it?** → read `agents/HANDOFFS.md` handoff matrix or `.cursor/skills/spring-ai-orchestration/playbooks.md`
@@ -132,15 +132,12 @@ When a task touches **both** lanes (e.g. QuoteAcceptedListener invokes deal-desk
 
 1. **Direct invocation** — `AgentRouter` REST or in-process; share context via Redis session
 2. **Event-driven** — Redis pub/sub (`quote:accepted` live; others planned in `agent-prd.md` §2.6)
-3. **Orchestrator** — cpq-agent-037 sequences 024 → 025 → 031 → 030 with 036 audit
 
 ## Feature flag (check first)
 
 ```yaml
 opencrm.ai.agents.enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
 ```
-
-When `false`: AgentRouter/OrchestrationController return 503; Redis listener beans not registered.
 
 ## Tool registration
 
@@ -160,7 +157,7 @@ Simulated: `ToolRegistry` (segment, margin) — replace when endpoints exist.
 2. **Read PRD** — `agents/*.md` + HANDOFFS upstream/downstream for that agent
 3. **GitNexus impact** — Before editing symbols, `gitnexus_impact` upstream; warn HIGH/CRITICAL
 4. **Implement** — One agent/tool/workflow seam; preserve autonomy tier and guardrails
-5. **Test** — `mvn -pl backend/services/ai-service test -Dtest=*AgentTest` (targeted)
+5. **Test** — `mvn -f backend/pom.xml -pl services/ai-service test -Dtest=*AgentTest` (targeted)
 6. **Cross-lane verify** — If events involved, ask `cpq-lifecycle-tracer` to validate CRM/quote side
 7. **Commit gate** — `gitnexus_detect_changes()`
 

@@ -10,6 +10,9 @@
 # Concurrency is scoped by ref so a manual feature-branch or tag run cannot cancel main.
 #
 # The full matrix (integration, frontend, cpq_beta, security audit) runs nightly from ci.yml.
+#
+# The report job (amendment 2026-11-10) keeps one open issue labelled main-red while main fails and
+# closes it on the next green run, so a red main is visible without anyone opening the Actions tab.
 name: Main verify
 
 on:
@@ -51,3 +54,20 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+
+  report:
+    name: Report main status
+    needs: backend-unit
+    # Cancelled runs say nothing about main; manual runs on other refs are not main.
+    if: ${{ always() && github.ref == 'refs/heads/main' && (needs.backend-unit.result == 'success' || needs.backend-unit.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Open or close the main-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/report-main-status.sh "${{ needs.backend-unit.result }}"

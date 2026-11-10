@@ -83,6 +83,8 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
         errors.append(f"{rel} must not trigger on push")
     if not gha_has_run_core(text, "backend-unit"):
         errors.append(f"{rel} missing run-core.sh backend-unit")
+    if "frontend_job:" in contract and not gha_has_run_core(text, "frontend"):
+        errors.append(f"{rel} missing run-core.sh frontend")
     if "verify-drift.py" not in text:
         errors.append(f"{rel} must run verify-drift.py")
     if gha_has_ai_assist(text):
@@ -111,6 +113,10 @@ def main_gate_errors(repo: Path, contract: str) -> list[str]:
         errors.append(f"{rel} must run verify-drift.py")
     if gha_has_ai_assist(text):
         errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    if "report_script:" in contract:
+        for wf in (rel, ".github/workflows/ci.yml"):
+            if "report-main-status.sh" not in load_text(repo / wf):
+                errors.append(f"{wf} must run scripts/ci/report-main-status.sh (main-red issue)")
     return errors
 
 

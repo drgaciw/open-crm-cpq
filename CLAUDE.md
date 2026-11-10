@@ -16,10 +16,7 @@ This project is indexed by GitNexus as **open-crm-cpq** (28744 symbols, 61640 re
 
 ## Never Do
 
-- NEVER edit a function, class, or method before MCP/CLI impact analysis.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis, and never read `UNKNOWN` as an all-clear — it means the walk could not answer, which is the one verdict that requires confirming by other means.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit before MCP/CLI graph change analysis.
 
 ## Resources
 
@@ -55,7 +52,7 @@ are authoritative and kept current. Do not duplicate them here.
 
 ## Commands
 
-Backend — Maven, **Java 25 / Spring Boot 4.0.6**, 14 modules under `backend/`:
+Backend — Maven, **Java 25 / Spring Boot 4.1.2**, 15 modules under `backend/`:
 
 ```bash
 cd backend
@@ -65,7 +62,9 @@ mvn -Dtest=LeadServiceTest -pl services/crm-service test           # single clas
 mvn -Dtest=LeadServiceTest#methodName -pl services/crm-service test # single method
 ```
 
-`*IntegrationTest` classes extend `BaseIntegrationTest` and start a **PostgreSQL Testcontainer** —
+When a backend `mvn` command reports `command not found`, rerun its arguments with `./mvnw` from `backend/`.
+
+`*IntegrationTest` classes use **Testcontainers** —
 they need Docker. CI splits these into separate `backend-unit` and `backend-integration` jobs.
 
 Frontend — Nx + Angular 22, Vitest:
@@ -73,7 +72,7 @@ Frontend — Nx + Angular 22, Vitest:
 ```bash
 cd frontend
 npm ci --legacy-peer-deps      # the flag is mandatory; npm + package-lock.json only
-npm run test:crm               # crm-* + shared libs
+npm run test:crm               # crm-* + shared-models + shared-data-access
 npm run test:cpq               # cpq-* libs
 npx nx serve crm               # :4200, proxies /api -> gateway :8080
 npx nx test crm-leads -- -t "name"   # single spec
@@ -97,4 +96,4 @@ CI: **Jenkins is primary** (`Jenkinsfile`); `.github/workflows/ci.yml` is the `w
 fallback and also runs nightly on `main`; `pr-check.yml` gates pull requests and `main-verify.yml`
 re-runs the unit stage after every merge to `main` — see ADR-003 sections 7–8. The frontend stage
 (`scripts/ci/frontend.sh`) builds, lints and tests every Nx project; it runs in the full `ci.yml`
-matrix and the primary Jenkins Frontend stage. `.github/workflows/pr-check.yml` omits frontend.
+matrix and the primary Jenkins Frontend stage. `.github/workflows/pr-check.yml` runs it too, as the **Frontend (PR gate)** job.

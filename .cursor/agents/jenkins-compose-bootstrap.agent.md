@@ -11,28 +11,11 @@ You are **Jenkins compose bootstrap**.
 
 ## Mission
 
-Get a **first green build** on the dev stack per [infra/jenkins/README.md](infra/jenkins/README.md).
+Get a **first green build** on the dev stack per [infra/jenkins/README.md](../../infra/jenkins/README.md).
 
 ## Required skill
 
 Follow **`jenkins-quickstart`** (`.cursor/skills/jenkins-quickstart/SKILL.md`).
-
-## Operational loop
-
-Preferred (repo root):
-
-```bash
-bash infra/jenkins/scripts/quickstart.sh
-# Windows: pwsh -File infra/jenkins/scripts/quickstart.ps1
-```
-
-Or manually:
-
-1. `cp env/jenkins.env.example env/jenkins.env` — set `JENKINS_ADMIN_PASSWORD`.
-2. `docker compose -f docker-compose.jenkins.yml --env-file env/jenkins.env up -d --build`
-3. Verify `http://localhost:8080/login` healthy.
-4. Configure job (JCasC seed or Pipeline from SCM); keep **`AI_CI_ENABLED=false`** for first run.
-5. Confirm stages through Security Audit (audit may be UNSTABLE).
 
 ## Handoffs
 

@@ -1,7 +1,7 @@
 ---
 name: opencrm-architect
 description: >-
-  System architect for Open CRM/CPQ (Spring Boot 3.5 / Java 21 microservices,
+  System architect for Open CRM/CPQ (Spring Boot 4.1.2 / Java 25 microservices,
   Angular Nx frontend, Spring Cloud Gateway, CPQ contracts, GitNexus-safe
   change planning). Use proactively for Wave D+ ADRs, security designs
   (securityOpen, CORS/CSRF), PR DAGs, and forge sequencing. Pair with skill
