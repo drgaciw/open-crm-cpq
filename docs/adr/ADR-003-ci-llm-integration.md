@@ -79,6 +79,8 @@ Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when
 
 **Limit.** The repository is private and its plan does not offer branch protection or rulesets (the API answers 403), so the check cannot be made *required* on GitHub. Until the plan changes or the repository is public, the rule is procedural: merge only when **Backend Unit (PR gate)** is green (`gh pr checks <n> --watch`).
 
+**Amendment 2026-11-10: frontend job.** The workflow gains a second job, **Frontend (PR gate)**, which runs `bash scripts/ci/run-core.sh frontend` (install, build, lint and test of every Nx project). Why: on 2026-11-08 two dependency pull requests (#931, #933) changed `frontend/package.json` without `package-lock.json`, each merged on a green backend check, and `npm ci` failed on `main` until the nightly run reported it. This replaces "frontend" in the second boundary above; integration, `cpq_beta` and the AI assist stages are unchanged. The job calls the SSOT entrypoint only and adds no permissions or secrets.
+
 ### 8. Post-merge gate and nightly full run (amendment 2026-10-16, Proposed)
 
 **Why.** Section 7 checks each pull request on its own head. Nothing checks the head of `main` that results when several pull requests merge in quick succession. On 2026-10-16, #612 and #615 were each green and merged minutes apart, and `main` stopped compiling (DRG-613). Later the same evening eight pull requests merged within eight minutes with no run on the combined head. Separately, Jenkins is still unreachable, so the integration (Testcontainers), frontend and `cpq_beta` stages had not run anywhere since the May billing block. That block is gone: a manual `ci.yml` dispatch on 2026-10-16 acquired GitHub-hosted runners for every job (issue #238).

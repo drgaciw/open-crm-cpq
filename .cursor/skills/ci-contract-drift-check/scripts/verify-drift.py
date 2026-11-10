@@ -83,6 +83,8 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
         errors.append(f"{rel} must not trigger on push")
     if not gha_has_run_core(text, "backend-unit"):
         errors.append(f"{rel} missing run-core.sh backend-unit")
+    if "frontend_job:" in contract and not gha_has_run_core(text, "frontend"):
+        errors.append(f"{rel} missing run-core.sh frontend")
     if "verify-drift.py" not in text:
         errors.append(f"{rel} must run verify-drift.py")
     if gha_has_ai_assist(text):

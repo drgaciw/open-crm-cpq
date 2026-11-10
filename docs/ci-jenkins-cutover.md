@@ -54,9 +54,9 @@ On `main` (and release branches as needed):
 
 ## PR gate on GitHub Actions (added 2026-09-28)
 
-`.github/workflows/pr-check.yml` runs on every pull request to `main` and executes the drift check plus `scripts/ci/run-core.sh backend-unit`. It exists because no Jenkins instance was reachable, so `main` had no commit statuses; see ADR-003 section 7.
+`.github/workflows/pr-check.yml` runs on every pull request to `main` and executes the drift check plus `scripts/ci/run-core.sh backend-unit`, and since 2026-11-10 a second job that runs `scripts/ci/run-core.sh frontend`. It exists because no Jenkins instance was reachable, so `main` had no commit statuses; see ADR-003 section 7.
 
-- It is fast and Docker-free. Integration, frontend and AI assist remain Jenkins-only or manual.
+- It is Docker-free. Integration and AI assist remain Jenkins-only or manual.
 - The repository is private and the plan offers no branch protection (the API answers 403), so the check cannot be marked required. Merge only when **Backend Unit (PR gate)** is green: `gh pr checks <n> --watch`.
 - If Jenkins comes back, keep requiring `jenkins/opencrm-cpq-ci` as described above. This job stays as the quick first signal.
 
