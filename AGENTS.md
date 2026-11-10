@@ -93,8 +93,8 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 
 - `*IntegrationTest` classes need Docker; a Docker-less run did not execute them.
 - `scripts/ci/frontend.sh` builds, lints and tests every Nx project (`--all`), but there is no
-  frontend typecheck target and `.github/workflows/pr-check.yml` runs no frontend stage (DRG-527).
-  Frontend does run in the full `ci.yml` matrix and the primary Jenkins Frontend stage. `scripts/ci/backend-unit.sh` runs
+  frontend typecheck target (DRG-527). Frontend runs in `.github/workflows/pr-check.yml` (**Frontend (PR gate)**),
+  the full `ci.yml` matrix and the primary Jenkins Frontend stage. `scripts/ci/backend-unit.sh` runs
   every backend module's unit tests and fails if one starts a Testcontainer; tag Docker tests `integration`.
 - CPQ services are often down during CRM UAT — empty lists or 503 fallbacks are expected then, and prove
   nothing about the feature.

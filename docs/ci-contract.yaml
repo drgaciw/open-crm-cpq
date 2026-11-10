@@ -168,6 +168,11 @@ github_pr_gate:
   runs:
     - python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
     - bash scripts/ci/run-core.sh backend-unit
+  # Second job (ADR-003 section 7, amendment 2026-11-10): the frontend stage, unchanged.
+  frontend_job: frontend
+  frontend_job_name: Frontend (PR gate)
+  frontend_runs:
+    - bash scripts/ci/run-core.sh frontend
   ai_assist: false
   required_check_possible: false
   notes: >-
