@@ -192,6 +192,13 @@ github_main_gate:
   notes: >-
     Same Docker-free stage as the pull-request gate. Must trigger on push to main only, never on
     pull_request. A red run means the merge burst it covered broke main: fix or revert next.
+  # Amendment 2026-11-10: main-verify.yml and the nightly ci.yml each end with a report job that
+  # opens or closes one issue labelled main-red. It is the only job with issues: write.
+  report_script: scripts/ci/report-main-status.sh
+  report_label: main-red
+  report_workflows:
+    - .github/workflows/main-verify.yml
+    - .github/workflows/ci.yml
 
 jenkins:
   file: Jenkinsfile
