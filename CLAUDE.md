@@ -55,7 +55,7 @@ are authoritative and kept current. Do not duplicate them here.
 
 ## Commands
 
-Backend — Maven, **Java 25 / Spring Boot 4.0.6**, 14 modules under `backend/`:
+Backend — Maven, **Java 25 / Spring Boot 4.1.2**, 15 modules under `backend/`:
 
 ```bash
 cd backend
