@@ -111,6 +111,10 @@ def main_gate_errors(repo: Path, contract: str) -> list[str]:
         errors.append(f"{rel} must run verify-drift.py")
     if gha_has_ai_assist(text):
         errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    if "report_script:" in contract:
+        for wf in (rel, ".github/workflows/ci.yml"):
+            if "report-main-status.sh" not in load_text(repo / wf):
+                errors.append(f"{wf} must run scripts/ci/report-main-status.sh (main-red issue)")
     return errors
 
 

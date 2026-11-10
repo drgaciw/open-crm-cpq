@@ -67,6 +67,7 @@ See ADR-003 section 8.
 - `.github/workflows/main-verify.yml` runs **Backend Unit (main)** on every push to `main`. Merges in a burst cancel each other's runs, so the newest head is always the one verified. A red result means the burst it covered broke `main`; fix or revert before the next merge.
 - `.github/workflows/ci.yml` also runs on a nightly schedule (02:17 UTC), so integration (Testcontainers), frontend, `cpq_beta` and the security audit run on `main` once a day while Jenkins is unreachable.
 - Check the latest result: `gh run list --workflow main-verify.yml --branch main --limit 1` and `gh run list --workflow ci.yml --limit 1`.
+- Since 2026-11-10 a red run on `main` (either workflow) opens an issue labelled `main-red`, and the next green run closes it: `gh issue list --label main-red`.
 
 ## Manual GHA fallback
 

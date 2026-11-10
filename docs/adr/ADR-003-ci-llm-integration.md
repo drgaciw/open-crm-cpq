@@ -98,6 +98,8 @@ Jenkins publishes GitHub commit status context **`jenkins/opencrm-cpq-ci`** when
 
 **Procedure.** A red **Backend Unit (main)** or nightly run is treated like a broken build: the next merge to `main` is the fix or a revert.
 
+**Amendment 2026-11-10: red main opens an issue.** The procedure above depended on someone looking at the Actions tab. `main` was red from 2026-11-07 to 2026-11-10 with nobody told, while merges continued. `main-verify.yml` and the nightly `ci.yml` now end with a **Report main status** job that runs `scripts/ci/report-main-status.sh`: a failed run on `main` opens one issue labelled `main-red` per workflow (or comments on the open one), and the next green run closes it. Cancelled runs report nothing. The job uses the workflow's own `GITHUB_TOKEN` with `issues: write`; the build jobs keep `contents: read` only, and no configured secret is involved. `cancel-in-progress` is unchanged.
+
 Machine-readable stage names, job `needs`, and Jenkins stage mapping: **[docs/ci-contract.yaml](../ci-contract.yaml)**.
 
 ## Consequences

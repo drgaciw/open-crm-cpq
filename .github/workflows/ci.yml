@@ -129,3 +129,20 @@ jobs:
           cache: maven
       - name: Security audit
         run: bash scripts/ci/run-core.sh security-audit
+
+  report:
+    name: Report main status
+    needs: [shared-libraries, backend-unit, backend-integration, cpq-beta-python, frontend, security-audit]
+    # Only the nightly/manual run on main reports; a cancelled run says nothing about main.
+    if: ${{ always() && github.ref == 'refs/heads/main' && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Open or close the main-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/report-main-status.sh "${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}"
