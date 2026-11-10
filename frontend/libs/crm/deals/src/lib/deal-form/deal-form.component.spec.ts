@@ -18,7 +18,7 @@ describe('DealFormComponent amount validation (chaos)', () => {
     await TestBed.configureTestingModule({
       imports: [DealFormComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: '**', children: [] }]),
         provideNoopAnimations(),
         {
           provide: DealService,
