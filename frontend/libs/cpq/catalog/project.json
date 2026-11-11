@@ -11,16 +11,13 @@
   ],
   "targets": {
     "test": {
-      "executor": "@nx/vitest:test",
       "outputs": [
-        "{options.reportsDirectory}"
+        "{projectRoot}/{options.coverage.reportsDirectory}",
+        "{workspaceRoot}/coverage/libs/cpq/catalog"
       ],
       "options": {
-        "reportsDirectory": "{projectRoot}/../../../coverage/libs/cpq/catalog"
+        "coverage.reportsDirectory": "../../../coverage/libs/cpq/catalog"
       }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint"
     }
   }
 }

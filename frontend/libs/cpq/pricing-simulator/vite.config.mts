@@ -8,6 +8,9 @@ export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../../node_modules/.vite/libs/cpq/pricing-simulator',
   plugins: [angular(), nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
+  resolve: {
+    tsconfigPaths: true,
+  },
   test: {
     name: 'cpq-pricing-simulator',
     watch: false,
