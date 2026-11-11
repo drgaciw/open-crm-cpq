@@ -13,6 +13,7 @@ import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
+import com.opencrm.common.event.dto.PolicyDefinedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
@@ -204,6 +205,10 @@ public final class EventContractRegistry {
     public static final EventContract SOLUTION_DERIVED_V1 = published(
             "SolutionDerived", "crm-service", KafkaTopics.SOLUTION_DERIVED, SolutionDerivedEvent.class);
 
+    /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
+    public static final EventContract POLICY_DEFINED_V1 = published(
+            "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -234,7 +239,8 @@ public final class EventContractRegistry {
             HIERARCHY_CHANGED_V1,
             TERRITORY_ASSIGNED_V1,
             ACCOUNTS_MERGED_V1,
-            SOLUTION_DERIVED_V1);
+            SOLUTION_DERIVED_V1,
+            POLICY_DEFINED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

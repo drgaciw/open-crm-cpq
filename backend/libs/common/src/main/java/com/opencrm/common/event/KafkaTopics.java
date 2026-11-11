@@ -73,4 +73,7 @@ public final class KafkaTopics {
 
     /** DRG-487 / BC-13-03. Advisory solution derived from a guided selling session. */
     public static final String SOLUTION_DERIVED = "cpq.crm.opportunity.solution-derived";
+
+    /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
+    public static final String POLICY_DEFINED = "cpq.approval.policy.defined";
 }
