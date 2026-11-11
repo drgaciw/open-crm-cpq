@@ -7,12 +7,12 @@ schema_version: "1"
 repository: open-crm-cpq
 last_reviewed: "2026-11-11"
 
-# JDK2 toolchain pins (GHA + Jenkins Maven/Node). Jenkins WAR stays on lts-jdk21.
+# JDK2 toolchain pins (GHA + Jenkins Maven/Node). Jenkins controller image is 2.580.2-lts-jdk25.
 toolchain:
   java_version: "25"
   java_distribution: temurin
   node_version: "24.22.3"
-  jenkins_war_image: jenkins/jenkins:2.492.3-lts-jdk21
+  jenkins_war_image: jenkins/jenkins:2.580.2-lts-jdk25
   jenkins_maven_java_home: /opt/java/temurin-25
   service_runtime_image: eclipse-temurin:25-jre-alpine
 
@@ -213,7 +213,7 @@ jenkins:
   agent: any
   github_status_context: jenkins/opencrm-cpq-ci
   toolchain_note: >-
-    Jenkins-only; no GHA equivalent job. Controller WAR is 2.492.3-lts-jdk21;
+    Jenkins-only; no GHA equivalent job. Controller WAR is 2.580.2-lts-jdk25;
     Maven JAVA_HOME is Temurin 25; Node 24.22.3 LTS. Do not move Jenkins core to JDK 27.
   stages_ordered:
     - name: Checkout
