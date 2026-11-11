@@ -20,7 +20,9 @@ else
 fi
 
 (
-  ci_mvn -B org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=9 --no-transfer-progress \
+  # Fully-qualified pin matches GHA nightly (DRG-673). No -DfailBuildOnCVSS override —
+  # threshold comes from backend/pom.xml property dependency-check.failBuildOnCVSS.
+  ci_mvn -B org.owasp:dependency-check-maven:12.1.3:check --no-transfer-progress \
     || { echo "OWASP check complete with findings or scanner issue"; AUDIT_FAILED=1; }
 )
 
