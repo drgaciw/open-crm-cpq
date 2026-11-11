@@ -23,6 +23,7 @@
         <module>libs/security</module>
         <module>libs/rules-engine</module>
         <module>libs/jev-decision</module>
+        <module>libs/audit</module>
         <module>services/crm-service</module>
         <module>services/gateway-service</module>
         <module>services/pricing-service</module>
@@ -133,6 +134,11 @@
             <dependency>
                 <groupId>com.opencrm</groupId>
                 <artifactId>jev-decision</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.opencrm</groupId>
+                <artifactId>audit</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
