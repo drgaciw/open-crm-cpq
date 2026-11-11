@@ -46,7 +46,7 @@ spring:
             - id: crm-service
               uri: ${CRM_SERVICE_URI:http://localhost:8081}
               predicates:
-                - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/playbooks/**,/api/v1/guided-sessions/**,/api/v1/activities/**
+                - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/playbooks/**,/api/v1/guided-sessions/**,/api/v1/activities/**,/api/v1/audit-entries/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -450,7 +450,7 @@ spring:
             - id: crm-service
               uri: http://localhost:8081
               predicates:
-                - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/playbooks/**,/api/v1/guided-sessions/**,/api/v1/activities/**
+                - Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/playbooks/**,/api/v1/guided-sessions/**,/api/v1/activities/**,/api/v1/audit-entries/**
               filters:
                 - name: CircuitBreaker
                   args:
