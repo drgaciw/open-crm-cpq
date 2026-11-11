@@ -1,0 +1,33 @@
+package replay;
+import com.opencrm.pricing.waterfall.PricingLineResult;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+rule "Recorded pricing models"
+no-loop true
+when
+    $line : PricingLineResult(pricedPeriods == null)
+then
+    String model = String.valueOf($line.getMetadata().get("model"));
+    int quantity = $line.getQuantity();
+    BigDecimal price = $line.getListPrice();
+    BigDecimal gross = price.multiply(BigDecimal.valueOf(quantity));
+    BigDecimal net = gross;
+    if (model.equals("VOLUME")) {
+        net = gross.multiply(new BigDecimal(quantity >= 100 ? "0.82" : "0.93"));
+    } else if (model.equals("TIERED")) {
+        net = price.multiply(BigDecimal.valueOf(Math.min(quantity, 10)))
+            .add(price.multiply(new BigDecimal("0.80")).multiply(BigDecimal.valueOf(Math.max(0, quantity - 10))));
+    } else if (model.equals("STAIRSTEP")) {
+        net = price.multiply(BigDecimal.valueOf((quantity + 9) / 10));
+    } else if (model.equals("PROMOTION")) {
+        net = gross.multiply(new BigDecimal("0.875"));
+    } else if (model.equals("DISCOUNT")) {
+        net = gross.subtract(new BigDecimal("1.005")).max(BigDecimal.ZERO);
+    }
+    net = net.setScale(2, RoundingMode.HALF_UP);
+    $line.setFinalPrice(net);
+    $line.setUnitPrice(net.divide(BigDecimal.valueOf(quantity), 4, RoundingMode.HALF_UP));
+    $line.setDiscountAmount(gross.subtract(net));
+    $line.setDiscountRate(gross.signum() == 0 ? BigDecimal.ZERO : gross.subtract(net).divide(gross, 4, RoundingMode.HALF_UP));
+    $line.getExplanationCodes().add("RECORDED_" + model);
+end
