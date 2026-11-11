@@ -14,9 +14,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * - Contacts and Organizations
  * - Leads with lifecycle tracking
  * - Deals/Opportunities with pipeline stages
- * <p>
- * Extended activities (tasks, calls, notes) are planned; the API gateway does not route
- * {@code /api/v1/activities} to this service until that slice is implemented.
+ * - Activity timeline notes and tasks ({@code /api/v1/activities}). Email and meeting
+ *   rows are reserved for mailbox ingestion (DRG-521) and are not created here.
  */
 @SpringBootApplication(scanBasePackages = {"com.opencrm.crm", "com.opencrm.common"})
 @EntityScan(basePackages = {"com.opencrm.crm", "com.opencrm.common"})

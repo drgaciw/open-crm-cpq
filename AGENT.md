@@ -16,7 +16,7 @@
 | AI | None | `ai-service` AgentRouter; **runtime** Azure OpenAI `gpt-4o` (`application.yml`) | [ADR-014](docs/adr/ADR-014-jev-openrouter-model-selection.md): Jev selects qualifying OpenRouter models at lowest total cost; **implemented behind a disabled flag; live rollout pending**; supersedes GLM-5 ADR-002 |
 | Rules | None | Drools DRL on pricing-service; CE `ProductRuleEvaluationCore`; OpenL **not** required for forge | OpenL Tablets + full Drools |
 
-**Current implementation status (2026-09-13):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities API **does not exist**; its hold was lifted on 2026-11-03 under [ADR-030](docs/adr/ADR-030-activity-timeline-and-mailbox-ingestion.md), which does not authorize implementation by itself. Do not add a phantom route. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
+**Current implementation status (baseline 2026-09-13; activity note updated 2026-11-11):** **Not early stage.** Forge waves **A–V COMPLETE** on `main`; hygiene N′ COMPLETE; Wave T **skipped**; **Wave W** this closeout (W1∥W2∥W3 BE DTO wraps — configuration-session / approval-routing / document-job; W4 Accept ADR-006 — [35-wave-w-architecture.md](docs/forge/35-wave-w-architecture.md)). Controllers, services, repositories, Flyway, Vitest, and Maven tests **exist**. Angular CRM scaffold **exists** (`frontend/apps/crm`). Dual-read default remains `${APPROVALS_LEGACY_LOCAL_READ:true}` (**HIGH** to flip; hold **J–W**). Activities note and task API exists under `/api/v1/activities` (DRG-520 slice; email, meeting, and mailbox ingestion are still open). Do not add a mailbox route. N residual **R1** landed in Q2; **R2** price-book list-row delete still **HELD**; no N′′.
 
 ---
 
@@ -182,6 +182,11 @@ Nx workspace structure:
 - Branch naming: `{type}/{ticket-id}-{short-description}` (e.g., `feat/CRM-42-lead-scoring`)
 - Commit messages: Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`)
 - PRs require: passing CI, code review, no security warnings
+- **PR stacking (default):** Agents stack independent, small PRs two to three deep by default (each PR builds on the previous one's branch; each is reviewable alone), instead of opening every story as a separate PR off `main` at once.
+  - Wave plans group stories into stacks of 2–3 at intake.
+  - Stop stacking (start a new stack off `main`, or serialize) when a PR touches a shared file — e.g. `EventContractRegistry`, `KafkaTopics`, `EventContractRegistryTest`, a service's Flyway migration sequence, gateway `proxy.conf.json` / CSRF / routes, CI workflows, Jenkins, `docs/ci-contract.yaml` — or a service another lane needs.
+  - CPQ Decision checks every stack for shared-file boundaries **before dispatch**, not after; a flagged stack is split or serialized before launch.
+  - Stacks merge bottom-up. Each PR still needs the required checks (**Backend Unit**, **Frontend**, **Frontend npm audit**) green on an up-to-date branch.
 
 ---
 
@@ -230,7 +235,7 @@ Before marking any task as complete, verify:
 | CI | Jenkins primary; GHA manual — [ADR-003](docs/adr/ADR-003-ci-llm-integration.md) | — |
 | DB | Shared PostgreSQL, separate schemas | — |
 | Search | CRM/quote list+PageInfo over gateway; **not** Elasticsearch in tree | Elasticsearch 8 (target) |
-| Activities | **No** schema/controller | Hold lifted; [ADR-030](docs/adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) design and DRG-520 |
+| Activities | Note and task API `/api/v1/activities` (DRG-520 slice) | Email, meeting, mailbox ingestion, and the Angular client are still open |
 | GraphQL | **Not** in tree | Optional later |
 | PDF | Quote-service Thymeleaf/OpenHTML documents API | — |
 
