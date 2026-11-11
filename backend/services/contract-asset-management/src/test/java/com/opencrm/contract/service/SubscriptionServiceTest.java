@@ -1,5 +1,6 @@
 package com.opencrm.contract.service;
 
+import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.contract.acl.ErpAdapter;
 import com.opencrm.contract.acl.ErpSyncException;
@@ -21,9 +22,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,8 +50,15 @@ class SubscriptionServiceTest {
 
     @Mock private SubscriptionRateApplyService rateApply;
 
+    @Mock
+    private CancellationNoticePolicy cancellationNotice;
+
     @InjectMocks
     private SubscriptionService subscriptionService;
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 6, 1);
+    private static final Clock CLOCK = Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+    private static final int NOTICE_DAYS = 30;
 
     private Subscription pendingSubscription;
 
@@ -183,6 +194,121 @@ class SubscriptionServiceTest {
         assertEquals(initial, pendingSubscription.getStatus());
         verify(subscriptionRepository, never()).save(any());
         verifyNoInteractions(erpAdapter, subscriptionMapper);
+    }
+
+    @Test
+    @DisplayName("cancel inside the notice window is rejected and not persisted")
+    void cancelInsideNoticeWindowIsRejectedAndNotPersisted() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        pendingSubscription.setEndDate(TODAY.plusDays(1));
+        stubLoad();
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> noticeService(NOTICE_DAYS).cancel(1L));
+
+        assertEquals(CancellationNoticePolicy.ERROR_CODE, ex.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(SubscriptionStatus.ACTIVE, pendingSubscription.getStatus());
+        verify(subscriptionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("cancel outside the notice window sets CANCELLED immediately")
+    void cancelOutsideNoticeWindowSetsCancelled() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        LocalDate endDate = TODAY.plusDays(NOTICE_DAYS + 10);
+        pendingSubscription.setEndDate(endDate);
+        stubPersist();
+
+        SubscriptionDto cancelled = noticeService(NOTICE_DAYS).cancel(1L);
+
+        assertEquals(SubscriptionStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(SubscriptionStatus.CANCELLED, pendingSubscription.getStatus());
+        assertEquals(endDate, pendingSubscription.getEndDate());
+        verify(subscriptionRepository).save(pendingSubscription);
+    }
+
+    @Test
+    @DisplayName("cancel on the exact boundary day sets CANCELLED")
+    void cancelOnExactBoundaryDaySetsCancelled() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        pendingSubscription.setEndDate(TODAY.plusDays(NOTICE_DAYS));
+        stubPersist();
+
+        SubscriptionDto cancelled = noticeService(NOTICE_DAYS).cancel(1L);
+
+        assertEquals(SubscriptionStatus.CANCELLED, cancelled.getStatus());
+    }
+
+    @Test
+    @DisplayName("cancel one day past the boundary is rejected")
+    void cancelOneDayPastBoundaryIsRejected() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        pendingSubscription.setEndDate(TODAY.plusDays(NOTICE_DAYS - 1));
+        stubLoad();
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> noticeService(NOTICE_DAYS).cancel(1L));
+
+        assertEquals(CancellationNoticePolicy.ERROR_CODE, ex.getErrorCode());
+        assertEquals(SubscriptionStatus.ACTIVE, pendingSubscription.getStatus());
+        verify(subscriptionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("null endDate skips the notice guard and cancels")
+    void cancelWithNullEndDateSkipsNoticeGuard() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        pendingSubscription.setEndDate(null);
+        stubPersist();
+
+        SubscriptionDto cancelled = noticeService(NOTICE_DAYS).cancel(1L);
+
+        assertEquals(SubscriptionStatus.CANCELLED, cancelled.getStatus());
+        assertNull(pendingSubscription.getEndDate());
+    }
+
+    @Test
+    @DisplayName("notice-days 0 still cancels after endDate")
+    void zeroNoticeDaysStillCancelsAfterEndDate() {
+        pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
+        pendingSubscription.setEndDate(TODAY.minusDays(1));
+        stubPersist();
+
+        SubscriptionDto cancelled = noticeService(0).cancel(1L);
+
+        assertEquals(SubscriptionStatus.CANCELLED, cancelled.getStatus());
+    }
+
+    @Test
+    @DisplayName("notice-days 0 still refuses a terminal status")
+    void zeroNoticeDaysKeepsTheStatusGuard() {
+        pendingSubscription.setStatus(SubscriptionStatus.CANCELLED);
+        pendingSubscription.setEndDate(TODAY.minusDays(1));
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+
+        assertThrows(IllegalStateException.class, () -> noticeService(0).cancel(1L));
+        assertEquals(SubscriptionStatus.CANCELLED, pendingSubscription.getStatus());
+        verify(subscriptionRepository, never()).save(any());
+    }
+
+    private SubscriptionService noticeService(int noticeDays) {
+        return new SubscriptionService(
+                subscriptionRepository,
+                erpAdapter,
+                subscriptionMapper,
+                rateApply,
+                new CancellationNoticePolicy(noticeDays, CLOCK));
+    }
+
+    private void stubLoad() {
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+    }
+
+    private void stubPersist() {
+        stubLoad();
+        when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(subscriptionMapper.toDto(any(Subscription.class))).thenAnswer(inv -> dto(inv.getArgument(0)));
     }
 
     private static SubscriptionDto dto(Subscription s) {

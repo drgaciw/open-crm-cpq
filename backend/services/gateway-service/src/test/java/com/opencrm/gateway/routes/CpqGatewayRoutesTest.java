@@ -242,6 +242,8 @@ class CpqGatewayRoutesTest {
                 "CRM playbooks must route to crm-service");
         assertTrue(yaml.contains("/api/v1/guided-sessions/**"),
                 "CRM guided selling must route to crm-service");
+        assertEquals(2, countOf(yaml, "/api/v1/activities/**"),
+                "CRM activities must route to crm-service on the default and dev profiles");
         assertTrue(yaml.contains("Path=/api/v1/erp/**"),
                 "ERP agent-contract paths must hit erp-stub");
     }
@@ -385,6 +387,20 @@ class CpqGatewayRoutesTest {
         List<String> names = new ArrayList<>();
         iterator.forEachRemaining(names::add);
         return names;
+    }
+
+    private static int countOf(String haystack, String needle) {
+        int count = 0;
+        int from = 0;
+        while (from <= haystack.length() - needle.length()) {
+            int found = haystack.indexOf(needle, from);
+            if (found < 0) {
+                return count;
+            }
+            count++;
+            from = found + needle.length();
+        }
+        return count;
     }
 
     private static boolean matchesAnyGatewayPattern(String examplePath) {
