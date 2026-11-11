@@ -8,7 +8,7 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 
 ## Pre-cutover
 
-- [ ] Gateway routes for CRM are only: `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` (no phantom `/api/v1/activities/**` — **deferred**; see [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities-deferred)).
+- [ ] Gateway CRM paths include leads, deals, contacts, organizations, playbooks, guided sessions, and `/api/v1/activities/**` only because the note/task controller and `V18__activities.sql` exist (see [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities)). Do not add `/api/v1/mailboxes/**`.
 - [ ] `CRM_SERVICE_URI` in gateway / compose / deployment targets the intended `crm-service` instance ([CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md)).
 - [ ] Database: `crm` schema migrations applied; **backup** taken (owner + time boxed).
 - [ ] Redis: available to `crm-service` and `quote-service` (pub/sub channel `quote:accepted`).
@@ -58,8 +58,7 @@ Use this list before and after promoting `crm-service` as the only CRM API behin
 
 - [ ] Inventory `cpq_beta` CRM APIs and DocTypes vs Spring `crm-service` — expect a **large capability gap** list.
 - [ ] **Do not** big-bang Frappe: pick **one vertical** (e.g. read-only activities feed or notes), design migration + `crm-service` API, own plan.
-- [ ] **Activities API (deferred for cutover):** legacy reference `cpq_beta/crm/api/activities.py`. No Spring controller/schema yet — decision recorded in [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities-deferred).
-- [ ] Revisit gateway: add `/api/v1/activities/**` **only** when a **real** controller + schema exist (never stub a phantom route).
+- [ ] **Activities API (DRG-520 slice):** notes and tasks on `/api/v1/activities/**` with `V18__activities.sql`. Email, meeting, and mailbox ingestion are still open (DRG-521). Legacy reference `cpq_beta/crm/api/activities.py`. See [CRM_API_PARITY.md § Activities](./CRM_API_PARITY.md#activities).
 
 ---
 

@@ -273,7 +273,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | Identity | Entra ID login at the gateway BFF; every service a resource server ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md) steps 0–3) | Actor integrity and role checks (step 4); go-live gate: app registrations, workload identities, consent (step 5) |
 | Search | CRM/quote list + `PageInfo` over gateway | Elasticsearch 8 **not in tree** |
 | Comms | Gateway stubs `/api/v1/emails/**` etc. → `communication-service` (**not** in Maven reactor) | Twilio / SendGrid / WhatsApp hub. **#430 on `main` — do not undo** |
-| Activities | **No** schema, controller, or FE yet | Unheld 2026-11-03 per ADR-030 (DRG-520) |
+| Activities | Note and task schema, controller, and gateway predicate (DRG-520). No FE client | Email, meeting, and mailbox ingestion still open (ADR-030 / DRG-521) |
 
 **Forge status:** Waves **A–W COMPLETE** on `main`; hygiene N′ COMPLETE; Wave **T skipped** (do not name T1/T2). Not early stage.
 
