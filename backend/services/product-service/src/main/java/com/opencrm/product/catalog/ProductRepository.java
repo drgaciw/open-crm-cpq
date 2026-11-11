@@ -17,7 +17,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByUuidAndDeletedFalse(String uuid);
 
-    Optional<Product> findBySkuAndDeletedFalse(String sku);
+    /**
+     * DRG-418: SKU is unique per tenant, not globally. {@code tenantId} may be null (service tokens, dev mode,
+     * rows from before tenant scoping); Postgres and JPQL both treat {@code null = null} as unknown, so the
+     * null-tenant bucket is matched explicitly rather than with a plain equality.
+     */
+    @Query("SELECT p FROM Product p WHERE p.deleted = false AND p.sku = :sku AND "
+           + "((:tenantId IS NULL AND p.tenantId IS NULL) OR p.tenantId = :tenantId)")
+    Optional<Product> findByTenantIdAndSkuAndDeletedFalse(@Param("tenantId") String tenantId, @Param("sku") String sku);
 
     Page<Product> findByDeletedFalse(Pageable pageable);
 
@@ -35,5 +42,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByIdInAndDeletedFalse(List<Long> ids);
 
-    boolean existsBySkuAndDeletedFalse(String sku);
+    /** DRG-418: uniqueness check behind DefineProduct, scoped the same way as {@link #findByTenantIdAndSkuAndDeletedFalse}. */
+    @Query("SELECT COUNT(p) > 0 FROM Product p WHERE p.deleted = false AND p.sku = :sku AND "
+           + "((:tenantId IS NULL AND p.tenantId IS NULL) OR p.tenantId = :tenantId)")
+    boolean existsByTenantIdAndSkuAndDeletedFalse(@Param("tenantId") String tenantId, @Param("sku") String sku);
 }

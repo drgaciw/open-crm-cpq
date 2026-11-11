@@ -3,7 +3,9 @@ package com.opencrm.product.catalog;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
+import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
+import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +32,9 @@ public class ProductService {
     public ProductDto create(ProductCreateRequest request) {
         log.debug("Creating product with SKU: {}", request.getSku());
 
-        if (productRepository.existsBySkuAndDeletedFalse(request.getSku())) {
+        // DRG-418: SKU is unique per tenant, not globally.
+        String tenantId = ProductTenantResolver.currentTenantId();
+        if (productRepository.existsByTenantIdAndSkuAndDeletedFalse(tenantId, request.getSku())) {
             throw new BusinessException(
                     "Product with SKU " + request.getSku() + " already exists",
                     "DUPLICATE_SKU"
@@ -38,8 +42,26 @@ public class ProductService {
         }
 
         Product product = productMapper.toEntity(request);
+        product.setTenantId(tenantId);
         Product saved = productRepository.save(product);
         log.info("Created product with ID: {}", saved.getId());
+
+        // DRG-418 / BC-01-01: DefineProduct emits ProductDefined.
+        outboxEventPublisher.publish(
+                "Product",
+                saved.getId().toString(),
+                EventContractRegistry.PRODUCT_DEFINED_V1,
+                new ProductDefinedEvent(
+                        saved.getId().toString(),
+                        saved.getSku(),
+                        saved.getName(),
+                        saved.getUnitOfMeasure(),
+                        saved.getStatus().name(),
+                        saved.getEffectiveFrom(),
+                        saved.getEffectiveTo(),
+                        Instant.now()
+                )
+        );
 
         return productMapper.toDto(saved);
     }
@@ -52,10 +74,13 @@ public class ProductService {
         return productMapper.toDto(product);
     }
 
-    @Cacheable(value = "products-by-sku", key = "#sku")
+    // DRG-418: SKU lookup is scoped to the caller's tenant, matching create's uniqueness scope; the cache key
+    // includes the tenant so one tenant's cache entry is never served to another.
+    @Cacheable(value = "products-by-sku", key = "T(com.opencrm.product.catalog.ProductTenantResolver).currentTenantId() + ':' + #sku")
     @Transactional(readOnly = true)
     public ProductDto getBySku(String sku) {
-        Product product = productRepository.findBySkuAndDeletedFalse(sku)
+        String tenantId = ProductTenantResolver.currentTenantId();
+        Product product = productRepository.findByTenantIdAndSkuAndDeletedFalse(tenantId, sku)
                 .orElseThrow(() -> new ResourceNotFoundException("Product with SKU: " + sku));
         return productMapper.toDto(product);
     }
@@ -67,9 +92,39 @@ public class ProductService {
         Product product = productRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
+        // DRG-418: the generic revise endpoint can still change status directly (pre-existing shape, kept for the
+        // CRM product-detail form), but LifecycleState transitions must be legal even here, not only through the
+        // dedicated activate/deprecate/retire endpoints.
+        ProductStatus currentStatus = product.getStatus();
         productMapper.updateEntity(request, product);
+        ProductStatus requestedStatus = request.getStatus();
+        if (requestedStatus != null && requestedStatus != currentStatus
+                && !Product.isLegalTransition(currentStatus, requestedStatus)) {
+            throw new BusinessException(
+                    "Cannot transition product from " + currentStatus + " to " + requestedStatus,
+                    "INVALID_STATUS_TRANSITION"
+            );
+        }
+
         Product updated = productRepository.save(product);
         publishProductUpdated(updated, "UPDATED");
+
+        // DRG-418 / BC-01-01: ReviseProduct emits ProductRevised.
+        outboxEventPublisher.publish(
+                "Product",
+                updated.getId().toString(),
+                EventContractRegistry.PRODUCT_REVISED_V1,
+                new ProductRevisedEvent(
+                        updated.getId().toString(),
+                        updated.getSku(),
+                        updated.getUnitOfMeasure(),
+                        updated.getStatus().name(),
+                        updated.getEffectiveFrom(),
+                        updated.getEffectiveTo(),
+                        Instant.now()
+                )
+        );
+
         log.info("Updated product ID: {}", updated.getId());
 
         return productMapper.toDto(updated);
@@ -114,11 +169,8 @@ public class ProductService {
         Product product = productRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
-        if (product.getStatus() == ProductStatus.RETIRED) {
-            throw new BusinessException("Cannot activate a retired product", "INVALID_STATUS_TRANSITION");
-        }
-
-        product.setStatus(ProductStatus.ACTIVE);
+        // DRG-418: Draft -> Active only, enforced by the entity's state machine (Product.isLegalTransition).
+        product.activate();
         Product updated = productRepository.save(product);
         publishProductUpdated(updated, "PUBLISHED");
         log.info("Activated product ID: {}", id);
@@ -130,11 +182,8 @@ public class ProductService {
         Product product = productRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
-        if (product.getStatus() != ProductStatus.ACTIVE) {
-            throw new BusinessException("Only active products can be deprecated", "INVALID_STATUS_TRANSITION");
-        }
-
-        product.setStatus(ProductStatus.DEPRECATED);
+        // Active -> Deprecated only, enforced by the entity's state machine (Product.isLegalTransition).
+        product.deprecate();
         Product updated = productRepository.save(product);
         log.info("Deprecated product ID: {}", id);
         return productMapper.toDto(updated);
