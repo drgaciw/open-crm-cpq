@@ -17,6 +17,8 @@ public interface ProductMapper {
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "retiredAt", ignore = true)
     @Mapping(target = "retirementReason", ignore = true)
+    // tenantId is never taken from a request body (DRG-418); ProductService sets it from ProductTenantResolver.
+    @Mapping(target = "tenantId", ignore = true)
     @Mapping(target = "status", constant = "DRAFT")
     Product toEntity(ProductCreateRequest request);
 
@@ -33,6 +35,8 @@ public interface ProductMapper {
     @Mapping(target = "deleted", ignore = true)
     @Mapping(target = "retiredAt", ignore = true)
     @Mapping(target = "retirementReason", ignore = true)
+    // Immutable identity: SKU and tenant never change on revise (DRG-418).
+    @Mapping(target = "tenantId", ignore = true)
     void updateEntity(ProductUpdateRequest request, @MappingTarget Product product);
 
     List<ProductDto> toDtoList(List<Product> products);

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -28,6 +29,8 @@ public class ProductDto {
     private String currency;
     private BillingFrequency billingFrequency;
     private String unitOfMeasure;
+    private LocalDate effectiveFrom;
+    private LocalDate effectiveTo;
     private boolean configurable;
     private boolean bundle;
     private String metadata;

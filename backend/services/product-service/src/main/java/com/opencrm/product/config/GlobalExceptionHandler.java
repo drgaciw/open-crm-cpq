@@ -62,6 +62,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(response);
     }
 
+    // DRG-418: Product's lifecycle state machine (activate/deprecate/retire) rejects an illegal transition with
+    // IllegalStateException. A rejected transition is a conflict with the resource's current state, not a
+    // malformed request or an unexpected server failure.
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        logger.warn("Illegal state transition: {} [traceId={}]", ex.getMessage(), traceId);
+        ApiResponse<Void> response = ApiResponse.error(ex.getMessage(), "INVALID_STATUS_TRANSITION", traceId);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(ConstraintViolationException ex) {
         String traceId = MDC.get(TRACE_ID_KEY);
