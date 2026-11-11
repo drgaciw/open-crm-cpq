@@ -7,7 +7,9 @@ import lombok.experimental.SuperBuilder;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Configuration session entity - maintains session-safe configuration state.
@@ -44,6 +46,13 @@ public class ConfigurationSession extends BaseEntity {
     @Column(name = "option_value")
     @Builder.Default
     private Map<String, String> selections = new HashMap<>();
+
+    /** Selection keys inserted by ApplyDefaults; explicit seller edits remove the marker. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "configuration_default_selections", joinColumns = @JoinColumn(name = "session_id"))
+    @Column(name = "option_key", nullable = false)
+    @Builder.Default
+    private Set<String> defaultedSelectionKeys = new HashSet<>();
     
     @Column(name = "is_valid", nullable = false)
     @Builder.Default
@@ -60,11 +69,13 @@ public class ConfigurationSession extends BaseEntity {
     
     public void addSelection(String optionKey, String optionValue) {
         this.selections.put(optionKey, optionValue);
+        this.defaultedSelectionKeys.remove(optionKey);
         this.valid = false; // Invalidate until re-validated
     }
     
     public void removeSelection(String optionKey) {
         this.selections.remove(optionKey);
+        this.defaultedSelectionKeys.remove(optionKey);
         this.valid = false;
     }
     

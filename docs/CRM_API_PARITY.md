@@ -1,8 +1,8 @@
 # CRM API ↔ frontend parity
 
-**Scope:** `com.opencrm.crm` controllers (`LeadController`, `DealController`, `ContactController`, `OrganizationController`) vs `frontend/libs/crm/**` HTTP usage and `frontend/libs/shared/models/**` types.
+**Scope:** `com.opencrm.crm` controllers (`LeadController`, `DealController`, `ContactController`, `OrganizationController`, `ActivityController`) vs `frontend/libs/crm/**` HTTP usage and frontend model types.
 
-**Last verified:** forge Wave B5 / W1-08 (`b2-parity-docs`) — Batch 0 search contract + activities deferral encoded. No Java/FE app changes in that wave.
+**Last verified:** DRG-520 local implementation, 2026-11-05 — bounded activity API/table/gateway predicate/client added; provider ingestion remains DRG-521. Existing four-resource inventory below retains the forge baseline.
 
 **Gap rules (from cutover plan):**
 
@@ -11,7 +11,7 @@
 | API route with **no** FE caller | Candidate to **deprecate**, mark **internal-only** (e.g. Postman/Swagger), or **add** to UI later. |
 | FE call with **no** matching API row | **Bug** or **wrong base URL** / gateway route. |
 
-**Gateway:** Angular apps should use the **gateway** (default dev: `http://localhost:8080`); `crm-service` direct port **8081** is for debugging only. CRM predicates are only `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` — see [Activities (deferred)](#activities-deferred).
+**Gateway:** Angular apps should use the **gateway** (default dev: `http://localhost:8080`); `crm-service` direct port **8081** is for debugging only. CRM predicates include `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` and `/api/v1/activities/**` — see [Activities](#activities).
 
 ---
 
@@ -56,7 +56,7 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | GET | `/api/v1/organizations/search` | `search` (`q`, pageable) |
 | GET | `/api/v1/organizations/{id}/contacts` | `getContacts` |
 
-**Count:** 35 routes. There is **no** `/api/v1/activities/**` controller or inventory row (intentional — see [Activities (deferred)](#activities-deferred)).
+**Count:** 35 baseline routes above plus four activity routes below; the inventory is not a count of newer unrelated CRM capabilities.
 
 ---
 
@@ -139,24 +139,31 @@ Lead/Deal search previously put a Spring `Page` inside `data`. Batch 0 (`feat/fo
 
 ---
 
-## Activities (deferred)
+## Activities
 
-**Decision:** The Activities hold was lifted on 2026-11-03. [ADR-030](adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) assigns ownership to `crm-service` but does not itself authorize code, schema or paths. The inventory below describes the current implementation, not a continuing hold.
+**Decision:** [ADR-030](adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) is Accepted and the Activities hold was lifted on 2026-11-03. DRG-520 implements manually recorded NOTE, TASK, EMAIL references and MEETING references together with a real table/controller, gateway predicate and frontend HTTP client. [Delivery contract and evidence](plans/drg-520-activity-timeline-20261105.md).
+
+| HTTP/path | Controller / frontend client |
+|---|---|
+| POST `/api/v1/activities` | `ActivityController.create` / `ActivityApiService.create` |
+| GET `/api/v1/activities` | `ActivityController.timeline` / `ActivityApiService.list`; subject filters, page/size |
+| GET `/api/v1/activities/{id}` | `ActivityController.getById` / `ActivityApiService.getById` |
+| POST `/api/v1/activities/{id}/complete` | `ActivityController.complete` / `ActivityApiService.complete` |
 
 | Layer | State |
-|-------|--------|
-| `crm-service` | No `Activity*` entity, controller, or Flyway table |
-| Gateway | **No** `/api/v1/activities/**` predicate yet — [CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md), [CRM_CUTOVER_CHECKLIST.md](./CRM_CUTOVER_CHECKLIST.md) |
-| FE | No activities HTTP client under `frontend/libs/crm` |
-| Legacy | `cpq_beta/crm/api/activities.py` (`get_activities` for CRM Deal / CRM Lead) — Phase 2 / Frappe inventory only |
-| App comment | `CrmServiceApplication` notes activities are planned and gateway must not route until implemented |
+|---|---|
+| `crm-service` | New `com.opencrm.crm.activity` package; `V16__activity_timeline.sql` (local allocation; reconcile before push) |
+| Gateway | `/api/v1/activities/**` CRM predicate in default/dev configuration; existing token relay/CSRF posture |
+| FE | `frontend/libs/crm/activities` exports the typed HTTP client/model; no timeline screen added |
+| Legacy | `cpq_beta/crm/api/activities.py` `get_activities` maps conceptually to GET timeline for deals; legacy lead-only activity/todo/communication aggregation is not reimplemented |
 
-**Cutover checklist cross-links:**
+List uses `data: ActivityDto[]` plus `pagination: PageInfo`; the existing response interceptor produces `SpringPageResponse<ActivityDto>`. At least one active organizationId/contactId/dealId is required. Multiple supplied filters intersect; page is nonnegative, size 1–100; order is occurredAt DESC/id DESC. Creation checks every supplied subject. NOTE requires text, TASK supports due/completed timestamps; completion is idempotent under a row lock. Deleted linked subjects hide activity consistently.
 
-- Pre-cutover: gateway CRM paths are only leads/deals/contacts/organizations — **no phantom** `/api/v1/activities/**`.
-- When separately authorized, deliver the gateway predicate, real controller/schema, and frontend client together as specified by ADR-030.
+Author and workforce partition come from verified human identity. No request author/tenant can alter them. Anonymous or missing workforce context is refused; service/agent writers are unsupported. Reads/writes use the caller's workforce partition with existing coarse CRM access; this does not establish commercial customer tenancy (ADR-036 remains Proposed). An activity linked to an account subsequently merged/soft-deleted is hidden rather than automatically moved to the survivor.
 
-**Do not:** stub routes, invent FE callers, or add gateway paths “for future use.” Treat a phantom activities route as a cutover defect.
+All records return `source: MANUAL`. EMAIL/MEETING store opaque external references and bounded metadata only; they never fetch provider content or accept a mail body. DRG-521 owns provider grants, sync, ingest filtering, consent/retention and private-body sharing. These manual records are not provider-verified evidence. No UI, provider login/sync or browser UAT is claimed by this client/API delivery.
+
+The endpoint is real rather than a placeholder. Docker/PostgreSQL integration tests and broader live/browser checks remain distinct from focused unit/HTTP/client verification; see the delivery report for executed evidence.
 
 ---
 

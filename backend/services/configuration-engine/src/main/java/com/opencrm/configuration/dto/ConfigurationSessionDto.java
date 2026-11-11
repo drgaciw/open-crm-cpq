@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * API response DTO for configuration sessions.
@@ -27,6 +28,7 @@ public class ConfigurationSessionDto {
     private String userId;
     private ConfigurationStatus status;
     private Map<String, String> selections;
+    private Set<String> defaultedSelectionKeys;
     private boolean valid;
     private String validationErrors;
     private Instant completedAt;

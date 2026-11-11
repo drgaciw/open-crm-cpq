@@ -49,6 +49,19 @@ public class ConstraintSolver {
     }
 
     /**
+     * Check an authored default batch without treating an unpersisted DEFAULT target as selected.
+     * Uses the same hard/soft rule evaluator; existing evaluation endpoints retain their behavior.
+     */
+    public ConfigurationValidationResult evaluateExplicitSelections(ConfigurationSession session) {
+        return ProductRuleEvaluationCore.evaluate(selectedProductIds(session), productId -> {
+            List<com.opencrm.configuration.product.ProductConfigurationRuleDto> rules = ruleClient.getRulesForProduct(productId);
+            return rules == null ? List.of() : rules.stream().filter(rule -> rule != null
+                    && !ProductRuleEvaluationCore.DEFAULT.equalsIgnoreCase(
+                            rule.getRuleType() == null ? "" : rule.getRuleType().trim())).toList();
+        }, sessionAttributes(session));
+    }
+
+    /**
      * Session selection map used as VALIDATES attribute bag (option key → value).
      */
     static Map<String, String> sessionAttributes(ConfigurationSession session) {

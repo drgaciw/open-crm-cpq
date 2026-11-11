@@ -237,6 +237,17 @@ describe('QuotesDetailComponent', () => {
     expect(compiled.textContent).toContain('prod-1');
   });
 
+  it('links a deal-backed quote to its alternatives and hides the action without an opportunity', () => {
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), dealExternalId: 'deal-1' });
+    fixture.detectChanges();
+    const links = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a'));
+    expect(links().find((link) => link.textContent?.includes('Compare alternatives'))?.getAttribute('href'))
+      .toBe('/quotes/1/compare');
+    selectedQuote.set({ ...toQuoteDto(MOCK_QUOTES[0]), dealExternalId: undefined });
+    fixture.detectChanges();
+    expect(links().some((link) => link.textContent?.includes('Compare alternatives'))).toBe(false);
+  });
+
   it('shows loading spinner while QuoteService.loading', () => {
     selectedQuote.set(null);
     loading.set(true);

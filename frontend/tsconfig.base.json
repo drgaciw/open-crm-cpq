@@ -25,6 +25,7 @@
       "@frontend/crm-leads": ["libs/crm/leads/src/index.ts"],
       "@frontend/crm-deals": ["libs/crm/deals/src/index.ts"],
       "@frontend/crm-dashboard": ["libs/crm/dashboard/src/index.ts"],
+      "@frontend/crm-activities": ["libs/crm/activities/src/index.ts"],
       "@frontend/cpq-catalog": ["libs/cpq/catalog/src/index.ts"],
       "@frontend/cpq-quotes": ["libs/cpq/quotes/src/index.ts"],
       "@frontend/cpq-approvals": ["libs/cpq/approvals/src/index.ts"],

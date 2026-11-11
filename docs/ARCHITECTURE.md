@@ -93,7 +93,7 @@ PostgreSQL 16 :5432 (opencrm, schema-per-service)      Redis 7 :6379      Kafka 
 | `/api/v1/documents/**` | document-generation | FE quote docs use **quote-service** documents API |
 | `/api/v1/subscriptions/**` | contract-asset | **no FE** |
 | `/api/v1/erp/**` | gateway stub → `forward:/fallback/erp/unavailable` (S2A-7 reservation) | — |
-| `/api/v1/activities/**` | not yet landed (hold lifted 2026-11-03, ADR-030; DRG-520) | crm-service |
+| `/api/v1/activities/**` | DRG-520 timeline API/client; manual notes, tasks and email/meeting references; provider ingestion separate | crm-service |
 
 **Disambiguate:** `/api/v1/rules` (pricing DRL) ≠ `/api/v1/configuration/rules` (product config rules). `/api/v1/quotes/approvals` ≠ `/api/v1/approvals`. The **validate route must stay ordered before** `configuration/**` (SCG first-match would keep agents on the product `List<String>` path).
 
@@ -273,7 +273,7 @@ Copy this table into planning. **Do not present the Target column as current.**
 | Identity | Entra ID login at the gateway BFF; every service a resource server ([ADR-016](adr/ADR-016-identity-authentication-service-trust.md) steps 0–3) | Actor integrity and role checks (step 4); go-live gate: app registrations, workload identities, consent (step 5) |
 | Search | CRM/quote list + `PageInfo` over gateway | Elasticsearch 8 **not in tree** |
 | Comms | Gateway stubs `/api/v1/emails/**` etc. → `communication-service` (**not** in Maven reactor) | Twilio / SendGrid / WhatsApp hub. **#430 on `main` — do not undo** |
-| Activities | **No** schema, controller, or FE yet | Unheld 2026-11-03 per ADR-030 (DRG-520) |
+| Activities | DRG-520 timeline schema/controller and Angular client; manual provenance | Mailbox/calendar ingestion is DRG-521; no activity portal yet |
 
 **Forge status:** Waves **A–W COMPLETE** on `main`; hygiene N′ COMPLETE; Wave **T skipped** (do not name T1/T2). Not early stage.
 

@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
   ReactiveFormsModule,
@@ -69,6 +69,7 @@ function httpErrorMessage(err: unknown): string {
   selector: 'cpq-quotes-detail',
   standalone: true,
   imports: [
+    RouterLink,
     ReactiveFormsModule,
     AdvisorySuggestionComponent,
     MatButtonModule,
@@ -109,6 +110,9 @@ function httpErrorMessage(err: unknown): string {
             <mat-icon>arrow_back</mat-icon>
             Back to quotes
           </button>
+          @if (quote.dealExternalId?.trim()) {
+            <a mat-stroked-button [routerLink]="['/quotes', quote.id, 'compare']">Compare alternatives</a>
+          }
           <button
             mat-stroked-button
             type="button"
