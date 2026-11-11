@@ -102,7 +102,7 @@ Every row is `Status: Proposed`. Recommended default is **Recommended (Proposed)
 
 | ID | Question | Recommended (Proposed) | Reject / avoid | Blocks |
 |---|---|---|---|---|
-| **OQ-619-1** | How does a tenant value reach the NEW-path header writer? | **C. Other:** pass the UUID already stored on the new `subscriptions.tenant_id` row, and only when it is non-null. Do not add a second event field. Do not call CRM. | Invent a UUID; read a nested JSON field; treat IT-only coverage as Done | Future implementation story |
+| **OQ-619-1** | How does a tenant value reach the NEW-path header writer? | **C. Other:** pass the UUID already stored on the new `subscriptions.tenant_id` row, and only when it is non-null. Do not add a second event field. Do not call CRM. | Invent a UUID; read a nested JSON field; treat IT-only coverage as Done | Future implementation story. **Decision: C** (delegated by drg to Projects Manager + CPQ Decision, 2026-11-11 12:42 PM CT); not a build GO; OQ-619-2 and OQ-619-IMPL open. |
 | **OQ-619-2** | May that UUID be the interim Entra `tid`? | **No write until an owner sentence.** The column comments already say the subscription tid must match `contracts.tenant_id` **when** `contract_id` is set. They do not authorize creating the contract. ADR-036 stays Proposed. | Call the tid “authoritative” inside this brief; accept ADR-036 here | OQ-619-1; ADR-036 |
 | **OQ-619-3** | What if the tid is null, blank, or not a GUID? | **Skip the writer.** Leave `contract_id` null. The sale commits, as it does today. Do not fabricate a tenant. Those rows stay eligible for a later DRG-585 apply, which this brief does **not** run. | Let `requireTenant` / the SQL raise and roll back the sale; default a deployment UUID | Acceptance reliability |
 | **OQ-619-4** | What if `customer_id` is not a canonical UUID (or dates/status make the SQL function raise)? | **Skip the writer** on the same predicate the function uses (`contract_header_customer_uuid` null, inverted dates, unknown status). Do not hash a customer id. Do not widen V1_8 in place. | Raise inside the listener transaction; hash free-text into a uuid | OQ-585-2 (cite only) |
@@ -127,7 +127,7 @@ Every row is `Status: Proposed`. Recommended default is **Recommended (Proposed)
 | **B. Lookup** | Do not use the event `tid` as `contracts.tenant_id`. Resolve a verified account tenant (ADR-036 D-04 projection or synchronous CRM read) and pass only that UUID. ADR-036 is **not** Accepted. No lookup table or endpoint is authorized by this brief. AC-S7-3 stays unwired until that source exists. Fail closed when unmapped: do not fall back to `tid`. |
 | **C. Other (Recommended, Proposed)** | Reuse the UUID `SubscriptionTenant.resolve` already stored on the new subscription. Call the writer only when that UUID is non-null **and** the row would pass the SQL eligibility predicate. Otherwise leave `contract_id` null. No new event field, no CRM call, no fabricated id, no backfill apply. Still blocked by OQ-619-2: the bits are the interim `tid`, and this brief does not score them as the contract tenant. |
 
-**Recommended (Proposed):** C, after OQ-619-2 is scored. Until that sentence exists, **no option is a build GO**. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** C, after OQ-619-2 is scored. Until that sentence exists, **no option is a build GO**. **Decision: C** (delegated by drg to Projects Manager + CPQ Decision, 2026-11-11 12:42 PM CT); not a build GO; OQ-619-2 and OQ-619-IMPL open.
 
 ### OQ-619-2 — Interim `tid` versus authoritative contract tenant
 
