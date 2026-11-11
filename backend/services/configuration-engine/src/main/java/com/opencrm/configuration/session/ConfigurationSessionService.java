@@ -17,6 +17,7 @@ import com.opencrm.configuration.model.ConfigurationModelCache;
 import com.opencrm.configuration.model.ConfigurationModelCompiler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -205,8 +206,27 @@ public class ConfigurationSessionService {
         }
     }
 
+    /**
+     * A bundle-started session cannot be completed yet (DRG-424 follow-up). Bundle support today is a
+     * shell — StartSession/GetSessionState only; there is no bundle-item expansion anywhere in this
+     * service ({@link ConstraintSolver} and {@link ConfigurationModelCompiler} treat {@code bundleId} as
+     * an opaque subject id, nothing more) — and {@link ConfigurationCommittedEvent} has no
+     * {@code bundleId} field and, as of DRG-424, no live consumer that would need one. Completing a
+     * bundle session would publish an event with {@code productId=null} and no bundle identity at all:
+     * an ambiguous, half-built event for a feature that is not otherwise wired. Reject it here instead
+     * of guessing at a committed-bundle event shape; define that shape (most likely adding a nullable,
+     * mutually-exclusive {@code bundleId} to {@code ConfigurationCommittedEvent}, mirroring StartSession)
+     * when bundle-item expansion actually lands.
+     */
     public ConfigurationSessionDto complete(Long sessionId) {
         ConfigurationSession session = findEntityById(sessionId);
+        if (session.getBundleId() != null) {
+            throw new BusinessException(
+                    "Completing a session started against a bundle is not supported yet; "
+                            + "bundle sessions can be built incrementally and cancelled, but not completed",
+                    HttpStatus.CONFLICT,
+                    "CONFIGURATION_SESSION_BUNDLE_COMPLETE_UNSUPPORTED");
+        }
         session.complete(); // Throws if not valid
         ConfigurationSession saved = sessionRepository.save(session);
         publishConfigurationCommitted(saved);

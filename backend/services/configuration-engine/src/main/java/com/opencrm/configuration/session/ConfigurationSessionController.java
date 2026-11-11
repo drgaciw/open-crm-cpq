@@ -86,8 +86,9 @@ public class ConfigurationSessionController {
         return ApiResponse.success(session, session.isValid() ? "Configuration is valid" : "Configuration has errors");
     }
 
+    /** Rejects (409) a session started against a bundle — committed-bundle events are not defined yet (DRG-424). */
     @PostMapping("/{id}/complete")
-    @Operation(summary = "Complete a valid configuration session")
+    @Operation(summary = "Complete a valid configuration session (not yet supported for a bundle-started session)")
     public ApiResponse<ConfigurationSessionDto> complete(@PathVariable Long id) {
         ConfigurationSessionDto session = sessionService.complete(id);
         return ApiResponse.success(session, "Configuration completed");

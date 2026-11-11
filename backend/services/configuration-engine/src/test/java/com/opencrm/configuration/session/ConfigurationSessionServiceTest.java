@@ -281,6 +281,26 @@ class ConfigurationSessionServiceTest {
     }
 
     @Test
+    @DisplayName("DRG-424: completing a bundle-started session is rejected (no committed-bundle event shape yet)")
+    void rejectCompleteBundleSession() {
+        ConfigurationSession bundleSession = ConfigurationSession.builder()
+                .bundleId("BUNDLE-001")
+                .userId("user-1")
+                .status(ConfigurationStatus.IN_PROGRESS)
+                .selections(new HashMap<>())
+                .valid(true) // valid, so only the bundle guard can be what rejects this
+                .build();
+        bundleSession.setId(4L);
+        when(sessionRepository.findById(4L)).thenReturn(Optional.of(bundleSession));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> sessionService.complete(4L));
+
+        assertEquals("CONFIGURATION_SESSION_BUNDLE_COMPLETE_UNSUPPORTED", ex.getErrorCode());
+        verify(sessionRepository, never()).save(any());
+        verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("should cancel an in-progress session")
     void cancelSession() {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
