@@ -76,10 +76,10 @@ Local login through `nx serve`: `frontend/proxy.conf.json` forwards `/oauth2`, `
 From `gateway-service` `application.yml`, CRM routes **must** match only what `crm-service` implements:
 
 ```yaml
-Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**
+Path=/api/v1/leads/**,/api/v1/deals/**,/api/v1/contacts/**,/api/v1/organizations/**,/api/v1/playbooks/**,/api/v1/guided-sessions/**,/api/v1/activities/**
 ```
 
-- **No** `/api/v1/activities/**` until a real Spring controller + schema exist (Phase 2 / Frappe).
+- `/api/v1/activities/**` routes to `crm-service` because `ActivityController` and `V18__activities.sql` exist (DRG-520). Notes and tasks only. No `/api/v1/mailboxes/**`.
 
 ## Observability (staging / production)
 
