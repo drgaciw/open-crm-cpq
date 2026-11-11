@@ -1,0 +1,22 @@
+package com.opencrm.crm.fact;
+
+import java.util.Optional;
+
+/**
+ * Reads and writes the few standard columns this slice knows how to apply.
+ * Custom field values stay in the ledger until they are projected onto {@code field_value}.
+ */
+public interface RecordFieldAccess {
+
+    void requireSubject(FactSubjectType subjectType, long subjectId);
+
+    Optional<ColumnState> read(FactSubjectType subjectType, long subjectId, String fieldKey);
+
+    /**
+     * Copies an accepted or auto-applied value onto the subject.
+     * Re-parent keys throw. Unmapped keys are a no-op.
+     *
+     * @return true when a column changed
+     */
+    boolean write(FactSubjectType subjectType, long subjectId, String fieldKey, String value);
+}
