@@ -26,6 +26,7 @@ public class QuoteDto {
     private String description;
     private String customerExternalId;
     private String dealExternalId;
+    private boolean primary;
     private QuoteStatus status;
     private DealType dealType;
     private String subscriptionType;
