@@ -1,25 +1,36 @@
 package com.opencrm.common.event;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.ListenerExecutionFailedException;
+import org.springframework.kafka.listener.MessageListenerContainer;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("Kafka consumer support: inbox (ADR-018 D6) and dead-letter error handling (D7)")
@@ -56,6 +67,33 @@ class KafkaConsumerSupportTest {
             assertThat(factory.createContainer("cpq.quote.status.accepted").getCommonErrorHandler())
                     .isSameAs(context.getBean(CommonErrorHandler.class));
         });
+    }
+
+    @Test
+    @DisplayName("D7: the first poison delivery is published to the DLT with its failure reason")
+    void poisonDeliveryPublishesFailureReason() {
+        KafkaOperations<String, String> kafka = mock();
+        when(kafka.send(ArgumentMatchers.<ProducerRecord<String, String>>any()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        ObjectProvider<MeterRegistry> meters = mock();
+        DefaultErrorHandler handler = new KafkaConsumerErrorHandlingAutoConfiguration()
+                .kafkaDeadLetterErrorHandler(kafka, new KafkaConsumerErrorHandlingAutoConfiguration.RetryProperties(),
+                        meters);
+        ConsumerRecord<String, String> poison = record("evt-1");
+        var failure = new ListenerExecutionFailedException("Listener failed", "document-generation",
+                new NonRetryableEventException("QuoteAccepted event is missing quoteId"));
+
+        assertThat(handler.handleOne(failure, poison, null, mock(MessageListenerContainer.class))).isTrue();
+
+        ArgumentCaptor<ProducerRecord<String, String>> publishedRecord = ArgumentCaptor.captor();
+        verify(kafka).send(publishedRecord.capture());
+        ProducerRecord<String, String> dead = publishedRecord.getValue();
+        assertThat(dead.topic()).isEqualTo(poison.topic() + ".DLT");
+        assertThat(dead.value()).isEqualTo(poison.value());
+        assertThat(dead.headers().lastHeader(KafkaHeaders.DLT_EXCEPTION_MESSAGE))
+                .isNotNull()
+                .extracting(header -> new String(header.value(), StandardCharsets.UTF_8))
+                .asString().contains("QuoteAccepted event is missing quoteId");
     }
 
     @Test
