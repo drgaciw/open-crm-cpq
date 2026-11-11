@@ -19,6 +19,7 @@ import java.util.Optional;
  * Applies a fact onto a standard contact or organization column.
  * Parent links are refused: {@code AccountHierarchyService} is the only writer, and it is
  * unavailable outside its test seam.
+ * Subject load/mutate requires the authenticated tenant; foreign-tenant ledger history is 404.
  * TODO: project accepted custom keys onto {@code field_value} once that write is allowed for agents.
  */
 @Component
@@ -27,30 +28,31 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
 
     private final ContactRepository contactRepository;
     private final OrganizationRepository organizationRepository;
+    private final CrmFactRepository factRepository;
     private final ObjectProvider<CacheManager> cacheManager;
 
     @Override
-    public void requireSubject(FactSubjectType subjectType, long subjectId) {
+    public void requireSubject(FactSubjectType subjectType, long subjectId, String tenant) {
         switch (subjectType) {
-            case CONTACT -> requireContact(subjectId);
-            case ORGANIZATION -> requireOrganization(subjectId);
+            case CONTACT -> requireContact(subjectId, tenant);
+            case ORGANIZATION -> requireOrganization(subjectId, tenant);
         }
     }
 
     @Override
-    public Optional<ColumnState> read(FactSubjectType subjectType, long subjectId, String fieldKey) {
+    public Optional<ColumnState> read(FactSubjectType subjectType, long subjectId, String fieldKey, String tenant) {
         if (!StandardFactFields.columnWritable(subjectType, fieldKey)
                 && !StandardFactFields.reparent(subjectType, fieldKey)) {
             return Optional.empty();
         }
         return switch (subjectType) {
-            case CONTACT -> Optional.of(contactColumn(requireContact(subjectId), fieldKey));
-            case ORGANIZATION -> Optional.of(organizationColumn(requireOrganization(subjectId), fieldKey));
+            case CONTACT -> Optional.of(contactColumn(requireContact(subjectId, tenant), fieldKey));
+            case ORGANIZATION -> Optional.of(organizationColumn(requireOrganization(subjectId, tenant), fieldKey));
         };
     }
 
     @Override
-    public boolean write(FactSubjectType subjectType, long subjectId, String fieldKey, String value) {
+    public boolean write(FactSubjectType subjectType, long subjectId, String fieldKey, String value, String tenant) {
         if (StandardFactFields.reparent(subjectType, fieldKey)) {
             throw new BusinessException(
                     "Re-parenting is not applied from the fact ledger. Account hierarchy owns that column.",
@@ -61,13 +63,13 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
             return false;
         }
         return switch (subjectType) {
-            case CONTACT -> writeContact(subjectId, fieldKey, value);
-            case ORGANIZATION -> writeOrganization(subjectId, fieldKey, value);
+            case CONTACT -> writeContact(subjectId, fieldKey, value, tenant);
+            case ORGANIZATION -> writeOrganization(subjectId, fieldKey, value, tenant);
         };
     }
 
-    private boolean writeContact(long subjectId, String fieldKey, String value) {
-        Contact contact = requireContact(subjectId);
+    private boolean writeContact(long subjectId, String fieldKey, String value, String tenant) {
+        Contact contact = requireContact(subjectId, tenant);
         String key = StandardFactFields.canonical(fieldKey);
         switch (key) {
             case "jobtitle" -> contact.setJobTitle(value);
@@ -78,7 +80,8 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
             case "phone" -> contact.setPhone(value);
             case "department" -> contact.setDepartment(value);
             case "linkedinurl" -> contact.setLinkedinUrl(value);
-            case "organizationid" -> contact.setOrganization(requireOrganization(parseLong(value, "organizationId")));
+            case "organizationid" -> contact.setOrganization(
+                    requireOrganization(parseLong(value, "organizationId"), tenant));
             default -> {
                 return false;
             }
@@ -88,8 +91,8 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
         return true;
     }
 
-    private boolean writeOrganization(long subjectId, String fieldKey, String value) {
-        Organization organization = requireOrganization(subjectId);
+    private boolean writeOrganization(long subjectId, String fieldKey, String value, String tenant) {
+        Organization organization = requireOrganization(subjectId, tenant);
         String key = StandardFactFields.canonical(fieldKey);
         switch (key) {
             case "industry" -> organization.setIndustry(value);
@@ -149,7 +152,8 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
                 });
     }
 
-    private Contact requireContact(long subjectId) {
+    private Contact requireContact(long subjectId, String tenant) {
+        requireSubjectTenant(FactSubjectType.CONTACT, subjectId, tenant);
         Contact contact = contactRepository.findById(subjectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contact", subjectId));
         if (contact.isDeleted()) {
@@ -158,13 +162,31 @@ public class JpaRecordFieldAccess implements RecordFieldAccess {
         return contact;
     }
 
-    private Organization requireOrganization(long subjectId) {
+    private Organization requireOrganization(long subjectId, String tenant) {
+        requireSubjectTenant(FactSubjectType.ORGANIZATION, subjectId, tenant);
         Organization organization = organizationRepository.findById(subjectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", subjectId));
         if (organization.isDeleted()) {
             throw new ResourceNotFoundException("Organization", subjectId);
         }
         return organization;
+    }
+
+    /**
+     * Contacts/organizations have no tenant column yet (ADR-036 Proposed).
+     * Ownership for this slice: if the subject already has facts under another tenant, refuse.
+     * A virgin subject is claimable by the authenticated tenant on first ledger use.
+     */
+    private void requireSubjectTenant(FactSubjectType subjectType, long subjectId, String tenant) {
+        if (tenant == null || tenant.isBlank()) {
+            throw new BusinessException(
+                    "Tenant is not on the verified token",
+                    HttpStatus.FORBIDDEN,
+                    "TENANT_REQUIRED");
+        }
+        if (factRepository.existsForSubjectUnderOtherTenant(subjectType, Long.toString(subjectId), tenant)) {
+            FactTenantResolver.refuseForeignSubject(subjectType, subjectId);
+        }
     }
 
     private static long parseLong(String value, String fieldKey) {

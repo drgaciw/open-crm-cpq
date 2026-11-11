@@ -4,7 +4,6 @@ import com.opencrm.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +22,9 @@ import java.util.List;
 /**
  * Evidence-priced facts for one contact or organization (ADR-028 / DRG-512).
  * Routes sit under the existing contact and organization gateway prefixes.
- * The tenant-wide inbox is a later slice. Score and weight are not request fields.
+ * Tenant comes from the verified JWT {@code tid}; an optional {@code tenant} query
+ * value must match and cannot escalate. The tenant-wide inbox is a later slice.
+ * Score and weight are not request fields.
  */
 @RestController
 @Validated
@@ -37,7 +38,7 @@ public class FactController {
     @Operation(summary = "Propose a fact about a contact")
     public ResponseEntity<ApiResponse<FactResponse>> proposeContact(
             @PathVariable long subjectId,
-            @RequestParam @NotBlank String tenant,
+            @RequestParam(required = false) String tenant,
             @Valid @RequestBody ProposeFactRequest request) {
         return propose(FactSubjectType.CONTACT, subjectId, tenant, request);
     }
@@ -46,8 +47,9 @@ public class FactController {
     @Operation(summary = "List contact proposals", description = "PROPOSED and UNRESOLVED facts. POSSIBLE provenance is omitted.")
     public ApiResponse<List<FactResponse>> listContactProposals(
             @PathVariable long subjectId,
-            @RequestParam @NotBlank String tenant) {
-        return ApiResponse.success(factLedgerService.listProposals(FactSubjectType.CONTACT, subjectId, tenant));
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
+        return ApiResponse.success(factLedgerService.listProposals(FactSubjectType.CONTACT, subjectId, authenticated));
     }
 
     @PostMapping("/api/v1/contacts/{subjectId}/facts/{factId}/accept")
@@ -55,9 +57,10 @@ public class FactController {
     public ApiResponse<FactResponse> acceptContact(
             @PathVariable long subjectId,
             @PathVariable long factId,
-            @RequestParam @NotBlank String tenant) {
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
         return ApiResponse.success(
-                factLedgerService.accept(FactSubjectType.CONTACT, subjectId, factId, tenant),
+                factLedgerService.accept(FactSubjectType.CONTACT, subjectId, factId, authenticated),
                 "Fact accepted");
     }
 
@@ -66,9 +69,10 @@ public class FactController {
     public ApiResponse<FactResponse> dismissContact(
             @PathVariable long subjectId,
             @PathVariable long factId,
-            @RequestParam @NotBlank String tenant) {
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
         return ApiResponse.success(
-                factLedgerService.dismiss(FactSubjectType.CONTACT, subjectId, factId, tenant),
+                factLedgerService.dismiss(FactSubjectType.CONTACT, subjectId, factId, authenticated),
                 "Fact dismissed");
     }
 
@@ -76,7 +80,7 @@ public class FactController {
     @Operation(summary = "Propose a fact about an organization")
     public ResponseEntity<ApiResponse<FactResponse>> proposeOrganization(
             @PathVariable long subjectId,
-            @RequestParam @NotBlank String tenant,
+            @RequestParam(required = false) String tenant,
             @Valid @RequestBody ProposeFactRequest request) {
         return propose(FactSubjectType.ORGANIZATION, subjectId, tenant, request);
     }
@@ -85,8 +89,10 @@ public class FactController {
     @Operation(summary = "List organization proposals")
     public ApiResponse<List<FactResponse>> listOrganizationProposals(
             @PathVariable long subjectId,
-            @RequestParam @NotBlank String tenant) {
-        return ApiResponse.success(factLedgerService.listProposals(FactSubjectType.ORGANIZATION, subjectId, tenant));
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
+        return ApiResponse.success(
+                factLedgerService.listProposals(FactSubjectType.ORGANIZATION, subjectId, authenticated));
     }
 
     @PostMapping("/api/v1/organizations/{subjectId}/facts/{factId}/accept")
@@ -94,9 +100,10 @@ public class FactController {
     public ApiResponse<FactResponse> acceptOrganization(
             @PathVariable long subjectId,
             @PathVariable long factId,
-            @RequestParam @NotBlank String tenant) {
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
         return ApiResponse.success(
-                factLedgerService.accept(FactSubjectType.ORGANIZATION, subjectId, factId, tenant),
+                factLedgerService.accept(FactSubjectType.ORGANIZATION, subjectId, factId, authenticated),
                 "Fact accepted");
     }
 
@@ -105,9 +112,10 @@ public class FactController {
     public ApiResponse<FactResponse> dismissOrganization(
             @PathVariable long subjectId,
             @PathVariable long factId,
-            @RequestParam @NotBlank String tenant) {
+            @RequestParam(required = false) String tenant) {
+        String authenticated = FactTenantResolver.requireTenant(tenant);
         return ApiResponse.success(
-                factLedgerService.dismiss(FactSubjectType.ORGANIZATION, subjectId, factId, tenant),
+                factLedgerService.dismiss(FactSubjectType.ORGANIZATION, subjectId, factId, authenticated),
                 "Fact dismissed");
     }
 
@@ -116,7 +124,8 @@ public class FactController {
             long subjectId,
             String tenant,
             ProposeFactRequest request) {
-        FactResponse fact = factLedgerService.propose(subjectType, subjectId, tenant, request);
+        String authenticated = FactTenantResolver.requireTenant(tenant);
+        FactResponse fact = factLedgerService.propose(subjectType, subjectId, authenticated, request);
         if (!fact.isStored()) {
             return ResponseEntity.ok(ApiResponse.success(fact, "Fact was not stored"));
         }

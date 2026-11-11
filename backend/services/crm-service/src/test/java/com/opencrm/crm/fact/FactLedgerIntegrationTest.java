@@ -110,6 +110,7 @@ class FactLedgerIntegrationTest extends BaseIntegrationTest {
                 .subject("enrichment-agent")
                 .claim("idtyp", "app")
                 .claim("azp", "enrichment-agent")
+                .claim("tid", FixtureTenants.A)
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
     }
@@ -120,6 +121,7 @@ class FactLedgerIntegrationTest extends BaseIntegrationTest {
                 .subject("person-oid")
                 .claim("oid", "person-oid")
                 .claim("scp", "user")
+                .claim("tid", FixtureTenants.A)
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
     }

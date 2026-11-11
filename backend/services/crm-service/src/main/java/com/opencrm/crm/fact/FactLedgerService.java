@@ -3,7 +3,6 @@ package com.opencrm.crm.fact;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.crm.fields.AgentFieldValueGuard;
-import com.opencrm.crm.fields.FixtureTenants;
 import com.opencrm.security.Caller;
 import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +22,8 @@ import java.util.regex.Pattern;
  * ProposeFact, the subject proposals list, and accept / dismiss (ADR-028).
  * The score is computed here. Request bodies have no score field.
  * <p>
- * Tenant ids are the field-registry fixtures until JWT {@code tid} is wired.
+ * Tenant is the verified JWT {@code tid} ({@link FactTenantResolver}), never a free-form
+ * query value alone. Subject ownership is checked before load/mutate.
  * A tenant-wide inbox is not this slice: list is per subject.
  * Accept and dismiss call {@link FactDecisionAudit}. BC-20-01 is not landed, so the
  * bean only logs. TODO(BC-20-01): keep the call when the trail replaces the log.
@@ -44,11 +44,15 @@ public class FactLedgerService {
     private final CurrentActor currentActor;
     private final Clock clock;
 
-    public FactResponse propose(FactSubjectType subjectType, long subjectId, String tenant, ProposeFactRequest request) {
-        FixtureTenants.require(tenant);
+    public FactResponse propose(
+            FactSubjectType subjectType,
+            long subjectId,
+            String requestedTenant,
+            ProposeFactRequest request) {
+        String tenant = FactTenantResolver.requireTenant(requestedTenant);
         String actorId = AgentFieldValueGuard.actorId(currentActor);
         Prepared proposal = prepare(request);
-        recordFields.requireSubject(subjectType, subjectId);
+        recordFields.requireSubject(subjectType, subjectId, tenant);
         String subject = Long.toString(subjectId);
         boolean humanOwns = humanOwns(tenant, subjectType, subject, proposal.fieldKey());
         FactPrincipalKind principal = principal();
@@ -72,7 +76,8 @@ public class FactLedgerService {
         CrmFact saved = factRepository.save(fact);
         boolean appliedToRecord = false;
         if (disposition.writeRecord()) {
-            appliedToRecord = recordFields.write(subjectType, subjectId, proposal.fieldKey(), proposal.value());
+            appliedToRecord = recordFields.write(
+                    subjectType, subjectId, proposal.fieldKey(), proposal.value(), tenant);
         }
         if (saved.getStatus() == FactStatus.APPLIED) {
             audit(saved, actorId, now);
@@ -81,9 +86,9 @@ public class FactLedgerService {
     }
 
     @Transactional(readOnly = true)
-    public List<FactResponse> listProposals(FactSubjectType subjectType, long subjectId, String tenant) {
-        FixtureTenants.require(tenant);
-        recordFields.requireSubject(subjectType, subjectId);
+    public List<FactResponse> listProposals(FactSubjectType subjectType, long subjectId, String requestedTenant) {
+        String tenant = FactTenantResolver.requireTenant(requestedTenant);
+        recordFields.requireSubject(subjectType, subjectId, tenant);
         return factRepository.findInbox(tenant, subjectType, Long.toString(subjectId), FactStatus.inbox())
                 .stream()
                 .sorted(Comparator.comparing(CrmFact::getObservedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -104,11 +109,12 @@ public class FactLedgerService {
             FactSubjectType subjectType,
             long subjectId,
             long factId,
-            String tenant,
+            String requestedTenant,
             boolean accept) {
-        FixtureTenants.require(tenant);
+        String tenant = FactTenantResolver.requireTenant(requestedTenant);
         AgentFieldValueGuard.requireHumanWriter(currentActor);
         String actorId = AgentFieldValueGuard.actorId(currentActor);
+        recordFields.requireSubject(subjectType, subjectId, tenant);
         CrmFact fact = requireFact(subjectType, subjectId, factId, tenant);
         requireDecidable(fact.getStatus());
         if (accept && StandardFactFields.reparent(subjectType, fact.getFieldKey())) {
@@ -120,7 +126,8 @@ public class FactLedgerService {
         Instant now = clock.instant();
         boolean appliedToRecord = false;
         if (accept) {
-            appliedToRecord = recordFields.write(subjectType, subjectId, fact.getFieldKey(), fact.getFactValue());
+            appliedToRecord = recordFields.write(
+                    subjectType, subjectId, fact.getFieldKey(), fact.getFactValue(), tenant);
             supersedeOthers(tenant, subjectType, fact, now);
             fact.setStatus(FactStatus.APPLIED);
             fact.setWriterKind(WriterKind.HUMAN);
@@ -166,7 +173,7 @@ public class FactLedgerService {
                 return true;
             }
         }
-        return recordFields.read(subjectType, Long.parseLong(subjectId), fieldKey)
+        return recordFields.read(subjectType, Long.parseLong(subjectId), fieldKey, tenant)
                 .filter(column -> column.value() != null && !column.value().isBlank())
                 .map(column -> !serviceActor(column.lastWriter()))
                 .orElse(false);

@@ -2,6 +2,7 @@ package com.opencrm.crm.fact;
 
 import com.opencrm.crm.config.GlobalExceptionHandler;
 import com.opencrm.crm.fields.FixtureTenants;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -46,6 +50,12 @@ class FactControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
+        signIn(FixtureTenants.A);
+    }
+
+    @AfterEach
+    void clearSecurity() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -146,5 +156,36 @@ class FactControllerTest {
         mockMvc.perform(post("/api/v1/organizations/8/facts/3/dismiss").param("tenant", FixtureTenants.A))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("DISMISSED"));
+    }
+
+    @Test
+    void spoofedTenantQueryParamIsRejectedBeforeTheService() throws Exception {
+        mockMvc.perform(get("/api/v1/contacts/4/facts/proposals").param("tenant", FixtureTenants.B))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("TENANT_MISMATCH"));
+
+        verify(factLedgerService, never()).listProposals(any(), anyLong(), any());
+    }
+
+    @Test
+    void tenantQueryParamMayBeOmittedWhenJwtTidIsPresent() throws Exception {
+        when(factLedgerService.listProposals(FactSubjectType.CONTACT, 4L, FixtureTenants.A))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/contacts/4/facts/proposals"))
+                .andExpect(status().isOk());
+
+        verify(factLedgerService).listProposals(FactSubjectType.CONTACT, 4L, FixtureTenants.A);
+    }
+
+    private static void signIn(String tid) {
+        Jwt jwt = Jwt.withTokenValue("test")
+                .header("alg", "none")
+                .subject("person-oid")
+                .claim("oid", "person-oid")
+                .claim("scp", "user")
+                .claim("tid", tid)
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
     }
 }

@@ -51,4 +51,21 @@ public interface CrmFactRepository extends JpaRepository<CrmFact, Long> {
             @Param("subjectType") FactSubjectType subjectType,
             @Param("subjectId") String subjectId,
             @Param("statuses") Collection<FactStatus> statuses);
+
+    /**
+     * True when this subject already has ledger rows under a different tenant.
+     * Interim ownership signal until ADR-036 account→tenant mapping exists.
+     */
+    @Query("""
+            SELECT CASE WHEN COUNT(f) > 0 THEN TRUE ELSE FALSE END
+            FROM CrmFact f
+            WHERE f.subjectType = :subjectType
+              AND f.subjectId = :subjectId
+              AND f.tenantId <> :tenantId
+              AND f.deleted = false
+            """)
+    boolean existsForSubjectUnderOtherTenant(
+            @Param("subjectType") FactSubjectType subjectType,
+            @Param("subjectId") String subjectId,
+            @Param("tenantId") String tenantId);
 }
