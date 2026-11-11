@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     docker.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 22.23.4 (Angular 22 min; matches GHA setup-node). Pin — do not float on nodesource latest.
-ARG NODE_VERSION=22.23.4
+# Node.js 24.22.3 LTS (matches GHA setup-node in ci.yml). Pin — do not float on nodesource latest.
+ARG NODE_VERSION=24.22.3
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \

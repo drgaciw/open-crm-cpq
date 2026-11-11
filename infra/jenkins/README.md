@@ -138,7 +138,7 @@ Reports: `ci-reports/ai-code-review.md`, `ai-test-suggestions.md`, `ai-log-analy
    ```
    The compose file reads `/run/secrets/agent_secret` for `-secret` (see `docker-compose.build-agent.yml` comment).
 
-4. **Verify labels** — agent must match pipeline expectations: `linux docker maven node22` (default in compose).
+4. **Verify labels** — agent must match pipeline expectations: `linux docker maven node22 node24` (default in compose). `node22` remains a compatibility alias; the image runs Node 24 LTS.
 
 5. **Restrict docker.sock** to the build agent host only; never on the controller in production.
 
@@ -175,7 +175,7 @@ Reports: `ci-reports/ai-code-review.md`, `ai-test-suggestions.md`, `ai-log-analy
 | Wrong LLM target (`:8086`) | Misconfigured endpoint | Use Azure/APIM chat URL; see `ai_client.py` guard |
 | Sidecar stack won't start | `ai-service` JAR not built | `mvn -pl services/ai-service -am package -DskipTests` before overlay |
 | Jenkins waits forever on sidecar | Health check failing | Check `docker logs opencrm-jenkins-ai-sidecar`; postgres/redis up |
-| Build agent not picking jobs | Secret/labels | Verify agent online, labels `linux docker maven node22`, secret mounted |
+| Build agent not picking jobs | Secret/labels | Verify agent online, labels `linux docker maven node22 node24`, secret mounted |
 | Drift vs GHA | Different stage order | Compare [ci-contract.yaml](../../docs/ci-contract.yaml) and `.github/workflows/ci.yml` |
 
 ## Testcontainers
@@ -186,7 +186,7 @@ Reports: `ci-reports/ai-code-review.md`, `ai-test-suggestions.md`, `ai-log-analy
 
 ## Production checklist
 
-1. `JENKINS_NUM_EXECUTORS=0` on controller; labeled agents with Docker (`linux docker maven node22`).
+1. `JENKINS_NUM_EXECUTORS=0` on controller; labeled agents with Docker (`linux docker maven node22 node24`).
 2. No `docker.sock` on controller — use `docker-compose.build-agent.yml`.
 3. Store `LLM_API_KEY` in vault → Jenkins credential only.
 4. TLS reverse proxy in front of Jenkins; rotate default admin password.
