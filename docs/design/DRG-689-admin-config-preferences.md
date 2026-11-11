@@ -4,7 +4,7 @@
 
 **Stories:** [DRG-689 ADMIN-BE-01](https://linear.app/drgamtd-workspace/issue/DRG-689/admin-be-01-backend-admin-configuration-and-user-preferences) (this note is its "ADR or short design note required before extract" step) · [DRG-690 ADMIN-FE-01](https://linear.app/drgamtd-workspace/issue/DRG-690/admin-fe-01-frontend-admin-console-and-user-preferences-ux) (blocked by DRG-689) · parent epic [DRG-688](https://linear.app/drgamtd-workspace/issue/DRG-688).
 
-**Base read:** `main` at `d3256ae4b4960f58a2c060883bc980c8f27c2be1`.
+**Base read:** `main` at `33396144896d653a1aae39ee82624192da2db80c`.
 
 ## 1. Context and scope
 
