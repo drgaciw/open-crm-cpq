@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 
 @Slf4j
 @Service
@@ -124,7 +123,11 @@ public class PriceBookService {
 
     /**
      * GetListPrice: resolves the list price for a SKU, currency and unit of measure as of a date, among this
-     * price book's (possibly several, date-ranged) entries for that key.
+     * price book's (possibly several, date-ranged) entries for that key. Entry authoring rejects
+     * overlapping ranges for the same key ({@link #validateNoOverlappingEntry}), so at most one candidate
+     * can cover any given date; the "most recently started" pick below is then provably correct, not a
+     * tie-break over ambiguous data — it only matters for rows written before this validation existed or
+     * outside it (direct SQL, etc.).
      */
     @Transactional(readOnly = true)
     public PriceResolutionDto getListPrice(Long priceBookId, String sku, String currency, String unitOfMeasure,
@@ -187,8 +190,8 @@ public class PriceBookService {
         ensureNotPublished(priceBook);
         normalizeEntryCreateRequest(request, priceBook);
         validateEntryPriceRange(request.getListPrice(), request.getFloorPrice());
-        validateNoExactDuplicateEntry(priceBookId, request.getProductExternalId(), request.getCurrency(),
-                request.getUnitOfMeasure(), request.getEffectiveStartDate(), null);
+        validateNoOverlappingEntry(priceBookId, request.getProductExternalId(), request.getCurrency(),
+                request.getUnitOfMeasure(), request.getEffectiveStartDate(), request.getEffectiveEndDate(), null);
 
         PriceBookEntry entry = priceBookMapper.toEntryEntity(request);
         entry.setPriceBook(priceBook);
@@ -223,8 +226,10 @@ public class PriceBookService {
         String targetUom = request.getUnitOfMeasure() != null ? request.getUnitOfMeasure() : entry.getUnitOfMeasure();
         LocalDate targetStart = request.getEffectiveStartDate() != null
                 ? request.getEffectiveStartDate() : entry.getEffectiveStartDate();
-        validateNoExactDuplicateEntry(priceBookId, targetProductExternalId, targetCurrency, targetUom,
-                targetStart, entryId);
+        LocalDate targetEnd = request.getEffectiveEndDate() != null
+                ? request.getEffectiveEndDate() : entry.getEffectiveEndDate();
+        validateNoOverlappingEntry(priceBookId, targetProductExternalId, targetCurrency, targetUom,
+                targetStart, targetEnd, entryId);
 
         BigDecimal targetListPrice = request.getListPrice() != null ? request.getListPrice() : entry.getListPrice();
         BigDecimal targetFloorPrice = request.getFloorPrice() != null ? request.getFloorPrice() : entry.getFloorPrice();
@@ -301,25 +306,42 @@ public class PriceBookService {
     }
 
     /**
-     * Exact-match dedupe: rejects a second entry with the same Sku + currency + UnitOfMeasure +
-     * effectiveStartDate. Full date-range overlap validation across arbitrary windows is a known gap
-     * (see DRG-431 PR description).
+     * DRG-431: entries are keyed by Sku + currency + UnitOfMeasure + EffectiveDateRange, and the natural
+     * reading of that AC is that ranges for the same key must be non-overlapping — otherwise a resolution
+     * date could land in more than one entry, and GetListPrice would have to guess. Rejects (400) a
+     * create/update whose range overlaps any other non-deleted entry with the same Sku + currency +
+     * UnitOfMeasure in this price book. See {@link EffectiveDateRange} for the overlap rule and the
+     * precedent this follows.
+     *
+     * <p>To replace an open-ended entry with a new version, end-date the existing one first (update its
+     * {@code effectiveEndDate}), then create the new entry — the same way {@code effectiveEndDate} is
+     * documented to "shorten coverage without erasing history" elsewhere in this codebase
+     * (contract-asset-management's {@code SubscriptionRatePeriod}).
      */
-    private void validateNoExactDuplicateEntry(Long priceBookId, String sku, String currency, String unitOfMeasure,
-                                                LocalDate effectiveStartDate, Long excludeEntryId) {
+    private void validateNoOverlappingEntry(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                             LocalDate effectiveStartDate, LocalDate effectiveEndDate,
+                                             Long excludeEntryId) {
         List<PriceBookEntry> candidates = priceBookEntryRepository
                 .findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                         priceBookId, sku, currency, unitOfMeasure);
-        boolean duplicate = candidates.stream()
+        candidates.stream()
                 .filter(entry -> excludeEntryId == null || !excludeEntryId.equals(entry.getId()))
-                .anyMatch(entry -> Objects.equals(entry.getEffectiveStartDate(), effectiveStartDate));
-        if (duplicate) {
-            throw new BusinessException(
-                    "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
-                            + " already exists with that effective start date",
-                    "DUPLICATE_PRICE_BOOK_ENTRY"
-            );
-        }
+                .filter(entry -> entry.overlapsRange(effectiveStartDate, effectiveEndDate))
+                .findFirst()
+                .ifPresent(conflict -> {
+                    throw new BusinessException(
+                            "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
+                                    + " already covers an overlapping effective date range ["
+                                    + describe(conflict.getEffectiveStartDate()) + ".."
+                                    + describe(conflict.getEffectiveEndDate())
+                                    + "]; end-date the existing entry before adding one with an overlapping range",
+                            "OVERLAPPING_PRICE_BOOK_ENTRY_RANGE"
+                    );
+                });
+    }
+
+    private String describe(LocalDate date) {
+        return date == null ? "open-ended" : date.toString();
     }
 
     private void validateEntryPriceRange(BigDecimal listPrice, BigDecimal floorPrice) {

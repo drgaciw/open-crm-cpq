@@ -69,4 +69,9 @@ public class PriceBookEntry extends BaseEntity {
         return (effectiveStartDate == null || !effectiveStartDate.isAfter(asOfDate))
                 && (effectiveEndDate == null || !effectiveEndDate.isBefore(asOfDate));
     }
+
+    /** DRG-431: whether this entry's EffectiveDateRange overlaps the given range. See {@link EffectiveDateRange}. */
+    public boolean overlapsRange(LocalDate otherStart, LocalDate otherEnd) {
+        return EffectiveDateRange.overlaps(effectiveStartDate, effectiveEndDate, otherStart, otherEnd);
+    }
 }

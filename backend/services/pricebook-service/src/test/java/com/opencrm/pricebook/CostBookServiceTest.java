@@ -14,6 +14,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,7 +62,101 @@ class CostBookServiceTest {
     }
 
     @Test
+    void createEntryRejectsOverlappingEffectiveDateRange() {
+        CostBook costBook = CostBook.builder().id(9L).currency("USD").build();
+        CostBookEntry existing = CostBookEntry.builder()
+                .id(1L)
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 6, 30))
+                .build();
+        CostBookEntryCreateRequest request = CostBookEntryCreateRequest.builder()
+                .sku("SKU-1")
+                .cost(new BigDecimal("30.00"))
+                .effectiveStartDate(LocalDate.of(2026, 4, 1))
+                .build();
+
+        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(9L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> costBookService.createEntry(9L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("overlapping effective date range")
+                .hasFieldOrPropertyWithValue("errorCode", "OVERLAPPING_COST_BOOK_ENTRY_RANGE");
+
+        verify(costBookEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void createEntryAllowsAdjacentNonOverlappingEffectiveDateRange() {
+        CostBook costBook = CostBook.builder().id(9L).currency("USD").build();
+        CostBookEntry existing = CostBookEntry.builder()
+                .id(1L)
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 6, 30))
+                .build();
+        CostBookEntry mappedEntry = CostBookEntry.builder().build();
+        CostBookEntryDto savedDto = CostBookEntryDto.builder().costBookId(9L).build();
+        CostBookEntryCreateRequest request = CostBookEntryCreateRequest.builder()
+                .sku("SKU-1")
+                .cost(new BigDecimal("30.00"))
+                .effectiveStartDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(9L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(existing));
+        when(costBookMapper.toEntryEntity(request)).thenReturn(mappedEntry);
+        when(costBookEntryRepository.save(mappedEntry)).thenReturn(mappedEntry);
+        when(costBookMapper.toEntryDto(mappedEntry)).thenReturn(savedDto);
+
+        CostBookEntryDto result = costBookService.createEntry(9L, request);
+
+        assertThat(result).isSameAs(savedDto);
+        verify(costBookEntryRepository).save(mappedEntry);
+    }
+
+    @Test
+    void updateEntryExcludesItselfFromTheOverlapCheck() {
+        CostBook costBook = CostBook.builder().id(9L).currency("USD").build();
+        CostBookEntry entryToUpdate = CostBookEntry.builder()
+                .id(1L)
+                .sku("SKU-1")
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .cost(new BigDecimal("30.00"))
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 6, 30))
+                .build();
+        // Only widening its own end date by a day; must not be rejected as "overlapping itself".
+        CostBookEntryUpdateRequest request = CostBookEntryUpdateRequest.builder()
+                .effectiveEndDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookEntryRepository.findByIdAndCostBookIdAndDeletedFalse(1L, 9L))
+                .thenReturn(Optional.of(entryToUpdate));
+        when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(9L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(entryToUpdate));
+        when(costBookEntryRepository.save(entryToUpdate)).thenReturn(entryToUpdate);
+        when(costBookMapper.toEntryDto(entryToUpdate)).thenReturn(CostBookEntryDto.builder().build());
+
+        costBookService.updateEntry(9L, 1L, request);
+
+        verify(costBookEntryRepository).save(entryToUpdate);
+    }
+
+    @Test
     void getCostPicksEntryEffectiveOnTheResolutionDateAndPrefersMostRecentStart() {
+        // Simulates data written before overlap validation existed (or outside it): CostBookService's own
+        // create/update path would now reject two open-ended, overlapping entries for the same key.
         CostBook costBook = CostBook.builder().id(9L).build();
         CostBookEntry older = CostBookEntry.builder()
                 .cost(new BigDecimal("30.00"))

@@ -95,8 +95,8 @@ public class CostBookService {
         CostBook costBook = requireCostBook(costBookId);
         ensureNotPublished(costBook);
         normalizeEntryCreateRequest(request, costBook);
-        validateNoExactDuplicate(costBookId, request.getSku(), request.getCurrency(), request.getUnitOfMeasure(),
-                request.getEffectiveStartDate(), null);
+        validateNoOverlappingEntry(costBookId, request.getSku(), request.getCurrency(), request.getUnitOfMeasure(),
+                request.getEffectiveStartDate(), request.getEffectiveEndDate(), null);
 
         CostBookEntry entry = costBookMapper.toEntryEntity(request);
         entry.setCostBook(costBook);
@@ -130,7 +130,9 @@ public class CostBookService {
         String targetUom = request.getUnitOfMeasure() != null ? request.getUnitOfMeasure() : entry.getUnitOfMeasure();
         LocalDate targetStart = request.getEffectiveStartDate() != null
                 ? request.getEffectiveStartDate() : entry.getEffectiveStartDate();
-        validateNoExactDuplicate(costBookId, targetSku, targetCurrency, targetUom, targetStart, entryId);
+        LocalDate targetEnd = request.getEffectiveEndDate() != null
+                ? request.getEffectiveEndDate() : entry.getEffectiveEndDate();
+        validateNoOverlappingEntry(costBookId, targetSku, targetCurrency, targetUom, targetStart, targetEnd, entryId);
 
         costBookMapper.updateEntryEntity(request, entry);
         CostBookEntry updated = costBookEntryRepository.save(entry);
@@ -150,8 +152,10 @@ public class CostBookService {
     /**
      * GetCost: resolves the cost for a SKU, currency and unit of measure as of a date, picking among the
      * candidate entries (there may be several date-ranged rows for the same SKU/currency/UOM) the one whose
-     * EffectiveDateRange covers {@code asOfDate}, preferring the most recently started one when more than one
-     * matches (overlapping ranges should not normally occur; see entry authoring validation).
+     * EffectiveDateRange covers {@code asOfDate}. Entry authoring rejects overlapping ranges for the same
+     * key ({@link #validateNoOverlappingEntry}), so at most one candidate can cover any given date; the
+     * "most recently started" pick below is then provably correct, not a tie-break over ambiguous data —
+     * it only matters for rows written before this validation existed or outside it (direct SQL, etc.).
      */
     @Transactional(readOnly = true)
     public PriceResolutionDto getCost(Long costBookId, String sku, String currency, String unitOfMeasure,
@@ -213,24 +217,39 @@ public class CostBookService {
     }
 
     /**
-     * Exact-match dedupe: rejects a second entry with the same Sku + currency + UnitOfMeasure +
-     * effectiveStartDate. Full date-range overlap validation across arbitrary windows is a known gap
-     * (see DRG-431 PR description).
+     * DRG-431: entries are keyed by Sku + currency + UnitOfMeasure + EffectiveDateRange, and the natural
+     * reading of that AC is that ranges for the same key must be non-overlapping — otherwise a resolution
+     * date could land in more than one entry, and GetCost would have to guess. Rejects (400) a
+     * create/update whose range overlaps any other non-deleted entry with the same Sku + currency +
+     * UnitOfMeasure in this cost book. See {@link EffectiveDateRange} for the overlap rule.
+     *
+     * <p>To replace an open-ended entry with a new version, end-date the existing one first (update its
+     * {@code effectiveEndDate}), then create the new entry.
      */
-    private void validateNoExactDuplicate(Long costBookId, String sku, String currency, String unitOfMeasure,
-                                           LocalDate effectiveStartDate, Long excludeEntryId) {
+    private void validateNoOverlappingEntry(Long costBookId, String sku, String currency, String unitOfMeasure,
+                                             LocalDate effectiveStartDate, LocalDate effectiveEndDate,
+                                             Long excludeEntryId) {
         List<CostBookEntry> candidates = costBookEntryRepository
                 .findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                         costBookId, sku, currency, unitOfMeasure);
-        boolean duplicate = candidates.stream()
+        candidates.stream()
                 .filter(entry -> excludeEntryId == null || !excludeEntryId.equals(entry.getId()))
-                .anyMatch(entry -> java.util.Objects.equals(entry.getEffectiveStartDate(), effectiveStartDate));
-        if (duplicate) {
-            throw new BusinessException(
-                    "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
-                            + " already exists with that effective start date",
-                    "DUPLICATE_COST_BOOK_ENTRY");
-        }
+                .filter(entry -> entry.overlapsRange(effectiveStartDate, effectiveEndDate))
+                .findFirst()
+                .ifPresent(conflict -> {
+                    throw new BusinessException(
+                            "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
+                                    + " already covers an overlapping effective date range ["
+                                    + describe(conflict.getEffectiveStartDate()) + ".."
+                                    + describe(conflict.getEffectiveEndDate())
+                                    + "]; end-date the existing entry before adding one with an overlapping range",
+                            "OVERLAPPING_COST_BOOK_ENTRY_RANGE"
+                    );
+                });
+    }
+
+    private String describe(LocalDate date) {
+        return date == null ? "open-ended" : date.toString();
     }
 
     private void normalizeCreateRequest(CostBookCreateRequest request) {

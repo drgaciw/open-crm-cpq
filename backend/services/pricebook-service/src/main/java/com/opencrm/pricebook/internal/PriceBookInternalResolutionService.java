@@ -73,9 +73,11 @@ public class PriceBookInternalResolutionService {
     }
 
     /**
-     * DRG-431: among a SKU's candidate entries, the one whose EffectiveDateRange covers {@code asOfDate},
-     * preferring the most recently started one when more than one matches. Falls back to a legacy entry with
-     * no date range at all (pre-DRG-431 data) when nothing date-ranged matches.
+     * DRG-431: among a SKU's candidate entries, the one whose EffectiveDateRange covers {@code asOfDate}.
+     * {@code PriceBookService} rejects overlapping ranges for the same Sku+currency+UnitOfMeasure at write
+     * time, so at most one candidate should ever match; "most recently started" is a defensive pick for
+     * rows that predate that validation or were written outside it, not a tie-break over data this service
+     * expects to see.
      */
     private PriceBookEntry bestEffectiveEntry(List<PriceBookEntry> candidates, LocalDate asOfDate) {
         return candidates.stream()

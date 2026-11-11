@@ -79,6 +79,119 @@ class PriceBookServiceTest {
     }
 
     @Test
+    void createEntryRejectsOverlappingEffectiveDateRange() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .currency("USD")
+                .effectiveDate(LocalDate.now().plusDays(1))
+                .build();
+        PriceBookEntry existing = PriceBookEntry.builder()
+                .id(1L)
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 6, 30))
+                .build();
+        PriceBookEntryCreateRequest request = PriceBookEntryCreateRequest.builder()
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .effectiveStartDate(LocalDate.of(2026, 4, 1))
+                .effectiveEndDate(LocalDate.of(2026, 12, 31))
+                .build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> priceBookService.createEntry(42L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("overlapping effective date range")
+                .hasFieldOrPropertyWithValue("errorCode", "OVERLAPPING_PRICE_BOOK_ENTRY_RANGE");
+
+        verify(priceBookEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void createEntryAllowsAdjacentNonOverlappingEffectiveDateRange() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .currency("USD")
+                .effectiveDate(LocalDate.now().plusDays(1))
+                .build();
+        PriceBookEntry existing = PriceBookEntry.builder()
+                .id(1L)
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 6, 30))
+                .build();
+        PriceBookEntry mappedEntry = PriceBookEntry.builder().build();
+        PriceBookEntryDto savedDto = PriceBookEntryDto.builder().priceBookId(42L).build();
+        PriceBookEntryCreateRequest request = PriceBookEntryCreateRequest.builder()
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .effectiveStartDate(LocalDate.of(2026, 7, 1))
+                .build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(existing));
+        when(priceBookMapper.toEntryEntity(request)).thenReturn(mappedEntry);
+        when(priceBookEntryRepository.save(mappedEntry)).thenReturn(mappedEntry);
+        when(priceBookMapper.toEntryDto(mappedEntry)).thenReturn(savedDto);
+
+        PriceBookEntryDto result = priceBookService.createEntry(42L, request);
+
+        assertThat(result).isSameAs(savedDto);
+        verify(priceBookEntryRepository).save(mappedEntry);
+    }
+
+    @Test
+    void updateEntryRejectsOverlapWithAnotherEntryButAllowsItsOwnUnchangedRange() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .currency("USD")
+                .effectiveDate(LocalDate.now().plusDays(1))
+                .build();
+        PriceBookEntry other = PriceBookEntry.builder()
+                .id(2L)
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.of(2026, 7, 1))
+                .effectiveEndDate(null)
+                .build();
+        PriceBookEntry entryToUpdate = PriceBookEntry.builder()
+                .id(1L)
+                .productExternalId("SKU-1")
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .listPrice(new BigDecimal("90.00"))
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 5, 31))
+                .build();
+        // Widening entryToUpdate's end date into other's range must be rejected.
+        PriceBookEntryUpdateRequest request = PriceBookEntryUpdateRequest.builder()
+                .effectiveEndDate(LocalDate.of(2026, 8, 31))
+                .build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByIdAndPriceBookIdAndDeletedFalse(1L, 42L))
+                .thenReturn(Optional.of(entryToUpdate));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of(other, entryToUpdate));
+
+        assertThatThrownBy(() -> priceBookService.updateEntry(42L, 1L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("overlapping effective date range")
+                .hasFieldOrPropertyWithValue("errorCode", "OVERLAPPING_PRICE_BOOK_ENTRY_RANGE");
+
+        verify(priceBookEntryRepository, never()).save(any());
+    }
+
+    @Test
     void publishMarksPriceBookPublishedAndEmitsEvent() {
         PriceBook priceBook = PriceBook.builder()
                 .id(42L)
