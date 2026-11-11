@@ -53,7 +53,7 @@ class RampCompoundingMigrationIntegrationTest {
             assertThat(insertStep.executeUpdate()).isEqualTo(1);
         }
 
-        migrations(null).migrate();
+        migrations("1.16").migrate();
         try (var connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              var statement = connection.createStatement()) {
             try (var row = statement.executeQuery("select ramp_escalator_compounding from quote.quote_line_items")) {

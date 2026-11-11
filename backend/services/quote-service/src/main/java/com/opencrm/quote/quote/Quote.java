@@ -50,6 +50,10 @@ public class Quote extends BaseEntity {
     @Column(name = "deal_external_id")
     private String dealExternalId;
 
+    @Column(name = "is_primary", nullable = false)
+    @Builder.Default
+    private boolean primary = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
