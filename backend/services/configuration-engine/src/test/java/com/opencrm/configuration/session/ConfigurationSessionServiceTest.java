@@ -174,6 +174,47 @@ class ConfigurationSessionServiceTest {
     }
 
     @Test
+    @DisplayName("keeps the original completion and event when a completed session is retried")
+    void completeRetryReturnsOriginalSnapshot() {
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any())).thenReturn(session);
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
+
+        ConfigurationSessionDto completed = sessionService.complete(1L);
+        ConfigurationSessionDto retry = sessionService.complete(1L);
+
+        verify(sessionRepository).save(session);
+        verify(outboxEventPublisher).publish(any(), any(), eq(EventContractRegistry.CONFIGURATION_COMMITTED_V1), any());
+        assertEquals(completed.getCompletedAt(), retry.getCompletedAt());
+        assertEquals(ConfigurationStatus.COMPLETED, retry.getStatus());
+    }
+
+    @Test
+    @DisplayName("validation returns the completed snapshot after the rules change")
+    void validateReturnsCompletedSnapshot() {
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(constraintSolver.evaluate(session)).thenReturn(
+                ConfigurationValidationResult.ok(),
+                ConfigurationValidationResult.of(List.of(ConfigurationViolation.builder()
+                        .ruleType("REQUIRES")
+                        .description("A new required option is missing")
+                        .build())));
+        when(sessionRepository.save(session)).thenReturn(session);
+
+        sessionService.validate(1L);
+        session.complete();
+        ConfigurationSessionDto completed = sessionService.validate(1L);
+
+        assertTrue(completed.isValid());
+        assertNull(completed.getValidationErrors());
+        assertEquals(ConfigurationStatus.COMPLETED, completed.getStatus());
+        verify(constraintSolver).evaluate(session);
+        verify(sessionRepository).save(session);
+    }
+
+    @Test
     @DisplayName("ADR-018 D4: the committed event is published under the correlation its payload carries")
     void completePublishesUnderThePayloadCorrelation() {
         session.markAsValid();

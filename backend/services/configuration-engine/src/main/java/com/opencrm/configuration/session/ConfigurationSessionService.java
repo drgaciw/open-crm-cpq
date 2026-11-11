@@ -93,6 +93,9 @@ public class ConfigurationSessionService {
 
     public ConfigurationSessionDto validate(Long sessionId) {
         ConfigurationSession session = findEntityById(sessionId);
+        if (session.getStatus() == ConfigurationStatus.COMPLETED) {
+            return sessionMapper.toDto(session);
+        }
         configurationModelCache.getOrCompile(session.getProductId(), configurationModelCompiler);
         applyConstraintResult(session, constraintSolver.evaluate(session));
         return sessionMapper.toDto(sessionRepository.save(session));
@@ -114,6 +117,9 @@ public class ConfigurationSessionService {
 
     public ConfigurationSessionDto complete(Long sessionId) {
         ConfigurationSession session = findEntityById(sessionId);
+        if (session.getStatus() == ConfigurationStatus.COMPLETED) {
+            return sessionMapper.toDto(session);
+        }
         session.complete(); // Throws if not valid
         ConfigurationSession saved = sessionRepository.save(session);
         publishConfigurationCommitted(saved);
