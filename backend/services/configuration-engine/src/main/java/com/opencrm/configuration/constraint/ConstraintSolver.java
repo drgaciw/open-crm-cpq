@@ -4,6 +4,7 @@ import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.configuration.evaluate.ProductRuleEvaluationCore;
 import com.opencrm.configuration.product.ProductConfigurationRuleClient;
+import com.opencrm.configuration.product.ProductConfigurationRuleDto;
 import com.opencrm.configuration.session.ConfigurationSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,37 @@ public class ConstraintSolver {
      */
     public List<String> validate(ConfigurationSession session) {
         return hardFailureMessages(evaluate(session));
+    }
+
+    /**
+     * Candidate option (product) ids not yet selected and not excluded by the current selections
+     * (GetSessionState, DRG-424). Drawn from REQUIRES/RECOMMENDS targets of the session's selected
+     * products, minus anything an EXCLUDES rule rules out and minus what is already selected.
+     * Computed live from {@link ProductConfigurationRuleClient}; not persisted on the session.
+     */
+    public List<Long> availableOptionIds(ConfigurationSession session) {
+        List<Long> selectedIds = selectedProductIds(session);
+        if (selectedIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> candidates = new LinkedHashSet<>();
+        Set<Long> excluded = new LinkedHashSet<>();
+        for (Long id : selectedIds) {
+            for (ProductConfigurationRuleDto rule : ruleClient.getRulesForProduct(id)) {
+                if (rule == null || rule.getTargetProductId() == null) {
+                    continue;
+                }
+                String type = rule.getRuleType() == null ? "" : rule.getRuleType().trim().toUpperCase();
+                if ("EXCLUDES".equals(type)) {
+                    excluded.add(rule.getTargetProductId());
+                } else if ("REQUIRES".equals(type) || "RECOMMENDS".equals(type)) {
+                    candidates.add(rule.getTargetProductId());
+                }
+            }
+        }
+        candidates.removeAll(excluded);
+        candidates.removeAll(selectedIds);
+        return List.copyOf(candidates);
     }
 
     /**

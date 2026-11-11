@@ -27,16 +27,28 @@ public class ConfigurationSessionController {
     private final ConfigurationSessionService sessionService;
     private final CurrentActor currentActor;
 
+    /**
+     * StartSession (DRG-424 / BC-02-01): against a catalog version and a product or a bundle — exactly
+     * one of {@code productId}/{@code bundleId} is required. {@code catalogVersion} is optional and
+     * recorded as given. Existing callers that pass only {@code productId} are unaffected.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a configuration session for the authenticated caller")
-    public ApiResponse<ConfigurationSessionDto> create(@RequestParam String productId) {
-        ConfigurationSessionDto session = sessionService.create(productId, currentActor.id());
+    @Operation(summary = "Start a configuration session for the authenticated caller, against a catalog "
+            + "version and a product or a bundle (StartSession)")
+    public ApiResponse<ConfigurationSessionDto> create(
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) String bundleId,
+            @RequestParam(required = false) String catalogVersion) {
+        ConfigurationSessionDto session =
+                sessionService.create(productId, bundleId, catalogVersion, currentActor.id());
         return ApiResponse.success(session, "Configuration session created");
     }
 
+    /** GetSessionState (DRG-424 / BC-02-01): selections, open violations, and available options. */
     @GetMapping("/{id}")
-    @Operation(summary = "Get configuration session by ID")
+    @Operation(summary = "Get configuration session state: selections, open violations, and available "
+            + "options (GetSessionState)")
     public ApiResponse<ConfigurationSessionDto> getById(@PathVariable Long id) {
         return ApiResponse.success(sessionService.getById(id));
     }

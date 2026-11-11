@@ -6,6 +6,8 @@ import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
+import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
@@ -92,6 +94,8 @@ class ConfigurationSessionServiceTest {
             s.setId(1L);
             return s;
         });
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
 
         ConfigurationSessionDto result = sessionService.create("PROD-001", "user-1");
 
@@ -99,6 +103,73 @@ class ConfigurationSessionServiceTest {
         assertEquals("PROD-001", result.getProductId());
         assertEquals(ConfigurationStatus.IN_PROGRESS, result.getStatus());
         assertNotNull(result.getExpiresAt());
+        verify(outboxEventPublisher).publish(
+                eq("ConfigurationSession"),
+                eq("1"),
+                eq(EventContractRegistry.CONFIGURATION_SESSION_STARTED_V1),
+                any()
+        );
+    }
+
+    @Test
+    @DisplayName("DRG-424 StartSession: records catalog version, rule-set version, and tenant; emits SessionStarted")
+    void startSessionRecordsCatalogRuleSetAndTenant() {
+        when(sessionRepository.save(any())).thenAnswer(inv -> {
+            ConfigurationSession s = inv.getArgument(0);
+            s.setId(2L);
+            return s;
+        });
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("PROD-001", "product-PROD-001-v1", Instant.now()));
+        AtomicReference<Object> payload = new AtomicReference<>();
+        doAnswer(invocation -> {
+            payload.set(invocation.getArgument(3));
+            return null;
+        }).when(outboxEventPublisher).publish(any(), any(), any(), any());
+
+        ConfigurationSessionDto result = sessionService.create("PROD-001", null, "catalog-v9", "user-1");
+
+        assertEquals("catalog-v9", result.getCatalogVersion());
+        assertEquals("product-PROD-001-v1", result.getRuleSetVersion());
+        assertNull(result.getBundleId());
+
+        ConfigurationSessionStartedEvent event = (ConfigurationSessionStartedEvent) payload.get();
+        assertEquals("2", event.getSessionId());
+        assertEquals("PROD-001", event.getProductId());
+        assertEquals("catalog-v9", event.getCatalogVersion());
+        assertEquals("product-PROD-001-v1", event.getRuleSetVersion());
+        assertEquals("start-configuration-session", event.getCorrelation().getCausationId());
+    }
+
+    @Test
+    @DisplayName("DRG-424 StartSession: against a bundle instead of a product")
+    void startSessionAgainstBundle() {
+        when(sessionRepository.save(any())).thenAnswer(inv -> {
+            ConfigurationSession s = inv.getArgument(0);
+            s.setId(3L);
+            return s;
+        });
+        when(configurationModelCache.getOrCompile(any(), any()))
+                .thenReturn(new ConfigurationModel("BUNDLE-001", "product-BUNDLE-001-v1", Instant.now()));
+
+        ConfigurationSessionDto result = sessionService.create(null, "BUNDLE-001", null, "user-1");
+
+        assertNull(result.getProductId());
+        assertEquals("BUNDLE-001", result.getBundleId());
+        assertEquals("product-BUNDLE-001-v1", result.getRuleSetVersion());
+    }
+
+    @Test
+    @DisplayName("DRG-424 StartSession: rejects when neither product nor bundle is given")
+    void startSessionRejectsWhenNeitherSubjectGiven() {
+        assertThrows(BusinessException.class, () -> sessionService.create(null, null, null, "user-1"));
+    }
+
+    @Test
+    @DisplayName("DRG-424 StartSession: rejects when both product and bundle are given")
+    void startSessionRejectsWhenBothSubjectsGiven() {
+        assertThrows(BusinessException.class,
+                () -> sessionService.create("PROD-001", "BUNDLE-001", null, "user-1"));
     }
 
     @Test
@@ -228,11 +299,34 @@ class ConfigurationSessionServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> sessionService.getById(99L));
     }
 
+    @Test
+    @DisplayName("DRG-424 GetSessionState: returns selections, open violations, and available options")
+    void getByIdReturnsSessionState() {
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(constraintSolver.evaluate(any())).thenReturn(ConfigurationValidationResult.of(List.of(
+                ConfigurationViolation.builder()
+                        .ruleType("REQUIRES")
+                        .description("Color is required")
+                        .build()
+        )));
+        when(constraintSolver.availableOptionIds(any())).thenReturn(List.of(20L, 30L));
+
+        ConfigurationSessionDto result = sessionService.getById(1L);
+
+        assertEquals(1, result.getOpenViolations().size());
+        assertEquals("Color is required", result.getOpenViolations().get(0).getDescription());
+        assertEquals(List.of(20L, 30L), result.getAvailableOptionIds());
+    }
+
     private static ConfigurationSessionDto dto(ConfigurationSession s) {
         return ConfigurationSessionDto.builder()
                 .id(s.getId())
                 .uuid(s.getUuid())
                 .productId(s.getProductId())
+                .bundleId(s.getBundleId())
+                .catalogVersion(s.getCatalogVersion())
+                .ruleSetVersion(s.getRuleSetVersion())
+                .tenantId(s.getTenantId())
                 .userId(s.getUserId())
                 .status(s.getStatus())
                 .selections(s.getSelections() == null ? Map.of() : Map.copyOf(s.getSelections()))
