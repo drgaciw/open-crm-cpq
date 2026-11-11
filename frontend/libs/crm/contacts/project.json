@@ -7,16 +7,13 @@
   "tags": [],
   "targets": {
     "test": {
-      "executor": "@nx/vitest:test",
       "outputs": [
-        "{options.reportsDirectory}"
+        "{projectRoot}/{options.coverage.reportsDirectory}",
+        "{workspaceRoot}/coverage/libs/crm/contacts"
       ],
       "options": {
-        "reportsDirectory": "{projectRoot}/../../../coverage/libs/crm/contacts"
+        "coverage.reportsDirectory": "../../../coverage/libs/crm/contacts"
       }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint"
     }
   }
 }
