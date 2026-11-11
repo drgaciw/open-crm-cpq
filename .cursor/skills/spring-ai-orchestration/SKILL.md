@@ -56,7 +56,7 @@ export OPENCRM_GATEWAY_BASE_URL=http://localhost:8080
 | `GET /api/v1/ai/orchestrations` | List workflows |
 | `POST /api/v1/ai/orchestrations/{workflowId}/invoke` | Workflow (e.g. `deal-desk`) |
 
-Port **8086** (gateway: `/api/v1/ai/**`).
+Port **8090** (gateway: `/api/v1/ai/**`).
 
 ## Critical agent IDs
 
@@ -81,9 +81,9 @@ Port **8086** (gateway: `/api/v1/ai/**`).
 ## Targeted tests
 
 ```bash
-mvn -pl backend/services/ai-service test -Dtest=CpqAgentToolsTest
-mvn -pl backend/services/ai-service test -Dtest=AgentRouterFeatureFlagTest
-mvn -pl backend/services/ai-service test -Dtest=*AgentTest
+mvn -f backend/pom.xml -pl services/ai-service test -Dtest=CpqAgentToolsTest
+mvn -f backend/pom.xml -pl services/ai-service test -Dtest=AgentRouterFeatureFlagTest
+mvn -f backend/pom.xml -pl services/ai-service test -Dtest=*AgentTest
 ```
 
 ## Integrated Cursor agents

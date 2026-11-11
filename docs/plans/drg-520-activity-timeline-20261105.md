@@ -38,7 +38,7 @@ DRG-521 separately owns per-user Google/Microsoft grants, encrypted refresh toke
 
 The activity lane owns new `com.opencrm.crm.activity` production/tests plus `V16__activity_timeline.sql`, this plan and parity inventory. A child implemented new `frontend/libs/crm/activities` client/models/tests and independently reviewed backend semantics. A second child wrote PostgreSQL/Flyway/concurrency tests and challenged timestamp precision. The root owns gateway predicates, client discoverability, test-script inclusion and steering-doc integration. Existing duplicate/custom-field worker packages are untouched.
 
-The root verified current fetched main and local CRM inventory through V15 and allocated **V16 locally**. Reconcile main and external workers' migration claims before any future push/merge; DRG-514a is unpushed and does not reserve a version. Do not use `V1_15`: it sorts before V2, not after V15. Additive rollback is reverting application code while retaining the unused table; destructive table removal requires checking and preserving any activity data first. No deployed migration or data apply occurred.
+The root initially allocated V16 locally. During the main-branch sync, CRM V16 and V17 were already allocated, so the activity migration moved to `V18__activity_timeline.sql`. No deployed migration or data apply was recorded. Additive rollback is reverting application code while retaining the unused table; destructive table removal requires checking and preserving any activity data first.
 
 ## Validation evidence and remaining gaps
 

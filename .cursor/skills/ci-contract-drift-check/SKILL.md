@@ -10,7 +10,7 @@ description: >-
 
 ## When to use
 
-- Any change to [Jenkinsfile](Jenkinsfile), [.github/workflows/ci.yml](.github/workflows/ci.yml), [scripts/ci/](scripts/ci/), or [docs/ci-contract.yaml](docs/ci-contract.yaml).
+- Any change to [Jenkinsfile](../../../Jenkinsfile), [.github/workflows/ci.yml](../../../.github/workflows/ci.yml), [scripts/ci/](../../../scripts/ci/), or [docs/ci-contract.yaml](../../../docs/ci-contract.yaml).
 - After `ci-ssot-editor` completes a stage add/remove/reorder.
 
 ## Run verification
@@ -21,7 +21,7 @@ From repository root:
 python .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
 ```
 
-Optional contract verify commands from [docs/ci-contract.yaml](docs/ci-contract.yaml):
+Optional contract verify commands from [docs/ci-contract.yaml](../../../docs/ci-contract.yaml):
 
 ```bash
 bash scripts/ci/run-core.sh toolchain
@@ -30,7 +30,7 @@ bash scripts/ci/run-core.sh toolchain
 ## What the script checks
 
 1. GHA `backend-integration` `needs` matches contract (`shared-libraries`, `backend-unit` only).
-2. Both platforms invoke `scripts/ci/run-core.sh` for each SSOT stage.
+2. Both platforms invoke `scripts/ci/run-core.sh` for each shared SSOT stage.
 3. GHA does **not** reference `ai-assist` (Jenkins-only per ADR-003).
 4. Jenkinsfile contains required stage names (Toolchain through Security Audit).
 

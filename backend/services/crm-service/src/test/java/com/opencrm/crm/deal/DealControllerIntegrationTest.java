@@ -133,6 +133,37 @@ class DealControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("Create deal with a term stores it and returns it (DRG-636)")
+    void createDeal_withTermMonths_returnsTerm() throws Exception {
+        DealCreateRequest request = DealCreateRequest.builder()
+                .name("Three year licence")
+                .amount(new BigDecimal("360000"))
+                .termMonths(36)
+                .build();
+
+        mockMvc.perform(post("/api/v1/deals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.termMonths").value(36));
+    }
+
+    @Test
+    @DisplayName("Create deal with a zero term returns 422 (DRG-636)")
+    void createDeal_withZeroTermMonths_returns422() throws Exception {
+        DealCreateRequest request = DealCreateRequest.builder()
+                .name("Test Deal")
+                .termMonths(0)
+                .build();
+
+        mockMvc.perform(post("/api/v1/deals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     @DisplayName("Get deal by ID returns 200")
     void getDeal_withExistingId_returns200() throws Exception {
         DealCreateRequest request = DealCreateRequest.builder()

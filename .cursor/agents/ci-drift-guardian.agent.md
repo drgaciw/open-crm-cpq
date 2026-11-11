@@ -11,7 +11,7 @@ You are **CI drift guardian**.
 
 ## Mission
 
-Ensure **GitHub Actions** and **Jenkins** stay aligned with [docs/ci-contract.yaml](docs/ci-contract.yaml).
+Ensure **GitHub Actions** and **Jenkins** stay aligned with [docs/ci-contract.yaml](../../docs/ci-contract.yaml).
 
 ## Required skill
 

@@ -11,7 +11,7 @@ last_reviewed: "2026-10-16"
 toolchain:
   java_version: "25"
   java_distribution: temurin
-  node_version: "22.22.3"
+  node_version: "22.23.4"
   jenkins_war_image: jenkins/jenkins:2.492.3-lts-jdk21
   jenkins_maven_java_home: /opt/java/temurin-25
   service_runtime_image: eclipse-temurin:25-jre-alpine
@@ -145,11 +145,11 @@ github_actions:
     frontend:
       needs: []
       run: bash scripts/ci/run-core.sh frontend
-      notes: actions/setup-node 22.22.3 (Angular 22 min)
+      notes: actions/setup-node 22.23.4 (Angular 22 min)
     security-audit:
       needs: []
       run: bash scripts/ci/run-core.sh security-audit
-      notes: actions/setup-node 22.22.3 + actions/setup-java temurin 25
+      notes: actions/setup-node 22.23.4 + actions/setup-java temurin 25
   needs_graph:
     # Integration gates only on shared-libraries + backend-unit (not frontend or cpq-beta)
     backend-integration:
@@ -168,6 +168,11 @@ github_pr_gate:
   runs:
     - python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
     - bash scripts/ci/run-core.sh backend-unit
+  # Second job (ADR-003 section 7, amendment 2026-11-10): the frontend stage, unchanged.
+  frontend_job: frontend
+  frontend_job_name: Frontend (PR gate)
+  frontend_runs:
+    - bash scripts/ci/run-core.sh frontend
   ai_assist: false
   required_check_possible: false
   notes: >-
@@ -192,6 +197,13 @@ github_main_gate:
   notes: >-
     Same Docker-free stage as the pull-request gate. Must trigger on push to main only, never on
     pull_request. A red run means the merge burst it covered broke main: fix or revert next.
+  # Amendment 2026-11-10: main-verify.yml and the nightly ci.yml each end with a report job that
+  # opens or closes one issue labelled main-red. It is the only job with issues: write.
+  report_script: scripts/ci/report-main-status.sh
+  report_label: main-red
+  report_workflows:
+    - .github/workflows/main-verify.yml
+    - .github/workflows/ci.yml
 
 jenkins:
   file: Jenkinsfile
@@ -201,7 +213,7 @@ jenkins:
   github_status_context: jenkins/opencrm-cpq-ci
   toolchain_note: >-
     Jenkins-only; no GHA equivalent job. Controller WAR is 2.492.3-lts-jdk21;
-    Maven JAVA_HOME is Temurin 25; Node 22.22.3. Do not move Jenkins core to JDK 27.
+    Maven JAVA_HOME is Temurin 25; Node 22.23.4. Do not move Jenkins core to JDK 27.
   stages_ordered:
     - name: Checkout
       type: scm

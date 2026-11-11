@@ -54,9 +54,9 @@ On `main` (and release branches as needed):
 
 ## PR gate on GitHub Actions (added 2026-09-28)
 
-`.github/workflows/pr-check.yml` runs on every pull request to `main` and executes the drift check plus `scripts/ci/run-core.sh backend-unit`. It exists because no Jenkins instance was reachable, so `main` had no commit statuses; see ADR-003 section 7.
+`.github/workflows/pr-check.yml` runs on every pull request to `main` and executes the drift check plus `scripts/ci/run-core.sh backend-unit`, and since 2026-11-10 a second job that runs `scripts/ci/run-core.sh frontend`. It exists because no Jenkins instance was reachable, so `main` had no commit statuses; see ADR-003 section 7.
 
-- It is fast and Docker-free. Integration, frontend and AI assist remain Jenkins-only or manual.
+- It is Docker-free. Integration and AI assist remain Jenkins-only or manual.
 - The repository is private and the plan offers no branch protection (the API answers 403), so the check cannot be marked required. Merge only when **Backend Unit (PR gate)** is green: `gh pr checks <n> --watch`.
 - If Jenkins comes back, keep requiring `jenkins/opencrm-cpq-ci` as described above. This job stays as the quick first signal.
 
@@ -67,6 +67,7 @@ See ADR-003 section 8.
 - `.github/workflows/main-verify.yml` runs **Backend Unit (main)** on every push to `main`. Merges in a burst cancel each other's runs, so the newest head is always the one verified. A red result means the burst it covered broke `main`; fix or revert before the next merge.
 - `.github/workflows/ci.yml` also runs on a nightly schedule (02:17 UTC), so integration (Testcontainers), frontend, `cpq_beta` and the security audit run on `main` once a day while Jenkins is unreachable.
 - Check the latest result: `gh run list --workflow main-verify.yml --branch main --limit 1` and `gh run list --workflow ci.yml --limit 1`.
+- Since 2026-11-10 a red run on `main` (either workflow) opens an issue labelled `main-red`, and the next green run closes it: `gh issue list --label main-red`.
 
 ## Manual GHA fallback
 

@@ -56,7 +56,8 @@ class QuoteServiceTenantTest {
 
     static final String OWNER_WORDING = "tenantId is the Entra `tid` claim: a per-deployment value "
             + "(single issuer per deployment, ADR-016), chosen by the owner on 2026-10-23 as a deliberately "
-            + "weak interim. It is NOT a real per-tenant id, and the planned event follow-up inherits this limit.";
+            + "weak interim. It is NOT a real per-tenant id. DRG-631 publishes this same value on QuoteAccepted "
+            + "and inherits this limit.";
 
     private static final String STORED = "tenant-a";
     private static final String CALLER = "tenant-b";

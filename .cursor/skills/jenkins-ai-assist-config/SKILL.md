@@ -25,7 +25,7 @@ Prod: vault → Jenkins credential only.
 ## Guardrails (ADR-003)
 
 - **Do not** set `LLM_ENDPOINT` to `http://ai-service:8086` — product AgentRouter, not chat API.
-- **Do not** add `ai-assist` to [.github/workflows/ci.yml](.github/workflows/ci.yml).
+- **Do not** add `ai-assist` to [.github/workflows/ci.yml](../../../.github/workflows/ci.yml).
 
 ## Reports
 
@@ -37,7 +37,7 @@ Archived under `ci-reports/`:
 
 ## Stages
 
-Via [Jenkinsfile](Jenkinsfile) when `AI_CI_ENABLED=true`:
+Via [Jenkinsfile](../../../Jenkinsfile) when `AI_CI_ENABLED=true`:
 
 - `code_review`, `test_suggestions` (main pipeline)
 - `log_analysis` (post failure)
@@ -48,5 +48,5 @@ Consult **`jenkins-ai-gate-curator`** before `AI_CI_BLOCKING=true`.
 
 ## Related
 
-- [infra/jenkins/ai-assist/ai_client.py](infra/jenkins/ai-assist/ai_client.py)
+- [infra/jenkins/ai-assist/ai_client.py](../../../infra/jenkins/ai-assist/ai_client.py)
 - Playbook: `ai-advisory-on`

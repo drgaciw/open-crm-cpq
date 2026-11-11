@@ -1,6 +1,7 @@
 package com.opencrm.crm.deal;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -36,6 +37,9 @@ public class DealCreateRequest {
     private String currency = "USD";
 
     private LocalDate expectedCloseDate;
+
+    @Positive(message = "Term must be a positive number of months")
+    private Integer termMonths;
 
     private String description;
 

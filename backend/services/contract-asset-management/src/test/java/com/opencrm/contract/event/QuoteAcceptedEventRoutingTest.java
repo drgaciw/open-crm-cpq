@@ -39,8 +39,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Built routing cells only. R4, R5, R6 and R8 are not built: there is no event tenant and no document path.
- * Every built cell calls legacy apply exactly once.
+ * Built routing cells only. R4, R5, R6 and R8 are not built: there is no document path.
+ * DRG-631 publishes an optional event tenant (interim tid); {@link AmendmentRoutingFlag#decide} still
+ * returns only {@link AmendmentRoutingDecision#LEGACY}. Every built cell calls legacy apply exactly once.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -141,7 +142,7 @@ class QuoteAcceptedEventRoutingTest {
         consumer.handleQuoteAccepted(delivery);
         consumer.handleQuoteAccepted(delivery);
 
-        verify(acceptedQuotes, times(1)).apply(any());
+        verify(acceptedQuotes, times(1)).apply(any(), any());
         assertThat(meters.counter(AmendmentRoutingFlag.ROUTED_LEGACY).count()).isEqualTo(1.0);
         assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
     }
@@ -174,7 +175,7 @@ class QuoteAcceptedEventRoutingTest {
             pool.shutdownNow();
         }
 
-        verify(acceptedQuotes, times(1)).apply(any());
+        verify(acceptedQuotes, times(1)).apply(any(), any());
         assertThat(meters.counter(AmendmentRoutingFlag.DOCUMENT_PATH_SELECTED).count()).isZero();
     }
 
@@ -189,7 +190,7 @@ class QuoteAcceptedEventRoutingTest {
         }
 
         ArgumentCaptor<QuoteAcceptedEvent> applied = ArgumentCaptor.forClass(QuoteAcceptedEvent.class);
-        verify(acceptedQuotes, times(3)).apply(applied.capture());
+        verify(acceptedQuotes, times(3)).apply(applied.capture(), any());
         assertThat(applied.getAllValues()).allSatisfy(event -> {
             assertThat(event.getAmendmentDocumentId()).isNull();
             assertThat(event.getQuoteId()).isNotBlank();
@@ -203,6 +204,27 @@ class QuoteAcceptedEventRoutingTest {
      * A malformed id and an unknown well-formed id stay on the legacy path for flag-off and for a set flag
      * with no event tenant. A throw would be the existing non-retryable dead-letter path; this delivery must not take it.
      */
+    @Test
+    @DisplayName("DRG-631: tenant present and listed still stays on legacy; document path remains unbuilt")
+    void tenantPresentAndListedStillTakesLegacyPath() {
+        AmendmentRoutingFlag flag = AmendmentRoutingFlag.forTenants("tid-interim-deployment");
+        assertThat(flag.isDocumentPathEnabledFor("tid-interim-deployment")).isTrue();
+        bind(flag);
+        String payload = """
+                {"eventType":"QuoteAccepted","eventVersion":1,"quoteId":"Q-TENANT","customerId":"C-1",\
+                "currencyCode":"USD","tenantId":"tid-interim-deployment",\
+                "amendmentDocumentId":"11111111-1111-4111-8111-0000000000a1"}""";
+
+        consumer.handleQuoteAccepted(record("Q-TENANT", payload));
+
+        QuoteAcceptedEvent applied = captureSingleApply();
+        assertThat(applied.getTenantId()).isEqualTo("tid-interim-deployment");
+        assertThat(applied.getAmendmentDocumentId()).isEqualTo("11111111-1111-4111-8111-0000000000a1");
+        assertThat(flag.decide(applied)).isEqualTo(AmendmentRoutingDecision.LEGACY);
+        assertThat(AmendmentRoutingDecision.values()).containsExactly(AmendmentRoutingDecision.LEGACY);
+        assertLegacyMetrics();
+    }
+
     @Test
     @DisplayName("malformed or unknown document id stays on legacy apply, flag off and no tenant")
     void malformedOrUnknownDocumentIdTakesLegacyPathUnchanged() {
@@ -245,7 +267,7 @@ class QuoteAcceptedEventRoutingTest {
 
     private QuoteAcceptedEvent captureSingleApply() {
         ArgumentCaptor<QuoteAcceptedEvent> applied = ArgumentCaptor.forClass(QuoteAcceptedEvent.class);
-        verify(acceptedQuotes, times(1)).apply(applied.capture());
+        verify(acceptedQuotes, times(1)).apply(applied.capture(), any());
         return applied.getValue();
     }
 

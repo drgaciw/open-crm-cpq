@@ -3,7 +3,9 @@
 # Runs the same Docker-free stage that Jenkins runs (scripts/ci/run-core.sh backend-unit) plus the
 # blocking CI-contract drift check, so the security-baseline and event-contract fitness tests
 # (ADR-016, ADR-018) run on every pull request even while no Jenkins instance is reachable.
-# Jenkins stays the primary CI and still owns integration, frontend and the AI assist stages.
+# The frontend job (ADR-003 section 7, amendment 2026-11-10) runs the same frontend stage as Jenkins
+# and the nightly ci.yml, so a lockfile or Nx break is caught before merge.
+# Jenkins stays the primary CI and still owns integration and the AI assist stages.
 name: PR check
 
 on:
@@ -23,8 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
@@ -38,9 +40,23 @@ jobs:
         run: python3 scripts/ci/report-test-failures.py
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-check-unit-test-reports
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+
+  frontend:
+    name: Frontend (PR gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26.13.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build, lint, test
+        run: bash scripts/ci/run-core.sh frontend

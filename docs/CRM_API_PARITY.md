@@ -152,7 +152,7 @@ Lead/Deal search previously put a Spring `Page` inside `data`. Batch 0 (`feat/fo
 
 | Layer | State |
 |---|---|
-| `crm-service` | New `com.opencrm.crm.activity` package; `V16__activity_timeline.sql` (local allocation; reconcile before push) |
+| `crm-service` | New `com.opencrm.crm.activity` package; `V18__activity_timeline.sql` |
 | Gateway | `/api/v1/activities/**` CRM predicate in default/dev configuration; existing token relay/CSRF posture |
 | FE | `frontend/libs/crm/activities` exports the typed HTTP client/model; no timeline screen added |
 | Legacy | `cpq_beta/crm/api/activities.py` `get_activities` maps conceptually to GET timeline for deals; legacy lead-only activity/todo/communication aggregation is not reimplemented |

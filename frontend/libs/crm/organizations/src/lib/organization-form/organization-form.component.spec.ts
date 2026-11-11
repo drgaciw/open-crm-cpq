@@ -24,7 +24,7 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     await TestBed.configureTestingModule({
       imports: [OrganizationFormComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: '**', children: [] }]),
         provideNoopAnimations(),
         {
           provide: OrganizationService,
@@ -139,7 +139,7 @@ describe('OrganizationFormComponent reused edit route', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [OrganizationFormComponent],
-      providers: [provideRouter([]), provideNoopAnimations(), provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideRouter([{ path: '**', children: [] }]), provideNoopAnimations(), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(OrganizationFormComponent);

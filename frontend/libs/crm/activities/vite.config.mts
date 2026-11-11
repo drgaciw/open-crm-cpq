@@ -7,6 +7,9 @@ export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../../node_modules/.vite/libs/crm/activities',
   plugins: [angular(), nxViteTsPaths()],
+  resolve: {
+    tsconfigPaths: true,
+  },
   test: {
     name: 'crm-activities',
     watch: false,

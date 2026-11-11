@@ -8,7 +8,7 @@ ADR, October ramp, CSRF, and S3E worktree branches against `origin/main` at
 The aggregate records the original branch tips as merge parents while retaining
 the newer upstream implementation. It restores one genuinely missing file:
 `AiServiceAggregateOwnershipBoundaryTest.java`, copied unchanged from S3E-4.
-Its three tests verify the audit schema, the AI service's entity boundary, and
+Its five tests verify the audit schema, the AI service's entity boundary, and
 the absence of commercial aggregate repositories. No production code is changed.
 
 ## Branch decisions
@@ -57,12 +57,12 @@ dual-read, Activities, or other held feature is enabled by this reconciliation.
 
 Full file-by-file blob identities, latest upstream modifying commits, snapshot
 diffs, and normal merge previews were retained in the local housekeeping archive
-under `C:/Users/dgorn/worktree-housekeeping-20261104/`.
+under `C:/Users/<username>/worktree-housekeeping-20261104/`.
 
 ## Validation and limits
 
 The targeted Maven reactor build compiled the current AI service and its test
-sources. `AiServiceAggregateOwnershipBoundaryTest` passed all three tests using
+sources. `AiServiceAggregateOwnershipBoundaryTest` passed all five tests using
 the normal forked Surefire JVM. An earlier diagnostic run with `forkCount=0`
 failed because its reactor working directory changed the test's relative source
 path; rerunning with normal Surefire forking passed without source changes.

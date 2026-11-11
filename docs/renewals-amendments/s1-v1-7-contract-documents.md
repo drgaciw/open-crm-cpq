@@ -60,7 +60,7 @@ COMMIT;
 - DRG-582 (S4): apply, `document_apply_ledger` (V1_9). `applied_quote_acceptances` stays as it is.
 - DRG-584 (S6): schema-registry event contracts.
 - DRG-585 (S7): header backfill (V1_8). `subscriptions.customer_id` is varchar today; `contracts.customer_account_id` is uuid.
-- DRG-458: richer contract header fields.
+- DRG-458: richer contract header fields. Related Decision brief (Proposed): [prereq/story-drg-458-generate-contract-decision-brief.md](prereq/story-drg-458-generate-contract-decision-brief.md).
 - DRG-592: `precedence_flag`, not part of this header.
 - DRG-313 / OQ8: computing `retention_until`. The column stays null.
 - Ops: point the CAM login at `cam_app` when the service should lose owner rights on the event table. Not required for the trigger.

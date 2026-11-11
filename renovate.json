@@ -2,5 +2,75 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "description": "Major updates open only when ticked on the Dependency Dashboard.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Angular, its CLI, Material/CDK/Aria and Analog move together.",
+      "groupName": "angular ecosystem",
+      "matchPackageNames": [
+        "@angular/**",
+        "@angular-devkit/**",
+        "@angular-eslint/**",
+        "@schematics/angular",
+        "@analogjs/**"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    },
+    {
+      "description": "ESLint and typescript-eslint move together.",
+      "groupName": "lint tooling",
+      "matchPackageNames": [
+        "eslint",
+        "@eslint/**",
+        "typescript-eslint",
+        "@typescript-eslint/**"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    },
+    {
+      "description": "Spring Boot minors need an owner decision (backend/pom.xml hold on the Azure line); patches flow.",
+      "matchPackageNames": [
+        "org.springframework.boot:spring-boot-starter-parent"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "springdoc 2.10.0 broke the gateway context on Spring Boot 4 (#922, reverted in #947). Held until a Boot 4 compatible line is chosen.",
+      "matchPackageNames": [
+        "org.springdoc:**"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "TypeScript follows the range Angular supports; minors need an owner decision.",
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "dependencyDashboardApproval": true
+    }
   ]
 }

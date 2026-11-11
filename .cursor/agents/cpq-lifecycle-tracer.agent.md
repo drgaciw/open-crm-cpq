@@ -34,11 +34,11 @@ Lead (CRM) → qualify → convert → Deal (CRM)
 
 | Service | Port | Gateway prefix | Primary lifecycle role |
 |---------|------|----------------|------------------------|
-| crm-service | 8081 | `/api/v1/crm/**` | Lead, Deal, Contact, Organization |
+| crm-service | 8081 | `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` | Lead, Deal, Contact, Organization |
 | pricing-service | 8082 | `/api/v1/pricing/**` | Pricing waterfall, rules, audit |
-| configuration-engine | 8083 | `/api/v1/configuration/**` | Product configuration validation |
+| configuration-engine | 8088 | `/api/v1/configurations/**` | Product configuration validation |
 | quote-service | 8084 | `/api/v1/quotes/**` | Quote state machine, approvals, PDF |
-| ai-service | 8086 | `/api/v1/ai/**` | Agent tools, workflow orchestration |
+| ai-service | 8090 | `/api/v1/ai/**` | Agent tools, workflow orchestration |
 | gateway-service | 8080 | entry point | Routes, circuit breakers |
 
 ## State machines to respect
@@ -64,8 +64,8 @@ Guarded transitions only — never skip states unless an explicit API supports i
 3. **Trace the flow** — Use `gitnexus_query` / `gitnexus_context` / process resources for ordered execution paths; open source only after graph confirms the route.
 4. **Verify contracts** — Event DTOs, external IDs (`dealExternalId`), idempotency keys, correlation IDs. Compare producer and consumer payloads.
 5. **Reproduce narrowly** — Prefer targeted Maven tests over full-suite runs:
-   - CRM lifecycle: `mvn -pl backend/services/crm-service test -Dtest=LeadToDealLifecycleTest`
-   - Event contracts: `mvn -pl backend/libs/common test -Dtest=PublishedEventContractTest`
+   - CRM lifecycle: `mvn -f backend/pom.xml -pl services/crm-service test -Dtest=LeadToDealLifecycleTest`
+   - Event contracts: `mvn -f backend/pom.xml -pl libs/common test -Dtest=PublishedEventContractTest`
    - Adjust module/test name to match the failing seam.
 6. **Fix minimally** — One seam at a time. Preserve state-machine guards and idempotency.
 7. **Verify** — Re-run affected tests; run `gitnexus_detect_changes()` before any commit.

@@ -4,6 +4,10 @@
 
 **Current authority:** The linked record assigns a disposition to every fork in this frame and supplies overriding contracts. All proposal labels, owner-confirmation requests, defaults and open-question wording below are the historical pre-decision frame at `285ffef8e08274600090d8ba077a0c92f489c062`. They are retained as rationale/alternatives, not additional current owner gates. Evidence and implementation claims retain their original dates and limits.
 
+**Related Decision brief (DRG-598):** Residual delivery forks after Adopted call #14/#15 / F-598-1..F-598-7 are scored in [`story-drg-598-migration-phases-decision-brief.md`](story-drg-598-migration-phases-decision-brief.md). That brief does **not** reopen those Adopted cells; product code / schema / backfill-execution / flag / gateway-route remain NO-GO until its OQ-598-* slots close. S7-class data runs stay separately gated (named env, dry-run counts, restore point, owner GO). Visibility and queue residual forks stay on the DRG-595 / DRG-597 Decision briefs (draft PRs #826 / #828) — cite only, do not adopt here.
+
+**Related Decision brief (DRG-595):** Residual delivery forks after these Adopted cells are scored in [`story-drg-595-visibility-decision-brief.md`](story-drg-595-visibility-decision-brief.md). That brief does **not** reopen F-595-1..F-595-7; product code / schema / flag / gateway-route remain NO-GO until its OQ-595-* slots close.
+
 ## Historical decision frame
 
 

@@ -28,18 +28,6 @@ Source: `agent-prd.md` §4, `agents/HANDOFFS.md`.
 → 030 Contract Lifecycle [on acceptance]
 ```
 
-## 2. Deal desk workflow (orchestration API)
-
-```
-POST /api/v1/ai/orchestrations/deal-desk/invoke
-  → WorkflowOrchestrator
-    → cpq-agent-037 Deal Desk Workflow Orchestration
-    → cluster: cpq-agent-01, cpq-agent-02, cpq-agent-03
-Sequence inside 037:
-  024 Approval Routing → 025 Exception Handling → 031 Document Gen → 030 Contract
-  Audit: 036 at each gate
-```
-
 ## 3. Renewal flow
 
 ```
