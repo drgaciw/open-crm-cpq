@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Guards the application-layer half of DRG-309's "updates and deletes are rejected" requirement: even if someone
  * later changes {@link AuditEntryRepository} to extend {@code JpaRepository}/{@code CrudRepository} (which both
  * expose {@code delete}/{@code deleteAll}), this test fails and says why. The database trigger in
- * {@code V18__audit_entries.sql} (crm-service) is the independent, storage-layer half of that guarantee.
+ * {@code V20__audit_entries.sql} (crm-service) is the independent, storage-layer half of that guarantee.
  */
 class AuditEntryRepositoryContractTest {
 
