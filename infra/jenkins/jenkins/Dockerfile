@@ -1,7 +1,7 @@
 # Custom Jenkins controller for OpenCRM CPQ monorepo CI
 # Build context: infra/jenkins (see docker-compose.jenkins.yml)
-# Jenkins WAR stays on image JDK 21 (2.492.3 supports 17/21, not 25/27).
-FROM jenkins/jenkins:2.580.2-lts-jdk21
+# Jenkins WAR on image JDK 25 (LTS ≥2.541.1 supports Java 25; pinned 2.580.2-lts-jdk25).
+FROM jenkins/jenkins:2.580.2-lts-jdk25
 
 USER root
 
@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     docker.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 22.23.4 (Angular 22 min; matches GHA setup-node). Pin — do not float on nodesource latest.
-ARG NODE_VERSION=22.23.4
+# Node.js 24.22.3 LTS (matches GHA setup-node in ci.yml). Pin — do not float on nodesource latest.
+ARG NODE_VERSION=24.22.3
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
@@ -30,8 +30,9 @@ RUN set -eux; \
       | tar -xJ -C /usr/local --strip-components=1; \
     node -v | grep -F "v${NODE_VERSION}"
 
-# Temurin 25 LTS for Maven. Do not prepend JAVA_HOME/bin to PATH: jenkins.sh
-# `exec java` must keep resolving the image JDK 21 for the controller WAR.
+# Temurin 25 LTS for Maven (kept separate from image JDK for smallest change).
+# Do not prepend JAVA_HOME/bin to PATH: jenkins.sh `exec java` must keep
+# resolving the image JDK for the controller WAR.
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \

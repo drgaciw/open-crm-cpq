@@ -30,6 +30,7 @@ public class SubscriptionService {
     private final ErpAdapter erpAdapter;
     private final SubscriptionMapper subscriptionMapper;
     private final SubscriptionRateApplyService rateApply;
+    private final CancellationNoticePolicy cancellationNotice;
 
     @Transactional(readOnly = true)
     public SubscriptionDto getById(Long id) {
@@ -82,6 +83,7 @@ public class SubscriptionService {
 
     public SubscriptionDto cancel(Long id) {
         Subscription subscription = findEntityById(id);
+        cancellationNotice.enforce(subscription);
         subscription.cancel();
         Subscription saved = subscriptionRepository.save(subscription);
         log.info("Cancelled subscription: {}", saved.getSubscriptionNumber());
