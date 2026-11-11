@@ -201,7 +201,7 @@ class SubscriptionServiceTest {
     void cancelInsideNoticeWindowIsRejectedAndNotPersisted() {
         pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
         pendingSubscription.setEndDate(TODAY.plusDays(1));
-        stubPersist();
+        stubLoad();
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> noticeService(NOTICE_DAYS).cancel(1L));
@@ -245,7 +245,7 @@ class SubscriptionServiceTest {
     void cancelOneDayPastBoundaryIsRejected() {
         pendingSubscription.setStatus(SubscriptionStatus.ACTIVE);
         pendingSubscription.setEndDate(TODAY.plusDays(NOTICE_DAYS - 1));
-        stubPersist();
+        stubLoad();
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> noticeService(NOTICE_DAYS).cancel(1L));
@@ -301,8 +301,12 @@ class SubscriptionServiceTest {
                 new CancellationNoticePolicy(noticeDays, CLOCK));
     }
 
-    private void stubPersist() {
+    private void stubLoad() {
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(pendingSubscription));
+    }
+
+    private void stubPersist() {
+        stubLoad();
         when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
         when(subscriptionMapper.toDto(any(Subscription.class))).thenAnswer(inv -> dto(inv.getArgument(0)));
     }
