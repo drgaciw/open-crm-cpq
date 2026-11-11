@@ -1,0 +1,8 @@
+# Owner review required only for sensitive paths (ruleset change approved by drg 2026-11-11).
+# Everything else merges on green required checks (Backend Unit, Frontend, Frontend npm audit) with an up-to-date branch.
+/.github/                       @drgamtd0
+/Jenkinsfile                    @drgamtd0
+/infra/jenkins/                 @drgamtd0
+**/db/migration/                @drgamtd0
+/docs/ci-contract.yaml          @drgamtd0
+/docs/adr/                      @drgamtd0
