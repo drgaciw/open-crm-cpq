@@ -137,6 +137,42 @@ class PriceBookInternalResolutionServiceTest {
     }
 
     @Test
+    void resolveBatchPicksTheDateEffectiveEntryWhenASkuHasSeveralDatedVersions() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .region("EMEA")
+                .currency("EUR")
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry past = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("90.00"))
+                .currency("EUR")
+                .effectiveStartDate(LocalDate.now().minusMonths(6))
+                .effectiveEndDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry current = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .currency("EUR")
+                .effectiveStartDate(LocalDate.now())
+                .effectiveEndDate(null)
+                .build();
+
+        when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(42L), eq(List.of("SKU-1"))))
+                .thenReturn(List.of(past, current));
+
+        ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
+
+        assertThat(response.getEntries().get("SKU-1").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("SKU-1").getListPrice()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
     void resolveBatchRejectsExpiredDefaultPriceBook() {
         PriceBook expiredDefault = PriceBook.builder()
                 .id(1L)

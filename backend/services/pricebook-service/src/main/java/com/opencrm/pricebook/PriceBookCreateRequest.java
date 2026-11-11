@@ -30,4 +30,7 @@ public class PriceBookCreateRequest {
     private LocalDate effectiveDate;
 
     private LocalDate expirationDate;
+
+    /** DRG-431: the cost book that supplies this price book's costs (optional, set or changed later). */
+    private Long costBookId;
 }

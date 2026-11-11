@@ -2,7 +2,7 @@ package com.opencrm.pricebook;
 
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
-import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.event.OutboxEventRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("integration")
@@ -44,10 +43,11 @@ class PriceBookOutboxWiringTest {
     }
 
     /**
-     * pricebook publishes no event of its own; it shares the pricing schema's outbox. Any PUBLISHED contract proves the
-     * wiring, and this test is outside src/main, so the ADR-018 D9 one-emitter check does not count it.
+     * DRG-431: pricebook now owns PriceBookPublished, published through the pricing schema's shared outbox
+     * table. This test is outside src/main, so the ADR-018 D9 one-emitter check (PriceBookService#publish is
+     * the real, sole call site) does not count it.
      */
-    private static final EventContractRegistry.EventContract CONTRACT = EventContractRegistry.DISCOUNT_APPROVAL_REQUIRED_V1;
+    private static final EventContractRegistry.EventContract CONTRACT = EventContractRegistry.PRICE_BOOK_PUBLISHED_V1;
 
     @Autowired OutboxEventPublisher publisher;
     @Autowired OutboxEventRepository repository;
@@ -71,7 +71,7 @@ class PriceBookOutboxWiringTest {
         });
     }
 
-    private static DiscountApprovalRequiredEvent payload(String currency) {
-        return new DiscountApprovalRequiredEvent("Q-UAT", "line-1", BigDecimal.ONE, BigDecimal.TEN, currency);
+    private static PriceBookPublishedEvent payload(String currency) {
+        return new PriceBookPublishedEvent(1L, "uat-uuid", 1, currency, "NA", null, null, null, null);
     }
 }

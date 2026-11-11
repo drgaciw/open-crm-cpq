@@ -82,4 +82,7 @@ public final class KafkaTopics {
 
     /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
     public static final String POLICY_DEFINED = "cpq.approval.policy.defined";
+
+    /** DRG-431 / BC-03-01. A price book version was published. */
+    public static final String PRICE_BOOK_PUBLISHED = "cpq.pricebook.published";
 }

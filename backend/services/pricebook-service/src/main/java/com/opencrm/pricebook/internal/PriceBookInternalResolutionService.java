@@ -10,11 +10,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,15 +35,20 @@ public class PriceBookInternalResolutionService {
                     .entries(entries)
                     .build();
         }
-        // Single IN query — avoids N+1 per productExternalId (GitHub #456 family).
-        Map<String, PriceBookEntry> entryByProductId = priceBookEntryRepository
-                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
-                        priceBook.getId(), productExternalIds)
+        // Single IN query — avoids N+1 per productExternalId (GitHub #456 family). A product may now have
+        // several date-ranged entries (DRG-431); group them and pick, per product, the one effective today.
+        LocalDate today = LocalDate.now();
+        Map<String, PriceBookEntry> entryByProductId = new LinkedHashMap<>();
+        priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdInAndDeletedFalse(priceBook.getId(), productExternalIds)
                 .stream()
-                .collect(Collectors.toMap(
-                        PriceBookEntry::getProductExternalId,
-                        Function.identity(),
-                        (first, ignored) -> first));
+                .collect(Collectors.groupingBy(PriceBookEntry::getProductExternalId))
+                .forEach((productExternalId, candidates) -> {
+                    PriceBookEntry best = bestEffectiveEntry(candidates, today);
+                    if (best != null) {
+                        entryByProductId.put(productExternalId, best);
+                    }
+                });
         for (String productExternalId : productExternalIds) {
             PriceBookEntry e = entryByProductId.get(productExternalId);
             if (e != null) {
@@ -65,6 +70,19 @@ public class PriceBookInternalResolutionService {
                 .priceBookCurrency(priceBook.getCurrency())
                 .entries(entries)
                 .build();
+    }
+
+    /**
+     * DRG-431: among a SKU's candidate entries, the one whose EffectiveDateRange covers {@code asOfDate},
+     * preferring the most recently started one when more than one matches. Falls back to a legacy entry with
+     * no date range at all (pre-DRG-431 data) when nothing date-ranged matches.
+     */
+    private PriceBookEntry bestEffectiveEntry(List<PriceBookEntry> candidates, LocalDate asOfDate) {
+        return candidates.stream()
+                .filter(entry -> entry.isEffectiveOn(asOfDate))
+                .max(Comparator.comparing(PriceBookEntry::getEffectiveStartDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElse(null);
     }
 
     private PriceBook findPriceBook(String region) {

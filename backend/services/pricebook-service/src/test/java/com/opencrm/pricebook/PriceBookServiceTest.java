@@ -1,5 +1,7 @@
 package com.opencrm.pricebook;
 
+import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,11 +12,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +34,12 @@ class PriceBookServiceTest {
 
     @Mock
     private PriceBookMapper priceBookMapper;
+
+    @Mock
+    private CostBookService costBookService;
+
+    @Mock
+    private OutboxEventPublisher outboxEventPublisher;
 
     @InjectMocks
     private PriceBookService priceBookService;
@@ -50,8 +60,9 @@ class PriceBookServiceTest {
                 .build();
 
         when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
-        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(42L, "SKU-1"))
-                .thenReturn(Optional.empty());
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
+                .thenReturn(List.of());
         when(priceBookMapper.toEntryEntity(request)).thenReturn(mappedEntry);
         when(priceBookEntryRepository.save(mappedEntry)).thenReturn(mappedEntry);
         when(priceBookMapper.toEntryDto(mappedEntry)).thenReturn(savedDto);
@@ -64,6 +75,97 @@ class PriceBookServiceTest {
         assertThat(entryCaptor.getValue().getPriceBook()).isSameAs(priceBook);
         assertThat(entryCaptor.getValue().getPriceBookId()).isEqualTo(42L);
         assertThat(request.getCurrency()).isEqualTo("USD");
+        assertThat(request.getUnitOfMeasure()).isEqualTo("EACH");
+    }
+
+    @Test
+    void publishMarksPriceBookPublishedAndEmitsEvent() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .uuid("uuid-42")
+                .currency("USD")
+                .versionNumber(1)
+                .status(PriceBookStatus.DRAFT)
+                .build();
+        PriceBookDto dto = PriceBookDto.builder().id(42L).status(PriceBookStatus.PUBLISHED).build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.save(priceBook)).thenReturn(priceBook);
+        when(priceBookMapper.toDto(priceBook)).thenReturn(dto);
+
+        PriceBookDto result = priceBookService.publish(42L);
+
+        assertThat(result).isSameAs(dto);
+        assertThat(priceBook.getStatus()).isEqualTo(PriceBookStatus.PUBLISHED);
+        assertThat(priceBook.getPublishedAt()).isNotNull();
+        verify(outboxEventPublisher).publish(eq("PriceBook"), eq("uuid-42"),
+                eq(EventContractRegistry.PRICE_BOOK_PUBLISHED_V1), any());
+    }
+
+    @Test
+    void publishRejectsAlreadyPublishedPriceBook() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .status(PriceBookStatus.PUBLISHED)
+                .build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+
+        assertThatThrownBy(() -> priceBookService.publish(42L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("already published");
+
+        verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());
+    }
+
+    @Test
+    void getListPricePicksEntryEffectiveOnTheResolutionDate() {
+        PriceBook priceBook = PriceBook.builder().id(42L).currency("USD").build();
+        PriceBookEntry past = PriceBookEntry.builder()
+                .listPrice(new BigDecimal("90.00"))
+                .effectiveStartDate(LocalDate.of(2026, 1, 1))
+                .effectiveEndDate(LocalDate.of(2026, 5, 31))
+                .build();
+        PriceBookEntry current = PriceBookEntry.builder()
+                .listPrice(new BigDecimal("100.00"))
+                .effectiveStartDate(LocalDate.of(2026, 6, 1))
+                .effectiveEndDate(null)
+                .build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                42L, "SKU-1", "USD", "EACH"))
+                .thenReturn(List.of(past, current));
+
+        PriceResolutionDto result = priceBookService.getListPrice(
+                42L, "SKU-1", "USD", "EACH", LocalDate.of(2026, 7, 1));
+
+        assertThat(result.isMatched()).isTrue();
+        assertThat(result.getAmount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void getCostFollowsLinkedCostBook() {
+        CostBook costBook = CostBook.builder().id(9L).build();
+        PriceBook priceBook = PriceBook.builder().id(42L).costBook(costBook).build();
+        PriceResolutionDto expected = PriceResolutionDto.builder().matched(true).amount(new BigDecimal("40.00")).build();
+
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(costBookService.getCost(9L, "SKU-1", "USD", "EACH", null)).thenReturn(expected);
+
+        PriceResolutionDto result = priceBookService.getCost(42L, "SKU-1", "USD", "EACH", null);
+
+        assertThat(result).isSameAs(expected);
+    }
+
+    @Test
+    void getCostRejectsPriceBookWithNoLinkedCostBook() {
+        PriceBook priceBook = PriceBook.builder().id(42L).build();
+        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+
+        assertThatThrownBy(() -> priceBookService.getCost(42L, "SKU-1", "USD", "EACH", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("no linked cost book");
     }
 
     @Test

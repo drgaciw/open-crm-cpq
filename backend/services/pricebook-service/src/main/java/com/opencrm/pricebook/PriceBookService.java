@@ -1,5 +1,8 @@
 package com.opencrm.pricebook;
 
+import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -21,6 +28,8 @@ public class PriceBookService {
     private final PriceBookRepository priceBookRepository;
     private final PriceBookEntryRepository priceBookEntryRepository;
     private final PriceBookMapper priceBookMapper;
+    private final CostBookService costBookService;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     public PriceBookDto create(PriceBookCreateRequest request) {
         normalizeCreateRequest(request);
@@ -32,6 +41,9 @@ public class PriceBookService {
         }
 
         PriceBook priceBook = priceBookMapper.toEntity(request);
+        if (request.getCostBookId() != null) {
+            priceBook.setCostBook(costBookService.requireCostBook(request.getCostBookId()));
+        }
         PriceBook saved = priceBookRepository.save(priceBook);
         log.info("Created price book with ID: {}", saved.getId());
         return priceBookMapper.toDto(saved);
@@ -71,9 +83,95 @@ public class PriceBookService {
         }
 
         priceBookMapper.updateEntity(request, existing);
+        if (request.getCostBookId() != null) {
+            existing.setCostBook(costBookService.requireCostBook(request.getCostBookId()));
+        }
         PriceBook updated = priceBookRepository.save(existing);
         log.info("Updated price book with ID: {}", updated.getId());
         return priceBookMapper.toDto(updated);
+    }
+
+    /**
+     * PublishPriceBookVersion: makes this price book version immutable, stamps {@code publishedAt}, and emits
+     * PriceBookPublished (AC: "PriceBookPublished event is emitted"). The cost book it links to, if any, is
+     * published separately via {@link CostBookService#publish(Long)} — list prices and costs stay versioned
+     * and publishable independently.
+     */
+    public PriceBookDto publish(Long id) {
+        PriceBook priceBook = requirePriceBook(id);
+        if (priceBook.isPublished()) {
+            throw new BusinessException("Price book is already published", "PRICE_BOOK_ALREADY_PUBLISHED");
+        }
+        priceBook.setStatus(PriceBookStatus.PUBLISHED);
+        priceBook.setPublishedAt(Instant.now());
+        PriceBook saved = priceBookRepository.save(priceBook);
+
+        outboxEventPublisher.publish("PriceBook", saved.getUuid(), EventContractRegistry.PRICE_BOOK_PUBLISHED_V1,
+                new PriceBookPublishedEvent(
+                        saved.getId(),
+                        saved.getUuid(),
+                        saved.getVersionNumber(),
+                        saved.getCurrency(),
+                        saved.getRegion(),
+                        saved.getCostBookId(),
+                        saved.getEffectiveDate(),
+                        saved.getExpirationDate(),
+                        saved.getPublishedAt()));
+
+        log.info("Published price book with ID: {} (version {})", saved.getId(), saved.getVersionNumber());
+        return priceBookMapper.toDto(saved);
+    }
+
+    /**
+     * GetListPrice: resolves the list price for a SKU, currency and unit of measure as of a date, among this
+     * price book's (possibly several, date-ranged) entries for that key.
+     */
+    @Transactional(readOnly = true)
+    public PriceResolutionDto getListPrice(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                            LocalDate asOfDate) {
+        requirePriceBook(priceBookId);
+        LocalDate resolutionDate = asOfDate != null ? asOfDate : LocalDate.now();
+        String normalizedUom = unitOfMeasure != null ? unitOfMeasure : "EACH";
+
+        List<PriceBookEntry> candidates = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                        priceBookId, sku, currency, normalizedUom);
+
+        return candidates.stream()
+                .filter(entry -> entry.isEffectiveOn(resolutionDate))
+                .max(Comparator.comparing(PriceBookEntry::getEffectiveStartDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(entry -> PriceResolutionDto.builder()
+                        .bookId(priceBookId)
+                        .sku(sku)
+                        .currency(currency)
+                        .unitOfMeasure(normalizedUom)
+                        .asOfDate(resolutionDate)
+                        .matched(true)
+                        .amount(entry.getListPrice())
+                        .build())
+                .orElseGet(() -> PriceResolutionDto.builder()
+                        .bookId(priceBookId)
+                        .sku(sku)
+                        .currency(currency)
+                        .unitOfMeasure(normalizedUom)
+                        .asOfDate(resolutionDate)
+                        .matched(false)
+                        .build());
+    }
+
+    /**
+     * GetCost: follows this price book's cost book linkage and resolves the cost there, as of a date.
+     */
+    @Transactional(readOnly = true)
+    public PriceResolutionDto getCost(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                       LocalDate asOfDate) {
+        PriceBook priceBook = requirePriceBook(priceBookId);
+        if (priceBook.getCostBookId() == null) {
+            throw new BusinessException(
+                    "Price book " + priceBookId + " has no linked cost book", "NO_LINKED_COST_BOOK");
+        }
+        return costBookService.getCost(priceBook.getCostBookId(), sku, currency, unitOfMeasure, asOfDate);
     }
 
     public void delete(Long id) {
@@ -89,16 +187,8 @@ public class PriceBookService {
         ensureNotPublished(priceBook);
         normalizeEntryCreateRequest(request, priceBook);
         validateEntryPriceRange(request.getListPrice(), request.getFloorPrice());
-
-        if (priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                priceBookId,
-                request.getProductExternalId()
-        ).isPresent()) {
-            throw new BusinessException(
-                    "Product " + request.getProductExternalId() + " already exists in this price book",
-                    "DUPLICATE_PRICE_BOOK_ENTRY"
-            );
-        }
+        validateNoExactDuplicateEntry(priceBookId, request.getProductExternalId(), request.getCurrency(),
+                request.getUnitOfMeasure(), request.getEffectiveStartDate(), null);
 
         PriceBookEntry entry = priceBookMapper.toEntryEntity(request);
         entry.setPriceBook(priceBook);
@@ -127,17 +217,14 @@ public class PriceBookService {
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         normalizeEntryUpdateRequest(request);
 
-        if (request.getProductExternalId() != null
-                && !request.getProductExternalId().equals(entry.getProductExternalId())
-                && priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                priceBookId,
-                request.getProductExternalId()
-        ).isPresent()) {
-            throw new BusinessException(
-                    "Product " + request.getProductExternalId() + " already exists in this price book",
-                    "DUPLICATE_PRICE_BOOK_ENTRY"
-            );
-        }
+        String targetProductExternalId = request.getProductExternalId() != null
+                ? request.getProductExternalId() : entry.getProductExternalId();
+        String targetCurrency = request.getCurrency() != null ? request.getCurrency() : entry.getCurrency();
+        String targetUom = request.getUnitOfMeasure() != null ? request.getUnitOfMeasure() : entry.getUnitOfMeasure();
+        LocalDate targetStart = request.getEffectiveStartDate() != null
+                ? request.getEffectiveStartDate() : entry.getEffectiveStartDate();
+        validateNoExactDuplicateEntry(priceBookId, targetProductExternalId, targetCurrency, targetUom,
+                targetStart, entryId);
 
         BigDecimal targetListPrice = request.getListPrice() != null ? request.getListPrice() : entry.getListPrice();
         BigDecimal targetFloorPrice = request.getFloorPrice() != null ? request.getFloorPrice() : entry.getFloorPrice();
@@ -204,10 +291,33 @@ public class PriceBookService {
 
     private void ensureNotPublished(PriceBook priceBook) {
         LocalDate effectiveDate = priceBook.getEffectiveDate();
-        if (effectiveDate != null && !effectiveDate.isAfter(LocalDate.now())) {
+        boolean dateImpliesPublished = effectiveDate != null && !effectiveDate.isAfter(LocalDate.now());
+        if (priceBook.isPublished() || dateImpliesPublished) {
             throw new BusinessException(
                     "Published price books and their entries are immutable",
                     "PRICE_BOOK_PUBLISHED_IMMUTABLE"
+            );
+        }
+    }
+
+    /**
+     * Exact-match dedupe: rejects a second entry with the same Sku + currency + UnitOfMeasure +
+     * effectiveStartDate. Full date-range overlap validation across arbitrary windows is a known gap
+     * (see DRG-431 PR description).
+     */
+    private void validateNoExactDuplicateEntry(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                                LocalDate effectiveStartDate, Long excludeEntryId) {
+        List<PriceBookEntry> candidates = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                        priceBookId, sku, currency, unitOfMeasure);
+        boolean duplicate = candidates.stream()
+                .filter(entry -> excludeEntryId == null || !excludeEntryId.equals(entry.getId()))
+                .anyMatch(entry -> Objects.equals(entry.getEffectiveStartDate(), effectiveStartDate));
+        if (duplicate) {
+            throw new BusinessException(
+                    "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
+                            + " already exists with that effective start date",
+                    "DUPLICATE_PRICE_BOOK_ENTRY"
             );
         }
     }
@@ -269,6 +379,10 @@ public class PriceBookService {
         if (request.getCurrency() == null) {
             request.setCurrency(priceBook.getCurrency());
         }
+        request.setUnitOfMeasure(normalize(request.getUnitOfMeasure()));
+        if (request.getUnitOfMeasure() == null) {
+            request.setUnitOfMeasure("EACH");
+        }
     }
 
     private void normalizeEntryUpdateRequest(PriceBookEntryUpdateRequest request) {
@@ -285,6 +399,14 @@ public class PriceBookService {
                     request.getCurrency(),
                     "Currency must not be blank when provided",
                     "INVALID_PRICE_BOOK_ENTRY_CURRENCY"
+            ));
+        }
+
+        if (request.getUnitOfMeasure() != null) {
+            request.setUnitOfMeasure(requireNonBlank(
+                    request.getUnitOfMeasure(),
+                    "Unit of measure must not be blank when provided",
+                    "INVALID_PRICE_BOOK_ENTRY_UOM"
             ));
         }
     }
