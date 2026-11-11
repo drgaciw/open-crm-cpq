@@ -182,6 +182,11 @@ Nx workspace structure:
 - Branch naming: `{type}/{ticket-id}-{short-description}` (e.g., `feat/CRM-42-lead-scoring`)
 - Commit messages: Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`)
 - PRs require: passing CI, code review, no security warnings
+- **PR stacking (default):** Agents stack independent, small PRs two to three deep by default (each PR builds on the previous one's branch; each is reviewable alone), instead of opening every story as a separate PR off `main` at once.
+  - Wave plans group stories into stacks of 2–3 at intake.
+  - Stop stacking (start a new stack off `main`, or serialize) when a PR touches a shared file — e.g. `EventContractRegistry`, `KafkaTopics`, `EventContractRegistryTest`, a service's Flyway migration sequence, gateway `proxy.conf.json` / CSRF / routes, CI workflows, Jenkins, `docs/ci-contract.yaml` — or a service another lane needs.
+  - CPQ Decision checks every stack for shared-file boundaries **before dispatch**, not after; a flagged stack is split or serialized before launch.
+  - Stacks merge bottom-up. Each PR still needs the required checks (**Backend Unit**, **Frontend**, **Frontend npm audit**) green on an up-to-date branch.
 
 ---
 

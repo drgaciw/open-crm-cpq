@@ -79,6 +79,19 @@ class SubscriptionTest {
         assertEquals(SubscriptionStatus.CANCELLED, subscription.getStatus());
     }
 
+    @Test
+    @DisplayName("entity cancel does not apply a notice period")
+    void cancelIgnoresEndDate() {
+        subscription.setEndDate(null);
+        subscription.cancel();
+        assertEquals(SubscriptionStatus.CANCELLED, subscription.getStatus());
+
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setEndDate(LocalDate.now().minusDays(1));
+        subscription.cancel();
+        assertEquals(SubscriptionStatus.CANCELLED, subscription.getStatus());
+    }
+
     @ParameterizedTest
     @EnumSource(value = SubscriptionStatus.class, names = {"CANCELLED", "EXPIRED"})
     void rejectsCancellationOfTerminalStates(SubscriptionStatus initial) {

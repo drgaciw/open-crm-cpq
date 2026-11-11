@@ -31,7 +31,7 @@ services:
         exec /sbin/tini -- /usr/local/bin/jenkins-agent.sh
           -url http://jenkins:8080/
           -workDir /home/jenkins/agent
-          -labels 'linux docker maven node22'
+          -labels 'linux docker maven node22 node24'
           -name build-agent-1
           -secret $$(cat /run/secrets/agent_secret 2>/dev/null || echo '')
       "
