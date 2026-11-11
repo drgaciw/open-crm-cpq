@@ -36,7 +36,7 @@ class ServiceSchemaIsolationIntegrationTest {
     /** Flyway versions applied to schema contract. Count is this list, not a floor. */
     private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12",
-            "1.13", "1.14", "1.15", "1.16", "1.17");
+            "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21");
 
     /** Every base table in schema contract, including assets and the asset history. */
     private static final List<String> CONTRACT_TABLES = List.of(
@@ -58,6 +58,7 @@ class ServiceSchemaIsolationIntegrationTest {
             "processed_events",
             "renewal_eligibility_publications",
             "renewal_policy_record",
+            "subscription_ingest_audits",
             "subscription_rate_periods",
             "subscriptions");
 
@@ -75,6 +76,8 @@ class ServiceSchemaIsolationIntegrationTest {
             // V1_11 renewal policy records.
             // V1_9 is permanently unused; V1_12 creates the ledger, V1_13 assets,
             // V1_14 asset history, and V1_15 adds unit replay evidence.
+            // V1_18 adds subscriptions.tenant_id. V1_19 adds subscription_model and creates
+            // subscription_ingest_audits. V1_20 adds customer_account_id. V1_21 adds renewal_mode.
             new Service("contract-asset-management", "contract", "subscriptions", CONTRACT_MIGRATION_VERSIONS.size()));
 
     @Test
