@@ -11,7 +11,7 @@
 | API route with **no** FE caller | Candidate to **deprecate**, mark **internal-only** (e.g. Postman/Swagger), or **add** to UI later. |
 | FE call with **no** matching API row | **Bug** or **wrong base URL** / gateway route. |
 
-**Gateway:** Angular apps should use the **gateway** (default dev: `http://localhost:8080`); `crm-service` direct port **8081** is for debugging only. CRM predicates are only `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**` — see [Activities (deferred)](#activities-deferred).
+**Gateway:** Angular apps should use the **gateway** (default dev: `http://localhost:8080`); `crm-service` direct port **8081** is for debugging only. CRM predicates are `/api/v1/leads/**`, `/api/v1/deals/**`, `/api/v1/contacts/**`, `/api/v1/organizations/**`, `/api/v1/playbooks/**`, `/api/v1/guided-sessions/**`, and `/api/v1/activities/**` — see [Activities](#activities).
 
 ---
 
@@ -55,8 +55,12 @@ Base paths: `/api/v1/leads`, `/api/v1/deals`, `/api/v1/contacts`, `/api/v1/organ
 | DELETE | `/api/v1/organizations/{id}` | `delete` |
 | GET | `/api/v1/organizations/search` | `search` (`q`, pageable) |
 | GET | `/api/v1/organizations/{id}/contacts` | `getContacts` |
+| POST | `/api/v1/activities` | `create` (NOTE and TASK; EMAIL and MEETING return `ACTIVITY_INGEST_NOT_IMPLEMENTED`) |
+| GET | `/api/v1/activities` | `timeline` (exactly one of `organizationId`, `contactId`, `dealId`; optional `type`) |
+| GET | `/api/v1/activities/{id}` | `getById` |
+| POST | `/api/v1/activities/{id}/complete` | `complete` (tasks only; idempotent) |
 
-**Count:** 35 routes. There is **no** `/api/v1/activities/**` controller or inventory row (intentional — see [Activities (deferred)](#activities-deferred)).
+**Count:** 39 routes. Activity note and task routes are live in `crm-service` (DRG-520). Mailbox ingestion is not — see [Activities](#activities).
 
 ---
 
@@ -139,24 +143,19 @@ Lead/Deal search previously put a Spring `Page` inside `data`. Batch 0 (`feat/fo
 
 ---
 
-## Activities (deferred)
+## Activities
 
-**Decision:** The Activities hold was lifted on 2026-11-03. [ADR-030](adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) assigns ownership to `crm-service` but does not itself authorize code, schema or paths. The inventory below describes the current implementation, not a continuing hold.
+**Decision:** The Activities hold was lifted on 2026-11-03. [ADR-030](adr/ADR-030-activity-timeline-and-mailbox-ingestion.md) assigns `/api/v1/activities/**` to `crm-service`. DRG-520's first slice logs notes and tasks. Email and meeting rows, mailbox endpoints, and the Angular client are still open. This is not the whole story.
 
 | Layer | State |
 |-------|--------|
-| `crm-service` | No `Activity*` entity, controller, or Flyway table |
-| Gateway | **No** `/api/v1/activities/**` predicate yet — [CRM_GATEWAY_ENV.md](./CRM_GATEWAY_ENV.md), [CRM_CUTOVER_CHECKLIST.md](./CRM_CUTOVER_CHECKLIST.md) |
-| FE | No activities HTTP client under `frontend/libs/crm` |
-| Legacy | `cpq_beta/crm/api/activities.py` (`get_activities` for CRM Deal / CRM Lead) — Phase 2 / Frappe inventory only |
-| App comment | `CrmServiceApplication` notes activities are planned and gateway must not route until implemented |
+| `crm-service` | `activities` table (`V18__activities.sql`). `ActivityController` creates NOTE and TASK, reads one timeline parent, and completes a task once. EMAIL and MEETING are in the type check and rejected with `ACTIVITY_INGEST_NOT_IMPLEMENTED` |
+| Gateway | `/api/v1/activities/**` is on the `crm-service` predicate in the default and `dev` profiles |
+| FE | No activities HTTP client under `frontend/libs/crm` yet |
+| Legacy | `cpq_beta/crm/api/activities.py` `get_activities` aggregated Frappe comments, tasks, and changelog for a CRM Deal or CRM Lead. The Spring timeline is a new row, not that aggregate |
+| Mailbox | `/api/v1/mailboxes/**` is not routed. Thread and event columns are reserved and stay null (DRG-521) |
 
-**Cutover checklist cross-links:**
-
-- Pre-cutover: gateway CRM paths are only leads/deals/contacts/organizations — **no phantom** `/api/v1/activities/**`.
-- When separately authorized, deliver the gateway predicate, real controller/schema, and frontend client together as specified by ADR-030.
-
-**Do not:** stub routes, invent FE callers, or add gateway paths “for future use.” Treat a phantom activities route as a cutover defect.
+**Do not:** enable mailbox OAuth, store mail bodies, or treat this slice as Done. A route without the controller above would still be a phantom; the controller and `V18` are what make the predicate real.
 
 ---
 
