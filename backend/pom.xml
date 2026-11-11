@@ -79,6 +79,11 @@
         <!-- Testing -->
         <testcontainers.version>1.21.4</testcontainers.version>
         <jacoco.skip>false</jacoco.skip>
+
+        <!-- OWASP dependency-check (not bound to a lifecycle phase; GHA nightly invokes the
+             fully-qualified goal. Jenkins scripts/ci/security-audit.sh still passes
+             -DfailBuildOnCVSS=9 until DRG-674.) -->
+        <dependency-check.failBuildOnCVSS>7</dependency-check.failBuildOnCVSS>
     </properties>
 
     <dependencyManagement>
@@ -187,6 +192,18 @@
                                 <version>${lombok-mapstruct-binding.version}</version>
                             </path>
                         </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <!-- Pinned for GHA nightly (DRG-673). Not bound to any lifecycle phase, so
+                     mvn verify / unit profile builds do not run the check. Maven Central
+                     latest/release was 13.0.0 as of 2026-11-11, but 13.0.0 fails keyless with
+                     NvdApiException (empty API key); keep story pin 12.1.3 for keyless nightly. -->
+                <plugin>
+                    <groupId>org.owasp</groupId>
+                    <artifactId>dependency-check-maven</artifactId>
+                    <version>12.1.3</version>
+                    <configuration>
+                        <failBuildOnCVSS>${dependency-check.failBuildOnCVSS}</failBuildOnCVSS>
                     </configuration>
                 </plugin>
             </plugins>

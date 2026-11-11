@@ -73,6 +73,10 @@ opencrm:
     poll-interval: PT30S
     batch-size: 20
     stale-after: PT10M
+  # DRG-472 slice a. DRG-596 (In Review) states no global notice integer, so 0 leaves cancel unchanged.
+  contract:
+    cancellation:
+      notice-days: 0
 
 ---
 # Local and CI only: the well-known development database password. The default profile has no secret
