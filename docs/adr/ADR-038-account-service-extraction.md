@@ -18,7 +18,7 @@
 
 DRG-692 asks for a decision on whether the customer Account moves out of `crm-service` into its own `account-service`. Its stated reasons are clearer BC-12 ownership, account APIs that evolve independently of Leads and Deals, and public naming (`Account` vs `Organization`) for CPQ consumers that already use `AccountId`.
 
-What exists on `main` (`3c31d5cd4f3dfd8e1eb58b505d5175dde5814781`):
+What exists on `main` (`ae74f83d0d7489f634da2ac3d6fecb2d99fd38f0`):
 
 - **Aggregate.** Account is `Organization` in crm-service, table `crm.organizations`: `backend/services/crm-service/src/main/java/com/opencrm/crm/organization/Organization.java:18`. It has a parent link (`parent_organization_id`, `:91-92`), soft delete (`@SQLRestriction("is_deleted = false")`, `:95`) and a contact count computed from `crm.contacts` (`:102`).
 - **API.** `/api/v1/organizations` (`OrganizationController.java:23`) supports create, list, get, update, set parent, hierarchy, delete, search and contacts (`:30-132`). Merge is at `/api/v1/organizations/merge` (`merge/AccountMergeController.java:19`). Territory and segment are under `/api/v1/organizations` (`territory/TerritoryAssignmentController.java:26-61`).
