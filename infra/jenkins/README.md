@@ -31,7 +31,7 @@ Orchestrator agent: **`jenkins-ci-orchestrator`**. For GHA PR check failures, us
 | Topic | Choice |
 |-------|--------|
 | **Primary CI** | Jenkins multibranch job `opencrm-cpq` (PR + branch builds) |
-| **GHA** | Manual fallback only — no push/PR triggers |
+| **GHA** | `ci.yml` is manual fallback (`workflow_dispatch`) and nightly; `pr-check.yml` triggers on `pull_request` |
 | **PR gate status** | `jenkins/opencrm-cpq-ci` (GitHub commit status API) |
 | CI commands | `scripts/ci/*` — SSOT for Jenkins and manual GHA |
 | LLM for CI | `LLM_*` env → chat completions gateway |
