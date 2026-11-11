@@ -54,7 +54,7 @@ class CommercialPolicyServiceTest {
         commercialPolicyService = new CommercialPolicyService(
                 commercialPolicyRepository, commercialPolicyMapper, outboxEventPublisher);
 
-        when(commercialPolicyRepository.save(any(CommercialPolicy.class)))
+        lenient().when(commercialPolicyRepository.save(any(CommercialPolicy.class)))
                 .thenAnswer(inv -> {
                     CommercialPolicy entity = inv.getArgument(0);
                     if (entity.getId() == null) {
@@ -155,7 +155,8 @@ class CommercialPolicyServiceTest {
         assertEquals(2, result.getPolicyVersion());
         assertEquals(1L, result.getSupersedesId());
         assertEquals(PolicyStatus.DEPRECATED, predecessor.getStatus());
-        verify(commercialPolicyRepository).save(predecessor);
+        // One save for the new version, one for deprecating the predecessor.
+        verify(commercialPolicyRepository, times(2)).save(any(CommercialPolicy.class));
 
         ArgumentCaptor<PolicyDefinedEvent> eventCaptor = ArgumentCaptor.forClass(PolicyDefinedEvent.class);
         verify(outboxEventPublisher).publish(any(), any(), eq(EventContractRegistry.POLICY_DEFINED_V1),

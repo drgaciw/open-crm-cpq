@@ -33,6 +33,7 @@ public record PolicyDefinedEvent(
         List<ThresholdDefined> thresholds) {
 
     /** One declarative threshold on the defined policy version. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ThresholdDefined(
             String thresholdType,
             BigDecimal limitValue,
