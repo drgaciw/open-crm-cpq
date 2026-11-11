@@ -15,7 +15,9 @@ import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
+import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
+import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
@@ -109,6 +111,14 @@ public final class EventContractRegistry {
     public static final EventContract BUNDLE_STRUCTURE_CHANGED_V1 = published(
             "BundleStructureChanged", "product-service", KafkaTopics.BUNDLE_STRUCTURE_CHANGED,
             ProductCatalogLifecycleEvent.class);
+
+    /** DRG-418 / BC-01-01. DefineProduct: a new Product definition created. */
+    public static final EventContract PRODUCT_DEFINED_V1 = published(
+            "ProductDefined", "product-service", KafkaTopics.PRODUCT_DEFINED, ProductDefinedEvent.class);
+
+    /** DRG-418 / BC-01-01. ReviseProduct: an existing Product definition revised. */
+    public static final EventContract PRODUCT_REVISED_V1 = published(
+            "ProductRevised", "product-service", KafkaTopics.PRODUCT_REVISED, ProductRevisedEvent.class);
 
     public static final EventContract SUBSCRIPTION_RENEWAL_ELIGIBLE_V1 = published(
             "SubscriptionRenewalEligible", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RENEWAL_ELIGIBLE,
@@ -219,6 +229,8 @@ public final class EventContractRegistry {
             PRODUCT_RETIRED_V1,
             PRODUCT_UPDATED_V1,
             BUNDLE_STRUCTURE_CHANGED_V1,
+            PRODUCT_DEFINED_V1,
+            PRODUCT_REVISED_V1,
             SUBSCRIPTION_RENEWAL_ELIGIBLE_V1,
             CONFIGURATION_COMMITTED_V1,
             CONFIGURATION_SESSION_STARTED_V1,

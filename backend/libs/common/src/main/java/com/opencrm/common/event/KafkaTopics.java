@@ -19,6 +19,10 @@ public final class KafkaTopics {
     public static final String PRODUCT_STATUS_RETIRED = "cpq.product.status.retired";
     public static final String PRODUCT_UPDATED = "cpq.product.updated";
     public static final String BUNDLE_STRUCTURE_CHANGED = "cpq.product.bundle.structure.changed";
+    /** DRG-418 / BC-01-01. A new Product definition (DefineProduct). */
+    public static final String PRODUCT_DEFINED = "cpq.product.defined";
+    /** DRG-418 / BC-01-01. An existing Product definition revised (ReviseProduct). */
+    public static final String PRODUCT_REVISED = "cpq.product.revised";
 
     // Configuration Events
     public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
