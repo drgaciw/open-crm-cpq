@@ -7,16 +7,13 @@
   "tags": [],
   "targets": {
     "test": {
-      "executor": "@nx/vitest:test",
       "outputs": [
-        "{options.reportsDirectory}"
+        "{projectRoot}/{options.coverage.reportsDirectory}",
+        "{workspaceRoot}/coverage/libs/shared/data-access"
       ],
       "options": {
-        "reportsDirectory": "{projectRoot}/../../../coverage/libs/shared/data-access"
+        "coverage.reportsDirectory": "../../../coverage/libs/shared/data-access"
       }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint"
     }
   }
 }
