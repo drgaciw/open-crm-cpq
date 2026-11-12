@@ -16,7 +16,7 @@
     <description>Append-only, hash-chained audit trail (DRG-309): AuditEntry entity, append-only repository,
         AuditTrailService and SearchAuditTrail query support. Ships as a Spring Boot auto-configuration so a
         consuming service only needs this dependency on its classpath, plus its own Flyway migration for the
-        audit_entries table (libs do not own schema/Flyway; see V18__audit_entries.sql in crm-service).</description>
+        audit_entries table (libs do not own schema/Flyway; see V20__audit_entries.sql in crm-service).</description>
 
     <!-- Library jar, not a bootable application -->
     <packaging>jar</packaging>
