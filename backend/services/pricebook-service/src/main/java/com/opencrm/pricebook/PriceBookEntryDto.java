@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -23,6 +24,9 @@ public class PriceBookEntryDto {
     private BigDecimal listPrice;
     private BigDecimal floorPrice;
     private String currency;
+    private String unitOfMeasure;
+    private LocalDate effectiveStartDate;
+    private LocalDate effectiveEndDate;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;

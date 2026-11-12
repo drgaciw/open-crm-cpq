@@ -226,6 +226,14 @@ class CpqGatewayRoutesTest {
                 "DRL rules must route to pricing-service");
         assertTrue(yaml.contains("Path=/api/v1/price-books/**"),
                 "Price books must route to pricebook-service");
+        assertEquals(2, countOf(yaml, "Path=/api/v1/cost-books/**"),
+                "DRG-431: cost books must route to pricebook-service on the default and dev profiles "
+                        + "(CostBookController was otherwise unreachable through the gateway)");
+        assertEquals(2, countOf(yaml, "Path=/api/v1/cpq/cost-books/**"),
+                "DRG-431: the CPQ cost-books alias must exist on the default and dev profiles");
+        assertTrue(yaml.contains(
+                "RewritePath=/api/v1/cpq/(?<segment>cost-books)(?<remaining>/?.*), /api/v1/$\\{segment}$\\{remaining}"),
+                "DRG-431: the CPQ cost-books alias must rewrite to the unprefixed path, like price-books does");
         assertTrue(yaml.contains("Path=/api/v1/quotes/**"),
                 "Quote and BFF approval paths must route to quote-service");
         assertTrue(yaml.contains("/api/v1/products/**"),

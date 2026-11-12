@@ -15,6 +15,7 @@ import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.PolicyDefinedEvent;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;

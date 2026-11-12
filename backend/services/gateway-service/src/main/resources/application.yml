@@ -99,6 +99,29 @@ spring:
                     name: pricebookCircuitBreaker
                     fallbackUri: forward:/fallback/pricebook
 
+            # DRG-431: cost books live in pricebook-service alongside price books; same backend, same breaker.
+            - id: costbook-service
+              uri: ${PRICEBOOK_SERVICE_URI:http://localhost:8089}
+              predicates:
+                - Path=/api/v1/cost-books/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
+
+            # CPQ gateway alias delegates cost book commands to the price book aggregate owner.
+            - id: cpq-costbook-service
+              uri: ${PRICEBOOK_SERVICE_URI:http://localhost:8089}
+              predicates:
+                - Path=/api/v1/cpq/cost-books/**
+              filters:
+                - RewritePath=/api/v1/cpq/(?<segment>cost-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
+
             # S2B-11: agent validate must precede configuration/** (product CRUD) or SCG
             # first-match keeps agents on product List<String>. Route + rewrite only.
             # Rewrites to CE's public evaluate; CE's internal path refuses user tokens (ADR-016 step 2).
@@ -494,6 +517,29 @@ spring:
                 - Path=/api/v1/cpq/price-books/**
               filters:
                 - RewritePath=/api/v1/cpq/(?<segment>price-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
+
+            # DRG-431: cost books live in pricebook-service alongside price books; same backend, same breaker.
+            - id: costbook-service
+              uri: http://localhost:8089
+              predicates:
+                - Path=/api/v1/cost-books/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: pricebookCircuitBreaker
+                    fallbackUri: forward:/fallback/pricebook
+
+            # CPQ gateway alias delegates cost book commands to the price book aggregate owner.
+            - id: cpq-costbook-service
+              uri: http://localhost:8089
+              predicates:
+                - Path=/api/v1/cpq/cost-books/**
+              filters:
+                - RewritePath=/api/v1/cpq/(?<segment>cost-books)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
                 - name: CircuitBreaker
                   args:
                     name: pricebookCircuitBreaker
