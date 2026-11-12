@@ -112,6 +112,9 @@ class EventContractRegistryTest {
         expected.put("cpq.crm.opportunity.solution-derived", "SolutionDerived v1, crm-service, PUBLISHED");
         expected.put("cpq.approval.policy.defined", "PolicyDefined v1, approval-routing, PUBLISHED");
         expected.put("cpq.configuration.frozen", "ConfigurationFrozen v1, configuration-engine, PUBLISHED");
+        expected.put("cpq.pricebook.published", "PriceBookPublished v1, pricebook-service, PUBLISHED");
+        expected.put("cpq.contract.signature.completed",
+                "SignatureCompleted v1, contract-asset-management, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
             actual.put(contract.topic(), contract.eventType() + " v" + contract.eventVersion() + ", "
