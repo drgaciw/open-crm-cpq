@@ -3,12 +3,14 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
+import { LoadingService } from '@frontend/shared-data-access';
 import { ShellComponent } from './shell.component';
 
 describe('ShellComponent', () => {
   let fixture: ComponentFixture<ShellComponent>;
   let component: ShellComponent;
   let observeSpy: ReturnType<typeof vi.fn>;
+  let loadingService: LoadingService;
 
   async function setup(matchesMobile: boolean): Promise<void> {
     observeSpy = vi.fn(() => of({ matches: matchesMobile, breakpoints: {} }));
@@ -24,6 +26,8 @@ describe('ShellComponent', () => {
 
     fixture = TestBed.createComponent(ShellComponent);
     component = fixture.componentInstance;
+    loadingService = TestBed.inject(LoadingService);
+    loadingService.reset();
     fixture.detectChanges();
   }
 
@@ -70,5 +74,21 @@ describe('ShellComponent', () => {
     expect(component.sidenavOpened()).toBe(true);
     component.onToggleSidenav();
     expect(component.sidenavOpened()).toBe(false);
+  });
+
+  it('shows a global progress bar while LoadingService reports loading', async () => {
+    await setup(false);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('mat-progress-bar.global-loading')).toBeNull();
+
+    loadingService.startRequest();
+    fixture.detectChanges();
+    const bar = el.querySelector('mat-progress-bar.global-loading');
+    expect(bar).toBeTruthy();
+    expect(bar?.getAttribute('aria-label')).toBe('Loading');
+
+    loadingService.endRequest();
+    fixture.detectChanges();
+    expect(el.querySelector('mat-progress-bar.global-loading')).toBeNull();
   });
 });
