@@ -23,6 +23,7 @@ import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.RoleAssignedEvent;
+import com.opencrm.common.event.dto.SignatureCompletedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.event.dto.TerritoryAssignedEvent;
@@ -280,7 +281,8 @@ public final class EventContractRegistry {
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
             ROLE_ASSIGNED_V1,
-            PRICE_BOOK_PUBLISHED_V1);
+            PRICE_BOOK_PUBLISHED_V1,
+            SIGNATURE_COMPLETED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
