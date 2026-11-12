@@ -33,9 +33,12 @@ public class CatalogPublishService {
 
     /**
      * Creates the next immutable catalog version for the caller's tenant from current ACTIVE/DEPRECATED products.
+     * Same-tenant publishes take a Postgres transaction advisory lock before {@code max(version_number)+1}.
      */
     public CatalogVersionDto publish() {
         String tenantId = ProductTenantResolver.currentTenantId();
+        // Serialize max(version_number)+1 for this tenant bucket (including unresolved/null).
+        catalogVersionRepository.lockTenantForPublish(tenantId == null ? "" : tenantId);
         Instant publishedAt = Instant.now();
         int nextNumber = catalogVersionRepository.findMaxVersionNumberByTenantId(tenantId) + 1;
 
@@ -49,7 +52,7 @@ public class CatalogPublishService {
                 .publishedBy(currentActorId())
                 .productCount(publishable.size())
                 .build();
-        CatalogVersion saved = catalogVersionRepository.save(version);
+        CatalogVersion saved = catalogVersionRepository.saveAndFlush(version);
 
         List<CatalogVersionProduct> entries = publishable.stream()
                 .map(product -> toSnapshotEntry(saved.getId(), product))
@@ -93,7 +96,8 @@ public class CatalogPublishService {
      */
     @Transactional(readOnly = true)
     public CatalogPinDto resolvePin(String versionId) {
-        return catalogVersionRepository.findByUuidAndDeletedFalse(versionId)
+        String tenantId = ProductTenantResolver.currentTenantId();
+        return catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse(versionId, tenantId)
                 .map(version -> CatalogPinDto.builder()
                         .versionId(version.getUuid())
                         .versionNumber(version.getVersionNumber())
@@ -135,7 +139,8 @@ public class CatalogPublishService {
     }
 
     private CatalogVersion requireVersion(String versionId) {
-        return catalogVersionRepository.findByUuidAndDeletedFalse(versionId)
+        String tenantId = ProductTenantResolver.currentTenantId();
+        return catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse(versionId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("CatalogVersion", versionId));
     }
 

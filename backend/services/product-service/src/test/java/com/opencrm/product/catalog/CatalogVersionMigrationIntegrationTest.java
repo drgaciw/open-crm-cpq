@@ -9,7 +9,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -95,6 +102,95 @@ class CatalogVersionMigrationIntegrationTest {
         }
     }
 
+    @Test
+    void tenantScopedLookupDoesNotResolveForeignTenantVersionUuid() throws Exception {
+        flyway().migrate();
+        try (Connection connection = connection()) {
+            String foreignUuid = UUID.randomUUID().toString();
+            insertCatalogVersionForTenant(connection, foreignUuid, 1, "tenant-b");
+
+            try (PreparedStatement statement = connection.prepareStatement(
+                    """
+                    SELECT count(*) FROM product.catalog_versions
+                    WHERE uuid = ? AND NOT is_deleted
+                      AND ((?::text IS NULL AND tenant_id IS NULL) OR tenant_id = ?)
+                    """)) {
+                statement.setString(1, foreignUuid);
+                statement.setString(2, "tenant-a");
+                statement.setString(3, "tenant-a");
+                try (ResultSet rows = statement.executeQuery()) {
+                    rows.next();
+                    assertThat(rows.getInt(1)).isZero();
+                }
+            }
+        }
+    }
+
+    @Test
+    void concurrentSameTenantPublishWithAdvisoryLockAllocatesDistinctVersionNumbers() throws Exception {
+        flyway().migrate();
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Set<Integer> allocated = ConcurrentHashMap.newKeySet();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = pool.submit(() -> publishNextVersion("tenant-a", ready, start, allocated));
+            Future<?> second = pool.submit(() -> publishNextVersion("tenant-a", ready, start, allocated));
+            assertThat(ready.await(20, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(allocated).containsExactlyInAnyOrder(1, 2);
+        try (Connection connection = connection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT version_number FROM product.catalog_versions WHERE tenant_id = ? AND NOT is_deleted "
+                                + "ORDER BY version_number")) {
+            statement.setString(1, "tenant-a");
+            try (ResultSet rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getInt(1)).isEqualTo(1);
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getInt(1)).isEqualTo(2);
+                assertThat(rows.next()).isFalse();
+            }
+        }
+    }
+
+    private static void publishNextVersion(
+            String tenantId, CountDownLatch ready, CountDownLatch start, Set<Integer> allocated) {
+        try (Connection connection = connection()) {
+            connection.setAutoCommit(false);
+            ready.countDown();
+            if (!start.await(20, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("timed out waiting for concurrent start");
+            }
+            try (PreparedStatement lock = connection.prepareStatement(
+                    "SELECT pg_advisory_xact_lock(hashtext(CAST(? AS text)))")) {
+                lock.setString(1, tenantId);
+                lock.executeQuery().close();
+            }
+            int next;
+            try (PreparedStatement max = connection.prepareStatement(
+                    "SELECT COALESCE(MAX(version_number), 0) FROM product.catalog_versions "
+                            + "WHERE NOT is_deleted AND tenant_id = ?")) {
+                max.setString(1, tenantId);
+                try (ResultSet rows = max.executeQuery()) {
+                    rows.next();
+                    next = rows.getInt(1) + 1;
+                }
+            }
+            insertCatalogVersionForTenant(connection, UUID.randomUUID().toString(), next, tenantId);
+            connection.commit();
+            allocated.add(next);
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
     private static Flyway flyway() {
         return Flyway.configure()
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
@@ -141,16 +237,22 @@ class CatalogVersionMigrationIntegrationTest {
 
     private static long insertCatalogVersion(Connection connection, String versionUuid, int versionNumber)
             throws SQLException {
+        return insertCatalogVersionForTenant(connection, versionUuid, versionNumber, null);
+    }
+
+    private static long insertCatalogVersionForTenant(
+            Connection connection, String versionUuid, int versionNumber, String tenantId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 """
                 INSERT INTO product.catalog_versions(
-                    uuid, version_number, published_at, product_count)
-                VALUES (?, ?, ?, 1)
+                    uuid, version_number, tenant_id, published_at, product_count)
+                VALUES (?, ?, ?, ?, 1)
                 RETURNING id
                 """)) {
             statement.setString(1, versionUuid);
             statement.setInt(2, versionNumber);
-            statement.setTimestamp(3, Timestamp.from(Instant.parse("2026-11-12T00:00:00Z")));
+            statement.setString(3, tenantId);
+            statement.setTimestamp(4, Timestamp.from(Instant.parse("2026-11-12T00:00:00Z")));
             try (ResultSet rows = statement.executeQuery()) {
                 rows.next();
                 return rows.getLong(1);

@@ -82,11 +82,12 @@ class CatalogPublishServiceTest {
     @Test
     @DisplayName("publish() freezes ACTIVE products, skips drafts, and emits CatalogPublished with version id")
     void publishEmitsCatalogPublishedWithVersionId() {
+        when(catalogVersionRepository.lockTenantForPublish("")).thenReturn(0);
         when(catalogVersionRepository.findMaxVersionNumberByTenantId(isNull())).thenReturn(0);
         when(productRepository.findPublishableByTenantIdAndStatusIn(
                 isNull(), eq(CatalogPublishService.PUBLISHABLE_STATUSES)))
                 .thenReturn(List.of(activeProduct));
-        when(catalogVersionRepository.save(any(CatalogVersion.class))).thenAnswer(invocation -> {
+        when(catalogVersionRepository.saveAndFlush(any(CatalogVersion.class))).thenAnswer(invocation -> {
             CatalogVersion toSave = invocation.getArgument(0);
             toSave.setId(100L);
             if (toSave.getUuid() == null) {
@@ -145,7 +146,7 @@ class CatalogPublishServiceTest {
                 .currency("USD")
                 .build();
 
-        when(catalogVersionRepository.findByUuidAndDeletedFalse("catalog-version-uuid-1"))
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("catalog-version-uuid-1", null))
                 .thenReturn(Optional.of(version));
         when(catalogVersionProductRepository.findByCatalogVersionIdOrderBySkuAsc(100L))
                 .thenReturn(List.of(frozen));
@@ -174,7 +175,7 @@ class CatalogPublishServiceTest {
         version.setUuid("pin-version-id");
         version.setPublishedAt(java.time.Instant.parse("2026-11-12T00:00:00Z"));
 
-        when(catalogVersionRepository.findByUuidAndDeletedFalse("pin-version-id"))
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("pin-version-id", null))
                 .thenReturn(Optional.of(version));
 
         CatalogPinDto pin = catalogPublishService.resolvePin("pin-version-id");
@@ -188,7 +189,7 @@ class CatalogPublishServiceTest {
     @Test
     @DisplayName("resolvePin returns resolvable=false for an unknown version id")
     void resolvePinUnknownVersion() {
-        when(catalogVersionRepository.findByUuidAndDeletedFalse("missing"))
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("missing", null))
                 .thenReturn(Optional.empty());
 
         CatalogPinDto pin = catalogPublishService.resolvePin("missing");
@@ -199,12 +200,36 @@ class CatalogPublishServiceTest {
     }
 
     @Test
+    @DisplayName("getByVersionId rejects a version UUID that is not in the caller's tenant bucket")
+    void getByVersionIdRejectsCrossTenantUuid() {
+        // Unresolved caller (null tid) must not resolve a version owned by tenant-b via UUID alone.
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("foreign-version", null))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> catalogPublishService.getByVersionId("foreign-version"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(catalogVersionRepository).findByUuidAndTenantIdAndDeletedFalse("foreign-version", null);
+    }
+
+    @Test
+    @DisplayName("resolvePin is not resolvable for a cross-tenant version UUID")
+    void resolvePinRejectsCrossTenantUuid() {
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("foreign-version", null))
+                .thenReturn(Optional.empty());
+
+        CatalogPinDto pin = catalogPublishService.resolvePin("foreign-version");
+
+        assertThat(pin.isResolvable()).isFalse();
+        assertThat(pin.getVersionId()).isEqualTo("foreign-version");
+    }
+
+    @Test
     @DisplayName("getPublishedProduct rejects a product id that was never frozen in the version")
     void getPublishedProductRejectsMissingSnapshotEntry() {
         CatalogVersion version = CatalogVersion.builder().versionNumber(1).productCount(0).build();
         version.setId(100L);
         version.setUuid("catalog-version-uuid-1");
-        when(catalogVersionRepository.findByUuidAndDeletedFalse("catalog-version-uuid-1"))
+        when(catalogVersionRepository.findByUuidAndTenantIdAndDeletedFalse("catalog-version-uuid-1", null))
                 .thenReturn(Optional.of(version));
         when(catalogVersionProductRepository.findByCatalogVersionIdAndProductId(100L, 11L))
                 .thenReturn(Optional.empty());
