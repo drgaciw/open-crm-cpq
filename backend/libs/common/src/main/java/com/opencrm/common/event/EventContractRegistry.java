@@ -23,6 +23,7 @@ import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.RoleAssignedEvent;
 import com.opencrm.common.event.dto.SignatureCompletedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
@@ -236,6 +237,10 @@ public final class EventContractRegistry {
     /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
     public static final EventContract POLICY_DEFINED_V1 = published(
             "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
+
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final EventContract ROLE_ASSIGNED_V1 = published(
+            "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
 
     /** DRG-431 / BC-03-01. One event per price book version publish. */
     public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
