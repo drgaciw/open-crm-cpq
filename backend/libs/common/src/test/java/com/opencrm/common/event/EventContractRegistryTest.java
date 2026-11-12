@@ -116,6 +116,7 @@ class EventContractRegistryTest {
         expected.put("cpq.pricebook.published", "PriceBookPublished v1, pricebook-service, PUBLISHED");
         expected.put("cpq.contract.signature.completed",
                 "SignatureCompleted v1, contract-asset-management, PUBLISHED");
+        expected.put("cpq.quote.created", "QuoteCreated v1, quote-service, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
             actual.put(contract.topic(), contract.eventType() + " v" + contract.eventVersion() + ", "
@@ -137,7 +138,8 @@ class EventContractRegistryTest {
     void forTopicLooksUpByTopic() {
         assertThat(EventContractRegistry.forTopic(KafkaTopics.QUOTE_STATUS_ACCEPTED))
                 .contains(EventContractRegistry.QUOTE_ACCEPTED_V1);
-        assertThat(EventContractRegistry.forTopic("cpq.quote.created")).isEmpty();
+        // DRG-447 reintroduced cpq.quote.created as PUBLISHED; use a topic that genuinely has no contract.
+        assertThat(EventContractRegistry.forTopic("cpq.quote.nonexistent-topic")).isEmpty();
     }
 
     @Test

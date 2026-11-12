@@ -40,6 +40,12 @@ public final class KafkaTopics {
     public static final String QUOTE_STATUS_ACCEPTED = "cpq.quote.status.accepted";
     public static final String QUOTE_APPROVAL_REJECTED = "cpq.quote.approval.rejected";
     public static final String RAMP_APPROVAL_BINDING_CHANGED = "cpq.quote.ramp.approval.binding.changed";
+    /**
+     * DRG-447 / BC-05-01. CreateQuote: a new quote created from an opportunity or account. This is the same name
+     * that was removed on 2026-09-22 for having no producer or contract (see the class javadoc); it comes back here
+     * as PUBLISHED now that its wave (DRG-447) is planned.
+     */
+    public static final String QUOTE_CREATED = "cpq.quote.created";
 
     // Approval Events
     public static final String APPROVAL_STEP_DECIDED = "cpq.approval.step.decided";
@@ -94,3 +100,4 @@ public final class KafkaTopics {
     /** DRG-457 / BC-06-04. Every required signer completed an e-signature envelope. */
     public static final String SIGNATURE_COMPLETED = "cpq.contract.signature.completed";
 }
+

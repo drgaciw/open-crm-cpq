@@ -34,6 +34,10 @@ public class QuoteUpdateRequest {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    /** ValidityPeriod: the date through which this quote is valid. Editable while the quote is DRAFT/REJECTED. */
+    private LocalDate validUntil;
+
     private String targetSubscriptionNumber;
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;
