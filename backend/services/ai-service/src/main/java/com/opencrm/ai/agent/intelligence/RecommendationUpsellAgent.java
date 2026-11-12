@@ -3,6 +3,7 @@ package com.opencrm.ai.agent.intelligence;
 import com.opencrm.ai.agent.AgentRequest;
 import com.opencrm.ai.agent.AgentResponse;
 import com.opencrm.ai.agent.CpqAgent;
+import com.opencrm.ai.profile.SellingProfileContextProvider;
 import org.springframework.ai.chat.ChatClient;
 import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.StreamingChatClient;
@@ -10,6 +11,8 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -22,10 +25,13 @@ public class RecommendationUpsellAgent implements CpqAgent {
 
     private final ChatClient chatClient;
     private final StreamingChatClient streamingChatClient;
+    private final SellingProfileContextProvider sellingProfiles;
 
-    public RecommendationUpsellAgent(ChatClient chatClient, StreamingChatClient streamingChatClient) {
+    public RecommendationUpsellAgent(ChatClient chatClient, StreamingChatClient streamingChatClient,
+                                     SellingProfileContextProvider sellingProfiles) {
         this.chatClient = chatClient;
         this.streamingChatClient = streamingChatClient;
+        this.sellingProfiles = sellingProfiles;
     }
 
     @Override
@@ -47,6 +53,17 @@ public class RecommendationUpsellAgent implements CpqAgent {
         List<Message> messageList = new ArrayList<>();
         if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
             messageList.add(new SystemMessage(request.getSystemPrompt()));
+        }
+
+        if (SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken jwt
+                && jwt.isAuthenticated()) {
+            String tenant = jwt.getToken().getClaimAsString("tid");
+            if (tenant != null && !tenant.isBlank()) {
+                String profile = sellingProfiles.promptBlock(tenant);
+                if (!profile.isBlank()) {
+                    messageList.add(new UserMessage(profile));
+                }
+            }
         }
 
         if (request.getMessages() != null && !request.getMessages().isEmpty()) {
