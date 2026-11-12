@@ -22,6 +22,7 @@ import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.QuoteCreatedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
 import com.opencrm.common.event.dto.RoleAssignedEvent;
 import com.opencrm.common.event.dto.SignatureCompletedEvent;
@@ -255,6 +256,14 @@ public final class EventContractRegistry {
             "SignatureCompleted", "contract-asset-management", KafkaTopics.SIGNATURE_COMPLETED,
             SignatureCompletedEvent.class);
 
+    /**
+     * DRG-447 / BC-05-01. CreateQuote: a quote created from an opportunity or account. {@code cpq.quote.created} had
+     * neither a producer nor a contract and was removed on 2026-09-22 (see {@link KafkaTopics}); it is PUBLISHED
+     * again now that this wave is planned.
+     */
+    public static final EventContract QUOTE_CREATED_V1 = published(
+            "QuoteCreated", "quote-service", KafkaTopics.QUOTE_CREATED, QuoteCreatedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -293,7 +302,8 @@ public final class EventContractRegistry {
             ROLE_ASSIGNED_V1,
             CONFIGURATION_FROZEN_V1,
             PRICE_BOOK_PUBLISHED_V1,
-            SIGNATURE_COMPLETED_V1);
+            SIGNATURE_COMPLETED_V1,
+            QUOTE_CREATED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

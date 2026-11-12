@@ -80,6 +80,14 @@ public class Quote extends BaseEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    /**
+     * DRG-447 / BC-05-01. ValidityPeriod: the date through which this quote's pricing is valid for the customer to
+     * accept. Distinct from {@link #startDate}/{@link #endDate}, which are the subscription term being quoted, not
+     * the quote document's own expiration. Defaulted by {@link QuoteService#create} when the request omits it.
+     */
+    @Column(name = "valid_until")
+    private LocalDate validUntil;
+
     @Column(name = "target_subscription_number")
     private String targetSubscriptionNumber;
 

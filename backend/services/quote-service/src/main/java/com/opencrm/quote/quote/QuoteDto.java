@@ -34,6 +34,8 @@ public class QuoteDto {
     private int durationInMonths;
     private LocalDate startDate;
     private LocalDate endDate;
+    /** ValidityPeriod: the date through which this quote is valid. */
+    private LocalDate validUntil;
     private String targetSubscriptionNumber;
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;

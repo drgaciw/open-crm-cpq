@@ -10,6 +10,7 @@ import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.EventCorrelation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.QuoteCreatedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.PricedPeriodView;
@@ -42,6 +43,7 @@ import org.springframework.web.client.RestClientException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -79,6 +81,9 @@ public class QuoteService {
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
 
+    /** DRG-447 / BC-05-01. ValidityPeriod default when CreateQuote's request omits one. */
+    static final long DEFAULT_VALIDITY_DAYS = 30L;
+
     public QuoteDto create(QuoteCreateRequest request) {
         log.debug("Creating quote for customer: {}", request.getCustomerExternalId());
 
@@ -89,10 +94,37 @@ public class QuoteService {
         if (request.getDurationInMonths() == null) {
             quote.setDurationInMonths(12);
         }
+        if (quote.getCurrency() == null) {
+            // Quote.currency documents a "USD" default, but QuoteMapper.toEntity builds through Quote.builder(),
+            // which always calls builder.currency(request.getCurrency()) regardless of the field's declared
+            // @Builder.Default (MapStruct does not honor nullValuePropertyMappingStrategy for builder targets the
+            // way it does for setters). DRG-447 needs currency to actually default per the acceptance criteria.
+            quote.setCurrency("USD");
+        }
+        if (quote.getValidUntil() == null) {
+            quote.setValidUntil(LocalDate.now().plusDays(DEFAULT_VALIDITY_DAYS));
+        }
         quote.setTenantId(QuoteTenantResolver.currentTenantId());
 
         Quote saved = quoteRepository.save(quote);
         log.info("Created quote: {}", saved.getQuoteNumber());
+
+        // DRG-447 / BC-05-01: CreateQuote emits QuoteCreated.
+        outboxEventPublisher.publish(
+                "Quote",
+                saved.getId() != null ? saved.getId().toString() : saved.getUuid(),
+                EventContractRegistry.QUOTE_CREATED_V1,
+                new QuoteCreatedEvent(
+                        saved.getId() != null ? saved.getId().toString() : null,
+                        saved.getQuoteNumber(),
+                        saved.getCustomerExternalId(),
+                        saved.getDealExternalId(),
+                        saved.getCurrency(),
+                        saved.getValidUntil(),
+                        saved.getStatus().name(),
+                        Instant.now()
+                )
+        );
 
         return quoteMapper.toDto(saved);
     }
