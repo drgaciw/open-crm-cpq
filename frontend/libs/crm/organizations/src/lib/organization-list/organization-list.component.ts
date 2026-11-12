@@ -1,35 +1,49 @@
 import { Component, inject, OnInit, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import { PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatInputModule } from '@angular/material/input';
 import { OrganizationService } from '../organization.service';
 import { ACCOUNT_INDUSTRIES } from '../account-industries';
 import { OrganizationDto } from '@frontend/shared-models';
 import {
+  DataTableComponent,
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
+  TableColumn,
+  TableRowAction,
+  RowActionEvent,
 } from '@frontend/shared-ui';
+
+export interface OrganizationTableRow {
+  id: number;
+  name: string;
+  industry: string;
+  territory: string;
+  owner: string;
+  ownerId: string;
+  city: string;
+  phone: string;
+}
 
 @Component({
   selector: 'app-organization-list',
   standalone: true,
   imports: [
-    MatTableModule,
-    MatPaginatorModule,
-    MatSortModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule,
-    MatMenuModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    MatInputModule,
     PageHeaderComponent,
     SearchInputComponent,
     EmptyStateComponent,
+    DataTableComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -38,7 +52,7 @@ import {
       subtitle="Manage customer accounts"
     >
       <div actions>
-        <button mat-raised-button color="primary" (click)="onCreate()">
+        <button mat-raised-button color="primary" type="button" (click)="onCreate()">
           <mat-icon>add</mat-icon>
           New Account
         </button>
@@ -51,40 +65,42 @@ import {
       </div>
     </app-page-header>
 
-    <div class="account-filters">
-      <label>
-        Industry
-        <select
+    <div class="account-filters" role="search" aria-label="Account filters">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Industry</mat-label>
+        <mat-select
           data-testid="account-industry-filter"
           [value]="industryFilter()"
-          (change)="onIndustryFilter($any($event.target).value)"
+          (selectionChange)="onIndustryFilter($event.value)"
         >
-          <option value="">All industries</option>
+          <mat-option value="">All industries</mat-option>
           @for (ind of industries; track ind) {
-            <option [value]="ind">{{ ind }}</option>
+            <mat-option [value]="ind">{{ ind }}</mat-option>
           }
-        </select>
-      </label>
-      <label>
-        Territory
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Territory</mat-label>
         <input
+          matInput
           data-testid="account-territory-filter"
-          type="text"
           [value]="territoryFilter()"
           (input)="onTerritoryFilter($any($event.target).value)"
           placeholder="Territory"
         />
-      </label>
-      <label>
-        Owner
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Owner</mat-label>
         <input
+          matInput
           data-testid="account-owner-filter"
-          type="text"
           [value]="ownerFilter()"
           (input)="onOwnerFilter($any($event.target).value)"
           placeholder="Owner"
         />
-      </label>
+      </mat-form-field>
     </div>
 
     @if (orgService.error()) {
@@ -96,12 +112,6 @@ import {
       </div>
     }
 
-    @if (orgService.loading()) {
-      <div class="loading-overlay" role="status" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
-      </div>
-    }
-
     @if (!orgService.loading() && !orgService.error() && orgService.isEmpty()) {
       <app-empty-state
         icon="business"
@@ -110,117 +120,44 @@ import {
         [actionLabel]="hasActiveCriteria() ? '' : 'Create Account'"
         (action)="onCreate()"
       />
-    } @else if (!orgService.loading() && !orgService.isEmpty()) {
-      <div class="table-container">
-        <table mat-table [dataSource]="visibleOrganizations()" [trackBy]="trackById" matSort
-               (matSortChange)="onSort($event)">
-
-          <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-            <td mat-cell *matCellDef="let org">
-              <a class="link" (click)="onRowClick(org)">{{ org.name }}</a>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="industry">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Industry</th>
-            <td mat-cell *matCellDef="let org">{{ org.industry || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="territory">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Territory</th>
-            <td mat-cell *matCellDef="let org">{{ org.territory || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="owner">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header="ownerId">Owner</th>
-            <td mat-cell *matCellDef="let org">{{ org.ownerId || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="city">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>City</th>
-            <td mat-cell *matCellDef="let org">{{ org.city || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="phone">
-            <th mat-header-cell *matHeaderCellDef>Phone</th>
-            <td mat-cell *matCellDef="let org">{{ org.phone || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let org" (click)="$event.stopPropagation()">
-              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Account actions">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu">
-                <button mat-menu-item (click)="onEdit(org)">
-                  <mat-icon>edit</mat-icon>
-                  <span>Edit</span>
-                </button>
-                <button mat-menu-item (click)="onDelete(org)" class="delete-action">
-                  <mat-icon>archive</mat-icon>
-                  <span>Archive</span>
-                </button>
-              </mat-menu>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"
-              class="clickable-row" (click)="onRowClick(row)"></tr>
-        </table>
-
-        <mat-paginator
-          [length]="orgService.pagination().totalElements"
-          [pageSize]="orgService.pagination().size"
-          [pageIndex]="orgService.pagination().page"
-          [pageSizeOptions]="[10, 20, 50]"
-          (page)="onPageChange($event)"
-          showFirstLastButtons>
-        </mat-paginator>
-      </div>
+    } @else if (!orgService.isEmpty()) {
+      <app-data-table
+        [columns]="columns"
+        [data]="tableRows()"
+        [loading]="orgService.loading()"
+        [pagination]="orgService.pagination()"
+        [rowActions]="rowActions"
+        rowActionsAriaLabel="Account actions"
+        [pageSizeOptions]="[10, 20, 50]"
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSort($event)"
+        (rowClick)="onRowClick($event)"
+        (rowAction)="onRowAction($event)"
+      />
     }
   `,
   styles: [`
-    .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
-    table { width: 100%; }
-    .link { color: #1976d2; cursor: pointer; text-decoration: none; font-weight: 500; }
-    .link:hover { text-decoration: underline; }
-    .clickable-row { cursor: pointer; }
-    .clickable-row:hover { background-color: #f5f5f5; }
-    .loading-overlay { display: flex; justify-content: center; padding: 48px; }
-    .delete-action { color: #d32f2f; }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
     }
     .account-filters {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
-      margin: 0 0 16px;
+      gap: var(--crm-space-md, 16px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      align-items: flex-start;
     }
-    .account-filters label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 0.75rem;
-      color: #555;
-    }
-    .account-filters select,
-    .account-filters input {
+    .account-filters mat-form-field {
       min-width: 180px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95rem;
+      flex: 1 1 180px;
+      max-width: 280px;
     }
   `],
 })
@@ -228,19 +165,40 @@ export class OrganizationListComponent implements OnInit {
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
 
-  displayedColumns = ['name', 'industry', 'territory', 'owner', 'city', 'phone', 'actions'];
+  readonly columns: TableColumn[] = [
+    { key: 'name', header: 'Name', sortable: true },
+    { key: 'industry', header: 'Industry', sortable: true },
+    { key: 'territory', header: 'Territory', sortable: true },
+    { key: 'owner', header: 'Owner', sortable: true },
+    { key: 'city', header: 'City', sortable: true },
+    { key: 'phone', header: 'Phone', sortable: false },
+  ];
+
+  readonly rowActions: TableRowAction[] = [
+    { action: 'edit', label: 'Edit', icon: 'edit' },
+    { action: 'archive', label: 'Archive', icon: 'archive', danger: true },
+  ];
+
   readonly industries = ACCOUNT_INDUSTRIES;
   readonly industryFilter = signal('');
   readonly territoryFilter = signal('');
   readonly ownerFilter = signal('');
-  readonly visibleOrganizations = this.orgService.organizations;
-  private currentSort = 'name,asc';
   readonly searchQuery = signal('');
-  readonly hasActiveCriteria = computed(() => !!(this.searchQuery() || this.industryFilter().trim() || this.territoryFilter().trim() || this.ownerFilter().trim()));
+  readonly hasActiveCriteria = computed(
+    () =>
+      !!(
+        this.searchQuery() ||
+        this.industryFilter().trim() ||
+        this.territoryFilter().trim() ||
+        this.ownerFilter().trim()
+      ),
+  );
 
-  trackById(index: number, item: OrganizationDto): string | number {
-    return item.id;
-  }
+  readonly tableRows = computed<OrganizationTableRow[]>(() =>
+    this.orgService.organizations().map((org) => this.toRow(org)),
+  );
+
+  private currentSort = 'name,asc';
 
   ngOnInit(): void {
     this.orgService.list(0, 20, this.currentSort);
@@ -256,7 +214,7 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onIndustryFilter(value: string): void {
-    this.industryFilter.set(value);
+    this.industryFilter.set(value ?? '');
     this.reload(0);
   }
 
@@ -278,10 +236,9 @@ export class OrganizationListComponent implements OnInit {
     this.reload(event.pageIndex, event.pageSize);
   }
 
-  onSort(sort: Sort): void {
-    this.currentSort = sort.active && sort.direction
-      ? `${sort.active},${sort.direction}`
-      : 'name,asc';
+  onSort(sort: SortChangeEvent): void {
+    const field = sort.active === 'owner' ? 'ownerId' : sort.active;
+    this.currentSort = field && sort.direction ? `${field},${sort.direction}` : 'name,asc';
     this.reload(0);
   }
 
@@ -289,20 +246,44 @@ export class OrganizationListComponent implements OnInit {
     this.router.navigate(['/organizations', 'new']);
   }
 
-  onRowClick(org: OrganizationDto): void {
-    this.router.navigate(['/organizations', org.id]);
+  onRowClick(row: OrganizationTableRow): void {
+    this.router.navigate(['/organizations', row.id]);
   }
 
-  onEdit(org: OrganizationDto): void {
-    this.router.navigate(['/organizations', org.id, 'edit']);
+  onEdit(row: OrganizationTableRow): void {
+    this.router.navigate(['/organizations', row.id, 'edit']);
   }
 
-  onDelete(org: OrganizationDto): void {
-    if (confirm(`Archive "${org.name}"? The account will be hidden from lists.`)) {
+  onRowAction(event: RowActionEvent<OrganizationTableRow>): void {
+    if (event.action === 'edit') {
+      this.onEdit(event.row);
+      return;
+    }
+    if (event.action === 'archive') {
+      this.onDelete(event.row);
+    }
+  }
+
+  onDelete(org: OrganizationTableRow | OrganizationDto): void {
+    const name = org.name;
+    if (confirm(`Archive "${name}"? The account will be hidden from lists.`)) {
       this.orgService.delete(org.id).subscribe(() => {
         this.reload(this.orgService.pagination().page);
       });
     }
+  }
+
+  private toRow(org: OrganizationDto): OrganizationTableRow {
+    return {
+      id: org.id,
+      name: org.name,
+      industry: org.industry || '—',
+      territory: org.territory || '—',
+      owner: org.ownerId || '—',
+      ownerId: org.ownerId || '',
+      city: org.city || '—',
+      phone: org.phone || '—',
+    };
   }
 
   private currentFilters():

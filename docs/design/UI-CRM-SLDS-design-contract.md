@@ -57,7 +57,7 @@ Defined on `:root` in [`frontend/apps/crm/src/styles.scss`](../../frontend/apps/
 | `--crm-space-*` | Spacing scale |
 | `--crm-focus-ring` | Focus-visible outline |
 
-Stage/status badge colors remain in shared-models maps until Phase 2 unifies them onto tokens.
+Stage/status badge colors remain in shared-models maps until Phase 2 finishes unifying them onto tokens (Leads/Deals/forms still open).
 
 ## Phase 0 acceptance
 
@@ -73,3 +73,13 @@ Stage/status badge colors remain in shared-models maps until Phase 2 unifies the
 - [x] Account (organization) detail uses shared record page header
 - [x] Sidebar / shell chrome use `--crm-*` tokens; Accounts nav label aligns with page title
 - [x] Focus-visible treatment on interactive controls (Phase 0 global styles)
+
+## Phase 2 acceptance (CRM lists → DataTable)
+
+- [x] `DataTableComponent` optional `rowActions` / `rowAction` / `rowActionsAriaLabel` / `visible` / `rowActionsDisabled` (additive; CPQ callers unchanged)
+- [x] Contacts list uses shared `DataTable` + row menu (edit/delete)
+- [x] Accounts (organizations) list uses shared `DataTable` + Material outline filters (`data-testid` preserved)
+- [x] Leads list uses shared `DataTable` + status-gated row actions (tabs/priority filter kept)
+- [x] Opportunities (deals) list uses shared `DataTable` + Material org/owner filters (`data-testid` preserved)
+- [ ] Forms / status badges fully on `--crm-*` tokens (lists flatten status/stage text for now)
+- [ ] Browser UAT of Contacts + Accounts + Leads + Opportunities lists
