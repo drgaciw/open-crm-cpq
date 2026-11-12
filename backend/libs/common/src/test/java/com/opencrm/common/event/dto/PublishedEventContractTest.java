@@ -88,6 +88,37 @@ class PublishedEventContractTest {
     }
 
     @Test
+    void configurationSessionStartedV1CarriesStartedSessionSnapshot() {
+        Instant startedAt = Instant.parse("2026-05-11T01:00:00Z");
+
+        ConfigurationSessionStartedEvent event = ConfigurationSessionStartedEvent.v1(
+                "session-123",
+                "product-123",
+                null,
+                "catalog-v9",
+                "product-product-123-v1",
+                "tenant-abc",
+                "user-123",
+                startedAt,
+                ConfigurationSessionStartedEvent.CorrelationSnapshot.builder()
+                        .correlationId("corr-session-123")
+                        .causationId("start-configuration-session")
+                        .sourceService("configuration-engine")
+                        .build()
+        );
+
+        assertThat(event.getEventType()).isEqualTo(EventContractRegistry.CONFIGURATION_SESSION_STARTED_V1.eventType());
+        assertThat(event.getEventVersion()).isEqualTo(1);
+        assertThat(event.getSessionId()).isEqualTo("session-123");
+        assertThat(event.getProductId()).isEqualTo("product-123");
+        assertThat(event.getBundleId()).isNull();
+        assertThat(event.getCatalogVersion()).isEqualTo("catalog-v9");
+        assertThat(event.getRuleSetVersion()).isEqualTo("product-product-123-v1");
+        assertThat(event.getTenantId()).isEqualTo("tenant-abc");
+        assertThat(event.getCorrelation().getSourceService()).isEqualTo("configuration-engine");
+    }
+
+    @Test
     void contractExecutedV1SeparatesClmActivationFromBillingPayload() {
         Instant executedAt = Instant.parse("2026-05-11T02:00:00Z");
 

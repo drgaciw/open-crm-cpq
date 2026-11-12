@@ -224,6 +224,39 @@ class ConstraintSolverTest {
     }
 
     @Test
+    @DisplayName("DRG-424 GetSessionState: available options are REQUIRES/RECOMMENDS targets minus EXCLUDES and selected")
+    void availableOptionIdsExcludesSelectedAndExcluded() {
+        ConfigurationSession session = session("10", Map.of("addon", "20"));
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                // already selected: must not reappear as "available"
+                ProductConfigurationRuleDto.builder()
+                        .id(1L).ruleType("REQUIRES").sourceProductId(10L).targetProductId(20L).build(),
+                // candidate: survives
+                ProductConfigurationRuleDto.builder()
+                        .id(2L).ruleType("RECOMMENDS").sourceProductId(10L).targetProductId(30L).build(),
+                // candidate, but also EXCLUDES'd: must not survive
+                ProductConfigurationRuleDto.builder()
+                        .id(3L).ruleType("REQUIRES").sourceProductId(10L).targetProductId(40L).build(),
+                ProductConfigurationRuleDto.builder()
+                        .id(4L).ruleType("EXCLUDES").sourceProductId(10L).targetProductId(40L).build()
+        ));
+        when(ruleClient.getRulesForProduct(20L)).thenReturn(List.of());
+
+        List<Long> available = solver.availableOptionIds(session);
+
+        assertThat(available).containsExactly(30L);
+    }
+
+    @Test
+    @DisplayName("available options is empty with no numeric selection to seed rule lookup")
+    void availableOptionIdsEmptyWithoutSelection() {
+        ConfigurationSession session = session("PROD-001", Map.of("color", "red"));
+
+        assertThat(solver.availableOptionIds(session)).isEmpty();
+        verify(ruleClient, never()).getRulesForProduct(anyLong());
+    }
+
+    @Test
     @DisplayName("sessionAttributes copies selection map for expression evaluation")
     void sessionAttributesFromSelections() {
         ConfigurationSession session = session("10", Map.of("color", "red", "size", "L"));

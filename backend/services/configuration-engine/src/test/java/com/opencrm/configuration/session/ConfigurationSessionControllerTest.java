@@ -115,7 +115,7 @@ class ConfigurationSessionControllerTest {
     @DisplayName("POST / creates a session for the authenticated caller; a userId parameter is ignored (ADR-016)")
     void createReturnsDtoOnly() throws Exception {
         String caller = TestCallers.signInUser("user-1", "CPQ.User");
-        when(sessionService.create("PROD-001", caller)).thenReturn(sampleDto);
+        when(sessionService.create("PROD-001", null, null, caller)).thenReturn(sampleDto);
 
         MvcResult result = mockMvc.perform(post("/api/v1/configurations")
                         .param("productId", "PROD-001")
@@ -133,6 +133,29 @@ class ConfigurationSessionControllerTest {
     }
 
     @Test
+    @DisplayName("POST / StartSession against a bundle and a catalog version (DRG-424)")
+    void createAgainstBundleAndCatalogVersionReturnsDtoOnly() throws Exception {
+        String caller = TestCallers.signInUser("user-1", "CPQ.User");
+        ConfigurationSessionDto bundleDto = sampleDto.toBuilder()
+                .productId(null)
+                .bundleId("BUNDLE-001")
+                .catalogVersion("catalog-v9")
+                .ruleSetVersion("product-BUNDLE-001-v1")
+                .tenantId("tenant-abc")
+                .build();
+        when(sessionService.create(null, "BUNDLE-001", "catalog-v9", caller)).thenReturn(bundleDto);
+
+        mockMvc.perform(post("/api/v1/configurations")
+                        .param("bundleId", "BUNDLE-001")
+                        .param("catalogVersion", "catalog-v9")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.bundleId").value("BUNDLE-001"))
+                .andExpect(jsonPath("$.data.catalogVersion").value("catalog-v9"))
+                .andExpect(jsonPath("$.data.tenantId").value("tenant-abc"));
+    }
+
+    @Test
     @DisplayName("GET /{id} returns DTO JSON without BaseEntity deleted flag")
     void getByIdReturnsDtoOnly() throws Exception {
         when(sessionService.getById(1L)).thenReturn(sampleDto);
@@ -147,6 +170,27 @@ class ConfigurationSessionControllerTest {
                 .andReturn();
 
         assertNoEntityLeakFields(result.getResponse().getContentAsString());
+    }
+
+    @Test
+    @DisplayName("GET /{id} GetSessionState returns selections, open violations, and available options (DRG-424)")
+    void getByIdReturnsSessionState() throws Exception {
+        ConfigurationSessionDto stateDto = sampleDto.toBuilder()
+                .openViolations(List.of(com.opencrm.common.dto.ConfigurationViolation.builder()
+                        .ruleType("REQUIRES")
+                        .description("Color is required")
+                        .build()))
+                .availableOptionIds(List.of(20L, 30L))
+                .build();
+        when(sessionService.getById(1L)).thenReturn(stateDto);
+
+        mockMvc.perform(get("/api/v1/configurations/1")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.openViolations[0].ruleType").value("REQUIRES"))
+                .andExpect(jsonPath("$.data.openViolations[0].description").value("Color is required"))
+                .andExpect(jsonPath("$.data.availableOptionIds[0]").value(20))
+                .andExpect(jsonPath("$.data.availableOptionIds[1]").value(30));
     }
 
     @Test

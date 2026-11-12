@@ -4,6 +4,7 @@ import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
 import com.opencrm.common.event.dto.DealClosedEvent;
@@ -127,6 +128,11 @@ public final class EventContractRegistry {
             "ConfigurationCommitted", "configuration-engine", KafkaTopics.CONFIGURATION_COMMITTED,
             ConfigurationCommittedEvent.class);
 
+    /** DRG-424 / BC-02-01. Emitted when StartSession creates a configuration session. */
+    public static final EventContract CONFIGURATION_SESSION_STARTED_V1 = published(
+            "ConfigurationSessionStarted", "configuration-engine", KafkaTopics.CONFIGURATION_SESSION_STARTED,
+            ConfigurationSessionStartedEvent.class);
+
     /** Contract/asset owns the transactional rate application and its sole outbox publish site. */
     public static final EventContract RAMP_APPLIED_V1 = published(
             "RampApplied", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RAMP_APPLIED, RampAppliedEvent.class);
@@ -227,6 +233,7 @@ public final class EventContractRegistry {
             PRODUCT_REVISED_V1,
             SUBSCRIPTION_RENEWAL_ELIGIBLE_V1,
             CONFIGURATION_COMMITTED_V1,
+            CONFIGURATION_SESSION_STARTED_V1,
             QUOTE_APPROVAL_REJECTED_V1,
             PRICE_CALCULATED_V1,
             CONTRACT_EXECUTED_V1,
