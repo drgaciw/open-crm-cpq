@@ -227,6 +227,10 @@ public final class EventContractRegistry {
     public static final EventContract POLICY_DEFINED_V1 = published(
             "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
 
+    /** DRG-431 / BC-03-01. One event per price book version publish. */
+    public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
+            "PriceBookPublished", "pricebook-service", KafkaTopics.PRICE_BOOK_PUBLISHED, PriceBookPublishedEvent.class);
+
     /**
      * DRG-457 / BC-06-04. Every required signer completed an e-signature envelope, behind the ACL in
      * {@code com.opencrm.contract.signature.acl}. Owned by contract-asset-management: e-signature coordination sits
@@ -271,6 +275,7 @@ public final class EventContractRegistry {
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
+            PRICE_BOOK_PUBLISHED_V1,
             SIGNATURE_COMPLETED_V1);
 
     /** Every registered contract, published and reserved. */
