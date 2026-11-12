@@ -11,6 +11,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet } from '@angular/router';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { LoadingService } from '@frontend/shared-data-access';
 import { ToolbarComponent } from './toolbar.component';
 import { SidebarComponent } from './sidebar.component';
 
@@ -20,12 +22,26 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, MatSidenavModule, ToolbarComponent, SidebarComponent],
+  imports: [
+    RouterOutlet,
+    MatSidenavModule,
+    MatProgressBarModule,
+    ToolbarComponent,
+    SidebarComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell-container">
       <a class="skip-link" href="#main-content">Skip to main content</a>
       <app-toolbar (toggleSidenav)="onToggleSidenav()" />
+      @if (loadingService.loading()) {
+        <mat-progress-bar
+          class="global-loading"
+          mode="indeterminate"
+          aria-label="Loading"
+          role="progressbar"
+        />
+      }
       <mat-sidenav-container class="sidenav-container">
         <mat-sidenav
           #sidenavRef
@@ -58,14 +74,21 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
         left: -9999px;
         top: 0;
         z-index: 1000;
-        padding: 8px 16px;
-        background: #1976d2;
-        color: #fff;
+        padding: var(--crm-space-sm, 8px) var(--crm-space-md, 16px);
+        background: var(--crm-color-brand, #1b5fd1);
+        color: var(--crm-color-on-brand, #fff);
         text-decoration: none;
-        border-radius: 0 0 4px 0;
+        border-radius: 0 0 var(--crm-radius-sm, 4px) 0;
       }
       .skip-link:focus {
         left: 0;
+        outline: 3px solid var(--crm-focus-ring, #ffb747);
+        outline-offset: 2px;
+      }
+      .global-loading {
+        position: relative;
+        z-index: 2;
+        height: 3px;
       }
       .sidenav-container {
         flex: 1;
@@ -74,11 +97,11 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
         width: 240px;
       }
       .content {
-        background-color: #fafafa;
+        background-color: var(--crm-color-canvas, #f4f7fb);
       }
       .page-container {
-        padding: 24px;
-        max-width: 1400px;
+        padding: var(--crm-space-lg, 24px);
+        max-width: var(--crm-page-max, 1400px);
         margin: 0 auto;
       }
       .page-container:focus {
@@ -86,7 +109,7 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
       }
       @media (max-width: 767.98px) {
         .page-container {
-          padding: 16px;
+          padding: var(--crm-space-md, 16px);
         }
       }
     `,
@@ -97,6 +120,7 @@ export class ShellComponent implements OnInit {
 
   private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
+  readonly loadingService = inject(LoadingService);
 
   /** `over` below 768px; `side` at desktop. */
   readonly sidenavMode = signal<'side' | 'over'>('side');

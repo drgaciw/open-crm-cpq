@@ -4,10 +4,9 @@ import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OrganizationService } from '../organization.service';
+import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-organization-detail',
@@ -17,9 +16,8 @@ import { OrganizationService } from '../organization.service';
     MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatChipsModule,
-    MatDividerModule,
     MatProgressSpinnerModule,
+    PageHeaderComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -35,25 +33,45 @@ import { OrganizationService } from '../organization.service';
     @if (orgService.loading()) {
       <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (orgService.selectedOrganization(); as org) {
-      <div class="detail-header">
-        <button mat-icon-button (click)="goBack()" aria-label="Go back to accounts">
-          <mat-icon>arrow_back</mat-icon>
-        </button>
-        <div class="header-info">
-          <h1>{{ org.name }}</h1>
-          @if (org.industry) {
-            <mat-chip>{{ org.industry }}</mat-chip>
-          }
-        </div>
-        <div class="header-actions">
-          <button mat-stroked-button (click)="onEdit()">
+      <app-page-header
+        [title]="org.name"
+        [subtitle]="org.industry || ''"
+      >
+        <nav breadcrumb aria-label="Breadcrumb">
+          <a routerLink="/organizations">Accounts</a>
+          <span aria-hidden="true"> / </span>
+          <span>{{ org.name }}</span>
+        </nav>
+        <div actions>
+          <button mat-icon-button type="button" (click)="goBack()" aria-label="Go back to accounts">
+            <mat-icon>arrow_back</mat-icon>
+          </button>
+          <button mat-stroked-button type="button" (click)="onEdit()">
             <mat-icon>edit</mat-icon> Edit
           </button>
-          <button mat-stroked-button color="warn" (click)="onDelete()">
+          <button mat-stroked-button color="warn" type="button" (click)="onDelete()">
             <mat-icon>archive</mat-icon> Archive
           </button>
         </div>
-      </div>
+        <div highlights class="record-highlights">
+          <div class="highlight">
+            <span class="highlight-label">Phone</span>
+            <span class="highlight-value">{{ org.phone || '—' }}</span>
+          </div>
+          <div class="highlight">
+            <span class="highlight-label">Territory</span>
+            <span class="highlight-value">{{ org.territory || '—' }}</span>
+          </div>
+          <div class="highlight">
+            <span class="highlight-label">City</span>
+            <span class="highlight-value">{{ org.city || '—' }}</span>
+          </div>
+          <div class="highlight">
+            <span class="highlight-label">Owner</span>
+            <span class="highlight-value">{{ org.ownerId || '—' }}</span>
+          </div>
+        </div>
+      </app-page-header>
 
       <div class="detail-grid">
         <mat-card>
@@ -286,56 +304,88 @@ import { OrganizationService } from '../organization.service';
     }
   `,
   styles: [`
-    .loading { display: flex; justify-content: center; padding: 48px; }
+    .loading { display: flex; justify-content: center; padding: var(--crm-space-xl, 48px); }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
     }
-    .detail-header {
+    .record-highlights {
+      display: contents;
+    }
+    .highlight {
       display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: var(--crm-space-xs, 4px);
+      min-width: 120px;
     }
-    .header-info { flex: 1; }
-    .header-info h1 { margin: 0; font-size: 1.5rem; }
-    .header-actions { display: flex; gap: 8px; }
+    .highlight-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--crm-color-muted, #52627b);
+    }
+    .highlight-value {
+      font-size: 0.95rem;
+      color: var(--crm-color-ink, #17254b);
+    }
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 16px;
+      gap: var(--crm-space-md, 16px);
     }
     .full-width { grid-column: 1 / -1; }
-    .loading-inline { display: flex; justify-content: center; padding: 16px; }
+    .loading-inline { display: flex; justify-content: center; padding: var(--crm-space-md, 16px); }
     .contact-list { list-style: none; margin: 0; padding: 0; }
-    .contact-list li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
-    .contact-link { color: #1976d2; text-decoration: none; font-weight: 500; }
+    .contact-list li {
+      padding: var(--crm-space-sm, 8px) 0;
+      border-bottom: 1px solid var(--crm-color-line, #eee);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: baseline;
+    }
+    .contact-link { color: var(--crm-color-brand, #1b5fd1); text-decoration: none; font-weight: 500; }
     .contact-link:hover { text-decoration: underline; }
-    .contact-meta { font-size: 0.85rem; color: #666; }
-    .empty-text { color: #999; margin: 0; }
-    .section-links { display: flex; gap: 16px; margin: 12px 0 0; }
-    .section-links a { color: #1976d2; text-decoration: none; font-weight: 500; }
-    .hierarchy-nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-    .hierarchy-nav a { color: #1976d2; text-decoration: none; }
+    .contact-meta { font-size: 0.85rem; color: var(--crm-color-muted, #666); }
+    .empty-text { color: var(--crm-color-empty, #999); margin: 0; }
+    .section-links { display: flex; gap: var(--crm-space-md, 16px); margin: 12px 0 0; }
+    .section-links a { color: var(--crm-color-brand, #1b5fd1); text-decoration: none; font-weight: 500; }
+    .hierarchy-nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: var(--crm-space-sm, 8px); }
+    .hierarchy-nav a { color: var(--crm-color-brand, #1b5fd1); text-decoration: none; }
     .parent-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 12px; }
-    .parent-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: #555; }
-    .parent-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .parent-form label {
+      display: flex;
+      flex-direction: column;
+      gap: var(--crm-space-xs, 4px);
+      font-size: 0.75rem;
+      color: var(--crm-color-muted, #555);
+    }
+    .parent-form input {
+      padding: var(--crm-space-sm, 8px);
+      border: 1px solid var(--crm-color-line, #ccc);
+      border-radius: var(--crm-radius-sm, 4px);
+    }
     .info-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      padding: 16px 0;
+      gap: var(--crm-space-md, 16px);
+      padding: var(--crm-space-md, 16px) 0;
     }
-    .info-item { display: flex; flex-direction: column; gap: 4px; }
-    .label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    .value { font-size: 0.95rem; }
+    .info-item { display: flex; flex-direction: column; gap: var(--crm-space-xs, 4px); }
+    .label {
+      font-size: 0.75rem;
+      color: var(--crm-color-muted, #666);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .value { font-size: 0.95rem; color: var(--crm-color-ink, #17254b); }
   `],
 })
 export class OrganizationDetailComponent implements OnInit {
