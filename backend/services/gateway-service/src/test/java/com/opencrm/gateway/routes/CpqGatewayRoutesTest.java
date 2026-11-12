@@ -242,6 +242,8 @@ class CpqGatewayRoutesTest {
                 "Product bundles must route to product-service");
         assertTrue(yaml.contains("/api/v1/product-attributes/**"),
                 "Product attributes must route to product-service");
+        assertTrue(yaml.contains("/api/v1/catalog/**"),
+                "Catalog publish/pin routes must route to product-service (DRG-421)");
         assertTrue(yaml.contains("/api/v1/contacts/**") || yaml.contains("/api/v1/contacts,"),
                 "CRM contacts must route to crm-service");
         assertTrue(yaml.contains("/api/v1/deals/**"),

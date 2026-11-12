@@ -46,4 +46,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT COUNT(p) > 0 FROM Product p WHERE p.deleted = false AND p.sku = :sku AND "
            + "((:tenantId IS NULL AND p.tenantId IS NULL) OR p.tenantId = :tenantId)")
     boolean existsByTenantIdAndSkuAndDeletedFalse(@Param("tenantId") String tenantId, @Param("sku") String sku);
+
+    /**
+     * DRG-421: live products eligible for PublishCatalog snapshot. Draft and retired definitions stay out of
+     * seller-facing catalog versions; only ACTIVE and DEPRECATED are frozen.
+     */
+    @Query("SELECT p FROM Product p WHERE p.deleted = false AND p.status IN :statuses AND "
+           + "((:tenantId IS NULL AND p.tenantId IS NULL) OR p.tenantId = :tenantId) "
+           + "ORDER BY p.sku ASC")
+    List<Product> findPublishableByTenantIdAndStatusIn(
+            @Param("tenantId") String tenantId,
+            @Param("statuses") List<ProductStatus> statuses);
 }

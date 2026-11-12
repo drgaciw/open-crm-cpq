@@ -3,6 +3,7 @@ package com.opencrm.common.event;
 import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
+import com.opencrm.common.event.dto.CatalogPublishedEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
 import com.opencrm.common.event.dto.ConfigurationFrozenEvent;
 import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
@@ -125,6 +126,10 @@ public final class EventContractRegistry {
     /** DRG-418 / BC-01-01. ReviseProduct: an existing Product definition revised. */
     public static final EventContract PRODUCT_REVISED_V1 = published(
             "ProductRevised", "product-service", KafkaTopics.PRODUCT_REVISED, ProductRevisedEvent.class);
+
+    /** DRG-421 / BC-01-04. PublishCatalog: immutable catalog version published. */
+    public static final EventContract CATALOG_PUBLISHED_V1 = published(
+            "CatalogPublished", "product-service", KafkaTopics.CATALOG_PUBLISHED, CatalogPublishedEvent.class);
 
     public static final EventContract SUBSCRIPTION_RENEWAL_ELIGIBLE_V1 = published(
             "SubscriptionRenewalEligible", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RENEWAL_ELIGIBLE,
@@ -275,6 +280,7 @@ public final class EventContractRegistry {
             BUNDLE_STRUCTURE_CHANGED_V1,
             PRODUCT_DEFINED_V1,
             PRODUCT_REVISED_V1,
+            CATALOG_PUBLISHED_V1,
             SUBSCRIPTION_RENEWAL_ELIGIBLE_V1,
             CONFIGURATION_COMMITTED_V1,
             CONFIGURATION_SESSION_STARTED_V1,

@@ -23,6 +23,8 @@ public final class KafkaTopics {
     public static final String PRODUCT_DEFINED = "cpq.product.defined";
     /** DRG-418 / BC-01-01. An existing Product definition revised (ReviseProduct). */
     public static final String PRODUCT_REVISED = "cpq.product.revised";
+    /** DRG-421 / BC-01-04. PublishCatalog: an immutable catalog version was published. */
+    public static final String CATALOG_PUBLISHED = "cpq.catalog.published";
 
     // Configuration Events
     public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
