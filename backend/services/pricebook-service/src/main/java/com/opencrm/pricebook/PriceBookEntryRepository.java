@@ -35,4 +35,15 @@ public interface PriceBookEntryRepository extends JpaRepository<PriceBookEntry, 
     @Query("select entry from PriceBookEntry entry where entry.priceBook.id = :priceBookId and entry.productExternalId in :productExternalIds and entry.deleted = false")
     List<PriceBookEntry> findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
             @Param("priceBookId") Long priceBookId, @Param("productExternalIds") Collection<String> productExternalIds);
+
+    /**
+     * DRG-431: candidate rows for GetListPrice. A SKU/currency/UOM combination may have several date-ranged
+     * entries; the caller picks the one whose EffectiveDateRange covers the resolution date.
+     */
+    @Query("select entry from PriceBookEntry entry where entry.priceBook.id = :priceBookId "
+            + "and entry.productExternalId = :sku and entry.currency = :currency "
+            + "and entry.unitOfMeasure = :unitOfMeasure and entry.deleted = false")
+    List<PriceBookEntry> findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+            @Param("priceBookId") Long priceBookId, @Param("sku") String sku,
+            @Param("currency") String currency, @Param("unitOfMeasure") String unitOfMeasure);
 }

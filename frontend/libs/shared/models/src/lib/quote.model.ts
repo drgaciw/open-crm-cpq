@@ -320,6 +320,8 @@ export interface QuoteDto {
   durationInMonths: number;
   startDate?: string;
   endDate?: string;
+  /** ValidityPeriod: the date through which this quote is valid (ISO date string). */
+  validUntil?: string;
   /** Continuation target subscription number when this quote is a typed continuation. */
   targetSubscriptionNumber?: string;
   observedRevision?: number;
@@ -366,6 +368,8 @@ export interface QuoteCreateRequest {
   durationInMonths?: number;
   startDate?: string;
   endDate?: string;
+  /** ValidityPeriod: the date through which this quote is valid. Defaults server-side when omitted. */
+  validUntil?: string;
   notes?: string;
 }
 
@@ -383,6 +387,7 @@ export interface QuoteUpdateRequest {
   durationInMonths?: number;
   startDate?: string;
   endDate?: string;
+  validUntil?: string;
   notes?: string;
 }
 

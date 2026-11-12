@@ -111,6 +111,12 @@ class EventContractRegistryTest {
         expected.put("cpq.crm.account.merged", "AccountsMerged v1, crm-service, PUBLISHED");
         expected.put("cpq.crm.opportunity.solution-derived", "SolutionDerived v1, crm-service, PUBLISHED");
         expected.put("cpq.approval.policy.defined", "PolicyDefined v1, approval-routing, PUBLISHED");
+        expected.put("cpq.authorization.role.assigned", "RoleAssigned v1, authorization-service, PUBLISHED");
+        expected.put("cpq.configuration.frozen", "ConfigurationFrozen v1, configuration-engine, PUBLISHED");
+        expected.put("cpq.pricebook.published", "PriceBookPublished v1, pricebook-service, PUBLISHED");
+        expected.put("cpq.contract.signature.completed",
+                "SignatureCompleted v1, contract-asset-management, PUBLISHED");
+        expected.put("cpq.quote.created", "QuoteCreated v1, quote-service, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
             actual.put(contract.topic(), contract.eventType() + " v" + contract.eventVersion() + ", "
@@ -132,7 +138,8 @@ class EventContractRegistryTest {
     void forTopicLooksUpByTopic() {
         assertThat(EventContractRegistry.forTopic(KafkaTopics.QUOTE_STATUS_ACCEPTED))
                 .contains(EventContractRegistry.QUOTE_ACCEPTED_V1);
-        assertThat(EventContractRegistry.forTopic("cpq.quote.created")).isEmpty();
+        // DRG-447 reintroduced cpq.quote.created as PUBLISHED; use a topic that genuinely has no contract.
+        assertThat(EventContractRegistry.forTopic("cpq.quote.nonexistent-topic")).isEmpty();
     }
 
     @Test

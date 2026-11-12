@@ -8,8 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/price-books")
@@ -57,6 +60,35 @@ public class PriceBookController {
     @Operation(summary = "Delete price book", description = "Soft delete a price book")
     public void delete(@PathVariable Long id) {
         priceBookService.delete(id);
+    }
+
+    @PostMapping("/{id}/publish")
+    @Operation(summary = "Publish price book version",
+            description = "PublishPriceBookVersion: makes this version immutable and emits PriceBookPublished")
+    public ApiResponse<PriceBookDto> publish(@PathVariable Long id) {
+        return ApiResponse.success(priceBookService.publish(id), "Price book published successfully");
+    }
+
+    @GetMapping("/{id}/list-price")
+    @Operation(summary = "GetListPrice", description = "Resolve the list price for a SKU, currency and unit of measure as of a date")
+    public ApiResponse<PriceResolutionDto> getListPrice(
+            @PathVariable Long id,
+            @RequestParam String sku,
+            @RequestParam String currency,
+            @RequestParam(required = false, defaultValue = "EACH") String unitOfMeasure,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
+        return ApiResponse.success(priceBookService.getListPrice(id, sku, currency, unitOfMeasure, asOfDate));
+    }
+
+    @GetMapping("/{id}/cost")
+    @Operation(summary = "GetCost", description = "Resolve the cost for a SKU via this price book's linked cost book, as of a date")
+    public ApiResponse<PriceResolutionDto> getCost(
+            @PathVariable Long id,
+            @RequestParam String sku,
+            @RequestParam String currency,
+            @RequestParam(required = false, defaultValue = "EACH") String unitOfMeasure,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
+        return ApiResponse.success(priceBookService.getCost(id, sku, currency, unitOfMeasure, asOfDate));
     }
 
     @PostMapping("/{id}/entries")

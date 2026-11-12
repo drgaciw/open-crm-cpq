@@ -203,6 +203,7 @@ describe('Java source field-name checks (ALM surfaces)', () => {
       'durationInMonths',
       'startDate',
       'endDate',
+      'validUntil',
       'targetSubscriptionNumber',
       'observedRevision',
       'subscriptionEffectiveDate',

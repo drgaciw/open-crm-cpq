@@ -50,6 +50,13 @@ public class QuoteCreateRequest {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    /**
+     * ValidityPeriod: the date through which this quote is valid. Optional; {@link QuoteService#create} defaults it
+     * to {@link QuoteService#DEFAULT_VALIDITY_DAYS} days from creation when omitted.
+     */
+    private LocalDate validUntil;
+
     private String targetSubscriptionNumber;
     private Long observedRevision;
     private LocalDate subscriptionEffectiveDate;

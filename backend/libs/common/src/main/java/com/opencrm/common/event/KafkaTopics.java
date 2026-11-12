@@ -28,6 +28,8 @@ public final class KafkaTopics {
     public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
     /** DRG-424 / BC-02-01. Emitted when a configuration session is started (StartSession). */
     public static final String CONFIGURATION_SESSION_STARTED = "cpq.configuration.session.started";
+    /** DRG-428 / BC-02-05. Emitted when FreezeConfiguration makes a validated configuration immutable. */
+    public static final String CONFIGURATION_FROZEN = "cpq.configuration.frozen";
 
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";
@@ -38,6 +40,12 @@ public final class KafkaTopics {
     public static final String QUOTE_STATUS_ACCEPTED = "cpq.quote.status.accepted";
     public static final String QUOTE_APPROVAL_REJECTED = "cpq.quote.approval.rejected";
     public static final String RAMP_APPROVAL_BINDING_CHANGED = "cpq.quote.ramp.approval.binding.changed";
+    /**
+     * DRG-447 / BC-05-01. CreateQuote: a new quote created from an opportunity or account. This is the same name
+     * that was removed on 2026-09-22 for having no producer or contract (see the class javadoc); it comes back here
+     * as PUBLISHED now that its wave (DRG-447) is planned.
+     */
+    public static final String QUOTE_CREATED = "cpq.quote.created";
 
     // Approval Events
     public static final String APPROVAL_STEP_DECIDED = "cpq.approval.step.decided";
@@ -82,4 +90,14 @@ public final class KafkaTopics {
 
     /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
     public static final String POLICY_DEFINED = "cpq.approval.policy.defined";
+
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
+
+    /** DRG-431 / BC-03-01. A price book version was published. */
+    public static final String PRICE_BOOK_PUBLISHED = "cpq.pricebook.published";
+
+    /** DRG-457 / BC-06-04. Every required signer completed an e-signature envelope. */
+    public static final String SIGNATURE_COMPLETED = "cpq.contract.signature.completed";
 }
+

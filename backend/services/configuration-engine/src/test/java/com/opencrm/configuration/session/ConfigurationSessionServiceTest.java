@@ -6,11 +6,13 @@ import com.opencrm.common.dto.ConfigurationValidationResult;
 import com.opencrm.common.dto.ConfigurationViolation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationFrozenEvent;
 import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.configuration.hash.ConfigurationHasher;
 import com.opencrm.configuration.mapper.ConfigurationSessionMapper;
 import com.opencrm.configuration.model.ConfigurationModel;
 import com.opencrm.configuration.model.ConfigurationModelCache;
@@ -301,6 +303,155 @@ class ConfigurationSessionServiceTest {
     }
 
     @Test
+    @DisplayName("DRG-428 FreezeConfiguration: freezes a valid session, computes ConfigurationHash, emits ConfigurationFrozen")
+    void freezeValidSessionComputesHashAndPublishes() {
+        session.setCatalogVersion("catalog-v9");
+        session.setRuleSetVersion("product-PROD-001-v1");
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any())).thenReturn(session);
+
+        String expectedHash = ConfigurationHasher.compute(
+                session.getSelections(), session.getCatalogVersion(), session.getRuleSetVersion());
+
+        ConfigurationSessionDto result = sessionService.freeze(1L);
+
+        assertEquals(ConfigurationStatus.FROZEN, result.getStatus());
+        assertEquals(expectedHash, result.getConfigurationHash());
+        assertNotNull(result.getFrozenAt());
+        verify(outboxEventPublisher).publish(
+                eq("ConfigurationSession"),
+                eq("1"),
+                eq(EventContractRegistry.CONFIGURATION_FROZEN_V1),
+                any()
+        );
+    }
+
+    @Test
+    @DisplayName("DRG-428 ComputeHash: freezing the same selections/catalog/rule-set twice (independent sessions) "
+            + "produces the identical hash — determinism, not a side effect of session identity")
+    void freezeProducesTheSameHashForTheSameInputsAcrossSessions() {
+        session.setCatalogVersion("catalog-v9");
+        session.setRuleSetVersion("product-PROD-001-v1");
+        session.addSelection("color", "red");
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any())).thenReturn(session);
+        ConfigurationSessionDto firstFreeze = sessionService.freeze(1L);
+
+        ConfigurationSession secondSession = ConfigurationSession.builder()
+                .productId("PROD-001")
+                .userId("user-1")
+                .status(ConfigurationStatus.IN_PROGRESS)
+                .catalogVersion("catalog-v9")
+                .ruleSetVersion("product-PROD-001-v1")
+                .selections(new HashMap<>(Map.of("color", "red")))
+                .valid(true)
+                .build();
+        secondSession.setId(2L);
+        when(sessionRepository.findById(2L)).thenReturn(Optional.of(secondSession));
+        when(sessionRepository.save(any())).thenReturn(secondSession);
+        ConfigurationSessionDto secondFreeze = sessionService.freeze(2L);
+
+        assertEquals(firstFreeze.getConfigurationHash(), secondFreeze.getConfigurationHash());
+    }
+
+    @Test
+    @DisplayName("DRG-428: freezing an invalid session is rejected, same precondition as complete()")
+    void rejectFreezeInvalid() {
+        session.markAsInvalid("Missing required options");
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        assertThrows(IllegalStateException.class, () -> sessionService.freeze(1L));
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("DRG-428: freezing an already-frozen session is rejected")
+    void rejectFreezeAlreadyFrozen() {
+        session.markAsValid();
+        session.freeze("deadbeef");
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> sessionService.freeze(1L));
+        assertEquals("CONFIGURATION_ALREADY_FROZEN", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("DRG-428: freezing a bundle-started session is rejected, mirroring complete()'s restriction")
+    void rejectFreezeBundleSession() {
+        ConfigurationSession bundleSession = ConfigurationSession.builder()
+                .bundleId("BUNDLE-001")
+                .userId("user-1")
+                .status(ConfigurationStatus.IN_PROGRESS)
+                .selections(new HashMap<>())
+                .valid(true)
+                .build();
+        bundleSession.setId(5L);
+        when(sessionRepository.findById(5L)).thenReturn(Optional.of(bundleSession));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> sessionService.freeze(5L));
+
+        assertEquals("CONFIGURATION_SESSION_BUNDLE_FREEZE_UNSUPPORTED", ex.getErrorCode());
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("DRG-428: freezing a non-IN_PROGRESS (e.g. cancelled) session is rejected")
+    void rejectFreezeWrongState() {
+        session.setStatus(ConfigurationStatus.CANCELLED);
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> sessionService.freeze(1L));
+        assertEquals("CONFIGURATION_FREEZE_INVALID_STATE", ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("DRG-428: ConfigurationFrozen carries the computed hash, selections, catalog and rule-set version")
+    void frozenEventCarriesTheHash() {
+        session.setCatalogVersion("catalog-v9");
+        session.setRuleSetVersion("product-PROD-001-v1");
+        session.addSelection("color", "red");
+        session.markAsValid();
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any())).thenReturn(session);
+        AtomicReference<Object> payload = new AtomicReference<>();
+        doAnswer(invocation -> {
+            payload.set(invocation.getArgument(3));
+            return null;
+        }).when(outboxEventPublisher).publish(any(), any(), any(), any());
+
+        ConfigurationSessionDto result = sessionService.freeze(1L);
+
+        ConfigurationFrozenEvent event = (ConfigurationFrozenEvent) payload.get();
+        assertEquals(result.getConfigurationHash(), event.getConfigurationHash());
+        assertEquals("catalog-v9", event.getCatalogVersion());
+        assertEquals("product-PROD-001-v1", event.getRuleSetVersion());
+        assertEquals(Map.of("color", "red"), event.getSelections());
+        assertEquals("freeze-configuration", event.getCorrelation().getCausationId());
+    }
+
+    @Test
+    @DisplayName("DRG-428: a frozen session rejects addSelection, removeSelection, validate and complete")
+    void frozenSessionRejectsMutation() {
+        session.markAsValid();
+        session.freeze("deadbeef");
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+
+        assertFrozenImmutable(() -> sessionService.addSelection(1L, "color", "red"));
+        assertFrozenImmutable(() -> sessionService.removeSelection(1L, "color"));
+        assertFrozenImmutable(() -> sessionService.validate(1L));
+        assertFrozenImmutable(() -> sessionService.complete(1L));
+        verify(sessionRepository, never()).save(any());
+    }
+
+    private static void assertFrozenImmutable(Runnable action) {
+        BusinessException ex = assertThrows(BusinessException.class, action::run);
+        assertEquals("CONFIGURATION_FROZEN_IMMUTABLE", ex.getErrorCode());
+    }
+
+    @Test
     @DisplayName("should cancel an in-progress session")
     void cancelSession() {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
@@ -354,6 +505,8 @@ class ConfigurationSessionServiceTest {
                 .validationErrors(s.getValidationErrors())
                 .completedAt(s.getCompletedAt())
                 .expiresAt(s.getExpiresAt())
+                .configurationHash(s.getConfigurationHash())
+                .frozenAt(s.getFrozenAt())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .createdBy(s.getCreatedBy())

@@ -4,6 +4,7 @@ import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationFrozenEvent;
 import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
@@ -15,12 +16,16 @@ import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.PolicyDefinedEvent;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
+import com.opencrm.common.event.dto.QuoteCreatedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.RoleAssignedEvent;
+import com.opencrm.common.event.dto.SignatureCompletedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.event.dto.TerritoryAssignedEvent;
@@ -134,6 +139,15 @@ public final class EventContractRegistry {
             "ConfigurationSessionStarted", "configuration-engine", KafkaTopics.CONFIGURATION_SESSION_STARTED,
             ConfigurationSessionStartedEvent.class);
 
+    /**
+     * DRG-428 / BC-02-05. FreezeConfiguration: ValidateConfiguration then FreezeConfiguration computes the
+     * deterministic ConfigurationHash over selections, catalog version and rule set version, making the
+     * configuration immutable so Pricing and Quote can reference it.
+     */
+    public static final EventContract CONFIGURATION_FROZEN_V1 = published(
+            "ConfigurationFrozen", "configuration-engine", KafkaTopics.CONFIGURATION_FROZEN,
+            ConfigurationFrozenEvent.class);
+
     /** Contract/asset owns the transactional rate application and its sole outbox publish site. */
     public static final EventContract RAMP_APPLIED_V1 = published(
             "RampApplied", "contract-asset-management", KafkaTopics.SUBSCRIPTION_RAMP_APPLIED, RampAppliedEvent.class);
@@ -225,6 +239,31 @@ public final class EventContractRegistry {
     public static final EventContract POLICY_DEFINED_V1 = published(
             "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
 
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final EventContract ROLE_ASSIGNED_V1 = published(
+            "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
+
+    /** DRG-431 / BC-03-01. One event per price book version publish. */
+    public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
+            "PriceBookPublished", "pricebook-service", KafkaTopics.PRICE_BOOK_PUBLISHED, PriceBookPublishedEvent.class);
+
+    /**
+     * DRG-457 / BC-06-04. Every required signer completed an e-signature envelope, behind the ACL in
+     * {@code com.opencrm.contract.signature.acl}. Owned by contract-asset-management: e-signature coordination sits
+     * in the Govern &amp; Contract phase alongside amendment/asset lifecycle, which this service already owns.
+     */
+    public static final EventContract SIGNATURE_COMPLETED_V1 = published(
+            "SignatureCompleted", "contract-asset-management", KafkaTopics.SIGNATURE_COMPLETED,
+            SignatureCompletedEvent.class);
+
+    /**
+     * DRG-447 / BC-05-01. CreateQuote: a quote created from an opportunity or account. {@code cpq.quote.created} had
+     * neither a producer nor a contract and was removed on 2026-09-22 (see {@link KafkaTopics}); it is PUBLISHED
+     * again now that this wave is planned.
+     */
+    public static final EventContract QUOTE_CREATED_V1 = published(
+            "QuoteCreated", "quote-service", KafkaTopics.QUOTE_CREATED, QuoteCreatedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -259,7 +298,12 @@ public final class EventContractRegistry {
             TERRITORY_ASSIGNED_V1,
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1,
-            POLICY_DEFINED_V1);
+            POLICY_DEFINED_V1,
+            ROLE_ASSIGNED_V1,
+            CONFIGURATION_FROZEN_V1,
+            PRICE_BOOK_PUBLISHED_V1,
+            SIGNATURE_COMPLETED_V1,
+            QUOTE_CREATED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
