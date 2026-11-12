@@ -51,6 +51,6 @@ export class QuoteComparisonService {
   }
 
   markPrimary(id: number) {
-    return this.http.post<QuoteDto & { primary: boolean }>(`/api/v1/quotes/${id}/primary`, {});
+    return this.http.post<QuoteDto>(`/api/v1/quotes/${id}/primary`, {});
   }
 }

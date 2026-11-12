@@ -195,6 +195,7 @@ describe('Java source field-name checks (ALM surfaces)', () => {
       'description',
       'customerExternalId',
       'dealExternalId',
+      'primary',
       'status',
       'dealType',
       'subscriptionType',

@@ -312,6 +312,7 @@ export interface QuoteDto {
   description?: string;
   customerExternalId: string;
   dealExternalId?: string;
+  primary?: boolean;
   status: QuoteStatus;
   dealType?: QuoteDealType;
   subscriptionType?: string;
