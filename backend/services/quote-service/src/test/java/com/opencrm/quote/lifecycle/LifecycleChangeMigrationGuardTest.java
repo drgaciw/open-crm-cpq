@@ -35,7 +35,10 @@ class LifecycleChangeMigrationGuardTest {
             "V1_14__lifecycle_changes.sql",
             "V1_15__lifecycle_pricing_validation.sql",
             "V1_16__ramp_escalator_compounding.sql",
-            "V1_17__quote_valid_until.sql");
+            // V1_17 is intentionally skipped here: PR #983 (DRG-452) claims it for
+            // V1_17__quote_primary_flag.sql and was further along in review when this was written.
+            // Gaps in the version sequence are fine for Flyway; two files both claiming 1.17 is not.
+            "V1_18__quote_valid_until.sql");
 
     @Test
     @DisplayName("quote-service has exactly these versions, including lifecycle validation evidence")
