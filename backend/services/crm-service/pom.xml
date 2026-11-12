@@ -27,6 +27,10 @@
         </dependency>
         <dependency>
             <groupId>com.opencrm</groupId>
+            <artifactId>audit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.opencrm</groupId>
             <artifactId>security</artifactId>
         </dependency>
         <dependency>
