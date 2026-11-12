@@ -83,6 +83,7 @@ class EventContractRegistryTest {
         expected.put("cpq.product.bundle.structure.changed", "BundleStructureChanged v1, product-service, PUBLISHED");
         expected.put("cpq.product.defined", "ProductDefined v1, product-service, PUBLISHED");
         expected.put("cpq.product.revised", "ProductRevised v1, product-service, PUBLISHED");
+        expected.put("cpq.catalog.published", "CatalogPublished v1, product-service, PUBLISHED");
         expected.put("cpq.subscription.renewal.eligible",
                 "SubscriptionRenewalEligible v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.configuration.committed", "ConfigurationCommitted v1, configuration-engine, PUBLISHED");
