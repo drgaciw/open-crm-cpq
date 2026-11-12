@@ -203,6 +203,28 @@ describe('OrganizationDetailComponent account UX', () => {
     confirm.mockRestore();
   });
 
+  it('UI-CRM-SLDS: uses shared record page header with breadcrumb and highlights', async () => {
+    flushAccount();
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush(
+      { message: 'Not found' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-page-header')).toBeTruthy();
+    expect(el.querySelector('.detail-header')).toBeNull();
+    expect(el.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain('Accounts');
+    expect(el.querySelector('.page-header-highlights')?.textContent).toContain('Territory');
+    expect(el.querySelector('h1.page-header-title')?.textContent?.trim()).toBe('Acme Account');
+  });
+
   it('does not update state or show an error when a delete request fails after the component is destroyed', () => {
     flushAccount();
     httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });

@@ -47,14 +47,14 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
       <!-- KPI Cards -->
       <div class="kpi-grid">
         <mat-card class="kpi-card">
-          <mat-icon class="kpi-icon" style="color:#2196f3">handshake</mat-icon>
+          <mat-icon class="kpi-icon kpi-icon--info">handshake</mat-icon>
           <div class="kpi-info">
             <span class="kpi-value">{{ totalDeals() }}</span>
             <span class="kpi-label">Total Deals</span>
           </div>
         </mat-card>
         <mat-card class="kpi-card">
-          <mat-icon class="kpi-icon" style="color:#4caf50">attach_money</mat-icon>
+          <mat-icon class="kpi-icon kpi-icon--success">attach_money</mat-icon>
           <div class="kpi-info">
             <span class="kpi-value">{{ totalValue() | currency:baseCurrency():'symbol':'1.0-0' }}</span>
             <span class="kpi-label">Pipeline Value</span>
@@ -66,14 +66,14 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
           </div>
         </mat-card>
         <mat-card class="kpi-card">
-          <mat-icon class="kpi-icon" style="color:#ff9800">leaderboard</mat-icon>
+          <mat-icon class="kpi-icon kpi-icon--warning">leaderboard</mat-icon>
           <div class="kpi-info">
             <span class="kpi-value">{{ totalLeadCount() }}</span>
             <span class="kpi-label">Total Leads</span>
           </div>
         </mat-card>
         <mat-card class="kpi-card">
-          <mat-icon class="kpi-icon" style="color:#9c27b0">emoji_events</mat-icon>
+          <mat-icon class="kpi-icon kpi-icon--brand">emoji_events</mat-icon>
           <div class="kpi-info">
             <span class="kpi-value">{{ wonValue() | currency:baseCurrency():'symbol':'1.0-0' }}</span>
             <span class="kpi-label">Won Value</span>
@@ -172,42 +172,67 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
     }
   `,
   styles: [`
-    .loading { display: flex; justify-content: center; padding: 48px; }
+    .loading { display: flex; justify-content: center; padding: var(--crm-space-xl); }
 
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm);
+      margin: 0 0 var(--crm-space-md);
+      padding: 12px var(--crm-space-md);
+      border-radius: var(--crm-radius-sm);
+      background: var(--crm-color-danger-container);
+      color: var(--crm-color-danger);
     }
 
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .kpi-card { display: flex; align-items: center; gap: 16px; padding: 20px !important; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--crm-space-md);
+      margin-bottom: var(--crm-space-lg);
+    }
+    .kpi-card { display: flex; align-items: center; gap: var(--crm-space-md); padding: 20px !important; }
     .kpi-icon { font-size: 40px; width: 40px; height: 40px; }
+    .kpi-icon--info { color: var(--crm-color-info); }
+    .kpi-icon--success { color: var(--crm-color-success); }
+    .kpi-icon--warning { color: var(--crm-color-warning); }
+    .kpi-icon--brand { color: var(--crm-color-brand); }
     .kpi-info { display: flex; flex-direction: column; }
-    .kpi-value { font-size: 1.5rem; font-weight: 700; }
-    .kpi-label { font-size: 0.8rem; color: #666; }
-    .kpi-note { font-size: 0.75rem; color: #8a5a00; }
+    .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--crm-color-ink); }
+    .kpi-label { font-size: 0.8rem; color: var(--crm-color-muted); }
+    .kpi-note { font-size: 0.75rem; color: var(--crm-color-warning-ink); }
 
-    .pipeline-card { margin-bottom: 24px; }
-    .pipeline-bars { display: flex; flex-direction: column; gap: 12px; padding: 16px 0; }
+    .pipeline-card { margin-bottom: var(--crm-space-lg); }
+    .pipeline-bars { display: flex; flex-direction: column; gap: 12px; padding: var(--crm-space-md) 0; }
     .pipeline-row { display: flex; align-items: center; gap: 12px; }
-    .stage-name { width: 100px; font-size: 0.85rem; font-weight: 500; }
-    .bar-container { flex: 1; height: 24px; background: #f0f0f0; border-radius: 12px; overflow: hidden; }
-    .bar { height: 100%; border-radius: 12px; transition: width 0.3s ease; min-width: 2px; }
-    .stage-stats { width: 180px; font-size: 0.8rem; color: #666; text-align: right; }
+    .stage-name { width: 100px; font-size: 0.85rem; font-weight: 500; color: var(--crm-color-ink); }
+    .bar-container {
+      flex: 1;
+      height: 24px;
+      background: var(--crm-color-track);
+      border-radius: var(--crm-radius-md);
+      overflow: hidden;
+    }
+    .bar { height: 100%; border-radius: var(--crm-radius-md); transition: width 0.3s ease; min-width: 2px; }
+    .stage-stats { width: 180px; font-size: 0.8rem; color: var(--crm-color-muted); text-align: right; }
 
-    .activity-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; }
+    .activity-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: var(--crm-space-md);
+    }
     .card-spacer { flex: 1; }
     .compact-table { width: 100%; }
-    .stage-badge { color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 500; }
-    .link { color: #1976d2; text-decoration: none; font-weight: 500; }
+    .stage-badge {
+      color: var(--crm-color-on-brand);
+      padding: 2px var(--crm-space-sm);
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+    .link { color: var(--crm-color-brand); text-decoration: none; font-weight: 500; }
     .link:hover { text-decoration: underline; }
-    .empty-text { color: #999; text-align: center; padding: 24px; }
+    .empty-text { color: var(--crm-color-empty); text-align: center; padding: var(--crm-space-lg); }
   `],
 })
 export class DashboardComponent implements OnInit {
