@@ -1,22 +1,23 @@
 import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import { PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
-import { CurrencyPipe, DatePipe } from '@angular/common';
 import { DealService } from '../deal.service';
 import { DealDto, DealStage } from '@frontend/shared-models';
 import {
+  DataTableComponent,
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
+  TableColumn,
+  TableRowAction,
+  RowActionEvent,
 } from '@frontend/shared-ui';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 import { dealActionErrorMessage } from '../deal-action-error';
@@ -24,18 +25,35 @@ import {
   DEAL_STAGE_ORDER,
   canAdvanceDeal,
   canCloseDeal,
-  dealStageColor,
   dealStageLabel,
 } from '../deal-stage';
+
+export interface DealTableRow {
+  id: number;
+  name: string;
+  organization: string;
+  owner: string;
+  amount: string;
+  stage: DealStage;
+  stageLabel: string;
+  probability: string;
+  expectedCloseDate: string;
+  contact: string;
+}
 
 @Component({
   selector: 'app-deal-list',
   standalone: true,
   imports: [
-    MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
-    MatIconModule, MatProgressSpinnerModule,
-    MatMenuModule, MatTabsModule, MatChipsModule, CurrencyPipe, DatePipe,
-    PageHeaderComponent, SearchInputComponent, EmptyStateComponent,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatTabsModule,
+    PageHeaderComponent,
+    SearchInputComponent,
+    EmptyStateComponent,
+    DataTableComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -44,10 +62,10 @@ import {
       subtitle="Track deals through the pipeline"
     >
       <div actions>
-        <button mat-stroked-button (click)="router.navigate(['/deals/kanban'])">
+        <button mat-stroked-button type="button" (click)="router.navigate(['/deals/kanban'])">
           <mat-icon>view_kanban</mat-icon> Pipeline
         </button>
-        <button mat-raised-button color="primary" (click)="onCreate()">
+        <button mat-raised-button color="primary" type="button" (click)="onCreate()">
           <mat-icon>add</mat-icon> New opportunity
         </button>
       </div>
@@ -66,27 +84,27 @@ import {
       }
     </mat-tab-group>
 
-    <div class="deal-filters">
-      <label>
-        Organization
+    <div class="deal-filters" role="search" aria-label="Opportunity filters">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Organization</mat-label>
         <input
+          matInput
           data-testid="deal-organization-filter"
-          type="text"
           [value]="organizationFilter()"
           (input)="onOrganizationFilter($any($event.target).value)"
           placeholder="Name or id"
         />
-      </label>
-      <label>
-        Owner
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Owner</mat-label>
         <input
+          matInput
           data-testid="deal-owner-filter"
-          type="text"
           [value]="ownerFilter()"
           (input)="onOwnerFilter($any($event.target).value)"
           placeholder="Owner id"
         />
-      </label>
+      </mat-form-field>
     </div>
 
     @if (service.error()) {
@@ -95,12 +113,6 @@ import {
         <span>{{ service.error() }}</span>
         <button mat-button type="button" (click)="onRetry()">Retry</button>
         <button mat-button type="button" (click)="clearError()">Dismiss</button>
-      </div>
-    }
-
-    @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
       </div>
     }
 
@@ -114,133 +126,46 @@ import {
         [actionLabel]="hasActiveFilters() ? '' : 'Create opportunity'"
         (action)="onCreate()"
       />
-    } @else if (!service.loading() && visibleDeals().length > 0) {
-      <div class="table-container">
-        <table mat-table [dataSource]="visibleDeals()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
-          <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Opportunity</th>
-            <td mat-cell *matCellDef="let d">
-              <a class="link" (click)="onRowClick(d)">{{ d.name }}</a>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="organization">
-            <th mat-header-cell *matHeaderCellDef>Organization</th>
-            <td mat-cell *matCellDef="let d">{{ d.organizationName || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="owner">
-            <th mat-header-cell *matHeaderCellDef>Owner</th>
-            <td mat-cell *matCellDef="let d">{{ d.ownerId || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="amount">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Amount</th>
-            <td mat-cell *matCellDef="let d">{{ d.amount | currency:(d.currency || 'USD'):'symbol':'1.0-0' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="stage">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Stage</th>
-            <td mat-cell *matCellDef="let d">
-              <span class="stage-badge" [style.background]="stageColor(d.stage)">
-                {{ stageLabel(d.stage) }}
-              </span>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="probability">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Probability</th>
-            <td mat-cell *matCellDef="let d">{{ d.probability ? d.probability + '%' : '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="expectedCloseDate">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Close Date</th>
-            <td mat-cell *matCellDef="let d">{{ d.expectedCloseDate ? (d.expectedCloseDate | date:'mediumDate') : '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="contact">
-            <th mat-header-cell *matHeaderCellDef>Contact</th>
-            <td mat-cell *matCellDef="let d">{{ d.primaryContactName || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let d">
-              <button mat-icon-button [matMenuTriggerFor]="menu" [disabled]="actionLoading()"
-                      (click)="$event.stopPropagation()" aria-label="Deal actions">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu">
-                <button mat-menu-item (click)="onEdit(d)"><mat-icon>edit</mat-icon><span>Edit</span></button>
-                @if (canAdvance(d.stage)) {
-                  <button mat-menu-item (click)="onAdvance(d)" [disabled]="actionLoading()">
-                    <mat-icon>arrow_forward</mat-icon><span>Advance Stage</span>
-                  </button>
-                }
-                @if (canClose(d.stage)) {
-                  <button mat-menu-item (click)="onWin(d)" [disabled]="actionLoading()">
-                    <mat-icon>emoji_events</mat-icon><span>Mark Won</span>
-                  </button>
-                  <button mat-menu-item (click)="onLose(d)" [disabled]="actionLoading()">
-                    <mat-icon>cancel</mat-icon><span>Mark Lost</span>
-                  </button>
-                }
-                <button mat-menu-item (click)="onDelete(d)" [disabled]="actionLoading()">
-                  <mat-icon>delete</mat-icon><span>Delete</span>
-                </button>
-              </mat-menu>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"
-              class="clickable-row" (click)="onRowClick(row)"></tr>
-        </table>
-        <mat-paginator
-          [length]="service.pagination().totalElements"
-          [pageSize]="service.pagination().size"
-          [pageIndex]="service.pagination().page"
-          [pageSizeOptions]="[10, 20, 50]"
-          (page)="onPageChange($event)"
-          showFirstLastButtons>
-        </mat-paginator>
-      </div>
+    } @else if (!service.error() && (service.loading() || visibleDeals().length > 0)) {
+      <app-data-table
+        [columns]="columns"
+        [data]="tableRows()"
+        [loading]="service.loading()"
+        [pagination]="service.pagination()"
+        [rowActions]="rowActions"
+        rowActionsAriaLabel="Deal actions"
+        [rowActionsDisabled]="actionLoading()"
+        [pageSizeOptions]="[10, 20, 50]"
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSort($event)"
+        (rowClick)="onRowClick($event)"
+        (rowAction)="onRowAction($event)"
+      />
     }
   `,
   styles: `
-    .stage-tabs { margin-bottom: 16px; }
+    .stage-tabs { margin-bottom: var(--crm-space-md, 16px); }
     .deal-filters {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
-      margin: 0 0 16px;
+      gap: var(--crm-space-md, 16px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      align-items: flex-start;
     }
-    .deal-filters label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 0.75rem;
-      color: #555;
-    }
-    .deal-filters input {
+    .deal-filters mat-form-field {
       min-width: 180px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95rem;
+      flex: 1 1 180px;
+      max-width: 280px;
     }
-    .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
-    table { width: 100%; }
-    .link { color: #1976d2; cursor: pointer; font-weight: 500; }
-    .link:hover { text-decoration: underline; }
-    .clickable-row { cursor: pointer; }
-    .clickable-row:hover { background: #f5f5f5; }
-    .stage-badge { color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
-    .loading { display: flex; justify-content: center; padding: 48px; }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
-    }
-    @media (max-width: 768px) {
-      .error-banner { margin: 0 0 16px; }
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
     }
   `,
 })
@@ -255,12 +180,48 @@ export class DealListComponent implements OnInit {
   readonly searchQuery = signal('');
   readonly stageFilter = signal<DealStage | undefined>(undefined);
 
-  displayedColumns = [
-    'name', 'organization', 'owner', 'amount', 'stage',
-    'probability', 'expectedCloseDate', 'contact', 'actions',
+  readonly columns: TableColumn[] = [
+    { key: 'name', header: 'Opportunity', sortable: true },
+    { key: 'organization', header: 'Organization', sortable: false },
+    { key: 'owner', header: 'Owner', sortable: false },
+    { key: 'amount', header: 'Amount', sortable: true },
+    { key: 'stageLabel', header: 'Stage', sortable: true },
+    { key: 'probability', header: 'Probability', sortable: true },
+    { key: 'expectedCloseDate', header: 'Close Date', sortable: true },
+    { key: 'contact', header: 'Contact', sortable: false },
   ];
+
+  readonly rowActions: TableRowAction[] = [
+    { action: 'edit', label: 'Edit', icon: 'edit' },
+    {
+      action: 'advance',
+      label: 'Advance Stage',
+      icon: 'arrow_forward',
+      visible: (row) => this.canAdvance((row as DealTableRow).stage),
+    },
+    {
+      action: 'win',
+      label: 'Mark Won',
+      icon: 'emoji_events',
+      visible: (row) => this.canClose((row as DealTableRow).stage),
+    },
+    {
+      action: 'lose',
+      label: 'Mark Lost',
+      icon: 'cancel',
+      visible: (row) => this.canClose((row as DealTableRow).stage),
+    },
+    { action: 'delete', label: 'Delete', icon: 'delete', danger: true },
+  ];
+
   stages: readonly DealStage[] = DEAL_STAGE_ORDER;
   private currentSort = 'createdAt,desc';
+  private readonly money = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  });
+  private readonly dates = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
   readonly visibleDeals = computed(() => {
     let rows = this.service.deals();
@@ -288,9 +249,9 @@ export class DealListComponent implements OnInit {
     return rows;
   });
 
-  trackById(index: number, item: DealDto): string | number {
-    return item.id;
-  }
+  readonly tableRows = computed<DealTableRow[]>(() =>
+    this.visibleDeals().map((d) => this.toRow(d)),
+  );
 
   ngOnInit(): void {
     this.reload(0);
@@ -302,10 +263,6 @@ export class DealListComponent implements OnInit {
 
   canClose(stage: DealStage): boolean {
     return canCloseDeal(stage);
-  }
-
-  stageColor(stage: DealStage): string {
-    return dealStageColor(stage);
   }
 
   stageLabel(stage: DealStage): string {
@@ -347,8 +304,9 @@ export class DealListComponent implements OnInit {
     this.reload(e.pageIndex, e.pageSize);
   }
 
-  onSort(s: Sort): void {
-    this.currentSort = s.active && s.direction ? `${s.active},${s.direction}` : 'createdAt,desc';
+  onSort(s: SortChangeEvent): void {
+    const field = s.active === 'stageLabel' ? 'stage' : s.active;
+    this.currentSort = field && s.direction ? `${field},${s.direction}` : 'createdAt,desc';
     this.reload(0);
   }
 
@@ -363,15 +321,37 @@ export class DealListComponent implements OnInit {
     this.router.navigate(['/deals', 'new']);
   }
 
-  onRowClick(d: DealDto): void {
-    this.router.navigate(['/deals', d.id]);
+  onRowClick(row: DealTableRow): void {
+    this.router.navigate(['/deals', row.id]);
   }
 
-  onEdit(d: DealDto): void {
+  onRowAction(event: RowActionEvent<DealTableRow>): void {
+    if (event.action === 'edit') {
+      this.onEdit(event.row);
+      return;
+    }
+    if (event.action === 'advance') {
+      this.onAdvance(event.row);
+      return;
+    }
+    if (event.action === 'win') {
+      this.onWin(event.row);
+      return;
+    }
+    if (event.action === 'lose') {
+      this.onLose(event.row);
+      return;
+    }
+    if (event.action === 'delete') {
+      this.onDelete(event.row);
+    }
+  }
+
+  onEdit(d: DealTableRow | DealDto): void {
     this.router.navigate(['/deals', d.id, 'edit']);
   }
 
-  onAdvance(d: DealDto): void {
+  onAdvance(d: DealTableRow | DealDto): void {
     this.actionLoading.set(true);
     this.service.advanceStage(d.id).subscribe({
       next: (updated) => this.commitStage(updated),
@@ -379,7 +359,7 @@ export class DealListComponent implements OnInit {
     });
   }
 
-  onWin(d: DealDto): void {
+  onWin(d: DealTableRow | DealDto): void {
     if (!confirm(`Mark "${d.name}" as Won?`)) return;
     this.actionLoading.set(true);
     this.service.markWon(d.id).subscribe({
@@ -388,7 +368,7 @@ export class DealListComponent implements OnInit {
     });
   }
 
-  onLose(d: DealDto): void {
+  onLose(d: DealTableRow | DealDto): void {
     const dialogRef = this.dialog.open(DealLoseReasonDialogComponent, { width: '500px' });
     dialogRef.afterClosed().subscribe((reason: string | undefined) => {
       if (!reason) return;
@@ -400,7 +380,7 @@ export class DealListComponent implements OnInit {
     });
   }
 
-  onDelete(d: DealDto): void {
+  onDelete(d: DealTableRow | DealDto): void {
     if (!confirm(`Delete "${d.name}"?`)) return;
     this.actionLoading.set(true);
     this.service.delete(d.id).subscribe({
@@ -410,6 +390,32 @@ export class DealListComponent implements OnInit {
       },
       error: (err) => this.failStage(err, 'Could not delete this opportunity'),
     });
+  }
+
+  private toRow(d: DealDto): DealTableRow {
+    const currency = d.currency || 'USD';
+    const amountFormatter =
+      currency === 'USD'
+        ? this.money
+        : new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: 0,
+          });
+    return {
+      id: d.id,
+      name: d.name,
+      organization: d.organizationName || '—',
+      owner: d.ownerId || '—',
+      amount: d.amount != null ? amountFormatter.format(d.amount) : '—',
+      stage: d.stage,
+      stageLabel: dealStageLabel(d.stage),
+      probability: d.probability != null ? `${d.probability}%` : '—',
+      expectedCloseDate: d.expectedCloseDate
+        ? this.dates.format(new Date(d.expectedCloseDate))
+        : '—',
+      contact: d.primaryContactName || '—',
+    };
   }
 
   private serverOrganizationId(): number | undefined {

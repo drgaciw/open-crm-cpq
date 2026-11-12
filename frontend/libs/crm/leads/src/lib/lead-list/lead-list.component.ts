@@ -1,36 +1,52 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import { PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { LeadService } from '../lead.service';
 import { LeadDto, LeadPriority, LeadStatus } from '@frontend/shared-models';
-import { CurrencyPipe } from '@angular/common';
 import {
   ConfirmDialogComponent,
+  DataTableComponent,
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
-  StatusBadgeComponent,
+  SortChangeEvent,
+  TableColumn,
+  TableRowAction,
+  RowActionEvent,
 } from '@frontend/shared-ui';
 import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.component';
+
+export interface LeadTableRow {
+  id: number;
+  title: string;
+  status: LeadStatus;
+  priority: string;
+  source: string;
+  estimatedValue: string;
+  score: string;
+  contact: string;
+  organization: string;
+}
 
 @Component({
   selector: 'lib-lead-list',
   standalone: true,
   imports: [
-    MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
-    MatIconModule, MatProgressSpinnerModule, MatFormFieldModule,
-    MatMenuModule, MatTabsModule, MatSelectModule, CurrencyPipe,
-    PageHeaderComponent, SearchInputComponent, EmptyStateComponent, StatusBadgeComponent,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatTabsModule,
+    MatSelectModule,
+    PageHeaderComponent,
+    SearchInputComponent,
+    EmptyStateComponent,
+    DataTableComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -39,7 +55,7 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
       subtitle="Manage your lead pipeline"
     >
       <div actions>
-        <button mat-raised-button color="primary" (click)="onCreate()">
+        <button mat-raised-button color="primary" type="button" (click)="onCreate()">
           <mat-icon>add</mat-icon> New Lead
         </button>
       </div>
@@ -48,7 +64,7 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
           placeholder="Search leads..."
           (searchChange)="onSearch($event)"
         />
-        <mat-form-field appearance="outline" class="priority-field">
+        <mat-form-field appearance="outline" class="priority-field" subscriptSizing="dynamic">
           <mat-label>Priority</mat-label>
           <mat-select [value]="currentPriority() ?? ''" (selectionChange)="onPriorityChange($event.value)"
                       aria-label="Filter by priority">
@@ -80,10 +96,6 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
       </div>
     }
 
-    @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
-    }
-
     @if (!service.loading() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="trending_up"
@@ -94,135 +106,36 @@ import { LoseReasonDialogComponent } from '../lead-detail/lose-reason-dialog.com
         [actionLabel]="hasActiveFilters() ? '' : 'Create Lead'"
         (action)="onCreate()"
       />
-    } @else if (!service.loading() && !service.error()) {
-      <div class="table-container">
-        <table mat-table [dataSource]="service.leads()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
-          <ng-container matColumnDef="title">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
-            <td mat-cell *matCellDef="let lead">
-              <a class="link" (click)="onRowClick(lead)" (keyup.enter)="onRowClick(lead)" tabindex="0">{{ lead.title }}</a>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
-            <td mat-cell *matCellDef="let lead">
-              <app-status-badge [status]="lead.status" type="lead" />
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="priority">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Priority</th>
-            <td mat-cell *matCellDef="let lead">{{ lead.priority || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="source">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Source</th>
-            <td mat-cell *matCellDef="let lead">{{ lead.source || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="estimatedValue">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Estimated Value</th>
-            <td mat-cell *matCellDef="let lead">
-              {{ lead.estimatedValue ? (lead.estimatedValue | currency) : '—' }}
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="score">
-            <th mat-header-cell *matHeaderCellDef title="Advisory estimate, not a decision">Score (advisory)</th>
-            <td mat-cell *matCellDef="let lead">{{ lead.scoreSuggestion?.value ?? '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="contact">
-            <th mat-header-cell *matHeaderCellDef>Contact</th>
-            <td mat-cell *matCellDef="let lead">
-              {{ lead.contactName || '—' }}
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="organization">
-            <th mat-header-cell *matHeaderCellDef>Organization</th>
-            <td mat-cell *matCellDef="let lead">{{ lead.organizationName || '—' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let lead" (click)="$event.stopPropagation()">
-              <button mat-icon-button [matMenuTriggerFor]="menu" [disabled]="actionLoading()"
-                      [attr.aria-label]="'Actions for ' + lead.title">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu">
-                @if (canEdit(lead.status)) {
-                  <button mat-menu-item (click)="onEdit(lead)">
-                    <mat-icon>edit</mat-icon><span>Edit</span>
-                  </button>
-                }
-                @if (lead.status === 'NEW') {
-                  <button mat-menu-item (click)="onMarkContacted(lead)">
-                    <mat-icon>phone</mat-icon><span>Mark Contacted</span>
-                  </button>
-                }
-                @if (lead.status === 'CONTACTED') {
-                  <button mat-menu-item (click)="onQualify(lead)">
-                    <mat-icon>check_circle</mat-icon><span>Qualify</span>
-                  </button>
-                }
-                @if (lead.status === 'QUALIFIED') {
-                  <button mat-menu-item (click)="onConvert(lead)">
-                    <mat-icon>arrow_forward</mat-icon><span>Convert to Deal</span>
-                  </button>
-                }
-                @if (canMarkLost(lead.status)) {
-                  <button mat-menu-item (click)="onMarkLost(lead)">
-                    <mat-icon>close</mat-icon><span>Mark Lost</span>
-                  </button>
-                }
-                @if (canDelete(lead.status)) {
-                  <button mat-menu-item (click)="onDelete(lead)">
-                    <mat-icon>delete</mat-icon><span>Delete</span>
-                  </button>
-                }
-              </mat-menu>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"
-              class="clickable-row" (click)="onRowClick(row)"></tr>
-        </table>
-        <mat-paginator
-          [length]="service.pagination().totalElements"
-          [pageSize]="service.pagination().size"
-          [pageIndex]="service.pagination().page"
-          [pageSizeOptions]="[10, 20, 50]"
-          (page)="onPageChange($event)"
-          showFirstLastButtons>
-        </mat-paginator>
-      </div>
+    } @else if (!service.error() && (service.loading() || !service.isEmpty())) {
+      <app-data-table
+        [columns]="columns"
+        [data]="tableRows()"
+        [loading]="service.loading()"
+        [pagination]="service.pagination()"
+        [rowActions]="rowActions"
+        rowActionsAriaLabel="Lead actions"
+        [rowActionsDisabled]="actionLoading()"
+        [pageSizeOptions]="[10, 20, 50]"
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSort($event)"
+        (rowClick)="onRowClick($event)"
+        (rowAction)="onRowAction($event)"
+      />
     }
   `,
   styles: [`
-    .list-filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; width: 100%; }
+    .list-filters { display: flex; flex-wrap: wrap; gap: var(--crm-space-md, 16px); align-items: flex-start; width: 100%; }
     .priority-field { width: 160px; }
-    .priority-field .mat-mdc-form-field-subscript-wrapper { display: none; }
-    .status-tabs { margin-bottom: 24px; }
-    .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
-    table { width: 100%; }
-    .link { color: #1976d2; cursor: pointer; font-weight: 500; }
-    .link:hover { text-decoration: underline; }
-    .clickable-row { cursor: pointer; }
-    .clickable-row:hover { background: #f5f5f5; }
-    .loading { display: flex; justify-content: center; padding: 48px; }
+    .status-tabs { margin-bottom: var(--crm-space-lg, 24px); }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
     }
 
     @media (max-width: 768px) {
@@ -235,12 +148,70 @@ export class LeadListComponent implements OnInit {
   readonly service = inject(LeadService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly money = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+  });
 
   readonly priorities: LeadPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
   readonly actionLoading = signal(false);
   readonly currentPriority = signal<LeadPriority | undefined>(undefined);
 
-  displayedColumns = ['title', 'status', 'priority', 'source', 'estimatedValue', 'score', 'contact', 'organization', 'actions'];
+  readonly columns: TableColumn[] = [
+    { key: 'title', header: 'Title', sortable: true },
+    { key: 'status', header: 'Status', sortable: true },
+    { key: 'priority', header: 'Priority', sortable: true },
+    { key: 'source', header: 'Source', sortable: true },
+    { key: 'estimatedValue', header: 'Estimated Value', sortable: true },
+    { key: 'score', header: 'Score (advisory)', sortable: false },
+    { key: 'contact', header: 'Contact', sortable: false },
+    { key: 'organization', header: 'Organization', sortable: false },
+  ];
+
+  readonly rowActions: TableRowAction[] = [
+    {
+      action: 'edit',
+      label: 'Edit',
+      icon: 'edit',
+      visible: (row) => this.canEdit((row as LeadTableRow).status),
+    },
+    {
+      action: 'markContacted',
+      label: 'Mark Contacted',
+      icon: 'phone',
+      visible: (row) => (row as LeadTableRow).status === 'NEW',
+    },
+    {
+      action: 'qualify',
+      label: 'Qualify',
+      icon: 'check_circle',
+      visible: (row) => (row as LeadTableRow).status === 'CONTACTED',
+    },
+    {
+      action: 'convert',
+      label: 'Convert to Deal',
+      icon: 'arrow_forward',
+      visible: (row) => (row as LeadTableRow).status === 'QUALIFIED',
+    },
+    {
+      action: 'markLost',
+      label: 'Mark Lost',
+      icon: 'close',
+      visible: (row) => this.canMarkLost((row as LeadTableRow).status),
+    },
+    {
+      action: 'delete',
+      label: 'Delete',
+      icon: 'delete',
+      danger: true,
+      visible: (row) => this.canDelete((row as LeadTableRow).status),
+    },
+  ];
+
+  readonly tableRows = computed<LeadTableRow[]>(() =>
+    this.service.leads().map((lead) => this.toRow(lead)),
+  );
+
   selectedTabIndex = 0;
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;
@@ -249,10 +220,6 @@ export class LeadListComponent implements OnInit {
   private readonly statusMap: (LeadStatus | undefined)[] = [
     undefined, 'NEW', 'CONTACTED', 'QUALIFIED', 'UNQUALIFIED', 'CONVERTED', 'LOST',
   ];
-
-  trackById(index: number, item: LeadDto): string | number {
-    return item.id;
-  }
 
   ngOnInit(): void {
     this.refreshList(0, 20);
@@ -280,7 +247,7 @@ export class LeadListComponent implements OnInit {
     this.refreshList(e.pageIndex, e.pageSize);
   }
 
-  onSort(s: Sort): void {
+  onSort(s: SortChangeEvent): void {
     this.currentSort = s.active && s.direction ? `${s.active},${s.direction}` : 'createdAt,desc';
     this.refreshList(0, this.service.pagination().size);
   }
@@ -289,15 +256,42 @@ export class LeadListComponent implements OnInit {
     this.router.navigate(['/leads', 'new']);
   }
 
-  onRowClick(lead: LeadDto): void {
-    this.router.navigate(['/leads', lead.id]);
+  onRowClick(row: LeadTableRow): void {
+    this.router.navigate(['/leads', row.id]);
   }
 
-  onEdit(lead: LeadDto): void {
+  onRowAction(event: RowActionEvent<LeadTableRow>): void {
+    const row = event.row;
+    if (event.action === 'edit') {
+      this.onEdit(row);
+      return;
+    }
+    if (event.action === 'markContacted') {
+      this.onMarkContacted(row);
+      return;
+    }
+    if (event.action === 'qualify') {
+      this.onQualify(row);
+      return;
+    }
+    if (event.action === 'convert') {
+      this.onConvert(row);
+      return;
+    }
+    if (event.action === 'markLost') {
+      this.onMarkLost(row);
+      return;
+    }
+    if (event.action === 'delete') {
+      this.onDelete(row);
+    }
+  }
+
+  onEdit(lead: LeadTableRow | LeadDto): void {
     this.router.navigate(['/leads', lead.id, 'edit']);
   }
 
-  onMarkContacted(lead: LeadDto): void {
+  onMarkContacted(lead: LeadTableRow | LeadDto): void {
     this.actionLoading.set(true);
     this.service.markContacted(lead.id).subscribe({
       next: () => {
@@ -308,7 +302,7 @@ export class LeadListComponent implements OnInit {
     });
   }
 
-  onQualify(lead: LeadDto): void {
+  onQualify(lead: LeadTableRow | LeadDto): void {
     this.actionLoading.set(true);
     this.service.qualify(lead.id).subscribe({
       next: () => {
@@ -319,7 +313,7 @@ export class LeadListComponent implements OnInit {
     });
   }
 
-  onConvert(lead: LeadDto): void {
+  onConvert(lead: LeadTableRow | LeadDto): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       width: '400px',
       data: {
@@ -350,7 +344,7 @@ export class LeadListComponent implements OnInit {
     });
   }
 
-  onMarkLost(lead: LeadDto): void {
+  onMarkLost(lead: LeadTableRow | LeadDto): void {
     const dialogRef = this.dialog.open(LoseReasonDialogComponent, {
       width: '500px',
     });
@@ -368,7 +362,7 @@ export class LeadListComponent implements OnInit {
     });
   }
 
-  onDelete(lead: LeadDto): void {
+  onDelete(lead: LeadTableRow | LeadDto): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       width: '400px',
       data: {
@@ -410,6 +404,21 @@ export class LeadListComponent implements OnInit {
 
   retry(): void {
     this.refreshList(this.service.pagination().page, this.service.pagination().size || 20);
+  }
+
+  private toRow(lead: LeadDto): LeadTableRow {
+    return {
+      id: lead.id,
+      title: lead.title,
+      status: lead.status,
+      priority: lead.priority || '—',
+      source: lead.source || '—',
+      estimatedValue:
+        lead.estimatedValue != null ? this.money.format(lead.estimatedValue) : '—',
+      score: lead.scoreSuggestion?.value != null ? String(lead.scoreSuggestion.value) : '—',
+      contact: lead.contactName || '—',
+      organization: lead.organizationName || '—',
+    };
   }
 
   private refreshList(page: number, size: number): void {

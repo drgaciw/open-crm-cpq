@@ -1,6 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { DataTableComponent, TableColumn } from './data-table.component';
+import {
+  DataTableComponent,
+  TableColumn,
+  TableRowAction,
+  RowActionEvent,
+} from './data-table.component';
 import { PaginationMeta } from '@frontend/shared-models';
 
 describe('DataTableComponent', () => {
@@ -192,5 +197,76 @@ describe('DataTableComponent', () => {
 
     const paginator = component.nativeElement.querySelector('mat-paginator');
     expect(paginator).toBeFalsy();
+  });
+
+  it('should omit actions column when rowActions is empty', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.componentRef.setInput('rowActions', []);
+    component.detectChanges();
+
+    expect(component.componentInstance.displayedColumns()).toEqual(
+      mockColumns.map((c) => c.key),
+    );
+    expect(component.nativeElement.querySelector('[aria-label="Row actions"]')).toBeNull();
+  });
+
+  it('should append actions column and use custom aria-label', () => {
+    const actions: TableRowAction[] = [
+      { action: 'edit', label: 'Edit', icon: 'edit' },
+      { action: 'delete', label: 'Delete', icon: 'delete', danger: true },
+    ];
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.componentRef.setInput('rowActions', actions);
+    component.componentRef.setInput('rowActionsAriaLabel', 'Account actions');
+    component.detectChanges();
+
+    expect(component.componentInstance.displayedColumns()).toEqual([
+      ...mockColumns.map((c) => c.key),
+      '__actions',
+    ]);
+    const triggers = component.nativeElement.querySelectorAll(
+      'button[aria-label="Account actions"]',
+    );
+    expect(triggers.length).toBe(mockData.length);
+  });
+
+  it('should emit rowAction when emitRowAction is called', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.componentRef.setInput('rowActions', [
+      { action: 'edit', label: 'Edit' },
+    ] satisfies TableRowAction[]);
+    component.detectChanges();
+
+    const events: RowActionEvent<(typeof mockData)[0]>[] = [];
+    component.componentInstance.rowAction.subscribe((e) => events.push(e));
+
+    component.componentInstance.emitRowAction('edit', mockData[0]);
+    expect(events).toEqual([{ action: 'edit', row: mockData[0] }]);
+  });
+
+  it('should filter row actions via visible predicates', () => {
+    const actions: TableRowAction[] = [
+      { action: 'edit', label: 'Edit' },
+      {
+        action: 'delete',
+        label: 'Delete',
+        visible: (row) => (row as (typeof mockData)[0]).id === 1,
+      },
+    ];
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.componentRef.setInput('rowActions', actions);
+    component.detectChanges();
+
+    expect(component.componentInstance.visibleRowActions(mockData[0]).map((a) => a.action)).toEqual([
+      'edit',
+      'delete',
+    ]);
+    expect(component.componentInstance.visibleRowActions(mockData[1]).map((a) => a.action)).toEqual([
+      'edit',
+    ]);
   });
 });

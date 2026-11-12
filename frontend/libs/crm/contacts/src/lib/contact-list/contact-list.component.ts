@@ -1,29 +1,45 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, Sort } from '@angular/material/sort';
+import { PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
 import { ContactService } from '../contact.service';
 import { ContactDto } from '@frontend/shared-models';
 import {
   ConfirmDialogComponent,
+  DataTableComponent,
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
+  TableColumn,
+  TableRowAction,
+  RowActionEvent,
 } from '@frontend/shared-ui';
+
+/** Flat row for DataTable; keeps identity fields for edit/delete. */
+export interface ContactTableRow {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  organization: string;
+  title: string;
+  firstName: string;
+  lastName: string;
+}
 
 @Component({
   selector: 'app-contact-list',
   standalone: true,
   imports: [
-    MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule,
-    MatIconModule, MatProgressSpinnerModule, MatMenuModule,
-    PageHeaderComponent, SearchInputComponent, EmptyStateComponent,
+    MatButtonModule,
+    MatIconModule,
+    PageHeaderComponent,
+    SearchInputComponent,
+    EmptyStateComponent,
+    DataTableComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -32,7 +48,7 @@ import {
       subtitle="Manage your contact database"
     >
       <div actions>
-        <button mat-raised-button color="primary" (click)="onCreate()">
+        <button mat-raised-button color="primary" type="button" (click)="onCreate()">
           <mat-icon>add</mat-icon> New Contact
         </button>
       </div>
@@ -53,10 +69,6 @@ import {
       </div>
     }
 
-    @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
-    }
-
     @if (!service.loading() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="people"
@@ -65,76 +77,32 @@ import {
         actionLabel="Create Contact"
         (action)="onCreate()"
       />
-    } @else if (!service.loading() && !service.error()) {
-      <div class="table-container">
-        <table mat-table [dataSource]="service.contacts()" [trackBy]="trackById" matSort (matSortChange)="onSort($event)">
-          <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header="lastName">Name</th>
-            <td mat-cell *matCellDef="let c">
-              <a class="link" (click)="onRowClick(c)">{{ c.firstName }} {{ c.lastName }}</a>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="email">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
-            <td mat-cell *matCellDef="let c">{{ c.email }}</td>
-          </ng-container>
-          <ng-container matColumnDef="phone">
-            <th mat-header-cell *matHeaderCellDef>Phone</th>
-            <td mat-cell *matCellDef="let c">{{ c.phone || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="organization">
-            <th mat-header-cell *matHeaderCellDef>Organization</th>
-            <td mat-cell *matCellDef="let c">{{ c.organizationName || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="title">
-            <th mat-header-cell *matHeaderCellDef>Title</th>
-            <td mat-cell *matCellDef="let c">{{ c.jobTitle || '—' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let c">
-              <button mat-icon-button [matMenuTriggerFor]="menu">
-                <mat-icon>more_vert</mat-icon>
-              </button>
-              <mat-menu #menu="matMenu">
-                <button mat-menu-item (click)="onEdit(c)"><mat-icon>edit</mat-icon><span>Edit</span></button>
-                <button mat-menu-item (click)="onDelete(c)"><mat-icon>delete</mat-icon><span>Delete</span></button>
-              </mat-menu>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"
-              class="clickable-row" (click)="onRowClick(row)"></tr>
-        </table>
-        <mat-paginator
-          [length]="service.pagination().totalElements"
-          [pageSize]="service.pagination().size"
-          [pageIndex]="service.pagination().page"
-          [pageSizeOptions]="[10, 20, 50]"
-          (page)="onPageChange($event)"
-          showFirstLastButtons>
-        </mat-paginator>
-      </div>
+    } @else if (!service.error() && !service.isEmpty()) {
+      <app-data-table
+        [columns]="columns"
+        [data]="tableRows()"
+        [loading]="service.loading()"
+        [pagination]="service.pagination()"
+        [rowActions]="rowActions"
+        rowActionsAriaLabel="Contact actions"
+        [pageSizeOptions]="[10, 20, 50]"
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSort($event)"
+        (rowClick)="onRowClick($event)"
+        (rowAction)="onRowAction($event)"
+      />
     }
   `,
   styles: [`
-    .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; }
-    table { width: 100%; }
-    .link { color: #1976d2; cursor: pointer; font-weight: 500; }
-    .link:hover { text-decoration: underline; }
-    .clickable-row { cursor: pointer; }
-    .clickable-row:hover { background: #f5f5f5; }
-    .loading { display: flex; justify-content: center; padding: 48px; }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
     }
   `],
 })
@@ -143,14 +111,28 @@ export class ContactListComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
 
-  displayedColumns = ['name', 'email', 'phone', 'organization', 'title', 'actions'];
+  readonly columns: TableColumn[] = [
+    { key: 'name', header: 'Name', sortable: true },
+    { key: 'email', header: 'Email', sortable: true },
+    { key: 'phone', header: 'Phone', sortable: false },
+    { key: 'organization', header: 'Organization', sortable: false },
+    { key: 'title', header: 'Title', sortable: false },
+  ];
+
+  readonly rowActions: TableRowAction[] = [
+    { action: 'edit', label: 'Edit', icon: 'edit' },
+    { action: 'delete', label: 'Delete', icon: 'delete', danger: true },
+  ];
+
+  readonly tableRows = computed<ContactTableRow[]>(() =>
+    this.service.contacts().map((c) => this.toRow(c)),
+  );
+
   private currentSort = 'lastName,asc';
 
-  trackById(index: number, item: ContactDto): string | number {
-    return item.id;
+  ngOnInit(): void {
+    this.service.list(0, 20, this.currentSort);
   }
-
-  ngOnInit(): void { this.service.list(0, 20, this.currentSort); }
 
   onSearch(q: string): void {
     if (q.trim()) {
@@ -160,14 +142,37 @@ export class ContactListComponent implements OnInit {
     }
   }
 
-  onPageChange(e: PageEvent): void { this.service.list(e.pageIndex, e.pageSize, this.currentSort); }
-  onSort(s: Sort): void {
-    this.currentSort = s.active && s.direction ? `${s.active},${s.direction}` : 'lastName,asc';
+  onPageChange(e: PageEvent): void {
+    this.service.list(e.pageIndex, e.pageSize, this.currentSort);
+  }
+
+  onSort(s: SortChangeEvent): void {
+    const field = s.active === 'name' ? 'lastName' : s.active;
+    this.currentSort = field && s.direction ? `${field},${s.direction}` : 'lastName,asc';
     this.service.list(0, this.service.pagination().size, this.currentSort);
   }
-  onCreate(): void { this.router.navigate(['/contacts', 'new']); }
-  onRowClick(c: ContactDto): void { this.router.navigate(['/contacts', c.id]); }
-  onEdit(c: ContactDto): void { this.router.navigate(['/contacts', c.id, 'edit']); }
+
+  onCreate(): void {
+    this.router.navigate(['/contacts', 'new']);
+  }
+
+  onRowClick(row: ContactTableRow): void {
+    this.router.navigate(['/contacts', row.id]);
+  }
+
+  onEdit(row: ContactTableRow): void {
+    this.router.navigate(['/contacts', row.id, 'edit']);
+  }
+
+  onRowAction(event: RowActionEvent<ContactTableRow>): void {
+    if (event.action === 'edit') {
+      this.onEdit(event.row);
+      return;
+    }
+    if (event.action === 'delete') {
+      this.onDelete(event.row);
+    }
+  }
 
   clearError(): void {
     this.service.error.set(null);
@@ -181,12 +186,14 @@ export class ContactListComponent implements OnInit {
     );
   }
 
-  onDelete(c: ContactDto): void {
+  onDelete(c: ContactTableRow | ContactDto): void {
+    const firstName = 'firstName' in c ? c.firstName : '';
+    const lastName = 'lastName' in c ? c.lastName : '';
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       width: '400px',
       data: {
         title: 'Delete contact',
-        message: `Delete "${c.firstName} ${c.lastName}"?`,
+        message: `Delete "${firstName} ${lastName}"?`,
         confirmText: 'Delete',
         cancelText: 'Cancel',
         confirmColor: 'warn' as const,
@@ -199,5 +206,18 @@ export class ContactListComponent implements OnInit {
         this.service.list(this.service.pagination().page, this.service.pagination().size, this.currentSort);
       });
     });
+  }
+
+  private toRow(c: ContactDto): ContactTableRow {
+    return {
+      id: c.id,
+      name: `${c.firstName} ${c.lastName}`.trim(),
+      email: c.email || '—',
+      phone: c.phone || '—',
+      organization: c.organizationName || '—',
+      title: c.jobTitle || '—',
+      firstName: c.firstName,
+      lastName: c.lastName,
+    };
   }
 }

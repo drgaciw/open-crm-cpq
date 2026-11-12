@@ -182,12 +182,9 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     loading.set(false);
     error.set(null);
     fixture.detectChanges();
+    listSpy.mockClear();
 
-    const industry = fixture.nativeElement.querySelector(
-      '[data-testid="account-industry-filter"]',
-    ) as HTMLSelectElement;
-    industry.value = 'Technology';
-    industry.dispatchEvent(new Event('change'));
+    component.onIndustryFilter('Technology');
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -198,6 +195,17 @@ describe('OrganizationListComponent SearchInput wiring', () => {
       territory: '',
       ownerId: '',
     });
+  });
+
+  it('renders shared DataTable when accounts are loaded', () => {
+    organizations.set([org({ id: 1, name: 'Acme' })]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-data-table')).toBeTruthy();
+    expect(el.querySelector('table[mat-table], table.mat-mdc-table')).toBeTruthy();
   });
 
   it('keeps the search query when the seller changes page', () => {

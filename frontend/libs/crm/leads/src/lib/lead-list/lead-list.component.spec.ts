@@ -220,4 +220,13 @@ describe('LeadListComponent action wiring', () => {
     component.retry();
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
   });
+
+  it('renders shared DataTable when leads are loaded', () => {
+    leads.set([lead({ id: 1, title: 'Warm', status: 'NEW' })]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-data-table')).toBeTruthy();
+  });
 });
