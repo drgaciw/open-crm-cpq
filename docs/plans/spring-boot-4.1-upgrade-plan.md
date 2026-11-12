@@ -79,7 +79,7 @@ Every currently relevant reactor / Boot-managed property that DRG-672 and post-4
 | `testcontainers.version` | **1.21.4** | Keep Testcontainers BOM import; retain Docker API `1.44` Surefire property for Engine 29+. | **Yes** | Parent Surefire `api.version=1.44` comment |
 | `lombok.version` (BOM) | **1.18.48** | Inherit Boot. | **Yes** | Effective properties |
 | `jackson-bom.version` (BOM) | **3.1.7** | Jackson **3** is the Boot 4 default. Continue migrating remaining `com.fasterxml.jackson` call sites / Jackson2 bridges toward `tools.jackson` where production paths still dual-stack. | **Yes** (platform) | Boot 4 Jackson 3; mixed imports still present (e.g. CRM lead scoring vs event listeners) |
-| `dependency-check.failBuildOnCVSS` + plugin **12.1.3** | **7** / **12.1.3** | Owned by CI hygiene stories (DRG-673/674). Do not raise plugin to 13.x until keyless NVD works. | **N/A** (tooling) | Parent pluginManagement comments; [#972](https://github.com/drgaciw/open-crm-cpq/pull/972) |
+| `dependency-check.failBuildOnCVSS` + plugin **12.1.3** | **7** / **12.1.3** | **Threshold alignment landed** via DRG-674 [#974](https://github.com/drgaciw/open-crm-cpq/pull/974) (`5d7c8b6c`): `scripts/ci/security-audit.sh` reads the pom property (**7**) with **no** `-DfailBuildOnCVSS` CLI override. Residual: stale parent comment still mentions Jenkins `-DfailBuildOnCVSS=9` (comment-only); do not raise plugin to **13.x** until keyless NVD works (DRG-673 pin). | **N/A** (tooling) | `scripts/ci/security-audit.sh`; `backend/pom.xml` property + pluginManagement; [#974](https://github.com/drgaciw/open-crm-cpq/pull/974), [#972](https://github.com/drgaciw/open-crm-cpq/pull/972) |
 | CAM `resilience4j-spring-boot4` | **2.4.0** | Keep Boot **4** artifact (not `spring-boot3`). | **Yes** | [#935](https://github.com/drgaciw/open-crm-cpq/pull/935) |
 | Obsolete Surefire comment “HOLD: keep Spring Boot 4.0.x” | Still in `backend/pom.xml` | Doc/comment cleanup in an Azure or hygiene story — **wording is stale** after #907. | N/A | `backend/pom.xml` Surefire systemPropertyVariables |
 
@@ -119,7 +119,7 @@ Explicit overrides that still diverge from Boot 4.1.2 management:
 ### R5 — Test / tooling follow-ups
 
 - Surefire Azure excludes + Testcontainers Docker API **1.44** remain required until R1 completes.
-- OWASP dependency-check pin **12.1.3** / CVSS threshold coordination with Jenkins (`-DfailBuildOnCVSS=9` until DRG-674) — **owner-gated** if workflows change (G05/G06).
+- OWASP **CVSS threshold alignment is landed** (DRG-674 / [#974](https://github.com/drgaciw/open-crm-cpq/pull/974)): fail gate is pom `dependency-check.failBuildOnCVSS=7`; `scripts/ci/security-audit.sh` does not override. Remaining tooling risk is **comment hygiene** (pom still cites Jenkins `-DfailBuildOnCVSS=9`) and the **12.1.3** pin until keyless NVD allows 13.x — not a threshold gap.
 - Mixed Jackson 2 (`com.fasterxml`) vs Jackson 3 (`tools.jackson`) call sites — incremental cleanup, not a parent bump.
 
 ### R6 — Spring Cloud train
@@ -140,8 +140,8 @@ None of the following are filed in Linear by this PR. Each row is a sketch only.
 | F4 | **First-party Spring gRPC migration** — configuration-engine + pricing-service; drop `grpc-spring-boot-starter.version`; align `grpc.version` / `protobuf.version` with Boot | `backend/pom.xml`, `backend/services/{configuration-engine,pricing-service}/**` | Proposed · Owner: *(blank)* |
 | F5 | **springdoc 3.x patch watch** — bump within 3.x after release notes; smoke gateway WebFlux + servlet UIs | `backend/pom.xml` (+ service OpenAPI configs if needed) | Proposed · Owner: *(blank)* |
 | F6 | **Jackson 3 call-site sweep** — remove remaining Jackson2-only production paths / clarify intentional bridges | targeted `backend/libs/**`, `backend/services/**` | Proposed · Owner: *(blank)* |
-| F7 | **Parent comment hygiene** — remove stale “HOLD keep Boot 4.0.x” Surefire comment; document Azure shim until F2 | `backend/pom.xml` (comment-only) | Proposed · Owner: *(blank)* |
-| F8 | **OWASP / CVSS tooling alignment** — coordinate DRG-673/674; workflows/Jenkins **owner-gated G05/G06** | `.github/**`, `Jenkinsfile`, `scripts/ci/**`, `backend/pom.xml` pluginManagement | Proposed · Owner: *(blank)* · **owner-gated** |
+| F7 | **Parent comment hygiene** — remove stale “HOLD keep Boot 4.0.x” Surefire comment; remove/replace stale Jenkins `-DfailBuildOnCVSS=9` comment (threshold already **7** via [#974](https://github.com/drgaciw/open-crm-cpq/pull/974)); document Azure shim until F2 | `backend/pom.xml` (comment-only) | Proposed · Owner: *(blank)* |
+| F8 | **OWASP plugin 13.x / keyless NVD** — *threshold alignment already landed* (DRG-674 [#974](https://github.com/drgaciw/open-crm-cpq/pull/974)). Residual only: bump dependency-check beyond **12.1.3** when keyless NVD works; any workflow/Jenkins change remains **owner-gated G05/G06** | `.github/**`, `Jenkinsfile`, `scripts/ci/**`, `backend/pom.xml` pluginManagement | Proposed · Owner: *(blank)* · **owner-gated** · **partially landed** |
 
 ---
 
@@ -179,7 +179,7 @@ Boot **4.1.2** is already on `main`, so the original DRG-672 “upgrade before 3
 | Next delivery wave | F1 Azure 7.x spike evidence |
 | After green spike | F2 shim removal |
 | Parallel / after Azure | F3–F4 gRPC decision + migration |
-| Continuous | F5 springdoc 3.x, F6 Jackson sweep, F7 comment hygiene, F8 tooling (owner-gated) |
+| Continuous | F5 springdoc 3.x, F6 Jackson sweep, F7 comment hygiene (incl. stale CVSS-9 comment), F8 plugin 13.x when NVD allows (owner-gated) |
 
 ---
 
