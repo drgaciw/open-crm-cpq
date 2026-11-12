@@ -85,4 +85,7 @@ public final class KafkaTopics {
 
     /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
     public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
+
+    /** DRG-431 / BC-03-01. A price book version was published. */
+    public static final String PRICE_BOOK_PUBLISHED = "cpq.pricebook.published";
 }

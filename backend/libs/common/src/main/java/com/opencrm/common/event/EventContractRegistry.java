@@ -231,6 +231,10 @@ public final class EventContractRegistry {
     public static final EventContract ROLE_ASSIGNED_V1 = published(
             "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
 
+    /** DRG-431 / BC-03-01. One event per price book version publish. */
+    public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
+            "PriceBookPublished", "pricebook-service", KafkaTopics.PRICE_BOOK_PUBLISHED, PriceBookPublishedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -266,7 +270,8 @@ public final class EventContractRegistry {
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
-            ROLE_ASSIGNED_V1);
+            ROLE_ASSIGNED_V1,
+            PRICE_BOOK_PUBLISHED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
