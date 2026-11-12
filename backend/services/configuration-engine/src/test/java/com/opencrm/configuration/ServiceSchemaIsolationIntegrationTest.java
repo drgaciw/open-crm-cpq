@@ -65,7 +65,8 @@ class ServiceSchemaIsolationIntegrationTest {
     // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
     // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
     private static final List<Service> SERVICES = List.of(
-            new Service("configuration-engine", "configuration", "configuration_sessions", 5),
+            // V1_6 adds configuration_hash/frozen_at and widens the status CHECK for FROZEN (DRG-428).
+            new Service("configuration-engine", "configuration", "configuration_sessions", 6),
             // V1_1 tables, V1_2 relay status/leasing, V1_3 envelope columns, V1_4 SKIPPED status,
             // V1_5 catalog version/rule-set version/tenant/bundle columns (DRG-424)
             new Service("approval-routing", "approval", "approval_requests", 9),

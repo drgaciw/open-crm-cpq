@@ -52,6 +52,10 @@ public class ConfigurationSessionDto {
     private List<Long> availableOptionIds;
     private Instant completedAt;
     private Instant expiresAt;
+    /** Deterministic ConfigurationHash, set once FreezeConfiguration freezes the session (DRG-428). */
+    private String configurationHash;
+    /** Set once FreezeConfiguration freezes the session (DRG-428); {@code null} until then. */
+    private Instant frozenAt;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;

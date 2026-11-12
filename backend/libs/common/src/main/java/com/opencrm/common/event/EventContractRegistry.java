@@ -4,6 +4,7 @@ import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationFrozenEvent;
 import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
 import com.opencrm.common.event.dto.ContactCreatedEvent;
 import com.opencrm.common.event.dto.ContractExecutedEvent;
@@ -136,6 +137,15 @@ public final class EventContractRegistry {
     public static final EventContract CONFIGURATION_SESSION_STARTED_V1 = published(
             "ConfigurationSessionStarted", "configuration-engine", KafkaTopics.CONFIGURATION_SESSION_STARTED,
             ConfigurationSessionStartedEvent.class);
+
+    /**
+     * DRG-428 / BC-02-05. FreezeConfiguration: ValidateConfiguration then FreezeConfiguration computes the
+     * deterministic ConfigurationHash over selections, catalog version and rule set version, making the
+     * configuration immutable so Pricing and Quote can reference it.
+     */
+    public static final EventContract CONFIGURATION_FROZEN_V1 = published(
+            "ConfigurationFrozen", "configuration-engine", KafkaTopics.CONFIGURATION_FROZEN,
+            ConfigurationFrozenEvent.class);
 
     /** Contract/asset owns the transactional rate application and its sole outbox publish site. */
     public static final EventContract RAMP_APPLIED_V1 = published(
@@ -281,6 +291,7 @@ public final class EventContractRegistry {
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
             ROLE_ASSIGNED_V1,
+            CONFIGURATION_FROZEN_V1,
             PRICE_BOOK_PUBLISHED_V1,
             SIGNATURE_COMPLETED_V1);
 
