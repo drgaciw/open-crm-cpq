@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { finalize } from 'rxjs';
@@ -66,6 +66,7 @@ import { QuoteComparison, QuoteComparisonService } from './quote-comparison.serv
 })
 export class QuoteComparisonComponent {
   readonly dealExternalId = input.required<string>();
+  readonly primaryChanged = output<void>();
   private readonly service = inject(QuoteComparisonService);
   private readonly destroyRef = inject(DestroyRef);
   readonly result = signal<QuoteComparison | null>(null);
@@ -107,7 +108,13 @@ export class QuoteComparisonComponent {
     const generation = this.generation;
     this.busy.set(true); this.error.set(null);
     this.service.markPrimary(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { if (generation === this.generation) { this.busy.set(false); this.load(); } },
+      next: () => {
+        if (generation === this.generation) {
+          this.busy.set(false);
+          this.primaryChanged.emit();
+          this.load();
+        }
+      },
       error: () => { if (generation === this.generation) { this.busy.set(false); this.error.set('Could not mark quote as primary. Refresh and retry.'); } },
     });
   }

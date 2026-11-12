@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.quote.*;
+import com.opencrm.quote.ramp.QuoteRampStep;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
@@ -114,8 +115,23 @@ public class ComparisonService {
                 Collectors.mapping(l -> l.getQuantity() + ":" + zero(l.getListPrice()).stripTrailingZeros().toPlainString()
                         + ":" + zero(l.getUnitPrice()).stripTrailingZeros().toPlainString()
                         + ":" + zero(l.getDiscountRate()).stripTrailingZeros().toPlainString()
-                        + ":" + Objects.toString(l.getBillingFrequency(), ""),
+                        + ":" + Objects.toString(l.getBillingFrequency(), "")
+                        + ":" + rampSignature(l),
                         Collectors.collectingAndThen(Collectors.toList(), values -> values.stream().sorted().toList()))));
+    }
+
+    private static List<String> rampSignature(QuoteLineItem line) {
+        return line.getRampSteps().stream()
+                .filter(step -> !step.isDeleted())
+                .sorted(Comparator.comparingInt(QuoteRampStep::getSequence))
+                .map(step -> step.getStartMonth() + ":" + step.getMonths() + ":" + step.getQuantity()
+                        + ":" + step.getPriceBasis() + ":" + decimalSignature(step.getUnitPrice())
+                        + ":" + decimalSignature(step.getDiscountFraction()))
+                .toList();
+    }
+
+    private static String decimalSignature(BigDecimal amount) {
+        return amount == null ? "" : amount.stripTrailingZeros().toPlainString();
     }
 
     private static BigDecimal zero(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }

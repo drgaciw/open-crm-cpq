@@ -383,7 +383,7 @@ function httpErrorMessage(err: unknown): string {
         </mat-card>
 
         @if (quote.dealExternalId; as opportunityId) {
-          <cpq-quote-comparison [dealExternalId]="opportunityId" />
+          <cpq-quote-comparison [dealExternalId]="opportunityId" (primaryChanged)="refreshAfterPrimaryChange()" />
         }
 
         <cpq-quote-header-edit
@@ -1288,6 +1288,13 @@ export class QuotesDetailComponent {
   numericId(): number | null {
     const numericId = Number(this.id());
     return Number.isFinite(numericId) ? numericId : null;
+  }
+
+  refreshAfterPrimaryChange(): void {
+    const quoteId = this.numericId();
+    if (quoteId !== null) {
+      this.quoteService.getById(quoteId);
+    }
   }
 
   private load(): void {

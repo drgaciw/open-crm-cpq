@@ -4,6 +4,7 @@ import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.quote.*;
+import com.opencrm.quote.ramp.QuoteRampStep;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +63,22 @@ class ComparisonServiceTest {
             assertThat(column.marginPercent()).isNull();
             assertThat(result.unavailableFields()).contains("marginAmount", "validUntil", "paymentTerms");
             verify(repository).findByTenantIdAndDealExternalIdAndDeletedFalseOrderByIdAsc("tenant", "deal");
+        }
+    }
+
+    @Test void reportsSkuChangedWhenOnlyRampQuantityDiffers() {
+        var baselineLine = line("A", 1);
+        var alternativeLine = line("A", 1);
+        baselineLine.setRampSteps(List.of(QuoteRampStep.builder()
+                .sequence(1).startMonth(1).months(12).quantity(1).priceBasis("LIST").build()));
+        alternativeLine.setRampSteps(List.of(QuoteRampStep.builder()
+                .sequence(1).startMonth(1).months(12).quantity(2).priceBasis("LIST").build()));
+        first.setLineItems(List.of(baselineLine));
+        second.setLineItems(List.of(alternativeLine));
+        try (var tenant = mockStatic(QuoteTenantResolver.class)) {
+            tenant.when(QuoteTenantResolver::currentTenantId).thenReturn("tenant");
+            stubQuotes();
+            assertThat(service.compare("deal", null).quotes().get(1).skuDiff().changed()).containsExactly("A");
         }
     }
 
