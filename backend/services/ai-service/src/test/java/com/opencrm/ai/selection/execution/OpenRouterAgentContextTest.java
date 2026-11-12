@@ -7,6 +7,7 @@ import com.opencrm.ai.agent.commerce.MarginDiscountRouterAgent;
 import com.opencrm.ai.audit.AgentAuditLogger;
 import com.opencrm.ai.llm.LlmAdapter;
 import com.opencrm.ai.llm.SpringAiLlmAdapter;
+import com.opencrm.ai.profile.SellingProfileContextProvider;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +37,7 @@ class OpenRouterAgentContextTest {
                 .withUserConfiguration(AllProductionAgents.class, OpenRouterExecutionConfiguration.class, SpringAiLlmAdapter.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
                 .withBean(AgentAuditLogger.class, () -> mock(AgentAuditLogger.class))
+                .withBean(SellingProfileContextProvider.class, () -> mock(SellingProfileContextProvider.class))
                 .withPropertyValues("opencrm.ai.selection.execution-enabled=true",
                         "opencrm.ai.selection.profile-file=" + directory.resolve("profile.json"),
                         "opencrm.ai.selection.catalog-file=" + directory.resolve("catalog.json"),
