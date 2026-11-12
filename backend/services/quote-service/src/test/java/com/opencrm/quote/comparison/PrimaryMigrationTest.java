@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PrimaryMigrationTest {
     @Test void primaryIndexIsTenantScopedPartialAndCoversLegacyNullTenant() throws Exception {
-        try (var resource = getClass().getResourceAsStream("/db/migration/V1_17__quote_primary_flag.sql")) {
+        try (var resource = getClass().getResourceAsStream("/db/migration/V1_19__quote_primary_flag.sql")) {
             assertThat(resource).isNotNull();
             String sql = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
             assertThat(sql).contains("is_primary BOOLEAN NOT NULL DEFAULT FALSE")
