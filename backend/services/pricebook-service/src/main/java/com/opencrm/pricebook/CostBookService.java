@@ -50,7 +50,7 @@ public class CostBookService {
     }
 
     public CostBookDto update(Long id, CostBookUpdateRequest request) {
-        CostBook existing = requireCostBook(id);
+        CostBook existing = requireCostBookForUpdate(id);
         ensureNotPublished(existing);
 
         LocalDate targetEffectiveDate =
@@ -66,7 +66,7 @@ public class CostBookService {
     }
 
     public void delete(Long id) {
-        CostBook existing = requireCostBook(id);
+        CostBook existing = requireCostBookForUpdate(id);
         ensureNotPublished(existing);
         existing.softDelete();
         costBookRepository.save(existing);
@@ -80,7 +80,7 @@ public class CostBookService {
      * its entries.
      */
     public CostBookDto publish(Long id) {
-        CostBook costBook = requireCostBook(id);
+        CostBook costBook = requireCostBookForUpdate(id);
         if (costBook.isPublished()) {
             throw new BusinessException("Cost book is already published", "COST_BOOK_ALREADY_PUBLISHED");
         }
@@ -92,7 +92,7 @@ public class CostBookService {
     }
 
     public CostBookEntryDto createEntry(Long costBookId, CostBookEntryCreateRequest request) {
-        CostBook costBook = requireCostBook(costBookId);
+        CostBook costBook = requireCostBookForUpdate(costBookId);
         ensureNotPublished(costBook);
         normalizeEntryCreateRequest(request, costBook);
         validateNoOverlappingEntry(costBookId, request.getSku(), request.getCurrency(), request.getUnitOfMeasure(),
@@ -120,7 +120,7 @@ public class CostBookService {
     }
 
     public CostBookEntryDto updateEntry(Long costBookId, Long entryId, CostBookEntryUpdateRequest request) {
-        CostBook costBook = requireCostBook(costBookId);
+        CostBook costBook = requireCostBookForUpdate(costBookId);
         ensureNotPublished(costBook);
         CostBookEntry entry = requireEntry(costBookId, entryId);
         normalizeEntryUpdateRequest(request);
@@ -141,7 +141,7 @@ public class CostBookService {
     }
 
     public void deleteEntry(Long costBookId, Long entryId) {
-        CostBook costBook = requireCostBook(costBookId);
+        CostBook costBook = requireCostBookForUpdate(costBookId);
         ensureNotPublished(costBook);
         CostBookEntry entry = requireEntry(costBookId, entryId);
         entry.softDelete();
@@ -193,6 +193,11 @@ public class CostBookService {
 
     CostBook requireCostBook(Long id) {
         return costBookRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CostBook", id));
+    }
+
+    private CostBook requireCostBookForUpdate(Long id) {
+        return costBookRepository.findWithLockByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CostBook", id));
     }
 

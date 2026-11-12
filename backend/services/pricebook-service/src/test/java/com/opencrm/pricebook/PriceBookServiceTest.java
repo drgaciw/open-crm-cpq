@@ -59,7 +59,7 @@ class PriceBookServiceTest {
                 .floorPrice(new BigDecimal("80.00"))
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
         when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                 eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
                 .thenReturn(List.of());
@@ -99,7 +99,7 @@ class PriceBookServiceTest {
                 .effectiveEndDate(LocalDate.of(2026, 12, 31))
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
         when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                 eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
                 .thenReturn(List.of(existing));
@@ -134,7 +134,7 @@ class PriceBookServiceTest {
                 .effectiveStartDate(LocalDate.of(2026, 7, 1))
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
         when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                 eq(42L), eq("SKU-1"), eq("USD"), eq("EACH")))
                 .thenReturn(List.of(existing));
@@ -176,7 +176,7 @@ class PriceBookServiceTest {
                 .effectiveEndDate(LocalDate.of(2026, 8, 31))
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
         when(priceBookEntryRepository.findByIdAndPriceBookIdAndDeletedFalse(1L, 42L))
                 .thenReturn(Optional.of(entryToUpdate));
         when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
@@ -202,7 +202,7 @@ class PriceBookServiceTest {
                 .build();
         PriceBookDto dto = PriceBookDto.builder().id(42L).status(PriceBookStatus.PUBLISHED).build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
         when(priceBookRepository.save(priceBook)).thenReturn(priceBook);
         when(priceBookMapper.toDto(priceBook)).thenReturn(dto);
 
@@ -222,7 +222,7 @@ class PriceBookServiceTest {
                 .status(PriceBookStatus.PUBLISHED)
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
 
         assertThatThrownBy(() -> priceBookService.publish(42L))
                 .isInstanceOf(BusinessException.class)
@@ -291,7 +291,7 @@ class PriceBookServiceTest {
                 .listPrice(new BigDecimal("110.00"))
                 .build();
 
-        when(priceBookRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(priceBook));
 
         assertThatThrownBy(() -> priceBookService.updateEntry(42L, 7L, request))
                 .isInstanceOf(BusinessException.class)

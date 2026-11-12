@@ -40,7 +40,7 @@ class CostBookServiceTest {
         CostBook costBook = CostBook.builder().id(9L).status(PriceBookStatus.DRAFT).versionNumber(1).build();
         CostBookDto dto = CostBookDto.builder().id(9L).status(PriceBookStatus.PUBLISHED).build();
 
-        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookRepository.findWithLockByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
         when(costBookRepository.save(costBook)).thenReturn(costBook);
         when(costBookMapper.toDto(costBook)).thenReturn(dto);
 
@@ -54,7 +54,7 @@ class CostBookServiceTest {
     @Test
     void publishRejectsAlreadyPublishedCostBook() {
         CostBook costBook = CostBook.builder().id(9L).status(PriceBookStatus.PUBLISHED).build();
-        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookRepository.findWithLockByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
 
         assertThatThrownBy(() -> costBookService.publish(9L))
                 .isInstanceOf(BusinessException.class)
@@ -77,7 +77,7 @@ class CostBookServiceTest {
                 .effectiveStartDate(LocalDate.of(2026, 4, 1))
                 .build();
 
-        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookRepository.findWithLockByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
         when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                 eq(9L), eq("SKU-1"), eq("USD"), eq("EACH")))
                 .thenReturn(List.of(existing));
@@ -108,7 +108,7 @@ class CostBookServiceTest {
                 .effectiveStartDate(LocalDate.of(2026, 7, 1))
                 .build();
 
-        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookRepository.findWithLockByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
         when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(
                 eq(9L), eq("SKU-1"), eq("USD"), eq("EACH")))
                 .thenReturn(List.of(existing));
@@ -139,7 +139,7 @@ class CostBookServiceTest {
                 .effectiveEndDate(LocalDate.of(2026, 7, 1))
                 .build();
 
-        when(costBookRepository.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
+        when(costBookRepository.findWithLockByIdAndDeletedFalse(9L)).thenReturn(Optional.of(costBook));
         when(costBookEntryRepository.findByIdAndCostBookIdAndDeletedFalse(1L, 9L))
                 .thenReturn(Optional.of(entryToUpdate));
         when(costBookEntryRepository.findByCostBookIdAndSkuAndCurrencyAndUnitOfMeasureAndDeletedFalse(

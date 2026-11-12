@@ -64,7 +64,7 @@ public class PriceBookService {
     }
 
     public PriceBookDto update(Long id, PriceBookUpdateRequest request) {
-        PriceBook existing = requirePriceBook(id);
+        PriceBook existing = requirePriceBookForUpdate(id);
         ensureNotPublished(existing);
         normalizeUpdateRequest(request);
 
@@ -97,7 +97,7 @@ public class PriceBookService {
      * and publishable independently.
      */
     public PriceBookDto publish(Long id) {
-        PriceBook priceBook = requirePriceBook(id);
+        PriceBook priceBook = requirePriceBookForUpdate(id);
         if (priceBook.isPublished()) {
             throw new BusinessException("Price book is already published", "PRICE_BOOK_ALREADY_PUBLISHED");
         }
@@ -178,7 +178,7 @@ public class PriceBookService {
     }
 
     public void delete(Long id) {
-        PriceBook existing = requirePriceBook(id);
+        PriceBook existing = requirePriceBookForUpdate(id);
         ensureNotPublished(existing);
         existing.softDelete();
         priceBookRepository.save(existing);
@@ -186,7 +186,7 @@ public class PriceBookService {
     }
 
     public PriceBookEntryDto createEntry(Long priceBookId, PriceBookEntryCreateRequest request) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         normalizeEntryCreateRequest(request, priceBook);
         validateEntryPriceRange(request.getListPrice(), request.getFloorPrice());
@@ -215,7 +215,7 @@ public class PriceBookService {
     }
 
     public PriceBookEntryDto updateEntry(Long priceBookId, Long entryId, PriceBookEntryUpdateRequest request) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         normalizeEntryUpdateRequest(request);
@@ -242,7 +242,7 @@ public class PriceBookService {
     }
 
     public void deleteEntry(Long priceBookId, Long entryId) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         entry.softDelete();
@@ -252,6 +252,11 @@ public class PriceBookService {
 
     private PriceBook requirePriceBook(Long id) {
         return priceBookRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PriceBook", id));
+    }
+
+    private PriceBook requirePriceBookForUpdate(Long id) {
+        return priceBookRepository.findWithLockByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PriceBook", id));
     }
 
