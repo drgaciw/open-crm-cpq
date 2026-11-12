@@ -222,8 +222,9 @@ class DocumentApplyNullStartReplayIntegrationTest {
                     values (?, ?, ?, ?, 'ACTIVE', 'Plan', '2026-01-01', '2026-12-31', 0, 'test')
                     """, subscriptionUuid.toString(), "SUB-" + subscriptionUuid, subscriptionUuid.toString(),
                     "Q-" + subscriptionUuid);
-            jdbc.update("update subscriptions set contract_id = ?, tenant_id = ? where uuid = ?",
-                    contractId, tenant, subscriptionUuid.toString());
+            jdbc.update(
+                    "update subscriptions set contract_id = ?, tenant_id = ?, customer_account_id = ? where uuid = ?",
+                    contractId, tenant, customer, subscriptionUuid.toString());
             jdbc.update("""
                     insert into amendment_application_units (
                         document_id, unit_no, tenant_id, dependency_order, target_type, target_ref,

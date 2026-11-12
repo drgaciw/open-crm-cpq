@@ -625,7 +625,7 @@ class DocumentApplyIntegrationTest {
                     start_date, end_date, status, last_executed_seq, created_by)
                 values (?, ?, ?, ?, 'TERMED', '2026-01-01', '2026-12-31', 'ACTIVE', 0, 'test')
                 """, foreignContract, otherTenant, "FOREIGN-" + foreignContract, UUID.randomUUID());
-        jdbc.update("update subscriptions set contract_id = ? where uuid = ?", foreignContract, target.toString());
+        linkSubscriptionToContract(target, foreignContract);
         assertThat(orchestrator.apply(new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of())).status())
                 .isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
         assertBlockedTarget(documentId, target, "TENANT_MISMATCH");
@@ -645,7 +645,7 @@ class DocumentApplyIntegrationTest {
     void sameTenantWrongContractIsBlockedWithMismatchAuditAndReplay() {
         UUID tenant = UUID.randomUUID(), documentId = UUID.randomUUID(), target = UUID.randomUUID();
         seed(tenant, documentId, target, UUID.randomUUID(), false);
-        jdbc.update("update subscriptions set contract_id = ? where uuid = ?", insertOtherContract(tenant), target.toString());
+        linkSubscriptionToContract(target, insertOtherContract(tenant));
         ApplyCommand command = new ApplyCommand(documentId, tenant, "quote-service", "ROLE_INTERNAL_INVOKE", "corr", Map.of());
         assertThat(orchestrator.apply(command).status()).isEqualTo(AmendmentDocumentStatus.PARTIALLY_APPLIED);
         assertBlockedTarget(documentId, target, "TARGET_CONTRACT_MISMATCH");
@@ -675,6 +675,14 @@ class DocumentApplyIntegrationTest {
         return id;
     }
 
+    private void linkSubscriptionToContract(UUID subscriptionUuid, UUID contractId) {
+        UUID accountId = jdbc.queryForObject(
+                "select customer_account_id from contracts where id = ?", UUID.class, contractId);
+        jdbc.update(
+                "update subscriptions set contract_id = ?, customer_account_id = ? where uuid = ?",
+                contractId, accountId, subscriptionUuid.toString());
+    }
+
     private void assertBlockedTarget(UUID documentId, UUID target) {
         assertBlockedTarget(documentId, target, "TARGET_CONTRACT_MISMATCH");
     }
@@ -698,7 +706,7 @@ class DocumentApplyIntegrationTest {
         try {
             var relink = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
                 jdbc.queryForObject("select id from subscriptions where uuid = ? for update", Long.class, target.toString());
-                jdbc.update("update subscriptions set contract_id = ? where uuid = ?", wrong, target.toString());
+                linkSubscriptionToContract(target, wrong);
                 locked.countDown();
                 try { if (!release.await(15, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("timeout"); }
                 catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
@@ -770,8 +778,9 @@ class DocumentApplyIntegrationTest {
                     """, documentId, tenant, quoteId, HASH);
             insertSubscription(firstSubscription);
             insertSubscription(secondSubscription);
-            jdbc.update("update subscriptions set contract_id = ?, tenant_id = ? where uuid in (?, ?)",
-                    contractId, tenant, firstSubscription.toString(), secondSubscription.toString());
+            jdbc.update(
+                    "update subscriptions set contract_id = ?, tenant_id = ?, customer_account_id = ? where uuid in (?, ?)",
+                    contractId, tenant, customer, firstSubscription.toString(), secondSubscription.toString());
             insertUnit(documentId, tenant, 1, firstSubscription);
             insertUnit(documentId, tenant, 2, secondSubscription);
             insertLine(documentId, tenant, 1, firstSubscription);
