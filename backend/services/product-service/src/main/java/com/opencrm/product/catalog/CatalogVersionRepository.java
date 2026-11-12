@@ -20,13 +20,6 @@ public interface CatalogVersionRepository extends JpaRepository<CatalogVersion, 
     Optional<CatalogVersion> findByUuidAndTenantIdAndDeletedFalse(
             @Param("uuid") String uuid, @Param("tenantId") String tenantId);
 
-    /**
-     * Serialize same-tenant PublishCatalog allocations for the rest of the transaction (Postgres).
-     * {@code tenantKey} is {@code COALESCE(tenant_id, '')} so the null-tenant bucket shares one lock.
-     */
-    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(CAST(:tenantKey AS text)))", nativeQuery = true)
-    Integer lockTenantForPublish(@Param("tenantKey") String tenantKey);
-
     @Query("SELECT COALESCE(MAX(v.versionNumber), 0) FROM CatalogVersion v WHERE v.deleted = false AND "
            + "((:tenantId IS NULL AND v.tenantId IS NULL) OR v.tenantId = :tenantId)")
     int findMaxVersionNumberByTenantId(@Param("tenantId") String tenantId);

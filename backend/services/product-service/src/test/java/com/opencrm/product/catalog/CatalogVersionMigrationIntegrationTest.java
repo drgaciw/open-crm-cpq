@@ -17,10 +17,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -127,15 +132,23 @@ class CatalogVersionMigrationIntegrationTest {
     }
 
     @Test
-    void concurrentSameTenantPublishWithAdvisoryLockAllocatesDistinctVersionNumbers() throws Exception {
+    void concurrentSameTenantPublishWithJdbcTemplateAdvisoryLockAllocatesDistinctVersionNumbers()
+            throws Exception {
         flyway().migrate();
+        // Exercises CatalogPublishLock's Spring JDBC path (void lock → rs -> null), not raw JDBC.
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        TransactionTemplate tx = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         Set<Integer> allocated = ConcurrentHashMap.newKeySet();
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> first = pool.submit(() -> publishNextVersion("tenant-a", ready, start, allocated));
-            Future<?> second = pool.submit(() -> publishNextVersion("tenant-a", ready, start, allocated));
+            Future<?> first = pool.submit(
+                    () -> publishNextVersion(tx, jdbc, "tenant-a", ready, start, allocated));
+            Future<?> second = pool.submit(
+                    () -> publishNextVersion(tx, jdbc, "tenant-a", ready, start, allocated));
             assertThat(ready.await(20, TimeUnit.SECONDS)).isTrue();
             start.countDown();
             first.get(30, TimeUnit.SECONDS);
@@ -145,50 +158,62 @@ class CatalogVersionMigrationIntegrationTest {
         }
 
         assertThat(allocated).containsExactlyInAnyOrder(1, 2);
-        try (Connection connection = connection();
-                PreparedStatement statement = connection.prepareStatement(
+        assertThat(jdbc.queryForList(
                         "SELECT version_number FROM product.catalog_versions WHERE tenant_id = ? AND NOT is_deleted "
-                                + "ORDER BY version_number")) {
-            statement.setString(1, "tenant-a");
-            try (ResultSet rows = statement.executeQuery()) {
-                assertThat(rows.next()).isTrue();
-                assertThat(rows.getInt(1)).isEqualTo(1);
-                assertThat(rows.next()).isTrue();
-                assertThat(rows.getInt(1)).isEqualTo(2);
-                assertThat(rows.next()).isFalse();
-            }
-        }
+                                + "ORDER BY version_number",
+                        Integer.class,
+                        "tenant-a"))
+                .containsExactly(1, 2);
     }
 
     private static void publishNextVersion(
-            String tenantId, CountDownLatch ready, CountDownLatch start, Set<Integer> allocated) {
-        try (Connection connection = connection()) {
-            connection.setAutoCommit(false);
-            ready.countDown();
+            TransactionTemplate tx,
+            JdbcTemplate jdbc,
+            String tenantId,
+            CountDownLatch ready,
+            CountDownLatch start,
+            Set<Integer> allocated) {
+        ready.countDown();
+        try {
             if (!start.await(20, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("timed out waiting for concurrent start");
             }
-            try (PreparedStatement lock = connection.prepareStatement(
-                    "SELECT pg_advisory_xact_lock(hashtext(CAST(? AS text)))")) {
-                lock.setString(1, tenantId);
-                lock.executeQuery().close();
-            }
-            int next;
-            try (PreparedStatement max = connection.prepareStatement(
-                    "SELECT COALESCE(MAX(version_number), 0) FROM product.catalog_versions "
-                            + "WHERE NOT is_deleted AND tenant_id = ?")) {
-                max.setString(1, tenantId);
-                try (ResultSet rows = max.executeQuery()) {
-                    rows.next();
-                    next = rows.getInt(1) + 1;
-                }
-            }
-            insertCatalogVersionForTenant(connection, UUID.randomUUID().toString(), next, tenantId);
-            connection.commit();
+            Integer next = tx.execute(status -> {
+                // Same SQL + RowCallbackHandler as CatalogPublishLock.lock (Spring JDBC, not Spring Data).
+                jdbc.query(
+                        "SELECT pg_advisory_xact_lock(hashtext(CAST(? AS text)))",
+                        rs -> null,
+                        tenantId);
+                Integer max = jdbc.queryForObject(
+                        "SELECT COALESCE(MAX(version_number), 0) FROM product.catalog_versions "
+                                + "WHERE NOT is_deleted AND tenant_id = ?",
+                        Integer.class,
+                        tenantId);
+                int versionNumber = (max == null ? 0 : max) + 1;
+                jdbc.update(
+                        """
+                        INSERT INTO product.catalog_versions(
+                            uuid, version_number, tenant_id, published_at, product_count)
+                        VALUES (?, ?, ?, ?, 1)
+                        """,
+                        UUID.randomUUID().toString(),
+                        versionNumber,
+                        tenantId,
+                        Timestamp.from(Instant.parse("2026-11-12T00:00:00Z")));
+                return versionNumber;
+            });
             allocated.add(next);
         } catch (Exception failure) {
             throw new IllegalStateException(failure);
         }
+    }
+
+    private static DataSource dataSource() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource.setUrl(POSTGRES.getJdbcUrl());
+        dataSource.setUsername(POSTGRES.getUsername());
+        dataSource.setPassword(POSTGRES.getPassword());
+        return dataSource;
     }
 
     private static Flyway flyway() {

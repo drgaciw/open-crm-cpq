@@ -30,6 +30,7 @@ public class CatalogPublishService {
     private final CatalogVersionProductRepository catalogVersionProductRepository;
     private final ProductRepository productRepository;
     private final OutboxEventPublisher outboxEventPublisher;
+    private final CatalogPublishLock catalogPublishLock;
 
     /**
      * Creates the next immutable catalog version for the caller's tenant from current ACTIVE/DEPRECATED products.
@@ -38,7 +39,7 @@ public class CatalogPublishService {
     public CatalogVersionDto publish() {
         String tenantId = ProductTenantResolver.currentTenantId();
         // Serialize max(version_number)+1 for this tenant bucket (including unresolved/null).
-        catalogVersionRepository.lockTenantForPublish(tenantId == null ? "" : tenantId);
+        catalogPublishLock.lock(tenantId == null ? "" : tenantId);
         Instant publishedAt = Instant.now();
         int nextNumber = catalogVersionRepository.findMaxVersionNumberByTenantId(tenantId) + 1;
 

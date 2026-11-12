@@ -47,6 +47,9 @@ class CatalogPublishServiceTest {
     @Mock
     private OutboxEventPublisher outboxEventPublisher;
 
+    @Mock
+    private CatalogPublishLock catalogPublishLock;
+
     @InjectMocks
     private CatalogPublishService catalogPublishService;
 
@@ -82,7 +85,6 @@ class CatalogPublishServiceTest {
     @Test
     @DisplayName("publish() freezes ACTIVE products, skips drafts, and emits CatalogPublished with version id")
     void publishEmitsCatalogPublishedWithVersionId() {
-        when(catalogVersionRepository.lockTenantForPublish("")).thenReturn(0);
         when(catalogVersionRepository.findMaxVersionNumberByTenantId(isNull())).thenReturn(0);
         when(productRepository.findPublishableByTenantIdAndStatusIn(
                 isNull(), eq(CatalogPublishService.PUBLISHABLE_STATUSES)))
@@ -99,6 +101,7 @@ class CatalogPublishServiceTest {
 
         CatalogVersionDto result = catalogPublishService.publish();
 
+        verify(catalogPublishLock).lock("");
         assertThat(result.getVersionId()).isEqualTo("catalog-version-uuid-1");
         assertThat(result.getVersionNumber()).isEqualTo(1);
         assertThat(result.getProductCount()).isEqualTo(1);
