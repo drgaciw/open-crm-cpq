@@ -68,6 +68,7 @@ class RampCompoundingMigrationIntegrationTest {
                 assertThat(row.wasNull()).isFalse();
             }
         }
+        migrations(null).migrate();
         // Latest applied version is V1_19 (quote primary flag). V1_18 (valid_until) already landed on main.
         assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.19"));
 
