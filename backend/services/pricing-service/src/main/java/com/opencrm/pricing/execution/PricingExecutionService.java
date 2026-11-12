@@ -175,8 +175,12 @@ public class PricingExecutionService {
                             "Customer with external ID: " + context.getCustomerExternalId()));
 
             // 3. Find active RuleSet
+            LocalDate pricingDate = LocalDate.now(clock);
+            LocalDate periodAnchorDate = context.getTermStartDate() != null
+                    ? context.getTermStartDate()
+                    : pricingDate;
             List<RuleSet> activeRuleSets = ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(
-                    RuleSetStatus.ACTIVE, LocalDate.now(clock));
+                    RuleSetStatus.ACTIVE, pricingDate);
 
             if (activeRuleSets.isEmpty()) {
                 log.warn("No active rule sets found, executing with default pricing");
@@ -235,7 +239,13 @@ public class PricingExecutionService {
                 PricingProduct authoritativeProduct = fallbackProducts.get(lineRequest.getProductExternalId());
                 BigDecimal listPrice = getListPrice(lineRequest, priceBookBatch, fallbackProducts);
                 List<PricedPeriod> validatedPeriods = hasSchedule(lineRequest)
-                        ? rampPeriodPricer.price(lineRequest, listPrice, context.getDurationInMonths(), maxPeriods) : null;
+                        ? rampPeriodPricer.price(
+                                lineRequest,
+                                listPrice,
+                                context.getDurationInMonths(),
+                                maxPeriods,
+                                periodAnchorDate)
+                        : null;
                 if (validatedPeriods != null) {
                     String actualType = authoritativeProduct != null && authoritativeProduct.getProductType() != null
                             ? authoritativeProduct.getProductType().name() : null;

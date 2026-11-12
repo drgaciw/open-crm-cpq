@@ -38,6 +38,10 @@ import org.springframework.http.HttpStatus;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -72,6 +76,7 @@ class PricingRampEngineTest {
         productRepository = mock(PricingProductRepository.class);
         PricingAuditLogRepository auditLogRepository = mock(PricingAuditLogRepository.class);
         when(auditLogRepository.save(any(PricingAuditLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        this.auditLogRepository = auditLogRepository;
         RuleSetRepository ruleSetRepository = mock(RuleSetRepository.class);
         when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
                 .thenReturn(new ArrayList<>());
@@ -93,6 +98,7 @@ class PricingRampEngineTest {
     }
 
     private CustomerRepository customerRepository;
+    private PricingAuditLogRepository auditLogRepository;
 
     @Test
     @DisplayName("AC-01 prices each absolute period and does not extend year 1 across the term")
@@ -262,6 +268,89 @@ class PricingRampEngineTest {
         assertScheduleInvalid(lineWith(both), "RAMP_PRICE_BASIS");
         assertScheduleInvalid(lineWith(fraction(new BigDecimal("1.50"))), "RAMP_PRICE_BASIS");
         assertScheduleInvalid(lineWith(fraction(null)), "RAMP_PRICE_BASIS");
+    }
+
+    @Test
+    @DisplayName("DRG-531 dates ramp periods from termStartDate when present and falls back to injected Clock when absent")
+    void datesRampPeriodsFromTermStartDateOrClockFallback() throws Exception {
+        executionService.setClock(Clock.fixed(Instant.parse("2026-06-10T00:00:00Z"), ZoneOffset.UTC));
+
+        JsonNode root = fixture("ac-01-absolute-three-year.json");
+        stub(root);
+
+        PricingContext withTermStart = MAPPER.treeToValue(root.get("request"), PricingContext.class);
+        withTermStart.setTermStartDate(LocalDate.of(2027, 1, 1));
+        PricingResult datedResult = executionService.execute(withTermStart);
+
+        List<PricedPeriod> datedPeriods = datedResult.getLineResults().getFirst().getPricedPeriods();
+        assertThat(datedPeriods)
+                .extracting(PricedPeriod::getEffectiveDate)
+                .containsExactly(
+                        LocalDate.of(2027, 1, 1),
+                        LocalDate.of(2028, 1, 1),
+                        LocalDate.of(2029, 1, 1));
+
+        PricingContext withoutTermStart = MAPPER.treeToValue(root.get("request"), PricingContext.class);
+        assertThat(withoutTermStart.getTermStartDate()).isNull();
+        PricingResult fallbackResult = executionService.execute(withoutTermStart);
+
+        List<PricedPeriod> fallbackPeriods = fallbackResult.getLineResults().getFirst().getPricedPeriods();
+        assertThat(fallbackPeriods)
+                .extracting(PricedPeriod::getEffectiveDate)
+                .containsExactly(
+                        LocalDate.of(2026, 6, 10),
+                        LocalDate.of(2027, 6, 10),
+                        LocalDate.of(2028, 6, 10));
+
+        // Output JSON remains byte-identical whether termStartDate is set or omitted.
+        assertThat(MAPPER.writeValueAsString(datedResult))
+                .isEqualTo(MAPPER.writeValueAsString(fallbackResult));
+
+        var auditCaptor = org.mockito.ArgumentCaptor.forClass(PricingAuditLog.class);
+        verify(auditLogRepository, times(2)).save(auditCaptor.capture());
+        JsonNode firstInput = MAPPER.readTree(auditCaptor.getAllValues().get(0).getInputSnapshot());
+        JsonNode secondInput = MAPPER.readTree(auditCaptor.getAllValues().get(1).getInputSnapshot());
+        assertThat(firstInput.path("termStartDate").asText()).isEqualTo("2027-01-01");
+        assertThat(secondInput.has("termStartDate")).isFalse();
+    }
+
+    @Test
+    @DisplayName("DRG-531 preserves 4-arg RampPeriodPricer compatibility and month-end anniversary semantics")
+    void rampPeriodPricerFourArgOverloadAndMonthEndAnniversary() {
+        RampPeriodPricer pricer = new RampPeriodPricer();
+        PricingLineRequest threeMonthRamp = PricingLineRequest.builder()
+                .lineItemType("SAAS_SEAT_NAMED")
+                .billingFrequency("MONTHLY")
+                .quantity(10)
+                .schedule(List.of(
+                        RampStep.builder().sequence(3).startMonth(3).months(1).quantity(10)
+                                .priceBasis(RampPriceBasis.ABSOLUTE).unitPrice(new BigDecimal("50.00")).build(),
+                        RampStep.builder().sequence(1).startMonth(1).months(1).quantity(10)
+                                .priceBasis(RampPriceBasis.ABSOLUTE).unitPrice(new BigDecimal("40.00")).build(),
+                        RampStep.builder().sequence(2).startMonth(2).months(1).quantity(10)
+                                .priceBasis(RampPriceBasis.ABSOLUTE).unitPrice(new BigDecimal("45.00")).build()))
+                .build();
+
+        List<PricedPeriod> legacy = pricer.price(threeMonthRamp, new BigDecimal("50.00"), 3, 36);
+        assertThat(legacy).extracting(PricedPeriod::getEffectiveDate).containsOnlyNulls();
+
+        List<PricedPeriod> nonLeap = pricer.price(
+                threeMonthRamp, new BigDecimal("50.00"), 3, 36, LocalDate.of(2027, 1, 31));
+        assertThat(nonLeap)
+                .extracting(PricedPeriod::getEffectiveDate)
+                .containsExactly(
+                        LocalDate.of(2027, 1, 31),
+                        LocalDate.of(2027, 2, 28),
+                        LocalDate.of(2027, 3, 31));
+
+        List<PricedPeriod> leap = pricer.price(
+                threeMonthRamp, new BigDecimal("50.00"), 3, 36, LocalDate.of(2028, 1, 31));
+        assertThat(leap)
+                .extracting(PricedPeriod::getEffectiveDate)
+                .containsExactly(
+                        LocalDate.of(2028, 1, 31),
+                        LocalDate.of(2028, 2, 29),
+                        LocalDate.of(2028, 3, 31));
     }
 
     private static void assertScheduleInvalid(PricingLineRequest line, String reason) {

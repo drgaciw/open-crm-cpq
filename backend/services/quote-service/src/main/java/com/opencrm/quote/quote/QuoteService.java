@@ -868,6 +868,9 @@ public class QuoteService {
         context.put("region", quote.getRegion());
         context.put("currency", quote.getCurrency());
         context.put("durationInMonths", quote.getDurationInMonths());
+        if (quote.getStartDate() != null) {
+            context.put("termStartDate", quote.getStartDate().toString());
+        }
         context.put("subscriptionType", quote.getSubscriptionType());
         // Quote DealType is already the CRM mapping result (CrmQuoteDealTypeMapping). Pricing
         // matches the stored name; churn stays on the pricing customer, not this request.
@@ -932,6 +935,9 @@ public class QuoteService {
         policyLine.put("schedule",List.of(Map.of("sequence",1,"startMonth",1,"months",1,"quantity",partial.getQuantity(),
                 "priceBasis","ABSOLUTE","unitPrice",partial.getNetUnitPrice())));
         context.put("lineItems",List.of(policyLine));context.put("durationInMonths",1);
+        if (partial.getStartDate() != null) {
+            context.put("termStartDate", partial.getStartDate());
+        }
         PricingExecuteView result=fetchPricingData(context);
         var matches=result.getLineResults() == null ? List.<PricingLineResultView>of() : result.getLineResults();
         if (matches.size() != 1 || matches.getFirst().getPricedPeriods() == null || matches.getFirst().getPricedPeriods().size() != 1

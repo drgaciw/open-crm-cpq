@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -44,6 +45,15 @@ public class RampPeriodPricer {
     static final Set<String> REJECTED_LINE_TYPES = Set.of("DISCOUNT", "FEE", "TAX");
 
     public List<PricedPeriod> price(PricingLineRequest line, BigDecimal listPrice, int durationInMonths, int maxPeriods) {
+        return price(line, listPrice, durationInMonths, maxPeriods, null);
+    }
+
+    public List<PricedPeriod> price(
+            PricingLineRequest line,
+            BigDecimal listPrice,
+            int durationInMonths,
+            int maxPeriods,
+            LocalDate anchorDate) {
         if (!lineAllowsSchedule(line.getBillingFrequency(), line.getLineItemType())) {
             throw invalid("RAMP_NOT_ALLOWED_FOR_LINE_TYPE");
         }
@@ -78,12 +88,21 @@ public class RampPeriodPricer {
                 throw invalid(step.getQuantity() == null ? "RAMP_PERIOD_EMPTY" : "RAMP_NEGATIVE_VALUE");
             }
             expectedStart += step.getMonths();
-            priced.add(priceStep(line.getLineItemType(), listPrice, step));
+            LocalDate effectiveDate = periodEffectiveDate(anchorDate, step.getStartMonth());
+            priced.add(priceStep(line.getLineItemType(), listPrice, step, effectiveDate));
         }
         if (expectedStart - 1 != durationInMonths) {
             throw invalid("RAMP_TERM_MISMATCH");
         }
         return priced;
+    }
+
+    /**
+     * ADR-023 D-04: each period start is anchored to the contract term start (or pricing-date fallback),
+     * never chained from the previous period boundary.
+     */
+    static LocalDate periodEffectiveDate(LocalDate anchorDate, int startMonth) {
+        return anchorDate == null ? null : anchorDate.plusMonths(startMonth - 1L);
     }
 
     /**
@@ -105,7 +124,11 @@ public class RampPeriodPricer {
         return BigDecimal.ZERO;
     }
 
-    private static PricedPeriod priceStep(String lineItemType, BigDecimal listPrice, RampStep step) {
+    private static PricedPeriod priceStep(
+            String lineItemType,
+            BigDecimal listPrice,
+            RampStep step,
+            LocalDate effectiveDate) {
         BigDecimal base = baseUnit(listPrice, step);
         BigDecimal tier = namedSeatFraction(lineItemType, step.getQuantity());
         BigDecimal netUnit = base.multiply(BigDecimal.ONE.subtract(tier)).setScale(UNIT_SCALE, ROUNDING);
@@ -140,6 +163,7 @@ public class RampPeriodPricer {
                 .sequence(step.getSequence())
                 .startMonth(step.getStartMonth())
                 .months(step.getMonths())
+                .effectiveDate(effectiveDate)
                 .quantity(step.getQuantity())
                 .netUnitPrice(netUnit)
                 .netMonthly(netMonthly)

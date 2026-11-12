@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -549,6 +550,140 @@ class QuoteServiceCalculateTest {
         assertThat(line.getPricingWaterfallJson())
                 .isEqualTo("{\"authoritativeProductType\":\"SAAS_SEAT_NAMED\"}");
         assertThat(com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote)).isNull();
+    }
+
+    @Test
+    @DisplayName("DRG-531 forwards termStartDate when Quote.startDate is set and omits it when null")
+    void calculateForwardsTermStartDateWhenPresentAndOmitsWhenNull() {
+        when(pricingServiceClient.executePricing(anyMap())).thenReturn(ApiResponse.success(
+                PricingExecuteView.builder().success(true).lineResults(List.of(
+                        PricingLineResultView.builder().productExternalId("PROD-001").lineItemType("SUBSCRIPTION").build()
+                )).build()));
+        when(quoteRepository.save(org.mockito.ArgumentMatchers.any(Quote.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(quoteMapper.toDto(org.mockito.ArgumentMatchers.any(Quote.class)))
+                .thenReturn(QuoteDto.builder().id(1L).build());
+
+        Quote datedQuote = draftQuote();
+        datedQuote.setStartDate(LocalDate.of(2027, 1, 1));
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(datedQuote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(lineItem(datedQuote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
+
+        quoteService.calculate(1L);
+        assertThat(sentPricingContext()).containsEntry("termStartDate", "2027-01-01");
+
+        org.mockito.Mockito.clearInvocations(pricingServiceClient);
+        Quote undatedQuote = draftQuote();
+        assertThat(undatedQuote.getStartDate()).isNull();
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(undatedQuote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(lineItem(undatedQuote, "PROD-001", "SUBSCRIPTION", 1, BigDecimal.TEN)));
+
+        quoteService.calculate(1L);
+        assertThat(sentPricingContext()).doesNotContainKey("termStartDate");
+    }
+
+    @Test
+    @DisplayName("DRG-531 continuation initial proration prices initial interval with partial startDate as termStartDate")
+    void continuationInitialProrationUsesPartialStartDateForInitialInterval() {
+        quoteService.setContinuationService(continuationService);
+        Quote quote = draftQuote();
+        quote.setDealType(DealType.EXPANSION);
+        quote.setTargetSubscriptionNumber("SUB-R3");
+        quote.setStartDate(LocalDate.of(2028, 8, 1));
+        quote.setDurationInMonths(17);
+
+        QuoteLineItem line = lineItem(quote, "PROD-SEAT", "SUBSCRIPTION", 20, new BigDecimal("50"));
+        line.setProductType("SAAS_SEAT_NAMED");
+        line.setBillingFrequency("MONTHLY");
+        line.setRampSteps(new ArrayList<>(List.of(
+                QuoteRampStep.builder().lineItem(line).sequence(1).startMonth(1).months(5).quantity(20)
+                        .priceBasis("ABSOLUTE").unitPrice(new BigDecimal("45")).build(),
+                QuoteRampStep.builder().lineItem(line).sequence(2).startMonth(6).months(12).quantity(20)
+                        .priceBasis("ABSOLUTE").unitPrice(new BigDecimal("50")).build())));
+
+        var partial = com.opencrm.common.event.dto.QuoteAcceptedEvent.ProrationSnapshot.builder()
+                .startDate("2028-07-15")
+                .endDate("2028-07-31")
+                .billingPeriodStart("2028-07-01")
+                .billingPeriodEnd("2028-07-31")
+                .quantity(20)
+                .netUnitPrice(new BigDecimal("45"))
+                .netMonthly(new BigDecimal("900"))
+                .periodAmount(new BigDecimal("493.55"))
+                .build();
+        var plan = new QuoteContinuationPolicy.Plan(
+                LocalDate.of(2028, 8, 1),
+                LocalDate.of(2029, 12, 31),
+                17,
+                List.of(
+                        new QuoteContinuationPolicy.Period(1, 1, 5, 20, new BigDecimal("45")),
+                        new QuoteContinuationPolicy.Period(2, 6, 12, 20, new BigDecimal("50"))),
+                partial,
+                new BigDecimal("16993.55"));
+
+        when(continuationService.validate(quote, List.of(line))).thenReturn(plan);
+        when(quoteRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(quote));
+        when(quoteLineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(1L)).thenReturn(List.of(line));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(quoteMapper.toDto(quote)).thenReturn(QuoteDto.builder().id(1L).build());
+
+        PricingExecuteView mainResponse = PricingExecuteView.builder()
+                .success(true)
+                .approvalState("APPROVED")
+                .lineResults(List.of(PricingLineResultView.builder()
+                        .productExternalId("PROD-SEAT")
+                        .lineItemType("SUBSCRIPTION")
+                        .quantity(20)
+                        .listPrice(new BigDecimal("50"))
+                        .unitPrice(new BigDecimal("45"))
+                        .finalPrice(new BigDecimal("900"))
+                        .discountRate(new BigDecimal("0.10"))
+                        .discountAmount(new BigDecimal("100"))
+                        .pricedPeriods(List.of(
+                                PricedPeriodView.builder().sequence(1).startMonth(1).months(5).quantity(20)
+                                        .netUnitPrice(new BigDecimal("45")).netMonthly(new BigDecimal("900")).periodAmount(new BigDecimal("4500")).build(),
+                                PricedPeriodView.builder().sequence(2).startMonth(6).months(12).quantity(20)
+                                        .netUnitPrice(new BigDecimal("50")).netMonthly(new BigDecimal("1000")).periodAmount(new BigDecimal("12000")).build()))
+                        .metadata(Map.of("rampGovernanceEvaluated", true, "authoritativeProductType", "SAAS_SEAT_NAMED"))
+                        .build()))
+                .financialMetrics(PricingFinancialMetricsView.builder()
+                        .tcv(new BigDecimal("16500"))
+                        .acv(new BigDecimal("11647.06"))
+                        .arr(new BigDecimal("10800"))
+                        .exitArr(new BigDecimal("12000"))
+                        .build())
+                .build();
+
+        PricingExecuteView partialPolicyResponse = PricingExecuteView.builder()
+                .success(true)
+                .approvalState("APPROVED")
+                .lineResults(List.of(PricingLineResultView.builder()
+                        .productExternalId("PROD-SEAT")
+                        .lineItemType("SUBSCRIPTION")
+                        .quantity(20)
+                        .listPrice(new BigDecimal("50"))
+                        .unitPrice(new BigDecimal("45"))
+                        .finalPrice(new BigDecimal("900"))
+                        .pricedPeriods(List.of(
+                                PricedPeriodView.builder().sequence(1).startMonth(1).months(1).quantity(20)
+                                        .netUnitPrice(new BigDecimal("45")).netMonthly(new BigDecimal("900")).periodAmount(new BigDecimal("900")).build()))
+                        .metadata(Map.of("rampGovernanceEvaluated", true, "authoritativeProductType", "SAAS_SEAT_NAMED"))
+                        .build()))
+                .build();
+
+        when(pricingServiceClient.executePricing(anyMap()))
+                .thenReturn(ApiResponse.success(partialPolicyResponse))
+                .thenReturn(ApiResponse.success(mainResponse));
+
+        quoteService.calculate(1L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(pricingServiceClient, org.mockito.Mockito.times(2)).executePricing(captor.capture());
+        assertThat(captor.getAllValues().get(0)).containsEntry("termStartDate", "2028-07-15");
+        assertThat(captor.getAllValues().get(1)).containsEntry("termStartDate", "2028-08-01");
     }
 
     private static QuoteLineItem lineItem(
