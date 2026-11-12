@@ -290,6 +290,7 @@ public final class EventContractRegistry {
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
+            ROLE_ASSIGNED_V1,
             CONFIGURATION_FROZEN_V1,
             PRICE_BOOK_PUBLISHED_V1,
             SIGNATURE_COMPLETED_V1);
