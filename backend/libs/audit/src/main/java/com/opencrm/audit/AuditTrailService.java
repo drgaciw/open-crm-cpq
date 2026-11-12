@@ -19,7 +19,7 @@ import java.util.Objects;
  * <p>Registered as a bean by {@link AuditAutoConfiguration}, not discovered by component scanning; see that
  * class's Javadoc for why. A service adopts this by adding the {@code com.opencrm:audit} dependency and creating
  * the {@code audit_entries} table with its own Flyway migration (libs own no schema) — see crm-service's
- * {@code V18__audit_entries.sql} for the reference migration, including the database trigger that enforces
+ * {@code V20__audit_entries.sql} for the reference migration, including the database trigger that enforces
  * append-only at the storage layer. No other service is wired to call this yet; that is future integration work.
  *
  * <p><b>Concurrency:</b> {@link #append} runs at {@code SERIALIZABLE} isolation so two concurrent appends can

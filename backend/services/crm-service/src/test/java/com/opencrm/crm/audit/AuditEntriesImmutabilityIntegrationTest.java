@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Proves the DRG-309 storage-layer guarantee: {@code audit_entries} rejects UPDATE and DELETE regardless of what
  * issues the statement, not only through the application's repository (see
- * {@code V18__audit_entries.sql}'s {@code reject_audit_entries_mutation()} trigger).
+ * {@code V20__audit_entries.sql}'s {@code reject_audit_entries_mutation()} trigger).
  *
  * <p><b>Known gap:</b> this test needs Docker (Testcontainers Postgres) and was written but not executed in this
  * environment - see the PR description.
