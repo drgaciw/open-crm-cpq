@@ -2,6 +2,8 @@ package com.opencrm.ai.task;
 
 import com.opencrm.ai.ledger.AgentLedgerService;
 import com.opencrm.ai.ledger.LedgerTaskHandler;
+import com.opencrm.ai.profile.ProfileTaskHandler;
+import com.opencrm.ai.profile.SellingProfileContextProvider;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -16,8 +18,11 @@ public class AgentTaskConfiguration {
     @ConditionalOnProperty(prefix = "ai.agent-task.dispatcher", name = "enabled", havingValue = "true")
     public AgentTaskDispatcher agentTaskDispatcher(AgentTaskService tasks, AgentTaskProperties properties,
                                                    ObjectProvider<AgentTaskHandler> handlers,
-                                                   ObjectProvider<AgentLedgerService> ledger) {
+                                                   ObjectProvider<AgentLedgerService> ledger,
+                                                   ObjectProvider<SellingProfileContextProvider> profiles) {
+        var context = profiles.getIfAvailable();
         return new AgentTaskDispatcher(tasks, properties, handlers.orderedStream()
-                .map(handler -> (AgentTaskHandler) new LedgerTaskHandler(handler, ledger.getObject())).toList());
+                .map(handler -> (AgentTaskHandler) new LedgerTaskHandler(
+                        context == null ? handler : new ProfileTaskHandler(handler, context), ledger.getObject())).toList());
     }
 }

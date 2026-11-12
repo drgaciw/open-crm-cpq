@@ -76,6 +76,14 @@ public class AgentTask {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @jakarta.persistence.Transient
+    private String sellingProfileContext = "";
+
+    /** Append this tenant-scoped reference block when assembling the handler's prompt. */
+    public String getSellingProfileContext() { return sellingProfileContext; }
+
+    public void setSellingProfileContext(String context) { this.sellingProfileContext = context; }
+
     public AgentTask() {
     }
 
