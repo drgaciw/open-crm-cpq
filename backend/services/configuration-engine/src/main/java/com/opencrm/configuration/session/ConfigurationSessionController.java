@@ -94,6 +94,18 @@ public class ConfigurationSessionController {
         return ApiResponse.success(session, "Configuration completed");
     }
 
+    /**
+     * FreezeConfiguration (DRG-428 / BC-02-05): ValidateConfiguration then FreezeConfiguration computes
+     * the deterministic ConfigurationHash and makes the session immutable. Rejects a bundle-started
+     * session (409), matching {@code /complete}'s restriction.
+     */
+    @PostMapping("/{id}/freeze")
+    @Operation(summary = "Freeze a valid configuration session and compute its ConfigurationHash (FreezeConfiguration)")
+    public ApiResponse<ConfigurationSessionDto> freeze(@PathVariable Long id) {
+        ConfigurationSessionDto session = sessionService.freeze(id);
+        return ApiResponse.success(session, "Configuration frozen");
+    }
+
     @PostMapping("/{id}/cancel")
     @Operation(summary = "Cancel a configuration session")
     public ApiResponse<ConfigurationSessionDto> cancel(@PathVariable Long id) {

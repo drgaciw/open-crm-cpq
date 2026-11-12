@@ -77,10 +77,22 @@ public class ConfigurationSession extends BaseEntity {
     
     @Column(name = "completed_at")
     private Instant completedAt;
-    
+
     @Column(name = "expires_at")
     private Instant expiresAt;
-    
+
+    /**
+     * Deterministic {@code ConfigurationHash} (DRG-428 / BC-02-05), set by {@link #freeze(String)}. Computed
+     * by {@code ConfigurationHasher} over the selections, {@link #catalogVersion} and {@link #ruleSetVersion}
+     * pinned on this session — same inputs always produce the same hash.
+     */
+    @Column(name = "configuration_hash", length = 64)
+    private String configurationHash;
+
+    /** Set by {@link #freeze(String)}; {@code null} until the configuration is frozen. */
+    @Column(name = "frozen_at")
+    private Instant frozenAt;
+
     public void addSelection(String optionKey, String optionValue) {
         this.selections.put(optionKey, optionValue);
         this.valid = false; // Invalidate until re-validated
@@ -107,5 +119,20 @@ public class ConfigurationSession extends BaseEntity {
         }
         this.status = ConfigurationStatus.COMPLETED;
         this.completedAt = Instant.now();
+    }
+
+    /**
+     * FreezeConfiguration (DRG-428 / BC-02-05): makes this configuration immutable, carrying the
+     * pre-computed {@code configurationHash}. Callers must check {@link #isValid()} themselves first
+     * (consistent with {@link #complete()}) since the hash must be computed over this session's state
+     * before the entity is mutated.
+     */
+    public void freeze(String configurationHash) {
+        if (!valid) {
+            throw new IllegalStateException("Cannot freeze invalid configuration");
+        }
+        this.configurationHash = configurationHash;
+        this.status = ConfigurationStatus.FROZEN;
+        this.frozenAt = Instant.now();
     }
 }

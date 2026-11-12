@@ -6,11 +6,13 @@ import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.EventCorrelation;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
+import com.opencrm.common.event.dto.ConfigurationFrozenEvent;
 import com.opencrm.common.event.dto.ConfigurationSessionStartedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.configuration.constraint.ConstraintSolver;
 import com.opencrm.configuration.dto.ConfigurationSessionDto;
+import com.opencrm.configuration.hash.ConfigurationHasher;
 import com.opencrm.configuration.mapper.ConfigurationSessionMapper;
 import com.opencrm.configuration.model.ConfigurationModel;
 import com.opencrm.configuration.model.ConfigurationModelCache;
@@ -162,6 +164,7 @@ public class ConfigurationSessionService {
 
     public ConfigurationSessionDto addSelection(Long sessionId, String optionKey, String optionValue) {
         ConfigurationSession session = findEntityById(sessionId);
+        ensureNotFrozen(session);
 
         if (session.getStatus() != ConfigurationStatus.IN_PROGRESS) {
             throw new IllegalStateException("Cannot modify a session that is not IN_PROGRESS");
@@ -174,6 +177,7 @@ public class ConfigurationSessionService {
 
     public ConfigurationSessionDto removeSelection(Long sessionId, String optionKey) {
         ConfigurationSession session = findEntityById(sessionId);
+        ensureNotFrozen(session);
 
         if (session.getStatus() != ConfigurationStatus.IN_PROGRESS) {
             throw new IllegalStateException("Cannot modify a session that is not IN_PROGRESS");
@@ -184,12 +188,31 @@ public class ConfigurationSessionService {
         return sessionMapper.toDto(sessionRepository.save(session));
     }
 
+    /**
+     * ValidateConfiguration (DRG-428 / BC-02-05 AC1): re-evaluates the session's current selections.
+     * Rejected once the configuration is frozen — a frozen configuration's validity is fixed at the
+     * moment it was frozen and must not be recomputed in place.
+     */
     public ConfigurationSessionDto validate(Long sessionId) {
         ConfigurationSession session = findEntityById(sessionId);
+        ensureNotFrozen(session);
         configurationModelCache.getOrCompile(
                 subjectId(session.getProductId(), session.getBundleId()), configurationModelCompiler);
         applyConstraintResult(session, constraintSolver.evaluate(session));
         return sessionMapper.toDto(sessionRepository.save(session));
+    }
+
+    /**
+     * "Frozen items reject mutation" (DRG-428 AC2): once {@link ConfigurationStatus#FROZEN}, a session
+     * accepts no further change, mirroring pricebook-service's {@code ensureNotPublished} idiom.
+     */
+    private static void ensureNotFrozen(ConfigurationSession session) {
+        if (session.getStatus() == ConfigurationStatus.FROZEN) {
+            throw new BusinessException(
+                    "Frozen configurations are immutable",
+                    HttpStatus.CONFLICT,
+                    "CONFIGURATION_FROZEN_IMMUTABLE");
+        }
     }
 
     /**
@@ -220,6 +243,7 @@ public class ConfigurationSessionService {
      */
     public ConfigurationSessionDto complete(Long sessionId) {
         ConfigurationSession session = findEntityById(sessionId);
+        ensureNotFrozen(session);
         if (session.getBundleId() != null) {
             throw new BusinessException(
                     "Completing a session started against a bundle is not supported yet; "
@@ -260,6 +284,85 @@ public class ConfigurationSessionService {
                     "ConfigurationSession",
                     String.valueOf(session.getId()),
                     EventContractRegistry.CONFIGURATION_COMMITTED_V1,
+                    event
+            );
+        }
+    }
+
+    /**
+     * FreezeConfiguration (DRG-428 / BC-02-05): ValidateConfiguration then FreezeConfiguration. Requires
+     * a valid, in-progress, non-bundle session; computes the deterministic {@code ConfigurationHash}
+     * ({@code ComputeHash}) over the selections plus the {@code catalogVersion}/{@code ruleSetVersion}
+     * already pinned on the session at StartSession (DRG-424), makes the session immutable
+     * ({@link ConfigurationStatus#FROZEN}), and emits {@code ConfigurationFrozen} carrying that hash so
+     * Pricing and Quote can reference this exact configuration.
+     *
+     * <p>Mirrors {@link #complete(Long)}'s bundle restriction: bundle-item expansion does not exist yet
+     * anywhere in this service, so a committed/frozen bundle event would be half-built. Revisit when
+     * bundle-item expansion lands.
+     */
+    public ConfigurationSessionDto freeze(Long sessionId) {
+        ConfigurationSession session = findEntityById(sessionId);
+        ensureFreezable(session);
+
+        String hash = ConfigurationHasher.compute(
+                session.getSelections(), session.getCatalogVersion(), session.getRuleSetVersion());
+        session.freeze(hash); // Throws IllegalStateException if not valid.
+        ConfigurationSession saved = sessionRepository.save(session);
+        publishConfigurationFrozen(saved);
+        return sessionMapper.toDto(saved);
+    }
+
+    private static void ensureFreezable(ConfigurationSession session) {
+        if (session.getBundleId() != null) {
+            throw new BusinessException(
+                    "Freezing a session started against a bundle is not supported yet; "
+                            + "bundle sessions can be built incrementally and cancelled, but not frozen",
+                    HttpStatus.CONFLICT,
+                    "CONFIGURATION_SESSION_BUNDLE_FREEZE_UNSUPPORTED");
+        }
+        if (session.getStatus() == ConfigurationStatus.FROZEN) {
+            throw new BusinessException(
+                    "Configuration is already frozen", HttpStatus.CONFLICT, "CONFIGURATION_ALREADY_FROZEN");
+        }
+        if (session.getStatus() != ConfigurationStatus.IN_PROGRESS) {
+            throw new BusinessException(
+                    "Only an in-progress configuration can be frozen",
+                    HttpStatus.CONFLICT,
+                    "CONFIGURATION_FREEZE_INVALID_STATE");
+        }
+        // Checked here (not just in ConfigurationSession.freeze()) so an invalid session is rejected
+        // before ComputeHash runs — ComputeHash requires a non-null ruleSetVersion, which is only ever
+        // absent before StartSession has populated it.
+        if (!session.isValid()) {
+            throw new IllegalStateException("Cannot freeze invalid configuration");
+        }
+    }
+
+    private void publishConfigurationFrozen(ConfigurationSession session) {
+        ConfigurationFrozenEvent event = ConfigurationFrozenEvent.v1(
+                String.valueOf(session.getId()),
+                session.getProductId(),
+                session.getCatalogVersion(),
+                session.getRuleSetVersion(),
+                Map.copyOf(session.getSelections()),
+                session.getConfigurationHash(),
+                session.getUserId(),
+                session.getFrozenAt(),
+                ConfigurationFrozenEvent.CorrelationSnapshot.builder()
+                        .correlationId(UUID.randomUUID().toString())
+                        .causationId("freeze-configuration")
+                        .sourceService(ConfigurationValidityAuthority.OWNER_SERVICE)
+                        .build()
+        );
+        // ADR-018 D4: the envelope headers carry the same correlation as the payload's snapshot.
+        ConfigurationFrozenEvent.CorrelationSnapshot correlation = event.getCorrelation();
+        try (EventCorrelation.Scope ignored =
+                     EventCorrelation.begin(correlation.getCorrelationId(), correlation.getCausationId())) {
+            outboxEventPublisher.publish(
+                    "ConfigurationSession",
+                    String.valueOf(session.getId()),
+                    EventContractRegistry.CONFIGURATION_FROZEN_V1,
                     event
             );
         }
