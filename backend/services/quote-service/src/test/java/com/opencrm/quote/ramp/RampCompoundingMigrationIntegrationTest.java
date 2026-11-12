@@ -68,7 +68,9 @@ class RampCompoundingMigrationIntegrationTest {
                 assertThat(row.wasNull()).isFalse();
             }
         }
-        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.16"));
+        // Latest applied version is V1_18 (quote valid_until). V1_17 is reserved for DRG-452 (#983)
+        // and is not in this branch, so Flyway's current version skips 1.17.
+        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.18"));
 
         String rollback;
         try (var migration = getClass().getResourceAsStream("/db/migration/V1_16__ramp_escalator_compounding.sql")) {
