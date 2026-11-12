@@ -5,8 +5,10 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import java.util.Set;
 
 /**
- * The only tenants this slice accepts. They are literals for tests and local calls.
- * Production tenant ids, JWT {@code tid}, and ADR-036 account ownership are not read.
+ * Fixture tenant ids for field-registry tests and local samples.
+ * Fact-ledger routes derive tenant from the verified JWT {@code tid}
+ * ({@code FactTenantResolver}); they do not trust these literals from a query param.
+ * ADR-036 account→tenant ownership is still Proposed.
  */
 public final class FixtureTenants {
 
