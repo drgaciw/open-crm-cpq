@@ -246,7 +246,7 @@ spring:
             - id: contract-asset-management
               uri: ${CONTRACT_ASSET_MANAGEMENT_URI:http://localhost:8087}
               predicates:
-                - Path=/api/v1/subscriptions/**,/api/v1/assets/**
+                - Path=/api/v1/subscriptions/**,/api/v1/assets/**,/api/v1/signature-envelopes/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -633,7 +633,7 @@ spring:
             - id: contract-asset-management
               uri: http://localhost:8087
               predicates:
-                - Path=/api/v1/subscriptions/**,/api/v1/assets/**
+                - Path=/api/v1/subscriptions/**,/api/v1/assets/**,/api/v1/signature-envelopes/**
               filters:
                 - name: CircuitBreaker
                   args:
