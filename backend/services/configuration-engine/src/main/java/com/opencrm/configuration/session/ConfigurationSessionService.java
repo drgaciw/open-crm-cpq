@@ -57,9 +57,9 @@ public class ConfigurationSessionService {
     /**
      * StartSession (DRG-424 / BC-02-01): opens a configuration session against a catalog version and a
      * product or a bundle, so a seller can build a solution incrementally via the existing selection
-     * endpoints. Records the catalog version as given (there is no landed catalog-versioning authority
-     * yet to validate it against — DRG-421 is not landed), the compiled rule-set version in effect, and
-     * the caller's tenant. Emits {@code SessionStarted}.
+     * endpoints. Records the catalog version as given (prefer PublishCatalog {@code versionId} from DRG-421;
+     * callers may resolve it via product-service {@code GET /api/v1/catalog/versions/{versionId}/pin}),
+     * the compiled rule-set version in effect, and the caller's tenant. Emits {@code SessionStarted}.
      */
     public ConfigurationSessionDto create(String productId, String bundleId, String catalogVersion, String userId) {
         validateProductOrBundle(productId, bundleId);

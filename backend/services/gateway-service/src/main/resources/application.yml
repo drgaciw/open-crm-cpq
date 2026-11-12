@@ -153,7 +153,7 @@ spring:
             - id: product-service
               uri: ${PRODUCT_SERVICE_URI:http://localhost:8083}
               predicates:
-                - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
+                - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**,/api/v1/catalog/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -165,9 +165,9 @@ spring:
             - id: cpq-product-service
               uri: ${PRODUCT_SERVICE_URI:http://localhost:8083}
               predicates:
-                - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**
+                - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**,/api/v1/cpq/catalog/**
               filters:
-                - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+                - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration|catalog)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
                 - name: CircuitBreaker
                   args:
                     name: productCircuitBreaker
@@ -574,7 +574,7 @@ spring:
             - id: product-service
               uri: http://localhost:8083
               predicates:
-                - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**
+                - Path=/api/v1/products/**,/api/v1/product-bundles/**,/api/v1/product-options/**,/api/v1/product-attributes/**,/api/v1/configuration/**,/api/v1/catalog/**
               filters:
                 - name: CircuitBreaker
                   args:
@@ -584,9 +584,9 @@ spring:
             - id: cpq-product-service
               uri: http://localhost:8083
               predicates:
-                - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**
+                - Path=/api/v1/cpq/products/**,/api/v1/cpq/product-bundles/**,/api/v1/cpq/product-options/**,/api/v1/cpq/product-attributes/**,/api/v1/cpq/configuration/**,/api/v1/cpq/catalog/**
               filters:
-                - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
+                - RewritePath=/api/v1/cpq/(?<segment>products|product-bundles|product-options|product-attributes|configuration|catalog)(?<remaining>/?.*), /api/v1/$\{segment}$\{remaining}
                 - name: CircuitBreaker
                   args:
                     name: productCircuitBreaker

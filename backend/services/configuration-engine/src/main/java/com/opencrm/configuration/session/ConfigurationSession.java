@@ -40,9 +40,10 @@ public class ConfigurationSession extends BaseEntity {
     private String userId;
 
     /**
-     * Caller-supplied catalog version the session is pinned against at StartSession (DRG-424). Recorded as
-     * given; there is no landed catalog-versioning authority yet (DRG-421 is not landed) to validate it
-     * against, so a blank value simply means the caller did not pin one.
+     * Caller-supplied catalog version the session is pinned against at StartSession (DRG-424).
+     * Prefer the {@code versionId} (catalog_versions.uuid) from PublishCatalog / CatalogPublished (DRG-421).
+     * Recorded as given; optional remote pin resolution is via product-service
+     * {@code GET /api/v1/catalog/versions/{versionId}/pin}. A blank value means the caller did not pin one.
      */
     @Column(name = "catalog_version")
     private String catalogVersion;
