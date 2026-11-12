@@ -13,11 +13,9 @@ import java.time.LocalDate;
  * correct rather than a tie-break hiding ambiguous data. To replace a currently-open-ended entry with a new
  * version, end-date the existing entry first (set its {@code effectiveEndDate}), then create the new one.
  *
- * <p>No existing EXCLUDE/date-range-overlap precedent was found elsewhere in this codebase (checked for
- * Postgres {@code EXCLUDE USING gist}/{@code daterange} and for application-level overlap helpers); the
- * closest analog is {@code AcceptedRampValidator}'s month-interval overlap check in
- * contract-asset-management, which uses the same half-open/inclusive interval comparison shape this class
- * uses.
+ * <p>The same rule is enforced in PostgreSQL by
+ * {@code V11__price_and_cost_book_entry_range_exclusion.sql} so concurrent writers cannot insert overlapping
+ * ranges that this in-process check would miss. Entry create/update also locks the parent book row.
  */
 final class EffectiveDateRange {
 
