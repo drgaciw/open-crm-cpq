@@ -1,5 +1,8 @@
 package com.opencrm.pricebook;
 
+import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -21,6 +27,8 @@ public class PriceBookService {
     private final PriceBookRepository priceBookRepository;
     private final PriceBookEntryRepository priceBookEntryRepository;
     private final PriceBookMapper priceBookMapper;
+    private final CostBookService costBookService;
+    private final OutboxEventPublisher outboxEventPublisher;
 
     public PriceBookDto create(PriceBookCreateRequest request) {
         normalizeCreateRequest(request);
@@ -32,6 +40,9 @@ public class PriceBookService {
         }
 
         PriceBook priceBook = priceBookMapper.toEntity(request);
+        if (request.getCostBookId() != null) {
+            priceBook.setCostBook(costBookService.requireCostBook(request.getCostBookId()));
+        }
         PriceBook saved = priceBookRepository.save(priceBook);
         log.info("Created price book with ID: {}", saved.getId());
         return priceBookMapper.toDto(saved);
@@ -53,7 +64,7 @@ public class PriceBookService {
     }
 
     public PriceBookDto update(Long id, PriceBookUpdateRequest request) {
-        PriceBook existing = requirePriceBook(id);
+        PriceBook existing = requirePriceBookForUpdate(id);
         ensureNotPublished(existing);
         normalizeUpdateRequest(request);
 
@@ -71,13 +82,103 @@ public class PriceBookService {
         }
 
         priceBookMapper.updateEntity(request, existing);
+        if (request.getCostBookId() != null) {
+            existing.setCostBook(costBookService.requireCostBook(request.getCostBookId()));
+        }
         PriceBook updated = priceBookRepository.save(existing);
         log.info("Updated price book with ID: {}", updated.getId());
         return priceBookMapper.toDto(updated);
     }
 
+    /**
+     * PublishPriceBookVersion: makes this price book version immutable, stamps {@code publishedAt}, and emits
+     * PriceBookPublished (AC: "PriceBookPublished event is emitted"). The cost book it links to, if any, is
+     * published separately via {@link CostBookService#publish(Long)} — list prices and costs stay versioned
+     * and publishable independently.
+     */
+    public PriceBookDto publish(Long id) {
+        PriceBook priceBook = requirePriceBookForUpdate(id);
+        if (priceBook.isPublished()) {
+            throw new BusinessException("Price book is already published", "PRICE_BOOK_ALREADY_PUBLISHED");
+        }
+        priceBook.setStatus(PriceBookStatus.PUBLISHED);
+        priceBook.setPublishedAt(Instant.now());
+        PriceBook saved = priceBookRepository.save(priceBook);
+
+        outboxEventPublisher.publish("PriceBook", saved.getUuid(), EventContractRegistry.PRICE_BOOK_PUBLISHED_V1,
+                new PriceBookPublishedEvent(
+                        saved.getId(),
+                        saved.getUuid(),
+                        saved.getVersionNumber(),
+                        saved.getCurrency(),
+                        saved.getRegion(),
+                        saved.getCostBookId(),
+                        saved.getEffectiveDate(),
+                        saved.getExpirationDate(),
+                        saved.getPublishedAt()));
+
+        log.info("Published price book with ID: {} (version {})", saved.getId(), saved.getVersionNumber());
+        return priceBookMapper.toDto(saved);
+    }
+
+    /**
+     * GetListPrice: resolves the list price for a SKU, currency and unit of measure as of a date, among this
+     * price book's (possibly several, date-ranged) entries for that key. Entry authoring rejects
+     * overlapping ranges for the same key ({@link #validateNoOverlappingEntry}), so at most one candidate
+     * can cover any given date; the "most recently started" pick below is then provably correct, not a
+     * tie-break over ambiguous data — it only matters for rows written before this validation existed or
+     * outside it (direct SQL, etc.).
+     */
+    @Transactional(readOnly = true)
+    public PriceResolutionDto getListPrice(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                            LocalDate asOfDate) {
+        requirePriceBook(priceBookId);
+        LocalDate resolutionDate = asOfDate != null ? asOfDate : LocalDate.now();
+        String normalizedUom = unitOfMeasure != null ? unitOfMeasure : "EACH";
+
+        List<PriceBookEntry> candidates = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                        priceBookId, sku, currency, normalizedUom);
+
+        return candidates.stream()
+                .filter(entry -> entry.isEffectiveOn(resolutionDate))
+                .max(Comparator.comparing(PriceBookEntry::getEffectiveStartDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(entry -> PriceResolutionDto.builder()
+                        .bookId(priceBookId)
+                        .sku(sku)
+                        .currency(currency)
+                        .unitOfMeasure(normalizedUom)
+                        .asOfDate(resolutionDate)
+                        .matched(true)
+                        .amount(entry.getListPrice())
+                        .build())
+                .orElseGet(() -> PriceResolutionDto.builder()
+                        .bookId(priceBookId)
+                        .sku(sku)
+                        .currency(currency)
+                        .unitOfMeasure(normalizedUom)
+                        .asOfDate(resolutionDate)
+                        .matched(false)
+                        .build());
+    }
+
+    /**
+     * GetCost: follows this price book's cost book linkage and resolves the cost there, as of a date.
+     */
+    @Transactional(readOnly = true)
+    public PriceResolutionDto getCost(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                       LocalDate asOfDate) {
+        PriceBook priceBook = requirePriceBook(priceBookId);
+        if (priceBook.getCostBookId() == null) {
+            throw new BusinessException(
+                    "Price book " + priceBookId + " has no linked cost book", "NO_LINKED_COST_BOOK");
+        }
+        return costBookService.getCost(priceBook.getCostBookId(), sku, currency, unitOfMeasure, asOfDate);
+    }
+
     public void delete(Long id) {
-        PriceBook existing = requirePriceBook(id);
+        PriceBook existing = requirePriceBookForUpdate(id);
         ensureNotPublished(existing);
         existing.softDelete();
         priceBookRepository.save(existing);
@@ -85,20 +186,12 @@ public class PriceBookService {
     }
 
     public PriceBookEntryDto createEntry(Long priceBookId, PriceBookEntryCreateRequest request) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         normalizeEntryCreateRequest(request, priceBook);
         validateEntryPriceRange(request.getListPrice(), request.getFloorPrice());
-
-        if (priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                priceBookId,
-                request.getProductExternalId()
-        ).isPresent()) {
-            throw new BusinessException(
-                    "Product " + request.getProductExternalId() + " already exists in this price book",
-                    "DUPLICATE_PRICE_BOOK_ENTRY"
-            );
-        }
+        validateNoOverlappingEntry(priceBookId, request.getProductExternalId(), request.getCurrency(),
+                request.getUnitOfMeasure(), request.getEffectiveStartDate(), request.getEffectiveEndDate(), null);
 
         PriceBookEntry entry = priceBookMapper.toEntryEntity(request);
         entry.setPriceBook(priceBook);
@@ -122,22 +215,21 @@ public class PriceBookService {
     }
 
     public PriceBookEntryDto updateEntry(Long priceBookId, Long entryId, PriceBookEntryUpdateRequest request) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         normalizeEntryUpdateRequest(request);
 
-        if (request.getProductExternalId() != null
-                && !request.getProductExternalId().equals(entry.getProductExternalId())
-                && priceBookEntryRepository.findByPriceBookIdAndProductExternalIdAndDeletedFalse(
-                priceBookId,
-                request.getProductExternalId()
-        ).isPresent()) {
-            throw new BusinessException(
-                    "Product " + request.getProductExternalId() + " already exists in this price book",
-                    "DUPLICATE_PRICE_BOOK_ENTRY"
-            );
-        }
+        String targetProductExternalId = request.getProductExternalId() != null
+                ? request.getProductExternalId() : entry.getProductExternalId();
+        String targetCurrency = request.getCurrency() != null ? request.getCurrency() : entry.getCurrency();
+        String targetUom = request.getUnitOfMeasure() != null ? request.getUnitOfMeasure() : entry.getUnitOfMeasure();
+        LocalDate targetStart = request.getEffectiveStartDate() != null
+                ? request.getEffectiveStartDate() : entry.getEffectiveStartDate();
+        LocalDate targetEnd = request.getEffectiveEndDate() != null
+                ? request.getEffectiveEndDate() : entry.getEffectiveEndDate();
+        validateNoOverlappingEntry(priceBookId, targetProductExternalId, targetCurrency, targetUom,
+                targetStart, targetEnd, entryId);
 
         BigDecimal targetListPrice = request.getListPrice() != null ? request.getListPrice() : entry.getListPrice();
         BigDecimal targetFloorPrice = request.getFloorPrice() != null ? request.getFloorPrice() : entry.getFloorPrice();
@@ -150,7 +242,7 @@ public class PriceBookService {
     }
 
     public void deleteEntry(Long priceBookId, Long entryId) {
-        PriceBook priceBook = requirePriceBook(priceBookId);
+        PriceBook priceBook = requirePriceBookForUpdate(priceBookId);
         ensureNotPublished(priceBook);
         PriceBookEntry entry = requireEntry(priceBookId, entryId);
         entry.softDelete();
@@ -160,6 +252,11 @@ public class PriceBookService {
 
     private PriceBook requirePriceBook(Long id) {
         return priceBookRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PriceBook", id));
+    }
+
+    private PriceBook requirePriceBookForUpdate(Long id) {
+        return priceBookRepository.findWithLockByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PriceBook", id));
     }
 
@@ -204,12 +301,52 @@ public class PriceBookService {
 
     private void ensureNotPublished(PriceBook priceBook) {
         LocalDate effectiveDate = priceBook.getEffectiveDate();
-        if (effectiveDate != null && !effectiveDate.isAfter(LocalDate.now())) {
+        boolean dateImpliesPublished = effectiveDate != null && !effectiveDate.isAfter(LocalDate.now());
+        if (priceBook.isPublished() || dateImpliesPublished) {
             throw new BusinessException(
                     "Published price books and their entries are immutable",
                     "PRICE_BOOK_PUBLISHED_IMMUTABLE"
             );
         }
+    }
+
+    /**
+     * DRG-431: entries are keyed by Sku + currency + UnitOfMeasure + EffectiveDateRange, and the natural
+     * reading of that AC is that ranges for the same key must be non-overlapping — otherwise a resolution
+     * date could land in more than one entry, and GetListPrice would have to guess. Rejects (400) a
+     * create/update whose range overlaps any other non-deleted entry with the same Sku + currency +
+     * UnitOfMeasure in this price book. See {@link EffectiveDateRange} for the overlap rule and the
+     * precedent this follows.
+     *
+     * <p>To replace an open-ended entry with a new version, end-date the existing one first (update its
+     * {@code effectiveEndDate}), then create the new entry — the same way {@code effectiveEndDate} is
+     * documented to "shorten coverage without erasing history" elsewhere in this codebase
+     * (contract-asset-management's {@code SubscriptionRatePeriod}).
+     */
+    private void validateNoOverlappingEntry(Long priceBookId, String sku, String currency, String unitOfMeasure,
+                                             LocalDate effectiveStartDate, LocalDate effectiveEndDate,
+                                             Long excludeEntryId) {
+        List<PriceBookEntry> candidates = priceBookEntryRepository
+                .findByPriceBookIdAndProductExternalIdAndCurrencyAndUnitOfMeasureAndDeletedFalse(
+                        priceBookId, sku, currency, unitOfMeasure);
+        candidates.stream()
+                .filter(entry -> excludeEntryId == null || !excludeEntryId.equals(entry.getId()))
+                .filter(entry -> entry.overlapsRange(effectiveStartDate, effectiveEndDate))
+                .findFirst()
+                .ifPresent(conflict -> {
+                    throw new BusinessException(
+                            "An entry for SKU " + sku + " / " + currency + " / " + unitOfMeasure
+                                    + " already covers an overlapping effective date range ["
+                                    + describe(conflict.getEffectiveStartDate()) + ".."
+                                    + describe(conflict.getEffectiveEndDate())
+                                    + "]; end-date the existing entry before adding one with an overlapping range",
+                            "OVERLAPPING_PRICE_BOOK_ENTRY_RANGE"
+                    );
+                });
+    }
+
+    private String describe(LocalDate date) {
+        return date == null ? "open-ended" : date.toString();
     }
 
     private void validateEntryPriceRange(BigDecimal listPrice, BigDecimal floorPrice) {
@@ -269,6 +406,10 @@ public class PriceBookService {
         if (request.getCurrency() == null) {
             request.setCurrency(priceBook.getCurrency());
         }
+        request.setUnitOfMeasure(normalize(request.getUnitOfMeasure()));
+        if (request.getUnitOfMeasure() == null) {
+            request.setUnitOfMeasure("EACH");
+        }
     }
 
     private void normalizeEntryUpdateRequest(PriceBookEntryUpdateRequest request) {
@@ -285,6 +426,14 @@ public class PriceBookService {
                     request.getCurrency(),
                     "Currency must not be blank when provided",
                     "INVALID_PRICE_BOOK_ENTRY_CURRENCY"
+            ));
+        }
+
+        if (request.getUnitOfMeasure() != null) {
+            request.setUnitOfMeasure(requireNonBlank(
+                    request.getUnitOfMeasure(),
+                    "Unit of measure must not be blank when provided",
+                    "INVALID_PRICE_BOOK_ENTRY_UOM"
             ));
         }
     }
