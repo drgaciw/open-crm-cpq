@@ -1,0 +1,2782 @@
+[
+  {
+    "id": "001-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-001",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "002-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-002",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "003-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-003",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "004-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-004",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "005-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-005",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "0.00"
+        }
+      ]
+    }
+  },
+  {
+    "id": "006-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-006",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "007-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-007",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "008-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-008",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 6,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "0.00"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "0.00"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "009-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-009",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 6,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "010-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-010",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 6,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "011-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-011",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "012-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-012",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "013-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-013",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "014-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-014",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "015-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-015",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "0.005"
+        }
+      ]
+    }
+  },
+  {
+    "id": "016-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-016",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "017-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-017",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "018-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-018",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 14,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "0.005"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 9,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "0.005"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "019-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-019",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 14,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 9,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "020-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "0.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-020",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 9,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 14,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 9,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "021-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-021",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "022-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-022",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "023-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-023",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "024-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-024",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "025-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-025",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "1.005"
+        }
+      ]
+    }
+  },
+  {
+    "id": "026-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-026",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "027-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-027",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "028-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-028",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 15,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "1.005"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 10,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "1.005"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "029-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-029",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 15,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 10,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "030-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1.005",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-030",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 10,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 15,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 10,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "031-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-031",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "032-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-032",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "033-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-033",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "034-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-034",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "035-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-035",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "9.9999"
+        }
+      ]
+    }
+  },
+  {
+    "id": "036-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-036",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "037-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-037",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "038-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-038",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 16,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "9.9999"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 11,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "9.9999"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "039-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-039",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 16,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 11,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "040-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "9.9999",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-040",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 11,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 16,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 11,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "041-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-041",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "042-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-042",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "043-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-043",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "044-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-044",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "045-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-045",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "19.95"
+        }
+      ]
+    }
+  },
+  {
+    "id": "046-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-046",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "047-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-047",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "048-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-048",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 104,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "19.95"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 99,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "19.95"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "049-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-049",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 104,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 99,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "050-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "19.95",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-050",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 99,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 104,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 99,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "051-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-051",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "052-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-052",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "053-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-053",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "054-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-054",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "055-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-055",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "33.3333"
+        }
+      ]
+    }
+  },
+  {
+    "id": "056-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-056",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "057-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-057",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "058-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-058",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 105,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "33.3333"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 100,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "33.3333"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "059-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-059",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 105,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 100,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "060-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "33.3333",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-060",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 100,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 105,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 100,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "061-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-061",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "062-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-062",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "063-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-063",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "064-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-064",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "065-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-065",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "100.00"
+        }
+      ]
+    }
+  },
+  {
+    "id": "066-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-066",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "067-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-067",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "068-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-068",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 106,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "100.00"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 101,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "100.00"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "069-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-069",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 106,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 101,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "070-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "100.00",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-070",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 101,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 106,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 101,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "071-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-071",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "072-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-072",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "073-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-073",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "074-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-074",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "075-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-075",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "999.995"
+        }
+      ]
+    }
+  },
+  {
+    "id": "076-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-076",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "077-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-077",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "078-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-078",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 504,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "999.995"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 499,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "999.995"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "079-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-079",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 504,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 499,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "080-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "999.995",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-080",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 499,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 504,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 499,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "081-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-081",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "082-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-082",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "083-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-083",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "084-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-084",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "085-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-085",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "12.3456"
+        }
+      ]
+    }
+  },
+  {
+    "id": "086-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-086",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "087-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-087",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "088-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-088",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 505,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "12.3456"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 500,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "12.3456"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "089-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-089",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 505,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 500,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "090-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "12.3456",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-090",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 500,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 505,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 500,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "091-FLAT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-091",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "FLAT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "092-TIERED",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-092",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "TIERED"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "093-VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-093",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "VOLUME"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "094-STAIRSTEP",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-094",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "STAIRSTEP"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "095-OVERRIDE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-095",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "OVERRIDE"
+          },
+          "listPriceOverride": "1234.56"
+        }
+      ]
+    }
+  },
+  {
+    "id": "096-PROMOTION",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-096",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "PROMOTION"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "097-DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-097",
+      "region": "NA",
+      "currency": "USD",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "DISCOUNT"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "098-RAMP_ABSOLUTE",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-098",
+      "region": "NA",
+      "currency": "EUR",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "RAMP_ABSOLUTE"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 1005,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "1234.56"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1000,
+              "priceBasis": "ABSOLUTE",
+              "unitPrice": "1234.56"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "099-RAMP_DISCOUNT",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-099",
+      "region": "NA",
+      "currency": "JPY",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "RAMP_DISCOUNT"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 1005,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1000,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.125"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "100-RAMP_VOLUME",
+    "instant": "2026-01-15T12:00:00Z",
+    "listPrice": "1234.56",
+    "request": {
+      "customerExternalId": "CUSTOMER-1",
+      "quoteExternalId": "REPLAY-100",
+      "region": "NA",
+      "currency": "GBP",
+      "durationInMonths": 12,
+      "lineItems": [
+        {
+          "productExternalId": "PRODUCT-1",
+          "lineItemType": "SAAS_SEAT_NAMED",
+          "quantity": 1000,
+          "metadata": {
+            "model": "RAMP_VOLUME"
+          },
+          "billingFrequency": "MONTHLY",
+          "schedule": [
+            {
+              "sequence": 2,
+              "startMonth": 7,
+              "months": 6,
+              "quantity": 1005,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            },
+            {
+              "sequence": 1,
+              "startMonth": 1,
+              "months": 6,
+              "quantity": 1000,
+              "priceBasis": "DISCOUNT_FRACTION",
+              "discountFraction": "0.0"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
