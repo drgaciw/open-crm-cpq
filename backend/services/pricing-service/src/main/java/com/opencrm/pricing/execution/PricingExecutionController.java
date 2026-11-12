@@ -23,6 +23,20 @@ public class PricingExecutionController {
 
     private final PricingExecutionService pricingExecutionService;
 
+    private WaterfallExplainService waterfallExplainService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setWaterfallExplainService(WaterfallExplainService waterfallExplainService) {
+        this.waterfallExplainService = waterfallExplainService;
+    }
+
+    @GetMapping("/waterfall/{quoteExternalId}")
+    @Operation(summary = "Explain recorded waterfall", description = "Returns the latest recorded quote waterfall, or a specific auditId; never recalculates pricing")
+    public ApiResponse<com.opencrm.pricing.waterfall.PricingWaterfall> explainWaterfall(
+            @PathVariable String quoteExternalId, @RequestParam(required = false) Long auditId) {
+        return ApiResponse.success(waterfallExplainService.explain(quoteExternalId, auditId));
+    }
+
     /**
      * Execute pricing calculation.
      */

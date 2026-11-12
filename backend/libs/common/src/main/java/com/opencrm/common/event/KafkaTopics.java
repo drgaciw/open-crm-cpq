@@ -26,6 +26,8 @@ public final class KafkaTopics {
 
     // Configuration Events
     public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
+    /** DRG-424 / BC-02-01. Emitted when a configuration session is started (StartSession). */
+    public static final String CONFIGURATION_SESSION_STARTED = "cpq.configuration.session.started";
 
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";

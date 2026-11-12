@@ -296,7 +296,7 @@ class PricingDrulesGoldenFixtureTest {
         ArgumentCaptor<PricingAuditLog> saved = ArgumentCaptor.forClass(PricingAuditLog.class);
         verify(auditLogRepository).save(saved.capture());
         assertThat(saved.getValue().getRulesFired()).isNull();
-        assertThat(saved.getValue().getWaterfallTrace()).isNull();
+        assertThat(saved.getValue().getWaterfallTrace()).isEqualTo(MAPPER.writeValueAsString(result.getWaterfall()));
         assertThat(saved.getValue().getOutputSnapshot()).doesNotContain("FORGED");
     }
 
@@ -337,7 +337,7 @@ class PricingDrulesGoldenFixtureTest {
         ArgumentCaptor<PricingAuditLog> saved = ArgumentCaptor.forClass(PricingAuditLog.class);
         verify(auditLogRepository).save(saved.capture());
         assertThat(saved.getValue().getRulesFired()).isNull();
-        assertThat(saved.getValue().getWaterfallTrace()).isNull();
+        assertThat(saved.getValue().getWaterfallTrace()).isNotBlank();
         assertThat(saved.getValue().getOutputSnapshot()).doesNotContain("FORGED");
     }
 
