@@ -22,6 +22,7 @@ import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.RoleAssignedEvent;
 import com.opencrm.common.event.dto.SignatureCompletedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
@@ -227,6 +228,10 @@ public final class EventContractRegistry {
     public static final EventContract POLICY_DEFINED_V1 = published(
             "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
 
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final EventContract ROLE_ASSIGNED_V1 = published(
+            "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
+
     /** DRG-431 / BC-03-01. One event per price book version publish. */
     public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
             "PriceBookPublished", "pricebook-service", KafkaTopics.PRICE_BOOK_PUBLISHED, PriceBookPublishedEvent.class);
@@ -275,6 +280,7 @@ public final class EventContractRegistry {
             ACCOUNTS_MERGED_V1,
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
+            ROLE_ASSIGNED_V1,
             PRICE_BOOK_PUBLISHED_V1,
             SIGNATURE_COMPLETED_V1);
 
