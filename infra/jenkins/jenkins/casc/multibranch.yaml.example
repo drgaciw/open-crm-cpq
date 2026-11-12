@@ -8,6 +8,10 @@
 # 3. Disable seed pipelineJob 'opencrm-cpq-ci' if this job is primary
 #
 # Webhook: POST ${JENKINS_URL}/github-webhook/ (GitHub plugin)
+#
+# Use Job DSL dynamic API: branchSources { source { github { traits { ... } } } }.
+# Do NOT use static branchSources { github { traits { ... } } } — that invokes
+# GitHubBranchSourceContext.traits() and fails JCasC boot (DRG-720).
 
 jobs:
   - script: >
@@ -15,21 +19,23 @@ jobs:
         displayName('OpenCRM CPQ — Multibranch CI')
         description('PR and branch builds — Jenkinsfile at repo root (ADR-003 / ci-contract.yaml)')
         branchSources {
-          github {
-            id('opencrm-cpq-github')
-            scanCredentialsId('scm-token')
-            repoOwner('your-org')
-            repository('open-crm-cpq')
-            traits {
-              gitHubBranchDiscovery {
-                strategyId(1)
-              }
-              gitHubPullRequestDiscovery {
-                strategyId(1)
-              }
-              headWildcardFilter {
-                includes('main PR-* *')
-                excludes('')
+          source {
+            github {
+              id('opencrm-cpq-github')
+              credentialsId('scm-token')
+              repoOwner('your-org')
+              repository('open-crm-cpq')
+              traits {
+                gitHubBranchDiscovery {
+                  strategyId(1)
+                }
+                gitHubPullRequestDiscovery {
+                  strategyId(1)
+                }
+                headWildcardFilter {
+                  includes('main PR-* *')
+                  excludes('')
+                }
               }
             }
           }

@@ -68,27 +68,33 @@ unclassified:
   location:
     url: "${JENKINS_URL:-http://localhost:8080/}"
 
+# Multibranch seed uses Job DSL *dynamic* API (branchSources.source.github.traits).
+# Static branchSources.github { traits { ... } } calls GitHubBranchSourceContext.traits(),
+# which does not exist and fails JCasC boot with ConfigurationAsCodeBootFailure
+# (seen on jenkins/jenkins:2.580.2-lts-jdk25 — DRG-720 / DRG-671).
 jobs:
   - script: >
       multibranchPipelineJob('opencrm-cpq') {
         displayName('OpenCRM CPQ CI')
         description('Primary CI — branches and PRs with Jenkinsfile (see docs/ci-jenkins-cutover.md)')
         branchSources {
-          github {
-            id('opencrm-cpq-github')
-            scanCredentialsId('scm-token')
-            repoOwner('${GITHUB_REPO_OWNER}')
-            repository('${GITHUB_REPO_NAME}')
-            traits {
-              gitHubBranchDiscovery {
-                strategyId(1)
-              }
-              gitHubPullRequestDiscovery {
-                strategyId(1)
-              }
-              headWildcardFilter {
-                includes('main PR-* *')
-                excludes('')
+          source {
+            github {
+              id('opencrm-cpq-github')
+              credentialsId('scm-token')
+              repoOwner('${GITHUB_REPO_OWNER}')
+              repository('${GITHUB_REPO_NAME}')
+              traits {
+                gitHubBranchDiscovery {
+                  strategyId(1)
+                }
+                gitHubPullRequestDiscovery {
+                  strategyId(1)
+                }
+                headWildcardFilter {
+                  includes('main PR-* *')
+                  excludes('')
+                }
               }
             }
           }

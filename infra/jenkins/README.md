@@ -79,6 +79,8 @@ Open http://localhost:8080/ (bound to localhost only).
 
 For PR builds, the **`opencrm-cpq`** multibranch job is primary — see [docs/ci-jenkins-cutover.md](../../docs/ci-jenkins-cutover.md). Template reference: [jenkins/casc/multibranch.yaml.example](jenkins/casc/multibranch.yaml.example).
 
+**JCasC / Job DSL note (DRG-720):** the seed job must use the Job DSL *dynamic* API (`branchSources { source { github { traits { … } } } }`). The static helper `branchSources { github { traits { … } } }` calls `GitHubBranchSourceContext.traits()`, which does not exist and aborts boot with `ConfigurationAsCodeBootFailure` on `jenkins/jenkins:2.580.2-lts-jdk25`.
+
 ## Compose overlays
 
 | File | Use |
@@ -178,6 +180,7 @@ Reports: `ci-reports/ai-code-review.md`, `ai-test-suggestions.md`, `ai-log-analy
 | Jenkins waits forever on sidecar | Health check failing | Check `docker logs opencrm-jenkins-ai-sidecar`; postgres/redis up |
 | Build agent not picking jobs | Secret/labels | Verify agent online, labels `linux docker maven node22 node24`, secret mounted |
 | Drift vs GHA | Different stage order | Compare [ci-contract.yaml](../../docs/ci-contract.yaml) and `.github/workflows/ci.yml` |
+| `ConfigurationAsCodeBootFailure` / `GitHubBranchSourceContext.traits()` | Static Job DSL `github { traits {…} }` | Use dynamic `branchSources { source { github { traits {…} } } }` (DRG-720); see casc seed above |
 
 ## Testcontainers
 
