@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -34,6 +35,12 @@ public class ProductUpdateRequest {
 
     @Size(max = 50, message = "Unit of measure must not exceed 50 characters")
     private String unitOfMeasure;
+
+    /** DRG-418: EffectiveDateRange start. Null means sellable immediately. */
+    private LocalDate effectiveFrom;
+
+    /** DRG-418: EffectiveDateRange end. Null means no planned end. */
+    private LocalDate effectiveTo;
 
     private Boolean configurable;
     private Boolean bundle;
