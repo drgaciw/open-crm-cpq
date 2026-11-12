@@ -85,4 +85,7 @@ public final class KafkaTopics {
 
     /** DRG-431 / BC-03-01. A price book version was published. */
     public static final String PRICE_BOOK_PUBLISHED = "cpq.pricebook.published";
+
+    /** DRG-457 / BC-06-04. Every required signer completed an e-signature envelope. */
+    public static final String SIGNATURE_COMPLETED = "cpq.contract.signature.completed";
 }

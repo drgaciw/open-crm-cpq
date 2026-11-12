@@ -52,6 +52,11 @@ resilience4j:
         limit-for-period: 10
         limit-refresh-period: 1s
         timeout-duration: 5s
+      # DRG-457 / BC-06-04. E-signature ACL; stub provider today, same guard a real adapter would keep.
+      eSignatureProvider:
+        limit-for-period: 10
+        limit-refresh-period: 1s
+        timeout-duration: 5s
 
 server:
   port: 8087
