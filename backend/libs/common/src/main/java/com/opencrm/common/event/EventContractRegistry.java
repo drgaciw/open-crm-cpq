@@ -16,12 +16,14 @@ import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
 import com.opencrm.common.event.dto.PolicyDefinedEvent;
+import com.opencrm.common.event.dto.PriceBookPublishedEvent;
 import com.opencrm.common.event.dto.ProductCatalogLifecycleEvent;
 import com.opencrm.common.event.dto.ProductDefinedEvent;
 import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.SignatureCompletedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.event.dto.TerritoryAssignedEvent;
@@ -234,6 +236,19 @@ public final class EventContractRegistry {
     /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
     public static final EventContract POLICY_DEFINED_V1 = published(
             "PolicyDefined", "approval-routing", KafkaTopics.POLICY_DEFINED, PolicyDefinedEvent.class);
+
+    /** DRG-431 / BC-03-01. One event per price book version publish. */
+    public static final EventContract PRICE_BOOK_PUBLISHED_V1 = published(
+            "PriceBookPublished", "pricebook-service", KafkaTopics.PRICE_BOOK_PUBLISHED, PriceBookPublishedEvent.class);
+
+    /**
+     * DRG-457 / BC-06-04. Every required signer completed an e-signature envelope, behind the ACL in
+     * {@code com.opencrm.contract.signature.acl}. Owned by contract-asset-management: e-signature coordination sits
+     * in the Govern &amp; Contract phase alongside amendment/asset lifecycle, which this service already owns.
+     */
+    public static final EventContract SIGNATURE_COMPLETED_V1 = published(
+            "SignatureCompleted", "contract-asset-management", KafkaTopics.SIGNATURE_COMPLETED,
+            SignatureCompletedEvent.class);
 
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,

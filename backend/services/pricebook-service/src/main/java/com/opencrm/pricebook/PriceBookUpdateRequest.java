@@ -28,4 +28,7 @@ public class PriceBookUpdateRequest {
     private LocalDate effectiveDate;
 
     private LocalDate expirationDate;
+
+    /** DRG-431: the cost book that supplies this price book's costs. */
+    private Long costBookId;
 }

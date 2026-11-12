@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @Builder
@@ -17,6 +18,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class PriceBookEntryCreateRequest {
 
+    /** The SKU. */
     @NotBlank(message = "Product external ID is required")
     @Size(max = 255, message = "Product external ID must not exceed 255 characters")
     private String productExternalId;
@@ -30,4 +32,11 @@ public class PriceBookEntryCreateRequest {
 
     @Size(max = 10, message = "Currency must not exceed 10 characters")
     private String currency;
+
+    @Size(max = 20, message = "Unit of measure must not exceed 20 characters")
+    private String unitOfMeasure;
+
+    private LocalDate effectiveStartDate;
+
+    private LocalDate effectiveEndDate;
 }

@@ -24,6 +24,10 @@ public class PriceBookDto {
     private Boolean isDefault;
     private LocalDate effectiveDate;
     private LocalDate expirationDate;
+    private PriceBookStatus status;
+    private Integer versionNumber;
+    private Instant publishedAt;
+    private Long costBookId;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;

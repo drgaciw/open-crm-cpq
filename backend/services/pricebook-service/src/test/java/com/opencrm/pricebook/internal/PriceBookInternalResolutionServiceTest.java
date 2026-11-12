@@ -137,6 +137,120 @@ class PriceBookInternalResolutionServiceTest {
     }
 
     @Test
+    void resolveBatchPicksTheDateEffectiveEntryWhenASkuHasSeveralDatedVersions() {
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .region("EMEA")
+                .currency("EUR")
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry past = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("90.00"))
+                .currency("EUR")
+                .effectiveStartDate(LocalDate.now().minusMonths(6))
+                .effectiveEndDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry current = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .currency("EUR")
+                .effectiveStartDate(LocalDate.now())
+                .effectiveEndDate(null)
+                .build();
+
+        when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(42L), eq(List.of("SKU-1"))))
+                .thenReturn(List.of(past, current));
+
+        ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
+
+        assertThat(response.getEntries().get("SKU-1").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("SKU-1").getListPrice()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void resolveBatchIgnoresAnEffectiveCaseEntryAndResolvesTheEachEntryForTheSameSku() {
+        // Codex P1: the V11 exclusion constraint keys on (price_book_id, sku, currency, unit_of_measure),
+        // so an EACH entry and a CASE entry for the same SKU are explicitly allowed to coexist and both be
+        // effective today. resolveBatch has no caller-supplied unit, so it must resolve the default (EACH)
+        // entry, not whichever started most recently regardless of unit — the CASE entry below starts
+        // later, so a regression here would make this test fail by returning the CASE price (250.00).
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .region("EMEA")
+                .currency("EUR")
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry eachEntry = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .currency("EUR")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.now().minusMonths(1))
+                .build();
+        PriceBookEntry caseEntry = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("250.00"))
+                .currency("EUR")
+                .unitOfMeasure("CASE")
+                .effectiveStartDate(LocalDate.now()) // later start than eachEntry
+                .build();
+
+        when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(42L), eq(List.of("SKU-1"))))
+                .thenReturn(List.of(eachEntry, caseEntry));
+
+        ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
+
+        assertThat(response.getEntries().get("SKU-1").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("SKU-1").getListPrice()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void resolveBatchIgnoresAnEffectiveEntryInAnotherCurrencyForTheSameSku() {
+        // Same key shape, but currency differs instead of unit of measure — the book's own currency wins.
+        PriceBook priceBook = PriceBook.builder()
+                .id(42L)
+                .region("EMEA")
+                .currency("EUR")
+                .effectiveDate(LocalDate.now().minusDays(1))
+                .build();
+        PriceBookEntry eurEntry = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("100.00"))
+                .currency("EUR")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.now().minusMonths(1))
+                .build();
+        PriceBookEntry usdEntry = PriceBookEntry.builder()
+                .priceBook(priceBook)
+                .productExternalId("SKU-1")
+                .listPrice(new BigDecimal("120.00"))
+                .currency("USD")
+                .unitOfMeasure("EACH")
+                .effectiveStartDate(LocalDate.now()) // later start than eurEntry
+                .build();
+
+        when(priceBookRepository.findByRegionAndDeletedFalse("EMEA")).thenReturn(Optional.of(priceBook));
+        when(priceBookEntryRepository.findByPriceBookIdAndProductExternalIdInAndDeletedFalse(
+                eq(42L), eq(List.of("SKU-1"))))
+                .thenReturn(List.of(eurEntry, usdEntry));
+
+        ResolveBatchResponse response = service.resolveBatch("EMEA", List.of("SKU-1"));
+
+        assertThat(response.getEntries().get("SKU-1").isEntryMatched()).isTrue();
+        assertThat(response.getEntries().get("SKU-1").getListPrice()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
     void resolveBatchRejectsExpiredDefaultPriceBook() {
         PriceBook expiredDefault = PriceBook.builder()
                 .id(1L)
