@@ -1,0 +1,75 @@
+spring:
+  # Same Azure auto-configuration excludes as the running producer services (quote/product/pricing):
+  # spring-cloud-azure's B2C, token-credential, compatibility-verifier and Event Hubs Kafka OAuth2
+  # auto-configurations block local boot on Spring Boot 4 (ADR-018 D1 / ADR-010).
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.compatibility.AzureCompatibilityVerifierAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration
+  cloud:
+    azure:
+      compatibility-verifier:
+        enabled: false
+  application:
+    name: authorization-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:opencrm}?currentSchema=${DB_SCHEMA:authorization}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:authorization}
+  flyway:
+    enabled: true
+    # Existing standalone deployments must retain DB_NAME and set DB_SCHEMA=public.
+    # Refuse to baseline unknown data; preserve an existing Flyway history instead.
+    baseline-on-migrate: false
+    default-schema: ${DB_SCHEMA:authorization}
+    schemas: ${DB_SCHEMA:authorization}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: authorization-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8091
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+opencrm:
+  kafka:
+    inbox:
+      enabled: true
+  # DRG-307: Caffeine cache in front of Authorize. expire-after-write bounds staleness after a GrantPermission
+  # (which invalidates the whole cache, cheaply, because grants are rare); AssignRole/revoke evict just that
+  # principal's entry. max-size bounds memory for a tenant with many distinct principals.
+  authorization:
+    cache:
+      expire-after-write: PT5M
+      maximum-size: 50000
+
+---
+# Local and CI only: the well-known development database password. The default profile has no secret
+# defaults, so a deployment without DB_PASSWORD fails at startup instead of trying "postgres" (ADR-016 step 5).
+spring:
+  config:
+    activate:
+      on-profile: dev | test
+  datasource:
+    password: ${DB_PASSWORD:postgres}

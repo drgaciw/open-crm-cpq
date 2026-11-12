@@ -77,4 +77,7 @@ public final class KafkaTopics {
 
     /** DRG-487 / BC-13-03. Advisory solution derived from a guided selling session. */
     public static final String SOLUTION_DERIVED = "cpq.crm.opportunity.solution-derived";
+
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
 }

@@ -19,6 +19,7 @@ import com.opencrm.common.event.dto.ProductRetiredEvent;
 import com.opencrm.common.event.dto.ProductRevisedEvent;
 import com.opencrm.common.event.dto.QuoteAcceptedEvent;
 import com.opencrm.common.event.dto.RampAppliedEvent;
+import com.opencrm.common.event.dto.RoleAssignedEvent;
 import com.opencrm.common.event.dto.SolutionDerivedEvent;
 import com.opencrm.common.event.dto.SubscriptionRenewalEligibleEvent;
 import com.opencrm.common.event.dto.TerritoryAssignedEvent;
@@ -214,6 +215,10 @@ public final class EventContractRegistry {
     public static final EventContract SOLUTION_DERIVED_V1 = published(
             "SolutionDerived", "crm-service", KafkaTopics.SOLUTION_DERIVED, SolutionDerivedEvent.class);
 
+    /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
+    public static final EventContract ROLE_ASSIGNED_V1 = published(
+            "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -246,7 +251,8 @@ public final class EventContractRegistry {
             HIERARCHY_CHANGED_V1,
             TERRITORY_ASSIGNED_V1,
             ACCOUNTS_MERGED_V1,
-            SOLUTION_DERIVED_V1);
+            SOLUTION_DERIVED_V1,
+            ROLE_ASSIGNED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {
