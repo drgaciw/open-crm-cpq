@@ -63,6 +63,12 @@ CREATE TABLE role_assignments (
 CREATE INDEX idx_role_assignments_principal_active ON role_assignments(principal_id) WHERE revoked_at IS NULL;
 CREATE INDEX idx_role_assignments_role ON role_assignments(role_id);
 
+-- A principal can hold at most one ACTIVE assignment of a given role (revoking and re-assigning is fine; two
+-- concurrent AssignRole calls for the same (principal, role) are not: the database, not the race-prone
+-- read-then-insert in RoleAssignmentService, is what makes findActiveAssignment's single-result query safe).
+CREATE UNIQUE INDEX uk_role_assignments_principal_role_active
+    ON role_assignments(principal_id, role_id) WHERE revoked_at IS NULL;
+
 -- Outbox events table for Transactional Outbox pattern (ADR-018). Same baseline every service starts from.
 CREATE TABLE outbox_events (
     id BIGSERIAL PRIMARY KEY,
