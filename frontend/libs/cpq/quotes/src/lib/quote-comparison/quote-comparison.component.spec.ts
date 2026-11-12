@@ -44,11 +44,23 @@ describe('QuoteComparisonComponent', () => {
     expect(component.baselineName()).toBe('Q-1');
   });
 
-  it('marks primary and reloads server-authoritative alternatives', () => {
+  it('marks primary, emits primaryChanged, and reloads server-authoritative alternatives', () => {
+    const primaryChanged = vi.fn();
+    component.primaryChanged.subscribe(primaryChanged);
     component.load();
     component.markPrimary(2);
     expect(service.markPrimary).toHaveBeenCalledWith(2);
+    expect(primaryChanged).toHaveBeenCalledTimes(1);
     expect(service.compare).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not emit primaryChanged when markPrimary fails', () => {
+    const primaryChanged = vi.fn();
+    component.primaryChanged.subscribe(primaryChanged);
+    component.load();
+    service.markPrimary.mockReturnValueOnce(throwError(() => new Error('forbidden')));
+    component.markPrimary(2);
+    expect(primaryChanged).not.toHaveBeenCalled();
   });
 
   it('shows failure and allows retry', () => {

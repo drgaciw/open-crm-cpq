@@ -230,6 +230,12 @@ describe('QuotesDetailComponent', () => {
     expect(compiled.textContent).toContain('cust-acme');
   });
 
+  it('refreshAfterPrimaryChange reloads the displayed quote via getById', () => {
+    getByIdSpy.mockClear();
+    component.refreshAfterPrimaryChange();
+    expect(getByIdSpy).toHaveBeenCalledWith(1);
+  });
+
   it('lists line items from quote.lineItems', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('prod-0');
