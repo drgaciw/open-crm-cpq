@@ -13,6 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.util.Optional;
 
@@ -69,6 +72,44 @@ class PermissionGrantServiceTest {
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(ACTION, RESOURCE));
         verify(roleRepository).save(role);
         verify(authorizationQueryService).evictAll();
+    }
+
+    @Test
+    @DisplayName("Inside a transaction, GrantPermission clears the cache only after commit, never before")
+    void grantPermissionEvictsOnlyAfterCommit() {
+        stubNewPermissionGrant();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.grantPermission(new GrantPermissionCommand(ROLE_NAME, ACTION, RESOURCE));
+            verify(authorizationQueryService, never()).evictAll();
+
+            TransactionSynchronizationUtils.triggerAfterCommit();
+            verify(authorizationQueryService).evictAll();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("A rolled-back GrantPermission changed nothing, so it clears nothing")
+    void grantPermissionRolledBackDoesNotEvict() {
+        stubNewPermissionGrant();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.grantPermission(new GrantPermissionCommand(ROLE_NAME, ACTION, RESOURCE));
+            TransactionSynchronizationUtils.triggerAfterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        verify(authorizationQueryService, never()).evictAll();
+    }
+
+    private void stubNewPermissionGrant() {
+        when(roleRepository.findByName(ROLE_NAME)).thenReturn(Optional.of(Role.builder().name(ROLE_NAME).build()));
+        when(permissionRepository.findByActionAndResource(ACTION, RESOURCE)).thenReturn(Optional.empty());
+        when(permissionRepository.save(any(Permission.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
