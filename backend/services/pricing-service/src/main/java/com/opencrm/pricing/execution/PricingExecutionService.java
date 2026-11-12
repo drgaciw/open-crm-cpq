@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -70,6 +71,14 @@ public class PricingExecutionService {
 
     /** Default off. Spring sets this from {@link RampPricingProperties}. Tests may set it directly. */
     private boolean rampEnabled;
+
+    private Clock clock = Clock.systemUTC();
+
+    /** Pin this to the recorded execution instant when replaying with recorded dependencies. */
+    @Autowired
+    public void setClock(Clock clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
 
     private int maxPeriods = 36;
     private int migrationWindowMonths = 12;
@@ -148,7 +157,7 @@ public class PricingExecutionService {
     }
 
     private PricingResult executeInternal(PricingContext context, boolean persistAudit) {
-        long startTime = System.currentTimeMillis();
+        long startTime = clock.millis();
 
         try {
             // 1. Validate context
@@ -167,7 +176,7 @@ public class PricingExecutionService {
 
             // 3. Find active RuleSet
             List<RuleSet> activeRuleSets = ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(
-                    RuleSetStatus.ACTIVE, LocalDate.now());
+                    RuleSetStatus.ACTIVE, LocalDate.now(clock));
 
             if (activeRuleSets.isEmpty()) {
                 log.warn("No active rule sets found, executing with default pricing");
@@ -353,7 +362,7 @@ public class PricingExecutionService {
                 if (!result.getExplanationCodes().contains(code)) result.getExplanationCodes().add(code);
             }
 
-            long executionTime = System.currentTimeMillis() - startTime;
+            long executionTime = Math.max(0L, clock.millis() - startTime);
             result.setExecutionTimeMs(executionTime);
 
             // 13. Persist audit log for execute mode only
@@ -366,7 +375,6 @@ public class PricingExecutionService {
         } catch (BusinessException e) {
             throw e; // Let GlobalExceptionHandler map to proper HTTP status
         } catch (Exception e) {
-            long executionTime = System.currentTimeMillis() - startTime;
             log.error("Unexpected error during pricing execution for customer {}: {}",
                     context.getCustomerExternalId(), e.getMessage(), e);
             throw new BusinessException(
@@ -508,6 +516,8 @@ public class PricingExecutionService {
                     .ruleSetId(ruleSet != null ? ruleSet.getId() : null)
                     .inputSnapshot(inputSnapshot)
                     .outputSnapshot(outputSnapshot)
+                    .waterfallTrace(objectMapper.writeValueAsString(result.getWaterfall()))
+                    .executedAt(clock.instant())
                     .executionTimeMs(executionTime)
                     .build();
 
@@ -517,6 +527,7 @@ public class PricingExecutionService {
         } catch (JsonProcessingException e) {
             log.error("AUDIT_INTEGRITY_FAILURE: Failed to serialize audit log for quote {}: {}",
                     context.getQuoteExternalId(), e.getMessage(), e);
+            throw new BusinessException("Pricing audit could not be serialized", "AUDIT_PERSISTENCE_FAILED");
         } catch (Exception e) {
             log.error("AUDIT_INTEGRITY_FAILURE: Failed to persist audit log for quote {}: {}",
                     context.getQuoteExternalId(), e.getMessage(), e);

@@ -26,6 +26,8 @@ public final class KafkaTopics {
 
     // Configuration Events
     public static final String CONFIGURATION_COMMITTED = "cpq.configuration.committed";
+    /** DRG-424 / BC-02-01. Emitted when a configuration session is started (StartSession). */
+    public static final String CONFIGURATION_SESSION_STARTED = "cpq.configuration.session.started";
 
     // Pricing Events
     public static final String DISCOUNT_APPROVAL_REQUIRED = "cpq.discount.approval.required";
@@ -77,6 +79,9 @@ public final class KafkaTopics {
 
     /** DRG-487 / BC-13-03. Advisory solution derived from a guided selling session. */
     public static final String SOLUTION_DERIVED = "cpq.crm.opportunity.solution-derived";
+
+    /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
+    public static final String POLICY_DEFINED = "cpq.approval.policy.defined";
 
     /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
     public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
