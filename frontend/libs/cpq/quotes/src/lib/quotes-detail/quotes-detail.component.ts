@@ -37,6 +37,7 @@ import {
   QuoteLineItemDto,
 } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
+import { QuoteComparisonComponent } from '../quote-comparison/quote-comparison.component';
 import { QuoteDocumentsPanelComponent } from '../quote-documents-panel/quote-documents-panel.component';
 import { QuoteHeaderEditComponent } from '../quote-header-edit/quote-header-edit.component';
 import { QuoteRampEditorComponent } from '../quote-ramp-editor/quote-ramp-editor.component';
@@ -83,6 +84,7 @@ function httpErrorMessage(err: unknown): string {
     EmptyStateComponent,
     CurrencyFormatPipe,
     QuoteDocumentsPanelComponent,
+    QuoteComparisonComponent,
     QuoteHeaderEditComponent,
     QuoteRampEditorComponent,
   ],
@@ -379,6 +381,10 @@ function httpErrorMessage(err: unknown): string {
             </div>
           </mat-card-content>
         </mat-card>
+
+        @if (quote.dealExternalId; as opportunityId) {
+          <cpq-quote-comparison [dealExternalId]="opportunityId" (primaryChanged)="refreshAfterPrimaryChange()" />
+        }
 
         <cpq-quote-header-edit
           [quote]="quote"
@@ -1282,6 +1288,13 @@ export class QuotesDetailComponent {
   numericId(): number | null {
     const numericId = Number(this.id());
     return Number.isFinite(numericId) ? numericId : null;
+  }
+
+  refreshAfterPrimaryChange(): void {
+    const quoteId = this.numericId();
+    if (quoteId !== null) {
+      this.quoteService.getById(quoteId);
+    }
   }
 
   private load(): void {

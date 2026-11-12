@@ -53,7 +53,7 @@ class RampCompoundingMigrationIntegrationTest {
             assertThat(insertStep.executeUpdate()).isEqualTo(1);
         }
 
-        migrations(null).migrate();
+        migrations("1.16").migrate();
         try (var connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              var statement = connection.createStatement()) {
             try (var row = statement.executeQuery("select ramp_escalator_compounding from quote.quote_line_items")) {
@@ -68,9 +68,9 @@ class RampCompoundingMigrationIntegrationTest {
                 assertThat(row.wasNull()).isFalse();
             }
         }
-        // Latest applied version is V1_18 (quote valid_until). V1_17 is reserved for DRG-452 (#983)
-        // and is not in this branch, so Flyway's current version skips 1.17.
-        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.18"));
+        migrations(null).migrate();
+        // Latest applied version is V1_19 (quote primary flag). V1_18 (valid_until) already landed on main.
+        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.19"));
 
         String rollback;
         try (var migration = getClass().getResourceAsStream("/db/migration/V1_16__ramp_escalator_compounding.sql")) {

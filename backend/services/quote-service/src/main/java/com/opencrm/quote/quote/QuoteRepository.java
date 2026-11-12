@@ -14,6 +14,11 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, JpaSpecific
 
     Optional<Quote> findByIdAndDeletedFalse(Long id);
 
+    Optional<Quote> findByIdAndTenantIdAndDeletedFalse(Long id, String tenantId);
+
+    java.util.List<Quote> findByTenantIdAndDealExternalIdAndDeletedFalseOrderByIdAsc(
+            String tenantId, String dealExternalId);
+
     Optional<Quote> findByUuidAndDeletedFalse(String uuid);
 
     Optional<Quote> findByQuoteNumberAndDeletedFalse(String quoteNumber);
