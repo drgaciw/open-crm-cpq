@@ -86,6 +86,8 @@ class EventContractRegistryTest {
         expected.put("cpq.subscription.renewal.eligible",
                 "SubscriptionRenewalEligible v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.configuration.committed", "ConfigurationCommitted v1, configuration-engine, PUBLISHED");
+        expected.put("cpq.configuration.session.started",
+                "ConfigurationSessionStarted v1, configuration-engine, PUBLISHED");
         expected.put("cpq.quote.approval.rejected", "QuoteApprovalRejected v1, approval-routing, PUBLISHED");
         expected.put("cpq.price.calculated", "PriceCalculated v1, pricing-service, RESERVED");
         expected.put("cpq.contract.executed", "ContractExecuted v1, contract-asset-management, RESERVED");
