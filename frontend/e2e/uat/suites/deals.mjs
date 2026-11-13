@@ -133,6 +133,19 @@ export default {
       return `organization link -> /organizations/${org.id}`;
     });
 
+    // UI-CRM-SLDS Phase 3: deal probability advisory is out of scope for Jev (ADR-015) — the
+    // agent panel must stay visible and explicitly labelled 'disabled', never silently omitted.
+    await runCheck(ctx, 'deals.detail.agent-panel-disabled-and-labelled', async () => {
+      await openDeal(page, full, 'PROSPECTING');
+      const panel = page.getByTestId('agent-panel');
+      await panel.waitFor({ state: 'visible' });
+      const text = (await panel.innerText()).replace(/\s+/g, ' ');
+      if (!/out of scope for Jev advisory/i.test(text)) {
+        throw new Error(`disabled-state copy not found in agent panel: "${text.slice(0, 160)}"`);
+      }
+      return 'agent panel disabled + labelled (ADR-015)';
+    });
+
     const bare = await ensure(ctx, 'deal', { amount: null });
     await runCheck(ctx, 'deals.detail.empty-state-texts', async () => {
       await openDeal(page, bare, 'PROSPECTING');
@@ -228,6 +241,12 @@ export default {
       await waitUntil(() => searchBox(page).inputValue(), (value) => value === '', {
         describe: (value) => `search box still holds "${value}" after Clear`,
       });
+    });
+
+    // UI-CRM-SLDS Phase 2: the list renders the shared DataTableComponent, not a raw mat-table.
+    await runCheck(ctx, 'deals.list.uses-shared-data-table', async () => {
+      await findRow(page, full.name);
+      await page.getByTestId('data-table').waitFor({ state: 'visible', timeout: 5000 });
     });
 
     await runCheck(ctx, 'deals.row.click-opens-detail', async () => {

@@ -19,6 +19,7 @@ import { launch, goto, BASE } from './lib/browser.mjs';
 import { safeLinks, linkCriteria, observeDialog, assertUnchanged } from './lib/observe.mjs';
 import { createDecider, choice, noul } from './lib/decide.mjs';
 import { createReport } from './lib/report.mjs';
+import { runPreflight, blockedReason } from './lib/preflight.mjs';
 
 const SKU = `UAT-JEV-${Date.now()}`;
 const MIN_CONFIDENCE = Number(process.env.UAT_MIN_CONFIDENCE) || 0.9;
@@ -202,12 +203,21 @@ try {
     report.pass(`navigate: ${goal}`, landed);
   }
 
-  createStatus = await createProduct(page);
-  report.pass('product created', `HTTP ${createStatus}`);
+  // Product catalog mutations need product-service. CRM-only local stacks often leave CPQ
+  // backends down (AGENTS.md); treat that as BLOCKED, not FAIL — same preflight pattern as uat-full.
+  const preflight = await runPreflight(page.request);
+  const productBlocked = blockedReason(preflight, 'product');
+  if (productBlocked) {
+    report.blocked('product created', productBlocked);
+    report.blocked('product persisted', productBlocked);
+  } else {
+    createStatus = await createProduct(page);
+    report.pass('product created', `HTTP ${createStatus}`);
 
-  created = await verifyPersisted(page);
-  if (created) report.pass('product persisted', SKU);
-  else report.fail('product persisted', `SKU ${SKU} absent after reload`);
+    created = await verifyPersisted(page);
+    if (created) report.pass('product persisted', SKU);
+    else report.fail('product persisted', `SKU ${SKU} absent after reload`);
+  }
 } catch (error) {
   report.fail('fatal', String(error.message || error));
 } finally {

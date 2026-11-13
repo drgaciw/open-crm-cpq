@@ -60,7 +60,7 @@ const ACTIONS_COLUMN_KEY = '__actions';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="data-table-container">
+    <div class="data-table-container" data-testid="data-table">
       @if (loading()) {
         <div class="loading-overlay" role="status" aria-live="polite" aria-label="Loading">
           <mat-spinner diameter="50"></mat-spinner>

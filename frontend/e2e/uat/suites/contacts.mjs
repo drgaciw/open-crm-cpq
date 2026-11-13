@@ -168,6 +168,12 @@ export default {
       return text.slice(0, 100);
     });
 
+    // UI-CRM-SLDS Phase 2: the list renders the shared DataTableComponent, not a raw mat-table.
+    await runCheck(ctx, 'contacts.list.uses-shared-data-table', async () => {
+      await findRow(page, full.lastName);
+      await page.getByTestId('data-table').waitFor({ state: 'visible', timeout: 5000 });
+    });
+
     await runCheck(ctx, 'contacts.list.empty-cells-render-dash', async () => {
       const row = await findRow(page, bare.lastName);
       const cells = (await row.getByRole('cell').allInnerTexts()).map((t) => t.trim());

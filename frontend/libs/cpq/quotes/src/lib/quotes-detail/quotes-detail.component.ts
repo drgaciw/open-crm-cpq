@@ -8,20 +8,24 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import {
   FormBuilder,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTabsModule } from '@angular/material/tabs';
 import {
   AdvisorySuggestionComponent,
   AgentPanelComponent,
@@ -32,6 +36,7 @@ import {
   PageHeaderComponent,
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
+import { NotificationService } from '@frontend/shared-data-access';
 import {
   APPROVAL_TIER_LABELS,
   JevSuggestionEnvelope,
@@ -76,11 +81,13 @@ function httpErrorMessage(err: unknown): string {
     AgentPanelComponent,
     MatButtonModule,
     MatCardModule,
+    MatCheckboxModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
     MatMenuModule,
     MatProgressSpinnerModule,
+    MatTabsModule,
     PageHeaderComponent,
     StatusBadgeComponent,
     EmptyStateComponent,
@@ -265,6 +272,28 @@ function httpErrorMessage(err: unknown): string {
             </button>
           </mat-menu>
         </div>
+        <div highlights class="quote-highlights">
+          <div class="highlight">
+            <span class="highlight-label">Status</span>
+            <app-status-badge [status]="quote.status" type="quote" />
+          </div>
+          <div class="highlight">
+            <span class="highlight-label">Total</span>
+            <span class="highlight-value">{{
+              quote.totalAmount !== null && quote.totalAmount !== undefined
+                ? (quote.totalAmount | currencyFormat: quote.currency || 'USD')
+                : '—'
+            }}</span>
+          </div>
+          <div class="highlight">
+            <span class="highlight-label">ARR</span>
+            <span class="highlight-value">{{
+              quote.arr !== null && quote.arr !== undefined
+                ? (quote.arr | currencyFormat: quote.currency || 'USD')
+                : '—'
+            }}</span>
+          </div>
+        </div>
       </app-page-header>
 
       @if (canSubmit()) {
@@ -331,260 +360,307 @@ function httpErrorMessage(err: unknown): string {
             @for (reason of governance.reasons ?? []; track $index) { <p>{{ reason }}</p> }
           </section>
         }
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>Quote details</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="label">Status</span>
-                <app-status-badge [status]="quote.status" type="quote" />
-              </div>
-              <div class="info-item">
-                <span class="label">Deal type</span>
-                <span class="value">{{ quote.dealType || '—' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Customer</span>
-                <span class="value">{{ quote.customerExternalId }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Deal</span>
-                <span class="value">{{ quote.dealExternalId || '—' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Total amount</span>
-                <span class="value">{{
-                  quote.totalAmount !== null && quote.totalAmount !== undefined
-                    ? (quote.totalAmount | currencyFormat: quote.currency || 'USD')
-                    : '—'
-                }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">ARR</span>
-                <span class="value">{{
-                  quote.arr !== null && quote.arr !== undefined
-                    ? (quote.arr | currencyFormat: quote.currency || 'USD')
-                    : '—'
-                }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Duration</span>
-                <span class="value">{{ quote.durationInMonths }} months</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Region</span>
-                <span class="value">{{ quote.region || '—' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="label">Line items</span>
-                <span class="value">{{ lineItemCount() }}</span>
-              </div>
-              <div class="info-item full-width">
-                <span class="label">Description</span>
-                <span class="value">{{ quote.description || '—' }}</span>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-
         <cpq-quote-header-edit
           [quote]="quote"
           [editable]="canEditLines()"
           (saved)="onHeaderSaved()"
         />
 
-        <mat-card class="line-item-card">
-          <mat-card-header>
-            <mat-card-title>Line items</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            @if (lineItems().length === 0) {
-              <p class="empty-lines">No line items yet.</p>
-            } @else {
-              <div class="line-table" role="table">
-                <div class="line-row line-head" role="row">
-                  <span role="columnheader">Product</span>
-                  <span role="columnheader">Name</span>
-                  <span role="columnheader">Qty</span>
-                  <span role="columnheader">List price</span>
-                  <span role="columnheader">Net</span>
-                  <span role="columnheader">Actions</span>
-                </div>
-                @for (line of lineItems(); track line.id) {
-                  <div class="line-row" role="row">
-                    @if (editingLineId() === line.id) {
-                      <span role="cell">{{ line.productExternalId }}</span>
-                      <span role="cell">
-                        <mat-form-field appearance="outline" class="edit-field">
-                          <mat-label>Name</mat-label>
-                          <input matInput [formControl]="editForm.controls.productName" />
-                        </mat-form-field>
-                      </span>
-                      <span role="cell">
-                        <mat-form-field appearance="outline" class="edit-field narrow">
-                          <mat-label>Qty</mat-label>
-                          <input
-                            matInput
-                            type="number"
-                            min="1"
-                            [formControl]="editForm.controls.quantity"
-                          />
-                        </mat-form-field>
-                      </span>
-                      <span role="cell">
-                        <mat-form-field appearance="outline" class="edit-field">
-                          <mat-label>List price</mat-label>
-                          <input
-                            matInput
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            [formControl]="editForm.controls.listPrice"
-                          />
-                        </mat-form-field>
-                      </span>
-                      <span role="cell">{{
-                        line.netPrice !== null && line.netPrice !== undefined
-                          ? (line.netPrice | currencyFormat: quote.currency || 'USD')
-                          : '—'
-                      }}</span>
-                      <span role="cell" class="line-actions">
+        <mat-tab-group class="quote-tabs" animationDuration="0ms">
+          <mat-tab label="Lines">
+            <div class="tab-panel">
+              <mat-card class="line-item-card">
+                <mat-card-header>
+                  <mat-card-title>Line items</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  @if (lineItems().length === 0) {
+                    <p class="empty-lines">No line items yet.</p>
+                  } @else {
+                    <div class="line-table" role="table" data-testid="quote-lines-table">
+                      <div class="line-row line-head" [class.with-select]="canEditLines()" role="row">
+                        @if (canEditLines()) {
+                          <span role="columnheader" class="select-col">
+                            <mat-checkbox
+                              [checked]="allLinesSelected()"
+                              (change)="toggleSelectAllLines()"
+                              aria-label="Select all line items"
+                            ></mat-checkbox>
+                          </span>
+                        }
+                        <span role="columnheader">Product</span>
+                        <span role="columnheader">Name</span>
+                        <span role="columnheader">Qty</span>
+                        <span role="columnheader">List price</span>
+                        <span role="columnheader">Net</span>
+                        <span role="columnheader">Actions</span>
+                      </div>
+                      @for (line of lineItems(); track line.id) {
+                        <div class="line-row" [class.with-select]="canEditLines()" role="row">
+                          @if (canEditLines()) {
+                            <span role="cell" class="select-col">
+                              <mat-checkbox
+                                [checked]="selectedLineIds().has(line.id)"
+                                (change)="toggleLineSelection(line)"
+                                [attr.aria-label]="'Select line ' + (line.productName || line.productExternalId)"
+                              ></mat-checkbox>
+                            </span>
+                          }
+                          @if (editingLineId() === line.id) {
+                            <span role="cell">{{ line.productExternalId }}</span>
+                            <span role="cell">
+                              <mat-form-field appearance="outline" class="edit-field">
+                                <mat-label>Name</mat-label>
+                                <input matInput [formControl]="editForm.controls.productName" />
+                              </mat-form-field>
+                            </span>
+                            <span role="cell">
+                              <mat-form-field appearance="outline" class="edit-field narrow">
+                                <mat-label>Qty</mat-label>
+                                <input
+                                  matInput
+                                  type="number"
+                                  min="1"
+                                  [formControl]="editForm.controls.quantity"
+                                />
+                              </mat-form-field>
+                            </span>
+                            <span role="cell">
+                              <mat-form-field appearance="outline" class="edit-field">
+                                <mat-label>List price</mat-label>
+                                <input
+                                  matInput
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  [formControl]="editForm.controls.listPrice"
+                                />
+                              </mat-form-field>
+                            </span>
+                            <span role="cell">{{
+                              line.netPrice !== null && line.netPrice !== undefined
+                                ? (line.netPrice | currencyFormat: quote.currency || 'USD')
+                                : '—'
+                            }}</span>
+                            <span role="cell" class="line-actions">
+                              <button
+                                mat-button
+                                color="primary"
+                                type="button"
+                                (click)="onSaveLineEdit(line)"
+                                [disabled]="editForm.invalid || actionBusy()"
+                              >
+                                Save
+                              </button>
+                              <button
+                                mat-button
+                                type="button"
+                                (click)="cancelLineEdit()"
+                                [disabled]="actionBusy()"
+                              >
+                                Cancel
+                              </button>
+                            </span>
+                          } @else {
+                            <span role="cell">{{ line.productExternalId }}</span>
+                            <span role="cell">{{ line.productName || '—' }}</span>
+                            <span role="cell">{{ line.quantity }}</span>
+                            <span role="cell">{{
+                              line.listPrice !== null && line.listPrice !== undefined
+                                ? (line.listPrice | currencyFormat: quote.currency || 'USD')
+                                : '—'
+                            }}</span>
+                            <span role="cell">{{
+                              line.netPrice !== null && line.netPrice !== undefined
+                                ? (line.netPrice | currencyFormat: quote.currency || 'USD')
+                                : '—'
+                            }}</span>
+                            <span role="cell" class="line-actions">
+                              @if (canEditLines()) {
+                                <button
+                                  mat-button
+                                  type="button"
+                                  (click)="startLineEdit(line)"
+                                  [disabled]="actionBusy()"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  mat-button
+                                  color="warn"
+                                  type="button"
+                                  (click)="onRemoveLineItem(line)"
+                                  [disabled]="actionBusy()"
+                                >
+                                  Remove
+                                </button>
+                              } @else {
+                                <span class="muted">—</span>
+                              }
+                            </span>
+                          }
+                        </div>
+                      }
+                    </div>
+                    @if (canEditLines() && selectedLineIds().size > 0) {
+                      <div class="bulk-actions" data-testid="quote-lines-bulk-actions">
+                        <span>{{ selectedLineIds().size }} selected</span>
                         <button
-                          mat-button
-                          color="primary"
+                          mat-stroked-button
+                          color="warn"
                           type="button"
-                          (click)="onSaveLineEdit(line)"
-                          [disabled]="editForm.invalid || actionBusy()"
-                        >
-                          Save
-                        </button>
-                        <button
-                          mat-button
-                          type="button"
-                          (click)="cancelLineEdit()"
+                          (click)="onRemoveSelectedLines()"
                           [disabled]="actionBusy()"
                         >
-                          Cancel
+                          <mat-icon>delete_sweep</mat-icon>
+                          Remove selected
                         </button>
-                      </span>
-                    } @else {
-                      <span role="cell">{{ line.productExternalId }}</span>
-                      <span role="cell">{{ line.productName || '—' }}</span>
-                      <span role="cell">{{ line.quantity }}</span>
-                      <span role="cell">{{
-                        line.listPrice !== null && line.listPrice !== undefined
-                          ? (line.listPrice | currencyFormat: quote.currency || 'USD')
-                          : '—'
-                      }}</span>
-                      <span role="cell">{{
-                        line.netPrice !== null && line.netPrice !== undefined
-                          ? (line.netPrice | currencyFormat: quote.currency || 'USD')
-                          : '—'
-                      }}</span>
-                      <span role="cell" class="line-actions">
-                        @if (canEditLines()) {
-                          <button
-                            mat-button
-                            type="button"
-                            (click)="startLineEdit(line)"
-                            [disabled]="actionBusy()"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            mat-button
-                            color="warn"
-                            type="button"
-                            (click)="onRemoveLineItem(line)"
-                            [disabled]="actionBusy()"
-                          >
-                            Remove
-                          </button>
-                        } @else {
-                          <span class="muted">—</span>
-                        }
-                      </span>
+                      </div>
                     }
+                  }
+                </mat-card-content>
+              </mat-card>
+
+              @if (canEditLines()) {
+                <mat-card class="line-item-card">
+                  <mat-card-header>
+                    <mat-card-title>Add line item</mat-card-title>
+                  </mat-card-header>
+                  <mat-card-content>
+                    <form class="line-form" [formGroup]="lineForm" (ngSubmit)="onAddLineItem()">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Product external ID</mat-label>
+                        <input matInput formControlName="productExternalId" autocomplete="off" />
+                        @if (
+                          lineForm.controls.productExternalId.hasError('required') &&
+                          lineForm.controls.productExternalId.touched
+                        ) {
+                          <mat-error>Required</mat-error>
+                        }
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Product name</mat-label>
+                        <input matInput formControlName="productName" autocomplete="off" />
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>List price</mat-label>
+                        <input matInput type="number" formControlName="listPrice" min="0" step="0.01" />
+                        @if (
+                          lineForm.controls.listPrice.hasError('required') &&
+                          lineForm.controls.listPrice.touched
+                        ) {
+                          <mat-error>Required</mat-error>
+                        }
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Quantity</mat-label>
+                        <input matInput type="number" formControlName="quantity" min="1" />
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="notes-field">
+                        <mat-label>Notes</mat-label>
+                        <input matInput formControlName="notes" autocomplete="off" />
+                      </mat-form-field>
+                      <button
+                        mat-stroked-button
+                        color="primary"
+                        type="submit"
+                        [disabled]="lineForm.invalid || actionBusy()"
+                      >
+                        <mat-icon>add</mat-icon>
+                        Add line
+                      </button>
+                    </form>
+                  </mat-card-content>
+                </mat-card>
+              }
+            </div>
+          </mat-tab>
+
+          <mat-tab label="Pricing">
+            <div class="tab-panel">
+              <mat-card>
+                <mat-card-header>
+                  <mat-card-title>Quote details</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <span class="label">Status</span>
+                      <app-status-badge [status]="quote.status" type="quote" />
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Deal type</span>
+                      <span class="value">{{ quote.dealType || '—' }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Customer</span>
+                      <span class="value">{{ quote.customerExternalId }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Deal</span>
+                      <span class="value">{{ quote.dealExternalId || '—' }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Total amount</span>
+                      <span class="value">{{
+                        quote.totalAmount !== null && quote.totalAmount !== undefined
+                          ? (quote.totalAmount | currencyFormat: quote.currency || 'USD')
+                          : '—'
+                      }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">ARR</span>
+                      <span class="value">{{
+                        quote.arr !== null && quote.arr !== undefined
+                          ? (quote.arr | currencyFormat: quote.currency || 'USD')
+                          : '—'
+                      }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Duration</span>
+                      <span class="value">{{ quote.durationInMonths }} months</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Region</span>
+                      <span class="value">{{ quote.region || '—' }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Line items</span>
+                      <span class="value">{{ lineItemCount() }}</span>
+                    </div>
+                    <div class="info-item full-width">
+                      <span class="label">Description</span>
+                      <span class="value">{{ quote.description || '—' }}</span>
+                    </div>
                   </div>
-                }
-              </div>
-            }
-          </mat-card-content>
-        </mat-card>
+                </mat-card-content>
+              </mat-card>
 
-        <cpq-quote-ramp-editor
-          [quoteId]="numericId()"
-          [lines]="lineItems()"
-          [durationInMonths]="quote.durationInMonths"
-          [quoteVersion]="quote.version ?? null"
-          [currency]="quote.currency || 'USD'"
-          [editable]="canEditLines()"
-          [tcv]="quote.tcv ?? null"
-          [acv]="quote.acv ?? null"
-          [exitArr]="quote.exitArr ?? null"
-        />
+              <cpq-quote-ramp-editor
+                [quoteId]="numericId()"
+                [lines]="lineItems()"
+                [durationInMonths]="quote.durationInMonths"
+                [quoteVersion]="quote.version ?? null"
+                [currency]="quote.currency || 'USD'"
+                [editable]="canEditLines()"
+                [tcv]="quote.tcv ?? null"
+                [acv]="quote.acv ?? null"
+                [exitArr]="quote.exitArr ?? null"
+              />
+            </div>
+          </mat-tab>
 
-        @if (canEditLines()) {
-          <mat-card class="line-item-card">
-            <mat-card-header>
-              <mat-card-title>Add line item</mat-card-title>
-            </mat-card-header>
-            <mat-card-content>
-              <form class="line-form" [formGroup]="lineForm" (ngSubmit)="onAddLineItem()">
-                <mat-form-field appearance="outline">
-                  <mat-label>Product external ID</mat-label>
-                  <input matInput formControlName="productExternalId" autocomplete="off" />
-                  @if (
-                    lineForm.controls.productExternalId.hasError('required') &&
-                    lineForm.controls.productExternalId.touched
-                  ) {
-                    <mat-error>Required</mat-error>
-                  }
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Product name</mat-label>
-                  <input matInput formControlName="productName" autocomplete="off" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>List price</mat-label>
-                  <input matInput type="number" formControlName="listPrice" min="0" step="0.01" />
-                  @if (
-                    lineForm.controls.listPrice.hasError('required') &&
-                    lineForm.controls.listPrice.touched
-                  ) {
-                    <mat-error>Required</mat-error>
-                  }
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Quantity</mat-label>
-                  <input matInput type="number" formControlName="quantity" min="1" />
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="notes-field">
-                  <mat-label>Notes</mat-label>
-                  <input matInput formControlName="notes" autocomplete="off" />
-                </mat-form-field>
-                <button
-                  mat-stroked-button
-                  color="primary"
-                  type="submit"
-                  [disabled]="lineForm.invalid || actionBusy()"
-                >
-                  <mat-icon>add</mat-icon>
-                  Add line
-                </button>
-              </form>
-            </mat-card-content>
-          </mat-card>
-        }
+          <mat-tab label="Documents">
+            <div class="tab-panel">
+              <cpq-quote-documents-panel [quoteId]="numericId()" />
 
-        <cpq-quote-documents-panel [quoteId]="numericId()" />
-
-        <p class="clone-note" role="note">
-          Clone creates a new DRAFT and copies the quote header and line items.
-          Pricing waterfall and ARR are not copied — run Calculate on the clone.
-        </p>
+              <p class="clone-note" role="note">
+                Clone creates a new DRAFT and copies the quote header and line items.
+                Pricing waterfall and ARR are not copied — run Calculate on the clone.
+              </p>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
       </div>
     } @else {
       <app-empty-state
@@ -614,6 +690,32 @@ function httpErrorMessage(err: unknown): string {
       app-agent-panel {
         display: block;
         margin-bottom: 16px;
+      }
+
+      .quote-highlights {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--crm-space-md, 16px) 32px;
+      }
+
+      .quote-highlights .highlight {
+        display: flex;
+        flex-direction: column;
+        gap: var(--crm-space-xs, 4px);
+        min-width: 120px;
+      }
+
+      .highlight-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--crm-color-muted, #757575);
+      }
+
+      .highlight-value {
+        font-size: 15px;
+        color: var(--crm-color-ink, #212121);
       }
       .error-banner {
         display: flex;
@@ -691,6 +793,38 @@ function httpErrorMessage(err: unknown): string {
         align-items: center;
         padding: 8px 4px;
         border-bottom: 1px solid #eeeeee;
+      }
+
+      .line-row.with-select {
+        grid-template-columns: 40px 1.2fr 1.2fr 0.6fr 1fr 1fr 1.2fr;
+      }
+
+      .select-col {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .bulk-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+        padding: 8px 4px;
+        color: var(--crm-color-muted, #757575);
+        font-size: 13px;
+      }
+
+      .quote-tabs {
+        background: var(--crm-color-surface, #fff);
+        border-radius: var(--crm-radius-sm, 8px);
+      }
+
+      .tab-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px 0;
       }
 
       .line-head {
@@ -774,6 +908,7 @@ export class QuotesDetailComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly dialog = inject(MatDialog);
+  private readonly notifications = inject(NotificationService);
 
   /** Route param `:id` (string from Angular router). */
   readonly id = input.required<string>();
@@ -811,6 +946,13 @@ export class QuotesDetailComponent {
   readonly tierLabels: Record<string, string> = APPROVAL_TIER_LABELS;
   readonly editingLineId = signal<number | null>(null);
 
+  /** Bulk-select affordance for line items (Phase 4 workspace recipe); cleared on reload. */
+  readonly selectedLineIds = signal<ReadonlySet<number>>(new Set());
+  readonly allLinesSelected = computed(() => {
+    const ids = this.lineItems().map((line) => line.id);
+    return ids.length > 0 && ids.every((id) => this.selectedLineIds().has(id));
+  });
+
   /** Reload when route `:id` changes (e.g. after clone navigation). */
   private readonly loadOnIdChange = effect(() => {
     const _id = this.id();
@@ -820,8 +962,8 @@ export class QuotesDetailComponent {
     });
   });
 
-  /** Submit only from DRAFT (matches quote-service). */
-  readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT' && !this.rampPricingBlocked());
+  /** Submit only from DRAFT (matches quote-service); also blocked while an open line edit is invalid. */
+  readonly canSubmit = computed(() => this.quote()?.status === 'DRAFT' && !this.rampPricingBlocked() && !this.lineEditInvalid());
 
   /** A bound pending ramp may be amended; the server retires its approval and returns it to DRAFT. */
   readonly canEditLines = computed(() => {
@@ -876,6 +1018,20 @@ export class QuotesDetailComponent {
     quantity: [1 as number | null, Validators.required],
   });
 
+  /**
+   * Signal mirror of `editForm`'s validity (Phase 4 dirty/line-error coordination).
+   * Reactive forms don't expose status as a signal, so this tracks `statusChanges`.
+   */
+  private readonly editFormInvalid = signal(this.editForm.invalid);
+  private readonly editFormStatusSync = this.editForm.statusChanges
+    .pipe(takeUntilDestroyed())
+    .subscribe(() => this.editFormInvalid.set(this.editForm.invalid));
+
+  /** True while an open line edit is invalid; the parent workspace uses this to gate Submit. */
+  readonly lineEditInvalid = computed(
+    () => this.editingLineId() !== null && this.editFormInvalid(),
+  );
+
   goBack(): void {
     void this.router.navigate(['/quotes']);
   }
@@ -898,6 +1054,7 @@ export class QuotesDetailComponent {
     this.runQuoteAction(
       () => this.canCalculate(),
       (id) => this.quoteService.calculate(id),
+      'Pricing recalculated.',
     );
   }
 
@@ -956,6 +1113,7 @@ export class QuotesDetailComponent {
     this.runQuoteAction(
       () => this.canSubmit(),
       (id) => this.quoteService.submit(id),
+      'Quote submitted for review.',
     );
   }
 
@@ -998,6 +1156,7 @@ export class QuotesDetailComponent {
     this.runQuoteAction(
       () => this.canSend(),
       (id) => this.quoteService.send(id),
+      'Quote sent to customer.',
     );
   }
 
@@ -1285,6 +1444,7 @@ export class QuotesDetailComponent {
   private runQuoteAction(
     canRun: () => boolean,
     call: (id: number) => ReturnType<QuoteService['approve']>,
+    successMessage?: string,
   ): void {
     if (!canRun() || this.actionBusy()) {
       return;
@@ -1300,6 +1460,56 @@ export class QuotesDetailComponent {
         this.quoteService.selectedQuote.set(updated);
         this.editingLineId.set(null);
         this.actionBusy.set(false);
+        if (successMessage) {
+          this.notifications.success(successMessage);
+        }
+      },
+      error: (err) => {
+        this.actionBusy.set(false);
+        this.actionError.set(httpErrorMessage(err));
+      },
+    });
+  }
+
+  /** Toggle a single line in the bulk-select set (Phase 4 workspace recipe). */
+  toggleLineSelection(line: QuoteLineItemDto): void {
+    this.selectedLineIds.update((ids) => {
+      const next = new Set(ids);
+      if (next.has(line.id)) {
+        next.delete(line.id);
+      } else {
+        next.add(line.id);
+      }
+      return next;
+    });
+  }
+
+  /** Select or clear every currently loaded line item. */
+  toggleSelectAllLines(): void {
+    if (this.allLinesSelected()) {
+      this.selectedLineIds.set(new Set());
+      return;
+    }
+    this.selectedLineIds.set(new Set(this.lineItems().map((line) => line.id)));
+  }
+
+  /** Remove every selected line in one bulk action, then reload. */
+  onRemoveSelectedLines(): void {
+    if (!this.canEditLines() || this.actionBusy() || this.selectedLineIds().size === 0) {
+      return;
+    }
+    const numericId = this.numericId();
+    if (numericId == null) {
+      return;
+    }
+    const ids = Array.from(this.selectedLineIds());
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    forkJoin(ids.map((id) => this.quoteService.removeLineItem(numericId, id))).subscribe({
+      next: () => {
+        this.selectedLineIds.set(new Set());
+        this.actionBusy.set(false);
+        this.quoteService.getById(numericId);
       },
       error: (err) => {
         this.actionBusy.set(false);
@@ -1317,6 +1527,7 @@ export class QuotesDetailComponent {
   private load(): void {
     this.actionError.set(null);
     this.editingLineId.set(null);
+    this.selectedLineIds.set(new Set());
     const numericId = this.numericId();
     if (numericId == null) {
       this.quoteService.selectedQuote.set(null);

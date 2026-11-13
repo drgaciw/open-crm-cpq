@@ -29,7 +29,11 @@ export const list = validateSpec({
   subtitle: 'Track your sales pipeline',
   backend: 'crm',
   sidebar: 'Deals',
-  searchPlaceholder: 'Search deals...',
+  // deal-list.component.ts renders "Search opportunities..." (matches the page title
+  // "Opportunities" and docs/design/UI-CRM-SLDS-design-contract.md — "Opportunities (deals)").
+  // "Search deals..." never matched the live input and silently broke every list check that
+  // locates the search box by this placeholder (search/clear/row-click/tabs/row-menu/etc).
+  searchPlaceholder: 'Search opportunities...',
   actions: [
     { name: 'Kanban', in: 'header', navigatesTo: '/deals/kanban' },
     { name: 'New Deal', in: 'header', navigatesTo: '/deals/new' },
