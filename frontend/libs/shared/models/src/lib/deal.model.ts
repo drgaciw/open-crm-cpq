@@ -1,3 +1,5 @@
+import { CRM_STATUS_TONES } from './status-tokens';
+
 /**
  * Mirrors: com.opencrm.crm.deal.DealStage
  */
@@ -20,9 +22,15 @@ export type DealType =
   | 'UPSELL'
   | 'CROSS_SELL';
 
+/** Solid fills for kanban / pipeline bars — CSS vars from UI-CRM-SLDS tokens. */
 export const STAGE_COLORS: Record<string, string> = {
-  PROSPECTING: '#2196f3', QUALIFICATION: '#ff9800', NEEDS_ANALYSIS: '#00bcd4',
-  PROPOSAL: '#9c27b0', NEGOTIATION: '#f44336', WON: '#4caf50', LOST: '#757575',
+  PROSPECTING: CRM_STATUS_TONES.info.ink,
+  QUALIFICATION: CRM_STATUS_TONES.warning.ink,
+  NEEDS_ANALYSIS: CRM_STATUS_TONES.teal.ink,
+  PROPOSAL: CRM_STATUS_TONES.accent.ink,
+  NEGOTIATION: CRM_STATUS_TONES.danger.ink,
+  WON: CRM_STATUS_TONES.success.ink,
+  LOST: CRM_STATUS_TONES.muted.ink,
 };
 
 export const STAGE_LABELS: Record<string, string> = {
@@ -30,9 +38,14 @@ export const STAGE_LABELS: Record<string, string> = {
   PROPOSAL: 'Proposal', NEGOTIATION: 'Negotiation', WON: 'Won', LOST: 'Lost',
 };
 
+/** Lead / pipeline status solids for dashboard chips — CSS vars from UI-CRM-SLDS tokens. */
 export const STATUS_COLORS: Record<string, string> = {
-  NEW: '#2196f3', CONTACTED: '#ff9800', QUALIFIED: '#4caf50',
-  CONVERTED: '#9c27b0', LOST: '#757575',
+  NEW: CRM_STATUS_TONES.info.ink,
+  CONTACTED: CRM_STATUS_TONES.warning.ink,
+  QUALIFIED: CRM_STATUS_TONES.success.ink,
+  UNQUALIFIED: CRM_STATUS_TONES.warning.ink,
+  CONVERTED: CRM_STATUS_TONES.accent.ink,
+  LOST: CRM_STATUS_TONES.muted.ink,
 };
 
 /**

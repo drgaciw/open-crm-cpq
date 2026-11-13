@@ -62,26 +62,27 @@ interface ProbabilityRow {
   `,
   styles: [`
     .advisory-suggestion {
-      border: 1px dashed #9e9e9e;
-      border-radius: 8px;
+      border: 1px dashed var(--crm-color-line, #9e9e9e);
+      border-radius: var(--crm-radius-sm, 8px);
       padding: 12px 16px;
       font-size: 13px;
+      color: var(--crm-color-ink, #17254b);
     }
     .advisory-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: var(--crm-space-sm, 8px);
     }
     .advisory-heading { font-weight: 500; }
     .advisory-chip { font-size: 11px; min-height: 22px; }
     .advisory-value { margin: 8px 0; display: flex; gap: 8px; align-items: baseline; }
-    .advisory-confidence, .advisory-meta { color: #616161; font-size: 12px; }
+    .advisory-confidence, .advisory-meta { color: var(--crm-color-muted, #616161); font-size: 12px; }
     .advisory-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
     .advisory-bar { display: grid; grid-template-columns: minmax(80px, 30%) 1fr 40px; gap: 8px; align-items: center; }
     .advisory-bar.suggested .bar-label { font-weight: 600; }
-    .bar-track { background: #eeeeee; border-radius: 4px; height: 8px; overflow: hidden; }
-    .bar-fill { display: block; height: 100%; background: #1976d2; }
+    .bar-track { background: var(--crm-color-track, #eeeeee); border-radius: 4px; height: 8px; overflow: hidden; }
+    .bar-fill { display: block; height: 100%; background: var(--crm-color-brand, #1976d2); }
     .bar-percent { text-align: right; font-variant-numeric: tabular-nums; }
     .advisory-meta { margin-top: 8px; }
   `],
