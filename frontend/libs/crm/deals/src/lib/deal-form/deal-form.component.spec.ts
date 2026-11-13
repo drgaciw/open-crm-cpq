@@ -1,12 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { DealFormComponent } from './deal-form.component';
 import { DealService } from '../deal.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { ContactService } from '@frontend/crm-contacts';
+
+@Component({ standalone: true, template: '' })
+class RouterStubComponent {}
 
 describe('DealFormComponent amount validation (chaos)', () => {
   let fixture: ComponentFixture<DealFormComponent>;
@@ -18,7 +21,10 @@ describe('DealFormComponent amount validation (chaos)', () => {
     await TestBed.configureTestingModule({
       imports: [DealFormComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([
+          { path: 'deals/:id', component: RouterStubComponent },
+          { path: 'deals', component: RouterStubComponent },
+        ]),
         provideNoopAnimations(),
         {
           provide: DealService,
@@ -78,7 +84,7 @@ describe('DealFormComponent amount validation (chaos)', () => {
     expect(component.form.valid).toBe(true);
   });
 
-  it('create sends currency, type, and owner, and omits stage', () => {
+  it('create sends currency, type, and owner, and omits stage', async () => {
     component.form.patchValue({
       name: 'New opp',
       amount: 10,
@@ -101,6 +107,8 @@ describe('DealFormComponent amount validation (chaos)', () => {
     });
     expect(payload['stage']).toBeUndefined();
     expect(payload['probability']).toBeUndefined();
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/deals/3');
   });
 
   it('shows an actionable banner when create fails', () => {

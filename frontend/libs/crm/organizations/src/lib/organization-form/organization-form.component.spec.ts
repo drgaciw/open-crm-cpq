@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatSelect } from '@angular/material/select';
 import { provideHttpClient } from '@angular/common/http';
@@ -10,6 +10,14 @@ import { Subject } from 'rxjs';
 import { OrganizationFormComponent } from './organization-form.component';
 import { OrganizationService } from '../organization.service';
 import { OrganizationDto } from '@frontend/shared-models';
+
+@Component({ standalone: true, template: '' })
+class RouterStubComponent {}
+
+const orgFormRoutes = [
+  { path: 'organizations/:id', component: RouterStubComponent },
+  { path: 'organizations', component: RouterStubComponent },
+];
 
 describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
   let fixture: ComponentFixture<OrganizationFormComponent>;
@@ -24,7 +32,7 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     await TestBed.configureTestingModule({
       imports: [OrganizationFormComponent],
       providers: [
-        provideRouter([]),
+        provideRouter(orgFormRoutes),
         provideNoopAnimations(),
         {
           provide: OrganizationService,
@@ -139,7 +147,12 @@ describe('OrganizationFormComponent reused edit route', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [OrganizationFormComponent],
-      providers: [provideRouter([]), provideNoopAnimations(), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter(orgFormRoutes),
+        provideNoopAnimations(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(OrganizationFormComponent);
@@ -149,7 +162,7 @@ describe('OrganizationFormComponent reused edit route', () => {
 
   afterEach(() => http.verify({ ignoreCancelled: true }));
 
-  it('blocks a stale save immediately when the route ID changes and reloads the new account', () => {
+  it('blocks a stale save immediately when the route ID changes and reloads the new account', async () => {
     http.expectOne('/api/v1/organizations/7').flush(account(7, 'First'));
     fixture.detectChanges();
     fixture.componentRef.setInput('id', '8');
@@ -164,6 +177,8 @@ describe('OrganizationFormComponent reused edit route', () => {
     const update = http.expectOne('/api/v1/organizations/8');
     expect(update.request.body.name).toBe('Second');
     update.flush(account(8, 'Second'));
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/organizations/8');
   });
 
   it('cancels an old load before accepting a new account', () => {

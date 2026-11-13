@@ -4,6 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
+import { NotificationService } from '@frontend/shared-data-access';
 import { QuotesDetailComponent } from './quotes-detail.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
@@ -44,6 +45,17 @@ function toQuoteDto(item: QuoteListItem): QuoteDto {
   };
 }
 
+/** UI-CRM-SLDS Phase 4: mat-tab-group lazily renders only the active tab; switch before asserting its content. */
+function selectTab(fixture: ComponentFixture<QuotesDetailComponent>, label: string): void {
+  const tabs = Array.from(
+    (fixture.nativeElement as HTMLElement).querySelectorAll('.mat-mdc-tab'),
+  ) as HTMLElement[];
+  const tab = tabs.find((t) => t.textContent?.trim() === label);
+  expect(tab).toBeTruthy();
+  tab!.click();
+  fixture.detectChanges();
+}
+
 describe('QuotesDetailComponent', () => {
   let fixture: ComponentFixture<QuotesDetailComponent>;
   let component: QuotesDetailComponent;
@@ -65,6 +77,7 @@ describe('QuotesDetailComponent', () => {
   let updateLineItemSpy: ReturnType<typeof vi.fn>;
   let removeLineItemSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
+  let notificationSuccessSpy: ReturnType<typeof vi.fn>;
 
   const selectedQuote = signal<QuoteDto | null>(null);
   const loading = signal(false);
@@ -171,6 +184,7 @@ describe('QuotesDetailComponent', () => {
     dialogOpen = vi.fn(() => ({
       afterClosed: () => of(true),
     }));
+    notificationSuccessSpy = vi.fn();
     selectedQuote.set(null);
     loading.set(false);
     error.set(null);
@@ -207,6 +221,16 @@ describe('QuotesDetailComponent', () => {
         provideNoopAnimations(),
         { provide: QuoteService, useValue: serviceMock },
         { provide: MatDialog, useValue: { open: dialogOpen } },
+        {
+          provide: NotificationService,
+          useValue: {
+            success: notificationSuccessSpy,
+            error: vi.fn(),
+            info: vi.fn(),
+            warning: vi.fn(),
+            dismiss: vi.fn(),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -227,7 +251,9 @@ describe('QuotesDetailComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Acme CRM Seat Rollout');
     expect(compiled.textContent).toContain('Q-2026-0001');
-    expect(compiled.textContent).toContain('cust-acme');
+    // Quote details (customer) live under the Pricing tab (UI-CRM-SLDS Phase 4).
+    selectTab(fixture, 'Pricing');
+    expect(fixture.nativeElement.textContent).toContain('cust-acme');
   });
 
   it('lists line items from quote.lineItems', () => {
@@ -571,6 +597,8 @@ describe('QuotesDetailComponent', () => {
   });
 
   it('embeds the ramp editor and does not show a governing-period banner', () => {
+    // The ramp editor lives under the Pricing tab (UI-CRM-SLDS Phase 4).
+    selectTab(fixture, 'Pricing');
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('cpq-quote-ramp-editor')).toBeTruthy();
     expect(compiled.textContent).not.toContain('Governing period');
@@ -872,10 +900,12 @@ describe('QuotesDetailComponent', () => {
 
   it('renders documents panel, header edit, and clone note (lines copied; Calculate required)', () => {
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('cpq-quote-documents-panel')).toBeTruthy();
     expect(el.querySelector('cpq-quote-header-edit')).toBeTruthy();
-    expect(el.textContent).toMatch(/header and line items/i);
     expect(el.textContent).toMatch(/Calculate/i);
+    // Documents panel and clone note live under the Documents tab (UI-CRM-SLDS Phase 4).
+    selectTab(fixture, 'Documents');
+    expect(fixture.nativeElement.querySelector('cpq-quote-documents-panel')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toMatch(/header and line items/i);
     expect(listDocumentsSpy).toHaveBeenCalledWith(1);
   });
 
@@ -893,5 +923,149 @@ describe('QuotesDetailComponent', () => {
     expect(el.querySelector('cpq-quote-header-edit')?.textContent).not.toMatch(
       /\bEdit\b/,
     );
+  });
+
+  // --- UI-CRM-SLDS Phase 4: CPQ sales workspace recipe ---------------------
+
+  it('shows status and totals in the PageHeader highlights slot', async () => {
+    selectedQuote.set({
+      ...toQuoteDto(MOCK_QUOTES[0]),
+      totalAmount: 54321,
+      arr: 12345,
+      currency: 'USD',
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const highlights = fixture.nativeElement.querySelector(
+      '.page-header-highlights',
+    ) as HTMLElement;
+    expect(highlights).toBeTruthy();
+    expect(highlights.textContent).toContain('Status');
+    expect(highlights.textContent).toMatch(/\$54,321|54321/);
+  });
+
+  it('organizes the detail body into Lines / Pricing / Documents tabs', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('mat-tab-group')).toBeTruthy();
+    const tabLabels = Array.from(
+      el.querySelectorAll('.mdc-tab__text-label, .mat-mdc-tab .mdc-tab__text-label'),
+    ).map((n) => n.textContent?.trim());
+    expect(tabLabels.some((label) => label === 'Lines')).toBe(true);
+    expect(tabLabels.some((label) => label === 'Pricing')).toBe(true);
+    expect(tabLabels.some((label) => label === 'Documents')).toBe(true);
+  });
+
+  it('wraps line items in a data-testid table and offers bulk select when editable', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const table = el.querySelector('[data-testid="quote-lines-table"]');
+    expect(table).toBeTruthy();
+    // DRAFT quote (id 1) is editable: bulk-select checkboxes are present.
+    expect(table!.querySelectorAll('mat-checkbox').length).toBeGreaterThan(0);
+  });
+
+  it('hides the bulk-select affordance when lines are not editable', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW
+    fixture.detectChanges();
+    const table = fixture.nativeElement.querySelector(
+      '[data-testid="quote-lines-table"]',
+    ) as HTMLElement;
+    expect(table).toBeTruthy();
+    expect(table.querySelectorAll('mat-checkbox').length).toBe(0);
+  });
+
+  it('selects lines in bulk and removes them together via the bulk action', () => {
+    getByIdSpy.mockClear();
+    const lines = selectedQuote()!.lineItems!;
+    component.toggleLineSelection(lines[0]);
+    component.toggleLineSelection(lines[1]);
+    expect(component.selectedLineIds().size).toBe(2);
+
+    component.onRemoveSelectedLines();
+
+    expect(removeLineItemSpy).toHaveBeenCalledWith(1, lines[0].id);
+    expect(removeLineItemSpy).toHaveBeenCalledWith(1, lines[1].id);
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(getByIdSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('select-all toggles every current line and clears on reload', () => {
+    const lines = selectedQuote()!.lineItems!;
+    component.toggleSelectAllLines();
+    expect(component.selectedLineIds().size).toBe(lines.length);
+    expect(component.allLinesSelected()).toBe(true);
+
+    component.toggleSelectAllLines();
+    expect(component.selectedLineIds().size).toBe(0);
+  });
+
+  it('does not bulk-remove when lines are not editable or none selected', () => {
+    // Nothing selected on the editable DRAFT fixture.
+    component.onRemoveSelectedLines();
+    expect(removeLineItemSpy).not.toHaveBeenCalled();
+
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[1])); // IN_REVIEW: not editable
+    fixture.detectChanges();
+    const line = selectedQuote()!.lineItems![0];
+    component.toggleLineSelection(line);
+    component.onRemoveSelectedLines();
+    expect(removeLineItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('exposes a line-edit-invalid signal that disables Submit until the open edit is saved or cancelled', () => {
+    const line = selectedQuote()!.lineItems![0];
+    expect(component.canSubmit()).toBe(true);
+
+    component.startLineEdit(line);
+    component.editForm.controls.listPrice.setValue(null); // required -> invalid
+    expect(component.lineEditInvalid()).toBe(true);
+    expect(component.canSubmit()).toBe(false);
+
+    component.onSubmit();
+    expect(submitSpy).not.toHaveBeenCalled();
+
+    component.cancelLineEdit();
+    expect(component.lineEditInvalid()).toBe(false);
+    expect(component.canSubmit()).toBe(true);
+  });
+
+  it('re-enables Submit once an open line edit becomes valid again', () => {
+    const line = selectedQuote()!.lineItems![0];
+    component.startLineEdit(line);
+    component.editForm.controls.listPrice.setValue(null);
+    expect(component.canSubmit()).toBe(false);
+
+    component.editForm.controls.listPrice.setValue(199);
+    expect(component.lineEditInvalid()).toBe(false);
+    expect(component.canSubmit()).toBe(true);
+  });
+
+  it('shows a success toast after Calculate', () => {
+    component.onCalculate();
+    expect(calculateSpy).toHaveBeenCalledWith(1);
+    expect(notificationSuccessSpy).toHaveBeenCalled();
+  });
+
+  it('shows a success toast after Submit', () => {
+    component.onSubmit();
+    expect(submitSpy).toHaveBeenCalledWith(1);
+    expect(notificationSuccessSpy).toHaveBeenCalled();
+  });
+
+  it('shows a success toast after Send', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[3])); // APPROVED
+    fixture.detectChanges();
+    component.onSend();
+    expect(sendSpy).toHaveBeenCalledWith(1);
+    expect(notificationSuccessSpy).toHaveBeenCalled();
+  });
+
+  it('does not toast when Calculate fails', () => {
+    calculateSpy.mockReturnValue(throwError(() => ({ error: { message: 'boom' } })));
+    component.onCalculate();
+    expect(notificationSuccessSpy).not.toHaveBeenCalled();
+    expect(component.actionError()).toBe('boom');
   });
 });

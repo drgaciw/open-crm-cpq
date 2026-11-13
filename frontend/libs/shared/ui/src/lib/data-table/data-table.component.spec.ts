@@ -42,6 +42,16 @@ describe('DataTableComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  // UI-CRM-SLDS Phase 2: CRM list pages (contacts/accounts/leads/deals) assert this testid via
+  // Playwright to confirm they render the shared table rather than a raw mat-table.
+  it('exposes a stable data-testid for browser UAT', () => {
+    component.componentRef.setInput('columns', mockColumns);
+    component.componentRef.setInput('data', mockData);
+    component.detectChanges();
+
+    expect(component.nativeElement.querySelector('[data-testid="data-table"]')).toBeTruthy();
+  });
+
   it('should display table with correct columns', () => {
     component.componentRef.setInput('columns', mockColumns);
     component.componentRef.setInput('data', mockData);
