@@ -13,6 +13,7 @@ import { LeadService } from '../lead.service';
 import { ContactService } from '@frontend/crm-contacts';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-models';
+import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
   selector: 'lib-lead-form',
@@ -20,16 +21,20 @@ import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-mode
   imports: [
     ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatAutocompleteModule, MatProgressSpinnerModule,
-    MatSelectModule,
+    MatSelectModule, PageHeaderComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="form-header">
-      <button mat-icon-button (click)="goBack()" aria-label="Go back"><mat-icon>arrow_back</mat-icon></button>
-      <h1>{{ isEditMode ? 'Edit Lead' : 'New Lead' }}</h1>
-    </div>
+    <app-page-header [title]="isEditMode ? 'Edit Lead' : 'New Lead'">
+      <nav breadcrumb aria-label="Breadcrumb">
+        <button mat-button type="button" (click)="goBack()">
+          <mat-icon>arrow_back</mat-icon>
+          {{ isEditMode ? 'Lead' : 'Leads' }}
+        </button>
+      </nav>
+    </app-page-header>
 
-    <mat-card class="form-card">
+    <mat-card class="crm-form-shell">
       <mat-card-content>
         <form [formGroup]="form" (ngSubmit)="onSubmit()">
           <h3 class="section-title">Lead Information</h3>
@@ -144,16 +149,8 @@ import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-mode
     </mat-card>
   `,
   styles: [`
-    .form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
-    .form-header h1 { margin: 0; font-size: 1.5rem; }
-    .form-card { max-width: 800px; }
-    .section-title { margin: 24px 0 12px; font-size: 1rem; font-weight: 500; color: #333; }
-    .section-title:first-of-type { margin-top: 0; }
-    .form-row { display: flex; gap: 16px; margin-bottom: 8px; }
-    .two-col > * { flex: 1; }
-    .full-width { width: 100%; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
-    .option-detail { font-size: 0.75rem; color: #666; margin-left: 8px; }
+    :host { display: block; }
+    .option-detail { font-size: 0.75rem; color: var(--crm-color-muted, #666); margin-left: var(--crm-space-sm, 8px); }
   `],
 })
 export class LeadFormComponent implements OnInit {

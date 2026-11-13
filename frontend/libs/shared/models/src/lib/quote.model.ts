@@ -1,3 +1,5 @@
+import { CRM_STATUS_TONES } from './status-tokens';
+
 /**
  * Quote domain models.
  * Aligned to quote-service (`com.opencrm.quote.*`).
@@ -31,15 +33,15 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
 };
 
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
-  DRAFT: '#9e9e9e',
-  IN_REVIEW: '#2196f3',
-  PENDING_APPROVAL: '#ff9800',
-  APPROVED: '#4caf50',
-  SENT: '#00bcd4',
-  ACCEPTED: '#8bc34a',
-  EXPIRED: '#795548',
-  CANCELLED: '#757575',
-  REJECTED: '#f44336',
+  DRAFT: CRM_STATUS_TONES.muted.ink,
+  IN_REVIEW: CRM_STATUS_TONES.info.ink,
+  PENDING_APPROVAL: CRM_STATUS_TONES.warning.ink,
+  APPROVED: CRM_STATUS_TONES.success.ink,
+  SENT: CRM_STATUS_TONES.teal.ink,
+  ACCEPTED: CRM_STATUS_TONES.successStrong.ink,
+  EXPIRED: CRM_STATUS_TONES.neutral.ink,
+  CANCELLED: CRM_STATUS_TONES.muted.ink,
+  REJECTED: CRM_STATUS_TONES.danger.ink,
 };
 
 export const QUOTE_STATUSES: readonly QuoteStatus[] = [

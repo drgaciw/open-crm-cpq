@@ -24,6 +24,8 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   AdvisorySuggestionComponent,
+  AgentPanelComponent,
+  AgentPanelState,
   ConfirmDialogComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
@@ -71,6 +73,7 @@ function httpErrorMessage(err: unknown): string {
   imports: [
     ReactiveFormsModule,
     AdvisorySuggestionComponent,
+    AgentPanelComponent,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -265,30 +268,36 @@ function httpErrorMessage(err: unknown): string {
       </app-page-header>
 
       @if (canSubmit()) {
-        <section class="tier-suggestion" aria-label="Advisory approval tier suggestion">
-          <button
-            mat-stroked-button
-            type="button"
-            (click)="onSuggestTier()"
-            [disabled]="tierSuggestionLoading()"
-            title="Ask for an advisory suggestion. It never selects or submits a tier."
-          >
-            <mat-icon>tips_and_updates</mat-icon>
-            Suggest approval tier (advisory)
-          </button>
+        <app-agent-panel
+          title="Approval tier advisory"
+          [state]="tierAgentPanelState()"
+          emptyMessage="Ask for an advisory tier suggestion. It never selects or submits a tier; Jev flags stay off unless already configured server-side."
+          loadingMessage="Evaluating advisory tier…"
+          errorMessage="No suggestion available from the advisory service."
+          [evidence]="tierEvidence()"
+          [showActions]="tierAgentPanelState() === 'ready'"
+        >
+          <div tools>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="onSuggestTier()"
+              [disabled]="tierSuggestionLoading()"
+              title="Ask for an advisory suggestion. It never selects or submits a tier."
+            >
+              <mat-icon>tips_and_updates</mat-icon>
+              Suggest approval tier (advisory)
+            </button>
+          </div>
           @if (tierSuggestion(); as envelope) {
-            @if (envelope.status === 'READY') {
+            @if (envelope.status === 'READY' && envelope.suggestion) {
               <app-advisory-suggestion
                 [suggestion]="envelope.suggestion"
                 heading="Suggested approval tier"
                 [labels]="tierLabels" />
-            } @else if (envelope.status === 'PENDING') {
-              <p class="tier-suggestion-note" role="status">Evaluating — ask again in a moment.</p>
-            } @else {
-              <p class="tier-suggestion-note" role="status">No suggestion available.</p>
             }
           }
-        </section>
+        </app-agent-panel>
       }
 
       @if (actionError(); as actionErr) {
@@ -602,20 +611,9 @@ function httpErrorMessage(err: unknown): string {
         align-items: center;
       }
 
-      .tier-suggestion {
-        display: grid;
-        gap: 12px;
-        max-width: 520px;
+      app-agent-panel {
+        display: block;
         margin-bottom: 16px;
-        justify-items: start;
-      }
-      .tier-suggestion app-advisory-suggestion {
-        justify-self: stretch;
-      }
-      .tier-suggestion-note {
-        margin: 0;
-        color: #616161;
-        font-size: 13px;
       }
       .error-banner {
         display: flex;
@@ -901,6 +899,38 @@ export class QuotesDetailComponent {
       () => this.canCalculate(),
       (id) => this.quoteService.calculate(id),
     );
+  }
+
+  tierAgentPanelState(): AgentPanelState {
+    if (this.tierSuggestionLoading()) {
+      return 'loading';
+    }
+    const envelope = this.tierSuggestion();
+    if (!envelope) {
+      return 'empty';
+    }
+    if (envelope.status === 'PENDING') {
+      return 'loading';
+    }
+    if (envelope.status === 'READY' && envelope.suggestion) {
+      return 'ready';
+    }
+    if (envelope.status === 'UNAVAILABLE') {
+      return 'error';
+    }
+    return 'empty';
+  }
+
+  tierEvidence(): string[] {
+    const suggestion = this.tierSuggestion()?.suggestion;
+    if (!suggestion) {
+      return [];
+    }
+    return [
+      `Model ${suggestion.model}`,
+      `Rubric ${suggestion.rubricVersion}`,
+      'Never preselects or submits an approval tier',
+    ];
   }
 
   onSuggestTier(): void {
