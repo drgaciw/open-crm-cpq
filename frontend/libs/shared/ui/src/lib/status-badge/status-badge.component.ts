@@ -6,6 +6,9 @@ import {
   DealStage,
   QuoteStatus,
   QUOTE_STATUS_LABELS,
+  CRM_STATUS_TONES,
+  CrmStatusTone,
+  STAGE_LABELS,
 } from '@frontend/shared-models';
 
 export type StatusType = 'lead' | 'deal' | 'product' | 'quote';
@@ -22,14 +25,17 @@ interface StatusConfig {
   label: string;
 }
 
+function fromTone(tone: CrmStatusTone, label: string): StatusConfig {
+  return {
+    color: tone.ink,
+    backgroundColor: tone.container,
+    label,
+  };
+}
+
 /**
- * Color-coded badge for lead, deal, product, and quote statuses
- *
- * @example
- * <app-status-badge [status]="'NEW'" [type]="'lead'" />
- * <app-status-badge [status]="'WON'" [type]="'deal'" />
- * <app-status-badge [status]="'ACTIVE'" [type]="'product'" />
- * <app-status-badge [status]="'DRAFT'" [type]="'quote'" />
+ * Color-coded badge for lead, deal, product, and quote statuses.
+ * Colors resolve through UI-CRM-SLDS `--crm-*` tokens (see CRM_STATUS_TONES).
  */
 @Component({
   selector: 'app-status-badge',
@@ -84,175 +90,55 @@ export class StatusBadgeComponent {
 
   private getLeadStatusConfig(status: LeadStatus): StatusConfig {
     const configs: Record<LeadStatus, StatusConfig> = {
-      NEW: {
-        color: '#1976d2',
-        backgroundColor: '#e3f2fd',
-        label: 'New',
-      },
-      CONTACTED: {
-        color: '#0288d1',
-        backgroundColor: '#b3e5fc',
-        label: 'Contacted',
-      },
-      QUALIFIED: {
-        color: '#7b1fa2',
-        backgroundColor: '#f3e5f5',
-        label: 'Qualified',
-      },
-      UNQUALIFIED: {
-        color: '#e65100',
-        backgroundColor: '#fff3e0',
-        label: 'Unqualified',
-      },
-      CONVERTED: {
-        color: '#388e3c',
-        backgroundColor: '#e8f5e9',
-        label: 'Converted',
-      },
-      LOST: {
-        color: '#d32f2f',
-        backgroundColor: '#ffebee',
-        label: 'Lost',
-      },
+      NEW: fromTone(CRM_STATUS_TONES.info, 'New'),
+      CONTACTED: fromTone(CRM_STATUS_TONES.infoStrong, 'Contacted'),
+      QUALIFIED: fromTone(CRM_STATUS_TONES.accent, 'Qualified'),
+      UNQUALIFIED: fromTone(CRM_STATUS_TONES.warning, 'Unqualified'),
+      CONVERTED: fromTone(CRM_STATUS_TONES.success, 'Converted'),
+      LOST: fromTone(CRM_STATUS_TONES.danger, 'Lost'),
     };
 
-    return configs[status] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: status,
-    };
+    return configs[status] || fromTone(CRM_STATUS_TONES.muted, status);
   }
 
   private getDealStageConfig(stage: DealStage): StatusConfig {
     const configs: Record<DealStage, StatusConfig> = {
-      PROSPECTING: {
-        color: '#1976d2',
-        backgroundColor: '#e3f2fd',
-        label: 'Prospecting',
-      },
-      QUALIFICATION: {
-        color: '#0288d1',
-        backgroundColor: '#b3e5fc',
-        label: 'Qualification',
-      },
-      NEEDS_ANALYSIS: {
-        color: '#00838f',
-        backgroundColor: '#e0f7fa',
-        label: 'Needs Analysis',
-      },
-      PROPOSAL: {
-        color: '#f57c00',
-        backgroundColor: '#fff3e0',
-        label: 'Proposal',
-      },
-      NEGOTIATION: {
-        color: '#7b1fa2',
-        backgroundColor: '#f3e5f5',
-        label: 'Negotiation',
-      },
-      WON: {
-        color: '#388e3c',
-        backgroundColor: '#e8f5e9',
-        label: 'Won',
-      },
-      LOST: {
-        color: '#d32f2f',
-        backgroundColor: '#ffebee',
-        label: 'Lost',
-      },
+      PROSPECTING: fromTone(CRM_STATUS_TONES.info, STAGE_LABELS['PROSPECTING'] ?? 'Prospecting'),
+      QUALIFICATION: fromTone(CRM_STATUS_TONES.infoStrong, STAGE_LABELS['QUALIFICATION'] ?? 'Qualification'),
+      NEEDS_ANALYSIS: fromTone(CRM_STATUS_TONES.teal, STAGE_LABELS['NEEDS_ANALYSIS'] ?? 'Needs Analysis'),
+      PROPOSAL: fromTone(CRM_STATUS_TONES.warning, STAGE_LABELS['PROPOSAL'] ?? 'Proposal'),
+      NEGOTIATION: fromTone(CRM_STATUS_TONES.accent, STAGE_LABELS['NEGOTIATION'] ?? 'Negotiation'),
+      WON: fromTone(CRM_STATUS_TONES.success, STAGE_LABELS['WON'] ?? 'Won'),
+      LOST: fromTone(CRM_STATUS_TONES.danger, STAGE_LABELS['LOST'] ?? 'Lost'),
     };
 
-    return configs[stage] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: stage,
-    };
+    return configs[stage] || fromTone(CRM_STATUS_TONES.muted, stage);
   }
 
   private getProductStatusConfig(status: ProductStatusBadge): StatusConfig {
     const configs: Record<ProductStatusBadge, StatusConfig> = {
-      DRAFT: {
-        color: '#757575',
-        backgroundColor: '#f5f5f5',
-        label: 'Draft',
-      },
-      ACTIVE: {
-        color: '#388e3c',
-        backgroundColor: '#e8f5e9',
-        label: 'Active',
-      },
-      DEPRECATED: {
-        color: '#f57c00',
-        backgroundColor: '#fff3e0',
-        label: 'Deprecated',
-      },
-      RETIRED: {
-        color: '#d32f2f',
-        backgroundColor: '#ffebee',
-        label: 'Retired',
-      },
+      DRAFT: fromTone(CRM_STATUS_TONES.muted, 'Draft'),
+      ACTIVE: fromTone(CRM_STATUS_TONES.success, 'Active'),
+      DEPRECATED: fromTone(CRM_STATUS_TONES.warning, 'Deprecated'),
+      RETIRED: fromTone(CRM_STATUS_TONES.danger, 'Retired'),
     };
 
-    return configs[status] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: status,
-    };
+    return configs[status] || fromTone(CRM_STATUS_TONES.muted, status);
   }
 
   private getQuoteStatusConfig(status: QuoteStatus): StatusConfig {
     const configs: Record<QuoteStatus, StatusConfig> = {
-      DRAFT: {
-        color: '#757575',
-        backgroundColor: '#f5f5f5',
-        label: QUOTE_STATUS_LABELS.DRAFT,
-      },
-      IN_REVIEW: {
-        color: '#1976d2',
-        backgroundColor: '#e3f2fd',
-        label: QUOTE_STATUS_LABELS.IN_REVIEW,
-      },
-      PENDING_APPROVAL: {
-        color: '#f57c00',
-        backgroundColor: '#fff3e0',
-        label: QUOTE_STATUS_LABELS.PENDING_APPROVAL,
-      },
-      APPROVED: {
-        color: '#388e3c',
-        backgroundColor: '#e8f5e9',
-        label: QUOTE_STATUS_LABELS.APPROVED,
-      },
-      SENT: {
-        color: '#00838f',
-        backgroundColor: '#e0f7fa',
-        label: QUOTE_STATUS_LABELS.SENT,
-      },
-      ACCEPTED: {
-        color: '#2e7d32',
-        backgroundColor: '#c8e6c9',
-        label: QUOTE_STATUS_LABELS.ACCEPTED,
-      },
-      EXPIRED: {
-        color: '#5d4037',
-        backgroundColor: '#efebe9',
-        label: QUOTE_STATUS_LABELS.EXPIRED,
-      },
-      CANCELLED: {
-        color: '#616161',
-        backgroundColor: '#eeeeee',
-        label: QUOTE_STATUS_LABELS.CANCELLED,
-      },
-      REJECTED: {
-        color: '#d32f2f',
-        backgroundColor: '#ffebee',
-        label: QUOTE_STATUS_LABELS.REJECTED,
-      },
+      DRAFT: fromTone(CRM_STATUS_TONES.muted, QUOTE_STATUS_LABELS.DRAFT),
+      IN_REVIEW: fromTone(CRM_STATUS_TONES.info, QUOTE_STATUS_LABELS.IN_REVIEW),
+      PENDING_APPROVAL: fromTone(CRM_STATUS_TONES.warning, QUOTE_STATUS_LABELS.PENDING_APPROVAL),
+      APPROVED: fromTone(CRM_STATUS_TONES.success, QUOTE_STATUS_LABELS.APPROVED),
+      SENT: fromTone(CRM_STATUS_TONES.teal, QUOTE_STATUS_LABELS.SENT),
+      ACCEPTED: fromTone(CRM_STATUS_TONES.successStrong, QUOTE_STATUS_LABELS.ACCEPTED),
+      EXPIRED: fromTone(CRM_STATUS_TONES.neutral, QUOTE_STATUS_LABELS.EXPIRED),
+      CANCELLED: fromTone(CRM_STATUS_TONES.muted, QUOTE_STATUS_LABELS.CANCELLED),
+      REJECTED: fromTone(CRM_STATUS_TONES.danger, QUOTE_STATUS_LABELS.REJECTED),
     };
 
-    return configs[status] || {
-      color: '#757575',
-      backgroundColor: '#f5f5f5',
-      label: status,
-    };
+    return configs[status] || fromTone(CRM_STATUS_TONES.muted, status);
   }
 }

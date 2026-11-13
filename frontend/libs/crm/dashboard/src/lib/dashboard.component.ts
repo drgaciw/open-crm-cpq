@@ -249,9 +249,9 @@ export class DashboardComponent implements OnInit {
 
   pipelineStages: DealStage[] = ['PROSPECTING', 'QUALIFICATION', 'NEEDS_ANALYSIS', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
 
-  stageColor(stage: string): string { return STAGE_COLORS[stage] ?? '#666'; }
+  stageColor(stage: string): string { return STAGE_COLORS[stage] ?? 'var(--crm-color-muted)'; }
   stageLabel(stage: string): string { return STAGE_LABELS[stage] ?? stage; }
-  statusColor(status: string): string { return STATUS_COLORS[status] ?? '#666'; }
+  statusColor(status: string): string { return STATUS_COLORS[status] ?? 'var(--crm-color-muted)'; }
 
   trackById(index: number, item: { id?: string | number }): string | number {
     return item?.id ?? index;

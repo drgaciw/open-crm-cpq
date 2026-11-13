@@ -22,6 +22,7 @@ import {
   DealType,
   DealUpdateRequest,
 } from '@frontend/shared-models';
+import { PageHeaderComponent } from '@frontend/shared-ui';
 import { dealActionErrorMessage } from '../deal-action-error';
 import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../deal-stage';
 
@@ -32,13 +33,18 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
     ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatSelectModule, MatDatepickerModule,
     MatNativeDateModule, MatAutocompleteModule, MatProgressSpinnerModule,
+    PageHeaderComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="form-header">
-      <button mat-icon-button (click)="goBack()" aria-label="Go back"><mat-icon>arrow_back</mat-icon></button>
-      <h1>{{ isEditMode ? 'Edit opportunity' : 'New opportunity' }}</h1>
-    </div>
+    <app-page-header [title]="isEditMode ? 'Edit opportunity' : 'New opportunity'">
+      <nav breadcrumb aria-label="Breadcrumb">
+        <button mat-button type="button" (click)="goBack()">
+          <mat-icon>arrow_back</mat-icon>
+          {{ isEditMode ? 'Opportunity' : 'Opportunities' }}
+        </button>
+      </nav>
+    </app-page-header>
 
     @if (saveError() || dealService.error()) {
       <div class="error-banner" role="alert">
@@ -48,7 +54,7 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
       </div>
     }
 
-    <mat-card class="form-card">
+    <mat-card class="crm-form-shell">
       <mat-card-content>
         <form [formGroup]="form" (ngSubmit)="onSubmit()">
           <h3 class="section-title">Opportunity</h3>
@@ -153,25 +159,17 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
     </mat-card>
   `,
   styles: [`
-    .form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
-    .form-header h1 { margin: 0; font-size: 1.5rem; }
-    .form-card { max-width: 900px; }
-    .section-title { margin: 24px 0 12px; font-size: 1rem; font-weight: 500; color: #333; }
-    .section-title:first-of-type { margin-top: 0; }
-    .form-row { display: flex; gap: 16px; margin-bottom: 8px; }
-    .two-col > * { flex: 1; }
-    .three-col > * { flex: 1; }
-    .full-width { width: 100%; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; }
+    :host { display: block; }
+    .crm-form-shell { max-width: 900px; }
     .error-banner {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #ffebee;
-      color: #c62828;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-danger-container, #ffebee);
+      color: var(--crm-color-danger, #c62828);
       max-width: 900px;
     }
   `],

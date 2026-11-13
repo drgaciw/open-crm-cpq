@@ -52,12 +52,13 @@ Defined on `:root` in [`frontend/apps/crm/src/styles.scss`](../../frontend/apps/
 | `--crm-color-surface` | Cards / panels |
 | `--crm-color-brand` | Links / primary accent |
 | `--crm-color-info` / `--success` / `--warning` / `--danger` | Semantic status |
-| `--crm-color-danger-container` / `--warning-container` | Soft alert backgrounds |
+| `--crm-color-info-container` / `--success-container` / `--danger-container` / `--warning-container` | Soft alert / badge fills |
+| `--crm-color-accent` / `--teal` / `--neutral` (+ containers) | Pipeline / quote secondary tones |
 | `--crm-radius-sm` / `--md` | Corner radius |
 | `--crm-space-*` | Spacing scale |
 | `--crm-focus-ring` | Focus-visible outline |
 
-Stage/status badge colors remain in shared-models maps until Phase 2 finishes unifying them onto tokens (Leads/Deals/forms still open).
+Status/stage colors resolve through `CRM_STATUS_TONES` → `--crm-*` CSS variables (`status-tokens.ts` + `styles.scss`).
 
 ## Phase 0 acceptance
 
@@ -81,5 +82,14 @@ Stage/status badge colors remain in shared-models maps until Phase 2 finishes un
 - [x] Accounts (organizations) list uses shared `DataTable` + Material outline filters (`data-testid` preserved)
 - [x] Leads list uses shared `DataTable` + status-gated row actions (tabs/priority filter kept)
 - [x] Opportunities (deals) list uses shared `DataTable` + Material org/owner filters (`data-testid` preserved)
-- [ ] Forms / status badges fully on `--crm-*` tokens (lists flatten status/stage text for now)
+- [x] Status/stage maps + `StatusBadgeComponent` use `CRM_STATUS_TONES` / `--crm-*` tokens
+- [x] CRM create/edit forms use shared `PageHeader` + `.crm-form-shell` (sticky actions)
 - [ ] Browser UAT of Contacts + Accounts + Leads + Opportunities lists
+
+## Phase 3 acceptance (agent panel shell, flag-off)
+
+- [x] `AgentPanelComponent` with loading / empty / error / ready / disabled / validation + collapse
+- [x] Lead detail wraps score advisory in agent panel (snackbar dismiss/acknowledge; no record mutation)
+- [x] Deal detail shows labelled disabled panel (probability out of scope per ADR-015)
+- [x] Quote detail DRAFT tier suggestion uses agent panel + tools slot (on-demand; never auto-submits)
+- [x] No `opencrm.jev.*.enabled` flips in this change

@@ -11,12 +11,23 @@
   --crm-color-brand: #1b5fd1;
   --crm-color-brand-strong: #09265c;
   --crm-color-info: #2196f3;
+  --crm-color-info-container: #e3f2fd;
   --crm-color-success: #388e3c;
+  --crm-color-success-container: #e8f5e9;
+  --crm-color-success-strong: #2e7d32;
+  --crm-color-success-strong-container: #c8e6c9;
   --crm-color-warning: #f57c00;
   --crm-color-warning-ink: #8a5a00;
   --crm-color-danger: #c62828;
   --crm-color-danger-container: #ffebee;
-  --crm-color-warning-container: #fff8e1;
+  --crm-color-warning-container: #fff3e0;
+  --crm-color-accent: #7b1fa2;
+  --crm-color-accent-container: #f3e5f5;
+  --crm-color-teal: #00838f;
+  --crm-color-teal-container: #e0f7fa;
+  --crm-color-muted-container: #f5f5f5;
+  --crm-color-neutral: #5d4037;
+  --crm-color-neutral-container: #efebe9;
   --crm-color-on-brand: #ffffff;
   --crm-color-track: #e8eef7;
   --crm-color-empty: #8a97ad;
@@ -29,6 +40,50 @@
   --crm-space-lg: 24px;
   --crm-space-xl: 48px;
   --crm-page-max: 1400px;
+}
+
+// Shared CRM form shell (UI-CRM-SLDS Phase 2) — PageHeader + section card + sticky actions.
+.crm-form-shell {
+  max-width: 800px;
+}
+
+.crm-form-shell .section-title {
+  margin: var(--crm-space-lg) 0 var(--crm-space-sm);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--crm-color-ink);
+}
+
+.crm-form-shell .section-title:first-of-type {
+  margin-top: 0;
+}
+
+.crm-form-shell .form-row {
+  display: flex;
+  gap: var(--crm-space-md);
+  margin-bottom: var(--crm-space-sm);
+}
+
+.crm-form-shell .two-col > *,
+.crm-form-shell .three-col > * {
+  flex: 1;
+}
+
+.crm-form-shell .full-width {
+  width: 100%;
+}
+
+.crm-form-shell .form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: var(--crm-space-lg);
+  padding: var(--crm-space-md) 0;
+  border-top: 1px solid var(--crm-color-line);
+  background: var(--crm-color-surface);
 }
 
 // Custom Material theme
