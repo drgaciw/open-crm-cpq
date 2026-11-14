@@ -68,8 +68,9 @@ class ServiceSchemaIsolationIntegrationTest {
             // V1_6 adds configuration_hash/frozen_at and widens the status CHECK for FROZEN (DRG-428).
             new Service("configuration-engine", "configuration", "configuration_sessions", 6),
             // V1_1 tables, V1_2 relay status/leasing, V1_3 envelope columns, V1_4 SKIPPED status,
-            // V1_5 catalog version/rule-set version/tenant/bundle columns (DRG-424)
-            new Service("approval-routing", "approval", "approval_requests", 9),
+            // V1_5 catalog version/rule-set version/tenant/bundle columns (DRG-424).
+            // V1_10 commercial policy tables (DRG-441).
+            new Service("approval-routing", "approval", "approval_requests", 10),
             new Service("document-generation", "document", "document_generation_jobs", 4),
             // V1_1 to V1_5 as above, V1_6 rate schedule, V1_7 contract documents, V1_7_1 renewal receipts,
             // V1_7_2 frozen line membership, V1_8 header backfill functions,
