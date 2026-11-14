@@ -122,6 +122,26 @@ export default {
       return `contact link -> /contacts/${contact.id}`;
     });
 
+    // UI-CRM-SLDS Phase 3: the agent panel is always rendered on the lead detail page (state is
+    // 'empty' until Jev scores the lead, 'ready' once it has — never a silent absence), and its
+    // collapse/expand toggle works.
+    await runCheck(ctx, 'leads.detail.agent-panel-present-and-collapsible', async () => {
+      await openLead(page, full, 'NEW');
+      const panel = page.getByTestId('agent-panel');
+      await panel.waitFor({ state: 'visible' });
+      const toggle = panel.getByRole('button', { name: /Collapse agent panel|Expand agent panel/ });
+      const before = (await toggle.getAttribute('aria-expanded')) === 'true';
+      await toggle.click();
+      await waitUntil(() => toggle.getAttribute('aria-expanded'), (v) => (v === 'true') !== before, {
+        describe: (v) => `aria-expanded stayed "${v}" after clicking the collapse toggle`,
+      });
+      await toggle.click();
+      await waitUntil(() => toggle.getAttribute('aria-expanded'), (v) => (v === 'true') === before, {
+        describe: (v) => `aria-expanded is "${v}" after toggling twice, expected it restored to ${before}`,
+      });
+      return `collapse/expand toggles aria-expanded (started ${before})`;
+    });
+
     const bare = await ensure(ctx, 'lead', { source: null, estimatedValue: null });
     await runCheck(ctx, 'leads.detail.empty-cards-hidden', async () => {
       await openLead(page, bare, 'NEW');
@@ -196,6 +216,12 @@ export default {
         if (!text.includes(value)) throw new Error(`row does not show "${value}": ${text}`);
       }
       return text.slice(0, 120);
+    });
+
+    // UI-CRM-SLDS Phase 2: the list renders the shared DataTableComponent, not a raw mat-table.
+    await runCheck(ctx, 'leads.list.uses-shared-data-table', async () => {
+      await findRow(page, full.title);
+      await page.getByTestId('data-table').waitFor({ state: 'visible', timeout: 5000 });
     });
 
     await runCheck(ctx, 'leads.list.empty-cells-render-dash', async () => {

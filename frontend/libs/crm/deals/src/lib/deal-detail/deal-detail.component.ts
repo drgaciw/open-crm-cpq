@@ -12,6 +12,7 @@ import { DealDto, DealStage } from '@frontend/shared-models';
 import { DealService } from '../deal.service';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 import { dealActionErrorMessage } from '../deal-action-error';
+import { AgentPanelComponent } from '@frontend/shared-ui';
 import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '../deal-stage';
 
 @Component({
@@ -20,6 +21,7 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule,
     MatProgressSpinnerModule, MatDividerModule, CurrencyPipe, DatePipe,
+    AgentPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -67,6 +69,12 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
           }
         </div>
       </div>
+
+      <app-agent-panel
+        title="Opportunity advisory"
+        state="disabled"
+        disabledMessage="Deal probability is out of scope for Jev advisory (ADR-015). This shell stays visible and labelled; runtime flags remain off."
+      />
 
       <div class="detail-grid">
         <mat-card>

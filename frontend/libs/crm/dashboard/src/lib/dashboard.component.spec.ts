@@ -100,6 +100,19 @@ describe('DashboardComponent', () => {
     expect(el.textContent).toContain('Dashboard');
   });
 
+  it('UI-CRM-SLDS: KPI icons use semantic token classes instead of inline hex', () => {
+    fixture.detectChanges();
+    flushSuccess();
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.kpi-icon--info')).toBeTruthy();
+    expect(el.querySelector('.kpi-icon--success')).toBeTruthy();
+    expect(el.querySelector('.kpi-icon--warning')).toBeTruthy();
+    expect(el.querySelector('.kpi-icon--brand')).toBeTruthy();
+    expect(el.querySelector('.kpi-icon[style*="color"]')).toBeNull();
+  });
+
   it('loading spinner wrapper exposes role=status and aria-live=polite', () => {
     fixture.detectChanges();
 

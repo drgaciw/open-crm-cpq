@@ -152,10 +152,20 @@ describe('DealListComponent action wiring', () => {
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
-    const loadingEl = el.querySelector('.loading') as HTMLElement;
+    const loadingEl = el.querySelector('.loading-overlay') as HTMLElement;
     expect(loadingEl).toBeTruthy();
     expect(loadingEl.getAttribute('role')).toBe('status');
     expect(loadingEl.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('renders shared DataTable when opportunities are loaded', () => {
+    deals.set([deal({ id: 1, name: 'Acme opp', stage: 'PROSPECTING' })]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('app-data-table')).toBeTruthy();
   });
 
   it('onSearch with term calls DealService.search', () => {
