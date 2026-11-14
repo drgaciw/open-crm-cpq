@@ -56,6 +56,9 @@ class ServiceSchemaIsolationIntegrationTest {
             "processed_events",
             "renewal_eligibility_publications",
             "renewal_policy_record",
+            // V1_22 signature envelopes (DRG-457).
+            "signature_envelope_events",
+            "signature_envelopes",
             "subscription_ingest_audits",
             "subscription_rate_periods",
             "subscriptions");
@@ -101,11 +104,22 @@ class ServiceSchemaIsolationIntegrationTest {
                 }
             }
         }
-        try (Connection connection = POSTGRES.createConnection(""); var statement = connection.createStatement();
-             var result = statement.executeQuery("SELECT count(*) FROM information_schema.tables "
-                     + "WHERE table_schema = 'public' AND table_name IN ('outbox_events', 'flyway_schema_history')")) {
-            assertThat(result.next()).isTrue();
-            assertThat(result.getInt(1)).isZero();
+        try (Connection connection = POSTGRES.createConnection(""); var statement = connection.createStatement()) {
+            try (var result = statement.executeQuery("SELECT count(*) FROM information_schema.tables "
+                    + "WHERE table_schema = 'public' AND table_name IN ('outbox_events', 'flyway_schema_history')")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isZero();
+            }
+            // V1_22 tables belong only in schema contract.
+            List<String> leaked = new ArrayList<>();
+            try (var result = statement.executeQuery("SELECT table_schema || '.' || table_name FROM information_schema.tables "
+                    + "WHERE table_schema IN ('public', 'configuration', 'approval', 'document') "
+                    + "AND table_name IN ('signature_envelopes', 'signature_envelope_events')")) {
+                while (result.next()) {
+                    leaked.add(result.getString(1));
+                }
+            }
+            assertThat(leaked).isEmpty();
         }
     }
 
