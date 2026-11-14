@@ -7,19 +7,23 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { LeadService } from '../lead.service';
-import { LeadStatus } from '@frontend/shared-models';
-import { AdvisorySuggestionComponent } from '@frontend/shared-ui';
+import { JevSuggestion, LeadStatus } from '@frontend/shared-models';
+import {
+  AdvisorySuggestionComponent,
+  AgentPanelComponent,
+  AgentPanelState,
+} from '@frontend/shared-ui';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
-
-
 
 @Component({
   selector: 'lib-lead-detail',
   standalone: true,
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule,
-    MatChipsModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe, AdvisorySuggestionComponent,
+    MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, CurrencyPipe, DatePipe,
+    AdvisorySuggestionComponent, AgentPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -53,11 +57,20 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
         </div>
       </div>
 
-      <app-advisory-suggestion
-        class="score-suggestion"
-        [suggestion]="lead.scoreSuggestion"
-        heading="Likelihood to qualify (0–100)"
-        [labels]="scoreLevelLabels" />
+      <app-agent-panel
+        title="Lead scoring"
+        [state]="agentPanelState(lead.scoreSuggestion)"
+        emptyMessage="No score suggestion yet. When Jev is flag-off or still computing, this panel stays empty and labelled — never a silent failure."
+        [evidence]="scoreEvidence(lead.scoreSuggestion)"
+        [showActions]="!!lead.scoreSuggestion"
+        (dismiss)="onAdvisoryDismiss()"
+        (acknowledge)="onAdvisoryAcknowledge()"
+      >
+        <app-advisory-suggestion
+          [suggestion]="lead.scoreSuggestion"
+          heading="Likelihood to qualify (0–100)"
+          [labels]="scoreLevelLabels" />
+      </app-agent-panel>
 
       <div class="action-bar">
         @if (lead.status === 'NEW') {
@@ -199,7 +212,6 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
       background: #ffebee;
       color: #c62828;
     }
-    .score-suggestion { display: block; max-width: 480px; margin-bottom: 16px; }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
     .header-info { flex: 1; display: flex; align-items: center; gap: 12px; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
@@ -240,12 +252,36 @@ export class LeadDetailComponent implements OnInit {
   readonly service = inject(LeadService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   id = input.required<string>();
   actionLoading = signal(false);
 
   ngOnInit(): void {
     this.service.getById(Number(this.id()));
+  }
+
+  agentPanelState(suggestion: JevSuggestion | null | undefined): AgentPanelState {
+    return suggestion ? 'ready' : 'empty';
+  }
+
+  scoreEvidence(suggestion: JevSuggestion | null | undefined): string[] {
+    if (!suggestion) {
+      return [];
+    }
+    return [
+      `Model ${suggestion.model}`,
+      `Rubric ${suggestion.rubricVersion}`,
+      'Advisory only — does not change lead status or score authority',
+    ];
+  }
+
+  onAdvisoryDismiss(): void {
+    this.snackBar.open('Advisory dismissed (no record change)', undefined, { duration: 2500 });
+  }
+
+  onAdvisoryAcknowledge(): void {
+    this.snackBar.open('Advisory acknowledged (not a decision)', undefined, { duration: 2500 });
   }
 
   clearError(): void {

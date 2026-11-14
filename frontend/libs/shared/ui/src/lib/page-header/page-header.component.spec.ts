@@ -31,6 +31,27 @@ class HostWithoutSearchComponent {}
 })
 class HostWithSearchComponent {}
 
+@Component({
+  standalone: true,
+  imports: [PageHeaderComponent],
+  template: `
+    <app-page-header title="Acme" subtitle="Technology">
+      <nav breadcrumb aria-label="Breadcrumb">
+        <a href="/organizations">Accounts</a>
+        <span> / </span>
+        <span>Acme</span>
+      </nav>
+      <div actions>
+        <button type="button">Edit</button>
+      </div>
+      <div highlights>
+        <span class="hl">Phone</span>
+      </div>
+    </app-page-header>
+  `,
+})
+class HostWithRecordSlotsComponent {}
+
 describe('PageHeaderComponent', () => {
   async function settle(fixture: ComponentFixture<unknown>): Promise<void> {
     fixture.detectChanges();
@@ -81,6 +102,42 @@ describe('PageHeaderComponent', () => {
       expect(search).toBeTruthy();
       expect(search.hidden).toBe(false);
       expect(search.querySelector('input[type="search"]')).toBeTruthy();
+    });
+  });
+
+  describe('with record breadcrumb and highlights', () => {
+    let fixture: ComponentFixture<HostWithRecordSlotsComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [HostWithRecordSlotsComponent],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(HostWithRecordSlotsComponent);
+      await settle(fixture);
+    }, 30000);
+
+    it('shows breadcrumb and highlights when projected', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const crumb = el.querySelector('.page-header-breadcrumb') as HTMLElement;
+      const highlights = el.querySelector('.page-header-highlights') as HTMLElement;
+      expect(crumb.hidden).toBe(false);
+      expect(crumb.querySelector('nav[aria-label="Breadcrumb"]')).toBeTruthy();
+      expect(highlights.hidden).toBe(false);
+      expect(highlights.textContent).toContain('Phone');
+      expect(el.querySelector('.page-header--record')).toBeTruthy();
+    });
+
+    it('keeps list headers working without those slots', async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [HostWithoutSearchComponent],
+      }).compileComponents();
+      const listFixture = TestBed.createComponent(HostWithoutSearchComponent);
+      await settle(listFixture);
+      const el = listFixture.nativeElement as HTMLElement;
+      expect((el.querySelector('.page-header-breadcrumb') as HTMLElement).hidden).toBe(true);
+      expect((el.querySelector('.page-header-highlights') as HTMLElement).hidden).toBe(true);
     });
   });
 });

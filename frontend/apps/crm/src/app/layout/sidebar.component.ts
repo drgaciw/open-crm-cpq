@@ -20,7 +20,7 @@ import { MatIconModule } from '@angular/material/icon';
       </a>
       <a mat-list-item routerLink="/organizations" routerLinkActive="active-link">
         <mat-icon matListItemIcon>business</mat-icon>
-        <span matListItemTitle>Organizations</span>
+        <span matListItemTitle>Accounts</span>
       </a>
       <a mat-list-item routerLink="/contacts" routerLinkActive="active-link">
         <mat-icon matListItemIcon>people</mat-icon>
@@ -78,26 +78,26 @@ import { MatIconModule } from '@angular/material/icon';
         height: 100%;
       }
       .sidebar-header {
-        padding: 16px 24px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        padding: var(--crm-space-md, 16px) var(--crm-space-lg, 24px);
+        border-bottom: 1px solid var(--crm-color-line, #d8e0ed);
       }
       .sidebar-title {
         margin: 0;
         font-size: 1.25rem;
         font-weight: 600;
-        color: #1976d2;
+        color: var(--crm-color-brand, #1b5fd1);
       }
       .nav-group {
-        margin: 16px 16px 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+        margin: var(--crm-space-md, 16px) var(--crm-space-md, 16px) var(--crm-space-xs, 4px);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(0, 0, 0, 0.54);
+        color: var(--crm-color-muted, #52627b);
       }
       .active-link {
-        background-color: rgba(25, 118, 210, 0.08) !important;
-        color: #1976d2 !important;
+        background-color: color-mix(in srgb, var(--crm-color-brand, #1b5fd1) 10%, transparent) !important;
+        color: var(--crm-color-brand, #1b5fd1) !important;
       }
     `,
   ],

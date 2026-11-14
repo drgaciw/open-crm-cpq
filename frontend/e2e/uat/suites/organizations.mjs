@@ -58,6 +58,12 @@ export default {
       return (await row.innerText()).replace(/\s+/g, ' ').slice(0, 80);
     });
 
+    // UI-CRM-SLDS Phase 2: the list renders the shared DataTableComponent, not a raw mat-table.
+    await runCheck(ctx, 'organizations.list.uses-shared-data-table', async () => {
+      await findRow(page, org.name);
+      await page.getByTestId('data-table').waitFor({ state: 'visible', timeout: 5000 });
+    });
+
     await runCheck(ctx, 'organizations.search.clear-restores-list', async () => {
       await findRow(page, org.name);
       await page.getByRole('button', { name: 'Clear search', exact: true }).click();
