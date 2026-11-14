@@ -1,3 +1,5 @@
+import { CRM_STATUS_TONES } from './status-tokens';
+
 /**
  * Catalog product domain models.
  * Aligned to product-service (`com.opencrm.product.catalog.*`).
@@ -91,10 +93,10 @@ export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
 };
 
 export const PRODUCT_STATUS_COLORS: Record<ProductStatus, string> = {
-  DRAFT: '#9e9e9e',
-  ACTIVE: '#4caf50',
-  DEPRECATED: '#ff9800',
-  RETIRED: '#757575',
+  DRAFT: CRM_STATUS_TONES.muted.ink,
+  ACTIVE: CRM_STATUS_TONES.success.ink,
+  DEPRECATED: CRM_STATUS_TONES.warning.ink,
+  RETIRED: CRM_STATUS_TONES.muted.ink,
 };
 
 /** Mirrors: com.opencrm.product.catalog.BillingFrequency */
