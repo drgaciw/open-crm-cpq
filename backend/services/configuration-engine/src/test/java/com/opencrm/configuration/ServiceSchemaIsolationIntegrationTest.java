@@ -2,6 +2,7 @@ package com.opencrm.configuration;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
@@ -13,6 +14,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -32,11 +35,6 @@ class ServiceSchemaIsolationIntegrationTest {
     @Container
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("opencrm");
-
-    /** Flyway versions applied to schema contract. Count is this list, not a floor. */
-    private static final List<String> CONTRACT_MIGRATION_VERSIONS = List.of(
-            "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.7.1", "1.7.2", "1.8", "1.10", "1.11", "1.12",
-            "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20", "1.21");
 
     /** Every base table in schema contract, including assets and the asset history. */
     private static final List<String> CONTRACT_TABLES = List.of(
@@ -58,28 +56,19 @@ class ServiceSchemaIsolationIntegrationTest {
             "processed_events",
             "renewal_eligibility_publications",
             "renewal_policy_record",
+            // V1_22 signature envelopes (DRG-457).
+            "signature_envelope_events",
+            "signature_envelopes",
             "subscription_ingest_audits",
             "subscription_rate_periods",
             "subscriptions");
 
-    // Migration counts per service. Each ADR-018 step that touches outbox_events adds one per schema:
-    // D2/D3 relay status, D6 inbox (approval, contract), D4 envelope columns and the SKIPPED status.
+    /** Counts are the versioned scripts in each module's {@code db/migration} folder. */
     private static final List<Service> SERVICES = List.of(
-            // V1_6 adds configuration_hash/frozen_at and widens the status CHECK for FROZEN (DRG-428).
-            new Service("configuration-engine", "configuration", "configuration_sessions", 6),
-            // V1_1 tables, V1_2 relay status/leasing, V1_3 envelope columns, V1_4 SKIPPED status,
-            // V1_5 catalog version/rule-set version/tenant/bundle columns (DRG-424)
-            new Service("approval-routing", "approval", "approval_requests", 9),
-            new Service("document-generation", "document", "document_generation_jobs", 4),
-            // V1_1 to V1_5 as above, V1_6 rate schedule, V1_7 contract documents, V1_7_1 renewal receipts,
-            // V1_7_2 frozen line membership, V1_8 header backfill functions,
-            // V1_10 unpriced revision storage (S3). That file is one Flyway version and creates two tables.
-            // V1_11 renewal policy records.
-            // V1_9 is permanently unused; V1_12 creates the ledger, V1_13 assets,
-            // V1_14 asset history, and V1_15 adds unit replay evidence.
-            // V1_18 adds subscriptions.tenant_id. V1_19 adds subscription_model and creates
-            // subscription_ingest_audits. V1_20 adds customer_account_id. V1_21 adds renewal_mode.
-            new Service("contract-asset-management", "contract", "subscriptions", CONTRACT_MIGRATION_VERSIONS.size()));
+            counted("configuration-engine", "configuration", "configuration_sessions"),
+            counted("approval-routing", "approval", "approval_requests"),
+            counted("document-generation", "document", "document_generation_jobs"),
+            counted("contract-asset-management", "contract", "subscriptions"));
 
     @Test
     void defaultSchemasKeepTablesOutboxesAndHistoriesSeparate() throws Exception {
@@ -115,11 +104,22 @@ class ServiceSchemaIsolationIntegrationTest {
                 }
             }
         }
-        try (Connection connection = POSTGRES.createConnection(""); var statement = connection.createStatement();
-             var result = statement.executeQuery("SELECT count(*) FROM information_schema.tables "
-                     + "WHERE table_schema = 'public' AND table_name IN ('outbox_events', 'flyway_schema_history')")) {
-            assertThat(result.next()).isTrue();
-            assertThat(result.getInt(1)).isZero();
+        try (Connection connection = POSTGRES.createConnection(""); var statement = connection.createStatement()) {
+            try (var result = statement.executeQuery("SELECT count(*) FROM information_schema.tables "
+                    + "WHERE table_schema = 'public' AND table_name IN ('outbox_events', 'flyway_schema_history')")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isZero();
+            }
+            // V1_22 tables belong only in schema contract.
+            List<String> leaked = new ArrayList<>();
+            try (var result = statement.executeQuery("SELECT table_schema || '.' || table_name FROM information_schema.tables "
+                    + "WHERE table_schema IN ('public', 'configuration', 'approval', 'document') "
+                    + "AND table_name IN ('signature_envelopes', 'signature_envelope_events')")) {
+                while (result.next()) {
+                    leaked.add(result.getString(1));
+                }
+            }
+            assertThat(leaked).isEmpty();
         }
     }
 
@@ -171,7 +171,7 @@ class ServiceSchemaIsolationIntegrationTest {
                 versions.add(result.getString(1));
             }
         }
-        assertThat(versions).containsExactlyElementsOf(CONTRACT_MIGRATION_VERSIONS);
+        assertThat(versions).containsExactlyElementsOf(migrationVersions("contract-asset-management"));
         assertThat(versions).doesNotContain("1.9");
         List<String> tables = new ArrayList<>();
         try (var result = statement.executeQuery(
@@ -221,13 +221,13 @@ class ServiceSchemaIsolationIntegrationTest {
                 .defaultSchema(config.getRequiredProperty("spring.flyway.default-schema"))
                 .schemas(config.getRequiredProperty("spring.flyway.schemas"))
                 .baselineOnMigrate(config.getRequiredProperty("spring.flyway.baseline-on-migrate", Boolean.class))
-                .locations("filesystem:" + resources(service).resolve("db/migration").toAbsolutePath())
+                .locations("filesystem:" + resources(service.module()).resolve("db/migration").toAbsolutePath())
                 .load();
     }
 
     private static StandardEnvironment configuration(Service service, Map<String, Object> overrides) {
         var yaml = new YamlPropertiesFactoryBean();
-        yaml.setResources(new FileSystemResource(resources(service).resolve("application.yml")));
+        yaml.setResources(new FileSystemResource(resources(service.module()).resolve("application.yml")));
         var environment = new StandardEnvironment();
         // Test only explicit overrides; developer shell environment must not redirect test connections.
         environment.getPropertySources().remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
@@ -239,12 +239,37 @@ class ServiceSchemaIsolationIntegrationTest {
         return environment;
     }
 
-    private static Path resources(Service service) {
+    private static Service counted(String module, String schema, String table) {
+        return new Service(module, schema, table, migrationVersions(module).size());
+    }
+
+    /**
+     * Versions of {@code V*__*.sql} in the module's {@code src/main/resources/db/migration}.
+     * That folder is what the service loads as {@code classpath:db/migration}. These modules are
+     * not on this test's classpath, so the scripts are read from the same directory passed to Flyway.
+     */
+    private static List<String> migrationVersions(String module) {
+        Path directory = resources(module).resolve("db/migration");
+        try (var paths = Files.list(directory)) {
+            return paths.filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.startsWith("V") && name.contains("__") && name.endsWith(".sql"))
+                    .map(name -> name.substring(1, name.indexOf("__")).replace('_', '.'))
+                    .map(MigrationVersion::fromVersion)
+                    .sorted()
+                    .map(MigrationVersion::getVersion)
+                    .toList();
+        } catch (IOException ex) {
+            throw new UncheckedIOException("Cannot read migrations for " + module, ex);
+        }
+    }
+
+    private static Path resources(String module) {
         Path directory = Path.of("").toAbsolutePath();
         while (directory != null) {
             Path services = directory.resolve("services");
             if (Files.isDirectory(services.resolve("configuration-engine"))) {
-                return services.resolve(service.module()).resolve("src/main/resources");
+                return services.resolve(module).resolve("src/main/resources");
             }
             directory = directory.getParent();
         }
