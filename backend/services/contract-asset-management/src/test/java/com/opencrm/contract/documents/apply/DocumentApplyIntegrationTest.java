@@ -670,8 +670,11 @@ class DocumentApplyIntegrationTest {
         jdbc.update("""
                 insert into contracts (id, tenant_id, contract_number, customer_account_id, term_model,
                     start_date, end_date, status, last_executed_seq, created_by)
-                values (?, ?, ?, ?, 'TERMED', '2026-01-01', '2026-12-31', 'ACTIVE', 0, 'test')
-                """, id, tenant, "OTHER-" + id, UUID.randomUUID());
+                select ?, ?, ?, customer_account_id, 'TERMED', '2026-01-01', '2026-12-31', 'ACTIVE', 0, 'test'
+                from contracts
+                where tenant_id = ?
+                limit 1
+                """, id, tenant, "OTHER-" + id, tenant);
         return id;
     }
 
@@ -768,10 +771,12 @@ class DocumentApplyIntegrationTest {
                         inputs_snapshot_ref, status_at_close, created_by)
                     values (?, 1, ?, 1, ?, ?, 'snapshot', 'EXECUTED', 'test')
                     """, documentId, tenant, quoteId, HASH);
-            insertSubscription(firstSubscription);
-            insertSubscription(secondSubscription);
-            jdbc.update("update subscriptions set contract_id = ?, tenant_id = ? where uuid in (?, ?)",
-                    contractId, tenant, firstSubscription.toString(), secondSubscription.toString());
+            insertSubscription(firstSubscription, customer);
+            insertSubscription(secondSubscription, customer);
+            jdbc.update("""
+                    update subscriptions set contract_id = ?, tenant_id = ?, customer_account_id = ?
+                    where uuid in (?, ?)
+                    """, contractId, tenant, customer, firstSubscription.toString(), secondSubscription.toString());
             insertUnit(documentId, tenant, 1, firstSubscription);
             insertUnit(documentId, tenant, 2, secondSubscription);
             insertLine(documentId, tenant, 1, firstSubscription);
@@ -785,12 +790,12 @@ class DocumentApplyIntegrationTest {
         });
     }
 
-    private void insertSubscription(UUID uuid) {
+    private void insertSubscription(UUID uuid, UUID customerAccountId) {
         jdbc.update("""
                 insert into subscriptions (uuid, subscription_number, customer_id, quote_id, status, plan_name,
-                    start_date, end_date, commercial_revision, created_by)
-                values (?, ?, ?, ?, 'ACTIVE', 'Plan', '2026-01-01', '2026-12-31', 0, 'test')
-                """, uuid.toString(), "SUB-" + uuid, uuid.toString(), "Q-" + uuid);
+                    start_date, end_date, commercial_revision, customer_account_id, created_by)
+                values (?, ?, ?, ?, 'ACTIVE', 'Plan', '2026-01-01', '2026-12-31', 0, ?, 'test')
+                """, uuid.toString(), "SUB-" + uuid, uuid.toString(), "Q-" + uuid, customerAccountId);
     }
 
     private void insertUnit(UUID documentId, UUID tenant, int unitNo, UUID subscription) {
