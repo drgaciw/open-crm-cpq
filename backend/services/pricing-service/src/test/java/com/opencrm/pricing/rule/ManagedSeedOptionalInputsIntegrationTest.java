@@ -149,7 +149,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
     @Test
     void disablesUneditedSystemRule007AndSecondApplyIsANoOp() {
         int notices = v9NoOpNotices();
-        latest.migrate();
+        migrateThroughV9();
 
         Map<String, Object> disabled = rule007();
         assertThat(disabled.get("status")).isEqualTo("DISABLED");
@@ -159,8 +159,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from pricing.rules where status = 'ACTIVE'", Long.class))
                 .isEqualTo(10L);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
-        latest.migrate();
+        replayV9();
 
         assertThat(rule007()).isEqualTo(disabled);
         assertThat(v9NoOpNotices()).isEqualTo(notices);
@@ -174,7 +173,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         assertThat(rule007Md5()).isNotEqualTo(UNEDITED_RULE_007_MD5);
 
         int notices = v9NoOpNotices();
-        latest.migrate();
+        migrateThroughV9();
 
         Map<String, Object> row = rule007();
         assertThat(row.get("status")).isEqualTo("ACTIVE");
@@ -183,8 +182,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         awaitNoOpNotices(notices + 1);
         assertThat(v9NoOpNotices()).as("server log contains: %s", V9_NO_OP_NOTICE).isEqualTo(notices + 1);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
-        latest.migrate();
+        replayV9();
         awaitNoOpNotices(notices + 2);
         assertThat(rule007()).isEqualTo(row);
         assertThat(v9NoOpNotices()).isEqualTo(notices + 2);
@@ -197,7 +195,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         assertThat(rule007Md5()).isEqualTo(UNEDITED_RULE_007_MD5);
 
         int notices = v9NoOpNotices();
-        latest.migrate();
+        migrateThroughV9();
 
         Map<String, Object> row = rule007();
         assertThat(row.get("status")).isEqualTo("ACTIVE");
@@ -206,8 +204,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         awaitNoOpNotices(notices + 1);
         assertThat(v9NoOpNotices()).as("server log contains: %s", V9_NO_OP_NOTICE).isEqualTo(notices + 1);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
-        latest.migrate();
+        replayV9();
         awaitNoOpNotices(notices + 2);
         assertThat(rule007()).isEqualTo(row);
         assertThat(v9NoOpNotices()).isEqualTo(notices + 2);
@@ -216,6 +213,21 @@ class ManagedSeedOptionalInputsIntegrationTest {
     private void migrateThroughV8() {
         Flyway.configure().dataSource(jdbc.getDataSource()).schemas("pricing").defaultSchema("pricing")
                 .locations("classpath:db/migration").target("8").load().migrate();
+    }
+
+    /**
+     * Stops at V9. The replay deletes the V9 history row and migrates again. Applying
+     * V10 and V11 first leaves that row behind an already-applied version, and Flyway
+     * rejects the pending V9 as a resolved migration that was not applied.
+     */
+    private void migrateThroughV9() {
+        Flyway.configure().dataSource(jdbc.getDataSource()).schemas("pricing").defaultSchema("pricing")
+                .locations("classpath:db/migration").target("9").load().migrate();
+    }
+
+    private void replayV9() {
+        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
+        migrateThroughV9();
     }
 
     private int v9NoOpNotices() {
