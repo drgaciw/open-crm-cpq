@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { computed, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { PriceBookListComponent } from './price-book-list.component';
 import { PriceBookCreateDialogComponent } from '../price-book-create-dialog/price-book-create-dialog.component';
@@ -86,6 +87,26 @@ describe('PriceBookListComponent', () => {
     priceBooks.set([...MOCK_PRICE_BOOKS]);
     loading.set(false);
     error.set(null);
+  });
+
+  describe('column sorting (H-CPQ-PR-006)', () => {
+    const emitSort = (active: string, direction: 'asc' | 'desc' | '') => {
+      fixture.debugElement.query(By.css('app-data-table')).triggerEventHandler('sortChange', { active, direction });
+      fixture.detectChanges();
+    };
+
+    it('reloads page 0 from the API in the order the header asks for', () => {
+      listSpy.mockClear();
+      emitSort('name', 'desc');
+      expect(listSpy.mock.lastCall?.slice(0, 3)).toEqual([0, 20, 'name,desc']);
+    });
+
+    it('falls back to name order when the sort is cleared', () => {
+      emitSort('currency', 'asc');
+      listSpy.mockClear();
+      emitSort('currency', '');
+      expect(listSpy.mock.lastCall?.slice(0, 3)).toEqual([0, 20, 'name,asc']);
+    });
   });
 
   it('loads price books via PriceBookService.list on init', () => {
