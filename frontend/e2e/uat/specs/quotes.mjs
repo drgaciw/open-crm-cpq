@@ -22,7 +22,8 @@ export const STATUS_LABELS = {
 export const filters = {
   status: {
     label: 'Status', ariaLabel: 'Filter by status', kind: 'select',
-    options: [{ label: 'All statuses', value: '' }, ...STATUSES.map((s) => ({ label: s, value: s }))],
+    // H-CPQ-Q-002 fix: the filter shows the badge's words and still filters by the enum.
+    options: [{ label: 'All statuses', value: '' }, ...STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))],
   },
   dealType: {
     label: 'Deal type', ariaLabel: 'Filter by deal type', kind: 'select',

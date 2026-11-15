@@ -158,7 +158,7 @@ export default {
       await openList(page);
       const filtered = page.waitForResponse((r) => r.url().includes(`${API}?`) && r.url().includes('status=CANCELLED'), { timeout: 10000 })
         .catch(() => null);
-      await fillField(page, main(page), filters.status, 'CANCELLED');
+      await fillField(page, main(page), filters.status, STATUS_LABELS.CANCELLED);
       const response = await filtered;
       if (!response) throw new Error('choosing a status did not request ?status=CANCELLED');
       await searchBox(page).fill(first.name); // a DRAFT quote must not survive a CANCELLED filter
