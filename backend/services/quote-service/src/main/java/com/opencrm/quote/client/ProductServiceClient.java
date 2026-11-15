@@ -46,8 +46,10 @@ public class ProductServiceClient {
                     .retrieve()
                     .body(VALIDATE_RESPONSE);
         } catch (RestClientException ex) {
+            // The transport detail (host, port, exception text) is for the log, not the Submit banner (H-CPQ-Q-006).
+            log.warn("configuration-engine evaluate failed: {}", ex.getMessage());
             throw new BusinessException(
-                    "Failed to call configuration-engine evaluate: " + ex.getMessage(),
+                    "The configuration check is unavailable right now. Try submitting again in a few minutes.",
                     HttpStatus.BAD_GATEWAY,
                     "CONFIGURATION_VALIDATE_UNAVAILABLE"
             );
