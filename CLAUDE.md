@@ -87,6 +87,7 @@ Browser UAT / chaos (`frontend/e2e/`, plain `.mjs`, driven by Playwright):
 ```bash
 node e2e/uat-crm-smoke.mjs     # deterministic smoke
 node e2e/uat-jev-local.mjs     # LLM-driven (Jev) browser agent; needs OPENROUTER_API_KEY
+node e2e/uat-jev-mcp.mjs       # Jev drives the webapp through the Playwright MCP server (npx @playwright/mcp)
 node e2e/chaos-crm.mjs         # network/fault injection
 ```
 
