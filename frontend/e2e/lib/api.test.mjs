@@ -145,6 +145,13 @@ test('teardown deletes ledgered records newest-first and reports what it could n
   assert.equal(residue[0].type, 'organization');
 });
 
+test('tracking the same record twice ledgers it once', () => {
+  const api = createApi(fakeRequest([]), { base: 'http://x', sleep: noSleep });
+  api.track('quote', 7, '/api/v1/quotes/7');
+  api.track('quote', '7', '/api/v1/quotes/7');
+  assert.equal(api.ledger.length, 1);
+});
+
 // ── preflight classification ──────────────────────────────────────────────────
 
 test('classifies backend probes', () => {

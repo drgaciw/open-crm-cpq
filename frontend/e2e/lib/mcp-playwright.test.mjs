@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseSnapshot, responseFacts, createMcpClient, tableRows, actionCandidates } from './mcp-playwright.mjs';
@@ -92,6 +92,22 @@ test('createMcpClient speaks newline-delimited JSON-RPC: initialize, tools/list 
   } finally {
     client.close();
   }
+});
+
+test('createMcpClient stops the server when the handshake fails', async () => {
+  // A server that starts, records its pid, and never answers initialize.
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-silent-'));
+  const server = join(dir, 'server.mjs');
+  const pidFile = join(dir, 'pid');
+  writeFileSync(server, `
+    import { writeFileSync } from 'node:fs';
+    writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+    process.stdin.resume();
+  `);
+  await assert.rejects(createMcpClient({ command: process.execPath, args: [server], timeoutMs: 500 }), /initialize timed out/);
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.throws(() => process.kill(pid, 0), /ESRCH/, 'the server process is still running');
 });
 
 test('tableRows groups each data row with its cell texts; header rows are skipped', () => {
