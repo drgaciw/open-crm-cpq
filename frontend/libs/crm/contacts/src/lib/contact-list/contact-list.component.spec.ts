@@ -142,4 +142,19 @@ describe('ContactListComponent shared-ui wiring', () => {
     component.retry();
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'lastName,asc');
   });
+
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): every row menu was named "Contact actions".
+  it('names each row actions button after its contact', () => {
+    contacts.set([
+      contact({ id: 1, firstName: 'Ada', lastName: 'Lovelace' }),
+      contact({ id: 2, firstName: 'Alan', lastName: 'Turing' }),
+    ]);
+    loading.set(false);
+    error.set(null);
+    fixture.detectChanges();
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button[aria-label^="Actions for"]'),
+    ).map((b) => b.getAttribute('aria-label'));
+    expect(labels).toEqual(['Actions for Ada Lovelace', 'Actions for Alan Turing']);
+  });
 });
