@@ -120,6 +120,17 @@ describe('LeadFormComponent linked records and validation (H-CRM-016, H-CRM-023,
     expect(submit.disabled).toBe(true);
   });
 
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): the Priority options read "LOW", "MEDIUM",
+  // "HIGH", "URGENT" — the raw enum — and the closed select showed "MEDIUM".
+  it('shows lead priority in words, not as the raw enum', async () => {
+    await setup();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const shown = (fixture.nativeElement as HTMLElement).querySelector('mat-select[formcontrolname="priority"] .mat-mdc-select-value-text');
+    expect(shown?.textContent?.trim()).toBe('Medium');
+    expect(component.priorities.map((p) => component.priorityLabel(p))).toEqual(['Low', 'Medium', 'High', 'Urgent']);
+  });
+
   it('zero is a valid estimated value', async () => {
     await setup();
     control('title').setValue('New lead');
