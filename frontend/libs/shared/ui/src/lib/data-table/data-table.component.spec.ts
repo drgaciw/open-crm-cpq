@@ -61,7 +61,7 @@ describe('DataTableComponent', () => {
     component.componentRef.setInput('columns', [{ key: 'title', header: 'Title' }]);
     component.componentRef.setInput('data', [{ id: 1, title: 'Alpha' }, { id: 2, title: 'Beta' }]);
     component.componentRef.setInput('rowActions', [{ action: 'edit', label: 'Edit' }]);
-    component.componentRef.setInput('rowActionsAriaLabel', (row: { title: string }) => `Actions for ${row.title}`);
+    component.componentRef.setInput('rowActionsAriaLabel', (row: unknown) => `Actions for ${(row as { title: string }).title}`);
     component.detectChanges();
 
     const labels = Array.from(component.nativeElement.querySelectorAll('td.actions-cell button'))

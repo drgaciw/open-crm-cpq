@@ -120,7 +120,7 @@ const ACTIONS_COLUMN_KEY = '__actions';
                       type="button"
                       [matMenuTriggerFor]="rowMenu"
                       [disabled]="rowActionsDisabled()"
-                      [attr.aria-label]="rowActionsAriaLabel()"
+                      [attr.aria-label]="rowActionsLabel(row)"
                     >
                       <mat-icon>more_vert</mat-icon>
                     </button>
@@ -284,7 +284,13 @@ export class DataTableComponent<T = unknown> {
   /** Optional trailing menu actions; empty/omitted keeps CPQ lists unchanged. */
   rowActions = input<TableRowAction[]>([]);
   /** Accessible name for the row actions trigger (CRM lists customize per entity). */
-  rowActionsAriaLabel = input<string>('Row actions');
+  /** Accessible name of each row's actions trigger: a fixed string, or built from the row. */
+  rowActionsAriaLabel = input<string | ((row: unknown) => string)>('Row actions');
+
+  rowActionsLabel(row: unknown): string {
+    const label = this.rowActionsAriaLabel();
+    return typeof label === 'function' ? label(row) : label;
+  }
   /** Disables the actions trigger (e.g. while a lifecycle mutation is in flight). */
   rowActionsDisabled = input<boolean>(false);
   pageSizeOptions = input<number[]>([10, 25, 50, 100]);

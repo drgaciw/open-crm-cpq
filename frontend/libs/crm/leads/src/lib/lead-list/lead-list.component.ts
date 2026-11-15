@@ -113,7 +113,7 @@ export interface LeadTableRow {
         [loading]="service.loading()"
         [pagination]="service.pagination()"
         [rowActions]="rowActions"
-        rowActionsAriaLabel="Lead actions"
+        [rowActionsAriaLabel]="rowActionsLabel"
         [rowActionsDisabled]="actionLoading()"
         [pageSizeOptions]="[10, 20, 50]"
         (pageChange)="onPageChange($event)"
@@ -381,6 +381,9 @@ export class LeadListComponent implements OnInit {
       });
     });
   }
+
+  /** Per-row accessible name for the actions trigger, e.g. "Actions for Acme renewal". */
+  readonly rowActionsLabel = (row: unknown): string => `Actions for ${(row as LeadTableRow).title}`;
 
   canEdit(status: LeadStatus): boolean {
     return status !== 'CONVERTED' && status !== 'LOST';
