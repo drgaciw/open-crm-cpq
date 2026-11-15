@@ -46,9 +46,9 @@ export default [
     claim: 'Reject flows collect the reason through native window.prompt; on the approvals inbox the prompt fires BEFORE the Material confirm dialog.',
     file: 'frontend/libs/cpq/approvals/src/lib/approvals-inbox/approvals-inbox.component.ts',
     triage: 'browserCheckable',
-    checkId: 'approvals.row.reject.prompt-before-confirm',
+    checkId: 'approvals.row.reject.single-dialog',
     class: 'consistency',
-    note: 'Confirmed by source (approvals-inbox onReject: prompt, then dialog.open; quotes-detail onReject: prompt only). Both browser checks need an IN_REVIEW quote / a pending approval, unreachable while configuration-engine and approval-routing are down. Second check: quotes.reject.uses-native-prompt.',
+    note: 'Fixed on both screens (UAT 2026-11-14): quotes-detail and the approvals inbox open one Material reject dialog with an optional reason. Second check: quotes.reject.uses-native-prompt.',
   },
   {
     id: 'H-CPQ-Q-006',
