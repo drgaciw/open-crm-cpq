@@ -98,6 +98,17 @@ describe('DealDetailComponent', () => {
     expect(probability?.querySelector('.value')?.textContent?.trim()).toBe('0%');
   });
 
+  it('does not offer Edit on a closed opportunity, which the API refuses to update (H-CRM-040)', () => {
+    const buttons = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.header-actions button'))
+      .map((b) => b.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    expect(buttons().some((t) => t.endsWith('Edit'))).toBe(true);
+    for (const stage of ['WON', 'LOST'] as const) {
+      selectedDeal.set(deal({ id: 6, name: 'Closed', stage }));
+      fixture.detectChanges();
+      expect(buttons().some((t) => t.endsWith('Edit'))).toBe(false);
+    }
+  });
+
   it('onWin explains OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE and keeps the open stage', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     markWon.mockReturnValueOnce(throwError(() => ({
