@@ -31,8 +31,11 @@ import {
 import {
   AttributeValueDto,
   AttributeValueSetRequest,
+  CATALOG_PRODUCT_TYPE_LABELS,
   CATALOG_PRODUCT_TYPES,
   CatalogProductType,
+  PRODUCT_CATEGORY_LABELS,
+  PRODUCT_STATUS_LABELS,
   ProductAttributeDto,
   ProductCategory,
   ProductDto,
@@ -249,7 +252,7 @@ function httpErrorMessage(
                     <mat-label>Product type</mat-label>
                     <mat-select formControlName="productType" aria-label="Product type">
                       @for (t of productTypes; track t) {
-                        <mat-option [value]="t">{{ t }}</mat-option>
+                        <mat-option [value]="t">{{ typeLabels[t] ?? t }}</mat-option>
                       }
                     </mat-select>
                     @if (form.get('productType')?.hasError('required')) {
@@ -261,7 +264,7 @@ function httpErrorMessage(
                     <mat-label>Category</mat-label>
                     <mat-select formControlName="category" aria-label="Category">
                       @for (c of categories; track c) {
-                        <mat-option [value]="c">{{ c }}</mat-option>
+                        <mat-option [value]="c">{{ categoryLabels[c] ?? c }}</mat-option>
                       }
                     </mat-select>
                     @if (form.get('category')?.hasError('required')) {
@@ -275,7 +278,7 @@ function httpErrorMessage(
                     <mat-label>Status</mat-label>
                     <mat-select formControlName="status" aria-label="Status">
                       @for (s of statuses; track s) {
-                        <mat-option [value]="s">{{ s }}</mat-option>
+                        <mat-option [value]="s">{{ statusLabels[s] ?? s }}</mat-option>
                       }
                     </mat-select>
                     @if (form.get('status')?.hasError('required')) {
@@ -786,6 +789,10 @@ export class CatalogDetailComponent implements OnInit {
   readonly attrsError = signal<string | null>(null);
 
   readonly productTypes: CatalogProductType[] = [...CATALOG_PRODUCT_TYPES];
+  /** The edit form shows labels, as the header and list do; the values are unchanged. */
+  protected readonly typeLabels: Record<string, string> = CATALOG_PRODUCT_TYPE_LABELS;
+  protected readonly categoryLabels: Record<string, string> = PRODUCT_CATEGORY_LABELS;
+  protected readonly statusLabels: Record<string, string> = PRODUCT_STATUS_LABELS;
   readonly categories: ProductCategory[] = [
     'SUBSCRIPTION',
     'LICENSE',
