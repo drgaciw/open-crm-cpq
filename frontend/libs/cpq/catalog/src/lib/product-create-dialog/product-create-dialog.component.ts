@@ -30,6 +30,8 @@ import { MatIconModule } from '@angular/material/icon';
 import {
   CATALOG_PRODUCT_TYPES,
   CatalogProductType,
+  CATALOG_PRODUCT_TYPE_LABELS,
+  PRODUCT_CATEGORY_LABELS,
   ProductCategory,
   ProductCreateRequest,
   ProductDto,
@@ -100,7 +102,7 @@ export interface ProductCreateFormModel {
             <mat-label>Product type</mat-label>
             <mat-select [formField]="productForm.productType" aria-label="Product type">
               @for (t of productTypes; track t) {
-                <mat-option [value]="t">{{ t }}</mat-option>
+                <mat-option [value]="t">{{ typeLabels[t] ?? t }}</mat-option>
               }
             </mat-select>
             @if (productForm.productType().touched() && productForm.productType().invalid()) {
@@ -114,7 +116,7 @@ export interface ProductCreateFormModel {
             <mat-label>Category</mat-label>
             <mat-select [formField]="productForm.category" aria-label="Category">
               @for (c of categories; track c) {
-                <mat-option [value]="c">{{ c }}</mat-option>
+                <mat-option [value]="c">{{ categoryLabels[c] ?? c }}</mat-option>
               }
             </mat-select>
             @if (productForm.category().touched() && productForm.category().invalid()) {
@@ -222,6 +224,10 @@ export interface ProductCreateFormModel {
   `,
 })
 export class ProductCreateDialogComponent {
+  /** Users read labels; the enum value is the API contract (found by the Jev + Playwright MCP UAT). */
+  protected readonly typeLabels: Record<string, string> = CATALOG_PRODUCT_TYPE_LABELS;
+  protected readonly categoryLabels: Record<string, string> = PRODUCT_CATEGORY_LABELS;
+
   private readonly productService = inject(ProductService);
   private readonly dialogRef = inject(MatDialogRef<ProductCreateDialogComponent, ProductDto>);
 
