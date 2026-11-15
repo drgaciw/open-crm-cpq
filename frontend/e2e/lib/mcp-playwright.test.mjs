@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseSnapshot, responseFacts, createMcpClient } from './mcp-playwright.mjs';
+import { parseSnapshot, responseFacts, createMcpClient, tableRows } from './mcp-playwright.mjs';
 
 const SNAPSHOT = `- generic [ref=e4]:
   - link "Skip to main content" [ref=e5] [cursor=pointer]:
@@ -19,11 +19,11 @@ const SNAPSHOT = `- generic [ref=e4]:
     - textbox "Account name" [ref=e90]
     - combobox "Industry" [ref=e91]
     - textbox "Notes \\"quoted\\"" [ref=e92]: some value
-    - button "Create" [disabled] [ref=e95]
+    - button "Create" [disabled]
     - button "Cancel" [ref=e96] [cursor=pointer]
 `;
 
-test('parseSnapshot lists role, name, ref, url and state of every referenced element', () => {
+test('parseSnapshot lists role, name, ref, url and state of every element it can act on or report', () => {
   const elements = parseSnapshot(SNAPSHOT);
   const byRef = Object.fromEntries(elements.map((e) => [e.ref, e]));
   assert.deepEqual(byRef.e29, { role: 'link', name: 'Accounts', ref: 'e29', url: '/organizations', disabled: false });
@@ -31,7 +31,9 @@ test('parseSnapshot lists role, name, ref, url and state of every referenced ele
   assert.equal(byRef.e90.role, 'textbox');
   assert.equal(byRef.e90.name, 'Account name');
   assert.equal(byRef.e92.name, 'Notes "quoted"');
-  assert.equal(byRef.e95.disabled, true);
+  // Playwright MCP gives a disabled control no ref; it is still listed so a check can see it.
+  const create = elements.find((e) => e.role === 'button' && e.name === 'Create');
+  assert.deepEqual(create, { role: 'button', name: 'Create', ref: null, disabled: true });
   assert.equal(byRef.e96.disabled, false);
   assert.equal(byRef.e80.role, 'heading');
   assert.equal(byRef.e4.name, '');
@@ -47,8 +49,20 @@ test('responseFacts reads the page URL, title and snapshot file from a tool resp
     url: 'http://localhost:4200/quotes?status=DRAFT',
     title: 'Open CRM',
     snapshotFile: '.playwright-mcp/page-2026-11-15T10-39-34-329Z.yml',
+    snapshot: null,
   });
-  assert.deepEqual(responseFacts('### Result\nok'), { url: null, title: null, snapshotFile: null });
+  assert.deepEqual(responseFacts('### Result\nok'), { url: null, title: null, snapshotFile: null, snapshot: null });
+});
+
+test('responseFacts returns an inline snapshot, as browser_snapshot sends it', () => {
+  const text = [
+    '### Page', '- Page URL: http://localhost:4200/organizations/new', '- Page Title: Open CRM',
+    '### Snapshot', '```yaml', '- generic [ref=e4]:', '  - button "Create" [disabled]', '```',
+  ].join('\n');
+  const facts = responseFacts(text);
+  assert.equal(facts.snapshotFile, null);
+  assert.equal(facts.snapshot, '- generic [ref=e4]:\n  - button "Create" [disabled]');
+  assert.equal(parseSnapshot(facts.snapshot).find((e) => e.name === 'Create').disabled, true);
 });
 
 test('createMcpClient speaks newline-delimited JSON-RPC: initialize, tools/list and tools/call', async () => {
@@ -78,4 +92,26 @@ test('createMcpClient speaks newline-delimited JSON-RPC: initialize, tools/list 
   } finally {
     client.close();
   }
+});
+
+test('tableRows groups each data row with its cell texts; header rows are skipped', () => {
+  // As the data table renders: rows carry no name, only their cells do.
+  const yaml = `- table [ref=e150]:
+  - rowgroup [ref=e151]:
+    - row "Account Name Industry" [ref=e152]:
+      - columnheader "Account Name" [ref=e153]
+      - columnheader "Industry" [ref=e154]
+  - rowgroup [ref=e160]:
+    - row [ref=e161] [cursor=pointer]:
+      - cell "UAT Org 1" [ref=e162]
+      - cell "—" [ref=e163]
+      - cell [ref=e168]:
+        - button "Actions for UAT Org 1" [ref=e169]
+    - row [ref=e170] [cursor=pointer]:
+      - cell "UAT Org 2" [ref=e171]
+- button "Next page" [ref=e200]`;
+  assert.deepEqual(tableRows(parseSnapshot(yaml)), [
+    { ref: 'e161', cells: ['UAT Org 1', '—'] },
+    { ref: 'e170', cells: ['UAT Org 2'] },
+  ]);
 });
