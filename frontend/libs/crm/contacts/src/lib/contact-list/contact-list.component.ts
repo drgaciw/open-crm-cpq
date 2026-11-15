@@ -84,7 +84,7 @@ export interface ContactTableRow {
         [loading]="service.loading()"
         [pagination]="service.pagination()"
         [rowActions]="rowActions"
-        rowActionsAriaLabel="Contact actions"
+        [rowActionsAriaLabel]="rowActionsLabel"
         [pageSizeOptions]="[10, 20, 50]"
         (pageChange)="onPageChange($event)"
         (sortChange)="onSort($event)"
@@ -107,6 +107,9 @@ export interface ContactTableRow {
   `],
 })
 export class ContactListComponent implements OnInit {
+  /** Each row menu is named after its row, so screen readers can tell them apart (as H-A11Y-003). */
+  readonly rowActionsLabel = (row: unknown): string => `Actions for ${(row as ContactTableRow).name}`;
+
   readonly service = inject(ContactService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
