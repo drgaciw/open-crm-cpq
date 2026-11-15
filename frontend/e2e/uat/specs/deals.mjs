@@ -37,15 +37,15 @@ export const list = validateSpec({
   actions: [
     { name: 'Pipeline', in: 'header', navigatesTo: '/deals/kanban' },
     { name: 'New opportunity', in: 'header', navigatesTo: '/deals/new' },
-    // Row menu — the trigger's aria-label is the same "Deal actions" on every row (H-A11Y-003).
-    { name: 'Edit', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, navigatesTo: '/deals/:id/edit' },
-    { name: 'Advance Stage', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ADVANCEABLE },
+    // Row menu — each trigger is named "Actions for <name>" (H-A11Y-003 fixed).
+    { name: 'Edit', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ALL, navigatesTo: '/deals/:id/edit' },
+    { name: 'Advance Stage', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ADVANCEABLE },
     {
-      name: 'Mark Won', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: OPEN,
+      name: 'Mark Won', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: OPEN,
       confirm: { kind: 'native', message: /^Mark ".+" as Won\?$/ }, effect: { status: 'WON' },
     },
-    { name: 'Mark Lost', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: OPEN, opensDialog: 'Mark Deal as Lost', effect: { status: 'LOST' } },
-    { name: 'Delete', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, confirm: { kind: 'native', message: /^Delete ".+"\?$/ } },
+    { name: 'Mark Lost', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: OPEN, opensDialog: 'Mark Deal as Lost', effect: { status: 'LOST' } },
+    { name: 'Delete', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ALL, confirm: { kind: 'native', message: /^Delete ".+"\?$/ } },
   ],
   tables: [{
     columns: ['Opportunity', 'Organization', 'Owner', 'Amount', 'Stage', 'Probability', 'Close Date', 'Contact'],

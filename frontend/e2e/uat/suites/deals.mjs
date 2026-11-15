@@ -20,7 +20,8 @@ import { runKanban } from '../workflows/kanban-menus.mjs';
 
 const API = '/api/v1/deals';
 const DETAIL_URL = /\/deals\/(\d+)$/;
-const TRIGGER = 'Deal actions';
+/** Row-menu trigger name: per row since the H-A11Y-003 fix ("Actions for <opportunity name>"). */
+const TRIGGER = (name) => `Actions for ${name}`;
 
 /** Run-unique names end in a counter, so "…-deal-3" must not also match "…-deal-30". */
 const named = (name) => new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d)`);
@@ -47,7 +48,7 @@ async function findRow(page, name) {
 /** Open the row menu of a deal (scoped by row: the trigger label repeats) and return item labels. */
 async function openRowMenu(page, name) {
   const row = await findRow(page, name);
-  await row.getByRole('button', { name: TRIGGER, exact: true }).click();
+  await row.getByRole('button', { name: TRIGGER(name), exact: true }).click();
   await page.getByRole('menuitem').first().waitFor({ state: 'visible' });
   return (await page.getByRole('menuitem').allInnerTexts()).map((t) => t.replace(/^[a-z_]+\s+/, '').replace(/\s+/g, ' ').trim());
 }
@@ -317,7 +318,7 @@ export default {
       });
     }
 
-    // H-A11Y-003 (weak): every row's trigger is announced as the same "Deal actions".
+    // H-A11Y-003 (fixed): each row menu trigger must have its own accessible name.
     await runCheck(ctx, 'deals.a11y.row-menu-names-are-distinct', async () => {
       await search(page, `UAT-${runId}-deal`);
       const triggers = page.getByRole('row').getByRole('button', { name: /actions/i });
