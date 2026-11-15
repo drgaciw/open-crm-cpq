@@ -77,7 +77,27 @@ async function observe(text) {
   const yaml = facts.snapshot ?? (facts.snapshotFile ? readFileSync(resolve(facts.snapshotFile), 'utf8') : null);
   if (yaml === null) throw new Error('the MCP response carried no snapshot');
   // An empty page (e.g. an unknown route) has an empty snapshot: no elements, not an error.
-  return { path: facts.url ? new URL(facts.url).pathname : null, elements: parseSnapshot(yaml) };
+  const elements = parseSnapshot(yaml);
+  // The snapshot omits aria-haspopup, which a screen reader announces ("menu button", "dialog
+  // button"); read it.
+  const popups = await mcp.call('browser_evaluate', {
+    function: `() => [...document.querySelectorAll('[aria-haspopup]')]
+      .map((e) => [(e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim(),
+        e.getAttribute('aria-haspopup')])`,
+  }).then((t) => JSON.parse(t.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '[]'), () => []);
+  for (const e of elements) {
+    if (e.role !== 'button') continue;
+    const kind = popups.find(([name]) => name === e.name)?.[1];
+    if (kind === 'menu' || kind === 'true') e.opensMenu = true;
+    if (kind === 'dialog') e.opensDialog = true;
+  }
+  // The record's status as its page header shows it (a chip the snapshot gives no role), so the
+  // state says what a user sees: "Draft" before Submit, "In review" before Approve.
+  const status = await mcp.call('browser_evaluate', {
+    function: `() => [...document.querySelectorAll('app-page-header app-status-badge')]
+      .map((e) => (e.textContent || '').replace(/\\s+/g, ' ').trim()).filter(Boolean)`,
+  }).then((t) => JSON.parse(t.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '[]'), () => []);
+  return { path: facts.url ? new URL(facts.url).pathname : null, elements, status: status[0] ?? null };
 }
 
 async function open(path, text) {
@@ -92,6 +112,11 @@ const FRAMING =
   'through its controls: you can click buttons, links, tabs, menu items, options and table rows, and the test ' +
   'types the goal\'s values into the fields you name. Work one step at a time; "completedSteps" lists what was ' +
   'already done in this session.';
+/**
+ * True of this agent when a goal gives it nothing to type: it never fills an edit form itself
+ * (jevDriver.mjs adopted the same sentence; without it "Edit" draws 0.16-0.30 from the right button).
+ */
+const NO_VALUES = ' This goal gives no values to type, so a control that only opens an edit form or opens a record for editing cannot make progress.';
 const FORBIDDEN = [/\bdelete\b/i, /\barchive\b/i, /^remove\b/i, /sign out/i];
 
 class Inconclusive extends Error {}
@@ -151,6 +176,7 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
         headings: page.elements.filter((e) => e.role === 'heading' && e.name && e.scope !== 'navigation').map((e) => e.name),
         dialog: page.elements.find((e) => e.role === 'dialog')?.name || null,
       };
+      if (page.status) where.status = page.status;
       // What the form currently shows, as the snapshot reports it: an observation, not a hint.
       const layerFields = actionCandidates(page.elements).filter((a) => a.kind === 'fill' || a.kind === 'use');
       where.form = layerFields.map((f) => `${f.name}: ${page.elements.find((e) => e.ref === f.ref)?.value ?? '(empty)'}`);
@@ -242,14 +268,31 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
       const clicks = actions.filter((a) => a.kind === 'click' && a.role !== 'option'
         && (!FORBIDDEN.some((f) => f.test(a.name)) || allow.some((r) => r.test(a.name))));
       if (!clicks.length) throw new Inconclusive(`nothing to click at ${page.path}`);
-      const criteria = Object.fromEntries(clicks.map((c) => [c.key, `click ${c.label}`]));
+      // What a control is declared to do, as a screen reader would announce it: a menu or dialog
+      // button, or a link's destination.
+      const effectNote = (c) => {
+        const e = page.elements.find((x) => x.ref === c.ref);
+        if (e?.opensMenu) return ' (opens a menu of more actions)';
+        if (e?.opensDialog) return ' (opens a dialog)';
+        if (e?.role === 'link' && e.url) return ` (goes to ${e.url})`;
+        return '';
+      };
+      const criteria = Object.fromEntries(clicks.map((c) => [c.key, `click ${c.label}${effectNote(c)}`]));
       criteria.stop = 'Give up: no offered control moves toward the goal.';
+      const framing = FRAMING + (values.length === 0 && choices.length === 0 ? NO_VALUES : '');
       const key = gated(await ask({ ...where, goalValuesStillToEnter: pendingValues.map((v) => v.label) }, 'next',
-        choice(`${FRAMING} Choose the next control to click toward the goal. ${UNTRUSTED}`, criteria)), 'choosing the next click', criteria);
+        choice(`${framing} Choose the next control to click toward the goal. ${UNTRUSTED}`, criteria)), 'choosing the next click', criteria);
       if (key === 'stop') throw new Inconclusive(`Jev chose to stop at ${page.path}`);
       const target = clicks.find((c) => c.key === key);
+      const before = { path: page.path, dialog: where.dialog };
       const clicked = await act(target, 'click');
-      steps.push(`click ${clicked.label}${note()}`);
+      // What the click did, as observed: an unchanged history line reads to Jev as "already done".
+      const dialogNow = page.elements.find((e) => e.role === 'dialog')?.name || null;
+      const effect = page.path !== before.path ? ` → now at ${page.path}`
+        : dialogNow && dialogNow !== before.dialog ? ` → opened dialog "${dialogNow}"`
+          : page.elements.some((e) => e.scope === 'menu') ? ' → opened a menu'
+            : before.dialog && !dialogNow ? ' → the dialog closed' : '';
+      steps.push(`click ${clicked.label}${note()}${effect}`);
     }
     if (await done(page)) {
       report.pass(id, `${steps.length} step(s) by Jev via MCP: ${steps.join(' → ')}`);
@@ -431,6 +474,8 @@ async function quotes() {
     values: [
       { key: 'name', label: 'Quote name', text: quoteName },
       { key: 'customer', label: 'Customer', text: customer.externalId },
+      // The goal says USD and the form's Currency field starts empty (optional; the server defaults it).
+      { key: 'currency', label: 'Currency', text: 'USD' },
     ],
     done: async (page) => {
       const m = page.path?.match(/^\/quotes\/(\d+)$/);
@@ -444,10 +489,14 @@ async function quotes() {
   });
   if (created) {
     await achieve('mcp.quotes.add-line', {
-      goal: `Add a line item to this quote for the product "${product.name}" with quantity 3.`,
+      // The add-line form takes a product external ID and a list price, both required; the
+      // harness fixtures use the product's numeric id and 25 (as draftWithLine does).
+      goal: `Add a line item to this quote: product external ID "${product.id}", product name "${product.name}", list price 25, quantity 3.`,
       start: `/quotes/${ctx.quote.id}`, startText: quoteName,
       values: [
-        { key: 'product', label: 'Product', text: product.name },
+        { key: 'product', label: 'Product external ID', text: String(product.id) },
+        { key: 'productName', label: 'Product name', text: product.name },
+        { key: 'price', label: 'List price', text: '25' },
         { key: 'qty', label: 'Quantity', text: '3' },
       ],
       done: async () => {

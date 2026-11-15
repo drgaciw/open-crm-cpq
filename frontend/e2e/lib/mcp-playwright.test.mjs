@@ -233,3 +233,31 @@ test('parseSnapshot keeps the value a field shows', () => {
   assert.equal(value('e7'), 'UAT-PROBE');
   assert.equal(elements.find((e) => e.ref === 'e7').name, 'Account Name');
 });
+
+test('parseSnapshot reads YAML-quoted lines (names containing "#" or ":")', () => {
+  // As the Playwright MCP writes them: the whole entry is single-quoted, '' escapes a quote.
+  const elements = parseSnapshot(`- main [ref=e1]:
+  - row [ref=e2]:
+    - cell "11" [ref=e3]
+    - 'button "Approve approval #11 for quote 211" [ref=e4]':
+      - img [aria-hidden] [ref=e5]: check
+    - 'button "Reject approval #11 for quote 211" [ref=e6]'
+    - 'link "Ada''s note: #2" [ref=e7]':
+      - /url: /notes/2`);
+  const byRef = Object.fromEntries(elements.map((e) => [e.ref, e]));
+  assert.equal(byRef.e4.name, 'Approve approval #11 for quote 211');
+  assert.equal(byRef.e4.role, 'button');
+  assert.equal(byRef.e6.name, 'Reject approval #11 for quote 211');
+  assert.equal(byRef.e7.name, "Ada's note: #2");
+  assert.equal(byRef.e7.url, '/notes/2');
+});
+
+test('actionCandidates leaves out controls without a name', () => {
+  const elements = parseSnapshot(`- main [ref=e1]:
+  - button "Submit" [ref=e2]
+  - button [ref=e3]:
+    - img [aria-hidden] [ref=e4]: more_vert
+  - link [ref=e5]:
+    - /url: /x`);
+  assert.deepEqual(actionCandidates(elements).map((a) => a.key), ['e2']);
+});
