@@ -18,6 +18,7 @@ import {
   EmptyStateComponent,
   PageHeaderComponent,
   TableColumn,
+  SortChangeEvent,
 } from '@frontend/shared-ui';
 import { PriceBookDto } from '@frontend/shared-models';
 import { PriceBookService } from '@frontend/cpq-pricing-data-access';
@@ -114,6 +115,7 @@ interface PriceBookTableRow {
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)"
         (rowClick)="onRowClick($event)"
       />
     }
@@ -161,6 +163,8 @@ interface PriceBookTableRow {
 })
 export class PriceBookListComponent implements OnInit {
   readonly service = inject(PriceBookService);
+  /** Spring sort chosen from a column header (`name,desc`); null keeps name order (H-CPQ-PR-006). */
+  readonly sort = signal<string | null>(null);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
 
@@ -237,8 +241,19 @@ export class PriceBookListComponent implements OnInit {
     this.service.error.set(null);
   }
 
+  /** H-CPQ-PR-006: the header only set aria-sort; the API does the ordering, from page 0. */
+  onSortChange(event: SortChangeEvent): void {
+    this.sort.set(event.direction ? `${event.active},${event.direction}` : null);
+    this.reload(0);
+  }
+
   private reload(page = 0, size = this.service.pagination().size || 20): void {
     const region = this.appliedRegion().trim();
+    const sort = this.sort();
+    if (sort) {
+      this.service.list(page, size, sort, region || undefined);
+      return;
+    }
     if (region) {
       this.service.listByRegion(region, page, size);
       return;
