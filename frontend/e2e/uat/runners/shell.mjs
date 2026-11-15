@@ -97,6 +97,8 @@ export async function runShell(ctx, spec, { path = spec.path, heading = spec.hea
 
   for (const card of spec.cards ?? []) {
     await runCheck(ctx, `${id}.card.${card.title}`, async () => {
+      // Reload like the other shell checks: an earlier action check may have navigated away.
+      await goto(page, path);
       if (card.tab) await selectTab(page, card.tab);
       const locator = scopeLocator(page, { kind: 'card', title: card.title });
       const visible = await locator.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
