@@ -21,6 +21,7 @@ import {
 } from '@frontend/shared-ui';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 import { dealActionErrorMessage } from '../deal-action-error';
+import { parseLocalDate } from '@frontend/shared-utils';
 import {
   DEAL_STAGE_ORDER,
   canAdvanceDeal,
@@ -417,7 +418,7 @@ export class DealListComponent implements OnInit {
       stageLabel: dealStageLabel(d.stage),
       probability: d.probability != null ? `${d.probability}%` : '—',
       expectedCloseDate: d.expectedCloseDate
-        ? this.dates.format(new Date(d.expectedCloseDate))
+        ? this.dates.format(parseLocalDate(d.expectedCloseDate) ?? new Date(d.expectedCloseDate))
         : '—',
       contact: d.primaryContactName || '—',
     };
