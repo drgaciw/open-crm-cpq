@@ -50,8 +50,10 @@ public class ProductController {
     @Operation(summary = "Search products by name, SKU, or description")
     public ApiResponse<Page<ProductDto>> search(
             @RequestParam String q,
-            @PageableDefault(size = 20) Pageable pageable) {
-        Page<ProductDto> products = productService.search(q, pageable);
+            @PageableDefault(size = 20) Pageable pageable,
+            @RequestParam(required = false) ProductCategory category,
+            @RequestParam(required = false) ProductStatus status) {
+        Page<ProductDto> products = productService.search(q, category, status, pageable);
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
                 .page(products.getNumber())
                 .size(products.getSize())

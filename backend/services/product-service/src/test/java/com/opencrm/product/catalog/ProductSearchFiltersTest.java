@@ -39,7 +39,7 @@ class ProductSearchFiltersTest {
     @Test
     void searchEndpointPassesCategoryAndStatusToTheService() throws Exception {
         var service = mock(ProductService.class);
-        when(service.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of()));
+        when(service.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mvc(service).perform(get("/api/v1/products/search")
                         .param("q", "H4").param("category", "SUPPORT").param("status", "DRAFT"))
@@ -51,7 +51,7 @@ class ProductSearchFiltersTest {
     @Test
     void searchEndpointWithoutFiltersStillSearchesEverything() throws Exception {
         var service = mock(ProductService.class);
-        when(service.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of()));
+        when(service.search(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mvc(service).perform(get("/api/v1/products/search").param("q", "H4")).andExpect(status().isOk());
 
