@@ -24,6 +24,11 @@ import {
   ApprovalTier,
 } from '@frontend/shared-models';
 import { ApprovalService } from '../approval.service';
+import {
+  ApprovalRejectDialogComponent,
+  ApprovalRejectDialogData,
+  ApprovalRejectResult,
+} from '../approval-reject-dialog/approval-reject-dialog.component';
 
 function httpErrorMessage(err: unknown): string {
   const e = err as {
@@ -320,31 +325,15 @@ export class ApprovalsInboxComponent implements OnInit {
   }
 
   onReject(row: ApprovalRequestDto): void {
-    const comments =
-      typeof window !== 'undefined'
-        ? window.prompt(
-            `Reject approval #${row.id} for quote ${row.quoteId}. Optional reason:`,
-            '',
-          )
-        : '';
-    if (comments === null) {
-      return;
-    }
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      width: '400px',
-      data: {
-        title: 'Reject request',
-        message: `Reject approval #${row.id} for quote ${row.quoteId}?`,
-        confirmText: 'Reject',
-        cancelText: 'Cancel',
-        confirmColor: 'warn' as const,
-      },
+    const ref = this.dialog.open(ApprovalRejectDialogComponent, {
+      width: '440px',
+      data: { approvalId: row.id, quoteId: row.quoteId } satisfies ApprovalRejectDialogData,
     });
-    ref.afterClosed().subscribe((confirmed) => {
-      if (confirmed !== true) {
+    ref.afterClosed().subscribe((result?: ApprovalRejectResult) => {
+      if (!result) {
         return;
       }
-      const trimmed = comments.trim();
+      const trimmed = result.comments.trim();
       this.runAction(() =>
         this.approvalService.reject(
           row.id,
