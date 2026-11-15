@@ -18,6 +18,7 @@ import {
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
   TableColumn,
 } from '@frontend/shared-ui';
 import {
@@ -128,6 +129,7 @@ interface CatalogTableRow {
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)"
         (rowClick)="onRowClick($event)"
       />
     }
@@ -206,6 +208,8 @@ export class CatalogListComponent implements OnInit {
   readonly searchTerm = signal('');
   readonly categoryFilter = signal('');
   readonly statusFilter = signal('');
+  /** Spring sort chosen from a column header (`sku,desc`); null keeps the default order. */
+  readonly sort = signal<string | null>(null);
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -277,6 +281,12 @@ export class CatalogListComponent implements OnInit {
     this.reload(event.pageIndex, event.pageSize);
   }
 
+  /** H-CPQ-P-002: the header only sets aria-sort; the API does the ordering, from page 0. */
+  onSortChange(event: SortChangeEvent): void {
+    this.sort.set(event.direction ? `${event.active},${event.direction}` : null);
+    this.reload(0);
+  }
+
   onRowClick(row: CatalogTableRow): void {
     void this.router.navigate(['/catalog', row.id]);
   }
@@ -300,14 +310,19 @@ export class CatalogListComponent implements OnInit {
 
   private reload(page = 0, size = this.service.pagination().size || 10): void {
     const q = this.searchTerm().trim();
+    const sort = this.sort();
     if (q) {
-      this.service.search(q, page, size);
+      if (sort) {
+        this.service.search(q, page, size, sort);
+      } else {
+        this.service.search(q, page, size);
+      }
       return;
     }
 
     const category = this.categoryFilter();
     const status = this.statusFilter();
-    this.service.list(page, size, 'name,asc', {
+    this.service.list(page, size, sort ?? 'name,asc', {
       category: (category || undefined) as ProductCategory | undefined,
       status: (status || undefined) as ProductStatus | undefined,
     });
