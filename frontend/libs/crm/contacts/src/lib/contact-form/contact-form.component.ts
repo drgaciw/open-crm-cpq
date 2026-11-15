@@ -86,6 +86,9 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                   <mat-option [value]="org">{{ org.name }}</mat-option>
                 }
               </mat-autocomplete>
+              @if (form.get('organizationSearch')?.hasError('orgNotPicked')) {
+                <mat-error>Pick an organization from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
           </div>
 
@@ -125,6 +128,8 @@ export class ContactFormComponent implements OnInit {
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
   selectedOrgId: number | null = null;
+  /** Name of the organization behind selectedOrgId, so edited text can be told apart from it. */
+  private selectedOrgName: string | null = null;
   filteredOrgs = signal<OrganizationDto[]>([]);
 
   constructor() {
@@ -162,7 +167,10 @@ export class ContactFormComponent implements OnInit {
             department: c.department, notes: c.notes,
             organizationSearch: c.organizationName ?? '',
           });
-          if (c.organizationId) this.selectedOrgId = c.organizationId;
+          if (c.organizationId) {
+            this.selectedOrgId = c.organizationId;
+            this.selectedOrgName = c.organizationName ?? null;
+          }
         }
       }, { injector: this.injector });
     }
@@ -175,16 +183,44 @@ export class ContactFormComponent implements OnInit {
     }
   }
 
-  displayOrg(org: OrganizationDto): string {
+  /** The control holds an OrganizationDto once picked, but a plain name when patched or typed (H-CRM-033). */
+  displayOrg(org: OrganizationDto | string | null): string {
+    if (typeof org === 'string') return org;
     return org?.name ?? '';
   }
 
   onOrgSelected(org: OrganizationDto): void {
     this.selectedOrgId = org.id;
+    this.selectedOrgName = org.name;
+    this.form.get('organizationSearch')?.setErrors(null);
+  }
+
+  /**
+   * Resolve the Organization field to an id (H-CRM-022): a picked option, an unchanged linked
+   * organization, or typed text that exactly names one known organization. Anything else is
+   * unresolved, and the save is blocked rather than silently dropping the organization.
+   */
+  private resolveOrganizationId(): { ok: true; id: number | null } | { ok: false } {
+    const raw: unknown = this.form.get('organizationSearch')?.value;
+    if (raw && typeof raw === 'object') return { ok: true, id: (raw as OrganizationDto).id };
+    const text = String(raw ?? '').trim().toLowerCase();
+    if (!text) return { ok: true, id: null };
+    if (this.selectedOrgId != null && this.selectedOrgName?.trim().toLowerCase() === text) {
+      return { ok: true, id: this.selectedOrgId };
+    }
+    const matches = this.filteredOrgs().filter((o) => o.name?.trim().toLowerCase() === text);
+    return matches.length === 1 ? { ok: true, id: matches[0].id } : { ok: false };
   }
 
   onSubmit(): void {
     if (this.form.invalid) return;
+    const org = this.resolveOrganizationId();
+    if (!org.ok) {
+      const control = this.form.get('organizationSearch');
+      control?.setErrors({ orgNotPicked: true });
+      control?.markAsTouched();
+      return;
+    }
     this.saving.set(true);
     const { organizationSearch, email, phone, jobTitle, department, notes, ...rest } =
       this.form.value;
@@ -195,7 +231,7 @@ export class ContactFormComponent implements OnInit {
       jobTitle: jobTitle?.trim() ? jobTitle.trim() : undefined,
       department: department?.trim() ? department.trim() : undefined,
       notes: notes?.trim() ? notes.trim() : undefined,
-      ...(this.selectedOrgId != null ? { organizationId: this.selectedOrgId } : {}),
+      ...(org.id != null ? { organizationId: org.id } : {}),
       primary: false,
     };
 

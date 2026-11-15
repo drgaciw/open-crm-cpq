@@ -62,6 +62,10 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
     return fixture.nativeElement.querySelector('input[formcontrolname="organizationSearch"]');
   }
 
+  function orgControl() {
+    return component.form.controls['organizationSearch'];
+  }
+
   function fillRequired(): void {
     component.form.patchValue({ firstName: 'Ada', lastName: 'Lovelace' });
   }
@@ -93,7 +97,7 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
   it('typed exact organization name without picking still links it (H-CRM-022)', async () => {
     await setup();
     fillRequired();
-    component.form.get('organizationSearch')!.setValue('acme corp');
+    orgControl().setValue('acme corp');
 
     component.onSubmit();
 
@@ -103,7 +107,7 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
   it('typed organization text that matches nothing blocks save with a visible message (H-CRM-022)', async () => {
     await setup();
     fillRequired();
-    component.form.get('organizationSearch')!.setValue('Initech');
+    orgControl().setValue('Initech');
 
     component.onSubmit();
     fixture.detectChanges();
@@ -116,9 +120,9 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
   it('changing the text after picking does not submit the stale organization id', async () => {
     await setup();
     fillRequired();
-    component.form.get('organizationSearch')!.setValue(ACME);
+    orgControl().setValue(ACME);
     component.onOrgSelected(ACME);
-    component.form.get('organizationSearch')!.setValue('Something else');
+    orgControl().setValue('Something else');
 
     component.onSubmit();
 
@@ -128,7 +132,7 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
   it('picked organization is submitted', async () => {
     await setup();
     fillRequired();
-    component.form.get('organizationSearch')!.setValue(GLOBEX);
+    orgControl().setValue(GLOBEX);
     component.onOrgSelected(GLOBEX);
 
     component.onSubmit();
