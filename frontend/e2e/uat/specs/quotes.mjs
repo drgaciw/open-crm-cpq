@@ -171,14 +171,16 @@ export const detail = validateSpec({
   ],
   cards: [
     {
+      // Phase 4 quote workspace (DRG-750): the details card lives in the Pricing tab.
       title: 'Quote details',
+      tab: 'Pricing',
       labels: ['Status', 'Deal type', 'Customer', 'Deal', 'Total amount', 'ARR', 'Duration', 'Region',
         'Line items', 'Description'],
     },
     { title: 'Quote header' },
-    { title: 'Line items', emptyText: 'No line items yet.' },
-    { title: 'Add line item', labels: ['Product external ID', 'Product name', 'List price', 'Quantity', 'Notes'] },
-    { title: 'Documents', labels: ['Document type'], emptyText: 'No documents generated yet.' },
+    { title: 'Line items', tab: 'Lines', emptyText: 'No line items yet.' },
+    { title: 'Add line item', tab: 'Lines', labels: ['Product external ID', 'Product name', 'List price', 'Quantity', 'Notes'] },
+    { title: 'Documents', tab: 'Documents', labels: ['Document type'], emptyText: 'No documents generated yet.' },
   ],
   forms: [
     {

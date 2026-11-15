@@ -5,7 +5,7 @@
  * Check ids: `<spec.id>.shell.<aspect>[.<name>]`
  */
 import { goto } from '../../lib/browser.mjs';
-import { runCheck } from '../../lib/health.mjs';
+import { runCheck, waitUntil } from '../../lib/health.mjs';
 import { scopeLocator } from '../../lib/fields.mjs';
 
 const has = (expected, actual) =>
@@ -97,6 +97,7 @@ export async function runShell(ctx, spec, { path = spec.path, heading = spec.hea
 
   for (const card of spec.cards ?? []) {
     await runCheck(ctx, `${id}.card.${card.title}`, async () => {
+      if (card.tab) await selectTab(page, card.tab);
       const locator = scopeLocator(page, { kind: 'card', title: card.title });
       const visible = await locator.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
       if (!visible) {
@@ -110,4 +111,14 @@ export async function runShell(ctx, spec, { path = spec.path, heading = spec.hea
   }
 
   return true;
+}
+
+/** Select a mat-tab by its label (no-op when it is already selected). */
+export async function selectTab(page, name) {
+  const tab = page.getByRole('tab', { name, exact: true }).first();
+  await tab.waitFor({ state: 'visible', timeout: 8000 });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+  await waitUntil(() => tab.getAttribute('aria-selected'), (v) => v === 'true', {
+    timeoutMs: 5000, describe: () => `tab "${name}" did not become selected`,
+  });
 }

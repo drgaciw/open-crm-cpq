@@ -74,7 +74,8 @@
  * @property {number[]} [pageSizes]
  * @property {'row'|'tr'} [rowRole]
  *
- * @typedef {{title:string,labels?:string[],emptyText?:string,optional?:boolean}} CardSpec
+ * @typedef {{title:string,labels?:string[],emptyText?:string,optional?:boolean,tab?:string}} CardSpec
+ *   `tab`: the mat-tab the card lives in; a card in an unselected tab is not rendered.
  *
  * @typedef {object} PageSpec
  * @property {string} id
@@ -141,7 +142,7 @@ const KEYS = {
     'titleDisabled', 'confirm', 'effect', 'navigatesTo', 'opensDialog', 'hypothesis'],
   confirm: ['kind', 'title', 'message', 'confirmText', 'cancelText'],
   table: ['scope', 'columns', 'sortable', 'pageSizes', 'rowRole'],
-  card: ['title', 'labels', 'emptyText', 'optional'],
+  card: ['title', 'labels', 'emptyText', 'optional', 'tab'],
   hypothesis: ['id', 'claim', 'file', 'triage', 'checkId', 'class', 'note'],
 };
 
@@ -254,6 +255,7 @@ export function validateSpec(spec) {
     const p = `${root}.cards[${i}]`;
     onlyKeys(c, KEYS.card, p);
     if (typeof c.title !== 'string') throw new SpecError(p, 'title is required');
+    if ('tab' in c && (typeof c.tab !== 'string' || !c.tab)) throw new SpecError(`${p}.tab`, 'tab must be a tab label');
   });
 
   return spec;

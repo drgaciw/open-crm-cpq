@@ -172,8 +172,10 @@ async function createProduct(page) {
 async function verifyPersisted(page) {
   await goto(page, '/catalog');
   await page.getByRole('heading', { name: 'Product Catalog', exact: true }).waitFor();
+  // The list endpoint has no `search` parameter (it would return page 1 of every product);
+  // /search?q= is the endpoint the catalog search box uses.
   const response = await page.request.get(
-    `${BASE}/api/v1/products?search=${encodeURIComponent(SKU)}`,
+    `${BASE}/api/v1/products/search?q=${encodeURIComponent(SKU)}`,
   );
   const payload = await response.json();
   return (
