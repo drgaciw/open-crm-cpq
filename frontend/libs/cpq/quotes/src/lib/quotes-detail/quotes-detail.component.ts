@@ -1,4 +1,8 @@
 import {
+  QuoteRejectDialogComponent,
+  QuoteRejectResult,
+} from '../quote-reject-dialog/quote-reject-dialog.component';
+import {
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -1138,24 +1142,28 @@ export class QuotesDetailComponent {
     if (numericId == null) {
       return;
     }
-    const reasonRaw = window.prompt('Rejection reason (optional):');
-    if (reasonRaw === null) {
-      return;
-    }
-    const reason = reasonRaw.trim();
-    this.actionBusy.set(true);
-    this.actionError.set(null);
-    this.quoteService.reject(numericId, reason || undefined).subscribe({
-      next: (updated) => {
-        this.quoteService.selectedQuote.set(updated);
-        this.editingLineId.set(null);
-        this.actionBusy.set(false);
-      },
-      error: (err) => {
-        this.actionBusy.set(false);
-        this.actionError.set(httpErrorMessage(err));
-      },
-    });
+    // H-CPQ-Q-005: a Material dialog collects the optional reason (was window.prompt).
+    this.dialog
+      .open(QuoteRejectDialogComponent, { width: '480px' })
+      .afterClosed()
+      .subscribe((result: QuoteRejectResult | undefined) => {
+        if (!result) {
+          return;
+        }
+        this.actionBusy.set(true);
+        this.actionError.set(null);
+        this.quoteService.reject(numericId, result.reason || undefined).subscribe({
+          next: (updated) => {
+            this.quoteService.selectedQuote.set(updated);
+            this.editingLineId.set(null);
+            this.actionBusy.set(false);
+          },
+          error: (err) => {
+            this.actionBusy.set(false);
+            this.actionError.set(httpErrorMessage(err));
+          },
+        });
+      });
   }
 
   onSend(): void {
