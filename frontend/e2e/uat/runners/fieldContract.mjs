@@ -64,6 +64,18 @@ export async function runFieldContract(ctx, spec, form) {
   for (const field of form.fields) {
     const fid = `${spec.id}.field.${field.label}`;
 
+    if (field.editOnly) {
+      // The create form must not render it; the CRUD edit pass types its editSample.
+      await runCheck(ctx, `${fid}.absent-on-create`, async () => {
+        const scope = await openForm(ctx, spec, form);
+        if (await controlLocator(scope, field).count()) {
+          throw new Error(`"${field.label}" is rendered on the create form, but the spec marks it edit-only`);
+        }
+        return 'edit-only: not on the create form';
+      }, { hypothesis: field.hypothesis });
+      continue;
+    }
+
     const present = await runCheck(ctx, `${fid}.present`, async () => {
       const scope = await openForm(ctx, spec, form);
       await controlLocator(scope, field).waitFor({ state: 'visible', timeout: 6000 });

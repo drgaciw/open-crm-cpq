@@ -36,6 +36,7 @@
  * @property {string} [inputFormat]    Date typing format, e.g. 'M/D/YYYY'.
  * @property {string} [apiFormat]
  * @property {string} [hypothesis]     Links a field-level claim to the registry.
+ * @property {boolean} [editOnly]     Rendered only by the edit form; the create form must not show it.
  *
  * @typedef {object} FormSpec
  * @property {string} id
@@ -73,7 +74,8 @@
  * @property {number[]} [pageSizes]
  * @property {'row'|'tr'} [rowRole]
  *
- * @typedef {{title:string,labels?:string[],emptyText?:string,optional?:boolean}} CardSpec
+ * @typedef {{title:string,labels?:string[],emptyText?:string,optional?:boolean,tab?:string}} CardSpec
+ *   `tab`: the mat-tab the card lives in; a card in an unselected tab is not rendered.
  *
  * @typedef {object} PageSpec
  * @property {string} id
@@ -133,14 +135,14 @@ const KEYS = {
   form: ['id', 'scope', 'flavor', 'open', 'submit', 'cancel', 'serverError', 'modes', 'fields'],
   field: ['label', 'kind', 'ariaLabel', 'required', 'placeholder', 'default', 'sample', 'editSample',
     'options', 'normalize', 'persist', 'validators', 'source', 'requiresPick', 'minChars',
-    'inputFormat', 'apiFormat', 'hypothesis'],
+    'inputFormat', 'apiFormat', 'hypothesis', 'editOnly'],
   validator: ['kind', 'sample', 'expectError', 'gatesSubmit', 'hypothesis'],
   scope: ['kind', 'title', 'selector', 'rowText', 'within'],
   action: ['name', 'in', 'menuTrigger', 'ariaLabel', 'css', 'enabledWhen', 'visibleWhen',
     'titleDisabled', 'confirm', 'effect', 'navigatesTo', 'opensDialog', 'hypothesis'],
   confirm: ['kind', 'title', 'message', 'confirmText', 'cancelText'],
   table: ['scope', 'columns', 'sortable', 'pageSizes', 'rowRole'],
-  card: ['title', 'labels', 'emptyText', 'optional'],
+  card: ['title', 'labels', 'emptyText', 'optional', 'tab'],
   hypothesis: ['id', 'claim', 'file', 'triage', 'checkId', 'class', 'note'],
 };
 
@@ -182,6 +184,12 @@ function checkField(field, path) {
   onlyKeys(field, KEYS.field, path);
   if (typeof field.label !== 'string' || !field.label) throw new SpecError(path, 'label is required');
   oneOf(field.kind, FIELD_KINDS, `${path}.kind`);
+  if ('editOnly' in field && typeof field.editOnly !== 'boolean') {
+    throw new SpecError(`${path}.editOnly`, 'editOnly must be a boolean');
+  }
+  if (field.editOnly && field.sample !== undefined) {
+    throw new SpecError(path, 'an editOnly field cannot be typed on create: use editSample, not sample');
+  }
   (field.options ?? []).forEach((opt, i) => {
     const p = `${path}.options[${i}]`;
     if (opt === null || typeof opt !== 'object' || typeof opt.label !== 'string' || !('value' in opt)) {
@@ -247,6 +255,7 @@ export function validateSpec(spec) {
     const p = `${root}.cards[${i}]`;
     onlyKeys(c, KEYS.card, p);
     if (typeof c.title !== 'string') throw new SpecError(p, 'title is required');
+    if ('tab' in c && (typeof c.tab !== 'string' || !c.tab)) throw new SpecError(`${p}.tab`, 'tab must be a tab label');
   });
 
   return spec;

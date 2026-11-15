@@ -9,7 +9,7 @@
  * Check ids: `deals.lifecycle.<step>` and `deals.lost.<step>`
  */
 import { goto } from '../../lib/browser.mjs';
-import { runSteps, waitUntil } from '../../lib/health.mjs';
+import { runSteps, waitUntil, blocked } from '../../lib/health.mjs';
 import { withNativeDialog } from '../../lib/dialogs.mjs';
 import { expectNoSnackbar } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator } from '../../lib/fields.mjs';
@@ -41,6 +41,24 @@ export async function expectApiStage(api, id, stage) {
     timeoutMs: 8000,
     describe: (dto) => `API stage is ${dto?.stage}, expected ${stage}`,
   });
+}
+
+/**
+ * An opportunity can be WON only with an accepted quote (DealService, OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE).
+ * Deal.acceptedQuoteId is recorded only from a QuoteAccepted event, which a local UAT stack without
+ * the event pipeline cannot produce, so WON is not reachable here.
+ */
+export const WON_NEEDS_ACCEPTED_QUOTE =
+  'WON needs an accepted quote (OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE); acceptedQuoteId is set only by a QuoteAccepted event, which this UAT stack cannot produce';
+
+/** After a confirmed Won: the refusal is shown in an alert and the stage is unchanged. */
+export async function expectWinRefused(page, api, id, stage) {
+  // Banner copy: "…until a linked quote is Accepted… [OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE]".
+  const alert = page.getByRole('alert').filter({ hasText: /OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE|quote is accepted|accepted quote/i }).first();
+  await alert.waitFor({ state: 'visible', timeout: 8000 });
+  const dto = await api.get(`${API}/${id}`);
+  if (dto.stage !== stage) throw new Error(`stage became ${dto.stage}; a win without an accepted quote must be refused`);
+  return `refused with "${(await alert.innerText()).replace(/\s+/g, ' ').trim()}"; stage stays ${stage}`;
 }
 
 /** Compare rendered header actions with what the spec declares for `stage`. */
@@ -120,26 +138,19 @@ export async function runDealLifecycle(ctx, detail) {
       },
     },
     {
-      id: 'deals.lifecycle.won',
+      id: 'deals.lifecycle.won-requires-accepted-quote',
       run: async () => {
         await openDeal(page, deal, 'NEGOTIATION');
         await withNativeDialog(page, { type: 'confirm', message: wonAction.confirm.message },
           () => button(page, 'Won').click());
-        const dto = await expectApiStage(api, deal.id, 'WON');
-        await expectBadge(page, 'WON');
-        await expectNoSnackbar(page);
-        if (dto.probability !== 100) throw new Error(`a WON deal has probability ${dto.probability}, expected 100`);
-        return `WON, probability ${dto.probability}%, wonAt ${dto.wonAt ?? dto.actualCloseDate ?? 'n/a'}`;
+        return expectWinRefused(page, api, deal.id, 'NEGOTIATION');
       },
     },
     {
+      // Needs a WON opportunity, which is unreachable without an accepted quote.
       id: 'deals.lifecycle.WON.actions',
       run: async () => {
-        await openDeal(page, deal, 'WON');
-        const summary = await assertActionsFor(page, detail, 'WON');
-        const info = (await scopeLocator(page, { kind: 'card', title: 'Deal Information' }).innerText()).replace(/\s+/g, ' ');
-        if (!info.includes('100%')) throw new Error(`Deal Information does not show 100%: ${info}`);
-        return summary;
+        throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
       },
     },
   );

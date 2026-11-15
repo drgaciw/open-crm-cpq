@@ -18,7 +18,7 @@ export const list = validateSpec({
   heading: 'Accounts',
   subtitle: 'Manage customer accounts',
   backend: 'crm',
-  sidebar: 'Organizations',
+  sidebar: 'Accounts',
   searchPlaceholder: 'Search accounts...',
   actions: [
     { name: 'New Account', in: 'header', navigatesTo: '/organizations/new' },

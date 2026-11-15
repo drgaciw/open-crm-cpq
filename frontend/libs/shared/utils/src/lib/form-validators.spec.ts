@@ -23,4 +23,19 @@ describe('FormValidators', () => {
       expect(FormValidators.url(control)).toEqual({ url: 'Invalid URL' });
     });
   });
+
+  describe('requiredTrimmed (H-CRM-017 / H-CRM-018)', () => {
+    it('flags whitespace-only text as required', () => {
+      expect(FormValidators.requiredTrimmed(new FormControl('  \n\t '))).toEqual({ required: true });
+    });
+
+    it('flags empty and null values as required', () => {
+      expect(FormValidators.requiredTrimmed(new FormControl(''))).toEqual({ required: true });
+      expect(FormValidators.requiredTrimmed(new FormControl(null))).toEqual({ required: true });
+    });
+
+    it('accepts text with surrounding whitespace', () => {
+      expect(FormValidators.requiredTrimmed(new FormControl('  lost on price '))).toBeNull();
+    });
+  });
 });

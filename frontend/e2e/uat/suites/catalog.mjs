@@ -14,7 +14,7 @@ import { expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, fillField, readField, fieldError, selectOptions, normalizeValue, readPath } from '../../lib/fields.mjs';
 import { ApiCallError } from '../../lib/api.mjs';
 import { ensure, uniqueName, runPrefix } from '../fixtures.mjs';
-import { list, detail, CATEGORIES, STATUSES } from '../specs/catalog.mjs';
+import { list, detail, CATEGORIES, STATUSES, STATUS_FILTER_LABELS } from '../specs/catalog.mjs';
 import { runShell } from '../runners/shell.mjs';
 import { runFieldContract, openForm } from '../runners/fieldContract.mjs';
 import { runDetailPanels } from '../workflows/catalog-detail-panels.mjs';
@@ -95,7 +95,7 @@ export default {
 
     for (const [name, filter, values, all] of [
       ['category', CATEGORY_FILTER, CATEGORIES, 'All categories'],
-      ['status', STATUS_FILTER, STATUSES, 'All statuses'],
+      ['status', STATUS_FILTER, STATUS_FILTER_LABELS, 'All statuses'],
     ]) {
       await runCheck(ctx, `catalog.filter.${name}.options`, async () => {
         await goto(page, list.path);
@@ -144,6 +144,36 @@ export default {
       }
       throw defect(`"${value}" is accepted: mat-error=${JSON.stringify(error)}, Create ${createEnabled ? 'enabled' : 'disabled'}`);
     }, { hypothesis: 'H-CPQ-P-005' });
+
+    // H-CPQ-P-015: SKU and Name have maxLength messages too. Fill to the limit, then type one
+    // more key: either maxlength stops it (message unreachable, not a defect), or the value is
+    // kept and the message must show in the error slot with Create disabled.
+    for (const [label, limit, message] of [
+      ['SKU', 100, 'SKU must be at most 100 characters'],
+      ['Name', 255, 'Name must be at most 255 characters'],
+    ]) {
+      await runCheck(ctx, `catalog.field.${label}.maxlength-typing`, async () => {
+        const dialog = await openForm(ctx, list, createForm);
+        for (const f of createForm.fields.filter((x) => x.required)) await fillField(page, dialog, f, f.sample);
+        const spec = field(createForm, label);
+        const input = controlLocator(dialog, spec);
+        const maxAttr = await input.getAttribute('maxlength');
+        await input.fill('X'.repeat(limit));
+        await input.press('End');
+        await input.pressSequentially('Y');
+        await page.keyboard.press('Tab');
+        const value = await input.inputValue();
+        const error = await fieldError(dialog, spec);
+        const createEnabled = await dialog.getByRole('button', { name: 'Create', exact: true }).isEnabled();
+        if (value.length <= limit) {
+          return `maxlength="${maxAttr}" stops typing at ${value.length} characters; the message is unreachable from the keyboard`;
+        }
+        if (error === message && !createEnabled) {
+          return `${value.length} characters kept; mat-error "${error}" shown and Create disabled`;
+        }
+        throw defect(`${value.length} characters accepted: mat-error=${JSON.stringify(error)}, Create ${createEnabled ? 'enabled' : 'disabled'}`);
+      }, { hypothesis: 'H-CPQ-P-015' });
+    }
 
     // H-CPQ-P-014 (found while reading the schema): signal-forms `required` accepts a
     // whitespace-only string, the component then trims it to '' and the server rejects it.
@@ -389,12 +419,13 @@ export default {
     await runCheck(ctx, 'catalog.filter.status.server-side', async () => {
       await goto(page, list.path);
       const requested = page.waitForResponse((r) => r.url().includes(`${API}?`) && r.url().includes('status=DRAFT'), { timeout: 10000 }).catch(() => null);
-      await fillField(page, main(page), STATUS_FILTER, 'DRAFT');
-      if (!(await requested)) throw new Error('selecting Status=DRAFT did not request /products?status=DRAFT');
-      const statuses = await waitUntil(() => cellTexts(page, 3), (v) => v.length > 0 && v.every((c) => c === 'DRAFT'), {
-        describe: (v) => `rows show statuses [${[...new Set(v)].join(', ')}] under Status=DRAFT`,
+      // The option reads "Draft" (H-CPQ-P-006 fixed); the request still filters by the DRAFT enum.
+      await fillField(page, main(page), STATUS_FILTER, 'Draft');
+      if (!(await requested)) throw new Error('selecting Status=Draft did not request /products?status=DRAFT');
+      const statuses = await waitUntil(() => cellTexts(page, 3), (v) => v.length > 0 && v.every((c) => c === 'Draft'), {
+        describe: (v) => `rows show statuses [${[...new Set(v)].join(', ')}] under Status=Draft`,
       });
-      return `${statuses.length} rows, all DRAFT`;
+      return `${statuses.length} rows, all Draft`;
     });
 
     // H-CPQ-P-002: mat-sort-header is active on every column but (sortChange) is not bound, so the

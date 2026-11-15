@@ -94,6 +94,23 @@ describe('LeadListComponent action wiring', () => {
     vi.restoreAllMocks();
   });
 
+  it('shows the humanised status label in the Status column, not the enum (H-CRM-020 list badge)', () => {
+    leads.set([lead({ id: 11, title: 'Fresh lead', status: 'NEW' })]);
+    fixture.detectChanges();
+
+    const row: HTMLElement = fixture.nativeElement.querySelector('tr.mat-mdc-row');
+    expect(row.querySelector('app-status-badge')?.textContent?.trim()).toBe('New');
+    expect(row.textContent).not.toContain('NEW');
+  });
+
+  it('gives each row menu trigger an accessible name with the lead title', () => {
+    leads.set([lead({ id: 11, title: 'Fresh lead', status: 'NEW' })]);
+    fixture.detectChanges();
+
+    const trigger: HTMLElement = fixture.nativeElement.querySelector('td.actions-cell button');
+    expect(trigger.getAttribute('aria-label')).toBe('Actions for Fresh lead');
+  });
+
   it('ngOnInit loads the lead list', () => {
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
   });

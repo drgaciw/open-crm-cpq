@@ -70,6 +70,15 @@ interface KanbanColumn {
       </div>
     }
 
+    @if (actionError(); as message) {
+      <!-- A refused action is not a load failure: the board stays, and Retry (which reloads) is not offered. -->
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+        <button mat-button type="button" (click)="actionError.set(null)">Dismiss</button>
+      </div>
+    }
+
     @if (service.loading()) {
       <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (!service.error()) {
@@ -197,6 +206,8 @@ export class DealKanbanComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
 
   readonly actionLoading = signal(false);
+  /** Error from Advance / Won / Lost; kept apart from the service's load error so the board stays visible. */
+  readonly actionError = signal<string | null>(null);
 
   /**
    * Currency for every total on the board. Prefer the base currency already on the deal,
@@ -316,6 +327,7 @@ export class DealKanbanComponent implements OnInit {
   }
 
   private commitStage(updated: DealDto): void {
+    this.actionError.set(null);
     this.service.applyStageChange(updated);
     this.actionLoading.set(false);
     this.refreshBoard();
@@ -323,7 +335,7 @@ export class DealKanbanComponent implements OnInit {
 
   private failStage(err: unknown, fallback: string): void {
     this.actionLoading.set(false);
-    this.service.error.set(dealActionErrorMessage(err, fallback));
+    this.actionError.set(dealActionErrorMessage(err, fallback));
   }
 
   private refreshBoard(): void {

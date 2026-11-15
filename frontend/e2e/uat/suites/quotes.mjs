@@ -158,7 +158,7 @@ export default {
       await openList(page);
       const filtered = page.waitForResponse((r) => r.url().includes(`${API}?`) && r.url().includes('status=CANCELLED'), { timeout: 10000 })
         .catch(() => null);
-      await fillField(page, main(page), filters.status, 'CANCELLED');
+      await fillField(page, main(page), filters.status, STATUS_LABELS.CANCELLED);
       const response = await filtered;
       if (!response) throw new Error('choosing a status did not request ?status=CANCELLED');
       await searchBox(page).fill(first.name); // a DRAFT quote must not survive a CANCELLED filter
@@ -191,7 +191,8 @@ export default {
       const cell = squash(await row.getByRole('cell').nth(3).innerText());
       const option = (await selectOptions(page, main(page), filters.status))[1];
       await goto(page, `/quotes/${first.id}`);
-      const badge = squash(await scopeLocator(page, { kind: 'card', title: 'Quote details' }).locator('app-status-badge').innerText());
+      // Phase 4 workspace (DRG-750): the status badge sits in the highlights strip above the tabs.
+      const badge = squash(await page.locator('.quote-highlights app-status-badge').innerText());
       const spellings = new Set([cell, option, badge]);
       if (spellings.size > 1) {
         throw defect(`DRAFT is spelled three ways: list filter option "${option}", list Status cell "${cell}", detail badge "${badge}" (expected the friendly "${STATUS_LABELS.DRAFT}" everywhere)`);

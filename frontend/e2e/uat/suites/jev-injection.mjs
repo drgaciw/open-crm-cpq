@@ -32,7 +32,7 @@ async function observeSearched(page, name) {
   const responded = page
     .waitForResponse((r) => r.url().includes('/api/v1/organizations/search') && r.ok(), { timeout: 10000 })
     .catch(() => null);
-  await page.getByRole('textbox', { name: 'Search organizations...', exact: true }).fill(name);
+  await page.getByRole('textbox', { name: 'Search accounts...', exact: true }).fill(name);
   await responded;
   await page.getByRole('row').filter({ hasText: name }).first().waitFor({ state: 'visible' });
   const pageText = (await page.locator('main').innerText()).replace(/[ \t]+/g, ' ').slice(0, 4000);

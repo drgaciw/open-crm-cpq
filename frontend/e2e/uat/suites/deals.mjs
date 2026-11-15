@@ -4,7 +4,8 @@
  * confirmations, date handling (including non-UTC browsers) and the registered hypotheses.
  */
 import { goto } from '../../lib/browser.mjs';
-import { runCheck, defect, waitUntil } from '../../lib/health.mjs';
+import { runCheck, defect, blocked, waitUntil } from '../../lib/health.mjs';
+import { WON_NEEDS_ACCEPTED_QUOTE, expectWinRefused } from '../workflows/deal-lifecycle.mjs';
 import { withNativeDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, fillField, readField } from '../../lib/fields.mjs';
@@ -19,7 +20,8 @@ import { runKanban } from '../workflows/kanban-menus.mjs';
 
 const API = '/api/v1/deals';
 const DETAIL_URL = /\/deals\/(\d+)$/;
-const TRIGGER = 'Deal actions';
+/** Row-menu trigger name: per row since the H-A11Y-003 fix ("Actions for <opportunity name>"). */
+const TRIGGER = (name) => `Actions for ${name}`;
 
 /** Run-unique names end in a counter, so "…-deal-3" must not also match "…-deal-30". */
 const named = (name) => new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d)`);
@@ -46,7 +48,7 @@ async function findRow(page, name) {
 /** Open the row menu of a deal (scoped by row: the trigger label repeats) and return item labels. */
 async function openRowMenu(page, name) {
   const row = await findRow(page, name);
-  await row.getByRole('button', { name: TRIGGER, exact: true }).click();
+  await row.getByRole('button', { name: TRIGGER(name), exact: true }).click();
   await page.getByRole('menuitem').first().waitFor({ state: 'visible' });
   return (await page.getByRole('menuitem').allInnerTexts()).map((t) => t.replace(/^[a-z_]+\s+/, '').replace(/\s+/g, ' ').trim());
 }
@@ -64,7 +66,8 @@ async function isGone(api, id) {
 /** Drive a deal to a stage through the API (create ignores `stage`). */
 async function dealIn(ctx, stage, overrides = {}) {
   const deal = await ensure(ctx, 'deal', overrides);
-  if (stage === 'WON') return ctx.api.post(`${API}/${deal.id}/win`);
+  // WON needs an accepted quote, which only a QuoteAccepted event can record; see WON_NEEDS_ACCEPTED_QUOTE.
+  if (stage === 'WON') return null;
   if (stage === 'LOST') return ctx.api.post(`${API}/${deal.id}/lose`, { reason: 'UAT fixture' });
   let current = deal;
   for (let i = 0; i < STAGES.findIndex((s) => s.value === stage); i++) current = await ctx.api.post(`${API}/${deal.id}/advance`);
@@ -107,7 +110,7 @@ export default {
     await runCrud(ctx, list, form, {
       entity: 'deal',
       apiPath: API,
-      nameField: 'Deal Name',
+      nameField: 'Name',
       detailUrl: DETAIL_URL,
       editPath: (id) => `/deals/${id}/edit`,
     });
@@ -121,7 +124,7 @@ export default {
 
     await runCheck(ctx, 'deals.detail.populated-cards', async () => {
       await openDeal(page, full, 'PROSPECTING');
-      const info = (await scopeLocator(page, { kind: 'card', title: 'Deal Information' }).innerText()).replace(/\s+/g, ' ');
+      const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       for (const value of ['$8,800', '10%', 'Jun 30, 2027']) {
         if (!info.includes(value)) throw new Error(`Deal Information card does not show "${value}": ${info}`);
       }
@@ -154,7 +157,7 @@ export default {
       for (const title of ['Lost Reason', 'Description']) {
         if (await scopeLocator(page, { kind: 'card', title }).isVisible()) throw new Error(`"${title}" card is rendered for a deal that has none`);
       }
-      const info = (await scopeLocator(page, { kind: 'card', title: 'Deal Information' }).innerText()).replace(/\s+/g, ' ');
+      const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       if (!/Amount\s*—/i.test(info) || !/Expected Close\s*—/i.test(info)) throw new Error(`empty Amount / Expected Close should render "—": ${info}`);
     });
 
@@ -211,7 +214,7 @@ export default {
       const row = await findRow(page, lost.name);
       const inList = (await row.getByRole('cell').nth(3).innerText()).trim();
       await openDeal(page, lost, 'LOST');
-      const info = (await scopeLocator(page, { kind: 'card', title: 'Deal Information' }).innerText()).replace(/\s+/g, ' ');
+      const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       const inDetail = info.match(/Probability\s*(\S+)/i)?.[1];
       if (inList !== '0%' || inDetail !== '0%') {
         throw defect(`API probability is 0 but the list shows "${inList}" and the detail shows "${inDetail}"`);
@@ -277,10 +280,10 @@ export default {
     // One deal per stage so that every tab has something to show.
     const byStage = { PROSPECTING: full };
     for (const stage of STAGES.slice(1)) byStage[stage.value] = await dealIn(ctx, stage.value);
-    const won = byStage.WON;
 
     for (const stage of STAGES) {
       await runCheck(ctx, `deals.tabs.${stage.label}`, async () => {
+        if (!byStage[stage.value]) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
         await goto(page, list.path);
         const requested = page.waitForRequest((r) => r.url().includes(`${API}?`) && r.url().includes(`stage=${stage.value}`), { timeout: 8000 })
           .catch(() => null);
@@ -289,7 +292,11 @@ export default {
         await page.waitForLoadState('networkidle').catch(() => {});
         const rows = page.locator('tr.mat-mdc-row');
         await waitUntil(() => rows.count(), (n) => n > 0, { timeoutMs: 5000, describe: () => `a ${stage.value} deal exists but the tab shows no rows` });
-        const badges = (await rows.locator('td:nth-child(3)').allInnerTexts()).map((t) => t.trim());
+        // Find the Stage column by its header: DRG-750 moved it (Opportunity | Organization | Owner | Amount | Stage | ...).
+        const headers = (await page.locator('tr.mat-mdc-header-row th').allInnerTexts()).map((t) => t.trim());
+        const col = headers.findIndex((h) => h.startsWith('Stage')) + 1;
+        if (!col) throw new Error(`no Stage column in [${headers.join(' | ')}]`);
+        const badges = (await rows.locator(`td:nth-child(${col})`).allInnerTexts()).map((t) => t.trim());
         const wrong = badges.filter((b) => b !== stage.label);
         if (wrong.length) throw new Error(`tab "${stage.label}" lists rows in stage ${[...new Set(wrong)].join(', ')}`);
         return `${badges.length} row(s), all "${stage.label}"`;
@@ -299,6 +306,7 @@ export default {
     const menuFor = (stage) => list.actions.filter((a) => a.in === 'menu' && a.visibleWhen.includes(stage)).map((a) => a.name);
     for (const stage of ['PROSPECTING', 'NEGOTIATION', 'WON', 'LOST']) {
       await runCheck(ctx, `deals.row-menu.${stage}`, async () => {
+        if (!byStage[stage]) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
         const items = await openRowMenu(page, byStage[stage].name);
         const path = new URL(page.url()).pathname;
         await page.keyboard.press('Escape');
@@ -310,7 +318,7 @@ export default {
       });
     }
 
-    // H-A11Y-003 (weak): every row's trigger is announced as the same "Deal actions".
+    // H-A11Y-003 (fixed): each row menu trigger must have its own accessible name.
     await runCheck(ctx, 'deals.a11y.row-menu-names-are-distinct', async () => {
       await search(page, `UAT-${runId}-deal`);
       const triggers = page.getByRole('row').getByRole('button', { name: /actions/i });
@@ -360,7 +368,7 @@ export default {
       await openRowMenu(page, deal.name);
       await withNativeDialog(page, { type: 'confirm', message: `Mark "${deal.name}" as Won?` },
         () => page.getByRole('menuitem', { name: 'Mark Won' }).click());
-      await expectApiStage(api, deal.id, 'WON');
+      return expectWinRefused(page, api, deal.id, 'PROSPECTING');
     });
 
     await runCheck(ctx, 'deals.list.menu.mark-lost-dialog', async () => {
@@ -392,38 +400,36 @@ export default {
     // ── form behaviour ────────────────────────────────────────────────────────
     await runCheck(ctx, 'deals.form.cancel-returns-to-list', async () => {
       await goto(page, '/deals/new');
-      await fillField(page, formScope(), field('Deal Name'), 'Discarded');
+      await fillField(page, formScope(), field('Name'), 'Discarded');
       await formScope().getByRole('button', { name: 'Cancel', exact: true }).click();
       await page.waitForURL((url) => url.pathname === list.path);
     });
 
     // H-CRM-010: onSubmit() destructures `stage` out of the create payload.
-    await runCheck(ctx, 'deals.form.stage-honoured-on-create', async () => {
-      const id = await createThroughUi(page, { 'Deal Name': uniqueName(runId, 'deal'), Stage: 'Negotiation' });
+    // H-CRM-010 (resolved by DRG-750): the create form no longer offers a Stage it would ignore.
+    // A new opportunity starts in Prospecting; the stage changes through Advance / Edit.
+    await runCheck(ctx, 'deals.form.create-starts-in-prospecting', async () => {
+      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal') });
       const dto = await api.get(`${API}/${id}`);
-      if (dto.stage !== 'NEGOTIATION') throw defect(`picked Stage "Negotiation" on the create form, the deal was created as ${dto.stage} with no warning`);
+      if (dto.stage !== 'PROSPECTING') throw new Error(`a new opportunity was created in ${dto.stage}`);
+      return 'no Stage input on create; created in PROSPECTING';
     }, { hypothesis: 'H-CRM-010' });
 
-    // H-CRM-031: neither DealCreateRequest nor DealUpdateRequest has a probability; the API derives it.
-    await runCheck(ctx, 'deals.form.probability-is-persisted', async () => {
-      const id = await createThroughUi(page, { 'Deal Name': uniqueName(runId, 'deal'), 'Probability (%)': '55' });
-      const created = (await api.get(`${API}/${id}`)).probability;
-      await goto(page, `/deals/${id}/edit`);
-      await waitUntil(() => readField(formScope(), field('Deal Name')), (v) => v !== '', { describe: () => 'edit form never loaded' });
-      await fillField(page, formScope(), field('Probability (%)'), '65');
-      await formScope().getByRole('button', { name: 'Update', exact: true }).click();
-      await page.waitForURL(DETAIL_URL, { timeout: 15000 });
-      const updated = (await api.get(`${API}/${id}`)).probability;
-      if (created !== 55 || updated !== 65) {
-        throw defect(`typed 55% on create and 65% on edit; the API holds ${created}% then ${updated}% — the field is editable but never persisted`);
-      }
-    }, { hypothesis: 'H-CRM-031' });
+    // H-CRM-031 (resolved): the form no longer offers a Probability input; the API derives
+    // probability from the stage, so there is nothing to persist or silently drop.
+    await runCheck(ctx, 'deals.form.no-probability-input', async () => {
+      await goto(page, '/deals/new');
+      await formScope().getByRole('button', { name: 'Create', exact: true }).waitFor({ state: 'visible' });
+      const probability = formScope().getByLabel(/Probability/i);
+      if (await probability.count()) throw new Error('the form offers a Probability input, but neither request DTO carries probability');
+      return 'no Probability input; probability is derived from the stage';
+    });
 
     // H-CRM-039: PUT maps `stage` onto the entity without recomputing the stage-derived probability.
     await runCheck(ctx, 'deals.form.stage-edit-updates-probability', async () => {
       const deal = await ensure(ctx, 'deal');
       await goto(page, `/deals/${deal.id}/edit`);
-      await waitUntil(() => readField(formScope(), field('Deal Name')), (v) => v === deal.name, { describe: (v) => `Deal Name holds "${v}"` });
+      await waitUntil(() => readField(formScope(), field('Name')), (v) => v === deal.name, { describe: (v) => `Name holds "${v}"` });
       await fillField(page, formScope(), field('Stage'), 'Negotiation');
       await formScope().getByRole('button', { name: 'Update', exact: true }).click();
       await page.waitForURL(DETAIL_URL, { timeout: 15000 });
@@ -435,29 +441,31 @@ export default {
     }, { hypothesis: 'H-CRM-039' });
 
     // H-CRM-040: the edit form always sends `stage`, and the API rejects any update that carries a
-    // stage once the deal is WON/LOST — yet Edit is offered on closed deals.
+    // stage once the deal is WON/LOST — yet Edit is offered on closed deals. Uses a LOST deal:
+    // WON is unreachable without an accepted quote (WON_NEEDS_ACCEPTED_QUOTE).
     await runCheck(ctx, 'deals.form.closed-deal-can-be-edited', async () => {
-      await goto(page, `/deals/${won.id}/edit`);
-      await waitUntil(() => readField(formScope(), field('Deal Name')), (v) => v === won.name, { describe: (v) => `Deal Name holds "${v}"` });
+      const closed = byStage.LOST;
+      await goto(page, `/deals/${closed.id}/edit`);
+      await waitUntil(() => readField(formScope(), field('Name')), (v) => v === closed.name, { describe: (v) => `Name holds "${v}"` });
       await fillField(page, formScope(), field('Description'), 'Post-mortem note (UAT)');
-      const responded = page.waitForResponse((r) => r.url().endsWith(`${API}/${won.id}`) && r.request().method() === 'PUT', { timeout: 8000 })
+      const responded = page.waitForResponse((r) => r.url().endsWith(`${API}/${closed.id}`) && r.request().method() === 'PUT', { timeout: 8000 })
         .catch(() => null);
       await formScope().getByRole('button', { name: 'Update', exact: true }).click();
       const response = await responded;
       if (response && !response.ok()) {
         const body = await response.text().catch(() => '');
         await dismissSnackbars(page);
-        throw defect(`Edit is offered on a WON deal, but changing only the description answers HTTP ${response.status()}: ${body.match(/"message":"([^"]+)"/)?.[1] ?? body.slice(0, 120)}`);
+        throw defect(`Edit is offered on a LOST deal, but changing only the description answers HTTP ${response.status()}: ${body.match(/"message":"([^"]+)"/)?.[1] ?? body.slice(0, 120)}`);
       }
       await page.waitForURL(DETAIL_URL, { timeout: 15000 });
     }, { hypothesis: 'H-CRM-040' });
 
     await runCheck(ctx, 'deals.form.close-date-persists', async () => {
-      const id = await createThroughUi(page, { 'Deal Name': uniqueName(runId, 'deal'), 'Expected Close Date': '3/15/2027' });
+      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal'), 'Expected Close Date': '3/15/2027' });
       await expectNoSnackbar(page);
       const dto = await api.get(`${API}/${id}`);
       if (dto.expectedCloseDate !== '2027-03-15') throw new Error(`typed 3/15/2027, API holds ${dto.expectedCloseDate}`);
-      const info = (await scopeLocator(page, { kind: 'card', title: 'Deal Information' }).innerText()).replace(/\s+/g, ' ');
+      const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       if (!info.includes('Mar 15, 2027')) throw new Error(`detail does not show Mar 15, 2027: ${info}`);
       await goto(page, `/deals/${id}/edit`);
       await waitUntil(() => readField(formScope(), field('Expected Close Date')), (v) => v === '3/15/2027', {
@@ -471,7 +479,7 @@ export default {
     await runCheck(ctx, 'deals.form.close-date-survives-timezone-ahead-of-utc', async () => {
       const session = await ctx.launch({ contextOptions: { locale: 'en-US', timezoneId: 'Pacific/Auckland' } });
       try {
-        const id = await createThroughUi(session.page, { 'Deal Name': uniqueName(runId, 'deal'), 'Expected Close Date': '3/15/2027' });
+        const id = await createThroughUi(session.page, { Name: uniqueName(runId, 'deal'), 'Expected Close Date': '3/15/2027' });
         const dto = await api.get(`${API}/${id}`);
         if (dto.expectedCloseDate !== '2027-03-15') {
           throw defect(`browser in Pacific/Auckland: typed 3/15/2027, the API stored ${dto.expectedCloseDate}`);
@@ -489,7 +497,7 @@ export default {
       try {
         const p = session.page;
         await goto(p, `/deals/${full.id}/edit`);
-        await waitUntil(() => readField(formScope(p), field('Deal Name')), (v) => v === full.name, { describe: (v) => `Deal Name holds "${v}"` });
+        await waitUntil(() => readField(formScope(p), field('Name')), (v) => v === full.name, { describe: (v) => `Name holds "${v}"` });
         const shown = await readField(formScope(p), field('Expected Close Date'));
         if (shown !== '6/30/2027') throw defect(`browser in America/Los_Angeles: the API holds 2027-06-30, the edit form shows ${shown}`);
         return `America/Los_Angeles shows ${shown}`;
@@ -499,7 +507,7 @@ export default {
     }, { hypothesis: 'H-CRM-041' });
 
     await runCheck(ctx, 'deals.form.autocomplete-pick-persists', async () => {
-      const id = await createThroughUi(page, { 'Deal Name': uniqueName(runId, 'deal'), Contact: contact.lastName, Organization: org.name });
+      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal'), Contact: contact.lastName, Organization: org.name });
       const dto = await api.get(`${API}/${id}`);
       if (dto.primaryContactId !== contact.id) throw new Error(`primaryContactId is ${dto.primaryContactId}, picked ${contact.id}`);
       if (dto.organizationId !== org.id) throw new Error(`organizationId is ${dto.organizationId}, picked ${org.id}`);
@@ -509,7 +517,7 @@ export default {
     // H-CRM-024: typed-but-not-picked autocomplete text is dropped without a warning.
     await runCheck(ctx, 'deals.form.organization-typed-not-picked', async () => {
       await goto(page, '/deals/new');
-      await fillField(page, formScope(), field('Deal Name'), uniqueName(runId, 'deal'));
+      await fillField(page, formScope(), field('Name'), uniqueName(runId, 'deal'));
       const responded = page.waitForResponse((r) => /organizations\/search/.test(r.url()), { timeout: 8000 }).catch(() => null);
       await controlLocator(formScope(), field('Organization')).fill(org.name);
       await responded;
@@ -528,7 +536,7 @@ export default {
     // H-CRM-035: edit mode patches *names* into controls whose displayWith expects DTOs.
     await runCheck(ctx, 'deals.form.edit-shows-linked-records', async () => {
       await goto(page, `/deals/${full.id}/edit`);
-      await waitUntil(() => readField(formScope(), field('Deal Name')), (v) => v === full.name, { describe: (v) => `Deal Name holds "${v}"` });
+      await waitUntil(() => readField(formScope(), field('Name')), (v) => v === full.name, { describe: (v) => `Name holds "${v}"` });
       await page.waitForTimeout(500);
       const shownContact = await readField(formScope(), field('Contact'));
       const shownOrg = await readField(formScope(), field('Organization'));

@@ -18,12 +18,14 @@ import {
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
   TableColumn,
 } from '@frontend/shared-ui';
 import {
   ProductCategory,
   ProductDto,
   ProductStatus,
+  PRODUCT_STATUS_LABELS,
 } from '@frontend/shared-models';
 import { ProductService } from '../product.service';
 import { ProductCreateDialogComponent } from '../product-create-dialog/product-create-dialog.component';
@@ -92,8 +94,8 @@ interface CatalogTableRow {
             aria-label="Filter by status"
           >
             <mat-option value="">All statuses</mat-option>
-            @for (s of statuses; track s) {
-              <mat-option [value]="s">{{ s }}</mat-option>
+            @for (s of statusOptions; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -127,6 +129,7 @@ interface CatalogTableRow {
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)"
         (rowClick)="onRowClick($event)"
       />
     }
@@ -191,17 +194,22 @@ export class CatalogListComponent implements OnInit {
     'RETIRED',
   ];
 
+  /** Status filter options: friendly labels, enum values (H-CPQ-P-006). */
+  readonly statusOptions = this.statuses.map((value) => ({ value, label: PRODUCT_STATUS_LABELS[value] }));
+
   readonly columns: TableColumn[] = [
     { key: 'sku', header: 'SKU', sortable: true },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'category', header: 'Category', sortable: true },
-    { key: 'status', header: 'Status', type: 'badge', sortable: true },
+    { key: 'status', header: 'Status', type: 'badge', badgeType: 'product', sortable: true },
     { key: 'listPrice', header: 'List Price', type: 'currency', sortable: true },
   ];
 
   readonly searchTerm = signal('');
   readonly categoryFilter = signal('');
   readonly statusFilter = signal('');
+  /** Spring sort chosen from a column header (`sku,desc`); null keeps the default order. */
+  readonly sort = signal<string | null>(null);
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -273,6 +281,12 @@ export class CatalogListComponent implements OnInit {
     this.reload(event.pageIndex, event.pageSize);
   }
 
+  /** H-CPQ-P-002: the header only sets aria-sort; the API does the ordering, from page 0. */
+  onSortChange(event: SortChangeEvent): void {
+    this.sort.set(event.direction ? `${event.active},${event.direction}` : null);
+    this.reload(0);
+  }
+
   onRowClick(row: CatalogTableRow): void {
     void this.router.navigate(['/catalog', row.id]);
   }
@@ -296,14 +310,19 @@ export class CatalogListComponent implements OnInit {
 
   private reload(page = 0, size = this.service.pagination().size || 10): void {
     const q = this.searchTerm().trim();
+    const sort = this.sort();
     if (q) {
-      this.service.search(q, page, size);
+      if (sort) {
+        this.service.search(q, page, size, sort);
+      } else {
+        this.service.search(q, page, size);
+      }
       return;
     }
 
     const category = this.categoryFilter();
     const status = this.statusFilter();
-    this.service.list(page, size, 'name,asc', {
+    this.service.list(page, size, sort ?? 'name,asc', {
       category: (category || undefined) as ProductCategory | undefined,
       status: (status || undefined) as ProductStatus | undefined,
     });

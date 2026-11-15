@@ -3,7 +3,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormValidators } from '@frontend/shared-utils';
 
 @Component({
   selector: 'lib-lose-reason-dialog',
@@ -40,12 +41,12 @@ export class LoseReasonDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<LoseReasonDialogComponent>);
 
   form: FormGroup = this.fb.group({
-    reason: ['', Validators.required],
+    reason: ['', FormValidators.requiredTrimmed],
   });
 
   onSubmit(): void {
     if (this.form.valid) {
-      this.dialogRef.close(this.form.value.reason);
+      this.dialogRef.close(String(this.form.value.reason).trim());
     }
   }
 }

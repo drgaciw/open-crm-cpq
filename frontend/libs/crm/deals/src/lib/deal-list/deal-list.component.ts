@@ -133,7 +133,7 @@ export interface DealTableRow {
         [loading]="service.loading()"
         [pagination]="service.pagination()"
         [rowActions]="rowActions"
-        rowActionsAriaLabel="Deal actions"
+        [rowActionsAriaLabel]="rowActionsLabel"
         [rowActionsDisabled]="actionLoading()"
         [pageSizeOptions]="[10, 20, 50]"
         (pageChange)="onPageChange($event)"
@@ -320,6 +320,9 @@ export class DealListComponent implements OnInit {
   onCreate(): void {
     this.router.navigate(['/deals', 'new']);
   }
+
+  /** H-A11Y-003: each trigger names its row, as the lead list does. */
+  readonly rowActionsLabel = (row: unknown): string => `Actions for ${(row as DealTableRow).name}`;
 
   onRowClick(row: DealTableRow): void {
     this.router.navigate(['/deals', row.id]);

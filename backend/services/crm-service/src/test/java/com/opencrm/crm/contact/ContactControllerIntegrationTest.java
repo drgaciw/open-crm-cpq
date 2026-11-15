@@ -334,4 +334,25 @@ class ContactControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.pagination").exists())
                 .andExpect(jsonPath("$.pagination.totalElements").value(2));
     }
+
+    @Test
+    @DisplayName("Search contacts by full name (as shown in the Name column) finds the contact — H-CRM-032")
+    void searchContacts_byFullName_returnsMatchingContact() throws Exception {
+        for (String[] name : new String[][] {{"John", "Smith"}, {"Jane", "Smith"}, {"John", "Doe"}}) {
+            mockMvc.perform(post("/api/v1/contacts")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(ContactCreateRequest.builder()
+                            .firstName(name[0])
+                            .lastName(name[1])
+                            .email(name[0].toLowerCase() + "." + name[1].toLowerCase() + "@example.com")
+                            .build())))
+                    .andExpect(status().isCreated());
+        }
+
+        mockMvc.perform(get("/api/v1/contacts/search").param("q", "john smith"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].firstName").value("John"))
+                .andExpect(jsonPath("$.data[0].lastName").value("Smith"));
+    }
 }

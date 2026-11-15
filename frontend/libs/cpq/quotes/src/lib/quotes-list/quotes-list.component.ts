@@ -23,6 +23,7 @@ import {
   QuoteDealType,
   QuoteDto,
   QuoteStatus,
+  QUOTE_STATUS_LABELS,
 } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 
@@ -79,8 +80,8 @@ interface QuoteTableRow {
             aria-label="Filter by status"
           >
             <mat-option value="">All statuses</mat-option>
-            @for (s of statuses; track s) {
-              <mat-option [value]="s">{{ s }}</mat-option>
+            @for (s of statusOptions; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -187,6 +188,8 @@ export class QuotesListComponent implements OnInit {
     'CANCELLED',
     'REJECTED',
   ];
+  /** H-CPQ-Q-002: filter by the enum, show the same words as the status badge. */
+  readonly statusOptions = this.statuses.map((value) => ({ value, label: QUOTE_STATUS_LABELS[value] }));
   readonly dealTypes: QuoteDealType[] = [
     'NEW',
     'AMENDMENT',
@@ -198,7 +201,7 @@ export class QuotesListComponent implements OnInit {
     { key: 'quoteNumber', header: 'Quote #', sortable: true },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'customerExternalId', header: 'Customer', sortable: true },
-    { key: 'status', header: 'Status', type: 'badge', sortable: true },
+    { key: 'status', header: 'Status', type: 'badge', badgeType: 'quote', sortable: true },
     { key: 'dealType', header: 'Deal type', sortable: true },
     { key: 'totalAmount', header: 'Total', type: 'currency', sortable: true },
   ];

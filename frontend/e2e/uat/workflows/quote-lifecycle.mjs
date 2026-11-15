@@ -18,6 +18,7 @@ import { withNativeDialog, confirmMatDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectSnackbar, expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { ApiCallError } from '../../lib/api.mjs';
 import { blockedReason } from '../../lib/preflight.mjs';
+import { selectTab } from '../runners/shell.mjs';
 import { ensure, uniqueName } from '../fixtures.mjs';
 import { detail, STATUS_LABELS } from '../specs/quotes.mjs';
 
@@ -28,6 +29,8 @@ const action = (name) => detail.actions.find((a) => a.name === name);
 const form = (id) => detail.forms.find((f) => f.id === id);
 const card = (page, title) => scopeLocator(page, { kind: 'card', title });
 const squash = (text) => (text ?? '').replace(/\s+/g, ' ').trim();
+/** Phase 4 workspace (DRG-750): Status / Total / ARR strip above the tabs, always rendered. */
+const highlights = (page) => page.locator('.quote-highlights');
 /** Match CurrencyFormatPipe (en-US + quote currency). Header edit may change currency (e.g. to GBP). */
 const formatMoney = (amount, currency) =>
   Number(amount).toLocaleString('en-US', { style: 'currency', currency: currency || 'USD' });
@@ -83,6 +86,11 @@ const priceBooks = new Map();
 const pricingCustomers = new Map();
 export async function productFor(ctx) {
   if (!products.has(ctx.runId)) {
+    // A quote line needs a price book entry for its product; with pricebook-service down every
+    // seed would fail on POST /price-books with 503. That is an environment gap, not a defect.
+    if (ctx.preflight?.pricebook && ctx.preflight.pricebook.state !== 'up') {
+      throw blocked(`${blockedReason(ctx.preflight, 'pricebook')} — a quote line needs a price book entry for its product`);
+    }
     const product = await ensure(ctx, 'product');
     const book = priceBooks.get(ctx.runId) ?? await ensureMutableDefaultPriceBook(ctx);
     priceBooks.set(ctx.runId, book);
@@ -144,9 +152,9 @@ async function expectStatus(ctx, id, want) {
   await waitUntil(async () => (await quoteDto(ctx.api, id)).status, (s) => s === want, {
     timeoutMs: 8000, intervalMs: 250, describe: (s) => `API status is ${s}, expected ${want}`,
   });
-  const details = card(ctx.page, 'Quote details');
-  await waitUntil(async () => squash(await details.innerText()), (t) => t.includes(STATUS_LABELS[want]), {
-    timeoutMs: 5000, describe: (t) => `status badge does not show "${STATUS_LABELS[want]}" — card says "${t.slice(0, 120)}"`,
+  const strip = highlights(ctx.page);
+  await waitUntil(async () => squash(await strip.innerText()), (t) => t.includes(STATUS_LABELS[want]), {
+    timeoutMs: 5000, describe: (t) => `status badge does not show "${STATUS_LABELS[want]}" — highlights say "${t.slice(0, 120)}"`,
   });
   return `API ${want}, badge "${STATUS_LABELS[want]}"`;
 }
@@ -234,6 +242,7 @@ export async function runDetailStructure(ctx, quote) {
   await runCheck(ctx, 'quotes.detail.details-card.values', async () => {
     await openDetail(page, id);
     const dto = await quoteDto(api, id);
+    await selectTab(page, 'Pricing');
     const text = squash(await card(page, 'Quote details').innerText());
     const expected = [STATUS_LABELS[dto.status], dto.dealType, dto.customerExternalId, `${dto.durationInMonths} months`];
     const missing = expected.filter((value) => !text.includes(String(value)));
@@ -244,8 +253,10 @@ export async function runDetailStructure(ctx, quote) {
   await runCheck(ctx, 'quotes.detail.empty-texts', async () => {
     await openDetail(page, id);
     for (const spec of detail.cards.filter((c) => c.emptyText)) {
+      if (spec.tab) await selectTab(page, spec.tab);
       await card(page, spec.title).getByText(spec.emptyText, { exact: true }).waitFor({ state: 'visible', timeout: 8000 });
     }
+    await selectTab(page, 'Documents');
     await page.getByRole('note').filter({ hasText: 'Clone creates a new DRAFT' }).waitFor({ state: 'visible' });
     return detail.cards.filter((c) => c.emptyText).map((c) => `"${c.emptyText}"`).join(' · ');
   });
@@ -504,7 +515,9 @@ export async function runLineItems(ctx, quote) {
         const money = formatMoney(25, dto.currency);
         const text = squash(await row().innerText());
         for (const want of ['3', money]) if (!text.includes(want)) throw new Error(`row lacks "${want}": "${text}"`);
+        await selectTab(page, 'Pricing');
         const details = squash(await card(page, 'Quote details').innerText());
+        await selectTab(page, 'Lines');
         if (!/Line items 1\b/i.test(details)) throw new Error(`details card line count is wrong: "${details}"`);
         return text;
       },
@@ -594,10 +607,10 @@ export async function runCalculate(ctx) {
     }
     const dto = await quoteDto(api, quote.id);
     if (!(Number(dto.totalAmount) > 0)) throw new Error(`Calculate returned 2xx but totalAmount is ${dto.totalAmount}`);
-    const shown = squash(await card(page, 'Quote details').innerText());
+    const shown = squash(await highlights(page).innerText());
     const money = formatMoney(dto.totalAmount, dto.currency);
-    await waitUntil(async () => squash(await card(page, 'Quote details').innerText()), (t) => t.includes(money), {
-      timeoutMs: 5000, describe: () => `details card does not show ${money}: "${shown}"`,
+    await waitUntil(async () => squash(await highlights(page).innerText()), (t) => t.includes(money), {
+      timeoutMs: 5000, describe: () => `highlights do not show ${money}: "${shown}"`,
     });
     return `totalAmount ${dto.totalAmount} ${dto.currency}, ARR ${dto.arr ?? '—'} (2 x 25 list)`;
   }, { expectedErrors: [/5\d\d POST \/api\/v1\/quotes\/\d+\/calculate/] });
@@ -614,6 +627,7 @@ export async function runDocuments(ctx, quote) {
 
   await runCheck(ctx, 'quotes.documents.type-options', async () => {
     await openDetail(page, id);
+    await selectTab(page, 'Documents');
     const selected = await readField(scope(), field);
     if (selected !== field.default) throw new Error(`default type is "${selected}", expected "${field.default}"`);
     const actual = await selectOptions(page, scope(), field);
@@ -628,6 +642,7 @@ export async function runDocuments(ctx, quote) {
       expectedErrors: [/5\d\d POST \/api\/v1\/quotes\/\d+\/documents/],
       run: async () => {
         await openDetail(page, id);
+        await selectTab(page, 'Documents');
         await scope().getByText('No documents generated yet.', { exact: true }).waitFor({ state: 'visible' });
         await fillField(page, scope(), field, 'Order form');
         const responded = page.waitForResponse(

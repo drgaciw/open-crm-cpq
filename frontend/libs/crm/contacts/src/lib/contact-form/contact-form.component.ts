@@ -11,6 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ContactService } from '../contact.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { OrganizationDto } from '@frontend/shared-models';
+import { displayLookup, resolveLookupId } from '@frontend/shared-utils';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
@@ -86,6 +87,9 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                   <mat-option [value]="org">{{ org.name }}</mat-option>
                 }
               </mat-autocomplete>
+              @if (form.get('organizationSearch')?.hasError('orgNotPicked')) {
+                <mat-error>Pick an organization from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
           </div>
 
@@ -125,6 +129,8 @@ export class ContactFormComponent implements OnInit {
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
   selectedOrgId: number | null = null;
+  /** Name of the organization behind selectedOrgId, so edited text can be told apart from it. */
+  private selectedOrgName: string | null = null;
   filteredOrgs = signal<OrganizationDto[]>([]);
 
   constructor() {
@@ -162,7 +168,10 @@ export class ContactFormComponent implements OnInit {
             department: c.department, notes: c.notes,
             organizationSearch: c.organizationName ?? '',
           });
-          if (c.organizationId) this.selectedOrgId = c.organizationId;
+          if (c.organizationId) {
+            this.selectedOrgId = c.organizationId;
+            this.selectedOrgName = c.organizationName ?? null;
+          }
         }
       }, { injector: this.injector });
     }
@@ -175,16 +184,30 @@ export class ContactFormComponent implements OnInit {
     }
   }
 
-  displayOrg(org: OrganizationDto): string {
-    return org?.name ?? '';
-  }
+  /** The control holds an OrganizationDto once picked, but a plain name when patched or typed (H-CRM-033). */
+  readonly displayOrg = displayLookup<OrganizationDto>((org) => org.name ?? '');
 
   onOrgSelected(org: OrganizationDto): void {
     this.selectedOrgId = org.id;
+    this.selectedOrgName = org.name;
+    this.form.get('organizationSearch')?.setErrors(null);
   }
 
   onSubmit(): void {
     if (this.form.invalid) return;
+    // H-CRM-022: typed-but-not-picked text is resolved or blocked, never silently dropped.
+    const org = resolveLookupId(
+      this.form.value.organizationSearch,
+      this.selectedOrgId === null ? null : { id: this.selectedOrgId, label: this.selectedOrgName },
+      this.filteredOrgs(),
+      (o) => o.name ?? '',
+    );
+    if (!org.ok) {
+      const control = this.form.get('organizationSearch');
+      control?.setErrors({ orgNotPicked: true });
+      control?.markAsTouched();
+      return;
+    }
     this.saving.set(true);
     const { organizationSearch, email, phone, jobTitle, department, notes, ...rest } =
       this.form.value;
@@ -195,7 +218,7 @@ export class ContactFormComponent implements OnInit {
       jobTitle: jobTitle?.trim() ? jobTitle.trim() : undefined,
       department: department?.trim() ? department.trim() : undefined,
       notes: notes?.trim() ? notes.trim() : undefined,
-      ...(this.selectedOrgId != null ? { organizationId: this.selectedOrgId } : {}),
+      ...(org.id != null ? { organizationId: org.id } : {}),
       primary: false,
     };
 

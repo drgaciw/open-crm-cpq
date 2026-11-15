@@ -25,37 +25,37 @@ const ALL = STAGES.map((s) => s.value);
 export const list = validateSpec({
   id: 'deals',
   path: '/deals',
-  heading: 'Deals',
-  subtitle: 'Track your sales pipeline',
+  heading: 'Opportunities',
+  subtitle: 'Track deals through the pipeline',
   backend: 'crm',
-  sidebar: 'Deals',
+  sidebar: 'Opportunities',
   // deal-list.component.ts renders "Search opportunities..." (matches the page title
   // "Opportunities" and docs/design/UI-CRM-SLDS-design-contract.md — "Opportunities (deals)").
   // "Search deals..." never matched the live input and silently broke every list check that
   // locates the search box by this placeholder (search/clear/row-click/tabs/row-menu/etc).
   searchPlaceholder: 'Search opportunities...',
   actions: [
-    { name: 'Kanban', in: 'header', navigatesTo: '/deals/kanban' },
-    { name: 'New Deal', in: 'header', navigatesTo: '/deals/new' },
-    // Row menu — the trigger's aria-label is the same "Deal actions" on every row (H-A11Y-003).
-    { name: 'Edit', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, navigatesTo: '/deals/:id/edit' },
-    { name: 'Advance Stage', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ADVANCEABLE },
+    { name: 'Pipeline', in: 'header', navigatesTo: '/deals/kanban' },
+    { name: 'New opportunity', in: 'header', navigatesTo: '/deals/new' },
+    // Row menu — each trigger is named "Actions for <name>" (H-A11Y-003 fixed).
+    { name: 'Edit', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ALL, navigatesTo: '/deals/:id/edit' },
+    { name: 'Advance Stage', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ADVANCEABLE },
     {
-      name: 'Mark Won', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: OPEN,
+      name: 'Mark Won', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: OPEN,
       confirm: { kind: 'native', message: /^Mark ".+" as Won\?$/ }, effect: { status: 'WON' },
     },
-    { name: 'Mark Lost', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: OPEN, opensDialog: 'Mark Deal as Lost', effect: { status: 'LOST' } },
-    { name: 'Delete', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, confirm: { kind: 'native', message: /^Delete ".+"\?$/ } },
+    { name: 'Mark Lost', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: OPEN, opensDialog: 'Mark Deal as Lost', effect: { status: 'LOST' } },
+    { name: 'Delete', in: 'menu', menuTrigger: 'Actions for <name>', visibleWhen: ALL, confirm: { kind: 'native', message: /^Delete ".+"\?$/ } },
   ],
   tables: [{
-    columns: ['Deal Name', 'Amount', 'Stage', 'Probability', 'Close Date', 'Contact'],
-    sortable: ['Deal Name', 'Amount', 'Stage', 'Probability', 'Close Date'],
+    columns: ['Opportunity', 'Organization', 'Owner', 'Amount', 'Stage', 'Probability', 'Close Date', 'Contact'],
+    sortable: ['Opportunity', 'Amount', 'Stage', 'Probability', 'Close Date'],
     pageSizes: [10, 20, 50],
   }],
   emptyState: {
-    title: 'No deals yet',
-    message: 'Create your first deal or convert a lead.',
-    action: 'Create Deal',
+    title: 'No opportunities yet',
+    message: 'Create your first opportunity or convert a lead.',
+    action: 'Create opportunity',
   },
   forms: [{
     id: 'deal',
@@ -66,38 +66,29 @@ export const list = validateSpec({
     cancel: { name: 'Cancel' },
     serverError: 'snackbar',
     modes: {
-      create: { path: '/deals/new', heading: 'New Deal', submit: 'Create' },
-      edit: { heading: 'Edit Deal', submit: 'Update' },
+      create: { path: '/deals/new', heading: 'New opportunity', submit: 'Create' },
+      edit: { heading: 'Edit opportunity', submit: 'Update' },
     },
     fields: [
       {
-        label: 'Deal Name', kind: 'input', required: true, normalize: 'trim',
+        label: 'Name', kind: 'input', required: true, normalize: 'trim',
         sample: 'Sample deal', // replaced with a run-unique name by the CRUD runner
         persist: { create: true, update: true, apiPath: 'name' },
         validators: [{ kind: 'required', sample: '', expectError: 'Required' }],
       },
       {
-        label: 'Amount ($)', kind: 'number', normalize: 'number', sample: 12500, editSample: 15000,
+        label: 'Amount', kind: 'number', normalize: 'number', sample: 12500, editSample: 15000,
         persist: { create: true, update: true, apiPath: 'amount' },
         validators: [{ kind: 'min', sample: '-1', expectError: 'Amount cannot be negative' }],
       },
       {
-        // The create request strips `stage` (H-CRM-010), so the CRUD pass creates with the default
-        // and only changes the stage on edit; the dedicated check picks a non-default stage.
-        label: 'Stage', kind: 'select', default: 'Prospecting', sample: 'Prospecting', editSample: 'Qualification',
+        // Edit-only since DRG-750: a new opportunity always starts in Prospecting (H-CRM-010 resolved).
+        label: 'Stage', kind: 'select', editOnly: true, editSample: 'Qualification',
         options: STAGES,
-        persist: { create: 'ignored', update: true, apiPath: 'stage' },
+        persist: { update: true, apiPath: 'stage' },
       },
-      {
-        // min(0)/max(100) are declared but the template has no <mat-error> for them (H-CRM-011).
-        // The value is also never sent anywhere useful: the API derives probability from the stage
-        // (H-CRM-031), hence no sample / persist here.
-        label: 'Probability (%)', kind: 'number', default: 10,
-        validators: [
-          { kind: 'min', sample: '-1', expectError: null, hypothesis: 'H-CRM-011' },
-          { kind: 'max', sample: '101', expectError: null, hypothesis: 'H-CRM-011' },
-        ],
-      },
+      // No Probability field since DRG-750: the API derives it from the stage (H-CRM-011 and
+      // H-CRM-031 resolved; deals.form.no-probability-input asserts the absence).
       {
         // Typed, never driven through the calendar. Persistence is asserted by hand because the
         // CRUD runner compares the typed text verbatim and cannot map M/D/YYYY -> YYYY-MM-DD.
@@ -135,7 +126,7 @@ export const detail = validateSpec({
     // There is no Delete on this page — H-CRM-025 (gap). Deals are deleted from the list row menu.
   ],
   cards: [
-    { title: 'Deal Information', labels: ['Amount', 'Probability', 'Expected Close', 'Created'] },
+    { title: 'Opportunity', labels: ['Amount', 'Probability', 'Expected Close', 'Created'] },
     { title: 'Relationships', emptyText: 'No linked contacts or organizations.' },
     { title: 'Lost Reason', optional: true },
     { title: 'Description', optional: true },
@@ -158,10 +149,10 @@ export const detail = validateSpec({
 export const kanban = validateSpec({
   id: 'deals.kanban',
   path: '/deals/kanban',
-  heading: 'Deal Pipeline',
+  heading: 'Opportunity pipeline',
   backend: 'crm',
   actions: [
-    { name: 'New Deal', in: 'header', navigatesTo: '/deals/new' },
+    { name: 'New opportunity', in: 'header', navigatesTo: '/deals/new' },
     { name: 'Back to deals list', in: 'header', ariaLabel: 'Back to deals list', navigatesTo: '/deals' },
     // Card menu — scope by card: the aria-label repeats on every open card. No drag-and-drop exists.
     { name: 'Advance Stage', in: 'card', menuTrigger: 'Deal stage actions', visibleWhen: ADVANCEABLE },

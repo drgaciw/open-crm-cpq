@@ -11,6 +11,8 @@ export const PRODUCT_TYPES = ['SAAS_SEAT_NAMED', 'SAAS_SEAT_CONCURRENT', 'SAAS_U
   'HARDWARE', 'CUSTOM'];
 export const CATEGORIES = ['SUBSCRIPTION', 'LICENSE', 'SUPPORT', 'SERVICES', 'ADD_ON'];
 export const STATUSES = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'];
+/** List Status filter labels (PRODUCT_STATUS_LABELS, H-CPQ-P-006); the edit-form select still shows raw enums. */
+export const STATUS_FILTER_LABELS = ['Draft', 'Active', 'Deprecated', 'Retired'];
 export const SELECTION_TYPES = ['SINGLE', 'MULTIPLE', 'REQUIRED_SINGLE'];
 export const RULE_TYPES = ['REQUIRES', 'EXCLUDES', 'RECOMMENDS', 'DEFAULT', 'VALIDATES'];
 
@@ -49,19 +51,15 @@ export const list = validateSpec({
         {
           label: 'SKU', kind: 'input', required: true, sample: 'UAT-SKU', normalize: 'trim',
           persist: { create: true, apiPath: 'sku' },
-          validators: [
-            { kind: 'required', sample: '', expectError: 'SKU is required' },
-            // H-CPQ-P-015: schema message exists but Signal Forms leaves Create disabled with no mat-error.
-            { kind: 'maxLength', sample: 'S'.repeat(101), expectError: null, hypothesis: 'H-CPQ-P-015' },
-          ],
+          // maxLength(100) is a hand-written typing check (H-CPQ-P-015): the native maxlength
+          // attribute stops input at the limit, so a fill() sample never reaches the validator.
+          validators: [{ kind: 'required', sample: '', expectError: 'SKU is required' }],
         },
         {
           label: 'Name', kind: 'input', required: true, sample: 'UAT product', normalize: 'trim',
           persist: { create: true, update: true, apiPath: 'name' },
-          validators: [
-            { kind: 'required', sample: '', expectError: 'Name is required' },
-            { kind: 'maxLength', sample: 'N'.repeat(256), expectError: null, hypothesis: 'H-CPQ-P-015' },
-          ],
+          // maxLength(255): hand-written typing check, as for SKU (H-CPQ-P-015).
+          validators: [{ kind: 'required', sample: '', expectError: 'Name is required' }],
         },
         {
           label: 'Product type', kind: 'select', required: true, default: '', sample: 'SAAS_FLAT_RATE',

@@ -158,4 +158,35 @@ describe('ProductCreateDialogComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('List price must be at least 0');
   });
+
+  // H-CPQ-P-015: mat-error nested in @if > @for is projected into the input's infix (clipped)
+  // instead of mat-form-field's error slot, so the message is in the DOM but never visible.
+  it('projects the SKU maxLength error into the form-field error slot (H-CPQ-P-015)', () => {
+    fillForm({ sku: 'S'.repeat(101), name: 'Long', productType: 'HARDWARE', category: 'ADD_ON' });
+    component.productForm.sku().markAsTouched();
+    fixture.detectChanges();
+
+    const slot = (fixture.nativeElement as HTMLElement).querySelector('.mat-mdc-form-field-error-wrapper');
+    expect(slot?.textContent).toContain('SKU must be at most 100 characters');
+  });
+
+  it('projects required errors into the error slot too', () => {
+    component.productForm.name().markAsTouched();
+    fixture.detectChanges();
+
+    const slots = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.mat-mdc-form-field-error-wrapper'));
+    expect(slots.map((s) => s.textContent ?? '').join(' ')).toContain('Name is required');
+  });
+
+  // H-CPQ-P-014: required() accepts whitespace, so Create was enabled for "   ".
+  it('treats a whitespace-only SKU or Name as missing (H-CPQ-P-014)', async () => {
+    fillForm({ sku: '   ', name: '  ', productType: 'HARDWARE', category: 'ADD_ON' });
+    fixture.detectChanges();
+
+    expect(component.productForm().invalid()).toBe(true);
+    expect(component.productForm.sku().errors().map((e) => e.message)).toContain('SKU is required');
+    expect(component.productForm.name().errors().map((e) => e.message)).toContain('Name is required');
+    await component.onSubmit();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
 });

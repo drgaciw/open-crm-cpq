@@ -44,6 +44,41 @@ describe('DataTableComponent', () => {
 
   // UI-CRM-SLDS Phase 2: CRM list pages (contacts/accounts/leads/deals) assert this testid via
   // Playwright to confirm they render the shared table rather than a raw mat-table.
+  it('renders a humanised status badge for badge columns with a badgeType (leads regression after UI-CRM-SLDS)', () => {
+    component.componentRef.setInput('columns', [
+      { key: 'title', header: 'Title' },
+      { key: 'status', header: 'Status', type: 'badge', badgeType: 'lead' },
+    ]);
+    component.componentRef.setInput('data', [{ id: 1, title: 'Warm lead', status: 'NEW' }]);
+    component.detectChanges();
+
+    const cell: HTMLElement = component.nativeElement.querySelectorAll('td.mat-mdc-cell')[1];
+    expect(cell.querySelector('app-status-badge')).not.toBeNull();
+    expect(cell.textContent?.trim()).toBe('New');
+  });
+
+  it('names each row-actions trigger from the row when given a label function (lead list a11y regression)', () => {
+    component.componentRef.setInput('columns', [{ key: 'title', header: 'Title' }]);
+    component.componentRef.setInput('data', [{ id: 1, title: 'Alpha' }, { id: 2, title: 'Beta' }]);
+    component.componentRef.setInput('rowActions', [{ action: 'edit', label: 'Edit' }]);
+    component.componentRef.setInput('rowActionsAriaLabel', (row: unknown) => `Actions for ${(row as { title: string }).title}`);
+    component.detectChanges();
+
+    const labels = Array.from(component.nativeElement.querySelectorAll('td.actions-cell button'))
+      .map((b) => (b as HTMLElement).getAttribute('aria-label'));
+    expect(labels).toEqual(['Actions for Alpha', 'Actions for Beta']);
+  });
+
+  it('keeps raw text for badge columns without a badgeType', () => {
+    component.componentRef.setInput('columns', [{ key: 'status', header: 'Status', type: 'badge' }]);
+    component.componentRef.setInput('data', [{ id: 1, status: 'DRAFT' }]);
+    component.detectChanges();
+
+    const cell: HTMLElement = component.nativeElement.querySelector('td.mat-mdc-cell');
+    expect(cell.querySelector('app-status-badge')).toBeNull();
+    expect(cell.textContent?.trim()).toBe('DRAFT');
+  });
+
   it('exposes a stable data-testid for browser UAT', () => {
     component.componentRef.setInput('columns', mockColumns);
     component.componentRef.setInput('data', mockData);

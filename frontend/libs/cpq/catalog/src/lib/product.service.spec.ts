@@ -85,6 +85,18 @@ describe('ProductService', () => {
     expect(service.products()[0].name).toBe('Core Plus');
   });
 
+  it('search sends the column sort only when one is chosen (H-CPQ-P-002)', () => {
+    service.search('core', 0, 20, 'sku,desc');
+    const sorted = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    expect(sorted.request.params.get('sort')).toBe('sku,desc');
+    sorted.flush({ content: [], totalElements: 0, number: 0, size: 20 });
+
+    service.search('core');
+    const unsorted = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    expect(unsorted.request.params.has('sort')).toBe(false);
+    unsorted.flush({ content: [], totalElements: 0, number: 0, size: 20 });
+  });
+
   it('list error.set is message [CODE] when errorCode present', () => {
     service.list();
     const req = httpMock.expectOne((r) => r.url === '/api/v1/products');

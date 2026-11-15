@@ -8,11 +8,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { PaginationMeta } from '@frontend/shared-models';
+import { StatusBadgeComponent, StatusType } from '../status-badge/status-badge.component';
 
 export interface TableColumn {
   key: string;
   header: string;
   type?: 'text' | 'number' | 'date' | 'currency' | 'badge';
+  /** For `type: 'badge'`: render the shared status badge for this status family. Omit to keep raw text. */
+  badgeType?: StatusType;
   sortable?: boolean;
 }
 
@@ -50,6 +53,7 @@ const ACTIONS_COLUMN_KEY = '__actions';
   standalone: true,
   imports: [
     CommonModule,
+    StatusBadgeComponent,
     MatTableModule,
     MatSortModule,
     MatPaginatorModule,
@@ -90,6 +94,13 @@ const ACTIONS_COLUMN_KEY = '__actions';
                   @case ('currency') {
                     {{ row[column.key] | currency }}
                   }
+                  @case ('badge') {
+                    @if (column.badgeType && row[column.key] !== null && row[column.key] !== undefined) {
+                      <app-status-badge [status]="row[column.key]" [type]="column.badgeType" />
+                    } @else {
+                      {{ row[column.key] }}
+                    }
+                  }
                   @default {
                     {{ row[column.key] }}
                   }
@@ -109,7 +120,7 @@ const ACTIONS_COLUMN_KEY = '__actions';
                       type="button"
                       [matMenuTriggerFor]="rowMenu"
                       [disabled]="rowActionsDisabled()"
-                      [attr.aria-label]="rowActionsAriaLabel()"
+                      [attr.aria-label]="rowActionsLabel(row)"
                     >
                       <mat-icon>more_vert</mat-icon>
                     </button>
@@ -273,7 +284,13 @@ export class DataTableComponent<T = unknown> {
   /** Optional trailing menu actions; empty/omitted keeps CPQ lists unchanged. */
   rowActions = input<TableRowAction[]>([]);
   /** Accessible name for the row actions trigger (CRM lists customize per entity). */
-  rowActionsAriaLabel = input<string>('Row actions');
+  /** Accessible name of each row's actions trigger: a fixed string, or built from the row. */
+  rowActionsAriaLabel = input<string | ((row: unknown) => string)>('Row actions');
+
+  rowActionsLabel(row: unknown): string {
+    const label = this.rowActionsAriaLabel();
+    return typeof label === 'function' ? label(row) : label;
+  }
   /** Disables the actions trigger (e.g. while a lifecycle mutation is in flight). */
   rowActionsDisabled = input<boolean>(false);
   pageSizeOptions = input<number[]>([10, 25, 50, 100]);

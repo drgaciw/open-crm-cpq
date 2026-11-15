@@ -125,13 +125,16 @@ export class ProductService {
     return this.http.delete<void>(`${this.basePath}/${id}`);
   }
 
-  search(query: string, page = 0, size = 20): void {
+  search(query: string, page = 0, size = 20, sort?: string): void {
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams()
+    let params = new HttpParams()
       .set('q', query)
       .set('page', page)
       .set('size', size);
+    if (sort) {
+      params = params.set('sort', sort);
+    }
     this.http
       .get<SpringPageResponse<ProductDto>>(`${this.basePath}/search`, { params })
       .pipe(finalize(() => this.loading.set(false)))
