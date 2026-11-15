@@ -13,7 +13,9 @@ import {
   maxLength,
   min,
   required,
+  requiredError,
   submit,
+  validate,
 } from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -77,9 +79,9 @@ export interface ProductCreateFormModel {
           <mat-label>SKU</mat-label>
           <input matInput [formField]="productForm.sku" autocomplete="off" />
           @if (productForm.sku().touched() && productForm.sku().invalid()) {
-            @for (err of productForm.sku().errors(); track err.kind) {
-              <mat-error>{{ err.message }}</mat-error>
-            }
+            <mat-error>
+              @for (err of productForm.sku().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+            </mat-error>
           }
         </mat-form-field>
 
@@ -87,9 +89,9 @@ export interface ProductCreateFormModel {
           <mat-label>Name</mat-label>
           <input matInput [formField]="productForm.name" autocomplete="off" />
           @if (productForm.name().touched() && productForm.name().invalid()) {
-            @for (err of productForm.name().errors(); track err.kind) {
-              <mat-error>{{ err.message }}</mat-error>
-            }
+            <mat-error>
+              @for (err of productForm.name().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+            </mat-error>
           }
         </mat-form-field>
 
@@ -102,9 +104,9 @@ export interface ProductCreateFormModel {
               }
             </mat-select>
             @if (productForm.productType().touched() && productForm.productType().invalid()) {
-              @for (err of productForm.productType().errors(); track err.kind) {
-                <mat-error>{{ err.message }}</mat-error>
-              }
+              <mat-error>
+                @for (err of productForm.productType().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+              </mat-error>
             }
           </mat-form-field>
 
@@ -116,9 +118,9 @@ export interface ProductCreateFormModel {
               }
             </mat-select>
             @if (productForm.category().touched() && productForm.category().invalid()) {
-              @for (err of productForm.category().errors(); track err.kind) {
-                <mat-error>{{ err.message }}</mat-error>
-              }
+              <mat-error>
+                @for (err of productForm.category().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+              </mat-error>
             }
           </mat-form-field>
         </div>
@@ -133,9 +135,9 @@ export interface ProductCreateFormModel {
               step="0.01"
             />
             @if (productForm.listPrice().touched() && productForm.listPrice().invalid()) {
-              @for (err of productForm.listPrice().errors(); track err.kind) {
-                <mat-error>{{ err.message }}</mat-error>
-              }
+              <mat-error>
+                @for (err of productForm.listPrice().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+              </mat-error>
             }
           </mat-form-field>
 
@@ -148,9 +150,9 @@ export interface ProductCreateFormModel {
               autocomplete="off"
             />
             @if (productForm.currency().touched() && productForm.currency().invalid()) {
-              @for (err of productForm.currency().errors(); track err.kind) {
-                <mat-error>{{ err.message }}</mat-error>
-              }
+              <mat-error>
+                @for (err of productForm.currency().errors(); track err.kind) { <span class="error-line">{{ err.message }}</span> }
+              </mat-error>
             }
           </mat-form-field>
         </div>
@@ -189,6 +191,11 @@ export interface ProductCreateFormModel {
 
     .full-width {
       width: 100%;
+    }
+
+    /* One mat-error per field (so it projects into the subscript slot); stack its messages. */
+    .error-line {
+      display: block;
     }
 
     .row {
@@ -242,8 +249,13 @@ export class ProductCreateDialogComponent {
     this.productModel,
     (path) => {
       required(path.sku, { message: 'SKU is required' });
+      // H-CPQ-P-014: required() accepts whitespace; the request trims, so "   " is missing too.
+      validate(path.sku, ({ value }) =>
+        value() !== '' && value().trim() === '' ? requiredError({ message: 'SKU is required' }) : undefined);
       maxLength(path.sku, 100, { message: 'SKU must be at most 100 characters' });
       required(path.name, { message: 'Name is required' });
+      validate(path.name, ({ value }) =>
+        value() !== '' && value().trim() === '' ? requiredError({ message: 'Name is required' }) : undefined);
       maxLength(path.name, 255, { message: 'Name must be at most 255 characters' });
       required(path.productType, { message: 'Product type is required' });
       required(path.category, { message: 'Category is required' });
