@@ -261,3 +261,17 @@ test('actionCandidates leaves out controls without a name', () => {
     - /url: /x`);
   assert.deepEqual(actionCandidates(elements).map((a) => a.key), ['e2']);
 });
+
+test('parseSnapshot keeps the text of a paragraph, with or without a ref', () => {
+  const els = parseSnapshot([
+    '- dialog "Retire product" [ref=e1]:',
+    '  - paragraph [ref=e2]: A retired product cannot be sold or reactivated.',
+    '  - paragraph: Why is this product retired?',
+    '  - button "Retire" [ref=e4]',
+  ].join('\n'));
+  const paragraphs = els.filter((e) => e.role === 'paragraph').map((e) => [e.name, e.scope]);
+  assert.deepEqual(paragraphs, [
+    ['A retired product cannot be sold or reactivated.', 'dialog'],
+    ['Why is this product retired?', 'dialog'],
+  ]);
+});

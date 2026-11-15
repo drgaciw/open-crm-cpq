@@ -78,18 +78,34 @@ async function observe(text) {
   if (yaml === null) throw new Error('the MCP response carried no snapshot');
   // An empty page (e.g. an unknown route) has an empty snapshot: no elements, not an error.
   const elements = parseSnapshot(yaml);
-  // The snapshot omits aria-haspopup, which a screen reader announces ("menu button", "dialog
-  // button"); read it.
-  const popups = await mcp.call('browser_evaluate', {
-    function: `() => [...document.querySelectorAll('[aria-haspopup]')]
-      .map((e) => [(e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim(),
-        e.getAttribute('aria-haspopup')])`,
+  // What the snapshot leaves out but a screen reader announces: aria-haspopup ("menu button",
+  // "dialog button"), the description (title), and, for a form's submit button, the form's fields.
+  const extras = await mcp.call('browser_evaluate', {
+    function: `() => {
+      const text = (el) => { const c = el.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach((x) => x.remove());
+        return (c.textContent || '').replace(/\\s+/g, ' ').trim(); };
+      const nameOf = (el) => (el.getAttribute('aria-label') || text(el)).trim();
+      return [...document.querySelectorAll('button, [role="menuitem"], a')].filter((el) => !el.disabled).map((el) => {
+        const form = el.type === 'submit' ? el.form : null;
+        return { name: nameOf(el), inDialog: Boolean(el.closest('[role="dialog"]')),
+          popup: el.getAttribute('aria-haspopup'), title: el.getAttribute('title'),
+          formFields: form ? [...form.querySelectorAll('input, textarea, select')]
+            .map((i) => (i.getAttribute('aria-label') || (i.labels?.[0] ? text(i.labels[0]) : '')).replace(/\\s*\\*$/, '').trim())
+            .filter(Boolean) : null };
+      });
+    }`,
   }).then((t) => JSON.parse(t.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '[]'), () => []);
   for (const e of elements) {
-    if (e.role !== 'button') continue;
-    const kind = popups.find(([name]) => name === e.name)?.[1];
-    if (kind === 'menu' || kind === 'true') e.opensMenu = true;
-    if (kind === 'dialog') e.opensDialog = true;
+    if (!['button', 'menuitem', 'link'].includes(e.role)) continue;
+    // Match by name within the same layer (a dialog's "Retire" is not the page's "Retire"), and
+    // say nothing when same-named controls there disagree.
+    const same = extras.filter((c) => c.name === e.name && c.inDialog === (e.scope === 'dialog'));
+    if (!same.length || same.some((c) => JSON.stringify({ ...c }) !== JSON.stringify({ ...same[0] }))) continue;
+    const x = same[0];
+    if (x.popup === 'menu' || x.popup === 'true') e.opensMenu = true;
+    if (x.popup === 'dialog') e.opensDialog = true;
+    if (x.title && x.title !== e.name) e.description = x.title;
+    if (x.formFields?.length) e.submitsForm = x.formFields;
   }
   // The record's status as its page header shows it (a chip the snapshot gives no role), so the
   // state says what a user sees: "Draft" before Submit, "In review" before Approve.
@@ -147,6 +163,7 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
   let openChoice = null; // a dropdown Jev opened, or a combobox typed into, whose option is still to pick
   let deferred = new Set();
   let screen = '';
+  const peeks = new Map(); // enabled items seen inside a menu, per screen and trigger
   const ask = async (state, key, question) => {
     const answer = (await decider.ask({ goal, ...state, completedSteps: steps }, { [key]: question }))[key];
     trace.push({ id, step: steps.length, question: key, choice: answer.choice, confidence: answer.confidence });
@@ -177,6 +194,9 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
         dialog: page.elements.find((e) => e.role === 'dialog')?.name || null,
       };
       if (page.status) where.status = page.status;
+      // What an open dialog says besides its controls, as a user reads it.
+      const dialogText = where.dialog ? page.elements.filter((e) => e.scope === 'dialog' && e.role === 'paragraph' && e.name).map((e) => e.name) : [];
+      if (dialogText.length) where.dialogText = dialogText;
       // What the form currently shows, as the snapshot reports it: an observation, not a hint.
       const layerFields = actionCandidates(page.elements).filter((a) => a.kind === 'fill' || a.kind === 'use');
       where.form = layerFields.map((f) => `${f.name}: ${page.elements.find((e) => e.ref === f.ref)?.value ?? '(empty)'}`);
@@ -265,17 +285,41 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
       }
 
       // 4. Otherwise: which control to click next?
-      const clicks = actions.filter((a) => a.kind === 'click' && a.role !== 'option'
+      // A user can look inside a menu without changing anything: open it, read its enabled items,
+      // close it. Do that once per menu button and screen, so the state says what the menu offers.
+      // A list with a menu per row (more than three menus) is left as is: one look per row is slow,
+      // and the row a goal needs is opened from its own page.
+      const menuButtons = actions.filter((a) => a.kind === 'click' && page.elements.find((e) => e.ref === a.ref)?.opensMenu);
+      for (const m of menuButtons.length <= 3 ? menuButtons : []) {
+        const peekKey = `${screen}|${m.name}`;
+        if (peeks.has(peekKey)) continue;
+        await mcp.call('browser_click', { element: m.label, target: m.ref });
+        await sleep(400);
+        const opened = await observe();
+        peeks.set(peekKey, opened.elements.filter((e) => e.scope === 'menu' && e.role === 'menuitem' && e.name && !e.disabled).map((e) => e.name));
+        await mcp.call('browser_press_key', { key: 'Escape' });
+        await sleep(300);
+        page = await observe();
+        trace.push({ id, step: steps.length, peek: m.name, items: peeks.get(peekKey) });
+      }
+      const clicks = actionCandidates(page.elements, { navigation }).filter((a) => a.kind === 'click' && a.role !== 'option'
         && (!FORBIDDEN.some((f) => f.test(a.name)) || allow.some((r) => r.test(a.name))));
       if (!clicks.length) throw new Inconclusive(`nothing to click at ${page.path}`);
       // What a control is declared to do, as a screen reader would announce it: a menu or dialog
       // button, or a link's destination.
       const effectNote = (c) => {
         const e = page.elements.find((x) => x.ref === c.ref);
-        if (e?.opensMenu) return ' (opens a menu of more actions)';
-        if (e?.opensDialog) return ' (opens a dialog)';
-        if (e?.role === 'link' && e.url) return ` (goes to ${e.url})`;
-        return '';
+        const notes = [];
+        // A dialog's button may share its name with the page button that opened the dialog
+        // ("Retire"); say which one this is.
+        if (e?.scope === 'dialog' && where.dialog) notes.push(`in the open dialog "${where.dialog}"`);
+        if (e?.description) notes.push(`described as "${e.description}"`);
+        const items = e?.opensMenu ? peeks.get(`${screen}|${c.name}`) : null;
+        if (e?.opensMenu) notes.push(items ? `opens a menu with ${items.length ? items.map((i) => `"${i}"`).join(', ') : 'no enabled items'}` : 'opens a menu of more actions');
+        if (e?.opensDialog) notes.push('opens a dialog');
+        if (e?.submitsForm) notes.push(`submits the form with fields ${e.submitsForm.join(', ')}`);
+        if (e?.role === 'link' && e.url) notes.push(`goes to ${e.url}`);
+        return notes.length ? ` (${notes.join('; ')})` : '';
       };
       const criteria = Object.fromEntries(clicks.map((c) => [c.key, `click ${c.label}${effectNote(c)}`]));
       criteria.stop = 'Give up: no offered control moves toward the goal.';

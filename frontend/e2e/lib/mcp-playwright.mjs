@@ -54,10 +54,12 @@ export function parseSnapshot(yaml) {
     const attrs = m[3] ?? '';
     // A disabled control has no ref (it cannot be acted on) but is kept when named, so checks can see it.
     const ref = attrs.match(/\[ref=([^\]]+)\]/)?.[1] ?? null;
-    if (!ref && m[2] === undefined) continue;
+    // A paragraph's text follows the attributes: `- paragraph [ref=e2]: Retiring is final.`
+    const said = m[1] === 'paragraph' && m[2] === undefined ? line.slice(m.index + m[0].length).match(/^: (.+)$/)?.[1]?.replace(/^"(.*)"$/, '$1') : undefined;
+    if (!ref && m[2] === undefined && said === undefined) continue;
     const element = {
       role: m[1],
-      name: (m[2] ?? '').replace(/\\(.)/g, '$1'),
+      name: (m[2] ?? said ?? '').replace(/\\(.)/g, '$1'),
       ref,
       disabled: /\[disabled\]/.test(attrs),
       scope: [...stack].reverse().find((s) => SCOPES.includes(s.element.role))?.element.role ?? null,
