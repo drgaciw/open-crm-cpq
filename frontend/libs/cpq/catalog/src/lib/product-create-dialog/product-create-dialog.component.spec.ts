@@ -189,4 +189,29 @@ describe('ProductCreateDialogComponent', () => {
     await component.onSubmit();
     expect(createSpy).not.toHaveBeenCalled();
   });
+
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): Product type listed SAAS_FLAT_RATE,
+  // ONPREM_PERPETUAL, ... and Category the raw enum too, although label maps exist in shared-models.
+  async function optionTexts(label: string): Promise<string[]> {
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(`mat-select[aria-label="${label}"]`);
+    trigger!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const texts = Array.from(document.querySelectorAll('mat-option')).map((o) => o.textContent!.trim());
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    (document.querySelector('.cdk-overlay-backdrop') as HTMLElement | null)?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return texts;
+  }
+
+  it('lists product types and categories by their labels, not the raw enum', async () => {
+    fixture.detectChanges();
+    const types = await optionTexts('Product type');
+    expect(types).toContain('SaaS Flat Rate');
+    expect(types).not.toContain('SAAS_FLAT_RATE');
+    const categories = await optionTexts('Category');
+    expect(categories.length).toBeGreaterThan(0);
+    expect(categories.every((c) => !/^[A-Z_]+$/.test(c))).toBe(true);
+  });
 });
