@@ -171,6 +171,23 @@ describe('PriceBookEntryDialogComponent', () => {
     expect(component.saving()).toBe(false);
   });
 
+  it('surfaces OVERLAPPING_PRICE_BOOK_ENTRY_RANGE, the code the API now uses for a duplicate (UAT 2026-11-14)', async () => {
+    await setup({ bookId: 3 });
+    createEntrySpy.mockReturnValue(
+      throwError(() => ({
+        error: {
+          message: 'An entry for SKU NEW-SKU / USD / EACH already covers an overlapping effective date range [open-ended..open-ended]',
+          errorCode: 'OVERLAPPING_PRICE_BOOK_ENTRY_RANGE',
+        },
+      })),
+    );
+    component.form.patchValue({ productExternalId: 'NEW-SKU', listPrice: 10 });
+
+    component.onSubmit();
+
+    expect(component.error()).toMatch(/\[OVERLAPPING_PRICE_BOOK_ENTRY_RANGE\]$/);
+  });
+
   it('surfaces PRICE_BOOK_PUBLISHED_IMMUTABLE in the error banner', async () => {
     await setup({
       bookId: 1,
