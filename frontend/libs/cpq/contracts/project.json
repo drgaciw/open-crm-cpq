@@ -1,0 +1,23 @@
+{
+  "name": "cpq-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cpq/contracts/src",
+  "prefix": "cpq",
+  "projectType": "library",
+  "tags": [
+    "scope:cpq",
+    "type:feature",
+    "domain:contracts"
+  ],
+  "targets": {
+    "test": {
+      "outputs": [
+        "{projectRoot}/{options.coverage.reportsDirectory}",
+        "{workspaceRoot}/coverage/libs/cpq/contracts"
+      ],
+      "options": {
+        "coverage.reportsDirectory": "../../../coverage/libs/cpq/contracts"
+      }
+    }
+  }
+}
