@@ -42,9 +42,12 @@ function entryHttpErrorMessage(err: unknown, fallback: string): string {
   } | null;
   const code = e?.errorCode || e?.error?.errorCode;
   const message = e?.error?.message || e?.message || fallback;
+  // OVERLAPPING_PRICE_BOOK_ENTRY_RANGE replaced DUPLICATE_PRICE_BOOK_ENTRY when entries became
+  // effective-dated; the old code is kept for older servers.
   if (
     code === 'PRICE_BOOK_PUBLISHED_IMMUTABLE' ||
-    code === 'DUPLICATE_PRICE_BOOK_ENTRY'
+    code === 'DUPLICATE_PRICE_BOOK_ENTRY' ||
+    code === 'OVERLAPPING_PRICE_BOOK_ENTRY_RANGE'
   ) {
     return `${message} [${code}]`;
   }
