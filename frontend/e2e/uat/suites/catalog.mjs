@@ -389,12 +389,13 @@ export default {
     await runCheck(ctx, 'catalog.filter.status.server-side', async () => {
       await goto(page, list.path);
       const requested = page.waitForResponse((r) => r.url().includes(`${API}?`) && r.url().includes('status=DRAFT'), { timeout: 10000 }).catch(() => null);
-      await fillField(page, main(page), STATUS_FILTER, 'DRAFT');
-      if (!(await requested)) throw new Error('selecting Status=DRAFT did not request /products?status=DRAFT');
-      const statuses = await waitUntil(() => cellTexts(page, 3), (v) => v.length > 0 && v.every((c) => c === 'DRAFT'), {
-        describe: (v) => `rows show statuses [${[...new Set(v)].join(', ')}] under Status=DRAFT`,
+      // The option reads "Draft" (H-CPQ-P-006 fixed); the request still filters by the DRAFT enum.
+      await fillField(page, main(page), STATUS_FILTER, 'Draft');
+      if (!(await requested)) throw new Error('selecting Status=Draft did not request /products?status=DRAFT');
+      const statuses = await waitUntil(() => cellTexts(page, 3), (v) => v.length > 0 && v.every((c) => c === 'Draft'), {
+        describe: (v) => `rows show statuses [${[...new Set(v)].join(', ')}] under Status=Draft`,
       });
-      return `${statuses.length} rows, all DRAFT`;
+      return `${statuses.length} rows, all Draft`;
     });
 
     // H-CPQ-P-002: mat-sort-header is active on every column but (sortChange) is not bound, so the

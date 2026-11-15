@@ -24,6 +24,7 @@ import {
   ProductCategory,
   ProductDto,
   ProductStatus,
+  PRODUCT_STATUS_LABELS,
 } from '@frontend/shared-models';
 import { ProductService } from '../product.service';
 import { ProductCreateDialogComponent } from '../product-create-dialog/product-create-dialog.component';
@@ -92,8 +93,8 @@ interface CatalogTableRow {
             aria-label="Filter by status"
           >
             <mat-option value="">All statuses</mat-option>
-            @for (s of statuses; track s) {
-              <mat-option [value]="s">{{ s }}</mat-option>
+            @for (s of statusOptions; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -191,11 +192,14 @@ export class CatalogListComponent implements OnInit {
     'RETIRED',
   ];
 
+  /** Status filter options: friendly labels, enum values (H-CPQ-P-006). */
+  readonly statusOptions = this.statuses.map((value) => ({ value, label: PRODUCT_STATUS_LABELS[value] }));
+
   readonly columns: TableColumn[] = [
     { key: 'sku', header: 'SKU', sortable: true },
     { key: 'name', header: 'Name', sortable: true },
     { key: 'category', header: 'Category', sortable: true },
-    { key: 'status', header: 'Status', type: 'badge', sortable: true },
+    { key: 'status', header: 'Status', type: 'badge', badgeType: 'product', sortable: true },
     { key: 'listPrice', header: 'List Price', type: 'currency', sortable: true },
   ];
 
