@@ -17,6 +17,7 @@ import {
   EmptyStateComponent,
   PageHeaderComponent,
   SearchInputComponent,
+  SortChangeEvent,
   TableColumn,
 } from '@frontend/shared-ui';
 import {
@@ -128,6 +129,7 @@ interface QuoteTableRow {
         [loading]="loading()"
         [pagination]="pagination()"
         (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)"
         (rowClick)="onRowClick($event)"
       />
     }
@@ -209,6 +211,8 @@ export class QuotesListComponent implements OnInit {
   readonly searchTerm = signal('');
   readonly statusFilter = signal('');
   readonly dealTypeFilter = signal('');
+  /** Spring sort from a column header (`name,desc`); null keeps newest first. */
+  readonly sort = signal<string | null>(null);
 
   readonly loading = computed(() => this.quoteService.loading());
   readonly error = computed(() => this.quoteService.error());
@@ -266,6 +270,12 @@ export class QuotesListComponent implements OnInit {
     this.reload(0, this.pagination().size || 10);
   }
 
+  /** H-CPQ-Q-003: the header only sets aria-sort; the API does the ordering, from page 0. */
+  onSortChange(event: SortChangeEvent): void {
+    this.sort.set(event.direction ? `${event.active},${event.direction}` : null);
+    this.reload(0, this.pagination().size || 10);
+  }
+
   onPageChange(event: PageEvent): void {
     this.reload(event.pageIndex, event.pageSize);
   }
@@ -285,7 +295,7 @@ export class QuotesListComponent implements OnInit {
   private reload(page: number, size: number): void {
     const status = this.statusFilter();
     const dealType = this.dealTypeFilter();
-    this.quoteService.list(page, size, 'createdAt,desc', {
+    this.quoteService.list(page, size, this.sort() ?? 'createdAt,desc', {
       status: status ? (status as QuoteStatus) : undefined,
       dealType: dealType ? (dealType as QuoteDealType) : undefined,
     });
