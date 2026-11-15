@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { LookupSelection, displayLookup, resolveLookupId } from '@frontend/shared-utils';
+import { LookupSelection, displayLookup, parseLocalDate, resolveLookupId, toLocalDateString } from '@frontend/shared-utils';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +25,7 @@ import {
 } from '@frontend/shared-models';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 import { dealActionErrorMessage } from '../deal-action-error';
-import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../deal-stage';
+import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDealStage } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-form',
@@ -52,6 +52,14 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
         <mat-icon>error_outline</mat-icon>
         <span>{{ saveError() || dealService.error() }}</span>
         <button mat-button type="button" (click)="dismissError()">Dismiss</button>
+      </div>
+    }
+
+    @if (closed()) {
+      <!-- H-CRM-040 / ADR-032 D-03: after close the API refuses stage, amount and currency changes. -->
+      <div class="closed-notice" role="note">
+        <mat-icon>lock</mat-icon>
+        <span>This opportunity is closed. Its stage, amount and currency can no longer change.</span>
       </div>
     }
 
@@ -187,6 +195,16 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
       color: var(--crm-color-danger, #c62828);
       max-width: 900px;
     }
+    .closed-notice {
+      display: flex;
+      align-items: center;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-surface-container, #f3f3f3);
+      max-width: 900px;
+    }
   `],
 })
 export class DealFormComponent implements OnInit {
@@ -202,6 +220,8 @@ export class DealFormComponent implements OnInit {
   isEditMode = false;
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
+  /** Edit mode on a WON/LOST opportunity: stage, amount and currency are locked (H-CRM-040). */
+  readonly closed = signal(false);
   readonly saveError = signal<string | null>(null);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
@@ -259,13 +279,20 @@ export class DealFormComponent implements OnInit {
       effect(() => {
         const d = this.dealService.selectedDeal();
         if (d) {
+          const closed = !isOpenDealStage(d.stage);
+          this.closed.set(closed);
+          for (const name of ['stage', 'amount', 'currency']) {
+            if (closed) this.form.get(name)?.disable({ emitEvent: false });
+            else this.form.get(name)?.enable({ emitEvent: false });
+          }
           this.form.patchValue({
             name: d.name,
             amount: d.amount,
             currency: d.currency ?? 'USD',
             type: d.type ?? 'NEW_BUSINESS',
             stage: d.stage,
-            expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
+            // H-CRM-041: a date-only value is a calendar day; new Date('YYYY-MM-DD') is UTC midnight.
+            expectedCloseDate: parseLocalDate(d.expectedCloseDate),
             termMonths: d.termMonths ?? null,
             ownerId: d.ownerId ?? '',
             contactSearch: d.primaryContactName ?? '',
@@ -351,7 +378,8 @@ export class DealFormComponent implements OnInit {
     this.saving.set(true);
     this.saveError.set(null);
     const closeDate = this.form.value.expectedCloseDate as Date | null;
-    const expectedCloseDate = closeDate ? closeDate.toISOString().split('T')[0] : undefined;
+    // H-CRM-021: keep the picked calendar day; toISOString() is the previous day east of UTC.
+    const expectedCloseDate = toLocalDateString(closeDate);
     const currency = String(this.form.value.currency ?? 'USD').toUpperCase();
     const ownerId = String(this.form.value.ownerId ?? '').trim();
     const termMonths = this.form.value.termMonths ?? undefined;
@@ -360,9 +388,10 @@ export class DealFormComponent implements OnInit {
     if (this.isEditMode && idVal) {
       const data: DealUpdateRequest = {
         name: this.form.value.name,
-        amount: this.form.value.amount ?? undefined,
-        currency,
-        stage: this.form.value.stage as DealStage,
+        // H-CRM-040: a closed deal's stage, amount and currency are frozen; sending them is refused.
+        amount: this.closed() ? undefined : this.form.value.amount ?? undefined,
+        currency: this.closed() ? undefined : currency,
+        stage: this.closed() ? undefined : (this.form.value.stage as DealStage),
         type: this.form.value.type as DealType,
         expectedCloseDate,
         termMonths,

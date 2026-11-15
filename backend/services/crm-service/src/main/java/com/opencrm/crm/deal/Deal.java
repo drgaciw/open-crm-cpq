@@ -195,9 +195,10 @@ public class Deal extends BaseEntity {
     }
 
     /**
-     * Update probability based on stage.
+     * Update probability based on stage. Package-visible so DealService.update applies the same
+     * stage-derived probability as Advance when the edit form changes an open stage (H-CRM-039).
      */
-    private void updateProbabilityByStage() {
+    void updateProbabilityByStage() {
         this.probability = switch (this.stage) {
             case PROSPECTING -> 10;
             case QUALIFICATION -> 20;

@@ -504,16 +504,30 @@ export default {
       throw defect(`search "${token}" + Category=SUPPORT shows ${rows} rows${empty ? ' and "No matching products"' : ''}, but ${target.name} is SUPPORT and matches — the filter only refines search page 1 of ${pageTwo.totalElements} results`);
     }, { hypothesis: 'H-CPQ-P-004' });
 
-    // H-CPQ-P-009 (gap): ProductService has activate/deprecate/retire; no UI calls them.
-    await runCheck(ctx, 'catalog.gap.lifecycle-actions', async () => {
-      await goto(page, `/catalog/${fixture.id}`);
+    // H-CPQ-P-009 (fixed by DRG-755): the detail page offers the transitions the API allows.
+    // A fresh DRAFT product is walked DRAFT -> ACTIVE -> DEPRECATED -> RETIRED through the UI.
+    await runCheck(ctx, 'catalog.lifecycle.activate-deprecate-retire', async () => {
+      const subject = await ensure(ctx, 'product', { description: 'Lifecycle fixture' });
+      const statusOf = async () => (await api.get(`/api/v1/products/${subject.id}`)).status;
+      const press = async (label, want) => {
+        await page.getByRole('button', { name: label, exact: true }).click();
+        await waitUntil(statusOf, (st) => st === want, { timeoutMs: 8000, describe: (st) => `after ${label} the API says ${st}, expected ${want}` });
+      };
+      await goto(page, `/catalog/${subject.id}`);
       await page.getByRole('button', { name: 'Edit', exact: true }).waitFor({ state: 'visible' });
-      const found = [];
+      if (await statusOf() !== 'DRAFT') throw new Error('fixture is not DRAFT');
+      if (await page.getByRole('button', { name: 'Retire', exact: true }).count()) throw new Error('Retire is offered on a DRAFT product');
+      await press('Activate', 'ACTIVE');
+      await press('Deprecate', 'DEPRECATED');
+      await page.getByRole('button', { name: 'Retire', exact: true }).click();
+      const dialog = page.getByRole('dialog').filter({ hasText: 'Retire product' });
+      await dialog.getByRole('textbox', { name: 'Reason' }).fill('UAT end of life');
+      await dialog.getByRole('button', { name: 'Retire', exact: true }).click();
+      await waitUntil(statusOf, (st) => st === 'RETIRED', { timeoutMs: 8000, describe: (st) => `after Retire the API says ${st}` });
       for (const label of ['Activate', 'Deprecate', 'Retire']) {
-        if (await page.getByRole('button', { name: label }).count()) found.push(label);
+        if (await page.getByRole('button', { name: label, exact: true }).count()) throw new Error(`${label} is still offered on a RETIRED product`);
       }
-      if (found.length) return `lifecycle actions now exist: ${found.join(', ')}`;
-      throw gap('no Activate / Deprecate / Retire action on the product detail page; status can only be changed through the Edit form select');
+      return 'DRAFT -> ACTIVE -> DEPRECATED -> RETIRED through the detail page; nothing offered once retired';
     }, { hypothesis: 'H-CPQ-P-009' });
 
     // ── detail panels ─────────────────────────────────────────────────────────────────────────

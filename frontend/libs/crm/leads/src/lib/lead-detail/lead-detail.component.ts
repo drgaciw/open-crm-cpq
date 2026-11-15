@@ -3,7 +3,6 @@ import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { LeadService } from '../lead.service';
@@ -12,6 +11,7 @@ import {
   AdvisorySuggestionComponent,
   AgentPanelComponent,
   AgentPanelState,
+  StatusBadgeComponent,
 } from '@frontend/shared-ui';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -22,8 +22,8 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
   standalone: true,
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule,
-    MatChipsModule, MatProgressSpinnerModule, MatSnackBarModule, CurrencyPipe, DatePipe,
-    AdvisorySuggestionComponent, AgentPanelComponent,
+    MatProgressSpinnerModule, MatSnackBarModule, CurrencyPipe, DatePipe,
+    AdvisorySuggestionComponent, AgentPanelComponent, StatusBadgeComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -41,7 +41,8 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
         <button mat-icon-button (click)="goBack()" aria-label="Go back to leads"><mat-icon>arrow_back</mat-icon></button>
         <div class="header-info">
           <h1>{{ lead.title }}</h1>
-          <mat-chip [class]="getStatusClass(lead.status)">{{ lead.status }}</mat-chip>
+          <!-- H-CRM-020: same words and look as the list badge (was the raw enum). -->
+          <app-status-badge [status]="lead.status" type="lead" />
         </div>
         <div class="header-actions">
           @if (canEdit(lead.status)) {
@@ -228,12 +229,6 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
     .link { color: #1976d2; text-decoration: none; font-weight: 500; }
     .link:hover { text-decoration: underline; }
 
-    mat-chip { font-size: 0.75rem; font-weight: 500; min-height: 24px; padding: 4px 8px; }
-    .status-new { background-color: #2196f3 !important; color: white !important; }
-    .status-contacted { background-color: #ff9800 !important; color: white !important; }
-    .status-qualified { background-color: #4caf50 !important; color: white !important; }
-    .status-converted { background-color: #9c27b0 !important; color: white !important; }
-    .status-lost { background-color: #f44336 !important; color: white !important; }
 
     .info-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; font-weight: 500; }
     .info-banner.converted { background-color: #e8f5e9; color: #2e7d32; }
@@ -383,9 +378,5 @@ export class LeadDetailComponent implements OnInit {
 
   canDelete(status: LeadStatus): boolean {
     return status !== 'CONVERTED';
-  }
-
-  getStatusClass(status: LeadStatus): string {
-    return `status-${status.toLowerCase()}`;
   }
 }

@@ -52,6 +52,8 @@ import {
   OptionCreateDialogData,
 } from '../option-create-dialog/option-create-dialog.component';
 import { ConfigRulesPanelComponent } from '../config-rules-panel/config-rules-panel.component';
+import { RetireProductDialogComponent } from '../retire-product-dialog/retire-product-dialog.component';
+import { Observable } from 'rxjs';
 
 function httpErrorMessage(
   err: unknown,
@@ -107,6 +109,22 @@ function httpErrorMessage(
             Back to catalog
           </button>
           @if (!editing()) {
+            <!-- DRG-755: lifecycle transitions the API allows (DRAFT -> ACTIVE -> DEPRECATED -> RETIRED). -->
+            @if (product.status === 'DRAFT') {
+              <button mat-stroked-button type="button" (click)="onActivate()" [disabled]="transitioning() || deleting()">
+                <mat-icon>play_circle</mat-icon> Activate
+              </button>
+            }
+            @if (product.status === 'ACTIVE') {
+              <button mat-stroked-button type="button" (click)="onDeprecate()" [disabled]="transitioning() || deleting()">
+                <mat-icon>trending_down</mat-icon> Deprecate
+              </button>
+            }
+            @if (product.status === 'ACTIVE' || product.status === 'DEPRECATED') {
+              <button mat-stroked-button color="warn" type="button" (click)="onRetire()" [disabled]="transitioning() || deleting()">
+                <mat-icon>block</mat-icon> Retire
+              </button>
+            }
             <button
               mat-raised-button
               color="primary"
@@ -753,6 +771,7 @@ export class CatalogDetailComponent implements OnInit {
   readonly editing = signal(false);
   readonly saving = signal(false);
   readonly deleting = signal(false);
+  readonly transitioning = signal(false);
   readonly saveError = signal<string | null>(null);
 
   readonly optionGroups = signal<ProductOptionGroupDto[]>([]);
@@ -898,6 +917,50 @@ export class CatalogDetailComponent implements OnInit {
       error: (err: unknown) => {
         this.saving.set(false);
         this.saveError.set(httpErrorMessage(err));
+      },
+    });
+  }
+
+  /** DRG-755: DRAFT -> ACTIVE. */
+  onActivate(): void {
+    this.transition((id) => this.service.activate(id));
+  }
+
+  /** DRG-755: ACTIVE -> DEPRECATED. */
+  onDeprecate(): void {
+    this.transition((id) => this.service.deprecate(id));
+  }
+
+  /** DRG-755: ACTIVE or DEPRECATED -> RETIRED; the API requires a reason and the step is final. */
+  onRetire(): void {
+    if (!this.product() || this.transitioning()) {
+      return;
+    }
+    this.dialog
+      .open(RetireProductDialogComponent, { width: '480px' })
+      .afterClosed()
+      .subscribe((reason: string | undefined) => {
+        if (reason) {
+          this.transition((id) => this.service.retire(id, reason));
+        }
+      });
+  }
+
+  private transition(call: (id: number) => Observable<ProductDto>): void {
+    const product = this.product();
+    if (!product || this.transitioning()) {
+      return;
+    }
+    this.saveError.set(null);
+    this.transitioning.set(true);
+    call(product.id).subscribe({
+      next: (updated) => {
+        this.service.selectedProduct.set(updated);
+        this.transitioning.set(false);
+      },
+      error: (err: unknown) => {
+        this.transitioning.set(false);
+        this.saveError.set(httpErrorMessage(err, 'Failed to change product status'));
       },
     });
   }

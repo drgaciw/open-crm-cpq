@@ -309,9 +309,15 @@ export async function runHeaderEdit(ctx, quote) {
       if (!(await locator.isVisible().catch(() => false))) { problems.push(`${field.label}: not found`); continue; }
       if (field.kind === 'date' && (await locator.getAttribute('type')) !== 'date') problems.push(`${field.label}: not <input type="date">`);
       if (field.placeholder && (await locator.getAttribute('placeholder')) !== field.placeholder) problems.push(`${field.label}: placeholder differs`);
-      const shown = await locator.inputValue();
+      // A mat-select has no input value: compare its trigger text with the label of the held option.
+      const shown = await readField(scope(), field);
       const held = readPath(dto, field.persist.apiPath);
-      const want = held == null ? '' : String(held).slice(0, field.kind === 'date' ? 10 : undefined);
+      let want = held == null ? '' : String(held).slice(0, field.kind === 'date' ? 10 : undefined);
+      if (field.kind === 'select') {
+        const option = field.options?.find((o) => o.value === want);
+        want = option ? option.label : want;
+        if (held == null && (shown === '' || shown === option?.label)) continue;
+      }
       if (shown !== want) problems.push(`${field.label}: shows "${shown}", API holds "${want}"`);
     }
     if (problems.length) throw new Error(problems.join('; '));
@@ -357,7 +363,9 @@ export async function runHeaderEdit(ctx, quote) {
     const problems = [];
     for (const field of spec.fields) {
       if (!(field.label in typed)) continue;
-      const want = field.kind === 'number' ? Number(typed[field.label]) : normalizeValue(typed[field.label], field.normalize);
+      const want = field.kind === 'number' ? Number(typed[field.label])
+        : field.kind === 'select' ? (field.options?.find((o) => o.label === typed[field.label])?.value ?? typed[field.label])
+        : normalizeValue(typed[field.label], field.normalize);
       const raw = readPath(dto, field.persist.apiPath);
       const held = field.kind === 'date' && raw ? String(raw).slice(0, 10) : raw;
       if (String(held ?? '') !== String(want)) problems.push(`${field.label}: typed "${want}", API holds "${held}"`);
@@ -370,22 +378,20 @@ export async function runHeaderEdit(ctx, quote) {
 
   // H-CPQ-Q-009: "Subscription type" is a free-text box, but the column carries a CHECK constraint
   // (SAAS | ONPREM | HYBRID) — anything else is refused with an opaque integrity error.
-  await runCheck(ctx, 'quotes.header.subscription-type-free-text', async () => {
+  // H-CPQ-Q-009 (fixed): Subscription type is a select of the values the API accepts.
+  await runCheck(ctx, 'quotes.header.subscription-type-choices', async () => {
     await startEdit();
     const field = spec.fields.find((f) => f.label === 'Subscription type');
-    await fill(page, scope(), field, 'ANNUAL');
-    const responded = page.waitForResponse((r) => r.url().endsWith(`${API}/${id}`) && r.request().method() === 'PUT', { timeout: 15000 })
-      .catch(() => null);
+    const options = await selectOptions(page, scope(), field);
+    const expected = field.options.map((o) => o.label);
+    if (JSON.stringify(options) !== JSON.stringify(expected)) throw defect(`Subscription type offers [${options.join(' | ')}]`);
+    await fill(page, scope(), field, 'Hybrid');
     await scope().getByRole('button', { name: spec.submit.name, exact: true }).click();
-    const response = await responded;
-    if (!response) throw new Error('Save sent no PUT');
-    if (response.ok()) return `"ANNUAL" accepted (HTTP ${response.status()})`;
-    const banner = scope().locator('.error-banner[role="alert"]');
-    await banner.waitFor({ state: 'visible' });
-    const said = await bannerText(banner);
-    await dismissSnackbars(page);
-    throw defect(`free-text Subscription type "ANNUAL" -> HTTP ${response.status()}: "${said}" — the input offers no options and the message names neither the field nor the allowed values (SAAS, ONPREM, HYBRID)`);
-  }, { hypothesis: 'H-CPQ-Q-009', expectedErrors: [/5\d\d PUT \/api\/v1\/quotes\/\d+/] });
+    await waitUntil(async () => (await quoteDto(api, id)).subscriptionType, (v) => v === 'HYBRID', {
+      timeoutMs: 8000, describe: (v) => `API holds subscriptionType=${v}`,
+    });
+    return `${options.join(' | ')}; Hybrid saved as HYBRID`;
+  }, { hypothesis: 'H-CPQ-Q-009' });
 
   // H-CPQ-Q-008: no success feedback after a mutation (the only toasts are error toasts).
   await runCheck(ctx, 'quotes.feedback.success-snackbar', async () => {
@@ -507,7 +513,8 @@ export async function runLineItems(ctx, quote) {
       id: 'quotes.lines.table.columns-and-count',
       run: async () => {
         const table = detail.tables[0];
-        const headers = (await scopeLocator(page, table.scope).getByRole('columnheader').allInnerTexts()).map(squash);
+        // Phase 4 added an unlabelled select-all column; CSS upper-cases the header text.
+        const headers = (await scopeLocator(page, table.scope).getByRole('columnheader').allInnerTexts()).map(squash).filter(Boolean);
         if (JSON.stringify(headers.map((h) => h.toLowerCase())) !== JSON.stringify(table.columns.map((c) => c.toLowerCase()))) {
           throw new Error(`line columns are [${headers.join(', ')}]`);
         }
@@ -895,8 +902,9 @@ export async function runLifecycle(ctx) {
     },
   ]);
 
-  // Path 2: IN_REVIEW -> REJECTED through window.prompt.
+  // Path 2: IN_REVIEW -> REJECTED through the reject dialog (H-CPQ-Q-005 fix: was window.prompt).
   const lost = { base: 'quotes.lifecycle.reject', id: null, prompt: null };
+  const rejectDialog = () => page.getByRole('dialog').filter({ hasText: 'Reject quote' });
   const reject = action('Reject');
   await runSteps(ctx, [
     ...opening(ctx, lost),
@@ -904,30 +912,37 @@ export async function runLifecycle(ctx) {
       id: `${lost.base}.prompt-cancel-keeps-status`,
       run: async () => {
         await openMenu(page);
-        await withNativeDialog(page, { type: 'prompt', message: reject.confirm.message, accept: false },
-          () => page.getByRole('menuitem', { name: reject.name, exact: true }).click());
-        await page.waitForTimeout(400);
+        await page.getByRole('menuitem', { name: reject.name, exact: true }).click();
+        await rejectDialog().getByRole('button', { name: 'Cancel', exact: true }).click();
+        await rejectDialog().waitFor({ state: 'hidden' });
         const status = (await quoteDto(api, lost.id)).status;
-        if (status !== 'IN_REVIEW') throw new Error(`dismissing the prompt changed the status to ${status}`);
+        if (status !== 'IN_REVIEW') throw new Error(`cancelling the dialog changed the status to ${status}`);
       },
     },
     {
       id: `${lost.base}.reject`,
       run: () => transition(ctx, lost.id, 'reject', 'REJECTED', async () => {
-        await openMenu(page);
-        lost.prompt = await withNativeDialog(page,
-          { type: 'prompt', message: reject.confirm.message, accept: true, promptText: 'UAT rejection reason' },
-          () => page.getByRole('menuitem', { name: reject.name, exact: true }).click());
+        // Record any native dialog (the old window.prompt) instead of expecting one.
+        const onNative = async (d) => { lost.prompt = { type: d.type(), message: d.message() }; await d.dismiss(); };
+        page.on('dialog', onNative);
+        try {
+          await openMenu(page);
+          await page.getByRole('menuitem', { name: reject.name, exact: true }).click();
+          await rejectDialog().getByRole('textbox', { name: 'Rejection reason (optional)' }).fill('UAT rejection reason');
+          await rejectDialog().getByRole('button', { name: 'Reject', exact: true }).click();
+        } finally {
+          page.off('dialog', onNative);
+        }
       }),
     },
     {
-      // H-CPQ-Q-005 (detail half): the reason is collected through a blocking native prompt while
-      // every other confirmation on this page uses the Material dialog.
+      // H-CPQ-Q-005 (fixed): the reason comes from the Material dialog, like every other confirmation.
       id: 'quotes.reject.uses-native-prompt',
       hypothesis: 'H-CPQ-Q-005',
       continueOnFail: true,
       run: async () => {
         if (lost.prompt?.type === 'prompt') throw defect(`Reject collected its reason through window.prompt("${lost.prompt.message}")`);
+        return 'reason collected in the "Reject quote" dialog';
       },
     },
     gating(ctx, lost, 'REJECTED'),

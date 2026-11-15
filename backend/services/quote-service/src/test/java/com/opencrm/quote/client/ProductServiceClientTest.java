@@ -103,4 +103,17 @@ class ProductServiceClientTest {
                 .extracting(ex -> ((BusinessException) ex).getErrorCode())
                 .isEqualTo("CONFIGURATION_VALIDATE_UNAVAILABLE");
     }
+
+    @Test
+    @DisplayName("a CE transport failure tells the user the check is unavailable, without internals (H-CPQ-Q-006)")
+    void transportFailureMessageIsForTheUser() {
+        // UAT 2026-11-14: the Submit banner showed "Failed to call configuration-engine evaluate: I/O error on
+        // POST request for \"http://localhost:8088/...\": Connection refused".
+        ceServer.expect(requestTo("http://configuration-engine.test/internal/v1/configurations/evaluate"))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.validateConfiguration(List.of(1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("The configuration check is unavailable right now. Try submitting again in a few minutes.");
+    }
 }

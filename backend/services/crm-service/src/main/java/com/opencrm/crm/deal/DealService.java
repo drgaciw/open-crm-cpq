@@ -151,6 +151,11 @@ public class DealService {
                 deal.markLost(null);
                 currencyConverter.freeze(deal);
             } else {
+                if (deal.getStage() != previousStage) {
+                    // H-CRM-039: probability is derived from the stage, as on Advance.
+                    deal.updateProbabilityByStage();
+                    deal.recalculateWeightedAmounts();
+                }
                 currencyConverter.freezeIfNeeded(deal, previousAmount, previousCurrency);
             }
         }

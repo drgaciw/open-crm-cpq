@@ -19,6 +19,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { QuoteDto, QuoteUpdateRequest } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 
@@ -42,7 +43,8 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
   const message = e?.error?.message || e?.message || 'An error occurred';
   const code = e?.error?.errorCode || e?.errorCode;
   if (code && !message.includes(code)) {
-    return `${message} (${code})`;
+    // H-CPQ-Q-004: same "message [CODE]" format as the page and the rest of the app.
+    return `${message} [${code}]`;
   }
   return message;
 }
@@ -63,6 +65,7 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -146,7 +149,13 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
               </mat-form-field>
               <mat-form-field appearance="outline" class="half">
                 <mat-label>Subscription type</mat-label>
-                <input matInput formControlName="subscriptionType" autocomplete="off" />
+                <!-- H-CPQ-Q-009: the API only accepts these values; free text answered HTTP 409. -->
+                <mat-select formControlName="subscriptionType">
+                  <mat-option value="">—</mat-option>
+                  @for (t of subscriptionTypes; track t.value) {
+                    <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
             </div>
 
@@ -285,6 +294,12 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
   ],
 })
 export class QuoteHeaderEditComponent {
+  /** chk_quotes_subscription_type: SAAS, ONPREM or HYBRID (or none). */
+  readonly subscriptionTypes = [
+    { value: 'SAAS', label: 'SaaS' },
+    { value: 'ONPREM', label: 'On-premises' },
+    { value: 'HYBRID', label: 'Hybrid' },
+  ] as const;
   private readonly fb = inject(FormBuilder);
   private readonly quoteService = inject(QuoteService);
 

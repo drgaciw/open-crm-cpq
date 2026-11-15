@@ -208,6 +208,33 @@ describe('CatalogListComponent', () => {
     });
   });
 
+  it('sends the category and status filters with a search instead of filtering page 1 (DRG-754)', () => {
+    vi.useFakeTimers();
+    component.onSearch('UAT');
+    vi.advanceTimersByTime(300);
+    searchSpy.mockClear();
+    component.onCategoryChange('SUPPORT');
+    expect(searchSpy).toHaveBeenLastCalledWith('UAT', 0, 10, undefined, { category: 'SUPPORT', status: undefined });
+
+    component.onStatusChange('DRAFT');
+    expect(searchSpy).toHaveBeenLastCalledWith('UAT', 0, 10, undefined, { category: 'SUPPORT', status: 'DRAFT' });
+    vi.useRealTimers();
+  });
+
+  it('shows what the server returned for a filtered search, without a second client-side filter (DRG-754)', () => {
+    vi.useFakeTimers();
+    searchSpy.mockImplementation(() => {
+      // The server already applied the filter across the whole result set.
+      products.set([{ ...MOCK_CATALOG_PRODUCTS.map(toProductDto)[0], category: 'SUPPORT' }]);
+    });
+    component.onSearch('UAT');
+    vi.advanceTimersByTime(300);
+    component.onCategoryChange('LICENSE');
+    fixture.detectChanges();
+    expect(component.tableRows().length).toBe(1);
+    vi.useRealTimers();
+  });
+
   it('searches via ProductService.search', () => {
     vi.useFakeTimers();
     component.onSearch('SUP-PREM');

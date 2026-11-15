@@ -90,6 +90,24 @@ describe('DealDetailComponent', () => {
     expect(el.textContent).not.toContain('Linked quote');
   });
 
+  it('shows a probability of 0 as 0%, not as missing (H-CRM-012)', () => {
+    selectedDeal.set(deal({ id: 5, name: 'Lost one', stage: 'LOST', probability: 0 }));
+    fixture.detectChanges();
+    const items = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.info-item'));
+    const probability = items.find((i) => i.querySelector('.label')?.textContent?.trim() === 'Probability');
+    expect(probability?.querySelector('.value')?.textContent?.trim()).toBe('0%');
+  });
+
+  it('still offers Edit on a closed opportunity: notes and dates stay editable (H-CRM-040, ADR-032 D-03)', () => {
+    for (const stage of ['WON', 'LOST'] as const) {
+      selectedDeal.set(deal({ id: 6, name: 'Closed', stage }));
+      fixture.detectChanges();
+      const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.header-actions button'))
+        .map((b) => b.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+      expect(buttons.some((t) => t.endsWith('Edit'))).toBe(true);
+    }
+  });
+
   it('onWin explains OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE and keeps the open stage', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     markWon.mockReturnValueOnce(throwError(() => ({

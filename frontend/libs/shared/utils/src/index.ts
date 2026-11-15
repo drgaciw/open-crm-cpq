@@ -2,3 +2,4 @@ export * from './lib/form-validators';
 export * from './lib/query-params.helper';
 export * from './lib/date.utils';
 export * from './lib/autocomplete-lookup';
+export * from './lib/local-date';

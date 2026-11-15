@@ -161,7 +161,13 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductDto> search(String query, Pageable pageable) {
-        return productRepository.search(query, pageable).map(productMapper::toDto);
+        return search(query, null, null, pageable);
+    }
+
+    /** Text search narrowed by optional category and status across the whole result set (DRG-754). */
+    @Transactional(readOnly = true)
+    public Page<ProductDto> search(String query, ProductCategory category, ProductStatus status, Pageable pageable) {
+        return productRepository.search(query, category, status, pageable).map(productMapper::toDto);
     }
 
     @CacheEvict(value = {"products", "products-by-sku"}, allEntries = true)

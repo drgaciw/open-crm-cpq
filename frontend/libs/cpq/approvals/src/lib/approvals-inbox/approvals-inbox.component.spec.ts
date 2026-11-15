@@ -92,21 +92,36 @@ describe('ApprovalsInboxComponent', () => {
     expect(approveSpy).toHaveBeenCalledWith(10);
   });
 
-  it('reject prompts then confirms and calls ApprovalService.reject', () => {
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Too steep');
+  // H-CPQ-Q-005 (UAT 2026-11-14): reject used window.prompt for the reason, then a second confirm
+  // dialog. One accessible dialog now collects the optional reason and confirms.
+  const rejectWith = (result: unknown) => {
+    dialogOpen.mockReturnValue({ afterClosed: () => of(result) });
+  };
+
+  it('reject opens one dialog, never window.prompt, and sends the reason it returns', () => {
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('from prompt');
+    rejectWith({ comments: 'Too steep' });
     component.onReject(MOCK_PENDING_APPROVALS[1]);
-    expect(promptSpy).toHaveBeenCalled();
-    expect(dialogOpen).toHaveBeenCalled();
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect(dialogOpen.mock.calls[0][0].name).toBe('ApprovalRejectDialogComponent');
+    expect(dialogOpen.mock.calls[0][1].data).toEqual(
+      expect.objectContaining({ approvalId: 11, quoteId: MOCK_PENDING_APPROVALS[1].quoteId }),
+    );
     expect(rejectSpy).toHaveBeenCalledWith(11, { comments: 'Too steep' });
     promptSpy.mockRestore();
   });
 
-  it('cancels reject when prompt is dismissed', () => {
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+  it('sends no comments when the reason is blank', () => {
+    rejectWith({ comments: '   ' });
+    component.onReject(MOCK_PENDING_APPROVALS[1]);
+    expect(rejectSpy).toHaveBeenCalledWith(11, {});
+  });
+
+  it('cancels reject when the dialog is dismissed', () => {
+    rejectWith(undefined);
     component.onReject(MOCK_PENDING_APPROVALS[0]);
-    expect(dialogOpen).not.toHaveBeenCalled();
     expect(rejectSpy).not.toHaveBeenCalled();
-    promptSpy.mockRestore();
   });
 
   it('openQuote navigates to quote detail', async () => {

@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { NotificationService } from '@frontend/shared-data-access';
+import { QuoteRejectDialogComponent } from '../quote-reject-dialog/quote-reject-dialog.component';
 import { QuotesDetailComponent } from './quotes-detail.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
@@ -512,20 +513,32 @@ describe('QuotesDetailComponent', () => {
     expect(component.canApproveReject()).toBe(false);
   });
 
-  it('rejects with optional reason from prompt', () => {
+  it('rejects with an optional reason from the reject dialog, not window.prompt (H-CPQ-Q-005)', () => {
     selectedQuote.set(toQuoteDto(MOCK_QUOTES[1]));
     fixture.detectChanges();
-    vi.spyOn(window, 'prompt').mockReturnValue('No budget');
+    const prompt = vi.spyOn(window, 'prompt');
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of({ reason: 'No budget' }) });
 
     component.onReject();
+    expect(dialogOpen).toHaveBeenCalledWith(QuoteRejectDialogComponent, expect.anything());
+    expect(prompt).not.toHaveBeenCalled();
     expect(rejectSpy).toHaveBeenCalledWith(1, 'No budget');
     expect(selectedQuote()?.status).toBe('REJECTED');
   });
 
-  it('cancels reject when prompt is dismissed', () => {
+  it('rejects without a reason when the dialog reason is left empty', () => {
     selectedQuote.set(toQuoteDto(MOCK_QUOTES[1]));
     fixture.detectChanges();
-    vi.spyOn(window, 'prompt').mockReturnValue(null);
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of({ reason: '' }) });
+
+    component.onReject();
+    expect(rejectSpy).toHaveBeenCalledWith(1, undefined);
+  });
+
+  it('cancels reject when the dialog is dismissed', () => {
+    selectedQuote.set(toQuoteDto(MOCK_QUOTES[1]));
+    fixture.detectChanges();
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(undefined) });
 
     component.onReject();
     expect(rejectSpy).not.toHaveBeenCalled();

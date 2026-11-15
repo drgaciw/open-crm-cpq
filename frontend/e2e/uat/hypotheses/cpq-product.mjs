@@ -79,7 +79,10 @@ export default [
     id: 'H-CPQ-P-009',
     claim: 'No product Activate / Deprecate / Retire actions in the UI although ProductService exposes activate(), deprecate() and retire().',
     file: `${CATALOG}/catalog-detail/catalog-detail.component.ts`,
-    triage: 'gap',
+    triage: 'browserCheckable',
+    checkId: 'catalog.lifecycle.activate-deprecate-retire',
+    class: 'functional',
+    note: 'Fixed by DRG-755 (UAT 2026-11-14): the detail page offers Activate / Deprecate / Retire as the status allows; the check walks a DRAFT product to RETIRED through the UI.',
   },
   {
     id: 'H-CPQ-P-010',

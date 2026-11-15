@@ -22,9 +22,13 @@ export const inbox = validateSpec({
       },
     },
     {
-      // Two dialogs in sequence: window.prompt first, then the Material confirm (H-CPQ-Q-005).
+      // One Material dialog with an optional reason (H-CPQ-Q-005 fixed; was window.prompt, then a confirm).
       name: 'Reject', in: 'row',
-      confirm: { kind: 'prompt', message: /^Reject approval #\d+ for quote \d+\. Optional reason:$/ },
+      confirm: {
+        kind: 'mat', title: 'Reject request',
+        message: /Reject approval #\d+ for quote \d+\?/,
+        confirmText: 'Reject', cancelText: 'Cancel',
+      },
       opensDialog: 'Reject request',
       hypothesis: 'H-CPQ-Q-005',
     },

@@ -90,7 +90,7 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
               } @else if (deal.amount && !deal.baseCurrency) {
                 <div class="info-item" data-testid="base-amount-missing"><span class="label">Base amount</span><span class="value">Not converted: no FX rate for {{ deal.currency }}</span></div>
               }
-              <div class="info-item"><span class="label">Probability</span><span class="value">{{ deal.probability ? deal.probability + '%' : '—' }}</span></div>
+              <div class="info-item"><span class="label">Probability</span><span class="value">{{ deal.probability !== null && deal.probability !== undefined ? deal.probability + '%' : '—' }}</span></div>
               <div class="info-item"><span class="label">Expected Close</span><span class="value">{{ deal.expectedCloseDate ? (deal.expectedCloseDate | date:'mediumDate') : '—' }}</span></div>
               <div class="info-item" data-testid="deal-term"><span class="label">Term</span><span class="value">{{ deal.termMonths ? deal.termMonths + (deal.termMonths === 1 ? ' month' : ' months') : '—' }}</span></div>
               <div class="info-item"><span class="label">Created</span><span class="value">{{ deal.createdAt | date:'mediumDate' }}</span></div>

@@ -124,7 +124,7 @@ export const detail = validateSpec({
     {
       name: 'Reject', in: 'menu', menuTrigger: MENU, enabledWhen: ['IN_REVIEW', 'PENDING_APPROVAL'],
       titleDisabled: 'Reject is available in review; pending approvals are decided in Approvals',
-      confirm: { kind: 'prompt', message: 'Rejection reason (optional):' },
+      confirm: { kind: 'mat', title: 'Reject quote' }, // H-CPQ-Q-005 fix: was window.prompt
       effect: { status: 'REJECTED' },
       hypothesis: 'H-CPQ-Q-005',
     },
@@ -199,7 +199,9 @@ export const detail = validateSpec({
           persist: { update: true, apiPath: 'description' } },
         { label: 'Deal external ID', kind: 'input', normalize: 'trim', editSample: 'DEAL-UAT-EDIT',
           persist: { update: true, apiPath: 'dealExternalId' } },
-        { label: 'Subscription type', kind: 'input', normalize: 'trim', editSample: 'SAAS', // DB CHECK allows SAAS | ONPREM | HYBRID only (H-CPQ-Q-009)
+        // H-CPQ-Q-009 fix: a select of the values the DB CHECK allows (SAAS | ONPREM | HYBRID).
+        { label: 'Subscription type', kind: 'select', editSample: 'SaaS',
+          options: [{ label: '—', value: '' }, { label: 'SaaS', value: 'SAAS' }, { label: 'On-premises', value: 'ONPREM' }, { label: 'Hybrid', value: 'HYBRID' }],
           persist: { update: true, apiPath: 'subscriptionType' } },
         { label: 'Currency', kind: 'input', placeholder: 'USD', normalize: 'upper', editSample: 'gbp',
           persist: { update: true, apiPath: 'currency' } },

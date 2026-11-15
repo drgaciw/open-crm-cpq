@@ -212,7 +212,10 @@ export default {
       const dto = await api.get(`${API}/${lost.id}`);
       if (dto.probability !== 0) throw new Error(`fixture problem: a LOST deal has probability ${dto.probability}, expected 0`);
       const row = await findRow(page, lost.name);
-      const inList = (await row.getByRole('cell').nth(3).innerText()).trim();
+      // Locate the Probability column by its header: DRG-750 reordered the columns.
+      const headers = (await page.locator('tr.mat-mdc-header-row th').allInnerTexts()).map((t) => t.trim());
+      const col = headers.findIndex((h) => h.startsWith('Probability'));
+      const inList = (await row.getByRole('cell').nth(col).innerText()).trim();
       await openDeal(page, lost, 'LOST');
       const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       const inDetail = info.match(/Probability\s*(\S+)/i)?.[1];
@@ -440,9 +443,9 @@ export default {
       }
     }, { hypothesis: 'H-CRM-039' });
 
-    // H-CRM-040: the edit form always sends `stage`, and the API rejects any update that carries a
-    // stage once the deal is WON/LOST — yet Edit is offered on closed deals. Uses a LOST deal:
-    // WON is unreachable without an accepted quote (WON_NEEDS_ACCEPTED_QUOTE).
+    // H-CRM-040 (fixed): a closed deal's notes stay editable (ADR-032 D-03). The form used to send
+    // `stage` with every update, which the API refuses after close. Uses a LOST deal: WON is
+    // unreachable without an accepted quote (WON_NEEDS_ACCEPTED_QUOTE).
     await runCheck(ctx, 'deals.form.closed-deal-can-be-edited', async () => {
       const closed = byStage.LOST;
       await goto(page, `/deals/${closed.id}/edit`);

@@ -109,8 +109,9 @@ function bookHttpErrorMessage(err: unknown, fallback: string): string {
               placeholder="USD"
               autocomplete="off"
             />
-            @if (form.get('currency')?.hasError('maxlength')) {
-              <mat-error>Currency must be 3 characters</mat-error>
+            <!-- H-CPQ-PR-011: an ISO 4217 code is exactly three letters ("US" used to pass). -->
+            @if (form.get('currency')?.hasError('pattern') || form.get('currency')?.hasError('maxlength')) {
+              <mat-error>Currency must be 3 letters</mat-error>
             }
           </mat-form-field>
         </div>
@@ -205,7 +206,7 @@ export class PriceBookEditDialogComponent {
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
     region: [''],
-    currency: ['', [Validators.maxLength(3)]],
+    currency: ['', [Validators.maxLength(3), Validators.pattern(/^[A-Za-z]{3}$/)]],
     isDefault: [false],
     effectiveDate: [''],
     expirationDate: [''],
