@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { LookupSelection, displayLookup, resolveLookupId } from '@frontend/shared-utils';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -133,6 +134,9 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
                   <mat-option [value]="c">{{ c.firstName }} {{ c.lastName }}</mat-option>
                 }
               </mat-autocomplete>
+              @if (form.get('contactSearch')?.hasError('notPicked')) {
+                <mat-error>Pick a contact from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Organization</mat-label>
@@ -144,6 +148,9 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
                   <mat-option [value]="o">{{ o.name }}</mat-option>
                 }
               </mat-autocomplete>
+              @if (form.get('orgSearch')?.hasError('notPicked')) {
+                <mat-error>Pick an organization from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
           </div>
 
@@ -198,6 +205,9 @@ export class DealFormComponent implements OnInit {
   readonly saveError = signal<string | null>(null);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
+  /** Labels the linked records were shown under, to tell edited text apart from them. */
+  private selectedContactLabel: string | null = null;
+  private selectedOrgLabel: string | null = null;
   filteredContacts = signal<ContactDto[]>([]);
   filteredOrgs = signal<OrganizationDto[]>([]);
 
@@ -262,8 +272,14 @@ export class DealFormComponent implements OnInit {
             orgSearch: d.organizationName ?? '',
             description: d.description,
           });
-          if (d.primaryContactId) this.selectedContactId = d.primaryContactId;
-          if (d.organizationId) this.selectedOrgId = d.organizationId;
+          if (d.primaryContactId) {
+            this.selectedContactId = d.primaryContactId;
+            this.selectedContactLabel = d.primaryContactName ?? null;
+          }
+          if (d.organizationId) {
+            this.selectedOrgId = d.organizationId;
+            this.selectedOrgLabel = d.organizationName ?? null;
+          }
         }
       }, { injector: this.injector });
     }
@@ -283,10 +299,25 @@ export class DealFormComponent implements OnInit {
     }
   }
 
-  displayContact(c: ContactDto): string { return c ? `${c.firstName} ${c.lastName}` : ''; }
-  displayOrg(o: OrganizationDto): string { return o?.name ?? ''; }
-  onContactSelected(c: ContactDto): void { this.selectedContactId = c.id; }
-  onOrgSelected(o: OrganizationDto): void { this.selectedOrgId = o.id; }
+  /** The controls hold a picked DTO, or a plain name when patched or typed. */
+  readonly displayContact = displayLookup<ContactDto>(contactLabel);
+  readonly displayOrg = displayLookup<OrganizationDto>(orgLabel);
+
+  onContactSelected(c: ContactDto): void {
+    this.selectedContactId = c.id;
+    this.selectedContactLabel = contactLabel(c);
+    this.form.get('contactSearch')?.setErrors(null);
+  }
+
+  onOrgSelected(o: OrganizationDto): void {
+    this.selectedOrgId = o.id;
+    this.selectedOrgLabel = orgLabel(o);
+    this.form.get('orgSearch')?.setErrors(null);
+  }
+
+  private selection(id: number | null, label: string | null): LookupSelection | null {
+    return id === null ? null : { id, label };
+  }
 
   dismissError(): void {
     this.saveError.set(null);
@@ -295,6 +326,28 @@ export class DealFormComponent implements OnInit {
 
   onSubmit(): void {
     if (this.form.invalid) return;
+    // Typed-but-not-picked contact/organization text is resolved or blocked, never dropped.
+    const contact = resolveLookupId(
+      this.form.value.contactSearch,
+      this.selection(this.selectedContactId, this.selectedContactLabel),
+      this.filteredContacts(),
+      contactLabel,
+    );
+    const org = resolveLookupId(
+      this.form.value.orgSearch,
+      this.selection(this.selectedOrgId, this.selectedOrgLabel),
+      this.filteredOrgs(),
+      orgLabel,
+    );
+    if (!contact.ok || !org.ok) {
+      for (const [name, result] of [['contactSearch', contact], ['orgSearch', org]] as const) {
+        if (!result.ok) {
+          this.form.get(name)?.setErrors({ notPicked: true });
+          this.form.get(name)?.markAsTouched();
+        }
+      }
+      return;
+    }
     this.saving.set(true);
     this.saveError.set(null);
     const closeDate = this.form.value.expectedCloseDate as Date | null;
@@ -315,8 +368,8 @@ export class DealFormComponent implements OnInit {
         termMonths,
         description: this.form.value.description || undefined,
         ownerId: ownerId || undefined,
-        primaryContactId: this.selectedContactId ?? undefined,
-        organizationId: this.selectedOrgId ?? undefined,
+        primaryContactId: contact.id ?? undefined,
+        organizationId: org.id ?? undefined,
       };
       this.dealService.update(Number(idVal), data).subscribe({
         next: () => this.router.navigate(['/deals', idVal]),
@@ -335,8 +388,8 @@ export class DealFormComponent implements OnInit {
         termMonths,
         description: this.form.value.description || undefined,
         ownerId: ownerId || undefined,
-        primaryContactId: this.selectedContactId ?? undefined,
-        organizationId: this.selectedOrgId ?? undefined,
+        primaryContactId: contact.id ?? undefined,
+        organizationId: org.id ?? undefined,
       };
       this.dealService.create(data).subscribe({
         next: (d) => this.router.navigate(['/deals', d.id]),
@@ -352,4 +405,12 @@ export class DealFormComponent implements OnInit {
     const idVal = this.id();
     this.router.navigate(this.isEditMode && idVal ? ['/deals', idVal] : ['/deals']);
   }
+}
+
+function contactLabel(contact: ContactDto): string {
+  return `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim();
+}
+
+function orgLabel(org: OrganizationDto): string {
+  return org.name ?? '';
 }
