@@ -298,6 +298,38 @@ class DealServiceTest {
             verify(domainEvents, never()).dealTransition(any(), any());
         }
 
+        @Test
+        @DisplayName("H-CRM-039: an open stage change through update takes that stage's probability, as Advance does")
+        void updateToOpenStageRecomputesProbability() {
+            updateRequest.setStage(DealStage.NEGOTIATION);
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            doAnswer(inv -> {
+                Deal target = inv.getArgument(1);
+                target.setStage(DealStage.NEGOTIATION);
+                return null;
+            }).when(dealMapper).updateEntity(updateRequest, deal);
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            dealService.update(1L, updateRequest);
+
+            assertThat(deal.getProbability()).isEqualTo(80);
+            assertThat(deal.getWeightedAmount()).isEqualByComparingTo("40000.00");
+        }
+
+        @Test
+        @DisplayName("H-CRM-039: an update that keeps the stage leaves the probability alone")
+        void updateWithoutStageChangeKeepsProbability() {
+            deal.setProbability(25);
+            when(dealRepository.findById(1L)).thenReturn(Optional.of(deal));
+            when(dealRepository.save(deal)).thenReturn(deal);
+            when(dealMapper.toDto(deal)).thenReturn(dealDto);
+
+            dealService.update(1L, updateRequest);
+
+            assertThat(deal.getProbability()).isEqualTo(25);
+        }
+
         private void assertTerminalUpdate(DealStage stage, int probability) {
             updateRequest.setStage(stage);
             if (stage == DealStage.WON) {
