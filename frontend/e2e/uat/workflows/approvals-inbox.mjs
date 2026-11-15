@@ -23,14 +23,26 @@ const SEEDED = 3;
  * the only way a pending row appears; nothing is written around the API.
  */
 export async function ensurePendingApprovals(ctx) {
-  const pending = asRows(await ctx.api.get(PENDING)).length;
+  const pending = (await decidableRows(ctx.api)).length;
   if (pending >= SEEDED) return pending;
   if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') return pending;
   for (let i = pending; i < SEEDED; i += 1) {
     const { quote } = await draftWithLine(ctx);
     await ctx.api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
   }
-  return asRows(await ctx.api.get(PENDING)).length;
+  return (await decidableRows(ctx.api)).length;
+}
+
+/**
+ * Pending requests whose quote still exists. A quote deleted while PENDING_APPROVAL (teardown does
+ * this every run) leaves an approval in the inbox that can no longer be decided.
+ */
+async function decidableRows(api) {
+  const rows = [];
+  for (const request of asRows(await api.get(PENDING))) {
+    if (await api.get(`/api/v1/quotes/${request.quoteId}`).then(() => true, () => false)) rows.push(request);
+  }
+  return rows;
 }
 
 const rowAction = (name) => inbox.actions.find((a) => a.in === 'row' && a.name === name);
@@ -47,12 +59,23 @@ async function openInbox(page) {
 
 /** The first pending row, or a BLOCKED outcome when the inbox is (legitimately) empty. */
 async function firstRowOrBlocked(ctx) {
-  const rows = asRows(await ctx.api.get(PENDING));
+  const rows = await decidableRows(ctx.api);
   if (!rows.length) throw blocked(NO_ROWS);
   await openInbox(ctx.page);
-  const row = ctx.page.getByRole('row').filter({ hasText: `Quote ${rows[0].quoteId}` }).first();
+  const row = rowFor(ctx.page, rows[0]);
   await row.waitFor({ state: 'visible' });
   return { row, request: rows[0] };
+}
+
+/**
+ * The inbox row of one approval request, by its ID cell and exact quote link. A hasText match on
+ * "Quote 8" also matches "Quote 87", so once a row leaves the table the locator would re-resolve
+ * to a different request.
+ */
+function rowFor(page, request) {
+  return page.getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: String(request.id), exact: true }) })
+    .filter({ has: page.getByRole('link', { name: `Quote ${request.quoteId}`, exact: true }) });
 }
 
 const stillPending = async (api, id) => asRows(await api.get(PENDING)).some((r) => r.id === id);
@@ -180,7 +203,7 @@ export async function runInboxRows(ctx) {
     {
       id: 'approvals.row.approve.confirm',
       run: async () => {
-        const row = page.getByRole('row').filter({ hasText: `Quote ${state.request.quoteId}` }).first();
+        const row = rowFor(page, state.request);
         await row.getByRole('button', { name: 'Approve', exact: true }).click();
         await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
         await waitUntil(() => stillPending(api, state.request.id), (present) => present === false, {
@@ -202,6 +225,31 @@ export async function runInboxRows(ctx) {
     await waitUntil(() => stillPending(api, request.id), (present) => present === false, {
       timeoutMs: 8000, intervalMs: 250, describe: () => 'request is still pending after Reject',
     });
+
+  // Found by UAT 2026-11-14: deleting a quote in PENDING_APPROVAL leaves its approval in the inbox.
+  // Deciding it used to record the decision in approval-routing and then fail with 404; now it is
+  // refused first and the request stays pending. Whether delete should be refused is DRG-758.
+  await runCheck(ctx, 'approvals.orphan.decision-refused-before-routing', async () => {
+    if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') throw blocked(NO_ROWS);
+    const { quote } = await draftWithLine(ctx);
+    await api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
+    const request = asRows(await api.get(PENDING)).find((r) => r.quoteId === quote.id);
+    if (!request) throw blocked(`the approval routed for quote ${quote.id} is not pending`);
+    await api.del(`/api/v1/quotes/${quote.id}`);
+    api.untrack('quote', quote.id);
+    await openInbox(page);
+    const row = rowFor(page, request);
+    await row.getByRole('button', { name: 'Approve', exact: true }).click();
+    await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
+    const banner = page.getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' });
+    await banner.waitFor({ state: 'visible', timeout: 8000 });
+    const said = (await banner.innerText()).replace(/\s+/g, ' ').trim();
+    if (!(await stillPending(api, request.id))) {
+      throw defect(`approval-routing recorded the decision on #${request.id} although quote ${quote.id} is deleted; the UI said "${said}"`);
+    }
+    await row.waitFor({ state: 'visible' });
+    return `approval #${request.id} stays pending; banner "${said.slice(0, 80)}"`;
+  });
     return `approval #${request.id} rejected`;
   });
 }
