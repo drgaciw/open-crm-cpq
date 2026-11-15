@@ -155,6 +155,18 @@ describe('CatalogListComponent', () => {
     expect(compiled.textContent).toContain('CRM-SEAT-NAMED');
   });
 
+  it('renders the Status column as a product status badge with friendly labels (H-CPQ-P-003, H-CPQ-P-006)', () => {
+    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('tr.mat-mdc-row'));
+    const badges = rows.map((r) => r.querySelector('app-status-badge')?.textContent?.trim());
+    expect(badges.every((b) => b !== undefined)).toBe(true);
+    for (const b of badges) expect(['Draft', 'Active', 'Deprecated', 'Retired']).toContain(b);
+  });
+
+  it('labels the status filter options in words but filters by the enum (H-CPQ-P-006)', () => {
+    expect(component.statusOptions.map((o) => o.label)).toEqual(['Draft', 'Active', 'Deprecated', 'Retired']);
+    expect(component.statusOptions.map((o) => o.value)).toEqual(['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED']);
+  });
+
   it('searches via ProductService.search', () => {
     vi.useFakeTimers();
     component.onSearch('SUP-PREM');
