@@ -16,8 +16,9 @@
 import { readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { launch } from './lib/browser.mjs';
-import { createReport } from './lib/report.mjs';
+import { BASE, launch } from './lib/browser.mjs';
+import { createReport, residueHint } from './lib/report.mjs';
+import { purgeLocalResidue } from './lib/residue.mjs';
 import { createApi } from './lib/api.mjs';
 import { runPreflight, blockedReason } from './lib/preflight.mjs';
 import { monitorPage } from './lib/health.mjs';
@@ -152,6 +153,10 @@ try {
     }
 
     for (const item of await api.teardown()) report.residue(item);
+    const leftover = residueHint(report.document().residue);
+    if (leftover) report.info('teardown.residue', leftover, 'low');
+    const purged = purgeLocalResidue({ base: BASE, residue: report.document().residue });
+    if (purged) report.info('teardown.purge', purged, 'low');
 
     // GAP / unitOnly / falsePositive hypotheses have no browser check; list them so the report
     // accounts for every claim the static pass produced.

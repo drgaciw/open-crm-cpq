@@ -28,6 +28,7 @@
       "@frontend/cpq-catalog": ["libs/cpq/catalog/src/index.ts"],
       "@frontend/cpq-quotes": ["libs/cpq/quotes/src/index.ts"],
       "@frontend/cpq-approvals": ["libs/cpq/approvals/src/index.ts"],
+      "@frontend/cpq-contracts": ["libs/cpq/contracts/src/index.ts"],
       "@frontend/cpq-price-books": ["libs/cpq/price-books/src/index.ts"],
       "@frontend/cpq-pricing-customers": [
         "libs/cpq/pricing-customers/src/index.ts"

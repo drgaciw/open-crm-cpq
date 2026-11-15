@@ -48,6 +48,14 @@ import { MatIconModule } from '@angular/material/icon';
         <mat-icon matListItemIcon>fact_check</mat-icon>
         <span matListItemTitle>Approvals</span>
       </a>
+      <a mat-list-item routerLink="/contracts" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>description</mat-icon>
+        <span matListItemTitle>Contracts</span>
+      </a>
+      <a mat-list-item routerLink="/assets" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>devices</mat-icon>
+        <span matListItemTitle>Assets</span>
+      </a>
       <a mat-list-item routerLink="/price-books" routerLinkActive="active-link">
         <mat-icon matListItemIcon>menu_book</mat-icon>
         <span matListItemTitle>Price Books</span>

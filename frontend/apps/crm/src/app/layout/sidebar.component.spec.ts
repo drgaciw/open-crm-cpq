@@ -33,7 +33,7 @@ describe('SidebarComponent', () => {
     expect(bundles?.textContent).toContain('Bundles');
   });
 
-  it('groups CRM and CPQ sections without adding routes', () => {
+  it('groups CRM and CPQ sections; Contracts and Assets follow Approvals (DRG-761)', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('CRM');
     expect(el.textContent).toContain('CPQ');
@@ -49,6 +49,8 @@ describe('SidebarComponent', () => {
       '/catalog',
       '/quotes',
       '/approvals',
+      '/contracts',
+      '/assets',
       '/price-books',
       '/pricing-customers',
       '/rule-sets',

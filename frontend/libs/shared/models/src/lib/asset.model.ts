@@ -2,8 +2,8 @@
  * Asset / installed-base models.
  * Mirrors: com.opencrm.contract.asset.* (contract-asset-management OHS).
  *
- * FE has no Assets UI yet (UAT-ALM-06 GAP); these types keep the SPA typed for
- * OHS/report clients and renewal-from-assets continuation payloads.
+ * Read in the SPA by @frontend/cpq-contracts (/assets and contract detail, DRG-761); also keeps
+ * OHS/report clients and renewal-from-assets continuation payloads typed.
  */
 
 /** Mirrors: com.opencrm.contract.asset.AssetStatus */

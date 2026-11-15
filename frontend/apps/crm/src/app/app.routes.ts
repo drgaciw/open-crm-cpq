@@ -48,6 +48,16 @@ export const appRoutes: Route[] = [
           import('@frontend/cpq-approvals').then((m) => m.APPROVALS_ROUTES),
       },
       {
+        path: 'contracts',
+        loadChildren: () =>
+          import('@frontend/cpq-contracts').then((m) => m.CONTRACTS_ROUTES),
+      },
+      {
+        path: 'assets',
+        loadChildren: () =>
+          import('@frontend/cpq-contracts').then((m) => m.ASSETS_ROUTES),
+      },
+      {
         path: 'price-books',
         loadChildren: () =>
           import('@frontend/cpq-price-books').then((m) => m.PRICE_BOOKS_ROUTES),

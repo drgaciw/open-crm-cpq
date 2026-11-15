@@ -3,7 +3,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createReport } from './report.mjs';
+import { createReport, residueHint } from './report.mjs';
 
 const quiet = (options = {}) => createReport('unit', { write: false, log: false, ...options });
 
@@ -71,4 +71,22 @@ test('hypothesisVerdicts maps each linked hypothesis to what the run observed', 
     'H-2': 'REFUTED',
     'H-3': 'BLOCKED',
   });
+});
+
+test('residueHint is null when teardown removed everything', () => {
+  assert.equal(residueHint([]), null);
+});
+
+test('residueHint names what the API would not delete and how to purge it locally', () => {
+  const hint = residueHint([
+    { type: 'quote', id: 264, path: '/api/v1/quotes/264', reason: 'DELETE /api/v1/quotes/264 -> HTTP 400: {"errorCode":"QUOTE_ACCEPTED_NO_DELETE"}' },
+    { type: 'lead', id: 7, reason: 'CONVERTED leads cannot be deleted' },
+  ]);
+  assert.match(hint, /^2 record\(s\) the API would not delete: quote 264, lead 7\./);
+  assert.match(hint, /accepted quotes and their contracts: run scripts\/dev\/purge-uat-residue\.sh --apply/);
+});
+
+test('residueHint mentions the purge script only when it can help', () => {
+  const hint = residueHint([{ type: 'lead', id: 7, reason: 'CONVERTED leads cannot be deleted' }]);
+  assert.equal(hint, '1 record(s) the API would not delete: lead 7.');
 });

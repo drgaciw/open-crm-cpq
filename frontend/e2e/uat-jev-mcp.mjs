@@ -19,6 +19,12 @@
  *   UAT_MIN_CONFIDENCE      Jev confidence gate (default 0.9). Jev holds 0.1-0.2 on "give up" before a
  *                           form's final submit however the page is described (probed 2026-11-15), so
  *                           end-to-end runs use 0.75; every step taken below 0.9 is marked "@<confidence>".
+ *   UAT_KEEP_RESIDUE=1      keep accepted UAT quotes (and their contracts) that teardown cannot delete;
+ *                           by default a local run soft-deletes them with scripts/dev/purge-uat-residue.sh.
+ *
+ * The contracts group needs quote-service started with OPENCRM_OUTBOX_RELAY_ENABLED=true: a contract
+ * exists only once contract-asset-management consumes the QuoteAccepted event (see
+ * docs/forge/42-contracts-ui-hold-exception.md). Without it that check is BLOCKED.
  *
  * Safety envelope, after uat/runners/jevDriver.mjs: page content is framed as untrusted data and
  * every answer is validated; destructive controls (delete, archive, remove) are removed before a
@@ -33,7 +39,8 @@ import { join, resolve } from 'node:path';
 import { request } from 'playwright';
 import { createMcpClient, parseSnapshot, responseFacts, actionCandidates } from './lib/mcp-playwright.mjs';
 import { createDecider, choice } from './lib/decide.mjs';
-import { createReport } from './lib/report.mjs';
+import { createReport, residueHint } from './lib/report.mjs';
+import { purgeLocalResidue } from './lib/residue.mjs';
 import { createApi } from './lib/api.mjs';
 import { BASE } from './lib/browser.mjs';
 import { runPreflight, blockedReason } from './lib/preflight.mjs';
@@ -648,6 +655,7 @@ async function navigation() {
     ['Open the list of customer accounts', '/organizations'], ['Open the sales leads', '/leads'],
     ['Open the opportunities pipeline', '/deals'], ['Open the product catalog', '/catalog'],
     ['Open the quotes list', '/quotes'], ['Open the approvals inbox', '/approvals'], ['Open the price books', '/price-books'],
+    ['Open the contracts', '/contracts'], ['Open the installed base (assets)', '/assets'],
   ];
   for (const [goal, path] of goals) {
     await achieve(`mcp.navigate: ${goal}`, {
@@ -659,13 +667,65 @@ async function navigation() {
 }
 
 /** Installed base and contracts: the webapp has no screens for them, and the APIs refuse locally. */
-async function assetsAndContracts() {
-  for (const [path, apiPath] of [['/assets', '/api/v1/assets?page=0&size=1'], ['/contracts', '/api/v1/contracts?page=0&size=1']]) {
-    const page = await open(path);
-    const headings = page.elements.filter((e) => e.role === 'heading' && e.scope === 'main').map((e) => e.name);
-    const status = await apiContext.get(`${BASE}${apiPath}`).then((r) => r.status());
-    report.gap(`mcp.ui-route${path}`,
-      `no screen: ${path} rendered ${page.path}${headings.length ? ` with heading(s) ${headings.map((h) => `"${h}"`).join(', ')}` : ''}; GET ${apiPath.split('?')[0]} -> HTTP ${status}`);
+/** What the page's main region says, as a user reads it. */
+async function mainText() {
+  const out = await mcp.call('browser_evaluate', { function: '() => document.querySelector("main")?.innerText ?? ""' });
+  return JSON.parse(out.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '""');
+}
+
+async function contracts() {
+  // A contract is created only when contract-asset-management consumes the QuoteAccepted event, so
+  // the quote-service outbox relay must be on (docs/forge/42-contracts-ui-hold-exception.md). The
+  // accepted quote is mock data seeded through the API; finding and reading the contract is the test.
+  const { quote } = await draftWithLine(ctx);
+  for (const step of ['submit', 'approve', 'send', 'accept']) await api.post(`/api/v1/quotes/${quote.id}/${step}`, {});
+  let contract = null;
+  for (let i = 0; i < 20 && !contract; i++) {
+    const listed = rowsOf(await api.get('/api/v1/subscriptions?page=0&size=50&sort=createdAt,desc'));
+    contract = listed.find((c) => c.quoteId === quote.uuid || c.quoteId === quote.quoteNumber) ?? null;
+    if (!contract) await sleep(1500);
+  }
+  if (!contract) {
+    report.blocked('mcp.contracts.find-and-open',
+      `no contract appeared within 30 s of accepting quote #${quote.id}: is the quote-service outbox relay on (OPENCRM_OUTBOX_RELAY_ENABLED=true)?`);
+  } else {
+    const opened = await achieve('mcp.contracts.find-and-open', {
+      goal: `Open contract ${contract.subscriptionNumber} from the contracts list.`,
+      start: '/contracts', startText: 'Contracts',
+      done: async (page) => page.path === `/contracts/${contract.id}`
+        && `${contract.subscriptionNumber} (${contract.status}), created from accepted quote #${quote.id}`,
+    });
+    if (opened) {
+      // What the detail page shows a user, checked against the API record.
+      const text = await mainText();
+      const status = { PENDING: 'Pending', ACTIVE: 'Active', SUSPENDED: 'Suspended', CANCELLED: 'Cancelled', EXPIRED: 'Expired' }[contract.status];
+      const shown = [contract.subscriptionNumber, status, contract.customerId, contract.planName, contract.startDate, contract.endDate]
+        .filter((v) => v && !text.includes(v));
+      if (shown.length) report.fail('mcp.contracts.detail', `the detail page does not show ${shown.join(', ')}`);
+      else report.pass('mcp.contracts.detail', `shows number, status "${status}", customer, plan and term`);
+      const assetsAnswer = await apiContext.get(`${BASE}/api/v1/assets?subscriptionId=${contract.id}`).then((r) => r.status());
+      if (assetsAnswer === 403 && text.includes('Viewing assets requires the InstalledBase.Read role.')) {
+        report.pass('mcp.contracts.detail.assets-access', 'GET /api/v1/assets -> 403; the page names the InstalledBase.Read role');
+      } else if (assetsAnswer === 200) {
+        report.pass('mcp.contracts.detail.assets-access', 'GET /api/v1/assets -> 200 (this user can read assets)');
+      } else {
+        report.fail('mcp.contracts.detail.assets-access', `GET /api/v1/assets -> ${assetsAnswer}; the page does not explain it`);
+      }
+    }
+  }
+
+  // The installed base: in dev mode the API refuses anonymous reads (403, by design); the page says why.
+  await open('/assets', 'Assets');
+  const text = await mainText();
+  const assetsAnswer = await apiContext.get(`${BASE}/api/v1/assets`).then((r) => r.status());
+  if (assetsAnswer === 403) {
+    if (text.includes('Viewing assets requires the InstalledBase.Read role.')) {
+      report.pass('mcp.assets.access-state', 'GET /api/v1/assets -> 403; the Assets page names the InstalledBase.Read role');
+    } else {
+      report.fail('mcp.assets.access-state', `GET /api/v1/assets -> 403 but the page shows: ${text.slice(0, 160)}`);
+    }
+  } else {
+    report.info('mcp.assets.access-state', `GET /api/v1/assets -> ${assetsAnswer}; the access notice is not expected`);
   }
 }
 
@@ -697,7 +757,7 @@ try {
     ['price-books', priceBooks, 'pricebook'],
     ['quotes', quotes, 'quote'],
     ['approvals', approvals, 'approvalsBff'],
-    ['assets-contracts', assetsAndContracts, null],
+    ['contracts', contracts, 'quote'],
   ];
   for (const [id, run, backend] of groups) {
     if (!group(id)) continue;
@@ -713,6 +773,10 @@ try {
   report.fail('fatal', String(error.message || error));
 } finally {
   if (api) for (const item of await api.teardown()) report.residue(item);
+  const leftover = residueHint(report.document().residue);
+  if (leftover) report.info('teardown.residue', leftover, 'low');
+  const purged = purgeLocalResidue({ base: BASE, residue: report.document().residue });
+  if (purged) report.info('teardown.purge', purged, 'low');
   await apiContext?.dispose();
   mcp?.close();
 }

@@ -233,9 +233,14 @@ export function actionCandidates(elements, { navigation = false } = {}) {
     inLayer = [...elements.filter((e) => e.scope === 'navigation' && e.role === 'link'), ...inLayer];
   }
   const actions = [];
+  const seen = new Set();
   for (const e of inLayer) {
     // An unnamed control gives a user (and Jev) nothing to choose it by.
     if (!e.ref || e.disabled || e.header || !e.name || PAGINATOR.test(e.name)) continue;
+    // Same role, name (and destination) in one layer is one choice: offer it once.
+    const identity = `${e.role}|${e.name}|${e.url ?? ''}`;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
     const label = `${e.role} "${e.name}"`;
     if (CLICKABLE.has(e.role)) actions.push({ key: e.ref, kind: 'click', ref: e.ref, role: e.role, name: e.name, label });
     if (e.role === 'combobox') actions.push({ key: e.ref, kind: 'use', ref: e.ref, role: e.role, name: e.name, label });
