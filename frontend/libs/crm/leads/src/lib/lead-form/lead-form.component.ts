@@ -13,7 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { LeadService } from '../lead.service';
 import { ContactService } from '@frontend/crm-contacts';
 import { OrganizationService } from '@frontend/crm-organizations';
-import { ContactDto, LeadPriority, OrganizationDto } from '@frontend/shared-models';
+import { ContactDto, LEAD_PRIORITY_LABELS, LeadPriority, OrganizationDto } from '@frontend/shared-models';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
@@ -58,7 +58,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
               <mat-label>Priority</mat-label>
               <mat-select formControlName="priority" aria-label="Lead priority">
                 @for (p of priorities; track p) {
-                  <mat-option [value]="p">{{ p }}</mat-option>
+                  <mat-option [value]="p">{{ priorityLabel(p) }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
@@ -184,6 +184,10 @@ export class LeadFormComponent implements OnInit {
   filteredContacts = signal<ContactDto[]>([]);
   filteredOrgs = signal<OrganizationDto[]>([]);
   readonly priorities: LeadPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+  priorityLabel(priority: LeadPriority): string {
+    return LEAD_PRIORITY_LABELS[priority] ?? priority;
+  }
 
   constructor() {
     // F1: effect() created once in constructor to reactively update filteredContacts

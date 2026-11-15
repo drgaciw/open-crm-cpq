@@ -20,6 +20,14 @@ export type LeadPriority =
   | 'HIGH'
   | 'URGENT';
 
+/** Display labels for lead priority (the enum value is the API contract; users read these). */
+export const LEAD_PRIORITY_LABELS: Record<LeadPriority, string> = {
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  URGENT: 'Urgent',
+};
+
 /**
  * Mirrors: com.opencrm.crm.lead.LeadDto
  * Returned by GET /api/v1/leads, GET /api/v1/leads/:id
