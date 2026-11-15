@@ -7,12 +7,31 @@
  * flows record BLOCKED with that reason; they are complete and run as soon as a row appears.
  */
 import { goto } from '../../lib/browser.mjs';
-import { runCheck, runSteps, defect, blocked, waitUntil } from '../../lib/health.mjs';
+import { runCheck, runSteps, defect, blocked, gap, waitUntil } from '../../lib/health.mjs';
 import { withNativeDialog, confirmMatDialog } from '../../lib/dialogs.mjs';
 import { inbox } from '../specs/approvals.mjs';
+import { draftWithLine } from './quote-lifecycle.mjs';
 
 const PENDING = '/api/v1/quotes/approvals/pending';
-const NO_ROWS = 'no pending approvals can exist while approval-routing is down';
+const NO_ROWS = 'no pending approval exists, and none could be routed (approval-routing or price book down)';
+/** Approve and Reject each consume a pending row, so the run routes a few. */
+const SEEDED = 3;
+
+/**
+ * Route quotes to tiered approval through the quote BFF's own endpoint (POST /quotes/{id}/approvals)
+ * when the inbox is empty. The webapp has no action that calls it (see approvals.gap.*), so this is
+ * the only way a pending row appears; nothing is written around the API.
+ */
+export async function ensurePendingApprovals(ctx) {
+  const pending = asRows(await ctx.api.get(PENDING)).length;
+  if (pending >= SEEDED) return pending;
+  if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') return pending;
+  for (let i = pending; i < SEEDED; i += 1) {
+    const quote = await draftWithLine(ctx);
+    await ctx.api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
+  }
+  return asRows(await ctx.api.get(PENDING)).length;
+}
 
 const rowAction = (name) => inbox.actions.find((a) => a.in === 'row' && a.name === name);
 const dataRows = (page) => page.locator('tr[mat-row], tr.mat-mdc-row');
@@ -81,6 +100,30 @@ export async function runInboxRows(ctx) {
   const { page, api } = ctx;
   const approve = rowAction('Approve');
   const reject = rowAction('Reject');
+
+  // Found by UAT 2026-11-14: the inbox can only fill through the API. No quote screen offers
+  // "submit for approval" (POST /quotes/{id}/approvals), so a user cannot route a quote to a tier.
+  await runCheck(ctx, 'approvals.gap.no-ui-route-to-tiered-approval', async () => {
+    const quote = await draftWithLine(ctx);
+    await goto(page, `/quotes/${quote.id}`);
+    await page.getByRole('heading', { level: 1 }).first().waitFor({ state: 'visible' });
+    const offered = (await page.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+    const more = page.getByRole('button', { name: 'More quote actions', exact: true });
+    if (await more.count()) {
+      await more.click();
+      offered.push(...(await page.getByRole('menuitem').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim()));
+      await page.keyboard.press('Escape');
+    }
+    const route = offered.filter((t) => /(submit|request|send).*(for )?approval/i.test(t));
+    if (route.length) return `the quote detail offers: ${route.join(', ')}`;
+    throw gap('no quote screen calls POST /quotes/{id}/approvals; a pending tiered approval cannot be created from the webapp');
+  });
+
+  await runCheck(ctx, 'approvals.seed.route-quotes-to-tiered-approval', async () => {
+    const pending = await ensurePendingApprovals(ctx);
+    if (!pending) throw blocked(NO_ROWS);
+    return `${pending} pending approval(s) routed through POST /quotes/{id}/approvals`;
+  });
 
   await runCheck(ctx, 'approvals.row.open-quote', async () => {
     const { row, request } = await firstRowOrBlocked(ctx);
