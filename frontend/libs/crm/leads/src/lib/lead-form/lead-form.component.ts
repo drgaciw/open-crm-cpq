@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { LookupSelection, displayLookup, resolveLookupId } from '@frontend/shared-utils';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -68,6 +69,9 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
               <mat-label>Estimated Value</mat-label>
               <input matInput formControlName="estimatedValue" type="number" placeholder="0">
               <span matTextPrefix>$&nbsp;</span>
+              @if (form.get('estimatedValue')?.hasError('min')) {
+                <mat-error>Estimated value cannot be negative</mat-error>
+              }
             </mat-form-field>
           </div>
 
@@ -105,6 +109,9 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                       aria-label="Clear">
                 <mat-icon>close</mat-icon>
               </button>
+              @if (form.get('contactSearch')?.hasError('notPicked')) {
+                <mat-error>Pick a contact from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline">
@@ -131,6 +138,9 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
                       aria-label="Clear">
                 <mat-icon>close</mat-icon>
               </button>
+              @if (form.get('organizationSearch')?.hasError('notPicked')) {
+                <mat-error>Pick an organization from the list, or clear the field.</mat-error>
+              }
             </mat-form-field>
           </div>
 
@@ -168,6 +178,9 @@ export class LeadFormComponent implements OnInit {
   saving = signal(false);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
+  /** Labels the linked records were shown under, to tell edited text apart from them. */
+  private selectedContactLabel: string | null = null;
+  private selectedOrgLabel: string | null = null;
   filteredContacts = signal<ContactDto[]>([]);
   filteredOrgs = signal<OrganizationDto[]>([]);
   readonly priorities: LeadPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -196,7 +209,7 @@ export class LeadFormComponent implements OnInit {
       source: [''],
       priority: ['MEDIUM' as LeadPriority],
       description: [''],
-      estimatedValue: [''],
+      estimatedValue: ['', Validators.min(0)],
       contactSearch: [''],
       organizationSearch: [''],
     });
@@ -217,8 +230,14 @@ export class LeadFormComponent implements OnInit {
             contactSearch: lead.contactName ?? '',
             organizationSearch: lead.organizationName ?? '',
           });
-          if (lead.contactId) this.selectedContactId = lead.contactId;
-          if (lead.organizationId) this.selectedOrgId = lead.organizationId;
+          if (lead.contactId) {
+            this.selectedContactId = lead.contactId;
+            this.selectedContactLabel = lead.contactName ?? null;
+          }
+          if (lead.organizationId) {
+            this.selectedOrgId = lead.organizationId;
+            this.selectedOrgLabel = lead.organizationName ?? null;
+          }
         }
       }, { injector: this.injector });
     }
@@ -238,34 +257,62 @@ export class LeadFormComponent implements OnInit {
     }
   }
 
-  displayContact(contact: ContactDto): string {
-    return contact ? `${contact.firstName} ${contact.lastName}` : '';
-  }
-
-  displayOrg(org: OrganizationDto): string {
-    return org?.name ?? '';
-  }
+  /** The controls hold a picked DTO, or a plain name when patched or typed (H-CRM-034). */
+  readonly displayContact = displayLookup<ContactDto>(contactLabel);
+  readonly displayOrg = displayLookup<OrganizationDto>(orgLabel);
 
   onContactSelected(contact: ContactDto): void {
     this.selectedContactId = contact.id;
+    this.selectedContactLabel = contactLabel(contact);
+    this.form.get('contactSearch')?.setErrors(null);
   }
 
   onOrgSelected(org: OrganizationDto): void {
     this.selectedOrgId = org.id;
+    this.selectedOrgLabel = orgLabel(org);
+    this.form.get('organizationSearch')?.setErrors(null);
   }
 
   clearContact(): void {
     this.selectedContactId = null;
+    this.selectedContactLabel = null;
     this.form.patchValue({ contactSearch: '' });
   }
 
   clearOrg(): void {
     this.selectedOrgId = null;
+    this.selectedOrgLabel = null;
     this.form.patchValue({ organizationSearch: '' });
+  }
+
+  private selection(id: number | null, label: string | null): LookupSelection | null {
+    return id === null ? null : { id, label };
   }
 
   onSubmit(): void {
     if (this.form.invalid) return;
+    // H-CRM-023: typed-but-not-picked text is resolved or blocked, never silently dropped.
+    const contact = resolveLookupId(
+      this.form.value.contactSearch,
+      this.selection(this.selectedContactId, this.selectedContactLabel),
+      this.filteredContacts(),
+      contactLabel,
+    );
+    const org = resolveLookupId(
+      this.form.value.organizationSearch,
+      this.selection(this.selectedOrgId, this.selectedOrgLabel),
+      this.filteredOrgs(),
+      orgLabel,
+    );
+    if (!contact.ok || !org.ok) {
+      for (const [name, result] of [['contactSearch', contact], ['organizationSearch', org]] as const) {
+        if (!result.ok) {
+          this.form.get(name)?.setErrors({ notPicked: true });
+          this.form.get(name)?.markAsTouched();
+        }
+      }
+      return;
+    }
     this.saving.set(true);
 
     const formValue = this.form.value;
@@ -273,9 +320,12 @@ export class LeadFormComponent implements OnInit {
     delete formValue.organizationSearch;
     const data = {
       ...formValue,
-      contactId: this.selectedContactId,
-      organizationId: this.selectedOrgId,
-      estimatedValue: formValue.estimatedValue ? Number(formValue.estimatedValue) : undefined,
+      contactId: contact.id,
+      organizationId: org.id,
+      estimatedValue:
+        formValue.estimatedValue === null || formValue.estimatedValue === undefined || formValue.estimatedValue === ''
+          ? undefined
+          : Number(formValue.estimatedValue),
     };
 
     const idVal = this.id();
@@ -296,4 +346,12 @@ export class LeadFormComponent implements OnInit {
     const idVal = this.id();
     this.router.navigate(this.isEditMode && idVal ? ['/leads', idVal] : ['/leads']);
   }
+}
+
+function contactLabel(contact: ContactDto): string {
+  return `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim();
+}
+
+function orgLabel(org: OrganizationDto): string {
+  return org.name ?? '';
 }

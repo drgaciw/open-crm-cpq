@@ -11,6 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ContactService } from '../contact.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { OrganizationDto } from '@frontend/shared-models';
+import { displayLookup, resolveLookupId } from '@frontend/shared-utils';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
@@ -184,10 +185,7 @@ export class ContactFormComponent implements OnInit {
   }
 
   /** The control holds an OrganizationDto once picked, but a plain name when patched or typed (H-CRM-033). */
-  displayOrg(org: OrganizationDto | string | null): string {
-    if (typeof org === 'string') return org;
-    return org?.name ?? '';
-  }
+  readonly displayOrg = displayLookup<OrganizationDto>((org) => org.name ?? '');
 
   onOrgSelected(org: OrganizationDto): void {
     this.selectedOrgId = org.id;
@@ -195,26 +193,15 @@ export class ContactFormComponent implements OnInit {
     this.form.get('organizationSearch')?.setErrors(null);
   }
 
-  /**
-   * Resolve the Organization field to an id (H-CRM-022): a picked option, an unchanged linked
-   * organization, or typed text that exactly names one known organization. Anything else is
-   * unresolved, and the save is blocked rather than silently dropping the organization.
-   */
-  private resolveOrganizationId(): { ok: true; id: number | null } | { ok: false } {
-    const raw: unknown = this.form.get('organizationSearch')?.value;
-    if (raw && typeof raw === 'object') return { ok: true, id: (raw as OrganizationDto).id };
-    const text = String(raw ?? '').trim().toLowerCase();
-    if (!text) return { ok: true, id: null };
-    if (this.selectedOrgId != null && this.selectedOrgName?.trim().toLowerCase() === text) {
-      return { ok: true, id: this.selectedOrgId };
-    }
-    const matches = this.filteredOrgs().filter((o) => o.name?.trim().toLowerCase() === text);
-    return matches.length === 1 ? { ok: true, id: matches[0].id } : { ok: false };
-  }
-
   onSubmit(): void {
     if (this.form.invalid) return;
-    const org = this.resolveOrganizationId();
+    // H-CRM-022: typed-but-not-picked text is resolved or blocked, never silently dropped.
+    const org = resolveLookupId(
+      this.form.value.organizationSearch,
+      this.selectedOrgId === null ? null : { id: this.selectedOrgId, label: this.selectedOrgName },
+      this.filteredOrgs(),
+      (o) => o.name ?? '',
+    );
     if (!org.ok) {
       const control = this.form.get('organizationSearch');
       control?.setErrors({ orgNotPicked: true });
