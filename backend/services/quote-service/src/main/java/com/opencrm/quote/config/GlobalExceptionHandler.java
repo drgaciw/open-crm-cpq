@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -78,6 +80,26 @@ public class GlobalExceptionHandler {
         logger.warn("Data integrity violation [traceId={}]: {}", traceId, ex.getMessage(), ex);
         ApiResponse<Void> response = ApiResponse.error("Data integrity violation: The operation conflicts with existing data constraints.", "DATA_INTEGRITY_VIOLATION", traceId);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /** A required query parameter is absent: the caller's error, not a server fault (UAT 2026-11-14). */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(MissingServletRequestParameterException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        String message = "Required request parameter '" + ex.getParameterName() + "' is missing";
+        logger.warn("{} [traceId={}]", message, traceId);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(message, "VALIDATION_ERROR", traceId));
+    }
+
+    /** A path variable or parameter that does not convert (e.g. /quotes/search for /quotes/{id}). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        String message = "Invalid value '" + ex.getValue() + "' for '" + ex.getName() + "'";
+        logger.warn("{} [traceId={}]", message, traceId);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(message, "VALIDATION_ERROR", traceId));
     }
 
     @ExceptionHandler(Exception.class)
