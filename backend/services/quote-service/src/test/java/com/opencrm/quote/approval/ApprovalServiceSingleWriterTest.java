@@ -166,6 +166,25 @@ class ApprovalServiceSingleWriterTest {
     }
 
     @Test
+    @DisplayName("a decision on an approval whose quote is gone is refused before approval-routing records it (UAT 2026-11-14)")
+    void decisionOnAMissingQuoteNeverReachesRouting() {
+        // UAT 2026-11-14: a quote deleted while PENDING_APPROVAL left its routing approval in the inbox.
+        // Approving it recorded APPROVED in approval-routing and only then failed with 404 on the quote.
+        when(approvalRoutingClient.getById(9001L)).thenReturn(RoutingApprovalDto.builder()
+                .id(9001L).quoteId("101").status("PENDING").approvalTier("DEAL_DESK").build());
+        when(quoteRepository.findByIdAndDeletedFalse(101L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> approvalService.approveRequest(9001L, null))
+                .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> approvalService.rejectRequest(9001L, null))
+                .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
+
+        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).reject(any(), any());
+        verify(quoteRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("approveRequest updates Quote via routing and does not save local ApprovalRequest")
     void approveViaRoutingDoesNotWriteLocal() {
         when(approvalRoutingClient.approve(9001L))
