@@ -309,9 +309,15 @@ export async function runHeaderEdit(ctx, quote) {
       if (!(await locator.isVisible().catch(() => false))) { problems.push(`${field.label}: not found`); continue; }
       if (field.kind === 'date' && (await locator.getAttribute('type')) !== 'date') problems.push(`${field.label}: not <input type="date">`);
       if (field.placeholder && (await locator.getAttribute('placeholder')) !== field.placeholder) problems.push(`${field.label}: placeholder differs`);
-      const shown = await locator.inputValue();
+      // A mat-select has no input value: compare its trigger text with the label of the held option.
+      const shown = await readField(scope(), field);
       const held = readPath(dto, field.persist.apiPath);
-      const want = held == null ? '' : String(held).slice(0, field.kind === 'date' ? 10 : undefined);
+      let want = held == null ? '' : String(held).slice(0, field.kind === 'date' ? 10 : undefined);
+      if (field.kind === 'select') {
+        const option = field.options?.find((o) => o.value === want);
+        want = option ? option.label : want;
+        if (held == null && (shown === '' || shown === option?.label)) continue;
+      }
       if (shown !== want) problems.push(`${field.label}: shows "${shown}", API holds "${want}"`);
     }
     if (problems.length) throw new Error(problems.join('; '));
@@ -357,7 +363,9 @@ export async function runHeaderEdit(ctx, quote) {
     const problems = [];
     for (const field of spec.fields) {
       if (!(field.label in typed)) continue;
-      const want = field.kind === 'number' ? Number(typed[field.label]) : normalizeValue(typed[field.label], field.normalize);
+      const want = field.kind === 'number' ? Number(typed[field.label])
+        : field.kind === 'select' ? (field.options?.find((o) => o.label === typed[field.label])?.value ?? typed[field.label])
+        : normalizeValue(typed[field.label], field.normalize);
       const raw = readPath(dto, field.persist.apiPath);
       const held = field.kind === 'date' && raw ? String(raw).slice(0, 10) : raw;
       if (String(held ?? '') !== String(want)) problems.push(`${field.label}: typed "${want}", API holds "${held}"`);
