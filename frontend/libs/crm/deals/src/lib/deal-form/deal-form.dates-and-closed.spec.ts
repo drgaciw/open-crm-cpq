@@ -56,17 +56,6 @@ describe('DealFormComponent closed deals and calendar dates', () => {
   }
 
   const control = (name: string) => component.form.controls[name];
-  const input = (name: string): HTMLInputElement =>
-    fixture.nativeElement.querySelector(`input[formcontrolname="${name}"]`);
-
-  function loadLinkedDeal(): void {
-    dealService.selectedDeal.set({
-      id: 12, name: 'Expansion', stage: 'PROSPECTING', currency: 'USD', type: 'NEW_BUSINESS',
-      primaryContactId: 5, primaryContactName: 'Ada Lovelace', organizationId: 7, organizationName: 'Globex',
-    } as DealDto);
-    fixture.detectChanges();
-  }
-
   function loadDeal(partial: Partial<DealDto>): void {
     dealService.selectedDeal.set({
       id: 12, name: 'Expansion', stage: 'PROSPECTING', currency: 'USD', type: 'NEW_BUSINESS', ...partial,
@@ -96,10 +85,9 @@ describe('DealFormComponent closed deals and calendar dates', () => {
     await setup();
     control('name').setValue('Auckland deal');
     // A datepicker value at local midnight, 15 March, in Pacific/Auckland: its UTC day is the 14th.
-    control('expectedCloseDate').setValue({
-      getFullYear: () => 2027, getMonth: () => 2, getDate: () => 15,
-      toISOString: () => '2027-03-14T11:00:00.000Z',
-    } as unknown as Date);
+    const picked = new Date(2027, 2, 15);
+    picked.toISOString = () => '2027-03-14T11:00:00.000Z';
+    control('expectedCloseDate').setValue(picked);
     component.onSubmit();
     expect(dealService.create).toHaveBeenCalledWith(expect.objectContaining({ expectedCloseDate: '2027-03-15' }));
   });
