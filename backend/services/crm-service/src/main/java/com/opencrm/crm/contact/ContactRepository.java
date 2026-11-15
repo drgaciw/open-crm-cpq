@@ -59,12 +59,14 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
     Page<Contact> findAllByDeletedFalse(Pageable pageable);
 
     /**
-     * Search contacts by first or last name (case-insensitive).
+     * Search contacts by first name, last name, or full name "first last" as shown in the UI
+     * Name column (case-insensitive). H-CRM-032.
      */
     @EntityGraph(attributePaths = {"organization"})
     @Query("SELECT c FROM Contact c WHERE c.deleted = false AND " +
            "(LOWER(c.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :query, '%')))")
+           "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(CONCAT(c.firstName, ' ', c.lastName)) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<Contact> searchByName(@Param("query") String query, Pageable pageable);
 
     /**
