@@ -13,7 +13,7 @@ import { DealService } from '../deal.service';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 import { dealActionErrorMessage } from '../deal-action-error';
 import { AgentPanelComponent } from '@frontend/shared-ui';
-import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '../deal-stage';
+import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel, isOpenDealStage } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-detail',
@@ -46,9 +46,12 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
           </span>
         </div>
         <div class="header-actions">
-          <button mat-stroked-button (click)="onEdit()" [disabled]="actionLoading()">
-            <mat-icon>edit</mat-icon> Edit
-          </button>
+          @if (isOpen(deal.stage)) {
+            <!-- H-CRM-040: the API refuses updates to a closed (WON/LOST) opportunity. -->
+            <button mat-stroked-button (click)="onEdit()" [disabled]="actionLoading()">
+              <mat-icon>edit</mat-icon> Edit
+            </button>
+          }
           @if (canAdvance(deal.stage)) {
             <button mat-raised-button color="primary" (click)="onAdvance()" [disabled]="actionLoading()">
               @if (actionLoading()) {
@@ -192,6 +195,10 @@ export class DealDetailComponent implements OnInit {
 
   canAdvance(stage: DealStage): boolean {
     return canAdvanceDeal(stage);
+  }
+
+  isOpen(stage: DealStage): boolean {
+    return isOpenDealStage(stage);
   }
 
   canClose(stage: DealStage): boolean {
