@@ -21,6 +21,7 @@ import {
 import { ConfirmDialogComponent } from '@frontend/shared-ui';
 import { OptionGroupCreateDialogComponent } from '../option-group-create-dialog/option-group-create-dialog.component';
 import { OptionCreateDialogComponent } from '../option-create-dialog/option-create-dialog.component';
+import { RetireProductDialogComponent } from '../retire-product-dialog/retire-product-dialog.component';
 
 function toProductDto(
   mock: (typeof MOCK_CATALOG_PRODUCTS)[number],
@@ -92,6 +93,9 @@ describe('CatalogDetailComponent', () => {
   let getByIdSpy: ReturnType<typeof vi.fn>;
   let updateSpy: ReturnType<typeof vi.fn>;
   let deleteSpy: ReturnType<typeof vi.fn>;
+  let activateSpy: ReturnType<typeof vi.fn>;
+  let deprecateSpy: ReturnType<typeof vi.fn>;
+  let retireSpy: ReturnType<typeof vi.fn>;
   let listGroupsSpy: ReturnType<typeof vi.fn>;
   let deleteGroupSpy: ReturnType<typeof vi.fn>;
   let listValuesSpy: ReturnType<typeof vi.fn>;
@@ -116,6 +120,10 @@ describe('CatalogDetailComponent', () => {
     });
     updateSpy = vi.fn();
     deleteSpy = vi.fn(() => of(undefined));
+    const withStatus = (status: ProductDto['status']) => () => of({ ...(selectedProduct() as ProductDto), status });
+    activateSpy = vi.fn(withStatus('ACTIVE'));
+    deprecateSpy = vi.fn(withStatus('DEPRECATED'));
+    retireSpy = vi.fn(withStatus('RETIRED'));
     listGroupsSpy = vi.fn(() => of([SAMPLE_GROUP]));
     deleteGroupSpy = vi.fn(() => of(undefined));
     listValuesSpy = vi.fn(() => of([SAMPLE_VALUE]));
@@ -142,6 +150,9 @@ describe('CatalogDetailComponent', () => {
       getById: getByIdSpy,
       update: updateSpy,
       delete: deleteSpy,
+      activate: activateSpy,
+      deprecate: deprecateSpy,
+      retire: retireSpy,
     };
 
     const optionServiceMock = {
@@ -380,6 +391,73 @@ describe('CatalogDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Product details',
     );
+  });
+
+  describe('lifecycle actions (DRG-755, H-CPQ-P-009)', () => {
+    const headerButtons = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.header-actions button'))
+        .map((b) => b.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+    const has = (label: string) => headerButtons().some((t) => t.endsWith(label));
+    const setStatus = (status: ProductDto['status']) => {
+      selectedProduct.set({ ...(selectedProduct() as ProductDto), status });
+      fixture.detectChanges();
+    };
+    const click = (label: string) => {
+      const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.header-actions button'))
+        .find((b) => b.textContent?.replace(/\s+/g, ' ').trim().endsWith(label)) as HTMLButtonElement;
+      btn.click();
+      fixture.detectChanges();
+    };
+
+    it('offers only the transitions the API allows for each status', () => {
+      setStatus('DRAFT');
+      expect([has('Activate'), has('Deprecate'), has('Retire')]).toEqual([true, false, false]);
+      setStatus('ACTIVE');
+      expect([has('Activate'), has('Deprecate'), has('Retire')]).toEqual([false, true, true]);
+      setStatus('DEPRECATED');
+      expect([has('Activate'), has('Deprecate'), has('Retire')]).toEqual([false, false, true]);
+      setStatus('RETIRED');
+      expect([has('Activate'), has('Deprecate'), has('Retire')]).toEqual([false, false, false]);
+    });
+
+    it('Activate calls the activate endpoint and shows the new status', () => {
+      setStatus('DRAFT');
+      click('Activate');
+      expect(activateSpy).toHaveBeenCalledWith(1);
+      expect(selectedProduct()?.status).toBe('ACTIVE');
+    });
+
+    it('Deprecate calls the deprecate endpoint and shows the new status', () => {
+      setStatus('ACTIVE');
+      click('Deprecate');
+      expect(deprecateSpy).toHaveBeenCalledWith(1);
+      expect(selectedProduct()?.status).toBe('DEPRECATED');
+    });
+
+    it('Retire asks for a reason and sends it', () => {
+      setStatus('ACTIVE');
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of('End of life') });
+      click('Retire');
+      expect(dialogOpen).toHaveBeenCalledWith(RetireProductDialogComponent, expect.anything());
+      expect(retireSpy).toHaveBeenCalledWith(1, 'End of life');
+      expect(selectedProduct()?.status).toBe('RETIRED');
+    });
+
+    it('a cancelled Retire changes nothing', () => {
+      setStatus('ACTIVE');
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(undefined) });
+      click('Retire');
+      expect(retireSpy).not.toHaveBeenCalled();
+      expect(selectedProduct()?.status).toBe('ACTIVE');
+    });
+
+    it('a refused transition shows the API error and keeps the status', () => {
+      setStatus('DRAFT');
+      activateSpy.mockReturnValueOnce(throwError(() => ({ error: { message: 'Cannot transition product from DRAFT to ACTIVE' } })));
+      click('Activate');
+      expect(component.saveError()).toContain('Cannot transition product from DRAFT to ACTIVE');
+      expect(selectedProduct()?.status).toBe('DRAFT');
+    });
   });
 
   it('renders Delete button with icon in view mode and deletes on click', () => {
