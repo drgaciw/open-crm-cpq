@@ -76,6 +76,17 @@ test('a validator with no visible error must name its hypothesis', () => {
   assert.ok(validateSpec(field({ kind: 'required', sample: '', expectError: 'Required' })));
 });
 
+test('editOnly marks a field the create form does not render', () => {
+  const spec = (extra) => ({
+    ...minimal(),
+    forms: [{ id: 'f', scope: { kind: 'page' }, fields: [{ label: 'Stage', kind: 'select', ...extra }] }],
+  });
+  assert.ok(validateSpec(spec({ editOnly: true, editSample: 'Qualification' })));
+  assert.throws(() => validateSpec(spec({ editOnly: 'yes' })), /editOnly/);
+  // A create-time sample on an edit-only field could never be typed.
+  assert.throws(() => validateSpec(spec({ editOnly: true, sample: 'Prospecting' })), /editOnly/);
+});
+
 test('actions validate confirm kinds', () => {
   const spec = (kind) => ({
     ...minimal(),
