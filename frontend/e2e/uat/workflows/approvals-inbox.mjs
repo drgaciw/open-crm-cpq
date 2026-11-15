@@ -8,7 +8,7 @@
  */
 import { goto } from '../../lib/browser.mjs';
 import { runCheck, runSteps, defect, blocked, gap, waitUntil } from '../../lib/health.mjs';
-import { withNativeDialog, confirmMatDialog } from '../../lib/dialogs.mjs';
+import { confirmMatDialog } from '../../lib/dialogs.mjs';
 import { inbox } from '../specs/approvals.mjs';
 import { draftWithLine } from './quote-lifecycle.mjs';
 
@@ -137,28 +137,32 @@ export async function runInboxRows(ctx) {
     await page.waitForURL((url) => url.pathname === `/quotes/${request.quoteId}`);
   });
 
-  // H-CPQ-Q-005 (inbox half): window.prompt fires first, the Material confirm only afterwards —
-  // the user types a reason before being asked whether they meant to reject at all.
-  await runCheck(ctx, 'approvals.row.reject.prompt-before-confirm', async () => {
-    const { row } = await firstRowOrBlocked(ctx);
-    const seen = await withNativeDialog(page,
-      { type: 'prompt', message: reject.confirm.message, accept: true, promptText: 'UAT order probe' },
-      () => row.getByRole('button', { name: 'Reject', exact: true }).click());
-    const dialog = page.getByRole('dialog').filter({ hasText: reject.opensDialog });
-    await dialog.waitFor({ state: 'visible' });
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click(); // leave the request pending
-    await dialog.waitFor({ state: 'hidden' });
-    throw defect(`native prompt "${seen.message}" is raised before the "${reject.opensDialog}" confirm dialog`);
-  }, { hypothesis: 'H-CPQ-Q-005' });
-
-  await runCheck(ctx, 'approvals.row.reject.prompt-cancel-aborts', async () => {
+  // H-CPQ-Q-005 (fixed, UAT 2026-11-14): Reject used to raise window.prompt for the reason and
+  // only then a Material confirm. One "Reject request" dialog now carries the optional reason.
+  await runCheck(ctx, 'approvals.row.reject.single-dialog', async () => {
     const { row, request } = await firstRowOrBlocked(ctx);
-    await withNativeDialog(page, { type: 'prompt', message: reject.confirm.message, accept: false },
-      () => row.getByRole('button', { name: 'Reject', exact: true }).click());
-    await page.waitForTimeout(400);
-    if (await page.getByRole('dialog').count()) throw new Error('the confirm dialog opened although the prompt was dismissed');
-    if (!(await stillPending(api, request.id))) throw new Error('request left the pending list');
-  });
+    const native = [];
+    const onDialog = (d) => { native.push(`${d.type()}: ${d.message()}`); void d.dismiss(); };
+    page.on('dialog', onDialog);
+    try {
+      await row.getByRole('button', { name: 'Reject', exact: true }).click();
+      const dialog = page.getByRole('dialog').filter({ hasText: reject.opensDialog });
+      await dialog.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+      if (native.length) throw defect(`native ${native.join('; ')} is raised by Reject`);
+      if (!(await dialog.isVisible())) throw new Error(`no "${reject.opensDialog}" dialog opened`);
+      await dialog.getByRole('textbox', { name: 'Reason (optional)' }).waitFor({ state: 'visible' });
+      const said = (await dialog.innerText()).replace(/\s+/g, ' ');
+      if (!said.includes(`Reject approval #${request.id} for quote ${request.quoteId}?`)) {
+        throw new Error(`dialog does not name the approval: "${said.slice(0, 120)}"`);
+      }
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+    } finally {
+      page.off('dialog', onDialog);
+    }
+    if (!(await stillPending(api, request.id))) throw new Error('Cancel rejected the request');
+    return 'one dialog with an optional reason; Cancel leaves the request pending';
+  }, { hypothesis: 'H-CPQ-Q-005' });
 
   const state = { request: null };
   await runSteps(ctx, [
@@ -190,9 +194,11 @@ export async function runInboxRows(ctx) {
 
   await runCheck(ctx, 'approvals.row.reject.confirm', async () => {
     const { row, request } = await firstRowOrBlocked(ctx);
-    await withNativeDialog(page, { type: 'prompt', message: reject.confirm.message, accept: true, promptText: 'UAT rejection' },
-      () => row.getByRole('button', { name: 'Reject', exact: true }).click());
-    await confirmMatDialog(page, { title: reject.opensDialog, message: /Reject approval #\d+ for quote \d+\?/, click: 'Reject' });
+    await row.getByRole('button', { name: 'Reject', exact: true }).click();
+    const dialog = page.getByRole('dialog').filter({ hasText: reject.opensDialog });
+    await dialog.getByRole('textbox', { name: 'Reason (optional)' }).fill('UAT rejection');
+    await dialog.getByRole('button', { name: 'Reject', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
     await waitUntil(() => stillPending(api, request.id), (present) => present === false, {
       timeoutMs: 8000, intervalMs: 250, describe: () => 'request is still pending after Reject',
     });
