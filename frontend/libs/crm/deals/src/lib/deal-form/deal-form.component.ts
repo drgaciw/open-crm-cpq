@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { LookupSelection, displayLookup, resolveLookupId } from '@frontend/shared-utils';
+import { LookupSelection, displayLookup, parseLocalDate, resolveLookupId, toLocalDateString } from '@frontend/shared-utils';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +25,7 @@ import {
 } from '@frontend/shared-models';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 import { dealActionErrorMessage } from '../deal-action-error';
-import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../deal-stage';
+import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDealStage } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-form',
@@ -52,6 +52,14 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
         <mat-icon>error_outline</mat-icon>
         <span>{{ saveError() || dealService.error() }}</span>
         <button mat-button type="button" (click)="dismissError()">Dismiss</button>
+      </div>
+    }
+
+    @if (closed()) {
+      <!-- H-CRM-040: the API refuses updates to a closed (WON/LOST) opportunity. -->
+      <div class="closed-notice" role="note">
+        <mat-icon>lock</mat-icon>
+        <span>This opportunity is closed and can no longer be edited.</span>
       </div>
     }
 
@@ -164,7 +172,7 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving() || closed()">
               @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
@@ -187,6 +195,16 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
       color: var(--crm-color-danger, #c62828);
       max-width: 900px;
     }
+    .closed-notice {
+      display: flex;
+      align-items: center;
+      gap: var(--crm-space-sm, 8px);
+      margin: 0 0 var(--crm-space-md, 16px);
+      padding: 12px var(--crm-space-md, 16px);
+      border-radius: var(--crm-radius-sm, 8px);
+      background: var(--crm-color-surface-container, #f3f3f3);
+      max-width: 900px;
+    }
   `],
 })
 export class DealFormComponent implements OnInit {
@@ -202,6 +220,8 @@ export class DealFormComponent implements OnInit {
   isEditMode = false;
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
+  /** Edit mode on a WON/LOST opportunity: shown read-only, Update not offered (H-CRM-040). */
+  readonly closed = signal(false);
   readonly saveError = signal<string | null>(null);
   selectedContactId: number | null = null;
   selectedOrgId: number | null = null;
@@ -259,13 +279,15 @@ export class DealFormComponent implements OnInit {
       effect(() => {
         const d = this.dealService.selectedDeal();
         if (d) {
+          this.closed.set(!isOpenDealStage(d.stage));
           this.form.patchValue({
             name: d.name,
             amount: d.amount,
             currency: d.currency ?? 'USD',
             type: d.type ?? 'NEW_BUSINESS',
             stage: d.stage,
-            expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
+            // H-CRM-041: a date-only value is a calendar day; new Date('YYYY-MM-DD') is UTC midnight.
+            expectedCloseDate: parseLocalDate(d.expectedCloseDate),
             termMonths: d.termMonths ?? null,
             ownerId: d.ownerId ?? '',
             contactSearch: d.primaryContactName ?? '',
@@ -325,7 +347,7 @@ export class DealFormComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.closed()) return;
     // Typed-but-not-picked contact/organization text is resolved or blocked, never dropped.
     const contact = resolveLookupId(
       this.form.value.contactSearch,
@@ -351,7 +373,8 @@ export class DealFormComponent implements OnInit {
     this.saving.set(true);
     this.saveError.set(null);
     const closeDate = this.form.value.expectedCloseDate as Date | null;
-    const expectedCloseDate = closeDate ? closeDate.toISOString().split('T')[0] : undefined;
+    // H-CRM-021: keep the picked calendar day; toISOString() is the previous day east of UTC.
+    const expectedCloseDate = toLocalDateString(closeDate);
     const currency = String(this.form.value.currency ?? 'USD').toUpperCase();
     const ownerId = String(this.form.value.ownerId ?? '').trim();
     const termMonths = this.form.value.termMonths ?? undefined;
