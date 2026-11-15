@@ -164,6 +164,7 @@ function httpErrorMessage(err: unknown): string {
                 (click)="onApprove(row)"
                 [disabled]="actionBusy()"
                 [attr.aria-label]="'Approve approval #' + row.id + ' for quote ' + row.quoteId"
+                aria-haspopup="dialog"
               >
                 <mat-icon>check</mat-icon>
                 Approve
@@ -175,6 +176,7 @@ function httpErrorMessage(err: unknown): string {
                 (click)="onReject(row)"
                 [disabled]="actionBusy()"
                 [attr.aria-label]="'Reject approval #' + row.id + ' for quote ' + row.quoteId"
+                aria-haspopup="dialog"
               >
                 <mat-icon>close</mat-icon>
                 Reject

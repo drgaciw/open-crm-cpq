@@ -449,6 +449,17 @@ describe('CatalogDetailComponent', () => {
       expect(selectedProduct()?.status).toBe('DEPRECATED');
     });
 
+    // Retire opens the reason dialog before anything changes; screen readers announce that only when
+    // the button declares aria-haspopup="dialog" (WAI-ARIA 1.2). Activate and Deprecate act at once.
+    it('declares that Retire opens a dialog', () => {
+      const popup = (label: string) => (Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.header-actions button'))
+        .find((b) => b.textContent?.replace(/\s+/g, ' ').trim().endsWith(label)) as HTMLButtonElement).getAttribute('aria-haspopup');
+      setStatus('DRAFT');
+      expect(popup('Activate')).toBeNull();
+      setStatus('ACTIVE');
+      expect([popup('Deprecate'), popup('Retire')]).toEqual([null, 'dialog']);
+    });
+
     it('Retire asks for a reason and sends it', () => {
       setStatus('ACTIVE');
       dialogOpen.mockReturnValueOnce({ afterClosed: () => of('End of life') });

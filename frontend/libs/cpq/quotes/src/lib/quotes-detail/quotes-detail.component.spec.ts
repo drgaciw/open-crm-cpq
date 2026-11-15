@@ -838,6 +838,22 @@ describe('QuotesDetailComponent', () => {
     expect(panel.textContent).toContain('Reject');
   });
 
+  // Reject, Expire, Cancel quote, Clone and Delete open a dialog before anything changes; screen
+  // readers announce that only when the item declares aria-haspopup="dialog". Approve acts at once.
+  it('declares which More menu actions open a dialog', () => {
+    const panel = openMoreMenu();
+    const popups = Object.fromEntries(Array.from(panel.querySelectorAll('[mat-menu-item], .mat-mdc-menu-item'))
+      .map((b) => [b.querySelector('span')?.textContent?.trim(), b.getAttribute('aria-haspopup')]));
+    expect(popups).toEqual({
+      Approve: null,
+      Reject: 'dialog',
+      Expire: 'dialog',
+      'Cancel quote': 'dialog',
+      Clone: 'dialog',
+      Delete: 'dialog',
+    });
+  });
+
   it('renders Delete in More menu and soft-deletes via ConfirmDialog then navigates to list', () => {
     const panel = openMoreMenu();
     expect(panel.textContent).toContain('Delete');

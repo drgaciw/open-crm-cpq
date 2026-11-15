@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseSnapshot, responseFacts, createMcpClient, tableRows, actionCandidates } from './mcp-playwright.mjs';
@@ -92,6 +92,22 @@ test('createMcpClient speaks newline-delimited JSON-RPC: initialize, tools/list 
   } finally {
     client.close();
   }
+});
+
+test('createMcpClient stops the server when the handshake fails', async () => {
+  // A server that starts, records its pid, and never answers initialize.
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-silent-'));
+  const server = join(dir, 'server.mjs');
+  const pidFile = join(dir, 'pid');
+  writeFileSync(server, `
+    import { writeFileSync } from 'node:fs';
+    writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+    process.stdin.resume();
+  `);
+  await assert.rejects(createMcpClient({ command: process.execPath, args: [server], timeoutMs: 500 }), /initialize timed out/);
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.throws(() => process.kill(pid, 0), /ESRCH/, 'the server process is still running');
 });
 
 test('tableRows groups each data row with its cell texts; header rows are skipped', () => {
@@ -232,4 +248,46 @@ test('parseSnapshot keeps the value a field shows', () => {
   // As the Playwright MCP renders a typed input: the value is a `text:` child, after the placeholder.
   assert.equal(value('e7'), 'UAT-PROBE');
   assert.equal(elements.find((e) => e.ref === 'e7').name, 'Account Name');
+});
+
+test('parseSnapshot reads YAML-quoted lines (names containing "#" or ":")', () => {
+  // As the Playwright MCP writes them: the whole entry is single-quoted, '' escapes a quote.
+  const elements = parseSnapshot(`- main [ref=e1]:
+  - row [ref=e2]:
+    - cell "11" [ref=e3]
+    - 'button "Approve approval #11 for quote 211" [ref=e4]':
+      - img [aria-hidden] [ref=e5]: check
+    - 'button "Reject approval #11 for quote 211" [ref=e6]'
+    - 'link "Ada''s note: #2" [ref=e7]':
+      - /url: /notes/2`);
+  const byRef = Object.fromEntries(elements.map((e) => [e.ref, e]));
+  assert.equal(byRef.e4.name, 'Approve approval #11 for quote 211');
+  assert.equal(byRef.e4.role, 'button');
+  assert.equal(byRef.e6.name, 'Reject approval #11 for quote 211');
+  assert.equal(byRef.e7.name, "Ada's note: #2");
+  assert.equal(byRef.e7.url, '/notes/2');
+});
+
+test('actionCandidates leaves out controls without a name', () => {
+  const elements = parseSnapshot(`- main [ref=e1]:
+  - button "Submit" [ref=e2]
+  - button [ref=e3]:
+    - img [aria-hidden] [ref=e4]: more_vert
+  - link [ref=e5]:
+    - /url: /x`);
+  assert.deepEqual(actionCandidates(elements).map((a) => a.key), ['e2']);
+});
+
+test('parseSnapshot keeps the text of a paragraph, with or without a ref', () => {
+  const els = parseSnapshot([
+    '- dialog "Retire product" [ref=e1]:',
+    '  - paragraph [ref=e2]: A retired product cannot be sold or reactivated.',
+    '  - paragraph: Why is this product retired?',
+    '  - button "Retire" [ref=e4]',
+  ].join('\n'));
+  const paragraphs = els.filter((e) => e.role === 'paragraph').map((e) => [e.name, e.scope]);
+  assert.deepEqual(paragraphs, [
+    ['A retired product cannot be sold or reactivated.', 'dialog'],
+    ['Why is this product retired?', 'dialog'],
+  ]);
 });

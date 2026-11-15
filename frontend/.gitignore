@@ -53,3 +53,5 @@ vitest.config.*.timestamp*
 .nx/migrate-runs
 # Browser UAT / chaos evidence output
 .ci-tmp
+# Playwright MCP server console logs and page snapshots (e2e/uat-jev-mcp.mjs)
+.playwright-mcp/

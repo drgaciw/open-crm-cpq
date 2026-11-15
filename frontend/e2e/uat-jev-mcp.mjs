@@ -77,7 +77,43 @@ async function observe(text) {
   const yaml = facts.snapshot ?? (facts.snapshotFile ? readFileSync(resolve(facts.snapshotFile), 'utf8') : null);
   if (yaml === null) throw new Error('the MCP response carried no snapshot');
   // An empty page (e.g. an unknown route) has an empty snapshot: no elements, not an error.
-  return { path: facts.url ? new URL(facts.url).pathname : null, elements: parseSnapshot(yaml) };
+  const elements = parseSnapshot(yaml);
+  // What the snapshot leaves out but a screen reader announces: aria-haspopup ("menu button",
+  // "dialog button"), the description (title), and, for a form's submit button, the form's fields.
+  const extras = await mcp.call('browser_evaluate', {
+    function: `() => {
+      const text = (el) => { const c = el.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach((x) => x.remove());
+        return (c.textContent || '').replace(/\\s+/g, ' ').trim(); };
+      const nameOf = (el) => (el.getAttribute('aria-label') || text(el)).trim();
+      return [...document.querySelectorAll('button, [role="menuitem"], a')].filter((el) => !el.disabled).map((el) => {
+        const form = el.type === 'submit' ? el.form : null;
+        return { name: nameOf(el), inDialog: Boolean(el.closest('[role="dialog"]')),
+          popup: el.getAttribute('aria-haspopup'), title: el.getAttribute('title'),
+          formFields: form ? [...form.querySelectorAll('input, textarea, select')]
+            .map((i) => (i.getAttribute('aria-label') || (i.labels?.[0] ? text(i.labels[0]) : '')).replace(/\\s*\\*$/, '').trim())
+            .filter(Boolean) : null };
+      });
+    }`,
+  }).then((t) => JSON.parse(t.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '[]'), () => []);
+  for (const e of elements) {
+    if (!['button', 'menuitem', 'link'].includes(e.role)) continue;
+    // Match by name within the same layer (a dialog's "Retire" is not the page's "Retire"), and
+    // say nothing when same-named controls there disagree.
+    const same = extras.filter((c) => c.name === e.name && c.inDialog === (e.scope === 'dialog'));
+    if (!same.length || same.some((c) => JSON.stringify({ ...c }) !== JSON.stringify({ ...same[0] }))) continue;
+    const x = same[0];
+    if (x.popup === 'menu' || x.popup === 'true') e.opensMenu = true;
+    if (x.popup === 'dialog') e.opensDialog = true;
+    if (x.title && x.title !== e.name) e.description = x.title;
+    if (x.formFields?.length) e.submitsForm = x.formFields;
+  }
+  // The record's status as its page header shows it (a chip the snapshot gives no role), so the
+  // state says what a user sees: "Draft" before Submit, "In review" before Approve.
+  const status = await mcp.call('browser_evaluate', {
+    function: `() => [...document.querySelectorAll('app-page-header app-status-badge')]
+      .map((e) => (e.textContent || '').replace(/\\s+/g, ' ').trim()).filter(Boolean)`,
+  }).then((t) => JSON.parse(t.match(/### Result\n([\s\S]*?)(\n###|$)/)?.[1] ?? '[]'), () => []);
+  return { path: facts.url ? new URL(facts.url).pathname : null, elements, status: status[0] ?? null };
 }
 
 async function open(path, text) {
@@ -92,6 +128,11 @@ const FRAMING =
   'through its controls: you can click buttons, links, tabs, menu items, options and table rows, and the test ' +
   'types the goal\'s values into the fields you name. Work one step at a time; "completedSteps" lists what was ' +
   'already done in this session.';
+/**
+ * True of this agent when a goal gives it nothing to type: it never fills an edit form itself
+ * (jevDriver.mjs adopted the same sentence; without it "Edit" draws 0.16-0.30 from the right button).
+ */
+const NO_VALUES = ' This goal gives no values to type, so a control that only opens an edit form or opens a record for editing cannot make progress.';
 const FORBIDDEN = [/\bdelete\b/i, /\barchive\b/i, /^remove\b/i, /sign out/i];
 
 class Inconclusive extends Error {}
@@ -111,8 +152,11 @@ class Inconclusive extends Error {}
  * @param {number} [w.maxSteps]
  * @param {boolean} [w.navigation]  Offer sidebar links too (navigation goals).
  * @param {RegExp[]} [w.allow]      Controls the goal needs that the forbidden list would remove.
+ * @param {() => Promise<unknown>} [w.recover] Run when the goal fails, to track a record the app may have
+ *                                  saved before the failure so teardown removes it. Defaults to one more
+ *                                  `done` check (create goals look their record up by its unique name).
  */
-async function achieve(id, { goal, start, startText, values = [], choices = [], done, maxSteps = 16, navigation = false, allow = [] }) {
+async function achieve(id, { goal, start, startText, values = [], choices = [], done, recover, maxSteps = 16, navigation = false, allow = [] }) {
   const steps = [];
   const pendingValues = [...values];
   const pendingChoices = [...choices];
@@ -122,6 +166,7 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
   let openChoice = null; // a dropdown Jev opened, or a combobox typed into, whose option is still to pick
   let deferred = new Set();
   let screen = '';
+  const peeks = new Map(); // enabled items seen inside a menu, per screen and trigger
   const ask = async (state, key, question) => {
     const answer = (await decider.ask({ goal, ...state, completedSteps: steps }, { [key]: question }))[key];
     trace.push({ id, step: steps.length, question: key, choice: answer.choice, confidence: answer.confidence });
@@ -138,8 +183,9 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
     }
     return answer.choice;
   };
+  let page = null;
   try {
-    let page = await open(start, startText);
+    page = await open(start, startText);
     for (let n = 0; n < maxSteps; n++) {
       const result = await done(page);
       if (result) {
@@ -151,6 +197,10 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
         headings: page.elements.filter((e) => e.role === 'heading' && e.name && e.scope !== 'navigation').map((e) => e.name),
         dialog: page.elements.find((e) => e.role === 'dialog')?.name || null,
       };
+      if (page.status) where.status = page.status;
+      // What an open dialog says besides its controls, as a user reads it.
+      const dialogText = where.dialog ? page.elements.filter((e) => e.scope === 'dialog' && e.role === 'paragraph' && e.name).map((e) => e.name) : [];
+      if (dialogText.length) where.dialogText = dialogText;
       // What the form currently shows, as the snapshot reports it: an observation, not a hint.
       const layerFields = actionCandidates(page.elements).filter((a) => a.kind === 'fill' || a.kind === 'use');
       where.form = layerFields.map((f) => `${f.name}: ${page.elements.find((e) => e.ref === f.ref)?.value ?? '(empty)'}`);
@@ -239,17 +289,58 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
       }
 
       // 4. Otherwise: which control to click next?
-      const clicks = actions.filter((a) => a.kind === 'click' && a.role !== 'option'
+      // A user can look inside a menu without changing anything: open it, read its enabled items,
+      // close it. Do that once per menu button and screen, so the state says what the menu offers.
+      // A list with a menu per row (more than three menus) is left as is: one look per row is slow,
+      // and the row a goal needs is opened from its own page.
+      const menuButtons = actions.filter((a) => a.kind === 'click' && page.elements.find((e) => e.ref === a.ref)?.opensMenu);
+      for (const m of menuButtons.length <= 3 ? menuButtons : []) {
+        const peekKey = `${screen}|${m.name}`;
+        if (peeks.has(peekKey)) continue;
+        await mcp.call('browser_click', { element: m.label, target: m.ref });
+        await sleep(400);
+        const opened = await observe();
+        peeks.set(peekKey, opened.elements.filter((e) => e.scope === 'menu' && e.role === 'menuitem' && e.name && !e.disabled).map((e) => e.name));
+        await mcp.call('browser_press_key', { key: 'Escape' });
+        await sleep(300);
+        page = await observe();
+        trace.push({ id, step: steps.length, peek: m.name, items: peeks.get(peekKey) });
+      }
+      const clicks = actionCandidates(page.elements, { navigation }).filter((a) => a.kind === 'click' && a.role !== 'option'
         && (!FORBIDDEN.some((f) => f.test(a.name)) || allow.some((r) => r.test(a.name))));
       if (!clicks.length) throw new Inconclusive(`nothing to click at ${page.path}`);
-      const criteria = Object.fromEntries(clicks.map((c) => [c.key, `click ${c.label}`]));
+      // What a control is declared to do, as a screen reader would announce it: a menu or dialog
+      // button, or a link's destination.
+      const effectNote = (c) => {
+        const e = page.elements.find((x) => x.ref === c.ref);
+        const notes = [];
+        // A dialog's button may share its name with the page button that opened the dialog
+        // ("Retire"); say which one this is.
+        if (e?.scope === 'dialog' && where.dialog) notes.push(`in the open dialog "${where.dialog}"`);
+        if (e?.description) notes.push(`described as "${e.description}"`);
+        const items = e?.opensMenu ? peeks.get(`${screen}|${c.name}`) : null;
+        if (e?.opensMenu) notes.push(items ? `opens a menu with ${items.length ? items.map((i) => `"${i}"`).join(', ') : 'no enabled items'}` : 'opens a menu of more actions');
+        if (e?.opensDialog) notes.push('opens a dialog');
+        if (e?.submitsForm) notes.push(`submits the form with fields ${e.submitsForm.join(', ')}`);
+        if (e?.role === 'link' && e.url) notes.push(`goes to ${e.url}`);
+        return notes.length ? ` (${notes.join('; ')})` : '';
+      };
+      const criteria = Object.fromEntries(clicks.map((c) => [c.key, `click ${c.label}${effectNote(c)}`]));
       criteria.stop = 'Give up: no offered control moves toward the goal.';
+      const framing = FRAMING + (values.length === 0 && choices.length === 0 ? NO_VALUES : '');
       const key = gated(await ask({ ...where, goalValuesStillToEnter: pendingValues.map((v) => v.label) }, 'next',
-        choice(`${FRAMING} Choose the next control to click toward the goal. ${UNTRUSTED}`, criteria)), 'choosing the next click', criteria);
+        choice(`${framing} Choose the next control to click toward the goal. ${UNTRUSTED}`, criteria)), 'choosing the next click', criteria);
       if (key === 'stop') throw new Inconclusive(`Jev chose to stop at ${page.path}`);
       const target = clicks.find((c) => c.key === key);
+      const before = { path: page.path, dialog: where.dialog };
       const clicked = await act(target, 'click');
-      steps.push(`click ${clicked.label}${note()}`);
+      // What the click did, as observed: an unchanged history line reads to Jev as "already done".
+      const dialogNow = page.elements.find((e) => e.role === 'dialog')?.name || null;
+      const effect = page.path !== before.path ? ` → now at ${page.path}`
+        : dialogNow && dialogNow !== before.dialog ? ` → opened dialog "${dialogNow}"`
+          : page.elements.some((e) => e.scope === 'menu') ? ' → opened a menu'
+            : before.dialog && !dialogNow ? ' → the dialog closed' : '';
+      steps.push(`click ${clicked.label}${note()}${effect}`);
     }
     if (await done(page)) {
       report.pass(id, `${steps.length} step(s) by Jev via MCP: ${steps.join(' → ')}`);
@@ -257,6 +348,8 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
     }
     throw new Error(`goal not met after ${maxSteps} steps (now at ${page.path})`);
   } catch (error) {
+    // The save may have gone through before the failure (Codex review on #1001): track what exists.
+    await (recover ?? (() => done(page ?? {})))().catch(() => {});
     const detail = `${String(error.message || error)}${steps.length ? ` — steps: ${steps.join(' → ')}` : ''}`;
     if (error instanceof Inconclusive) report.inconclusive(id, detail);
     else report.fail(id, detail);
@@ -431,7 +524,15 @@ async function quotes() {
     values: [
       { key: 'name', label: 'Quote name', text: quoteName },
       { key: 'customer', label: 'Customer', text: customer.externalId },
+      // The goal says USD and the form's Currency field starts empty (optional; the server defaults it).
+      { key: 'currency', label: 'Currency', text: 'USD' },
     ],
+    // A quote's done needs the detail page; recovery finds it by name among this customer's quotes.
+    recover: async () => {
+      const quote = rowsOf(await api.get(`/api/v1/quotes?customerExternalId=${encodeURIComponent(customer.externalId)}&size=200`))
+        .find((q) => q.name === quoteName);
+      if (quote) api.track('quote', quote.id, `/api/v1/quotes/${quote.id}`);
+    },
     done: async (page) => {
       const m = page.path?.match(/^\/quotes\/(\d+)$/);
       if (!m) return false;
@@ -444,10 +545,14 @@ async function quotes() {
   });
   if (created) {
     await achieve('mcp.quotes.add-line', {
-      goal: `Add a line item to this quote for the product "${product.name}" with quantity 3.`,
+      // The add-line form takes a product external ID and a list price, both required; the
+      // harness fixtures use the product's numeric id and 25 (as draftWithLine does).
+      goal: `Add a line item to this quote: product external ID "${product.id}", product name "${product.name}", list price 25, quantity 3.`,
       start: `/quotes/${ctx.quote.id}`, startText: quoteName,
       values: [
-        { key: 'product', label: 'Product', text: product.name },
+        { key: 'product', label: 'Product external ID', text: String(product.id) },
+        { key: 'productName', label: 'Product name', text: product.name },
+        { key: 'price', label: 'List price', text: '25' },
         { key: 'qty', label: 'Quantity', text: '3' },
       ],
       done: async () => {

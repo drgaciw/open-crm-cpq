@@ -28,7 +28,10 @@ const SCOPES = ['listbox', 'menu', 'dialog', 'main', 'navigation'];
 export function parseSnapshot(yaml) {
   const elements = [];
   const stack = []; // [{indent, element}]
-  for (const line of yaml.split('\n')) {
+  for (const raw of yaml.split('\n')) {
+    // YAML quotes an entry whose text has "#" or ": " in it: `- 'button "Approve #11" [ref=e4]':`.
+    const quoted = raw.match(/^(\s*)- '(.*)'(:?)\s*$/);
+    const line = quoted ? `${quoted[1]}- ${quoted[2].replace(/''/g, "'")}${quoted[3]}` : raw;
     const indent = line.search(/\S/);
     if (indent < 0) continue;
     while (stack.length && stack.at(-1).indent >= indent) stack.pop();
@@ -51,10 +54,12 @@ export function parseSnapshot(yaml) {
     const attrs = m[3] ?? '';
     // A disabled control has no ref (it cannot be acted on) but is kept when named, so checks can see it.
     const ref = attrs.match(/\[ref=([^\]]+)\]/)?.[1] ?? null;
-    if (!ref && m[2] === undefined) continue;
+    // A paragraph's text follows the attributes: `- paragraph [ref=e2]: Retiring is final.`
+    const said = m[1] === 'paragraph' && m[2] === undefined ? line.slice(m.index + m[0].length).match(/^: (.+)$/)?.[1]?.replace(/^"(.*)"$/, '$1') : undefined;
+    if (!ref && m[2] === undefined && said === undefined) continue;
     const element = {
       role: m[1],
-      name: (m[2] ?? '').replace(/\\(.)/g, '$1'),
+      name: (m[2] ?? said ?? '').replace(/\\(.)/g, '$1'),
       ref,
       disabled: /\[disabled\]/.test(attrs),
       scope: [...stack].reverse().find((s) => SCOPES.includes(s.element.role))?.element.role ?? null,
@@ -163,13 +168,27 @@ export async function createMcpClient({ command, args = [], cwd, timeoutMs = 600
     send({ id, method, params });
   });
 
-  const init = await request('initialize', {
-    protocolVersion: PROTOCOL_VERSION,
-    capabilities: {},
-    clientInfo: { name: 'open-crm-cpq-jev-uat', version: '1' },
-  });
-  send({ method: 'notifications/initialized' });
-  const listed = await request('tools/list', {});
+  const stop = () => {
+    for (const { timer } of pending.values()) clearTimeout(timer);
+    pending.clear();
+    child.stdin.end();
+    child.kill();
+  };
+  let init;
+  let listed;
+  try {
+    init = await request('initialize', {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: 'open-crm-cpq-jev-uat', version: '1' },
+    });
+    send({ method: 'notifications/initialized' });
+    listed = await request('tools/list', {});
+  } catch (error) {
+    // The caller never gets a client to close, so stop the server here.
+    stop();
+    throw error;
+  }
 
   return {
     serverInfo: init.serverInfo,
@@ -183,8 +202,7 @@ export async function createMcpClient({ command, args = [], cwd, timeoutMs = 600
       return text;
     },
     close() {
-      child.stdin.end();
-      child.kill();
+      stop();
     },
   };
 }
@@ -216,7 +234,8 @@ export function actionCandidates(elements, { navigation = false } = {}) {
   }
   const actions = [];
   for (const e of inLayer) {
-    if (!e.ref || e.disabled || e.header || PAGINATOR.test(e.name)) continue;
+    // An unnamed control gives a user (and Jev) nothing to choose it by.
+    if (!e.ref || e.disabled || e.header || !e.name || PAGINATOR.test(e.name)) continue;
     const label = `${e.role} "${e.name}"`;
     if (CLICKABLE.has(e.role)) actions.push({ key: e.ref, kind: 'click', ref: e.ref, role: e.role, name: e.name, label });
     if (e.role === 'combobox') actions.push({ key: e.ref, kind: 'use', ref: e.ref, role: e.role, name: e.name, label });
