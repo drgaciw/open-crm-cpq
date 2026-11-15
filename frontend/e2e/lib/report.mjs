@@ -116,3 +116,17 @@ export function createReport(name, { strict = false, write = true, log = true, d
     },
   };
 }
+
+/**
+ * One line for records teardown could not remove, or null when it removed everything. Accepted
+ * quotes (QUOTE_ACCEPTED_NO_DELETE) and the contracts created from them have no delete API; on a
+ * local stack scripts/dev/purge-uat-residue.sh soft-deletes them.
+ * @param {{type: string, id: unknown, reason?: string}[]} residue
+ */
+export function residueHint(residue) {
+  if (!residue?.length) return null;
+  const names = residue.map((r) => `${r.type} ${r.id}`).join(', ');
+  const purgeable = residue.some((r) => r.type === 'quote' && /QUOTE_ACCEPTED_NO_DELETE|accepted quote/i.test(r.reason ?? ''));
+  return `${residue.length} record(s) the API would not delete: ${names}.`
+    + (purgeable ? ' For accepted quotes and their contracts: run scripts/dev/purge-uat-residue.sh --apply on a local stack.' : '');
+}
