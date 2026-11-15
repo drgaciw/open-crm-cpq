@@ -11,13 +11,19 @@ import { createInterface } from 'node:readline';
 
 const PROTOCOL_VERSION = '2025-06-18';
 
+/** Roles whose snapshot line carries the value the field shows. */
+const FIELD_ROLES = new Set(['textbox', 'searchbox', 'spinbutton', 'combobox']);
+
+/** Containers that bound what a user can act on, innermost wins: an open list, menu or dialog first. */
+const SCOPES = ['listbox', 'menu', 'dialog', 'main', 'navigation'];
+
 /**
  * Elements of an aria snapshot that carry a ref or a name, in document order.
  * A line looks like `- link "Accounts" [ref=e29] [cursor=pointer]:`; a link's target is the
  * `- /url: /organizations` line nested under it.
  *
  * @param {string} yaml
- * @returns {{role:string,name:string,ref:string|null,url?:string,disabled:boolean}[]}
+ * @returns {{role:string,name:string,ref:string|null,url?:string,disabled:boolean,scope:string|null}[]}
  */
 export function parseSnapshot(yaml) {
   const elements = [];
@@ -27,6 +33,13 @@ export function parseSnapshot(yaml) {
     if (indent < 0) continue;
     while (stack.length && stack.at(-1).indent >= indent) stack.pop();
 
+    // A typed field's value is a `- text: ...` child line (after `- /placeholder: ...`).
+    const text = line.match(/^\s*- text: (.+)$/);
+    if (text) {
+      const owner = stack.at(-1)?.element;
+      if (owner && FIELD_ROLES.has(owner.role) && owner.value === undefined) owner.value = text[1].replace(/^"(.*)"$/, '$1');
+      continue;
+    }
     const url = line.match(/^\s*- \/url: "?([^"]*)"?\s*$/);
     if (url) {
       const owner = stack.at(-1)?.element;
@@ -44,7 +57,13 @@ export function parseSnapshot(yaml) {
       name: (m[2] ?? '').replace(/\\(.)/g, '$1'),
       ref,
       disabled: /\[disabled\]/.test(attrs),
+      scope: [...stack].reverse().find((s) => SCOPES.includes(s.element.role))?.element.role ?? null,
     };
+    // A field shows its current value after the attributes: `- textbox "City" [ref=e2]: Austin`.
+    const shown = FIELD_ROLES.has(element.role) && line.slice(m.index + m[0].length).match(/^: (.+)$/)?.[1];
+    if (shown) element.value = shown.replace(/^"(.*)"$/, '$1');
+    // A control inside a column header is a sort toggle, not a task action.
+    if (stack.some((s) => s.element.role === 'columnheader')) element.header = true;
     if (m[1] === 'link') element.url = undefined;
     elements.push(element);
     stack.push({ indent, element });
@@ -168,4 +187,46 @@ export async function createMcpClient({ command, args = [], cwd, timeoutMs = 600
       child.kill();
     },
   };
+}
+
+const CLICKABLE = new Set(['button', 'link', 'tab', 'menuitem', 'menuitemradio', 'menuitemcheckbox', 'option', 'checkbox', 'radio', 'switch']);
+const FILLABLE = new Set(['textbox', 'searchbox', 'spinbutton']);
+/** Material paginator controls: paging is never the step a task goal needs. */
+const PAGINATOR = /^(Items per page:?|First page|Previous page|Next page|Last page)$/;
+
+/**
+ * What a user can act on right now, as Jev's choices: the innermost open layer (listbox, then menu,
+ * then dialog) or else the main region. Each action has a unique key: the ref for a click, the ref
+ * plus "=" for typing. A combobox is one "use" action, because Material gives that role both to a
+ * select (click to open) and to an autocomplete input (type); the caller decides which by whether a
+ * value is to be typed. Table rows come last, described by their cells.
+ *
+ * Column sort toggles and paginator controls are left out; sidebar links are offered only when
+ * `navigation` is set (and no listbox, menu or dialog is open).
+ *
+ * @param {ReturnType<typeof parseSnapshot>} elements
+ * @param {{navigation?: boolean}} [options]
+ * @returns {{key:string,kind:'click'|'fill'|'use',ref:string,role:string,name:string,label:string}[]}
+ */
+export function actionCandidates(elements, { navigation = false } = {}) {
+  const layer = ['listbox', 'menu', 'dialog', 'main'].find((scope) => elements.some((e) => e.scope === scope && e.ref));
+  let inLayer = layer ? elements.filter((e) => e.scope === layer) : elements.filter((e) => e.scope !== 'navigation');
+  if (navigation && (layer === 'main' || !layer)) {
+    inLayer = [...elements.filter((e) => e.scope === 'navigation' && e.role === 'link'), ...inLayer];
+  }
+  const actions = [];
+  for (const e of inLayer) {
+    if (!e.ref || e.disabled || e.header || PAGINATOR.test(e.name)) continue;
+    const label = `${e.role} "${e.name}"`;
+    if (CLICKABLE.has(e.role)) actions.push({ key: e.ref, kind: 'click', ref: e.ref, role: e.role, name: e.name, label });
+    if (e.role === 'combobox') actions.push({ key: e.ref, kind: 'use', ref: e.ref, role: e.role, name: e.name, label });
+    if (FILLABLE.has(e.role)) {
+      actions.push({ key: `${e.ref}=`, kind: 'fill', ref: e.ref, role: e.role, name: e.name, label });
+    }
+  }
+  for (const row of tableRows(inLayer)) {
+    const name = row.cells.join(' | ');
+    actions.push({ key: row.ref, kind: 'click', ref: row.ref, role: 'row', name, label: `table row: ${name}` });
+  }
+  return actions;
 }

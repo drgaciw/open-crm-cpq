@@ -6,6 +6,7 @@
 import { validateSpec } from '../contract.mjs';
 
 export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+const PRIORITY_WORDS = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', URGENT: 'Urgent' };
 
 /** Tab label -> status query parameter (undefined = no filter). Order matches the tab group. */
 export const STATUS_TABS = [
@@ -87,9 +88,10 @@ export const list = validateSpec({
         persist: { create: true, update: true, apiPath: 'source' },
       },
       {
-        label: 'Priority', ariaLabel: 'Lead priority', kind: 'select', default: 'MEDIUM',
-        sample: 'HIGH', editSample: 'URGENT',
-        options: PRIORITIES.map((p) => ({ label: p, value: p })),
+        // The form shows words since the Jev + Playwright MCP UAT (2026-11-15); the API keeps the enum.
+        label: 'Priority', ariaLabel: 'Lead priority', kind: 'select', default: 'Medium',
+        sample: 'High', editSample: 'Urgent',
+        options: PRIORITIES.map((p) => ({ label: PRIORITY_WORDS[p], value: p })),
         persist: { create: true, update: true, apiPath: 'priority' },
       },
       {

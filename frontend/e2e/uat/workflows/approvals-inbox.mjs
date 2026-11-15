@@ -78,6 +78,15 @@ function rowFor(page, request) {
     .filter({ has: page.getByRole('link', { name: `Quote ${request.quoteId}`, exact: true }) });
 }
 
+/**
+ * A row's action button. Since the Jev + Playwright MCP UAT (2026-11-15) each is named after its
+ * approval and quote ("Approve approval #8 for quote 7"), not just "Approve".
+ */
+const rowButton = (row, verb, request) => row.getByRole('button', {
+  name: verb === 'Open quote' ? `Open quote ${request.quoteId}` : `${verb} approval #${request.id} for quote ${request.quoteId}`,
+  exact: true,
+});
+
 const stillPending = async (api, id) => asRows(await api.get(PENDING)).some((r) => r.id === id);
 
 export async function runInboxList(ctx) {
@@ -150,7 +159,7 @@ export async function runInboxRows(ctx) {
 
   await runCheck(ctx, 'approvals.row.open-quote', async () => {
     const { row, request } = await firstRowOrBlocked(ctx);
-    await row.getByRole('button', { name: 'Open quote', exact: true }).click();
+    await rowButton(row, 'Open quote', request).click();
     await page.waitForURL((url) => url.pathname === `/quotes/${request.quoteId}`);
   });
 
@@ -168,7 +177,7 @@ export async function runInboxRows(ctx) {
     const onDialog = (d) => { native.push(`${d.type()}: ${d.message()}`); void d.dismiss(); };
     page.on('dialog', onDialog);
     try {
-      await row.getByRole('button', { name: 'Reject', exact: true }).click();
+      await rowButton(row, 'Reject', request).click();
       const dialog = page.getByRole('dialog').filter({ hasText: reject.opensDialog });
       await dialog.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
       if (native.length) throw defect(`native ${native.join('; ')} is raised by Reject`);
@@ -194,7 +203,7 @@ export async function runInboxRows(ctx) {
       run: async () => {
         const { row, request } = await firstRowOrBlocked(ctx);
         state.request = request;
-        await row.getByRole('button', { name: 'Approve', exact: true }).click();
+        await rowButton(row, 'Approve', request).click();
         await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.cancelText });
         await page.waitForTimeout(400);
         if (!(await stillPending(api, request.id))) throw new Error('request left the pending list');
@@ -204,7 +213,7 @@ export async function runInboxRows(ctx) {
       id: 'approvals.row.approve.confirm',
       run: async () => {
         const row = rowFor(page, state.request);
-        await row.getByRole('button', { name: 'Approve', exact: true }).click();
+        await rowButton(row, 'Approve', state.request).click();
         await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
         await waitUntil(() => stillPending(api, state.request.id), (present) => present === false, {
           timeoutMs: 8000, intervalMs: 250, describe: () => 'request is still pending after Approve',
@@ -217,7 +226,7 @@ export async function runInboxRows(ctx) {
 
   await runCheck(ctx, 'approvals.row.reject.confirm', async () => {
     const { row, request } = await firstRowOrBlocked(ctx);
-    await row.getByRole('button', { name: 'Reject', exact: true }).click();
+    await rowButton(row, 'Reject', request).click();
     const dialog = page.getByRole('dialog').filter({ hasText: reject.opensDialog });
     await dialog.getByRole('textbox', { name: 'Reason (optional)' }).fill('UAT rejection');
     await dialog.getByRole('button', { name: 'Reject', exact: true }).click();
@@ -239,7 +248,7 @@ export async function runInboxRows(ctx) {
     api.untrack('quote', quote.id);
     await openInbox(page);
     const row = rowFor(page, request);
-    await row.getByRole('button', { name: 'Approve', exact: true }).click();
+    await rowButton(row, 'Approve', request).click();
     await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
     const banner = page.getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' });
     await banner.waitFor({ state: 'visible', timeout: 8000 });
