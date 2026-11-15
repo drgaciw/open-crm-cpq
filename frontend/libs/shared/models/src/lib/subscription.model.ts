@@ -2,7 +2,8 @@
  * Subscription / contract-commitment models.
  * Mirrors: com.opencrm.contract.dto.SubscriptionDto (contract-asset-management).
  *
- * Browser OHS: GET /api/v1/subscriptions (gateway → CAM). Amendments remain
+ * Browser OHS: GET /api/v1/subscriptions (gateway → CAM), shown read-only by
+ * @frontend/cpq-contracts at /contracts (DRG-761). Amendments remain
  * unreleased on the gateway; see amendment.model.ts for typed future UI.
  */
 
