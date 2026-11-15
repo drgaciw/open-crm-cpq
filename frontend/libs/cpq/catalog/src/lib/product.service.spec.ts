@@ -97,6 +97,20 @@ describe('ProductService', () => {
     unsorted.flush({ content: [], totalElements: 0, number: 0, size: 20 });
   });
 
+  it('search sends category and status filters so they apply to every page (DRG-754)', () => {
+    service.search('core', 0, 20, undefined, { category: 'SUPPORT', status: 'DRAFT' });
+    const filtered = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    expect(filtered.request.params.get('category')).toBe('SUPPORT');
+    expect(filtered.request.params.get('status')).toBe('DRAFT');
+    filtered.flush({ content: [], totalElements: 0, number: 0, size: 20 });
+
+    service.search('core');
+    const plain = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    expect(plain.request.params.has('category')).toBe(false);
+    expect(plain.request.params.has('status')).toBe(false);
+    plain.flush({ content: [], totalElements: 0, number: 0, size: 20 });
+  });
+
   it('list error.set is message [CODE] when errorCode present', () => {
     service.list();
     const req = httpMock.expectOne((r) => r.url === '/api/v1/products');
