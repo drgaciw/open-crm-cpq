@@ -291,7 +291,11 @@ export default {
         await page.waitForLoadState('networkidle').catch(() => {});
         const rows = page.locator('tr.mat-mdc-row');
         await waitUntil(() => rows.count(), (n) => n > 0, { timeoutMs: 5000, describe: () => `a ${stage.value} deal exists but the tab shows no rows` });
-        const badges = (await rows.locator('td:nth-child(3)').allInnerTexts()).map((t) => t.trim());
+        // Find the Stage column by its header: DRG-750 moved it (Opportunity | Organization | Owner | Amount | Stage | ...).
+        const headers = (await page.locator('tr.mat-mdc-header-row th').allInnerTexts()).map((t) => t.trim());
+        const col = headers.findIndex((h) => h.startsWith('Stage')) + 1;
+        if (!col) throw new Error(`no Stage column in [${headers.join(' | ')}]`);
+        const badges = (await rows.locator(`td:nth-child(${col})`).allInnerTexts()).map((t) => t.trim());
         const wrong = badges.filter((b) => b !== stage.label);
         if (wrong.length) throw new Error(`tab "${stage.label}" lists rows in stage ${[...new Set(wrong)].join(', ')}`);
         return `${badges.length} row(s), all "${stage.label}"`;
@@ -401,10 +405,13 @@ export default {
     });
 
     // H-CRM-010: onSubmit() destructures `stage` out of the create payload.
-    await runCheck(ctx, 'deals.form.stage-honoured-on-create', async () => {
-      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal'), Stage: 'Negotiation' });
+    // H-CRM-010 (resolved by DRG-750): the create form no longer offers a Stage it would ignore.
+    // A new opportunity starts in Prospecting; the stage changes through Advance / Edit.
+    await runCheck(ctx, 'deals.form.create-starts-in-prospecting', async () => {
+      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal') });
       const dto = await api.get(`${API}/${id}`);
-      if (dto.stage !== 'NEGOTIATION') throw defect(`picked Stage "Negotiation" on the create form, the deal was created as ${dto.stage} with no warning`);
+      if (dto.stage !== 'PROSPECTING') throw new Error(`a new opportunity was created in ${dto.stage}`);
+      return 'no Stage input on create; created in PROSPECTING';
     }, { hypothesis: 'H-CRM-010' });
 
     // H-CRM-031 (resolved): the form no longer offers a Probability input; the API derives

@@ -340,10 +340,16 @@ export default {
       });
     }
 
-    // H-CRM-015: every item is conditional and none applies to CONVERTED, yet the trigger stays
-    // enabled — the user opens an empty panel.
+    // H-CRM-015: every item is conditional and none applies to CONVERTED. Before DRG-750 the
+    // trigger stayed enabled and opened an empty panel; the DataTable now renders no trigger for
+    // a row with no applicable actions, which also resolves the hypothesis.
     await runCheck(ctx, 'leads.row-menu.CONVERTED-is-not-empty', async () => {
-      const items = await openRowMenu(page, byStatus.CONVERTED.title);
+      const { title } = byStatus.CONVERTED;
+      const row = await findRow(page, title);
+      if (!(await row.getByRole('button', { name: `Actions for ${title}`, exact: true }).count())) {
+        return 'no row-menu trigger: no action applies to a CONVERTED lead';
+      }
+      const items = await openRowMenu(page, title);
       await page.keyboard.press('Escape');
       await settleOverlays(page);
       if (!items.length) throw defect('the row menu of a CONVERTED lead opens with zero items (trigger is enabled)');

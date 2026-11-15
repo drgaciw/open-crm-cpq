@@ -53,7 +53,8 @@ export const WON_NEEDS_ACCEPTED_QUOTE =
 
 /** After a confirmed Won: the refusal is shown in an alert and the stage is unchanged. */
 export async function expectWinRefused(page, api, id, stage) {
-  const alert = page.getByRole('alert').filter({ hasText: /accepted quote/i }).first();
+  // Banner copy: "…until a linked quote is Accepted… [OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE]".
+  const alert = page.getByRole('alert').filter({ hasText: /OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE|quote is accepted|accepted quote/i }).first();
   await alert.waitFor({ state: 'visible', timeout: 8000 });
   const dto = await api.get(`${API}/${id}`);
   if (dto.stage !== stage) throw new Error(`stage became ${dto.stage}; a win without an accepted quote must be refused`);

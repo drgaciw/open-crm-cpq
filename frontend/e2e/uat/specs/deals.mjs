@@ -77,27 +77,18 @@ export const list = validateSpec({
         validators: [{ kind: 'required', sample: '', expectError: 'Required' }],
       },
       {
-        label: 'Amount ($)', kind: 'number', normalize: 'number', sample: 12500, editSample: 15000,
+        label: 'Amount', kind: 'number', normalize: 'number', sample: 12500, editSample: 15000,
         persist: { create: true, update: true, apiPath: 'amount' },
         validators: [{ kind: 'min', sample: '-1', expectError: 'Amount cannot be negative' }],
       },
       {
-        // The create request strips `stage` (H-CRM-010), so the CRUD pass creates with the default
-        // and only changes the stage on edit; the dedicated check picks a non-default stage.
-        label: 'Stage', kind: 'select', default: 'Prospecting', sample: 'Prospecting', editSample: 'Qualification',
+        // Edit-only since DRG-750: a new opportunity always starts in Prospecting (H-CRM-010 resolved).
+        label: 'Stage', kind: 'select', editOnly: true, editSample: 'Qualification',
         options: STAGES,
-        persist: { create: 'ignored', update: true, apiPath: 'stage' },
+        persist: { update: true, apiPath: 'stage' },
       },
-      {
-        // min(0)/max(100) are declared but the template has no <mat-error> for them (H-CRM-011).
-        // The value is also never sent anywhere useful: the API derives probability from the stage
-        // (H-CRM-031), hence no sample / persist here.
-        label: 'Probability (%)', kind: 'number', default: 10,
-        validators: [
-          { kind: 'min', sample: '-1', expectError: null, hypothesis: 'H-CRM-011' },
-          { kind: 'max', sample: '101', expectError: null, hypothesis: 'H-CRM-011' },
-        ],
-      },
+      // No Probability field since DRG-750: the API derives it from the stage (H-CRM-011 and
+      // H-CRM-031 resolved; deals.form.no-probability-input asserts the absence).
       {
         // Typed, never driven through the calendar. Persistence is asserted by hand because the
         // CRUD runner compares the typed text verbatim and cannot map M/D/YYYY -> YYYY-MM-DD.
