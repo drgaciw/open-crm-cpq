@@ -53,6 +53,23 @@ describe('PriceBookCreateDialogComponent', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects a currency that is not three letters, with a visible message (H-CPQ-PR-011)', () => {
+    const control = component.form.get('currency')!;
+    for (const bad of ['US', 'U5D', '1234']) {
+      control.setValue(bad);
+      control.markAsTouched();
+      expect(control.valid).toBe(false);
+    }
+    control.setValue('US');
+    control.markAsTouched();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Currency must be 3 letters');
+    for (const good of ['usd', 'EUR', '']) {
+      control.setValue(good);
+      expect(control.valid).toBe(true);
+    }
+  });
+
   it('requires name', () => {
     expect(component.form.valid).toBe(false);
     component.form.patchValue({ name: 'North America Standard' });
