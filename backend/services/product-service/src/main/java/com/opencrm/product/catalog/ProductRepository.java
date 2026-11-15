@@ -34,11 +34,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Page<Product> findByStatusAndDeletedFalse(ProductStatus status, Pageable pageable);
 
+    /** Text search; a null category or status means "any" (DRG-754: filters apply to every page). */
     @Query("SELECT p FROM Product p WHERE p.deleted = false AND " +
            "(LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :query, '%')))")
-    Page<Product> search(@Param("query") String query, Pageable pageable);
+           "LOWER(p.description) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
+           "(:category IS NULL OR p.category = :category) AND " +
+           "(:status IS NULL OR p.status = :status)")
+    Page<Product> search(@Param("query") String query,
+                         @Param("category") ProductCategory category,
+                         @Param("status") ProductStatus status,
+                         Pageable pageable);
 
     List<Product> findByIdInAndDeletedFalse(List<Long> ids);
 
