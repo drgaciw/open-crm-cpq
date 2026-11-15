@@ -57,6 +57,7 @@ export default [
     triage: 'browserCheckable',
     checkId: 'quotes.submit.config-engine-down.user-message',
     class: 'functional',
+    note: 'Fixed (UAT 2026-11-14): with configuration-engine down Submit answers 502 CONFIGURATION_VALIDATE_UNAVAILABLE with a plain message; the transport detail goes to the quote-service log. Observable only with the engine stopped (uat14-config-down).',
   },
   {
     id: 'H-CPQ-Q-007',
