@@ -67,7 +67,7 @@ describe('PriceBookEditDialogComponent', () => {
   });
 
   it('rejects a currency that is not three letters, with a visible message (H-CPQ-PR-011)', () => {
-    const control = component.form.get('currency')!;
+    const control = component.form.controls['currency'];
     for (const bad of ['US', 'U5D', '1234']) {
       control.setValue(bad);
       control.markAsTouched();
