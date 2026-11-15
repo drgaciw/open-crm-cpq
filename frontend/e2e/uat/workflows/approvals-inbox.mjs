@@ -27,7 +27,7 @@ export async function ensurePendingApprovals(ctx) {
   if (pending >= SEEDED) return pending;
   if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') return pending;
   for (let i = pending; i < SEEDED; i += 1) {
-    const quote = await draftWithLine(ctx);
+    const { quote } = await draftWithLine(ctx);
     await ctx.api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
   }
   return asRows(await ctx.api.get(PENDING)).length;
@@ -104,7 +104,7 @@ export async function runInboxRows(ctx) {
   // Found by UAT 2026-11-14: the inbox can only fill through the API. No quote screen offers
   // "submit for approval" (POST /quotes/{id}/approvals), so a user cannot route a quote to a tier.
   await runCheck(ctx, 'approvals.gap.no-ui-route-to-tiered-approval', async () => {
-    const quote = await draftWithLine(ctx);
+    const { quote } = await draftWithLine(ctx);
     await goto(page, `/quotes/${quote.id}`);
     await page.getByRole('heading', { level: 1 }).first().waitFor({ state: 'visible' });
     const offered = (await page.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
