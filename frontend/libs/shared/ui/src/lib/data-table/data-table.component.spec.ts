@@ -57,6 +57,18 @@ describe('DataTableComponent', () => {
     expect(cell.textContent?.trim()).toBe('New');
   });
 
+  it('names each row-actions trigger from the row when given a label function (lead list a11y regression)', () => {
+    component.componentRef.setInput('columns', [{ key: 'title', header: 'Title' }]);
+    component.componentRef.setInput('data', [{ id: 1, title: 'Alpha' }, { id: 2, title: 'Beta' }]);
+    component.componentRef.setInput('rowActions', [{ action: 'edit', label: 'Edit' }]);
+    component.componentRef.setInput('rowActionsAriaLabel', (row: { title: string }) => `Actions for ${row.title}`);
+    component.detectChanges();
+
+    const labels = Array.from(component.nativeElement.querySelectorAll('td.actions-cell button'))
+      .map((b) => (b as HTMLElement).getAttribute('aria-label'));
+    expect(labels).toEqual(['Actions for Alpha', 'Actions for Beta']);
+  });
+
   it('keeps raw text for badge columns without a badgeType', () => {
     component.componentRef.setInput('columns', [{ key: 'status', header: 'Status', type: 'badge' }]);
     component.componentRef.setInput('data', [{ id: 1, status: 'DRAFT' }]);
