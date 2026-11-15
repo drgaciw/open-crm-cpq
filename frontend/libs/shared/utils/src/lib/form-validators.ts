@@ -1,6 +1,16 @@
 import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 
 export class FormValidators {
+  /**
+   * Like Validators.required, but whitespace-only text also counts as empty. Uses the same
+   * `required` error key, so existing "is required" messages keep working.
+   */
+  static requiredTrimmed(control: AbstractControl): ValidationErrors | null {
+    const value = control.value;
+    if (value === null || value === undefined) return { required: true };
+    return String(value).trim().length > 0 ? null : { required: true };
+  }
+
   static email(control: AbstractControl): ValidationErrors | null {
     if (!control.value) return null;
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
