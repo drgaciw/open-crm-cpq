@@ -82,6 +82,21 @@ describe('DealListComponent action wiring', () => {
     vi.restoreAllMocks();
   });
 
+  it('gives each row menu trigger an accessible name with the opportunity name (H-A11Y-003)', () => {
+    deals.set([
+      deal({ id: 1, name: 'Alpha renewal', stage: 'PROSPECTING' }),
+      deal({ id: 2, name: 'Beta expansion', stage: 'PROPOSAL' }),
+    ]);
+    fixture.detectChanges();
+    const triggers: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('td.actions-cell button'));
+    expect(triggers.length).toBeGreaterThan(1);
+    const names = triggers.map((t) => t.getAttribute('aria-label'));
+    expect(new Set(names).size).toBe(names.length);
+    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('tr.mat-mdc-row'));
+    const firstName = component.tableRows()[0].name;
+    expect(rows[0].querySelector('td.actions-cell button')?.getAttribute('aria-label')).toBe(`Actions for ${firstName}`);
+  });
+
   it('ngOnInit loads the deal list', () => {
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc');
   });
