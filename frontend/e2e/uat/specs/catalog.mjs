@@ -11,13 +11,29 @@ export const PRODUCT_TYPES = ['SAAS_SEAT_NAMED', 'SAAS_SEAT_CONCURRENT', 'SAAS_U
   'HARDWARE', 'CUSTOM'];
 export const CATEGORIES = ['SUBSCRIPTION', 'LICENSE', 'SUPPORT', 'SERVICES', 'ADD_ON'];
 export const STATUSES = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'];
-/** List Status filter labels (PRODUCT_STATUS_LABELS, H-CPQ-P-006); the edit-form select still shows raw enums. */
+/** List Status filter labels (PRODUCT_STATUS_LABELS, H-CPQ-P-006); the edit form shows them too. */
 export const STATUS_FILTER_LABELS = ['Draft', 'Active', 'Deprecated', 'Retired'];
 export const SELECTION_TYPES = ['SINGLE', 'MULTIPLE', 'REQUIRED_SINGLE'];
 export const RULE_TYPES = ['REQUIRES', 'EXCLUDES', 'RECOMMENDS', 'DEFAULT', 'VALIDATES'];
 
-/** The UI renders raw enum constants, so label === value everywhere (see H-CPQ-P-006). */
+/** Option groups and config rules still render raw enum constants, so label === value there (H-CPQ-P-006). */
 const raw = (values) => values.map((v) => ({ label: v, value: v }));
+
+/**
+ * The product create and edit forms show labels since the Jev + Playwright MCP UAT (2026-11-15).
+ * Copied from shared-models (CATALOG_PRODUCT_TYPE_LABELS, PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LABELS).
+ */
+const TYPE_LABELS = {
+  SAAS_SEAT_NAMED: 'SaaS Named Seat', SAAS_SEAT_CONCURRENT: 'SaaS Concurrent Seat', SAAS_USAGE_METERED: 'SaaS Usage Metered',
+  SAAS_FLAT_RATE: 'SaaS Flat Rate', ONPREM_PERPETUAL: 'On-Prem Perpetual', ONPREM_CORE: 'On-Prem Core',
+  ONPREM_SUBSCRIPTION: 'On-Prem Subscription', HYBRID_PORTABLE: 'Hybrid Portable', SUPPORT_BASIC: 'Support Basic',
+  SUPPORT_PREMIUM: 'Support Premium', SUPPORT_ENTERPRISE: 'Support Enterprise', PROFESSIONAL_SERVICES: 'Professional Services',
+  TRAINING: 'Training', ADD_ON_API: 'Add-on API', ADD_ON_STORAGE: 'Add-on Storage', ADD_ON_ANALYTICS: 'Add-on Analytics',
+  ADD_ON_SECURITY: 'Add-on Security', ADD_ON_INTEGRATION: 'Add-on Integration', HARDWARE: 'Hardware', CUSTOM: 'Custom',
+};
+const CATEGORY_LABELS = { SUBSCRIPTION: 'Subscription', LICENSE: 'License', SUPPORT: 'Support', SERVICES: 'Services', ADD_ON: 'Add-on' };
+const STATUS_LABELS = { DRAFT: 'Draft', ACTIVE: 'Active', DEPRECATED: 'Deprecated', RETIRED: 'Retired' };
+const labelled = (values, labels) => values.map((v) => ({ label: labels[v], value: v }));
 
 export const list = validateSpec({
   id: 'catalog',
@@ -62,15 +78,15 @@ export const list = validateSpec({
           validators: [{ kind: 'required', sample: '', expectError: 'Name is required' }],
         },
         {
-          label: 'Product type', kind: 'select', required: true, default: '', sample: 'SAAS_FLAT_RATE',
+          label: 'Product type', kind: 'select', required: true, default: '', sample: 'SaaS Flat Rate',
           persist: { create: true, update: true, apiPath: 'productType' },
-          options: raw(PRODUCT_TYPES),
+          options: labelled(PRODUCT_TYPES, TYPE_LABELS),
           validators: [{ kind: 'required', sample: '', expectError: 'Product type is required' }],
         },
         {
-          label: 'Category', kind: 'select', required: true, default: '', sample: 'SUBSCRIPTION',
+          label: 'Category', kind: 'select', required: true, default: '', sample: 'Subscription',
           persist: { create: true, update: true, apiPath: 'category' },
-          options: raw(CATEGORIES),
+          options: labelled(CATEGORIES, CATEGORY_LABELS),
           validators: [{ kind: 'required', sample: '', expectError: 'Category is required' }],
         },
         {
@@ -187,9 +203,9 @@ export const detail = validateSpec({
     fields: [
       { label: 'Name', kind: 'input', required: true, normalize: 'trim', persist: { update: true, apiPath: 'name' } },
       { label: 'Description', kind: 'textarea', normalize: 'trim', editSample: 'Edited by the UAT.', persist: { update: true, apiPath: 'description' } },
-      { label: 'Product type', kind: 'select', required: true, editSample: 'TRAINING', options: raw(PRODUCT_TYPES), persist: { update: true, apiPath: 'productType' } },
-      { label: 'Category', kind: 'select', required: true, editSample: 'SERVICES', options: raw(CATEGORIES), persist: { update: true, apiPath: 'category' } },
-      { label: 'Status', kind: 'select', required: true, editSample: 'ACTIVE', options: raw(STATUSES), persist: { update: true, apiPath: 'status' } },
+      { label: 'Product type', kind: 'select', required: true, editSample: 'Training', options: labelled(PRODUCT_TYPES, TYPE_LABELS), persist: { update: true, apiPath: 'productType' } },
+      { label: 'Category', kind: 'select', required: true, editSample: 'Services', options: labelled(CATEGORIES, CATEGORY_LABELS), persist: { update: true, apiPath: 'category' } },
+      { label: 'Status', kind: 'select', required: true, editSample: 'Active', options: labelled(STATUSES, STATUS_LABELS), persist: { update: true, apiPath: 'status' } },
       { label: 'List price', kind: 'number', editSample: '99.25', normalize: 'number', persist: { update: true, apiPath: 'listPrice' } },
       { label: 'Currency', kind: 'input', placeholder: 'USD', editSample: 'eur', normalize: 'upper', persist: { update: true, apiPath: 'currency' } },
     ],

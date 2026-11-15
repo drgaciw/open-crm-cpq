@@ -14,7 +14,7 @@ import { expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, fillField, readField, fieldError, selectOptions, normalizeValue, readPath } from '../../lib/fields.mjs';
 import { ApiCallError } from '../../lib/api.mjs';
 import { ensure, uniqueName, runPrefix } from '../fixtures.mjs';
-import { list, detail, CATEGORIES, STATUSES, STATUS_FILTER_LABELS } from '../specs/catalog.mjs';
+import { list, detail, CATEGORIES, STATUS_FILTER_LABELS } from '../specs/catalog.mjs';
 import { runShell } from '../runners/shell.mjs';
 import { runFieldContract, openForm } from '../runners/fieldContract.mjs';
 import { runDetailPanels } from '../workflows/catalog-detail-panels.mjs';
@@ -71,7 +71,10 @@ function persistProblems(form, typed, dto, mode) {
   const problems = [];
   for (const f of form.fields) {
     if (!f.persist?.[mode] || !(f.label in typed)) continue;
-    const want = f.kind === 'number' ? Number(typed[f.label]) : normalizeValue(typed[f.label], f.normalize);
+    // A select is chosen by its label; the API holds the option's value.
+    const want = f.kind === 'number' ? Number(typed[f.label])
+      : f.kind === 'select' ? (f.options?.find((o) => o.label === typed[f.label])?.value ?? typed[f.label])
+      : normalizeValue(typed[f.label], f.normalize);
     const got = readPath(dto, f.persist.apiPath);
     if (String(got ?? '') !== String(want ?? '')) problems.push(`${f.label}: typed "${want}", API holds "${got}"`);
   }
@@ -275,7 +278,8 @@ export default {
           await headerButton('Edit').click();
           const card = editCard();
           await card.waitFor({ state: 'visible' });
-          const expected = { Name: name, 'Product type': 'SAAS_FLAT_RATE', Category: 'SUBSCRIPTION', Status: 'DRAFT', 'List price': '49.5', Currency: 'USD' };
+          // The edit form shows labels since the Jev + Playwright MCP UAT (2026-11-15); the detail card above still prints the enum.
+          const expected = { Name: name, 'Product type': 'SaaS Flat Rate', Category: 'Subscription', Status: 'Draft', 'List price': '49.5', Currency: 'USD' };
           const wrong = [];
           for (const [label, want] of Object.entries(expected)) {
             const got = await waitUntil(() => readField(card, field(editForm, label)), (v) => String(v) === want, { timeoutMs: 2000 }).catch(() => null);
@@ -283,7 +287,8 @@ export default {
           }
           if (wrong.length) throw new Error(wrong.join('; '));
           const statusOptions = await selectOptions(page, card, field(editForm, 'Status'));
-          if (JSON.stringify(statusOptions) !== JSON.stringify(STATUSES)) throw new Error(`Status options are [${statusOptions.join(' | ')}]`);
+          // Labels since the Jev + Playwright MCP UAT (2026-11-15), as the list filter shows them.
+          if (JSON.stringify(statusOptions) !== JSON.stringify(STATUS_FILTER_LABELS)) throw new Error(`Status options are [${statusOptions.join(' | ')}]`);
           return `prefilled; Status options ${statusOptions.join(' | ')}`;
         },
       },

@@ -127,7 +127,7 @@ export interface OrganizationTableRow {
         [loading]="orgService.loading()"
         [pagination]="orgService.pagination()"
         [rowActions]="rowActions"
-        rowActionsAriaLabel="Account actions"
+        [rowActionsAriaLabel]="rowActionsLabel"
         [pageSizeOptions]="[10, 20, 50]"
         (pageChange)="onPageChange($event)"
         (sortChange)="onSort($event)"
@@ -162,6 +162,9 @@ export interface OrganizationTableRow {
   `],
 })
 export class OrganizationListComponent implements OnInit {
+  /** Each row menu is named after its row, so screen readers can tell them apart (as H-A11Y-003). */
+  readonly rowActionsLabel = (row: unknown): string => `Actions for ${(row as OrganizationTableRow).name}`;
+
   readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
 

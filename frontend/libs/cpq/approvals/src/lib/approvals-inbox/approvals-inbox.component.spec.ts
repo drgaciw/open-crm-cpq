@@ -124,6 +124,23 @@ describe('ApprovalsInboxComponent', () => {
     expect(rejectSpy).not.toHaveBeenCalled();
   });
 
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): every row's buttons were named "Approve",
+  // "Reject" and "Open quote", so neither a screen reader nor the agent could tell which quote a
+  // button acts on (the agent opened the quote link instead). Names start with the visible text.
+  it('names each row action after its approval and quote', () => {
+    const names = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('td button'))
+      .map((b) => b.getAttribute('aria-label'));
+    const [first, second] = MOCK_PENDING_APPROVALS;
+    expect(names).toEqual([
+      `Approve approval #${first.id} for quote ${first.quoteId}`,
+      `Reject approval #${first.id} for quote ${first.quoteId}`,
+      `Open quote ${first.quoteId}`,
+      `Approve approval #${second.id} for quote ${second.quoteId}`,
+      `Reject approval #${second.id} for quote ${second.quoteId}`,
+      `Open quote ${second.quoteId}`,
+    ]);
+  });
+
   it('openQuote navigates to quote detail', async () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     component.openQuote(7);

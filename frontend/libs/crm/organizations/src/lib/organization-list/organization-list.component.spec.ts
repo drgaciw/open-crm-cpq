@@ -232,15 +232,17 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     );
   });
 
-  it('names the row actions button for screen readers', () => {
-    organizations.set([org({ id: 8, name: 'Named' })]);
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): every row menu was named "Account actions",
+  // so a screen reader could not tell rows apart (as H-A11Y-003 for opportunities).
+  it('names each row actions button after its account', () => {
+    organizations.set([org({ id: 8, name: 'Named' }), org({ id: 9, name: 'Other' })]);
     loading.set(false);
     error.set(null);
     fixture.detectChanges();
-    const trigger = (fixture.nativeElement as HTMLElement).querySelector(
-      'button[aria-label="Account actions"]',
-    );
-    expect(trigger).toBeTruthy();
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button[aria-label^="Actions for"]'),
+    ).map((b) => b.getAttribute('aria-label'));
+    expect(labels).toEqual(['Actions for Named', 'Actions for Other']);
   });
 });
 
