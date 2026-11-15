@@ -291,3 +291,16 @@ test('parseSnapshot keeps the text of a paragraph, with or without a ref', () =>
     ['Why is this product retired?', 'dialog'],
   ]);
 });
+
+test('actionCandidates offers same-named controls of one layer once (an empty list repeats "New Quote")', () => {
+  const els = parseSnapshot([
+    '- main [ref=e1]:',
+    '  - button "New Quote" [ref=e2]',
+    '  - button "New Quote" [ref=e3]',
+    '  - link "Docs" [ref=e4]:',
+    '    - /url: /a',
+    '  - link "Docs" [ref=e5]:',
+    '    - /url: /b',
+  ].join('\n'));
+  assert.deepEqual(actionCandidates(els).map((a) => a.ref), ['e2', 'e4', 'e5']);
+});
