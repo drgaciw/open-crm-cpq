@@ -152,8 +152,11 @@ class Inconclusive extends Error {}
  * @param {number} [w.maxSteps]
  * @param {boolean} [w.navigation]  Offer sidebar links too (navigation goals).
  * @param {RegExp[]} [w.allow]      Controls the goal needs that the forbidden list would remove.
+ * @param {() => Promise<unknown>} [w.recover] Run when the goal fails, to track a record the app may have
+ *                                  saved before the failure so teardown removes it. Defaults to one more
+ *                                  `done` check (create goals look their record up by its unique name).
  */
-async function achieve(id, { goal, start, startText, values = [], choices = [], done, maxSteps = 16, navigation = false, allow = [] }) {
+async function achieve(id, { goal, start, startText, values = [], choices = [], done, recover, maxSteps = 16, navigation = false, allow = [] }) {
   const steps = [];
   const pendingValues = [...values];
   const pendingChoices = [...choices];
@@ -180,8 +183,9 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
     }
     return answer.choice;
   };
+  let page = null;
   try {
-    let page = await open(start, startText);
+    page = await open(start, startText);
     for (let n = 0; n < maxSteps; n++) {
       const result = await done(page);
       if (result) {
@@ -344,6 +348,8 @@ async function achieve(id, { goal, start, startText, values = [], choices = [], 
     }
     throw new Error(`goal not met after ${maxSteps} steps (now at ${page.path})`);
   } catch (error) {
+    // The save may have gone through before the failure (Codex review on #1001): track what exists.
+    await (recover ?? (() => done(page ?? {})))().catch(() => {});
     const detail = `${String(error.message || error)}${steps.length ? ` — steps: ${steps.join(' → ')}` : ''}`;
     if (error instanceof Inconclusive) report.inconclusive(id, detail);
     else report.fail(id, detail);
@@ -521,6 +527,12 @@ async function quotes() {
       // The goal says USD and the form's Currency field starts empty (optional; the server defaults it).
       { key: 'currency', label: 'Currency', text: 'USD' },
     ],
+    // A quote's done needs the detail page; recovery finds it by name among this customer's quotes.
+    recover: async () => {
+      const quote = rowsOf(await api.get(`/api/v1/quotes?customerExternalId=${encodeURIComponent(customer.externalId)}&size=200`))
+        .find((q) => q.name === quoteName);
+      if (quote) api.track('quote', quote.id, `/api/v1/quotes/${quote.id}`);
+    },
     done: async (page) => {
       const m = page.path?.match(/^\/quotes\/(\d+)$/);
       if (!m) return false;

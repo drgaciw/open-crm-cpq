@@ -168,13 +168,27 @@ export async function createMcpClient({ command, args = [], cwd, timeoutMs = 600
     send({ id, method, params });
   });
 
-  const init = await request('initialize', {
-    protocolVersion: PROTOCOL_VERSION,
-    capabilities: {},
-    clientInfo: { name: 'open-crm-cpq-jev-uat', version: '1' },
-  });
-  send({ method: 'notifications/initialized' });
-  const listed = await request('tools/list', {});
+  const stop = () => {
+    for (const { timer } of pending.values()) clearTimeout(timer);
+    pending.clear();
+    child.stdin.end();
+    child.kill();
+  };
+  let init;
+  let listed;
+  try {
+    init = await request('initialize', {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: 'open-crm-cpq-jev-uat', version: '1' },
+    });
+    send({ method: 'notifications/initialized' });
+    listed = await request('tools/list', {});
+  } catch (error) {
+    // The caller never gets a client to close, so stop the server here.
+    stop();
+    throw error;
+  }
 
   return {
     serverInfo: init.serverInfo,
@@ -188,8 +202,7 @@ export async function createMcpClient({ command, args = [], cwd, timeoutMs = 600
       return text;
     },
     close() {
-      child.stdin.end();
-      child.kill();
+      stop();
     },
   };
 }

@@ -78,6 +78,7 @@ export function createApi(request, { base = BASE, maxRetries = 4, sleep = defaul
 
     /** Record something this run created so teardown can remove it. */
     track(type, id, path) {
+      if (ledger.some((e) => e.type === type && String(e.id) === String(id))) return;
       ledger.push({ type, id, path });
     },
     /** Forget a record the test already deleted through the UI. */
