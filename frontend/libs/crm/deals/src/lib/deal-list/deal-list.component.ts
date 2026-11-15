@@ -27,7 +27,6 @@ import {
   canAdvanceDeal,
   canCloseDeal,
   dealStageLabel,
-  isOpenDealStage,
 } from '../deal-stage';
 
 export interface DealTableRow {
@@ -194,8 +193,7 @@ export class DealListComponent implements OnInit {
   ];
 
   readonly rowActions: TableRowAction[] = [
-    // H-CRM-040: the API refuses updates to a closed (WON/LOST) opportunity.
-    { action: 'edit', label: 'Edit', icon: 'edit', visible: (row) => isOpenDealStage((row as DealTableRow).stage) },
+    { action: 'edit', label: 'Edit', icon: 'edit' },
     {
       action: 'advance',
       label: 'Advance Stage',

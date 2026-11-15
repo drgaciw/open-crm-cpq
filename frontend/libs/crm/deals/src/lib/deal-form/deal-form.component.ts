@@ -56,10 +56,10 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDeal
     }
 
     @if (closed()) {
-      <!-- H-CRM-040: the API refuses updates to a closed (WON/LOST) opportunity. -->
+      <!-- H-CRM-040 / ADR-032 D-03: after close the API refuses stage, amount and currency changes. -->
       <div class="closed-notice" role="note">
         <mat-icon>lock</mat-icon>
-        <span>This opportunity is closed and can no longer be edited.</span>
+        <span>This opportunity is closed. Its stage, amount and currency can no longer change.</span>
       </div>
     }
 
@@ -172,7 +172,7 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDeal
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving() || closed()">
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
               @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
@@ -220,7 +220,7 @@ export class DealFormComponent implements OnInit {
   isEditMode = false;
   /** Signal so OnPush refreshes after async HTTP error (chaos: offline/500). */
   saving = signal(false);
-  /** Edit mode on a WON/LOST opportunity: shown read-only, Update not offered (H-CRM-040). */
+  /** Edit mode on a WON/LOST opportunity: stage, amount and currency are locked (H-CRM-040). */
   readonly closed = signal(false);
   readonly saveError = signal<string | null>(null);
   selectedContactId: number | null = null;
@@ -279,7 +279,12 @@ export class DealFormComponent implements OnInit {
       effect(() => {
         const d = this.dealService.selectedDeal();
         if (d) {
-          this.closed.set(!isOpenDealStage(d.stage));
+          const closed = !isOpenDealStage(d.stage);
+          this.closed.set(closed);
+          for (const name of ['stage', 'amount', 'currency']) {
+            if (closed) this.form.get(name)?.disable({ emitEvent: false });
+            else this.form.get(name)?.enable({ emitEvent: false });
+          }
           this.form.patchValue({
             name: d.name,
             amount: d.amount,
@@ -347,7 +352,7 @@ export class DealFormComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.form.invalid || this.closed()) return;
+    if (this.form.invalid) return;
     // Typed-but-not-picked contact/organization text is resolved or blocked, never dropped.
     const contact = resolveLookupId(
       this.form.value.contactSearch,
@@ -383,9 +388,10 @@ export class DealFormComponent implements OnInit {
     if (this.isEditMode && idVal) {
       const data: DealUpdateRequest = {
         name: this.form.value.name,
-        amount: this.form.value.amount ?? undefined,
-        currency,
-        stage: this.form.value.stage as DealStage,
+        // H-CRM-040: a closed deal's stage, amount and currency are frozen; sending them is refused.
+        amount: this.closed() ? undefined : this.form.value.amount ?? undefined,
+        currency: this.closed() ? undefined : currency,
+        stage: this.closed() ? undefined : (this.form.value.stage as DealStage),
         type: this.form.value.type as DealType,
         expectedCloseDate,
         termMonths,
