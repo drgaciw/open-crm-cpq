@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
+import { By } from '@angular/platform-browser';
 import { computed, signal } from '@angular/core';
 import { of } from 'rxjs';
 import { CatalogListComponent } from './catalog-list.component';
@@ -165,6 +166,46 @@ describe('CatalogListComponent', () => {
   it('labels the status filter options in words but filters by the enum (H-CPQ-P-006)', () => {
     expect(component.statusOptions.map((o) => o.label)).toEqual(['Draft', 'Active', 'Deprecated', 'Retired']);
     expect(component.statusOptions.map((o) => o.value)).toEqual(['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED']);
+  });
+
+  describe('column sorting (H-CPQ-P-002)', () => {
+    function emitSort(active: string, direction: 'asc' | 'desc' | '') {
+      const table = fixture.debugElement.query(By.css('app-data-table'));
+      table.triggerEventHandler('sortChange', { active, direction });
+      fixture.detectChanges();
+    }
+
+    it('reloads page 0 from the API in the order the header asks for', () => {
+      listSpy.mockClear();
+      emitSort('sku', 'desc');
+
+      expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'sku,desc', {
+        category: undefined,
+        status: undefined,
+      });
+    });
+
+    it('falls back to name order when the sort is cleared', () => {
+      emitSort('listPrice', 'asc');
+      listSpy.mockClear();
+      emitSort('listPrice', '');
+
+      expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'name,asc', {
+        category: undefined,
+        status: undefined,
+      });
+    });
+
+    it('keeps the chosen order while searching', () => {
+      vi.useFakeTimers();
+      emitSort('sku', 'asc');
+      component.onSearch('SUP');
+      vi.advanceTimersByTime(300);
+      fixture.detectChanges();
+
+      expect(searchSpy).toHaveBeenLastCalledWith('SUP', 0, 10, 'sku,asc');
+      vi.useRealTimers();
+    });
   });
 
   it('searches via ProductService.search', () => {
