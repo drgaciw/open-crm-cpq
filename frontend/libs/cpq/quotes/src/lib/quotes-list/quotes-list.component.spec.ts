@@ -5,7 +5,7 @@ import { computed, signal } from '@angular/core';
 import { QuotesListComponent } from './quotes-list.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
-import { QuoteDto, PaginationMeta } from '@frontend/shared-models';
+import { QuoteDto, PaginationMeta, QUOTE_STATUS_LABELS } from '@frontend/shared-models';
 import { QuoteListItem } from '../quotes.model';
 
 function toQuoteDto(item: QuoteListItem): QuoteDto {
@@ -97,6 +97,23 @@ describe('QuotesListComponent', () => {
     expect(compiled.textContent).toContain('via gateway');
     expect(component.tableRows().length).toBe(MOCK_QUOTES.length);
     expect(compiled.textContent).toContain('Q-2026-0001');
+  });
+
+  it('renders the Status column as a quote status badge with friendly labels (H-CPQ-Q-002)', () => {
+    const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('tr.mat-mdc-row'));
+    expect(rows.length).toBeGreaterThan(0);
+    const badges = rows.map((r) => r.querySelector('app-status-badge')?.textContent?.trim());
+    expect(badges.every((b) => b !== undefined)).toBe(true);
+    const labels = Object.values(QUOTE_STATUS_LABELS);
+    for (const b of badges) expect(labels).toContain(b);
+  });
+
+  it('labels the status filter options in words but filters by the enum (H-CPQ-Q-002)', () => {
+    expect(component.statusOptions.map((o) => o.value)).toEqual(component.statuses);
+    expect(component.statusOptions.map((o) => o.label)).toEqual(
+      component.statuses.map((s) => QUOTE_STATUS_LABELS[s]),
+    );
+    expect(component.statusOptions[0]).toEqual({ value: 'DRAFT', label: 'Draft' });
   });
 
   it('filters by search term (name/number/customer) on loaded page', () => {
