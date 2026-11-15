@@ -141,6 +141,18 @@ describe('ApprovalsInboxComponent', () => {
     ]);
   });
 
+  // Approve and Reject open a dialog before anything is decided; screen readers announce that only
+  // when the button declares it (WAI-ARIA aria-haspopup="dialog"). Open quote navigates instead.
+  it('declares which row actions open a dialog', () => {
+    const popups = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('td button'))
+      .map((b) => [b.textContent?.trim(), b.getAttribute('aria-haspopup')]);
+    expect(popups.slice(0, 3)).toEqual([
+      [expect.stringContaining('Approve'), 'dialog'],
+      [expect.stringContaining('Reject'), 'dialog'],
+      [expect.stringContaining('Open quote'), null],
+    ]);
+  });
+
   it('openQuote navigates to quote detail', async () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     component.openQuote(7);
