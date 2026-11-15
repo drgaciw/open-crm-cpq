@@ -14,7 +14,7 @@ import { settleOverlays, expectNoSnackbar } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator } from '../../lib/fields.mjs';
 import { ensure } from '../fixtures.mjs';
 import { STAGES, stageLabel } from '../specs/deals.mjs';
-import { expectApiStage } from './deal-lifecycle.mjs';
+import { expectApiStage, expectWinRefused } from './deal-lifecycle.mjs';
 
 const API = '/api/v1/deals';
 const TRIGGER = 'Deal stage actions';
@@ -178,23 +178,26 @@ export async function runKanban(ctx, { kanban, detail }) {
       },
     },
     {
-      id: 'deals.kanban.menu.mark-won',
+      id: 'deals.kanban.menu.mark-won-requires-accepted-quote',
       run: async () => {
         await openBoard(page);
         await openCardMenu(page, deal);
         await withNativeDialog(page, { type: 'confirm', message: `Mark "${deal.name}" as Won?` },
           () => page.getByRole('menuitem', { name: 'Mark Won' }).click());
-        await expectApiStage(api, deal.id, 'WON');
-        await expectCardIn(page, deal, 'WON');
+        const note = await expectWinRefused(page, api, deal.id, 'NEGOTIATION');
+        await expectCardIn(page, deal, 'NEGOTIATION');
+        return note;
       },
     },
     {
+      // Closed cards (WON or LOST) have no menu; WON is unreachable without an accepted quote, so use LOST.
       id: 'deals.kanban.closed-card-has-no-menu',
       run: async () => {
+        await api.post(`${API}/${deal.id}/lose`, { reason: 'UAT closed-card check' });
         await openBoard(page);
-        await expectCardIn(page, deal, 'WON');
+        await expectCardIn(page, deal, 'LOST');
         if (await card(page, deal).getByRole('button', { name: TRIGGER, exact: true }).isVisible()) {
-          throw new Error('a WON card still offers the stage-actions menu');
+          throw new Error('a LOST card still offers the stage-actions menu');
         }
       },
     },

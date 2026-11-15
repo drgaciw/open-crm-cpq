@@ -25,18 +25,18 @@ const ALL = STAGES.map((s) => s.value);
 export const list = validateSpec({
   id: 'deals',
   path: '/deals',
-  heading: 'Deals',
-  subtitle: 'Track your sales pipeline',
+  heading: 'Opportunities',
+  subtitle: 'Track deals through the pipeline',
   backend: 'crm',
-  sidebar: 'Deals',
+  sidebar: 'Opportunities',
   // deal-list.component.ts renders "Search opportunities..." (matches the page title
   // "Opportunities" and docs/design/UI-CRM-SLDS-design-contract.md — "Opportunities (deals)").
   // "Search deals..." never matched the live input and silently broke every list check that
   // locates the search box by this placeholder (search/clear/row-click/tabs/row-menu/etc).
   searchPlaceholder: 'Search opportunities...',
   actions: [
-    { name: 'Kanban', in: 'header', navigatesTo: '/deals/kanban' },
-    { name: 'New Deal', in: 'header', navigatesTo: '/deals/new' },
+    { name: 'Pipeline', in: 'header', navigatesTo: '/deals/kanban' },
+    { name: 'New opportunity', in: 'header', navigatesTo: '/deals/new' },
     // Row menu — the trigger's aria-label is the same "Deal actions" on every row (H-A11Y-003).
     { name: 'Edit', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, navigatesTo: '/deals/:id/edit' },
     { name: 'Advance Stage', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ADVANCEABLE },
@@ -48,14 +48,14 @@ export const list = validateSpec({
     { name: 'Delete', in: 'menu', menuTrigger: 'Deal actions', visibleWhen: ALL, confirm: { kind: 'native', message: /^Delete ".+"\?$/ } },
   ],
   tables: [{
-    columns: ['Deal Name', 'Amount', 'Stage', 'Probability', 'Close Date', 'Contact'],
-    sortable: ['Deal Name', 'Amount', 'Stage', 'Probability', 'Close Date'],
+    columns: ['Opportunity', 'Organization', 'Owner', 'Amount', 'Stage', 'Probability', 'Close Date', 'Contact'],
+    sortable: ['Opportunity', 'Amount', 'Stage', 'Probability', 'Close Date'],
     pageSizes: [10, 20, 50],
   }],
   emptyState: {
-    title: 'No deals yet',
-    message: 'Create your first deal or convert a lead.',
-    action: 'Create Deal',
+    title: 'No opportunities yet',
+    message: 'Create your first opportunity or convert a lead.',
+    action: 'Create opportunity',
   },
   forms: [{
     id: 'deal',
@@ -66,12 +66,12 @@ export const list = validateSpec({
     cancel: { name: 'Cancel' },
     serverError: 'snackbar',
     modes: {
-      create: { path: '/deals/new', heading: 'New Deal', submit: 'Create' },
-      edit: { heading: 'Edit Deal', submit: 'Update' },
+      create: { path: '/deals/new', heading: 'New opportunity', submit: 'Create' },
+      edit: { heading: 'Edit opportunity', submit: 'Update' },
     },
     fields: [
       {
-        label: 'Deal Name', kind: 'input', required: true, normalize: 'trim',
+        label: 'Name', kind: 'input', required: true, normalize: 'trim',
         sample: 'Sample deal', // replaced with a run-unique name by the CRUD runner
         persist: { create: true, update: true, apiPath: 'name' },
         validators: [{ kind: 'required', sample: '', expectError: 'Required' }],
@@ -135,7 +135,7 @@ export const detail = validateSpec({
     // There is no Delete on this page — H-CRM-025 (gap). Deals are deleted from the list row menu.
   ],
   cards: [
-    { title: 'Deal Information', labels: ['Amount', 'Probability', 'Expected Close', 'Created'] },
+    { title: 'Opportunity', labels: ['Amount', 'Probability', 'Expected Close', 'Created'] },
     { title: 'Relationships', emptyText: 'No linked contacts or organizations.' },
     { title: 'Lost Reason', optional: true },
     { title: 'Description', optional: true },
@@ -158,10 +158,10 @@ export const detail = validateSpec({
 export const kanban = validateSpec({
   id: 'deals.kanban',
   path: '/deals/kanban',
-  heading: 'Deal Pipeline',
+  heading: 'Opportunity pipeline',
   backend: 'crm',
   actions: [
-    { name: 'New Deal', in: 'header', navigatesTo: '/deals/new' },
+    { name: 'New opportunity', in: 'header', navigatesTo: '/deals/new' },
     { name: 'Back to deals list', in: 'header', ariaLabel: 'Back to deals list', navigatesTo: '/deals' },
     // Card menu — scope by card: the aria-label repeats on every open card. No drag-and-drop exists.
     { name: 'Advance Stage', in: 'card', menuTrigger: 'Deal stage actions', visibleWhen: ADVANCEABLE },
