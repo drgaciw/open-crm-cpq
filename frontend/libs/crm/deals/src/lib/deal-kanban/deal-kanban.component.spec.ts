@@ -229,6 +229,32 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(deals().find((row) => row.id === 2)?.stage).toBe('PROPOSAL');
   });
 
+  it('keeps the board visible when Mark Won is refused, with a dismiss-only banner (UAT 2026-11-14)', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    markWonSpy.mockReturnValueOnce(throwError(() => ({
+      errorCode: 'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE',
+    })));
+
+    component.onWin(deal({ id: 2, name: 'B', stage: 'PROPOSAL' }));
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.kanban-board')).toBeTruthy();
+    const banner = el.querySelector('.error-banner') as HTMLElement;
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.textContent).toContain('OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE');
+    // Retry reloads the board; it would not retry the refused win, so it is not offered here.
+    expect(banner.textContent).not.toContain('Retry');
+    // A refused action is not a load failure.
+    expect(error()).toBeNull();
+
+    const dismiss = Array.from(banner.querySelectorAll('button')).find((b) => b.textContent?.includes('Dismiss'));
+    dismiss?.click();
+    fixture.detectChanges();
+    expect(el.querySelector('.error-banner')).toBeNull();
+    expect(el.querySelector('.kanban-board')).toBeTruthy();
+  });
+
   it('onLose opens dialog and calls markLost with reason', () => {
     dialogOpen.mockReturnValueOnce({ afterClosed: () => of('Competitor') });
     listSpy.mockClear();
