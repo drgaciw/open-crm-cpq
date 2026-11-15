@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { computed, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { QuotesListComponent } from './quotes-list.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
@@ -122,6 +123,33 @@ describe('QuotesListComponent', () => {
 
     expect(component.tableRows().length).toBe(1);
     expect(component.tableRows()[0].quoteNumber).toBe('Q-2026-0003');
+  });
+
+  describe('column sorting (H-CPQ-Q-003)', () => {
+    function emitSort(active: string, direction: 'asc' | 'desc' | '') {
+      fixture.debugElement.query(By.css('app-data-table')).triggerEventHandler('sortChange', { active, direction });
+      fixture.detectChanges();
+    }
+
+    it('reloads page 0 from the API in the order the header asks for', () => {
+      listSpy.mockClear();
+      emitSort('name', 'desc');
+      expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'name,desc', { status: undefined, dealType: undefined });
+    });
+
+    it('keeps the chosen order when a filter changes', () => {
+      emitSort('totalAmount', 'asc');
+      listSpy.mockClear();
+      component.onStatusChange('DRAFT');
+      expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'totalAmount,asc', { status: 'DRAFT', dealType: undefined });
+    });
+
+    it('falls back to newest first when the sort is cleared', () => {
+      emitSort('name', 'asc');
+      listSpy.mockClear();
+      emitSort('name', '');
+      expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'createdAt,desc', { status: undefined, dealType: undefined });
+    });
   });
 
   it('forwards status and deal type filters to QuoteService.list', () => {
