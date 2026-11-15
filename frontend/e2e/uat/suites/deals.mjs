@@ -212,7 +212,10 @@ export default {
       const dto = await api.get(`${API}/${lost.id}`);
       if (dto.probability !== 0) throw new Error(`fixture problem: a LOST deal has probability ${dto.probability}, expected 0`);
       const row = await findRow(page, lost.name);
-      const inList = (await row.getByRole('cell').nth(3).innerText()).trim();
+      // Locate the Probability column by its header: DRG-750 reordered the columns.
+      const headers = (await page.locator('tr.mat-mdc-header-row th').allInnerTexts()).map((t) => t.trim());
+      const col = headers.findIndex((h) => h.startsWith('Probability'));
+      const inList = (await row.getByRole('cell').nth(col).innerText()).trim();
       await openDeal(page, lost, 'LOST');
       const info = (await scopeLocator(page, { kind: 'card', title: 'Opportunity' }).innerText()).replace(/\s+/g, ' ');
       const inDetail = info.match(/Probability\s*(\S+)/i)?.[1];
@@ -440,24 +443,20 @@ export default {
       }
     }, { hypothesis: 'H-CRM-039' });
 
-    // H-CRM-040: the edit form always sends `stage`, and the API rejects any update that carries a
-    // stage once the deal is WON/LOST — yet Edit is offered on closed deals. Uses a LOST deal:
-    // WON is unreachable without an accepted quote (WON_NEEDS_ACCEPTED_QUOTE).
-    await runCheck(ctx, 'deals.form.closed-deal-can-be-edited', async () => {
+    // H-CRM-040 (fixed): the API refuses any update to a WON/LOST deal, so the UI must not offer one.
+    // Uses a LOST deal: WON is unreachable without an accepted quote (WON_NEEDS_ACCEPTED_QUOTE).
+    await runCheck(ctx, 'deals.form.closed-deal-is-read-only', async () => {
       const closed = byStage.LOST;
-      await goto(page, `/deals/${closed.id}/edit`);
-      await waitUntil(() => readField(formScope(), field('Name')), (v) => v === closed.name, { describe: (v) => `Name holds "${v}"` });
-      await fillField(page, formScope(), field('Description'), 'Post-mortem note (UAT)');
-      const responded = page.waitForResponse((r) => r.url().endsWith(`${API}/${closed.id}`) && r.request().method() === 'PUT', { timeout: 8000 })
-        .catch(() => null);
-      await formScope().getByRole('button', { name: 'Update', exact: true }).click();
-      const response = await responded;
-      if (response && !response.ok()) {
-        const body = await response.text().catch(() => '');
-        await dismissSnackbars(page);
-        throw defect(`Edit is offered on a LOST deal, but changing only the description answers HTTP ${response.status()}: ${body.match(/"message":"([^"]+)"/)?.[1] ?? body.slice(0, 120)}`);
+      await openDeal(page, closed, 'LOST');
+      if (await page.getByRole('button', { name: 'Edit', exact: true }).count()) {
+        throw defect('Edit is offered on a LOST deal, which the API refuses to update');
       }
-      await page.waitForURL(DETAIL_URL, { timeout: 15000 });
+      await goto(page, `/deals/${closed.id}/edit`);
+      await page.getByText('This opportunity is closed and can no longer be edited.', { exact: true }).waitFor({ state: 'visible' });
+      if (await formScope().getByRole('button', { name: 'Update', exact: true }).isEnabled()) {
+        throw defect('the edit form of a LOST deal offers an enabled Update');
+      }
+      return 'no Edit on the LOST deal; its edit URL opens read-only with Update disabled';
     }, { hypothesis: 'H-CRM-040' });
 
     await runCheck(ctx, 'deals.form.close-date-persists', async () => {
