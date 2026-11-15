@@ -125,7 +125,13 @@ export class ProductService {
     return this.http.delete<void>(`${this.basePath}/${id}`);
   }
 
-  search(query: string, page = 0, size = 20, sort?: string): void {
+  search(
+    query: string,
+    page = 0,
+    size = 20,
+    sort?: string,
+    filters?: { category?: ProductCategory; status?: ProductStatus },
+  ): void {
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
@@ -134,6 +140,13 @@ export class ProductService {
       .set('size', size);
     if (sort) {
       params = params.set('sort', sort);
+    }
+    // DRG-754: the server applies the filters to the whole result set, not just this page.
+    if (filters?.category) {
+      params = params.set('category', filters.category);
+    }
+    if (filters?.status) {
+      params = params.set('status', filters.status);
     }
     this.http
       .get<SpringPageResponse<ProductDto>>(`${this.basePath}/search`, { params })

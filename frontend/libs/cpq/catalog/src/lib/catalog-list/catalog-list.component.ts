@@ -222,25 +222,8 @@ export class CatalogListComponent implements OnInit {
    * current search page (search API has no category/status params).
    */
   readonly tableRows = computed<CatalogTableRow[]>(() => {
-    const category = this.categoryFilter();
-    const status = this.statusFilter();
-    const searching = this.searchTerm().trim().length > 0;
-
-    return this.service
-      .products()
-      .filter((p) => {
-        if (!searching) {
-          return true;
-        }
-        if (category && p.category !== category) {
-          return false;
-        }
-        if (status && p.status !== status) {
-          return false;
-        }
-        return true;
-      })
-      .map((p) => this.toRow(p));
+    // DRG-754: search results arrive already filtered by category and status (server side).
+    return this.service.products().map((p) => this.toRow(p));
   });
 
   readonly isEmpty = computed(
@@ -311,8 +294,15 @@ export class CatalogListComponent implements OnInit {
   private reload(page = 0, size = this.service.pagination().size || 10): void {
     const q = this.searchTerm().trim();
     const sort = this.sort();
+    const category = this.categoryFilter();
+    const status = this.statusFilter();
     if (q) {
-      if (sort) {
+      if (category || status) {
+        this.service.search(q, page, size, sort ?? undefined, {
+          category: (category || undefined) as ProductCategory | undefined,
+          status: (status || undefined) as ProductStatus | undefined,
+        });
+      } else if (sort) {
         this.service.search(q, page, size, sort);
       } else {
         this.service.search(q, page, size);
@@ -320,8 +310,6 @@ export class CatalogListComponent implements OnInit {
       return;
     }
 
-    const category = this.categoryFilter();
-    const status = this.statusFilter();
     this.service.list(page, size, sort ?? 'name,asc', {
       category: (category || undefined) as ProductCategory | undefined,
       status: (status || undefined) as ProductStatus | undefined,
