@@ -8,6 +8,10 @@ export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../../node_modules/.vite/libs/shared/ui',
   plugins: [angular(), nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
+  // nxViteTsPaths is an inert stub in Nx 24; resolve @frontend/* aliases natively (as crm-* libs do).
+  resolve: {
+    tsconfigPaths: true,
+  },
   // Uncomment this if you are using workers.
   // worker: {
   //   plugins: () => [ nxViteTsPaths() ],

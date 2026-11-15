@@ -159,7 +159,7 @@ export class LeadListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'title', header: 'Title', sortable: true },
-    { key: 'status', header: 'Status', sortable: true },
+    { key: 'status', header: 'Status', sortable: true, type: 'badge', badgeType: 'lead' },
     { key: 'priority', header: 'Priority', sortable: true },
     { key: 'source', header: 'Source', sortable: true },
     { key: 'estimatedValue', header: 'Estimated Value', sortable: true },

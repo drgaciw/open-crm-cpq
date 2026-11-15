@@ -8,11 +8,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { PaginationMeta } from '@frontend/shared-models';
+import { StatusBadgeComponent, StatusType } from '../status-badge/status-badge.component';
 
 export interface TableColumn {
   key: string;
   header: string;
   type?: 'text' | 'number' | 'date' | 'currency' | 'badge';
+  /** For `type: 'badge'`: render the shared status badge for this status family. Omit to keep raw text. */
+  badgeType?: StatusType;
   sortable?: boolean;
 }
 
@@ -50,6 +53,7 @@ const ACTIONS_COLUMN_KEY = '__actions';
   standalone: true,
   imports: [
     CommonModule,
+    StatusBadgeComponent,
     MatTableModule,
     MatSortModule,
     MatPaginatorModule,
@@ -89,6 +93,13 @@ const ACTIONS_COLUMN_KEY = '__actions';
                   }
                   @case ('currency') {
                     {{ row[column.key] | currency }}
+                  }
+                  @case ('badge') {
+                    @if (column.badgeType && row[column.key] !== null && row[column.key] !== undefined) {
+                      <app-status-badge [status]="row[column.key]" [type]="column.badgeType" />
+                    } @else {
+                      {{ row[column.key] }}
+                    }
                   }
                   @default {
                     {{ row[column.key] }}
