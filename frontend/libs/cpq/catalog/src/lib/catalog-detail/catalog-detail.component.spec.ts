@@ -1,3 +1,4 @@
+import { CATALOG_PRODUCT_TYPE_LABELS, PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LABELS } from '@frontend/shared-models';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -265,6 +266,20 @@ describe('CatalogDetailComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Edit product');
     expect(compiled.textContent).toContain('Save');
+  });
+
+  // Found by the Jev + Playwright MCP UAT (2026-11-15): the edit form showed SAAS_SEAT_NAMED,
+  // SUBSCRIPTION and ACTIVE although the page header and list use labels.
+  it('edit form shows product type, category and status by their labels', async () => {
+    component.startEdit();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const shown = (label: string) => (fixture.nativeElement as HTMLElement)
+      .querySelector(`mat-select[aria-label="${label}"] .mat-mdc-select-value-text`)?.textContent?.trim();
+    expect(shown('Product type')).toBe(CATALOG_PRODUCT_TYPE_LABELS.SAAS_SEAT_NAMED);
+    expect(shown('Category')).toBe(PRODUCT_CATEGORY_LABELS.SUBSCRIPTION);
+    expect(shown('Status')).toBe(PRODUCT_STATUS_LABELS.ACTIVE);
   });
 
   it('saves via ProductService.update, stays on detail, and exits edit mode', () => {
