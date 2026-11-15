@@ -63,15 +63,27 @@ describe('DealFormComponent closed deals and calendar dates', () => {
     fixture.detectChanges();
   }
 
-  it('edit form of a closed opportunity says it cannot be edited and does not offer Update (H-CRM-040)', async () => {
+  it('edit form of a closed opportunity locks stage, amount and currency (H-CRM-040)', async () => {
     await setup('12');
-    loadDeal({ stage: 'LOST' });
+    loadDeal({ stage: 'LOST', amount: 5000, currency: 'USD', description: 'Lost on price' });
     await fixture.whenStable();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('This opportunity is closed and can no longer be edited.');
-    const submit = el.querySelector('button[type="submit"]') as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
+    expect(el.textContent).toContain('This opportunity is closed. Its stage, amount and currency can no longer change.');
+    for (const name of ['stage', 'amount', 'currency']) expect(control(name).disabled).toBe(true);
+    expect((el.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('saving a closed opportunity sends neither stage nor amount nor currency, which the API refuses (H-CRM-040)', async () => {
+    await setup('12');
+    loadDeal({ stage: 'LOST', amount: 5000, currency: 'USD' });
+    await fixture.whenStable();
+    control('description').setValue('Post-mortem note');
+    component.onSubmit();
+    expect(dealService.update).toHaveBeenCalledTimes(1);
+    const sent = dealService.update.mock.calls[0][1] as Record<string, unknown>;
+    expect(sent['description']).toBe('Post-mortem note');
+    for (const key of ['stage', 'amount', 'currency']) expect(sent[key]).toBeUndefined();
   });
 
   it('loads the stored close date as local midnight of that day (H-CRM-041)', async () => {

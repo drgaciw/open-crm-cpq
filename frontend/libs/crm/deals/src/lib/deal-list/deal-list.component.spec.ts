@@ -97,12 +97,11 @@ describe('DealListComponent action wiring', () => {
     expect(rows[0].querySelector('td.actions-cell button')?.getAttribute('aria-label')).toBe(`Actions for ${firstName}`);
   });
 
-  it('offers Edit only on open opportunities (H-CRM-040)', () => {
+  it('offers Edit on every opportunity, closed ones included (H-CRM-040, ADR-032 D-03)', () => {
     const edit = component.rowActions.find((a) => a.action === 'edit');
-    const visible = (stage: DealDto['stage']) => !edit?.visible || edit.visible({ stage } as unknown);
-    expect(visible('PROPOSAL')).toBe(true);
-    expect(visible('WON')).toBe(false);
-    expect(visible('LOST')).toBe(false);
+    for (const stage of ['PROPOSAL', 'WON', 'LOST'] as const) {
+      expect(!edit?.visible || edit.visible({ stage } as unknown)).toBe(true);
+    }
   });
 
   it('ngOnInit loads the deal list', () => {
