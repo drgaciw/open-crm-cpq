@@ -108,8 +108,8 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {
+        refuseUndecidable(currentRouting(approvalId));
         try {
-            refuseStaleDecision(approvalRoutingClient.getById(approvalId));
             RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.APPROVED, ApprovalState.APPROVED);
             log.info("Approval {} approved via routing for quote {} by {}",
@@ -122,8 +122,8 @@ public class ApprovalService {
 
     public ApprovalRequestDto rejectRequest(Long approvalId, ApprovalResponseRequest request) {
         String comments = request != null ? request.getComments() : null;
+        refuseUndecidable(currentRouting(approvalId));
         try {
-            refuseStaleDecision(approvalRoutingClient.getById(approvalId));
             RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.REJECTED, ApprovalState.REJECTED);
             log.info("Approval {} rejected via routing for quote {} by {}",
@@ -243,10 +243,24 @@ public class ApprovalService {
         quoteRepository.save(quote);
     }
 
-    private void refuseStaleDecision(RoutingApprovalDto remote) {
-        if (remote == null || remote.getPricingFingerprint() == null) return;
+    private RoutingApprovalDto currentRouting(Long approvalId) {
+        try {
+            return approvalRoutingClient.getById(approvalId);
+        } catch (ResourceNotFoundException ex) {
+            throw notInRouting(approvalId, ex);
+        }
+    }
+
+    /**
+     * Checks that a decision can be applied to the quote before approval-routing records it, so the two
+     * stores cannot diverge. A quote deleted while its approval was pending is refused here (UAT 2026-11-14:
+     * the decision used to be recorded in routing and then fail with 404).
+     */
+    private void refuseUndecidable(RoutingApprovalDto remote) {
+        if (remote == null) return;
         Quote quote = quoteRepository.findByIdAndDeletedFalse(parseQuoteId(remote.getQuoteId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", remote.getQuoteId()));
+        if (remote.getPricingFingerprint() == null) return;
         if (quote.isRampScheduleStale()
                 || !remote.getPricingFingerprint().equals(com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote))) {
             throw new BusinessException("Approval belongs to an older ramp pricing snapshot",
