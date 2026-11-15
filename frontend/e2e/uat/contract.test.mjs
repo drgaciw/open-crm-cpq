@@ -87,6 +87,12 @@ test('editOnly marks a field the create form does not render', () => {
   assert.throws(() => validateSpec(spec({ editOnly: true, sample: 'Prospecting' })), /editOnly/);
 });
 
+test('a card can name the tab it lives in', () => {
+  const spec = (card) => ({ ...minimal(), cards: [card] });
+  assert.ok(validateSpec(spec({ title: 'Quote details', tab: 'Pricing' })));
+  assert.throws(() => validateSpec(spec({ title: 'Quote details', tab: '' })), /tab/);
+});
+
 test('actions validate confirm kinds', () => {
   const spec = (kind) => ({
     ...minimal(),
