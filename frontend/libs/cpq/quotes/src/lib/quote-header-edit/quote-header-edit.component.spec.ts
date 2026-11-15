@@ -40,7 +40,7 @@ describe('quoteHeaderHttpErrorMessage', () => {
           errorCode: 'QUOTE_NOT_EDITABLE',
         },
       }),
-    ).toBe('Cannot edit quote in APPROVED status (QUOTE_NOT_EDITABLE)');
+    ).toBe('Cannot edit quote in APPROVED status [QUOTE_NOT_EDITABLE]');
   });
 
   it('appends errorCode from ApiError-shaped object', () => {
@@ -49,7 +49,7 @@ describe('quoteHeaderHttpErrorMessage', () => {
         message: 'Not editable',
         errorCode: 'QUOTE_NOT_EDITABLE',
       }),
-    ).toBe('Not editable (QUOTE_NOT_EDITABLE)');
+    ).toBe('Not editable [QUOTE_NOT_EDITABLE]');
   });
 });
 
@@ -117,6 +117,15 @@ describe('QuoteHeaderEditComponent', () => {
     expect(el.textContent).not.toMatch(/\bEdit\b/);
     component.startEdit();
     expect(component.editing()).toBe(false);
+  });
+
+  it('offers Subscription type as a choice of the values the API accepts (H-CPQ-Q-009)', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Edit'))?.click();
+    fixture.detectChanges();
+    expect(el.querySelector('input[formcontrolname="subscriptionType"]')).toBeNull();
+    expect(el.querySelector('mat-select[formcontrolname="subscriptionType"]')).toBeTruthy();
+    expect(component.subscriptionTypes.map((t) => t.value)).toEqual(['SAAS', 'ONPREM', 'HYBRID']);
   });
 
   it('opens form on Edit and PUTs QuoteUpdateRequest without customer/status/money', () => {
