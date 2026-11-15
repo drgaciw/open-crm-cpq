@@ -163,6 +163,7 @@ function httpErrorMessage(err: unknown): string {
                 type="button"
                 (click)="onApprove(row)"
                 [disabled]="actionBusy()"
+                [attr.aria-label]="'Approve approval #' + row.id + ' for quote ' + row.quoteId"
               >
                 <mat-icon>check</mat-icon>
                 Approve
@@ -173,6 +174,7 @@ function httpErrorMessage(err: unknown): string {
                 type="button"
                 (click)="onReject(row)"
                 [disabled]="actionBusy()"
+                [attr.aria-label]="'Reject approval #' + row.id + ' for quote ' + row.quoteId"
               >
                 <mat-icon>close</mat-icon>
                 Reject
@@ -182,6 +184,7 @@ function httpErrorMessage(err: unknown): string {
                 type="button"
                 (click)="openQuote(row.quoteId)"
                 [disabled]="actionBusy()"
+                [attr.aria-label]="'Open quote ' + row.quoteId"
               >
                 <mat-icon>open_in_new</mat-icon>
                 Open quote
