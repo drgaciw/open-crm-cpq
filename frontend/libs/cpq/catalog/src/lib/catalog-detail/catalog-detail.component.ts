@@ -124,7 +124,7 @@ function httpErrorMessage(
               </button>
             }
             @if (product.status === 'ACTIVE' || product.status === 'DEPRECATED') {
-              <button mat-stroked-button color="warn" type="button" (click)="onRetire()" [disabled]="transitioning() || deleting()">
+              <button mat-stroked-button color="warn" type="button" (click)="onRetire()" [disabled]="transitioning() || deleting()" aria-haspopup="dialog">
                 <mat-icon>block</mat-icon> Retire
               </button>
             }

@@ -214,6 +214,7 @@ function httpErrorMessage(err: unknown): string {
               mat-menu-item
               type="button"
               (click)="onReject()"
+              aria-haspopup="dialog"
               [disabled]="!canApproveReject() || actionBusy()"
               [title]="
                 canApproveReject()
@@ -228,6 +229,7 @@ function httpErrorMessage(err: unknown): string {
               mat-menu-item
               type="button"
               (click)="onExpire()"
+              aria-haspopup="dialog"
               [disabled]="!canExpire() || actionBusy()"
               [title]="
                 canExpire()
@@ -242,6 +244,7 @@ function httpErrorMessage(err: unknown): string {
               mat-menu-item
               type="button"
               (click)="onCancelQuote()"
+              aria-haspopup="dialog"
               [disabled]="!canCancel() || actionBusy()"
               [title]="
                 canCancel()
@@ -256,6 +259,7 @@ function httpErrorMessage(err: unknown): string {
               mat-menu-item
               type="button"
               (click)="onClone()"
+              aria-haspopup="dialog"
               [disabled]="actionBusy()"
               title="Clone header and line items into a new DRAFT. Run Calculate for waterfall/ARR."
             >
@@ -266,6 +270,7 @@ function httpErrorMessage(err: unknown): string {
               mat-menu-item
               type="button"
               (click)="onDelete()"
+              aria-haspopup="dialog"
               [disabled]="!canDelete() || actionBusy()"
               [title]="
                 canDelete()
