@@ -448,9 +448,11 @@ export default {
           await scope.getByRole('button', { name: 'Create', exact: true }).click();
           await banner(scope).waitFor({ state: 'visible' });
           const text = squash(await banner(scope).innerText()).replace(/^error_outline\s*/, '');
-          await expectSnackbar(page, `Product ${entry.product} already exists`);
+          // Entries are effective-dated: a second entry for the same SKU / currency / unit is refused
+          // only when its range overlaps an existing one (OVERLAPPING_PRICE_BOOK_ENTRY_RANGE).
+          await expectSnackbar(page, `An entry for SKU ${entry.product} / USD / EACH already covers an overlapping effective date range`);
           await scope.getByRole('button', { name: 'Cancel', exact: true }).click();
-          if (!text.endsWith('[DUPLICATE_PRICE_BOOK_ENTRY]')) throw new Error(`banner reads "${text}"`);
+          if (!text.endsWith('[OVERLAPPING_PRICE_BOOK_ENTRY_RANGE]')) throw new Error(`banner reads "${text}"`);
           return text;
         },
       },

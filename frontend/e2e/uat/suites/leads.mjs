@@ -161,7 +161,8 @@ export default {
       const row = await findRow(page, full.title);
       const badge = (await row.getByRole('cell').nth(1).innerText()).trim();
       await openLead(page, full);
-      const chip = (await page.locator('.detail-header mat-chip').first().innerText()).trim();
+      // H-CRM-020 fix: the detail header uses the shared status badge, as the list does.
+      const chip = (await page.locator('.detail-header app-status-badge').first().innerText()).trim();
       if (chip !== badge) throw defect(`list badge says "${badge}" but the detail chip says "${chip}"`);
       return `"${chip}" on both`;
     }, { hypothesis: 'H-CRM-020' });
