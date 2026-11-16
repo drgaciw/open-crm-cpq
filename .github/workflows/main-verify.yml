@@ -5,9 +5,9 @@
 # requests (#612, #615) merged and main stopped compiling (DRG-613). This workflow runs the same
 # Docker-free stage on every push to main, so the combined head gets a result.
 #
-# Bursts of merges cancel earlier runs: only the newest head of main is verified, which costs one
-# run per burst instead of one per merge. If it fails, bisect the burst it covered.
 # Concurrency is scoped by ref so a manual feature-branch or tag run cannot cancel main.
+# In-progress runs cancel only for pull_request events. This workflow is push and
+# workflow_dispatch, so a burst of merges queues instead of dropping an older main run.
 #
 # The full matrix (integration, frontend, cpq_beta, security audit) runs nightly from ci.yml.
 #
@@ -25,12 +25,12 @@ permissions:
 
 concurrency:
   group: main-verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend-unit:
     name: Backend Unit (main)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -54,13 +54,18 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+      - name: Remove Testcontainers containers and networks
+        if: always()
+        run: |
+          docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
+          docker network ls -q --filter label=org.testcontainers=true | xargs -r docker network rm
 
   report:
     name: Report main status
     needs: backend-unit
     # Cancelled runs say nothing about main; manual runs on other refs are not main.
     if: ${{ always() && github.ref == 'refs/heads/main' && (needs.backend-unit.result == 'success' || needs.backend-unit.result == 'failure') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -71,3 +76,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/report-main-status.sh "${{ needs.backend-unit.result }}"
+      - name: Remove Testcontainers containers and networks
+        if: always()
+        run: |
+          docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
+          docker network ls -q --filter label=org.testcontainers=true | xargs -r docker network rm
