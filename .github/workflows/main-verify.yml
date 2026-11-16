@@ -58,6 +58,7 @@ jobs:
         with:
           java-version: '25'
           distribution: temurin
+          overwrite-settings: false
       - name: CI contract drift check
         run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
       - name: Fast unit verification
