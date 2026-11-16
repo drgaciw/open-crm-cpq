@@ -7,9 +7,9 @@
 # and the nightly ci.yml, so a lockfile or Nx break is caught before merge.
 # Jenkins stays the primary CI and still owns integration and the AI assist stages.
 #
-# This repository is public, so fork pull requests can trigger this workflow. runs-on sends
-# those jobs to ubuntu-latest. Same-repo PRs use CPQ_RUNS_ON, which defaults to the
-# self-hosted labels when the variable is unset. Check names stay on these jobs.
+# Every pull_request job runs on GitHub-hosted ubuntu-latest, fork or same-repo. This workflow
+# has no self-hosted path: a pull request can replace a runs-on expression in its own YAML, so
+# the hosted runner is a literal, not a condition. Check names stay on these jobs.
 name: PR check
 
 on:
@@ -26,10 +26,12 @@ concurrency:
 jobs:
   backend-unit:
     name: Backend Unit (PR gate)
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
@@ -50,18 +52,15 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
-      - name: Remove Testcontainers containers and networks
-        if: always()
-        run: |
-          docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
-          docker network ls -q --filter label=org.testcontainers=true | xargs -r docker network rm
 
   frontend:
     name: Frontend (PR gate)
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
@@ -69,18 +68,15 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build, lint, test
         run: bash scripts/ci/run-core.sh frontend
-      - name: Remove Testcontainers containers and networks
-        if: always()
-        run: |
-          docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
-          docker network ls -q --filter label=org.testcontainers=true | xargs -r docker network rm
 
   frontend-npm-audit:
     name: Frontend npm audit (PR gate)
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
@@ -89,8 +85,3 @@ jobs:
       - name: npm audit (high)
         working-directory: frontend
         run: npm ci && npm audit --audit-level=high
-      - name: Remove Testcontainers containers and networks
-        if: always()
-        run: |
-          docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
-          docker network ls -q --filter label=org.testcontainers=true | xargs -r docker network rm
