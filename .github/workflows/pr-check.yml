@@ -5,6 +5,9 @@
 # (ADR-016, ADR-018) run on every pull request even while no Jenkins instance is reachable.
 # The frontend job (ADR-003 section 7, amendment 2026-11-10) runs the same frontend stage as Jenkins
 # and the nightly ci.yml, so a lockfile or Nx break is caught before merge.
+# Backend Unit also runs scripts/ci/check-flyway-order.sh (DRG-774). That step fails the required
+# Backend Unit (PR gate) check when the PR adds a versioned migration at or below the highest
+# version already on the base branch, or when a module has two migrations with the same version.
 # Jenkins stays the primary CI and still owns integration and the AI assist stages.
 name: PR check
 
@@ -26,6 +29,24 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch base ref
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$BASE_REF" in
+            ''|*[!A-Za-z0-9._/-]*)
+              echo "Refusing base ref" >&2
+              exit 1
+              ;;
+          esac
+          git fetch --no-tags --depth=1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+      - name: Flyway migration order
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/ci/check-flyway-order.sh "origin/${BASE_REF}"
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
