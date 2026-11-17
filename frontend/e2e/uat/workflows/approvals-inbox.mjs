@@ -235,30 +235,38 @@ export async function runInboxRows(ctx) {
       timeoutMs: 8000, intervalMs: 250, describe: () => 'request is still pending after Reject',
     });
 
-  // Found by UAT 2026-11-14: deleting a quote in PENDING_APPROVAL leaves its approval in the inbox.
-  // Deciding it used to record the decision in approval-routing and then fail with 404; now it is
-  // refused first and the request stays pending. Whether delete should be refused is DRG-758.
-  await runCheck(ctx, 'approvals.orphan.decision-refused-before-routing', async () => {
+    return `approval #${request.id} rejected`;
+  });
+
+  // DRG-758: a live pending quote cannot be used to manufacture a historical orphan.
+  // Historical orphan decisions remain covered by ApprovalServiceSingleWriterTest.
+  await runCheck(ctx, 'approvals.pending.delete-refused-keeps-request', async () => {
     if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') throw blocked(NO_ROWS);
     const { quote } = await draftWithLine(ctx);
     await api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
     const request = asRows(await api.get(PENDING)).find((r) => r.quoteId === quote.id);
     if (!request) throw blocked(`the approval routed for quote ${quote.id} is not pending`);
-    await api.del(`/api/v1/quotes/${quote.id}`);
-    api.untrack('quote', quote.id);
+    const before = await api.get(`/api/v1/quotes/${quote.id}`);
+    let refusal;
+    try {
+      await api.del(`/api/v1/quotes/${quote.id}`);
+    } catch (error) {
+      refusal = error;
+    }
+    if (refusal?.status !== 409 || JSON.parse(refusal.body).errorCode !== 'QUOTE_APPROVAL_PENDING') {
+      throw defect(`pending quote delete must return 409 QUOTE_APPROVAL_PENDING: ${refusal?.message ?? 'delete succeeded'}`);
+    }
+    const after = await api.get(`/api/v1/quotes/${quote.id}`);
+    const pending = asRows(await api.get(PENDING)).find((r) => r.id === request.id);
+    if (JSON.stringify(before) !== JSON.stringify(after) || JSON.stringify(request) !== JSON.stringify(pending)) {
+      throw defect('refused deletion changed the quote or its original pending approval');
+    }
     await openInbox(page);
     const row = rowFor(page, request);
-    await rowButton(row, 'Approve', request).click();
-    await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
-    const banner = page.getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' });
-    await banner.waitFor({ state: 'visible', timeout: 8000 });
-    const said = (await banner.innerText()).replace(/\s+/g, ' ').trim();
-    if (!(await stillPending(api, request.id))) {
-      throw defect(`approval-routing recorded the decision on #${request.id} although quote ${quote.id} is deleted; the UI said "${said}"`);
-    }
     await row.waitFor({ state: 'visible' });
-    return `approval #${request.id} stays pending; banner "${said.slice(0, 80)}"`;
-  });
-    return `approval #${request.id} rejected`;
+    await row.getByRole('link', { name: `Quote ${request.quoteId}`, exact: true }).click();
+    await page.waitForURL((url) => url.pathname === `/quotes/${request.quoteId}`);
+    // Keep the quote tracked: teardown reports pending residue rather than hiding/cancelling it.
+    return `quote ${quote.id} and approval #${request.id} unchanged after refused delete`;
   });
 }

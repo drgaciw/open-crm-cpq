@@ -121,7 +121,11 @@ public class QuoteController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Delete a quote")
+    @Operation(summary = "Delete a quote", description = "Soft-delete an eligible quote. "
+            + "PENDING_APPROVAL returns 409 QUOTE_APPROVAL_PENDING without mutation; "
+            + "ACCEPTED retains 400 QUOTE_ACCEPTED_NO_DELETE.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409",
+            description = "QUOTE_APPROVAL_PENDING: Cannot delete a quote while approval is pending")
     public void delete(@PathVariable Long id) {
         quoteService.delete(id);
     }

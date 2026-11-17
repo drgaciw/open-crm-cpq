@@ -933,6 +933,29 @@ describe('QuotesDetailComponent', () => {
     );
   });
 
+  it('explains pending approval delete refusal and retains the quote on detail', () => {
+    selectedQuote.update((quote) => quote ? { ...quote, status: 'PENDING_APPROVAL' } : quote);
+    const before = selectedQuote();
+    deleteSpy.mockReturnValueOnce(throwError(() => ({
+      status: 409,
+      error: {
+        message: 'Cannot delete a quote while approval is pending',
+        errorCode: 'QUOTE_APPROVAL_PENDING',
+      },
+    })));
+
+    component.onDelete();
+    fixture.detectChanges();
+
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(component.actionBusy()).toBe(false);
+    expect(selectedQuote()).toBe(before);
+    expect(router.navigate).not.toHaveBeenCalledWith(['/quotes']);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Cannot delete a quote while approval is pending [QUOTE_APPROVAL_PENDING]',
+    );
+  });
+
   it('renders documents panel, header edit, and clone note (lines copied; Calculate required)', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('cpq-quote-header-edit')).toBeTruthy();
