@@ -11,6 +11,7 @@ import { runCheck, runSteps, defect, blocked, gap, waitUntil } from '../../lib/h
 import { confirmMatDialog } from '../../lib/dialogs.mjs';
 import { inbox } from '../specs/approvals.mjs';
 import { draftWithLine } from './quote-lifecycle.mjs';
+import { pendingDeleteRefusal } from './pending-delete.mjs';
 
 const PENDING = '/api/v1/quotes/approvals/pending';
 const NO_ROWS = 'no pending approval exists, and none could be routed (approval-routing or price book down)';
@@ -238,35 +239,9 @@ export async function runInboxRows(ctx) {
     return `approval #${request.id} rejected`;
   });
 
-  // DRG-758: a live pending quote cannot be used to manufacture a historical orphan.
   // Historical orphan decisions remain covered by ApprovalServiceSingleWriterTest.
-  await runCheck(ctx, 'approvals.pending.delete-refused-keeps-request', async () => {
-    if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') throw blocked(NO_ROWS);
-    const { quote } = await draftWithLine(ctx);
-    await api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
-    const request = asRows(await api.get(PENDING)).find((r) => r.quoteId === quote.id);
-    if (!request) throw blocked(`the approval routed for quote ${quote.id} is not pending`);
-    const before = await api.get(`/api/v1/quotes/${quote.id}`);
-    let refusal;
-    try {
-      await api.del(`/api/v1/quotes/${quote.id}`);
-    } catch (error) {
-      refusal = error;
-    }
-    if (refusal?.status !== 409 || JSON.parse(refusal.body).errorCode !== 'QUOTE_APPROVAL_PENDING') {
-      throw defect(`pending quote delete must return 409 QUOTE_APPROVAL_PENDING: ${refusal?.message ?? 'delete succeeded'}`);
-    }
-    const after = await api.get(`/api/v1/quotes/${quote.id}`);
-    const pending = asRows(await api.get(PENDING)).find((r) => r.id === request.id);
-    if (JSON.stringify(before) !== JSON.stringify(after) || JSON.stringify(request) !== JSON.stringify(pending)) {
-      throw defect('refused deletion changed the quote or its original pending approval');
-    }
-    await openInbox(page);
-    const row = rowFor(page, request);
-    await row.waitFor({ state: 'visible' });
-    await row.getByRole('link', { name: `Quote ${request.quoteId}`, exact: true }).click();
-    await page.waitForURL((url) => url.pathname === `/quotes/${request.quoteId}`);
-    // Keep the quote tracked: teardown reports pending residue rather than hiding/cancelling it.
-    return `quote ${quote.id} and approval #${request.id} unchanged after refused delete`;
+  // The role-separated browser check uses the narrow runner; a single dev session is BLOCKED.
+  await runCheck(ctx, 'approvals.pending.delete-refused-keeps-request', () => pendingDeleteRefusal(ctx), {
+    expectedErrors: ['409 (Conflict)'],
   });
 }
