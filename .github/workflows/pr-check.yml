@@ -6,6 +6,10 @@
 # The frontend job (ADR-003 section 7, amendment 2026-11-10) runs the same frontend stage as Jenkins
 # and the nightly ci.yml, so a lockfile or Nx break is caught before merge.
 # Jenkins stays the primary CI and still owns integration and the AI assist stages.
+#
+# Every pull_request job runs on GitHub-hosted ubuntu-latest, fork or same-repo. This workflow
+# has no self-hosted path: a pull request can replace a runs-on expression in its own YAML, so
+# the hosted runner is a literal, not a condition. Check names stay on these jobs.
 name: PR check
 
 on:
@@ -26,6 +30,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
@@ -53,6 +59,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
@@ -67,6 +75,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
