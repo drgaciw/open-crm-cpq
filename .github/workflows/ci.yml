@@ -2,6 +2,11 @@
 # (see docs/ci-jenkins-cutover.md). Push/PR triggers stay disabled (Option B cutover); the nightly
 # schedule exists because no Jenkins instance is reachable, so integration and frontend stages
 # otherwise never run (ADR-003 section 8, amendment 2026-10-16).
+#
+# Self-hosted labels (CPQ_RUNS_ON, default ["self-hosted","linux","cpq"]) apply only to the
+# nightly schedule when github.ref is refs/heads/main. workflow_dispatch, pull_request, push,
+# and any other ref use ubuntu-latest. Testcontainers 1.21 stamps a per-JVM session id and
+# Ryuk reaps that session only. Jobs do not remove other runs' containers.
 name: CI (manual fallback)
 
 on:
@@ -11,19 +16,39 @@ on:
 
 permissions:
   contents: read
-  actions: write
+
+# Schedule and workflow_dispatch only. In-progress main runs are not cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   shared-libraries:
     name: Shared Libraries (Maven)
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
-          cache: maven
+          overwrite-settings: false
       # Manual fallback has no Toolchain job; mirror blocking non-AI drift gate (ADR-003).
       - name: CI contract drift check
         run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
@@ -40,17 +65,42 @@ jobs:
           path: backend/libs/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   backend-unit:
     name: Backend Unit (Maven)
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
-          cache: maven
+          overwrite-settings: false
       - name: Fast unit verification
         run: bash scripts/ci/run-core.sh backend-unit
       - name: Name failing tests
@@ -64,18 +114,43 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   backend-integration:
     name: Backend Integration (Testcontainers)
-    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
     needs: [shared-libraries, backend-unit]
+    permissions:
+      contents: read
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
-          cache: maven
+          overwrite-settings: false
       - name: Full Docker-backed verification
         run: bash scripts/ci/run-core.sh backend-integration
       - name: Name failing tests
@@ -89,23 +164,71 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   cpq-beta-python:
     name: CPQ Beta (Python / Frappe)
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.15'
       - name: Run Python tests
         run: bash scripts/ci/run-core.sh cpq-beta-python
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   frontend:
     name: Frontend (Angular / NX)
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
@@ -113,12 +236,37 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build, lint, test
         run: bash scripts/ci/run-core.sh frontend
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   security-audit:
     name: Dependency Security Audit
-    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.3'
@@ -126,11 +274,11 @@ jobs:
         with:
           java-version: '25'
           distribution: temurin
-          cache: maven
+          overwrite-settings: false
       - name: Cache OWASP dependency-check NVD data
         uses: actions/cache@v4
         with:
-          path: ~/.m2/repository/org/owasp/dependency-check-data
+          path: ${{ runner.temp }}/m2/org/owasp/dependency-check-data
           key: owasp-dependency-check-data-${{ runner.os }}-${{ hashFiles('backend/pom.xml') }}
           restore-keys: |
             owasp-dependency-check-data-${{ runner.os }}-
@@ -146,20 +294,51 @@ jobs:
         continue-on-error: true
         working-directory: backend
         run: mvn -B org.owasp:dependency-check-maven:12.1.3:check
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   report:
     name: Report main status
     needs: [shared-libraries, backend-unit, backend-integration, cpq-beta-python, frontend, security-audit]
     # Only the nightly/manual run on main reports; a cancelled run says nothing about main.
     if: ${{ always() && github.ref == 'refs/heads/main' && !contains(needs.*.result, 'cancelled') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'schedule' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
       issues: write
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Open or close the main-red issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/report-main-status.sh "${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}"
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi

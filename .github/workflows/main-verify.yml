@@ -5,9 +5,14 @@
 # requests (#612, #615) merged and main stopped compiling (DRG-613). This workflow runs the same
 # Docker-free stage on every push to main, so the combined head gets a result.
 #
-# Bursts of merges cancel earlier runs: only the newest head of main is verified, which costs one
-# run per burst instead of one per merge. If it fails, bisect the burst it covered.
 # Concurrency is scoped by ref so a manual feature-branch or tag run cannot cancel main.
+# In-progress runs cancel only for pull_request events. This workflow is push and
+# workflow_dispatch, so a burst of merges queues instead of dropping an older main run.
+#
+# Self-hosted labels (CPQ_RUNS_ON, default ["self-hosted","linux","cpq"]) apply only to a push
+# whose ref is refs/heads/main. workflow_dispatch and any other event or ref use ubuntu-latest.
+# Testcontainers 1.21 stamps a per-JVM session id and Ryuk reaps that session only.
+# This workflow does not remove other runs' containers.
 #
 # The full matrix (integration, frontend, cpq_beta, security audit) runs nightly from ci.yml.
 #
@@ -25,20 +30,35 @@ permissions:
 
 concurrency:
   group: main-verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend-unit:
     name: Backend Unit (main)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
+    env:
+      # Keep Ryuk on so a node-level disable cannot turn session reaping off.
+      # Maven and npm caches are set in the next step: runner context is not valid in job env.
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
-          cache: maven
+          overwrite-settings: false
       - name: CI contract drift check
         run: python3 .cursor/skills/ci-contract-drift-check/scripts/verify-drift.py
       - name: Fast unit verification
@@ -54,20 +74,51 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
 
   report:
     name: Report main status
     needs: backend-unit
     # Cancelled runs say nothing about main; manual runs on other refs are not main.
     if: ${{ always() && github.ref == 'refs/heads/main' && (needs.backend-unit.result == 'success' || needs.backend-unit.result == 'failure') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && fromJSON(vars.CPQ_RUNS_ON || '["self-hosted","linux","cpq"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
       issues: write
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'false'
     steps:
+      - name: Scope Maven and npm caches to this job
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2" "$RUNNER_TEMP/npm-cache"
+          if [ -n "${MAVEN_OPTS:-}" ]; then
+            echo "MAVEN_OPTS=${MAVEN_OPTS} -Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          else
+            echo "MAVEN_OPTS=-Dmaven.repo.local=${RUNNER_TEMP}/m2" >> "$GITHUB_ENV"
+          fi
+          echo "npm_config_cache=${RUNNER_TEMP}/npm-cache" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Open or close the main-red issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/report-main-status.sh "${{ needs.backend-unit.result }}"
+      - name: Wipe job workspace
+        if: always()
+        run: |
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
+          cd /
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
