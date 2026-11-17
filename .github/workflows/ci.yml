@@ -68,17 +68,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   backend-unit:
@@ -123,17 +117,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   backend-integration:
@@ -179,17 +167,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   cpq-beta-python:
@@ -219,17 +201,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   frontend:
@@ -263,17 +239,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   security-audit:
@@ -327,17 +297,11 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
 
   report:
@@ -372,15 +336,9 @@ jobs:
       - name: Wipe job workspace
         if: always()
         run: |
-          # Drop this job's _work checkout. Leave RUNNER_TEMP so cache post-steps can save.
+          # Remove checkout contents but keep the directory. Post-job actions start
+          # with GITHUB_WORKSPACE as their cwd, so deleting it fails cache saves.
           cd /
-          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
-            case "$GITHUB_WORKSPACE" in
-              */_work/*)
-                rm -rf "$(dirname "$GITHUB_WORKSPACE")"
-                ;;
-              *)
-                rm -rf "$GITHUB_WORKSPACE"
-                ;;
-            esac
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ] && [ "$GITHUB_WORKSPACE" != "/" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           fi
