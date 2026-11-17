@@ -6,10 +6,7 @@
 # The frontend job (ADR-003 section 7, amendment 2026-11-10) runs the same frontend stage as Jenkins
 # and the nightly ci.yml, so a lockfile or Nx break is caught before merge.
 # Jenkins stays the primary CI and still owns integration and the AI assist stages.
-#
-# Every pull_request job runs on GitHub-hosted ubuntu-latest, fork or same-repo. This workflow
-# has no self-hosted path: a pull request can replace a runs-on expression in its own YAML, so
-# the hosted runner is a literal, not a condition. Check names stay on these jobs.
+# flyway-order (DRG-774) is a separate hosted job. It is not a required check (NEEDS_OWNER).
 name: PR check
 
 on:
@@ -85,3 +82,31 @@ jobs:
       - name: npm audit (high)
         working-directory: frontend
         run: npm ci && npm audit --audit-level=high
+
+  # Hosted on every pull request. Not added to the Protect main ruleset.
+  flyway-order:
+    name: flyway-order
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch base ref
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          case "$BASE_REF" in
+            ''|*[!A-Za-z0-9._/-]*)
+              echo "Refusing base ref" >&2
+              exit 1
+              ;;
+          esac
+          git fetch --no-tags --depth=1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+      - name: Flyway migration order
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/ci/check-flyway-order.sh "origin/${BASE_REF}"
