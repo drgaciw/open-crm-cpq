@@ -92,6 +92,48 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
     return errors
 
 
+def pr_integration_errors(repo: Path, contract: str) -> list[str]:
+    """Validate the path-filtered integration workflow under github_pr_integration."""
+    match = re.search(
+        r"^github_pr_integration:\s*\n\s+workflow:\s*(\S+)",
+        contract,
+        re.MULTILINE,
+    )
+    if not match:
+        return []
+    rel = match.group(1)
+    path = repo / rel
+    if not path.is_file():
+        return [f"github_pr_integration workflow {rel} is missing"]
+    text = load_text(path)
+    errors: list[str] = []
+    if not re.search(r"^\s+pull_request:", text, re.MULTILINE):
+        errors.append(f"{rel} must trigger on pull_request")
+    if re.search(r"^\s+pull_request_target:", text, re.MULTILINE):
+        errors.append(f"{rel} must not use pull_request_target")
+    if re.search(r"^\s+push:", text, re.MULTILINE):
+        errors.append(f"{rel} must not trigger on push")
+    if "workflow_dispatch" in text:
+        errors.append(f"{rel} must not define workflow_dispatch")
+    if not gha_has_run_core(text, "backend-integration"):
+        errors.append(f"{rel} missing run-core.sh backend-integration")
+    if gha_has_ai_assist(text):
+        errors.append(f"{rel} must not reference ai-assist (Jenkins-only per ADR-003)")
+    if "ubuntu-latest" not in text:
+        errors.append(f"{rel} must run on ubuntu-latest")
+    if "contents: read" not in text:
+        errors.append(f"{rel} must set contents: read")
+    if "persist-credentials: false" not in text:
+        errors.append(f"{rel} must set persist-credentials: false")
+    if "cancel-in-progress: true" not in text:
+        errors.append(f"{rel} must cancel in progress")
+    if "timeout-minutes:" not in text:
+        errors.append(f"{rel} must set timeout-minutes")
+    if "paths:" not in text:
+        errors.append(f"{rel} must path-filter pull_request")
+    return errors
+
+
 def main_gate_errors(repo: Path, contract: str) -> list[str]:
     """Validate the post-merge gate declared under github_main_gate (ADR-003 section 8)."""
     m = re.search(r"^github_main_gate:\s*\n\s+workflow:\s*(\S+)", contract, re.MULTILINE)
@@ -240,6 +282,7 @@ def main() -> int:
         errors.append("GHA workflow must not reference ai-assist (Jenkins-only per ADR-003)")
 
     errors.extend(pr_gate_errors(repo, contract))
+    errors.extend(pr_integration_errors(repo, contract))
     errors.extend(main_gate_errors(repo, contract))
     errors.extend(nightly_schedule_errors(contract, gha))
 

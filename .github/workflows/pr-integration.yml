@@ -1,0 +1,58 @@
+# Path-filtered integration on pull requests (DRG-774).
+#
+# Runs the same Docker-backed command as the nightly ci.yml backend-integration
+# job (bash scripts/ci/run-core.sh backend-integration) when a pull request
+# touches migrations, integration tests, test resources, or a pom.
+#
+# pull_request only. Never pull_request_target: that event runs the base
+# workflow with repository credentials.
+#
+# This workflow is not a required status check. Whether it becomes one, and
+# the hosted-minute cost, is drg's decision. ci.yml and main-verify.yml are
+# not edited here (draft #1006 owns those files).
+name: PR integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/db/migration/**"
+      - "**/*IntegrationTest.java"
+      - "**/src/test/resources/**"
+      - "**/pom.xml"
+      - "pom.xml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-integration-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend-integration:
+    name: Backend Integration (PR path filter)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+      - name: Full Docker-backed verification
+        run: bash scripts/ci/run-core.sh backend-integration
+      - name: Name failing tests
+        if: failure()
+        run: python3 scripts/ci/report-test-failures.py
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-integration-test-reports
+          path: backend/**/target/surefire-reports/*.xml
+          if-no-files-found: ignore
+          retention-days: 7

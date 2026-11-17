@@ -181,6 +181,35 @@ github_pr_gate:
     The repository is private and its plan offers no
     branch protection, so merging on a green check is procedural (gh pr checks --watch).
 
+# Path-filtered pull-request integration (DRG-774). Not a required status check.
+# The required-check decision and the hosted-minute cost belong to drg.
+# Does not change ci.yml, main-verify.yml, or the Jenkinsfile.
+github_pr_integration:
+  workflow: .github/workflows/pr-integration.yml
+  role: pull_request_path_filtered_integration
+  required_check: false
+  trigger:
+    pull_request_branches: [main]
+    paths:
+      - "**/db/migration/**"
+      - "**/*IntegrationTest.java"
+      - "**/src/test/resources/**"
+      - "**/pom.xml"
+      - "pom.xml"
+  job: backend-integration
+  job_name: Backend Integration (PR path filter)
+  runs_on: ubuntu-latest
+  timeout_minutes: 60
+  permissions:
+    contents: read
+  runs:
+    - bash scripts/ci/run-core.sh backend-integration
+  ai_assist: false
+  notes: >-
+    Same Docker-backed command as ci.yml backend-integration. Runs on ubuntu-latest
+    for pull_request only, with persist-credentials false and cancel-in-progress.
+    Not added to the Protect main branch ruleset.
+
 # Post-merge gate on main (ADR-003 section 8, 2026-10-16). Verifies the combined head after merges.
 github_main_gate:
   workflow: .github/workflows/main-verify.yml
@@ -248,7 +277,7 @@ drift_prevention:
     - Update this file when adding/removing Jenkins stages or GHA manual jobs.
     - Do not re-enable push/pull_request triggers on ci.yml without updating docs/ci-jenkins-cutover.md.
     - ci.yml on.schedule cron must match github_actions.trigger.schedule_cron.
-    - The automatic GHA workflows are pr-check.yml (github_pr_gate, pull_request only), main-verify.yml (github_main_gate, push to main only) and the nightly schedule on ci.yml; the two gates must call run-core.sh backend-unit and verify-drift.py, and none may reference ai-assist.
+    - The automatic GHA workflows are pr-check.yml (github_pr_gate, pull_request only), pr-integration.yml (github_pr_integration, pull_request path filter, not a required check), main-verify.yml (github_main_gate, push to main only) and the nightly schedule on ci.yml; the two gates must call run-core.sh backend-unit and verify-drift.py, pr-integration.yml must call run-core.sh backend-integration and must not use pull_request_target, and none may reference ai-assist.
     - backend-integration must depend only on shared-libraries and backend-unit in GHA needs (manual fallback).
     - Do not point ai-assist LLM_ENDPOINT at ai-service:8086 (product AgentRouter, not chat API).
     - ai-assist stages must not be added to .github/workflows/ci.yml without ADR amendment.
