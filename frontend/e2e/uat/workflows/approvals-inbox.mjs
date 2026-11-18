@@ -1,3 +1,4 @@
+import { approvalSubmitBody } from '../../lib/approval-submit.mjs';
 /**
  * Approvals inbox workflows: Refresh, table-or-empty-state, and the per-row Approve / Reject /
  * Open quote flows.
@@ -29,7 +30,7 @@ export async function ensurePendingApprovals(ctx) {
   if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') return pending;
   for (let i = pending; i < SEEDED; i += 1) {
     const { quote } = await draftWithLine(ctx);
-    await ctx.api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
+    await ctx.api.post(`/api/v1/quotes/${quote.id}/approvals`, await approvalSubmitBody((path) => ctx.api.get(path), quote.id, 'DEAL_DESK'));
   }
   return (await decidableRows(ctx.api)).length;
 }

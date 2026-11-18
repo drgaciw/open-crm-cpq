@@ -1,3 +1,4 @@
+import { approvalSubmitBody } from '../../lib/approval-submit.mjs';
 import assert from 'node:assert/strict';
 import { BASE, goto } from '../../lib/browser.mjs';
 import { blocked } from '../../lib/health.mjs';
@@ -36,7 +37,7 @@ export async function pendingDeleteRefusal(ctx, { seed = draftWithLine } = {}) {
   assert.ok(quote.name.startsWith(`UAT-${ctx.runId}-`), 'only this run’s synthetic quote may be used');
   const path = `/api/v1/quotes/${quote.id}`;
   // Submit returns the canonical routing id (ApprovalService.submitForApproval single-writer contract).
-  const original = await api.post(`${path}/approvals`, { tier: 'DEAL_DESK' });
+  const original = await api.post(`${path}/approvals`, await approvalSubmitBody((path) => api.get(path), quote.id, 'DEAL_DESK'));
   assert.ok(original.id != null, 'submit must return its canonical routing ID');
   assert.equal(String(original.quoteId), String(quote.id));
   assert.equal(original.status, 'PENDING');

@@ -43,8 +43,8 @@ function fixture(options = {}) {
   const ctx = { base, isolatedFixtures: true, runId: 'test', sellerActor: 'seller-id', approverActor: 'approver-id', page: page('seller'),
     preflight: Object.fromEntries(['quote', 'product', 'pricing', 'pricebook', 'approvalsBff'].map((key) => [key, { state: 'up' }])),
     api: {
-      async post() { steps.push('submit'); return { ...original, requestedBy: options.requestedBy ?? 'seller-id' }; },
-      async get() { return { id: 7, status: 'PENDING_APPROVAL', deleted: ++quoteReads > 1 && !!options.quoteChanged }; },
+      async post(path, body) { assert.deepEqual(body, { tier: 'DEAL_DESK', expectedVersion: 4 }); steps.push('submit'); return { ...original, requestedBy: options.requestedBy ?? 'seller-id' }; },
+      async get() { return { id: 7, status: 'PENDING_APPROVAL', version: 4, deleted: ++quoteReads > 2 && !!options.quoteChanged }; },
       async del() { throw new Error('API delete must never replace the browser action'); },
     },
     approver: { page: page('approver'), api: { async get() {

@@ -1,3 +1,4 @@
+import { approvalSubmitBody } from '../../frontend/e2e/lib/approval-submit.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
@@ -419,7 +420,7 @@ async function runHybridAcceptance(baseQuote, book, runId) {
   const pending = rows.find((row) => row.status === 'PENDING');
   assert.equal(pending.approvalTier, 'DEAL_DESK');
   await request(`/api/v1/quotes/${quote.id}/submit`, { method: 'POST', body: {} });
-  await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: { tier: 'DEAL_DESK' } });
+  await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: await approvalSubmitBody(request, quote.id, 'DEAL_DESK') });
   await request(`/api/v1/quotes/approvals/${pending.id}/approve`, { method: 'POST', body: {}, status: 403, code: 'APPROVER_ROLE_REQUIRED' });
   await request(`/api/v1/quotes/approvals/${pending.id}/approve`, { method: 'POST', body: {}, token: vp() });
   await request(`/api/v1/quotes/${quote.id}/send`, { method: 'POST', body: {} });
@@ -525,7 +526,7 @@ async function runLifecycleAcceptance() {
   const inReview = await request(`/api/v1/quotes/${quote.id}/submit`, { method: 'POST', body: {} });
   assert.equal(inReview.status, 'IN_REVIEW');
   assert.ok(report.fixtureTokenClients.includes('ramp-acceptance-quote-service'), 'submit must obtain a service token for real CE preflight');
-  const submitted = await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: { tier: 'SALES_VP' } });
+  const submitted = await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: await approvalSubmitBody(request, quote.id, 'SALES_VP') });
   assert.equal(submitted.id, originalApproval.id);
   assert.equal((await request(`/api/v1/quotes/${quote.id}`)).status, 'PENDING_APPROVAL');
   mark('actual submit uses authenticated configuration-engine/product and enters PENDING_APPROVAL');
@@ -562,7 +563,7 @@ async function runLifecycleAcceptance() {
   const replacement = pending(replacementRows)[0];
   assert.notEqual(replacement.pricingFingerprint, originalApproval.pricingFingerprint);
   await request(`/api/v1/quotes/${quote.id}/submit`, { method: 'POST', body: {} });
-  const resubmitted = await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: { tier: 'SALES_VP' } });
+  const resubmitted = await request(`/api/v1/quotes/${quote.id}/approvals`, { method: 'POST', body: await approvalSubmitBody(request, quote.id, 'SALES_VP') });
   assert.equal(resubmitted.id, replacement.id);
   await request(`/api/v1/quotes/approvals/${replacement.id}/approve`, { method: 'POST', body: {}, status: 403, code: 'APPROVER_ROLE_REQUIRED' });
   const approval = await request(`/api/v1/quotes/approvals/${replacement.id}/approve`, { method: 'POST', body: {}, token: vp() });
