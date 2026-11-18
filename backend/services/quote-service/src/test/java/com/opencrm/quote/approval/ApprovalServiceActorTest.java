@@ -113,7 +113,7 @@ class ApprovalServiceActorTest {
         Quote quote = quote(QuoteStatus.DRAFT);
         quote.setVersion(0L);
         when(approvalRoutingClient.getById(1L)).thenReturn(RoutingApprovalDto.builder().id(1L)
-                .quoteId("42").status("PENDING").approvalTier("DEAL_DESK").build());
+                .quoteId("42").status("PENDING").approvalTier("DEAL_DESK").requesterId("rep-oid").build());
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(approvalRoutingClient.submit(any(RoutingApprovalSubmitRequest.class)))
                 .thenReturn(RoutingApprovalDto.builder().id(1L).quoteId("42").status("PENDING")

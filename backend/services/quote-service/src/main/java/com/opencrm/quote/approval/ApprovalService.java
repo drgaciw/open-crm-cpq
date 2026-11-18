@@ -129,21 +129,21 @@ public class ApprovalService {
         if (current == null || !remote.getId().equals(current.getId())
                 || !String.valueOf(quoteId).equals(current.getQuoteId())
                 || !request.getTier().name().equals(current.getApprovalTier())
-                || !"PENDING".equals(current.getStatus())) {
+                || !java.util.Set.of("PENDING", "APPROVED", "REJECTED").contains(current.getStatus())) {
             throw new BusinessException("Canonical approval changed; refresh before continuing",
                     HttpStatus.CONFLICT, "APPROVAL_SUBMISSION_STATE_CHANGED");
         }
         quote.setApprovalSubmissionId(remote.getId());
         quote.setApprovalSubmissionVersion(submissionVersion);
         // Single-writer: do NOT persist a local ApprovalRequest on submit.
-        quote.setStatus(QuoteStatus.PENDING_APPROVAL);
-        quote.setApprovalState(ApprovalState.PENDING);
+        quote.setStatus("PENDING".equals(current.getStatus()) ? QuoteStatus.PENDING_APPROVAL : QuoteStatus.valueOf(current.getStatus()));
+        quote.setApprovalState(ApprovalState.valueOf(current.getStatus()));
         quote.setApprovalTier(request.getTier().name());
         quoteRepository.save(quote);
 
         log.info("Quote {} submitted for {} approval (routing id={})",
                 quote.getQuoteNumber(), request.getTier(), remote.getId());
-        return toDtoFromRouting(remote);
+        return toDtoFromRouting(current);
     }
 
     private BusinessException staleSubmission() {

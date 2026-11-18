@@ -63,9 +63,10 @@ class ApprovalSubmissionRecoveryTest {
         when(routing.submit(any())).thenReturn(result());
         when(routing.getById(9001L)).thenReturn(RoutingApprovalDto.builder().id(9001L).quoteId("42")
                 .approvalTier("DEAL_DESK").status("APPROVED").build());
-        assertThatThrownBy(() -> service.submitForApproval(42L, command(7))).isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException)e).getErrorCode()).isEqualTo("APPROVAL_SUBMISSION_STATE_CHANGED");
-        verify(quotes, never()).save(any());
+        assertThat(service.submitForApproval(42L, command(7)).getStatus()).isEqualTo(ApprovalStatus.APPROVED);
+        org.mockito.ArgumentCaptor<Quote> persisted = org.mockito.ArgumentCaptor.forClass(Quote.class);
+        verify(quotes).save(persisted.capture());
+        assertThat(persisted.getValue().getStatus()).isEqualTo(QuoteStatus.APPROVED);
     }
     @Test void missingVersionCannotGenerateAnotherKeyAfterConcurrentEdit() {
         when(quotes.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote(8)));
