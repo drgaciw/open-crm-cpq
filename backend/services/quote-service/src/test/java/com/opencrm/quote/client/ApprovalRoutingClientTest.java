@@ -216,4 +216,13 @@ class ApprovalRoutingClientTest {
 
         assertThat(client.approve(9L).getApproverId()).isEqualTo("oid-1");
     }
+    @Test
+    void keyedSubmissionSendsKeyAsHeaderNotPayload() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals"))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Idempotency-Key", "quote-submit:42:v7"))
+                .andExpect(content().json("{\"quoteId\":\"42\",\"tier\":\"DEAL_DESK\",\"reason\":null}", true))
+                .andRespond(withSuccess("{\"success\":true,\"data\":{\"id\":9001,\"quoteId\":\"42\",\"status\":\"PENDING\"}}", MediaType.APPLICATION_JSON));
+        assertThat(client.submit(RoutingApprovalSubmitRequest.builder().quoteId("42").tier("DEAL_DESK")
+                .idempotencyKey("quote-submit:42:v7").build()).getId()).isEqualTo(9001L);
+    }
 }

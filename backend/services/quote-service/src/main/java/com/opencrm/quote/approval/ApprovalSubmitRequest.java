@@ -15,4 +15,9 @@ public class ApprovalSubmitRequest {
 
     @NotNull(message = "Approval tier is required")
     private ApprovalTier tier;
+
+    /** Version the caller intends to submit; stale commands are refused before routing. */
+    @NotNull(message = "Quote version is required")
+    @jakarta.validation.constraints.PositiveOrZero
+    private Long expectedVersion;
 }

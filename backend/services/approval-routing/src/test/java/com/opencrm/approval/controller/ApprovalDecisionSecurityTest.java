@@ -75,6 +75,11 @@ class ApprovalDecisionSecurityTest {
     static class App {
 
         @Bean
+        com.opencrm.approval.service.IdempotentApprovalSubmission idempotentSubmission() {
+            return org.mockito.Mockito.mock(com.opencrm.approval.service.IdempotentApprovalSubmission.class);
+        }
+
+        @Bean
         ApprovalRequestRepository approvalRequestRepository() {
             return Mockito.mock(ApprovalRequestRepository.class);
         }

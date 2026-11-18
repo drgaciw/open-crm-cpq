@@ -79,6 +79,9 @@ class ApprovalServiceSingleWriterTest {
         quote.setId(42L);
 
         when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        quote.setVersion(0L);
+        when(approvalRoutingClient.getById(9001L)).thenReturn(RoutingApprovalDto.builder().id(9001L)
+                .quoteId("42").status("PENDING").approvalTier("DEAL_DESK").build());
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(approvalRoutingClient.submit(any(RoutingApprovalSubmitRequest.class)))
                 .thenReturn(RoutingApprovalDto.builder()
@@ -94,7 +97,7 @@ class ApprovalServiceSingleWriterTest {
 
         ApprovalRequestDto dto = approvalService.submitForApproval(
                 42L,
-                ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).build()
+                ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).expectedVersion(0L).build()
         );
 
         ArgumentCaptor<RoutingApprovalSubmitRequest> submitCaptor =

@@ -55,6 +55,9 @@ class ApprovalControllerTest {
     @Mock
     private ApprovalService approvalService;
 
+    @Mock
+    private com.opencrm.approval.service.IdempotentApprovalSubmission idempotentSubmission;
+
     @InjectMocks
     private ApprovalController approvalController;
 
@@ -283,5 +286,13 @@ class ApprovalControllerTest {
                     .anyMatch(this::containsForbiddenField);
         }
         return false;
+    }
+    @Test
+    void keyedSubmissionUsesDurableReceiptBoundary() throws Exception {
+        when(idempotentSubmission.submit(org.mockito.ArgumentMatchers.eq("quote:42:v7"), any())).thenReturn(sampleDto);
+        mockMvc.perform(post("/api/v1/approvals").header("Idempotency-Key", "quote:42:v7")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"quoteId\":\"42\",\"tier\":\"DEAL_DESK\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.data.id").value(9001));
+        org.mockito.Mockito.verifyNoInteractions(approvalService);
     }
 }

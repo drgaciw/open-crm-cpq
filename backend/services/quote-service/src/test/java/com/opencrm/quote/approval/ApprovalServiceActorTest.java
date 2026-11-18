@@ -111,13 +111,16 @@ class ApprovalServiceActorTest {
     @DisplayName("submit names no requester; approval-routing records the token's user")
     void submitSendsNoRequester() {
         Quote quote = quote(QuoteStatus.DRAFT);
+        quote.setVersion(0L);
+        when(approvalRoutingClient.getById(1L)).thenReturn(RoutingApprovalDto.builder().id(1L)
+                .quoteId("42").status("PENDING").approvalTier("DEAL_DESK").build());
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(approvalRoutingClient.submit(any(RoutingApprovalSubmitRequest.class)))
                 .thenReturn(RoutingApprovalDto.builder().id(1L).quoteId("42").status("PENDING")
                         .approvalTier("DEAL_DESK").requesterId("rep-oid").build());
 
         ApprovalRequestDto dto = service(false)
-                .submitForApproval(42L, ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).build());
+                .submitForApproval(42L, ApprovalSubmitRequest.builder().tier(ApprovalTier.DEAL_DESK).expectedVersion(0L).build());
 
         ArgumentCaptor<RoutingApprovalSubmitRequest> sent = ArgumentCaptor.forClass(RoutingApprovalSubmitRequest.class);
         verify(approvalRoutingClient).submit(sent.capture());

@@ -27,12 +27,14 @@ import java.util.List;
 public class ApprovalController {
 
     private final ApprovalService approvalService;
+    private final com.opencrm.approval.service.IdempotentApprovalSubmission idempotentSubmission;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create/submit approval request (quote BFF / internal orchestration)")
-    public ApiResponse<ApprovalRequestDto> submit(@Valid @RequestBody ApprovalSubmitRequest request) {
-        ApprovalRequestDto created = approvalService.submit(request);
+    public ApiResponse<ApprovalRequestDto> submit(@Valid @RequestBody ApprovalSubmitRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key) {
+        ApprovalRequestDto created = key == null ? approvalService.submit(request) : idempotentSubmission.submit(key, request);
         return ApiResponse.success(created, "Approval request created");
     }
 
