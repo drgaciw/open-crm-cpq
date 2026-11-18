@@ -13,12 +13,22 @@ Prerequisites:
 - Two authenticated synthetic users in the same test tenant: a seller able to
   create fixtures and submit a DEAL_DESK request, and a distinct DEAL_DESK approver.
   Export each login's Playwright storage state to a private path outside the repo.
-  The runner requires distinct gateway SESSION cookies. Configure the correct
+  The runner requires distinct gateway `OPENCRM_SESSION` cookies (the documented default). Configure the correct
   actor IDs from the supported test identity setup; it checks the submitted
   request's `requestedBy` against the seller ID. Distinct cookies alone cannot
   prove distinct server principals: the test operator must establish which user
   owns each login, particularly the approver (there is no who-am-I API here).
 - Playwright's Chromium installed through the existing supported browser setup.
+
+Cookie selection uses the browser-facing `UAT_BASE_URL` host and transport, the
+gateway's fixed root path `/`, and expiry. Secure cookies require HTTPS except
+for the documented Chromium localhost testing exception. TLS termination at an
+ingress does not make the internal gateway URL the cookie origin. If the isolated
+stack explicitly configures a custom gateway cookie name, pass
+`UAT_SESSION_COOKIE_NAME=<exact-name>`; there is no fallback to `SESSION` or an
+arbitrary cookie. Empty/invalid overrides and ambiguous matching cookies block.
+Cookie values and storage-state parse errors are never printed. These checks do
+not replace verification of distinct synthetic principals and their roles.
 
 From `frontend`:
 
@@ -46,8 +56,9 @@ failures can include a screenshot. A blocked or failed run exits nonzero. The
 single-session `uat-full` entry records BLOCKED for this check; use the narrow
 runner for role-separated evidence. Other existing suites are unchanged.
 
-All seeded fixtures stay in the exact per-run ledger and are reported as residue
-for evidence review. There is no broad sweep, database purge, forced pending
+Tracked fixtures are reported from the per-run ledger as residue for evidence
+review. This is not a complete inventory of created IDs: approval requests, for
+example, are not tracked. There is no broad sweep, database purge, forced pending
 quote deletion, or dependent-data teardown. Dispose of the isolated test stack
 through its normal owner-approved lifecycle after review. Never use this runner
 against a production endpoint, a forwarded production stack, or live customer data.
@@ -55,7 +66,7 @@ against a production endpoint, a forwarded production stack, or live customer da
 Local harness verification (not live product/browser evidence):
 
 ```sh
-node --test e2e/uat/workflows/pending-delete.test.mjs
+node --test e2e/lib/pending-delete-session.test.mjs e2e/uat/workflows/pending-delete.test.mjs e2e/lib/api.test.mjs
 node --check e2e/uat-pending-delete.mjs
 ```
 

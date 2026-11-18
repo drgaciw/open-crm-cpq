@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { BASE, launch } from './lib/browser.mjs';
 import { createApi } from './lib/api.mjs';
+import { requireDistinctGatewaySessions } from './lib/pending-delete-session.mjs';
 import { createReport } from './lib/report.mjs';
 import { monitorPage, runCheck } from './lib/health.mjs';
 import { newRunId } from './uat/fixtures.mjs';
@@ -25,14 +26,17 @@ try {
   }
   const loadSession = (key) => {
     if (!process.env[key]) throw new Error(`BLOCKED: ${key} must point to an authenticated Playwright storage state`);
-    return JSON.parse(readFileSync(process.env[key], 'utf8'));
+    try {
+      return JSON.parse(readFileSync(process.env[key], 'utf8'));
+    } catch {
+      throw new Error(`BLOCKED: ${key} could not be read as JSON storage state`);
+    }
   };
   const sellerState = loadSession('UAT_SELLER_STORAGE_STATE');
   const approverState = loadSession('UAT_APPROVER_STORAGE_STATE');
-  const sessionId = (state) => state.cookies?.find((c) => c.name === 'SESSION')?.value;
-  if (!sessionId(sellerState) || !sessionId(approverState) || sessionId(sellerState) === sessionId(approverState)) {
-    throw new Error('BLOCKED: distinct authenticated gateway SESSION cookies are required (not dev-mode sessions)');
-  }
+  requireDistinctGatewaySessions(sellerState, approverState, {
+    base: BASE, cookieName: process.env.UAT_SESSION_COOKIE_NAME,
+  });
   const session = await launch({ contextOptions: { storageState: sellerState } });
   browser = session.browser;
   const approverContext = await browser.newContext({ storageState: approverState });
