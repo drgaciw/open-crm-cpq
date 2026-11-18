@@ -11,6 +11,7 @@ import { runCheck, runSteps, defect, blocked, gap, waitUntil } from '../../lib/h
 import { confirmMatDialog } from '../../lib/dialogs.mjs';
 import { inbox } from '../specs/approvals.mjs';
 import { draftWithLine } from './quote-lifecycle.mjs';
+import { pendingDeleteRefusal } from './pending-delete.mjs';
 
 const PENDING = '/api/v1/quotes/approvals/pending';
 const NO_ROWS = 'no pending approval exists, and none could be routed (approval-routing or price book down)';
@@ -235,30 +236,12 @@ export async function runInboxRows(ctx) {
       timeoutMs: 8000, intervalMs: 250, describe: () => 'request is still pending after Reject',
     });
 
-  // Found by UAT 2026-11-14: deleting a quote in PENDING_APPROVAL leaves its approval in the inbox.
-  // Deciding it used to record the decision in approval-routing and then fail with 404; now it is
-  // refused first and the request stays pending. Whether delete should be refused is DRG-758.
-  await runCheck(ctx, 'approvals.orphan.decision-refused-before-routing', async () => {
-    if (ctx.preflight?.approvalsBff?.state !== 'up' || ctx.preflight?.pricebook?.state !== 'up') throw blocked(NO_ROWS);
-    const { quote } = await draftWithLine(ctx);
-    await api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
-    const request = asRows(await api.get(PENDING)).find((r) => r.quoteId === quote.id);
-    if (!request) throw blocked(`the approval routed for quote ${quote.id} is not pending`);
-    await api.del(`/api/v1/quotes/${quote.id}`);
-    api.untrack('quote', quote.id);
-    await openInbox(page);
-    const row = rowFor(page, request);
-    await rowButton(row, 'Approve', request).click();
-    await confirmMatDialog(page, { title: approve.confirm.title, message: approve.confirm.message, click: approve.confirm.confirmText });
-    const banner = page.getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' });
-    await banner.waitFor({ state: 'visible', timeout: 8000 });
-    const said = (await banner.innerText()).replace(/\s+/g, ' ').trim();
-    if (!(await stillPending(api, request.id))) {
-      throw defect(`approval-routing recorded the decision on #${request.id} although quote ${quote.id} is deleted; the UI said "${said}"`);
-    }
-    await row.waitFor({ state: 'visible' });
-    return `approval #${request.id} stays pending; banner "${said.slice(0, 80)}"`;
-  });
     return `approval #${request.id} rejected`;
+  });
+
+  // Historical orphan decisions remain covered by ApprovalServiceSingleWriterTest.
+  // The role-separated browser check uses the narrow runner; a single dev session is BLOCKED.
+  await runCheck(ctx, 'approvals.pending.delete-refused-keeps-request', () => pendingDeleteRefusal(ctx), {
+    expectedErrors: ['409 (Conflict)'],
   });
 }

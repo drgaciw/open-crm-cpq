@@ -210,6 +210,11 @@ public class QuoteService {
             throw new BusinessException("Cannot delete an accepted quote", "QUOTE_ACCEPTED_NO_DELETE");
         }
 
+        if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL) {
+            throw new BusinessException("Cannot delete a quote while approval is pending",
+                    HttpStatus.CONFLICT, "QUOTE_APPROVAL_PENDING");
+        }
+
         quote.softDelete();
         quoteRepository.save(quote);
         log.info("Deleted quote: {}", quote.getQuoteNumber());
