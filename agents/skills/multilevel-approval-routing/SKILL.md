@@ -45,7 +45,7 @@ quote_url="${CPQ_BASE_URL}/api/v1/quotes/${QUOTE_ID}"
 quote=$(curl --fail --silent --show-error "$quote_url" \
   -H "Authorization: Bearer ${TOKEN}") || exit 1
 approval_body=$(jq -ce '
-  .version
+  .data.version
   | select(type == "number" and . >= 0 and . == floor)
   | {tier: "DEAL_DESK", expectedVersion: .}
 ' <<< "$quote") || exit 1
