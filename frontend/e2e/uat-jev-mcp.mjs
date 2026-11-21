@@ -1,3 +1,4 @@
+import { approvalSubmitBody } from './lib/approval-submit.mjs';
 /**
  * Jev + Playwright MCP UAT: the model decides, the Playwright MCP server acts.
  *
@@ -602,7 +603,7 @@ async function approvals() {
   const seeded = [];
   for (let i = 0; i < 2; i++) {
     const { quote } = await draftWithLine(ctx);
-    await api.post(`/api/v1/quotes/${quote.id}/approvals`, { tier: 'DEAL_DESK' });
+    await api.post(`/api/v1/quotes/${quote.id}/approvals`, await approvalSubmitBody((path) => api.get(path), quote.id, 'DEAL_DESK'));
     seeded.push(quote);
   }
   const [x, y] = seeded;

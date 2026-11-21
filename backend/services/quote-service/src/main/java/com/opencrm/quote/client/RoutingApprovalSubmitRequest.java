@@ -16,6 +16,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RoutingApprovalSubmitRequest {
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String idempotencyKey;
+
     private String quoteId;
     /** Quote BFF tier name: DEAL_DESK, SALES_VP, CFO. */
     private String tier;

@@ -153,6 +153,12 @@ public class Quote extends BaseEntity {
     @Column(name = "approval_tier", length = 50)
     private String approvalTier;
 
+    @Column(name = "approval_submission_id")
+    private Long approvalSubmissionId;
+
+    @Column(name = "approval_submission_version")
+    private Long approvalSubmissionVersion;
+
     @Column(name = "pricing_waterfall_json", columnDefinition = "TEXT")
     private String pricingWaterfallJson;
 

@@ -40,11 +40,23 @@ Use this skill when a quote requires approval and the correct approval tier, wor
 ## Useful Commands
 
 ```bash
-# Submit a quote for approval
-curl -X POST "${CPQ_BASE_URL}/api/v1/quotes/{id}/approvals" \
+# Prepare a new submission from the current quote (set QUOTE_ID first).
+quote_url="${CPQ_BASE_URL}/api/v1/quotes/${QUOTE_ID}"
+quote=$(curl --fail --silent --show-error "$quote_url" \
+  -H "Authorization: Bearer ${TOKEN}") || exit 1
+approval_body=$(jq -ce '
+  .data.version
+  | select(type == "number" and . >= 0 and . == floor)
+  | {tier: "DEAL_DESK", expectedVersion: .}
+' <<< "$quote") || exit 1
+
+# For a transport retry of the same command, rerun only this POST with the
+# original approval_body; do not re-fetch the version or rebuild the body.
+# A stale-version conflict requires reviewing the current quote before a new command.
+curl --fail-with-body -X POST "${quote_url}/approvals" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"tier": "director", "reason": "Discount exceeds 25%"}'
+  --data-binary "$approval_body"
 
 # Retrieve pending approvals
 curl -X GET "${CPQ_BASE_URL}/api/v1/quotes/approvals/pending" \

@@ -48,6 +48,11 @@ public class ApprovalRoutingClient {
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
                     .uri("/api/v1/approvals")
+                    .headers(headers -> {
+                        if (request.getIdempotencyKey() != null) {
+                            headers.set("Idempotency-Key", request.getIdempotencyKey());
+                        }
+                    })
                     .body(request)
                     .retrieve()
                     .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {

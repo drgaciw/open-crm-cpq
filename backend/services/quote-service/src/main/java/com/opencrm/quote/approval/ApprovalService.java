@@ -65,6 +65,27 @@ public class ApprovalService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
 
+        if (request.getExpectedVersion() == null || request.getExpectedVersion() < 0) {
+            throw new BusinessException("expectedVersion is required for retry-safe approval submission",
+                    HttpStatus.BAD_REQUEST, "APPROVAL_VERSION_REQUIRED");
+        }
+        rampScheduleGuard.refuseIfStale(quote);
+        if (quote.getStatus() == QuoteStatus.PENDING_APPROVAL && quote.getApprovalSubmissionId() != null) {
+            if (request.getExpectedVersion() != null
+                    && !request.getExpectedVersion().equals(quote.getApprovalSubmissionVersion())) {
+                throw staleSubmission();
+            }
+            if (!request.getTier().name().equals(quote.getApprovalTier())) {
+                throw new BusinessException("A different approval tier is already pending",
+                        HttpStatus.CONFLICT, "APPROVAL_SUBMISSION_CONFLICT");
+            }
+            // A repeated command must not regress an already committed quote projection.
+            return toDtoFromRouting(approvalRoutingClient.getById(quote.getApprovalSubmissionId()));
+        }
+        if (request.getExpectedVersion() != null && !request.getExpectedVersion().equals(quote.getVersion())) {
+            throw staleSubmission();
+        }
+
         if (quote.getStatus() != QuoteStatus.IN_REVIEW && quote.getStatus() != QuoteStatus.DRAFT) {
             throw new BusinessException(
                     "Quote must be in DRAFT or IN_REVIEW to submit for approval",
@@ -72,7 +93,6 @@ public class ApprovalService {
             );
         }
 
-        rampScheduleGuard.refuseIfStale(quote);
         String fingerprint = com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote);
         com.opencrm.quote.ramp.RampGovernanceDto governance = com.opencrm.quote.ramp.RampPricingSnapshot.governance(quote);
         if (governance != null) {
@@ -88,7 +108,9 @@ public class ApprovalService {
             return toDtoFromRouting(pending);
         }
 
+        Long submissionVersion = quote.getVersion();
         RoutingApprovalDto remote = approvalRoutingClient.submit(RoutingApprovalSubmitRequest.builder()
+                .idempotencyKey("quote-submit:" + quote.getId() + ":" + quote.getUuid() + ":" + submissionVersion)
                 .quoteId(String.valueOf(quoteId))
                 .tier(request.getTier().name())
                 .reason("Quote approval submitted via BFF")
@@ -96,15 +118,37 @@ public class ApprovalService {
                 .governingPeriod(fingerprint == null ? null : 1)
                 .build());
 
+        if (!String.valueOf(quoteId).equals(remote.getQuoteId()) || remote.getId() == null
+                || !request.getTier().name().equals(remote.getApprovalTier()) || !"PENDING".equals(remote.getStatus())) {
+            throw new BusinessException("Routing returned an incompatible submission",
+                    HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_INVALID_RESPONSE");
+        }
+        // A frozen receipt preserves the first response, not the current lifecycle state.
+        // Never restore PENDING from that snapshot after routing has already decided it.
+        RoutingApprovalDto current = approvalRoutingClient.getById(remote.getId());
+        if (current == null || !remote.getId().equals(current.getId())
+                || !String.valueOf(quoteId).equals(current.getQuoteId())
+                || !request.getTier().name().equals(current.getApprovalTier())
+                || !java.util.Set.of("PENDING", "APPROVED", "REJECTED").contains(current.getStatus())) {
+            throw new BusinessException("Canonical approval changed; refresh before continuing",
+                    HttpStatus.CONFLICT, "APPROVAL_SUBMISSION_STATE_CHANGED");
+        }
+        quote.setApprovalSubmissionId(remote.getId());
+        quote.setApprovalSubmissionVersion(submissionVersion);
         // Single-writer: do NOT persist a local ApprovalRequest on submit.
-        quote.setStatus(QuoteStatus.PENDING_APPROVAL);
-        quote.setApprovalState(ApprovalState.PENDING);
+        quote.setStatus("PENDING".equals(current.getStatus()) ? QuoteStatus.PENDING_APPROVAL : QuoteStatus.valueOf(current.getStatus()));
+        quote.setApprovalState(ApprovalState.valueOf(current.getStatus()));
         quote.setApprovalTier(request.getTier().name());
         quoteRepository.save(quote);
 
         log.info("Quote {} submitted for {} approval (routing id={})",
                 quote.getQuoteNumber(), request.getTier(), remote.getId());
-        return toDtoFromRouting(remote);
+        return toDtoFromRouting(current);
+    }
+
+    private BusinessException staleSubmission() {
+        return new BusinessException("Quote changed since this approval submission",
+                HttpStatus.CONFLICT, "STALE_APPROVAL_SUBMISSION");
     }
 
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {

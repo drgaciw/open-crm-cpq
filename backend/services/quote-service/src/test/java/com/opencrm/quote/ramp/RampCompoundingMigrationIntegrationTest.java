@@ -69,8 +69,12 @@ class RampCompoundingMigrationIntegrationTest {
             }
         }
         migrations(null).migrate();
-        // Latest applied version is V1_19 (quote primary flag). V1_18 (valid_until) already landed on main.
-        assertThat(migrations(null).info().current().getVersion()).isEqualTo(MigrationVersion.fromVersion("1.19"));
+        // Exercise all later migrations without pinning this ramp regression to the latest filename.
+        var latest = migrations(null);
+        latest.validate();
+        assertThat(latest.info().current().getVersion())
+                .isGreaterThanOrEqualTo(MigrationVersion.fromVersion("1.19"));
+        assertThat(latest.info().pending()).isEmpty();
 
         String rollback;
         try (var migration = getClass().getResourceAsStream("/db/migration/V1_16__ramp_escalator_compounding.sql")) {
