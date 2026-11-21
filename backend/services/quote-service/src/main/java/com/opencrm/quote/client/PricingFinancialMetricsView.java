@@ -28,4 +28,8 @@ public class PricingFinancialMetricsView {
     private BigDecimal totalSurcharge;
     private BigDecimal priceMultiplier;
     private BigDecimal estimatedMarginPct;
+    /** Optional NPV. Absent until pricing emits it. */
+    private BigDecimal npv;
+    /** Optional contingent revenue amount. Absent until pricing emits it. */
+    private BigDecimal contingentRevenue;
 }

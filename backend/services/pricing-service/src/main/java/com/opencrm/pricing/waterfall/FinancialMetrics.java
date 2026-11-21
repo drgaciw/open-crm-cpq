@@ -25,6 +25,14 @@ public class FinancialMetrics {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal exitArr;
     private BigDecimal clv;  // Customer Lifetime Value
+
+    /** Deal Desk residual: TCV / (1+r)^(months/12). Additive; does not replace TCV. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal npv;
+
+    /** Deal Desk residual contingent amount. TCV grows only when the context includes it. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal contingentRevenue;
     private Integer churnScore;
     private BigDecimal discountRate;
     private BigDecimal totalDiscount;

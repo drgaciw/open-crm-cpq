@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/candidate.archify.md",
+    "sha256": "d811250f0a2e7cf4c902ba5a7fedafd7df5f8b5a8428f001d991c67c1f87ff95",
+    "bytes": 2115
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/wave3-experiments.html",
+    "sha256": "8eeec7d5d172d632fd9d511a4a51ffb63749882f6731fa06d654b4c018a2cad9",
+    "bytes": 525976
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "not-run"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/wave3-experiments.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/wave3-experiments.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 795,
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  }
+}

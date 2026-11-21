@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "95170629-852c-40d9-9a01-0e14c2d67a62",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/candidate.archify.md",
+  "output": "/home/username01/open-crm-cpq/.archify/explainer-wave3-experiments-20261116-073945/wave3-experiments.html",
+  "specification": {
+    "sha256": "d811250f0a2e7cf4c902ba5a7fedafd7df5f8b5a8428f001d991c67c1f87ff95",
+    "bytes": 2115
+  },
+  "artifact": {
+    "sha256": "8eeec7d5d172d632fd9d511a4a51ffb63749882f6731fa06d654b4c018a2cad9",
+    "bytes": 525976
+  },
+  "explainer": {
+    "preparedSha256": "6fa6c08fbe8b0cbeb8120f74d21faea64492259bdffb8656e9154005acdec299",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "experiment-flow",
+        "inline": true,
+        "sha256": "20620f8a7c1af9bf6971a6c7369ad49f12468f01e30883cd28da69bb3ceb58a9",
+        "bytes": 1002
+      }
+    ]
+  }
+}

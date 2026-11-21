@@ -65,6 +65,8 @@ opencrm:
       execution-enabled: ${OPENCRM_AI_SELECTION_EXECUTION_ENABLED:false}
     agents:
       enabled: ${OPENCRM_AI_AGENTS_ENABLED:false}
+    experiments:
+      enabled: ${OPENCRM_AI_EXPERIMENTS_ENABLED:false}
 
 logging:
   level:

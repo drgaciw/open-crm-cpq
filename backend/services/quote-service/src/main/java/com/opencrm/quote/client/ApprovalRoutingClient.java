@@ -23,8 +23,8 @@ import java.util.List;
  * HTTP client for approval-routing (canonical approval writer for S2C-12).
  * <p>
  * It sends no identity: approval-routing records the caller of the relayed user token as requester or approver, and
- * decides whether their role may decide the tier (ADR-016 decisions 6 and 7). Its refusals (401, 403, 409) reach the
- * caller with approval-routing's status, code and message instead of turning into a 502.
+ * decides whether their role may decide the tier (ADR-016 decisions 6 and 7). Its refusals (400, 401, 403, 409) reach
+ * the caller with approval-routing's status, code and message instead of turning into a 502.
  */
 @Slf4j
 @Component
@@ -202,12 +202,14 @@ public class ApprovalRoutingClient {
 
     public RoutingApprovalDto reject(Long approvalId, String reason) {
         log.debug("Rejecting routing approval {}", approvalId);
-        String safeReason = (reason == null || reason.isBlank()) ? "Rejected via quote BFF" : reason;
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("Reject reason is required", HttpStatus.BAD_REQUEST, "REJECT_REASON_REQUIRED");
+        }
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/v1/approvals/{id}/reject")
-                            .queryParam("reason", safeReason)
+                            .queryParam("reason", reason)
                             .build(approvalId))
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
@@ -236,6 +238,40 @@ public class ApprovalRoutingClient {
         }
     }
 
+    public RoutingApprovalDto cancel(Long approvalId) {
+        log.debug("Cancelling routing approval {}", approvalId);
+        try {
+            ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/v1/approvals/{id}/cancel")
+                            .build(approvalId))
+                    .retrieve()
+                    .onStatus(status -> status.value() == 404, (req, res) -> {
+                        throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+                    })
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_CANCEL_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing cancel failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_CANCEL_FAILED"
+                        );
+                    })
+                    .body(SINGLE);
+            return requireData(response, "APPROVAL_ROUTING_CANCEL_FAILED");
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing cancel: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
     private static RoutingApprovalDto requireData(ApiResponse<RoutingApprovalDto> response, String errorCode) {
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String message = response != null && response.getMessage() != null
@@ -246,10 +282,10 @@ public class ApprovalRoutingClient {
         return response.getData();
     }
 
-    /** 401, 403 and 409 are approval-routing's decisions about the caller or the request, not a gateway failure. */
+    /** 400, 401, 403 and 409 are approval-routing decisions about the caller or the request, not a gateway failure. */
     private static boolean isRefusal(HttpStatusCode status) {
         int code = status.value();
-        return code == 401 || code == 403 || code == 409;
+        return code == 400 || code == 401 || code == 403 || code == 409;
     }
 
     /** approval-routing's refusal with its status, error code and message, e.g. 403 {@code APPROVER_ROLE_REQUIRED}. */

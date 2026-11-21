@@ -244,6 +244,25 @@ class ApprovalControllerTest {
         assertNoEntityLeakFields(result.getResponse().getContentAsString());
     }
 
+    @Test
+    @DisplayName("POST /{id}/cancel returns DTO without deleted")
+    void cancelReturnsDto() throws Exception {
+        ApprovalRequestDto cancelled = sampleDto.toBuilder()
+                .status(ApprovalStatus.CANCELLED)
+                .build();
+        when(approvalService.cancel(eq(9001L))).thenReturn(cancelled);
+
+        MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/cancel")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Approval request cancelled"))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.data.deleted").doesNotExist())
+                .andReturn();
+
+        assertNoEntityLeakFields(result.getResponse().getContentAsString());
+    }
+
     private void assertNoEntityLeakFields(String json) throws Exception {
         JsonNode root = objectMapper.readTree(json);
         assertFalse(containsForbiddenField(root),

@@ -206,6 +206,62 @@ class ApprovalRoutingClientTest {
     }
 
     @Test
+    @DisplayName("D1-2: routing 409 INVALID_STATE_TRANSITION stays 409, not APPROVAL_ROUTING_APPROVE_FAILED 502")
+    void invalidStateConflictPassesThrough() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/9/approve"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"success":false,"message":"Cannot approve approval in APPROVED (action=approve, currentStatus=APPROVED, targetStatus=APPROVED)",
+                         "errorCode":"INVALID_STATE_TRANSITION"}
+                        """));
+
+        assertThatThrownBy(() -> client.approve(9L))
+                .isInstanceOfSatisfying(BusinessException.class, refused -> {
+                    assertThat(refused.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(refused.getErrorCode()).isEqualTo("INVALID_STATE_TRANSITION");
+                });
+    }
+
+    @Test
+    @DisplayName("D1-2: blank reject reason is refused locally as REJECT_REASON_REQUIRED")
+    void blankRejectReasonDoesNotCallRouting() {
+        assertThatThrownBy(() -> client.reject(9L, " "))
+                .isInstanceOfSatisfying(BusinessException.class, refused -> {
+                    assertThat(refused.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(refused.getErrorCode()).isEqualTo("REJECT_REASON_REQUIRED");
+                });
+    }
+
+    @Test
+    @DisplayName("D1-3: cancel posts /approvals/{id}/cancel")
+    void cancelPending() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/9/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":{"id":9,"quoteId":"42","status":"CANCELLED"}}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.cancel(9L).getStatus()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    @DisplayName("D1-3: cancel of a processed approval stays 409 INVALID_STATE_TRANSITION")
+    void cancelInvalidStatePassesThrough() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/9/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"success":false,"message":"Cannot cancel approval in APPROVED (action=cancel, currentStatus=APPROVED, targetStatus=CANCELLED)",
+                         "errorCode":"INVALID_STATE_TRANSITION"}
+                        """));
+
+        assertThatThrownBy(() -> client.cancel(9L))
+                .isInstanceOfSatisfying(BusinessException.class, refused -> {
+                    assertThat(refused.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(refused.getErrorCode()).isEqualTo("INVALID_STATE_TRANSITION");
+                });
+    }
+
+    @Test
     @DisplayName("ADR-016 step 4: approve and reject send no approver; approval-routing takes it from the token")
     void decisionsSendNoIdentity() {
         server.expect(requestTo("http://routing.test/api/v1/approvals/9/approve"))

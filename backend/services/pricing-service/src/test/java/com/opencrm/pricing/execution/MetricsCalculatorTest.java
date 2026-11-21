@@ -2,6 +2,7 @@ package com.opencrm.pricing.execution;
 
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.waterfall.FinancialMetrics;
+import com.opencrm.pricing.waterfall.PricingContext;
 import com.opencrm.pricing.waterfall.PricingLineResult;
 import com.opencrm.pricing.waterfall.PricingResult;
 import org.junit.jupiter.api.DisplayName;
@@ -241,6 +242,75 @@ class MetricsCalculatorTest {
                     .bind("opencrm.pricing.metrics.acv-version", AcvVersion.class)
                     .orElse(null))
                     .isEqualTo(AcvVersion.TERM_YEARS);
+        }
+    }
+
+    @Nested
+    @DisplayName("Deal Desk residual: contingent revenue + NPV")
+    class ContingentAndNpvGoldens {
+
+        @Test
+        @DisplayName("excluded contingent leaves waterfall TCV; NPV uses unadjusted TCV at r=0.10")
+        void excludedContingentDoesNotChangeTcv() {
+            FinancialMetrics metrics = calculator.calculate(singleLineMonthly("100.00"), 12);
+            BigDecimal waterfallTcv = metrics.getTcv();
+            BigDecimal arr = metrics.getArr();
+            BigDecimal acv = metrics.getAcv();
+
+            calculator.applyCommercialMetrics(metrics, PricingContext.builder()
+                    .durationInMonths(12)
+                    .contingentRevenueAmount(new BigDecimal("500.00"))
+                    .contingentIncludedInTcv(false)
+                    .build());
+
+            assertThat(metrics.getTcv()).isEqualByComparingTo(waterfallTcv);
+            assertThat(metrics.getArr()).isEqualByComparingTo(arr);
+            assertThat(metrics.getAcv()).isEqualByComparingTo(acv);
+            assertThat(metrics.getContingentRevenue()).isEqualByComparingTo("500.00");
+            assertThat(metrics.getNpv()).isEqualByComparingTo("1090.91");
+        }
+
+        @Test
+        @DisplayName("included contingent adds to commercial TCV only; ARR/ACV/CLV stay waterfall")
+        void includedContingentAddsToTcvNotArr() {
+            FinancialMetrics metrics = calculator.calculate(singleLineMonthly("100.00"), 12);
+            BigDecimal arr = metrics.getArr();
+            BigDecimal acv = metrics.getAcv();
+            BigDecimal clv = metrics.getClv();
+
+            calculator.applyCommercialMetrics(metrics, PricingContext.builder()
+                    .durationInMonths(12)
+                    .contingentRevenueAmount(new BigDecimal("500.00"))
+                    .contingentIncludedInTcv(true)
+                    .build());
+
+            assertThat(metrics.getTcv()).isEqualByComparingTo("1700.00");
+            assertThat(metrics.getArr()).isEqualByComparingTo(arr);
+            assertThat(metrics.getAcv()).isEqualByComparingTo(acv);
+            assertThat(metrics.getClv()).isEqualByComparingTo(clv);
+            assertThat(metrics.getContingentRevenue()).isEqualByComparingTo("500.00");
+            assertThat(metrics.getNpv()).isEqualByComparingTo("1545.45");
+        }
+
+        @Test
+        @DisplayName("NPV 24-month vector: TCV / (1.10)^2")
+        void npvTwentyFourMonthVector() {
+            FinancialMetrics metrics = calculator.calculate(singleLineMonthly("225.00"), 24);
+            assertThat(metrics.getTcv()).isEqualByComparingTo("5400.00");
+
+            calculator.applyCommercialMetrics(metrics, PricingContext.builder().durationInMonths(24).build());
+
+            assertThat(metrics.getNpv()).isEqualByComparingTo("4462.81");
+            assertThat(metrics.getContingentRevenue()).isNull();
+        }
+
+        @Test
+        @DisplayName("null contingent does not emit contingentRevenue; default r=0.10")
+        void defaultRateWithoutContingent() {
+            FinancialMetrics metrics = calculator.calculate(singleLineMonthly("100.00"), 12);
+            calculator.applyCommercialMetrics(metrics, PricingContext.builder().durationInMonths(12).build());
+            assertThat(metrics.getContingentRevenue()).isNull();
+            assertThat(metrics.getNpv()).isEqualByComparingTo("1090.91");
         }
     }
 

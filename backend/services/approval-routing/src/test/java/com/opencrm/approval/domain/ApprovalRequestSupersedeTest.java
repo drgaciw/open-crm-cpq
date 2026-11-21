@@ -1,7 +1,9 @@
 package com.opencrm.approval.domain;
 
+import com.opencrm.common.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,8 +56,18 @@ class ApprovalRequestSupersedeTest {
         ApprovalRequest request = request(ApprovalStatus.PENDING);
         request.supersede(9L);
 
-        assertThatThrownBy(() -> request.approve("oid-1")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> request.reject("oid-1", "no")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(request::cancel).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> request.approve("oid-1"))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo("INVALID_STATE_TRANSITION");
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                });
+        assertThatThrownBy(() -> request.reject("oid-1", "no"))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo("INVALID_STATE_TRANSITION");
+                });
+        assertThatThrownBy(request::cancel)
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo("INVALID_STATE_TRANSITION");
+                });
     }
 }

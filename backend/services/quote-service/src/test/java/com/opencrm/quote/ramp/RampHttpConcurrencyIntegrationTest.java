@@ -76,6 +76,7 @@ class RampHttpConcurrencyIntegrationTest {
         @Bean QuoteLineItemService lineService(QuoteLineItemRepository l, QuoteRepository q, RampScheduleAttacher a, RampScheduleGuard g) { return new QuoteLineItemService(l,q,a,g); }
         @Bean com.opencrm.quote.client.PricingServiceClient pricing() { return mock(com.opencrm.quote.client.PricingServiceClient.class); }
         @Bean com.opencrm.quote.quote.QuoteContinuationService continuation() { return mock(com.opencrm.quote.quote.QuoteContinuationService.class); }
+        @Bean ApprovalRoutingClient approvalRouting() { return mock(ApprovalRoutingClient.class); }
         @Bean QuoteService quotesService(QuoteRepository q, QuoteLineItemRepository l, com.opencrm.quote.client.PricingServiceClient p,
                 RampScheduleGuard g, ObjectMapper mapper) {
             var qm=org.mapstruct.factory.Mappers.getMapper(QuoteMapper.class);

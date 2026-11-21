@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "startedAt": "2026-11-16T14:32:03.649Z",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+    "sha256": "7fc7dc62380e4f9cfa60a770d24a5eea5616e9cce16320456f423d21b5ddf56e",
+    "bytes": 2950
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+    "sha256": "e3fb7ea761f2a8ddf383f0e3aeee42ff2ff8f6baedc7703e004468b897a7b639",
+    "bytes": 531068
+  },
+  "stages": {
+    "browser-check": {
+      "status": "not-run",
+      "execution": "not-requested"
+    },
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+        "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/username01/open-crm-cpq",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "7fc7dc62380e4f9cfa60a770d24a5eea5616e9cce16320456f423d21b5ddf56e",
+          "bytes": 2950
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 470,
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+        "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/username01/open-crm-cpq",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "75c51366-d18f-41e6-9394-09a3e4f8e69b",
+        "ok": true,
+        "command": "deliver",
+        "type": "explainer",
+        "input": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+        "output": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+        "explainer": {
+          "preparedSha256": "1496387f8db030b0bf6063ecf774f7ac2a9bfc468b7289009bf6e528833eb9c6",
+          "dependencies": [
+            {
+              "kind": "diagram-spec",
+              "id": "pd-flow",
+              "inline": true,
+              "sha256": "766aa526ffb582c77fae9dac2be50ed7b0d8eb1c5a9675520769d33e91abad18",
+              "bytes": 847
+            }
+          ]
+        },
+        "specification": {
+          "sha256": "7fc7dc62380e4f9cfa60a770d24a5eea5616e9cce16320456f423d21b5ddf56e",
+          "bytes": 2950
+        },
+        "artifact": {
+          "sha256": "e3fb7ea761f2a8ddf383f0e3aeee42ff2ff8f6baedc7703e004468b897a7b639",
+          "bytes": 531068
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 215,
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+        "family": "explainer",
+        "artifact": {
+          "sha256": "e3fb7ea761f2a8ddf383f0e3aeee42ff2ff8f6baedc7703e004468b897a7b639",
+          "bytes": 531068
+        },
+        "checks": [
+          {
+            "name": "explainer_structure",
+            "ok": true,
+            "details": [
+              "42 unique DOM IDs"
+            ]
+          },
+          {
+            "name": "explainer_payload_identity",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "explainer_dependencies",
+            "ok": true,
+            "details": [
+              "1 frozen dependencies"
+            ]
+          },
+          {
+            "name": "explainer_native_diagrams",
+            "ok": true,
+            "details": [
+              "pd-flow: pass"
+            ]
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "issues": [],
+          "nativeDiagrams": [
+            {
+              "id": "pd-flow",
+              "receipt": {
+                "ok": true,
+                "file": "/tmp/archify-explainer-check-27b6Vc/child.html",
+                "artifact": {
+                  "sha256": "c28982abe036355888d1a1d4c774f3bbcfd50dff0eef28f0ca3f430e2c6ed735",
+                  "bytes": 829509
+                },
+                "checks": [
+                  {
+                    "name": "single_svg",
+                    "ok": true,
+                    "details": [
+                      "found 1 <svg> block(s)"
+                    ]
+                  },
+                  {
+                    "name": "finite_svg",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "orthogonal_arrows",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "label_route_clearance",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_crossings",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_corridors",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "container_border_runs",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "route_rhythm",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "legend_clearance",
+                    "ok": true,
+                    "details": []
+                  }
+                ],
+                "composition": {
+                  "schemaVersion": 1,
+                  "profile": "showcase",
+                  "status": "pass",
+                  "summary": {
+                    "errors": 0,
+                    "warnings": 0
+                  },
+                  "metrics": {
+                    "properCrossings": 0,
+                    "resolvedCrossovers": 0,
+                    "ambiguousCorridors": 0,
+                    "arrowheadCollisions": 0,
+                    "containerBorderRuns": 0,
+                    "labelRouteClearanceIssues": 0,
+                    "labelCanvasOverflowIssues": 0,
+                    "minLabelRouteClearance": 27,
+                    "desktopReadabilityIssues": 0,
+                    "viewportHeightIssues": 0,
+                    "minProjectedNodeTextPx": 8,
+                    "maxBends": 0,
+                    "routesOverSuggestedBends": 0,
+                    "maxStretch": 1,
+                    "routesOverSuggestedStretch": 0,
+                    "minSegmentPx": 13,
+                    "minInteriorSegmentPx": null,
+                    "shortSegmentCount": 1,
+                    "shortEndpointSegmentCount": 1,
+                    "shortInteriorSegmentCount": 0,
+                    "microSegmentCount": 0
+                  },
+                  "suggestedLimits": {
+                    "bendsPerRelationship": 2,
+                    "stretch": 1.35,
+                    "segmentPx": 16,
+                    "microSegmentPx": 8
+                  },
+                  "routeReview": {
+                    "crossings": [],
+                    "detours": []
+                  },
+                  "leadingSpace": {
+                    "measured": false,
+                    "reviewSuggested": false
+                  },
+                  "desktopReadability": {
+                    "budgetBasis": "legacy-930",
+                    "readerContract": "declared-wide-v1",
+                    "availableDiagramWidth": 930,
+                    "actualBudgetPx": 930,
+                    "limit": "legacy",
+                    "requestedTargetPx": null,
+                    "requestedTargetMet": null,
+                    "hardFloorPx": 6,
+                    "hardFloorMet": true,
+                    "minimumOwner": {
+                      "kind": "edge",
+                      "id": "docs-to-hold-1",
+                      "from": "docs",
+                      "to": "hold"
+                    },
+                    "minimumSourceTextPx": 8,
+                    "minimumProjectedTextPx": 8,
+                    "semanticTextCount": 7
+                  },
+                  "issues": []
+                }
+              }
+            }
+          ]
+        },
+        "diagnostics": [],
+        "provenance": "current",
+        "deliveryReceiptId": "75c51366-d18f-41e6-9394-09a3e4f8e69b"
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  },
+  "diagnostics": [],
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "finishedAt": "2026-11-16T14:32:04.445Z",
+  "durationMs": 795,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

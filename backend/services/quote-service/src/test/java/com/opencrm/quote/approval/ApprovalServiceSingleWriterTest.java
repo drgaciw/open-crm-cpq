@@ -62,7 +62,9 @@ class ApprovalServiceSingleWriterTest {
                 .pricingFingerprint("a".repeat(64)).status("PENDING").build());
         assertThatThrownBy(() -> approvalService.approveRequest(9L, null)).isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
-        assertThatThrownBy(() -> approvalService.rejectRequest(9L, null)).isInstanceOf(BusinessException.class)
+        assertThatThrownBy(() -> approvalService.rejectRequest(
+                9L, ApprovalResponseRequest.builder().comments("stale").build()))
+                .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
         verify(approvalRoutingClient, never()).approve(any());
         verify(approvalRoutingClient, never()).reject(any(), any());

@@ -151,7 +151,39 @@ class ApprovalServiceTest {
         TestCallers.signInUser("manager-2", "DealDesk");
         stubFind(pendingRequest);
 
-        assertThrows(IllegalStateException.class, () -> approvalService.approve(1L));
+        assertRefused(HttpStatus.CONFLICT, "INVALID_STATE_TRANSITION", () -> approvalService.approve(1L));
+    }
+
+    @Test
+    @DisplayName("D1-2: reject requires a non-blank reason")
+    void rejectRequiresReason() {
+        assertRefused(HttpStatus.BAD_REQUEST, "REJECT_REASON_REQUIRED", () -> approvalService.reject(1L, "  "));
+        assertRefused(HttpStatus.BAD_REQUEST, "REJECT_REASON_REQUIRED", () -> approvalService.reject(1L, null));
+        verify(approvalRequestRepository, never()).save(any());
+        verify(approvalRequestRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("D1-3: cancel PENDING without an approver decision")
+    void cancelPending() {
+        stubFind(pendingRequest);
+        when(approvalRequestRepository.save(any())).thenReturn(pendingRequest);
+
+        ApprovalRequestDto result = approvalService.cancel(1L);
+
+        assertEquals(ApprovalStatus.CANCELLED, result.getStatus());
+        verify(approvalRequestRepository).save(pendingRequest);
+        verifyNoInteractions(outboxEventPublisher);
+    }
+
+    @Test
+    @DisplayName("D1-3: cancel of APPROVED is INVALID_STATE_TRANSITION")
+    void cannotCancelApproved() {
+        pendingRequest.approve(TestTokens.oidOf("manager-1"));
+        stubFind(pendingRequest);
+
+        assertRefused(HttpStatus.CONFLICT, "INVALID_STATE_TRANSITION", () -> approvalService.cancel(1L));
+        verify(approvalRequestRepository, never()).save(any());
     }
 
     @Test

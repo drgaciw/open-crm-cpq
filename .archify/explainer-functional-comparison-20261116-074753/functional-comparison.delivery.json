@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "20279828-9d30-4aa4-8332-b133764d3069",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/candidate.archify.md",
+  "output": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/functional-comparison.html",
+  "specification": {
+    "sha256": "c84c4f83537c208e2f0b89760cd24826df80ea50479b0973b4264a21cb0d650a",
+    "bytes": 5758
+  },
+  "artifact": {
+    "sha256": "ca0278bef434d7048103a392e77c6fdaa13fc69de30c52ca0f9b246a77a86cb8",
+    "bytes": 981845
+  },
+  "explainer": {
+    "preparedSha256": "b84ad6a6929c5f82e88e54c01a08970cc55ac20d2de68109da2c2ce100a932a1",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "platform-split",
+        "inline": true,
+        "sha256": "8167e110a1bb25256095447075840365405d199bb5563a3e475a87235a45a0f7",
+        "bytes": 1591
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "ai-ops-flow",
+        "inline": true,
+        "sha256": "6e930f8683e14036e90e969cee2b33fd259e04bfd8a75ce02368e837b9949452",
+        "bytes": 1181
+      }
+    ]
+  }
+}

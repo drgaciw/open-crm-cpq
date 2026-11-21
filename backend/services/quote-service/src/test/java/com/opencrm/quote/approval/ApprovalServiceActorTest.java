@@ -98,13 +98,28 @@ class ApprovalServiceActorTest {
     }
 
     @Test
+    @DisplayName("D1-2: reject without comments is REJECT_REASON_REQUIRED before routing is called")
+    void rejectRequiresReason() {
+        assertThatThrownBy(() -> service(true).rejectRequest(8L, null))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getErrorCode()).isEqualTo("REJECT_REASON_REQUIRED");
+                });
+        verify(approvalRoutingClient, never()).reject(any(), any());
+        verify(approvalRoutingClient, never()).getById(any());
+    }
+
+    @Test
     @DisplayName("an approval neither store knows is 404")
     void unknownApprovalIsNotFound() {
-        when(approvalRoutingClient.reject(8L, null)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 8L));
+        when(approvalRoutingClient.reject(8L, "gone")).thenThrow(new ResourceNotFoundException("ApprovalRequest", 8L));
         when(approvalRepository.findByIdAndDeletedFalse(8L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service(true).rejectRequest(8L, null))
+        assertThatThrownBy(() -> service(true).rejectRequest(
+                8L, ApprovalResponseRequest.builder().comments("gone").build()))
                 .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(approvalRoutingClient).reject(8L, "gone");
     }
 
     @Test

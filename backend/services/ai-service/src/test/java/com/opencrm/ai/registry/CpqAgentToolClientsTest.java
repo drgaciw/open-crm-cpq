@@ -199,4 +199,48 @@ class CpqAgentToolClientsTest {
         assertEquals("CPQ_CLIENT_ERROR", response.errorCode());
         assertNotNull(response.message());
     }
+
+    @Test
+    void getRuleUnwrapsApiResponse() {
+        server.expect(requestTo("http://gateway.test/api/v1/rules/9"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"success":true,"message":"ok","data":{"id":9,"name":"Volume","content":"rule X"}}
+                        """, MediaType.APPLICATION_JSON));
+
+        CpqToolResponse response = clients.getRule(9L);
+
+        assertTrue(response.success());
+        assertEquals(9, response.data().get("id").asInt());
+        assertEquals("Volume", response.data().get("name").asText());
+    }
+
+    @Test
+    void validateRuleAcceptsNullDataEnvelope() {
+        server.expect(requestTo("http://gateway.test/api/v1/rules/9/validate"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"success":true,"message":"Rule validated successfully","data":null}
+                        """, MediaType.APPLICATION_JSON));
+
+        CpqToolResponse response = clients.validateRule(9L);
+
+        assertTrue(response.success());
+        assertEquals("Rule validated successfully", response.message());
+        assertNull(response.data());
+    }
+
+    @Test
+    void simulatePricingUnwrapsData() {
+        server.expect(requestTo("http://gateway.test/api/v1/pricing/simulate"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"success":true,"message":"sim","data":{"success":true,"lineResults":[]}}
+                        """, MediaType.APPLICATION_JSON));
+
+        CpqToolResponse response = clients.simulatePricing(Map.of("quoteExternalId", "Q-2"));
+
+        assertTrue(response.success());
+        assertTrue(response.data().get("lineResults").isArray());
+    }
 }

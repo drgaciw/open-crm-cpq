@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "75c51366-d18f-41e6-9394-09a3e4f8e69b",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+  "output": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+  "specification": {
+    "sha256": "7fc7dc62380e4f9cfa60a770d24a5eea5616e9cce16320456f423d21b5ddf56e",
+    "bytes": 2950
+  },
+  "artifact": {
+    "sha256": "e3fb7ea761f2a8ddf383f0e3aeee42ff2ff8f6baedc7703e004468b897a7b639",
+    "bytes": 531068
+  },
+  "explainer": {
+    "preparedSha256": "1496387f8db030b0bf6063ecf774f7ac2a9bfc468b7289009bf6e528833eb9c6",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "pd-flow",
+        "inline": true,
+        "sha256": "766aa526ffb582c77fae9dac2be50ed7b0d8eb1c5a9675520769d33e91abad18",
+        "bytes": 847
+      }
+    ]
+  }
+}

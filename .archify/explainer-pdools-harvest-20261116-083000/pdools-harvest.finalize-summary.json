@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/candidate.archify.md",
+    "sha256": "7fc7dc62380e4f9cfa60a770d24a5eea5616e9cce16320456f423d21b5ddf56e",
+    "bytes": 2950
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.html",
+    "sha256": "e3fb7ea761f2a8ddf383f0e3aeee42ff2ff8f6baedc7703e004468b897a7b639",
+    "bytes": 531068
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "not-run"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-pdools-harvest-20261116-083000/pdools-harvest.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 795,
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  }
+}

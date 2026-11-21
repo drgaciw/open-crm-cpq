@@ -317,6 +317,7 @@ public class PricingExecutionService {
 
             migrationPolicy.apply(migrationPlan, lineResults);
             FinancialMetrics metrics = metricsCalculator.calculate(result, context.getDurationInMonths(), customer);
+            metricsCalculator.applyCommercialMetrics(metrics, context);
             result.setFinancialMetrics(metrics);
             // Customer churn is authoritative. A request value cannot choose the 8% or 3% branch.
             stampRenewalChurn(context, customer);

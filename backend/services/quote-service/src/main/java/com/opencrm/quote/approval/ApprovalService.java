@@ -122,6 +122,9 @@ public class ApprovalService {
 
     public ApprovalRequestDto rejectRequest(Long approvalId, ApprovalResponseRequest request) {
         String comments = request != null ? request.getComments() : null;
+        if (comments == null || comments.isBlank()) {
+            throw new BusinessException("Reject reason is required", HttpStatus.BAD_REQUEST, "REJECT_REASON_REQUIRED");
+        }
         try {
             refuseStaleDecision(approvalRoutingClient.getById(approvalId));
             RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);

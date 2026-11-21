@@ -202,7 +202,14 @@ class PricingExecuteGoldenFixtureTest {
         assertThat(actual.get("approvalState")).isEqualTo(expectedNode.get("approvalState"));
         assertThat(actual.get("lineResults")).isEqualTo(expectedNode.get("lineResults"));
         assertThat(actual.get("waterfall")).isEqualTo(expectedNode.get("waterfall"));
-        assertThat(actual.get("financialMetrics")).isEqualTo(expectedNode.get("financialMetrics"));
+        assertFinancialMetricsContainExpected(expectedNode.get("financialMetrics"), actual.get("financialMetrics"));
+    }
+
+    /** T1-1 listed ARR/TCV/ACV fields must still match; additive npv/contingent are allowed. */
+    private void assertFinancialMetricsContainExpected(JsonNode expected, JsonNode actual) {
+        assertThat(actual).isNotNull();
+        expected.fields().forEachRemaining(entry ->
+                assertThat(actual.get(entry.getKey())).as(entry.getKey()).isEqualTo(entry.getValue()));
     }
 
     private void stripLineNoise(ObjectNode actual) {

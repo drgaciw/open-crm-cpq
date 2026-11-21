@@ -16,8 +16,10 @@ import com.opencrm.quote.client.PricedPeriodView;
 import com.opencrm.quote.client.PricingExecuteView;
 import com.opencrm.quote.client.PricingFinancialMetricsView;
 import com.opencrm.quote.client.PricingLineResultView;
+import com.opencrm.quote.client.ApprovalRoutingClient;
 import com.opencrm.quote.client.PricingServiceClient;
 import com.opencrm.quote.client.ProductServiceClient;
+import com.opencrm.quote.client.RoutingApprovalDto;
 import com.opencrm.quote.event.QuoteEventPublisher;
 import com.opencrm.quote.lineitem.QuoteLineItem;
 import com.opencrm.quote.lineitem.QuoteLineItemDto;
@@ -71,10 +73,16 @@ public class QuoteService {
     private final CurrentActor currentActor;
     private final RampScheduleGuard rampScheduleGuard;
     private QuoteContinuationService continuationService;
+    private ApprovalRoutingClient approvalRoutingClient;
 
     @org.springframework.beans.factory.annotation.Autowired
     public void setContinuationService(QuoteContinuationService continuationService) {
         this.continuationService = continuationService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setApprovalRoutingClient(ApprovalRoutingClient approvalRoutingClient) {
+        this.approvalRoutingClient = approvalRoutingClient;
     }
 
     private static final Set<QuoteStatus> EDITABLE_STATUSES = Set.of(QuoteStatus.DRAFT, QuoteStatus.REJECTED);
@@ -447,10 +455,23 @@ public class QuoteService {
             throw new BusinessException("Cannot cancel an accepted quote", "CANNOT_CANCEL_ACCEPTED");
         }
 
+        cancelPendingApprovals(quote.getId());
         quote.setStatus(QuoteStatus.CANCELLED);
         Quote saved = quoteRepository.save(quote);
         log.info("Quote {} cancelled", saved.getQuoteNumber());
         return quoteMapper.toDto(saved);
+    }
+
+    /** D1-3: quote cancel moves routing PENDING rows to CANCELLED. Not an approver decision. */
+    private void cancelPendingApprovals(Long quoteId) {
+        if (approvalRoutingClient == null) {
+            return;
+        }
+        for (RoutingApprovalDto remote : approvalRoutingClient.getByQuoteId(quoteId)) {
+            if (remote.getId() != null && "PENDING".equalsIgnoreCase(remote.getStatus())) {
+                approvalRoutingClient.cancel(remote.getId());
+            }
+        }
     }
 
     public QuoteDto clone(Long id) {

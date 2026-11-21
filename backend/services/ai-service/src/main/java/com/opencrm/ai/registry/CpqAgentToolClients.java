@@ -128,6 +128,148 @@ public class CpqAgentToolClients {
     }
 
     /**
+     * Load a pricing rule by id (agent-contract GET /api/v1/rules/{id}).
+     */
+    public CpqToolResponse getRule(long ruleId) {
+        return getJson("/api/v1/rules/" + ruleId, "GET /api/v1/rules/{id}");
+    }
+
+    /**
+     * List rules for a rule set (agent-contract GET /api/v1/rules/by-rule-set/{ruleSetId}).
+     */
+    public CpqToolResponse listRulesByRuleSet(long ruleSetId) {
+        return getJson("/api/v1/rules/by-rule-set/" + ruleSetId + "?page=0&size=100",
+                "GET /api/v1/rules/by-rule-set/{ruleSetId}");
+    }
+
+    /**
+     * Create a DRAFT rule. Callers must never activate the owning rule set from ai-service.
+     */
+    public CpqToolResponse createDraftRule(Map<String, Object> ruleCreateRequest) {
+        log.debug("Calling gateway POST /api/v1/rules");
+        try {
+            String raw = restClient.post()
+                    .uri("/api/v1/rules")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(ruleCreateRequest)
+                    .retrieve()
+                    .body(String.class);
+            return unwrapEnvelope(raw, "Rule draft created");
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for POST /api/v1/rules: {}", ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for POST /api/v1/rules: {}", ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
+    }
+
+    /**
+     * Validate DRL syntax for an existing rule (POST /api/v1/rules/{id}/validate).
+     */
+    public CpqToolResponse validateRule(long ruleId) {
+        log.debug("Calling gateway POST /api/v1/rules/{}/validate", ruleId);
+        try {
+            String raw = restClient.post()
+                    .uri("/api/v1/rules/{ruleId}/validate", ruleId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(String.class);
+            return unwrapEnvelope(raw, "Rule validated successfully");
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for POST /api/v1/rules/{}/validate: {}", ruleId, ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for POST /api/v1/rules/{}/validate: {}", ruleId, ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
+    }
+
+    /**
+     * Rule impact analysis (GET /api/v1/rules/{id}/impact).
+     */
+    public CpqToolResponse getRuleImpact(long ruleId) {
+        return getJson("/api/v1/rules/" + ruleId + "/impact", "GET /api/v1/rules/{id}/impact");
+    }
+
+    /**
+     * Simulate pricing without audit persistence (POST /api/v1/pricing/simulate).
+     */
+    public CpqToolResponse simulatePricing(Map<String, Object> pricingContext) {
+        log.debug("Calling gateway POST /api/v1/pricing/simulate");
+        try {
+            String raw = restClient.post()
+                    .uri("/api/v1/pricing/simulate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(pricingContext)
+                    .retrieve()
+                    .body(String.class);
+            return unwrapEnvelope(raw, "Pricing simulated successfully");
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for POST /api/v1/pricing/simulate: {}", ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for POST /api/v1/pricing/simulate: {}", ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
+    }
+
+    /**
+     * Advisory price optimization (POST /api/v1/pricing/optimize) — BC-03-11.
+     */
+    public CpqToolResponse optimizePricing(Map<String, Object> pricingContext) {
+        log.debug("Calling gateway POST /api/v1/pricing/optimize");
+        try {
+            String raw = restClient.post()
+                    .uri("/api/v1/pricing/optimize")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(pricingContext)
+                    .retrieve()
+                    .body(String.class);
+            return unwrapEnvelope(raw, "Advisory price optimization completed");
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for POST /api/v1/pricing/optimize: {}", ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for POST /api/v1/pricing/optimize: {}", ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
+    }
+
+    private CpqToolResponse getJson(String uri, String label) {
+        log.debug("Calling gateway {}", label);
+        try {
+            String raw = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(String.class);
+            return unwrapEnvelope(raw, label + " succeeded");
+        } catch (ResourceAccessException ex) {
+            log.warn("Gateway unreachable for {}: {}", label, ex.getMessage());
+            return CpqToolResponse.gatewayUnavailable(ex.getMessage());
+        } catch (RestClientException ex) {
+            log.warn("Gateway client error for {}: {}", label, ex.getMessage());
+            return CpqToolResponse.clientError(ex.getMessage());
+        }
+    }
+
+    private CpqToolResponse unwrapEnvelope(String raw, String defaultMessage) {
+        JsonNode envelope = parseGatewayJson(raw);
+        JsonNode data = envelope != null ? envelope.path("data") : null;
+        if (envelope == null || !envelope.path("success").asBoolean(true)) {
+            String message = envelope != null && envelope.hasNonNull("message")
+                    ? envelope.get("message").asText()
+                    : "CPQ call returned an empty response";
+            return CpqToolResponse.clientError(message);
+        }
+        String message = envelope.hasNonNull("message") ? envelope.get("message").asText() : defaultMessage;
+        if (data == null || data.isMissingNode() || data.isNull()) {
+            return CpqToolResponse.ok(null, message);
+        }
+        return CpqToolResponse.ok(data, message);
+    }
+
+    /**
      * Wave F6 / H2: parse gateway {@code ApiResponse<ConfigurationValidationResult>}
      * ({@code valid} + {@code violations[]}) into the tool envelope.
      */

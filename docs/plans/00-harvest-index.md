@@ -12,7 +12,7 @@
 
 Read this file first. Then open only the track docs for the workstream you are assigned. Do **not** invent paths, flip forge holds, or merge source repos wholesale.
 
-**Naming (do not confuse):** harvest **Track T1 / T2** (pricing-ai-rules queues A/B) are **not** forge **Wave T** (skipped — do not name forge T1/T2). Harvest tracks: pricing T1/T2, deal-desk D1/D2, price-book P1–P4, trycompai CRM CC1.
+**Naming (do not confuse):** harvest **Track T1 / T2** (pricing-ai-rules queues A/B) are **not** forge **Wave T** (skipped — do not name forge T1/T2). Harvest tracks: pricing T1/T2, **price-dools PD1/PD2**, deal-desk D1/D2, price-book P1–P4, trycompai CRM CC1.
 
 ---
 
@@ -67,12 +67,13 @@ Steer from [docs/ARCHITECTURE.md](../ARCHITECTURE.md) §§1–11. **Pass** = thi
 | Source (GitHub) | Target owners | Primary vocabulary remap |
 |-----------------|---------------|---------------------------|
 | [drgaciw/pricing-ai-rules-service](https://github.com/drgaciw/pricing-ai-rules-service) | `pricing-service`, `libs/rules-engine`; Track 2 → `ai-service` | `/evaluate` → `POST /api/v1/pricing/execute` |
+| local `price-dools-service` (`price-rules-ai-drools`) | `pricing-service` (PD1/PD2); `ai-service` only after Path B ADR | `/api/v1/drools/**` → existing execute/simulate; conflicts/templates/tests/history as new flagged paths |
 | [drgaciw/deal-desk-service](https://github.com/drgaciw/deal-desk-service) | `approval-routing`, `quote-service` BFF; TCV → pricing residual (not closed T1 PRs) | Source Deal → Quote + ApprovalRequest |
 | [drgaciw/price-book-service](https://github.com/drgaciw/price-book-service) | `pricebook-service`, `@frontend/cpq-price-books` | `/api/pricebooks` → `/api/v1/price-books` |
 
 Cross-cutting: gateway + `docs/backlog/CPQ_API_CONTRACT_MATRIX.md` for any new external path; ADR-006 DTOs only.
 
-**Local clones:** pricing-ai-rules is pinned at `/home/username01/Projects/pricing-ai-rules-service` @ `3aa45bf164469364389e096df07e591c81079f6a`. Deal-desk and price-book clones **do not exist yet** — C0 / E0 create them.
+**Local clones:** pricing-ai-rules is pinned at `/home/username01/Projects/pricing-ai-rules-service` @ `3aa45bf164469364389e096df07e591c81079f6a`. **price-dools** is pinned at `/home/username01/MyCode/price-dools-service` @ `cf994fc055ad2b9723040ff1be73796ba3708014`. Deal-desk and price-book clones **do not exist yet** — C0 / E0 create them.
 
 ---
 
@@ -97,6 +98,18 @@ Paths are relative to `docs/plans/`.
 **Pinned source (T1):** `3aa45bf164469364389e096df07e591c81079f6a`.  
 **Priority locked:** (1) deterministic pricing parity → (2) AI agents (after Path B ADR).  
 **Hybrid metrics (still law):** ARR/TCV/ACV/CLV in Java `MetricsCalculator`; policy in DRL — no Calculate ARR/TCV as DRL.
+
+### 3.2b Price-dools / Drools sidecar — `price-dools-service`
+
+| Doc | Role | Track | Agentic status |
+|-----|------|-------|----------------|
+| [price-dools-reuse-gap-analysis.md](./price-dools-reuse-gap-analysis.md) | Parent plan, Decision ruling, non-goals | PD1 + PD2 | **Plan ready** (Decision 2026-11-16) |
+| [price-dools-capability-matrix-p1.md](./price-dools-capability-matrix-p1.md) | PD1/PD2 capability matrix @ pinned SHA | PD1 + PD2 | **Done** (docs gate) |
+| [price-dools-harvest-backlog-p1.md](./price-dools-harvest-backlog-p1.md) | Ranked PD PR DAG (PD1-1…PD2-2) | PD1 + PD2 | **Done** — code in `pricing-service` |
+
+**Pinned source (PD):** `cf994fc055ad2b9723040ff1be73796ba3708014`.  
+**Priority locked:** (1) conflicts → templates → test-suite runner (PD1) → (2) metrics history/churn-risk (PD2).  
+**HOLD:** Context7 / Sequential Thinking / semantic cache / any AI inside `pricing-service` until Path B ADR (same as Queue B).
 
 ### 3.3 Deal desk — `deal-desk-service`
 
@@ -175,8 +188,22 @@ A-GATE **does not** auto-start Queue B. Path B ADR is still **not** Accepted.
 | B0 | Path B Spring AI ADR draft | **GATED** — not in this parallel set (even though A-GATE is closed) |
 | B1 | RuleValidator / Author / Optimizer ports in `ai-service` | **Accepted** Path B ADR |
 | B-BLOCK | Any Spring AI in `pricing-service` | **Forbidden** |
+| PD-AI | price-dools Context7 / Sequential / semantic cache | **HOLD** — same Path B gate; do not port into `pricing-service` |
 
 Runtime remains Azure OpenAI **gpt-4o** / Spring AI **0.8.1** in `ai-service`.
+
+### Queue PD — price-dools deterministic harvest (Decision 2026-11-16)
+
+Docs-first, then algorithms only. Flags default **false**. Never auto-activate rule sets. Never a second Drools SoR.
+
+| ID | Package | Status |
+|----|---------|--------|
+| PD0 | Gap analysis + matrix + backlog | **Done** (this docs set) |
+| PD1-1 | Rule conflict analysis | `pricing-service` `/api/v1/rules/by-rule-set/{id}/conflicts` |
+| PD1-2 | Template → DRAFT helpers | `POST /api/v1/rules/templates/{kind}` |
+| PD1-3 | Test-suite runner over simulate | `POST /api/v1/rules/test-suites/run` |
+| PD2-1 | Metrics snapshots | `POST/GET /api/v1/pricing/metrics-history/**` |
+| PD2-2 | Churn-risk lookup | `GET /api/v1/pricing/churn-risk/{customerExternalId}` |
 
 ### Queue C — Deal desk D1 (docs first) — **AUTHORIZED (docs only)**
 

@@ -1,9 +1,11 @@
 package com.opencrm.approval.domain;
 
 import com.opencrm.common.entity.BaseEntity;
+import com.opencrm.common.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -88,18 +90,14 @@ public class ApprovalRequest extends BaseEntity {
     
     // State machine transitions
     public void approve(String approverId) {
-        if (status != ApprovalStatus.PENDING) {
-            throw new IllegalStateException("Can only approve PENDING requests");
-        }
+        requirePending("approve", ApprovalStatus.APPROVED);
         this.status = ApprovalStatus.APPROVED;
         this.approverId = approverId;
         this.approvedAt = Instant.now();
     }
     
     public void reject(String approverId, String rejectionReason) {
-        if (status != ApprovalStatus.PENDING) {
-            throw new IllegalStateException("Can only reject PENDING requests");
-        }
+        requirePending("reject", ApprovalStatus.REJECTED);
         this.status = ApprovalStatus.REJECTED;
         this.approverId = approverId;
         this.rejectionReason = rejectionReason;
@@ -109,9 +107,23 @@ public class ApprovalRequest extends BaseEntity {
     public void cancel() {
         if (status == ApprovalStatus.APPROVED || status == ApprovalStatus.REJECTED
                 || status == ApprovalStatus.SUPERSEDED) {
-            throw new IllegalStateException("Cannot cancel already processed requests");
+            throw invalidState("cancel", ApprovalStatus.CANCELLED);
         }
         this.status = ApprovalStatus.CANCELLED;
+    }
+
+    private void requirePending(String action, ApprovalStatus target) {
+        if (status != ApprovalStatus.PENDING) {
+            throw invalidState(action, target);
+        }
+    }
+
+    private BusinessException invalidState(String action, ApprovalStatus target) {
+        return new BusinessException(
+                "Cannot " + action + " approval in " + status
+                        + " (action=" + action + ", currentStatus=" + status + ", targetStatus=" + target + ")",
+                HttpStatus.CONFLICT,
+                "INVALID_STATE_TRANSITION");
     }
 
     /**

@@ -112,6 +112,14 @@ opencrm:
       # ADR-023 D-06. Stays off in committed config.
       enabled: false
       max-periods: 36
+    # PD1 harvest from price-dools. Advisory rule tools; default off.
+    rule-tools:
+      enabled: false
+    # PD2 harvest. On-demand snapshots only; no scheduler. Default off.
+    metrics-history:
+      enabled: false
+    # AI Context7 / Sequential Thinking / semantic cache: HOLD until Path B ADR.
+    # Do not add AI inside pricing-service.
 
 ---
 # Development profile

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "7e466d67-aace-41c5-ac80-7f014bf2a3c2",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+  "output": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+  "specification": {
+    "sha256": "7b993f50b1b82ff02c3c3a9bafcde23c69e703dd79b87b76fe0acfd6ba1f58b4",
+    "bytes": 5769
+  },
+  "artifact": {
+    "sha256": "252fd459b14f871019c7f958f1fa568c28acbb7f34aa1b8a994321bc5fbac16e",
+    "bytes": 981096
+  },
+  "explainer": {
+    "preparedSha256": "3551935b912d9947a5fc55305060a2d2b6db532af9e3341c037ba43cbac1e69c",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "shape-compare",
+        "inline": true,
+        "sha256": "6d9fc03ecb4d2a6156cbfc46987819dab833f0c1307615ca90bc4c7e8401678d",
+        "bytes": 1693
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "own-flow",
+        "inline": true,
+        "sha256": "36b36c611d622fe8f7668294f9a9ed61029a80f25f776103a0e34b3afb8aed80",
+        "bytes": 1079
+      }
+    ]
+  }
+}

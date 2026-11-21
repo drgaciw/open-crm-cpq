@@ -127,6 +127,7 @@ public class ApprovalService {
 
     public ApprovalRequestDto reject(Long id, String rejectionReason) {
         log.debug("Rejecting request ID: {}", id);
+        requireRejectReason(rejectionReason);
 
         ApprovalRequest request = findEntityById(id);
         String approver = authorizeDecision(request);
@@ -151,6 +152,18 @@ public class ApprovalService {
 
         log.info("Rejected request ID: {} for quote: {} by {}", id, request.getQuoteId(), request.getApproverId());
 
+        return approvalRequestMapper.toDto(saved);
+    }
+
+    /**
+     * Quote-cancel cascade (D1-3). Not a human approval decision: a service token may call this.
+     */
+    public ApprovalRequestDto cancel(Long id) {
+        log.debug("Cancelling request ID: {}", id);
+        ApprovalRequest request = findEntityById(id);
+        request.cancel();
+        ApprovalRequest saved = approvalRequestRepository.save(request);
+        log.info("Cancelled request ID: {} for quote: {}", id, request.getQuoteId());
         return approvalRequestMapper.toDto(saved);
     }
 
@@ -198,6 +211,12 @@ public class ApprovalService {
             throw new BusinessException("Approval " + request.getId() + " was superseded by approval "
                     + request.getSupersededBy() + " and can no longer be decided; decide the newer request",
                     HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED");
+        }
+    }
+
+    private static void requireRejectReason(String rejectionReason) {
+        if (rejectionReason == null || rejectionReason.isBlank()) {
+            throw new BusinessException("Reject reason is required", HttpStatus.BAD_REQUEST, "REJECT_REASON_REQUIRED");
         }
     }
 

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/candidate.archify.md",
+    "sha256": "c84c4f83537c208e2f0b89760cd24826df80ea50479b0973b4264a21cb0d650a",
+    "bytes": 5758
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/functional-comparison.html",
+    "sha256": "ca0278bef434d7048103a392e77c6fdaa13fc69de30c52ca0f9b246a77a86cb8",
+    "bytes": 981845
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "not-run"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/functional-comparison.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-20261116-074753/functional-comparison.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1058,
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  }
+}

@@ -107,8 +107,10 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - When given bug reports, verify each issue in the repo before changing code; leave false positives untouched.
 - When restarting local apps, kill all related dev servers first, then bring the stack back up cleanly; do not restart a healthy running stack unless it is broken or the user asks.
 - Keep committed `frontend/proxy.conf.json` targeting the gateway (`:8080`), not a temporary CRM-direct workaround.
-- When the user delegates product, architecture, or UX choices (including CPQ or open Notion questions) or asks to settle them with Clef, decide via Clef when available, record the choice in the plan/backlog, and proceed rather than blocking on owner reply.
+- When the user delegates product, architecture, or UX choices (including CPQ or open Notion questions) or asks to settle them with Clef or the Decision grok bot (TypeSafe Jev), settle via that path when available, record the choice in the plan/backlog, and proceed rather than blocking on owner reply.
 - For multi-phase goals, prefer subagent fan-out to finish the work, then Playwright (+ Jev when asked) UAT; when asked for a definition of done, use Jev to draft the rubric and validate against it when the goal is complete.
+- Prefer Archify explainers for project comparisons and multi-section functional analyses when asked to illustrate differences or gaps.
+- Prefer implementing attached plans as specified without editing the plan file itself.
 
 ## Learned Workspace Facts
 
@@ -118,7 +120,8 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - Frontend unit tests use Vitest (`@nx/vitest:test`, `vitest/globals`, Analog `setupTestBed`); `TestBed` + `vi.fn()` is the intended pattern, not Jasmine spies.
 - Chrome DevTools MCP needs Google Chrome stable; hosts with only Chromium should rely on Playwright and the Cursor browser for UI automation.
 - CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them); opportunity WON requires an accepted quote (`OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE`), so WON-stage UAT cannot complete while quote-service is down.
-- Sibling-service reuse gap analyses and harvest backlogs live under `docs/plans/`; `docs/plans/00-harvest-index.md` is the agentic index for that work.
+- Sibling-service reuse harvest starts at `docs/plans/00-harvest-index.md` (matrices/backlogs under `docs/plans/`); Deal Desk maps to `approval-routing` + quote BFF (no `/api/v1/deals`, Easy Rules, Mongo deal API, or Salesforce sync); pricing-ai-rules maps to `pricing-service` / `ai-service` — obey index holds and source pins rather than inventing clone paths.
+- Archify explainers use the skill at `/home/username01/agent-factory-poc-00/.agents/skills/archify` (`node …/bin/archify.mjs finalize`); write artifacts under the compared repo's `.archify/`.
 - CRM UI direction is SLDS2-inspired Angular Material (Material Cosmos), not LWC or a Salesforce look-alike; design contract is `docs/design/UI-CRM-SLDS-design-contract.md`; agent panel ships as UI shell first with `opencrm.jev.*.enabled` flags remaining off.
 - Shared `DataTableComponent` in `frontend/libs/shared/ui` is the target list pattern (`data-testid="data-table"`); CPQ lists already use it, and CRM entity lists are migrating off raw `mat-table`.
 - CRM user-facing copy uses Opportunities (not Deals) per the design contract; routes and libs may still use `deals` — keep UAT/search assertions aligned with Opportunities labels.

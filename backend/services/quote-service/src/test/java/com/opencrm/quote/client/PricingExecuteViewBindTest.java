@@ -70,6 +70,30 @@ class PricingExecuteViewBindTest {
     }
 
     @Test
+    @DisplayName("npv and contingentRevenue bind when pricing emits them")
+    void bindsDealDeskCommercialMetrics() throws Exception {
+        String json = """
+                {
+                  "success": true,
+                  "data": {
+                    "success": true,
+                    "lineResults": [{"productExternalId": "PROD-1"}],
+                    "financialMetrics": {
+                      "tcv": 1700.00,
+                      "npv": 1545.45,
+                      "contingentRevenue": 500.00
+                    }
+                  }
+                }
+                """;
+
+        PricingFinancialMetricsView metrics = objectMapper.readValue(json, responseType).getData().getFinancialMetrics();
+        assertThat(metrics.getTcv()).isEqualByComparingTo("1700.00");
+        assertThat(metrics.getNpv()).isEqualByComparingTo("1545.45");
+        assertThat(metrics.getContingentRevenue()).isEqualByComparingTo("500.00");
+    }
+
+    @Test
     @DisplayName("absent pricedPeriods and exitArr stay null")
     void absentFieldsStayNull() throws Exception {
         String json = """

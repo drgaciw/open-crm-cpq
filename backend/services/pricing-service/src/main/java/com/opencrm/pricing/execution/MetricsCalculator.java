@@ -3,6 +3,7 @@ package com.opencrm.pricing.execution;
 import com.opencrm.pricing.customer.Customer;
 import com.opencrm.pricing.ramp.PricedPeriod;
 import com.opencrm.pricing.waterfall.FinancialMetrics;
+import com.opencrm.pricing.waterfall.PricingContext;
 import com.opencrm.pricing.waterfall.PricingLineResult;
 import com.opencrm.pricing.waterfall.PricingResult;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,8 @@ public class MetricsCalculator {
 
     private static final int MONEY_SCALE = 2;
     private static final RoundingMode MONEY_ROUNDING = RoundingMode.HALF_UP;
+    /** Deal Desk NPV convention when the request omits a rate. */
+    static final BigDecimal DEFAULT_NPV_DISCOUNT_RATE = new BigDecimal("0.10");
 
     private final AcvVersion acvVersion;
 
@@ -264,5 +267,41 @@ public class MetricsCalculator {
 
     private static BigDecimal money(BigDecimal value) {
         return value.setScale(MONEY_SCALE, MONEY_ROUNDING);
+    }
+
+    /**
+     * Deal Desk Mode B residual: contingent revenue + NPV. Does not replace ARR/ACV/CLV/exitArr.
+     * When {@code contingentIncludedInTcv} is true, commercial TCV grows by the contingent amount.
+     * NPV = commercialTCV / (1+r)^(months/12), default r = {@link #DEFAULT_NPV_DISCOUNT_RATE}.
+     */
+    public void applyCommercialMetrics(FinancialMetrics metrics, PricingContext context) {
+        if (metrics == null) {
+            return;
+        }
+        int months = context != null && context.getDurationInMonths() != null && context.getDurationInMonths() > 0
+                ? context.getDurationInMonths()
+                : 12;
+        BigDecimal contingent = context != null ? context.getContingentRevenueAmount() : null;
+        if (contingent != null) {
+            metrics.setContingentRevenue(money(contingent));
+            if (Boolean.TRUE.equals(context.getContingentIncludedInTcv())) {
+                BigDecimal tcv = metrics.getTcv() != null ? metrics.getTcv() : BigDecimal.ZERO;
+                metrics.setTcv(money(tcv.add(contingent)));
+            }
+        }
+        BigDecimal rate = context != null ? context.getNpvDiscountRate() : null;
+        BigDecimal tcv = metrics.getTcv() != null ? metrics.getTcv() : BigDecimal.ZERO;
+        metrics.setNpv(npv(tcv, months, rate));
+    }
+
+    static BigDecimal npv(BigDecimal tcv, int months, BigDecimal rate) {
+        BigDecimal principal = tcv != null ? tcv : BigDecimal.ZERO;
+        int duration = months > 0 ? months : 12;
+        BigDecimal r = rate != null && rate.compareTo(BigDecimal.ZERO) > 0 ? rate : DEFAULT_NPV_DISCOUNT_RATE;
+        double factor = Math.pow(1.0d + r.doubleValue(), duration / 12.0d);
+        if (factor <= 0.0d) {
+            return money(principal);
+        }
+        return money(principal.divide(BigDecimal.valueOf(factor), MONEY_SCALE, MONEY_ROUNDING));
     }
 }

@@ -1,6 +1,8 @@
 package com.opencrm.pricing.execution;
 
 import com.opencrm.common.dto.ApiResponse;
+import com.opencrm.pricing.optimization.PriceOptimizationResponse;
+import com.opencrm.pricing.optimization.PriceOptimizationService;
 import com.opencrm.pricing.waterfall.PricingContext;
 import com.opencrm.pricing.waterfall.PricingResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +24,7 @@ import java.util.List;
 public class PricingExecutionController {
 
     private final PricingExecutionService pricingExecutionService;
+    private final PriceOptimizationService priceOptimizationService;
 
     /**
      * Execute pricing calculation.
@@ -63,5 +66,16 @@ public class PricingExecutionController {
     public ApiResponse<List<PricingAuditLog>> getAuditTrail(@PathVariable String quoteExternalId) {
         List<PricingAuditLog> auditLogs = pricingExecutionService.getAuditTrail(quoteExternalId);
         return ApiResponse.success(auditLogs);
+    }
+
+    /**
+     * BC-03-11: advisory price optimization within a guidance band.
+     * Recommendations are never authoritative; deterministic policy still governs.
+     */
+    @PostMapping("/optimize")
+    @Operation(summary = "Optimize pricing (advisory)", description = "Return advisory price recommendations with model version in the trace")
+    public ApiResponse<PriceOptimizationResponse> optimize(@Valid @RequestBody PricingContext context) {
+        PriceOptimizationResponse result = priceOptimizationService.optimize(context);
+        return ApiResponse.success(result, "Advisory price optimization completed");
     }
 }

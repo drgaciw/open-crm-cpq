@@ -48,9 +48,43 @@ public class CpqAgentTools {
         return request -> clients.validateConfiguration(request.selectedProductIds());
     }
 
+    @Bean
+    @Description("""
+            Load a pricing rule by id via CPQ gateway (GET /api/v1/rules/{id}). \
+            Used by cpq-agent-038 through cpq-agent-042.""")
+    public Function<RuleIdRequest, CpqToolResponse> getRuleTool() {
+        return request -> clients.getRule(request.ruleId());
+    }
+
+    @Bean
+    @Description("""
+            Validate DRL syntax for a draft rule via CPQ gateway \
+            (POST /api/v1/rules/{id}/validate). Used by rule workflow agents.""")
+    public Function<RuleIdRequest, CpqToolResponse> validateRuleTool() {
+        return request -> clients.validateRule(request.ruleId());
+    }
+
+    @Bean
+    @Description("""
+            Analyze rule impact signals via CPQ gateway (GET /api/v1/rules/{id}/impact). \
+            Used by cpq-agent-040 and cpq-agent-042.""")
+    public Function<RuleIdRequest, CpqToolResponse> getRuleImpactTool() {
+        return request -> clients.getRuleImpact(request.ruleId());
+    }
+
+    @Bean
+    @Description("""
+            Simulate pricing without audit persistence via CPQ gateway \
+            (POST /api/v1/pricing/simulate). Used by cpq-agent-041.""")
+    public Function<PricingExecuteRequest, CpqToolResponse> simulatePricingTool() {
+        return request -> clients.simulatePricing(request.pricingContext());
+    }
+
     public record PricingExecuteRequest(Map<String, Object> pricingContext) {}
 
     public record QuoteLineItemsRequest(long quoteId) {}
 
     public record ConfigurationValidateRequest(List<Long> selectedProductIds) {}
+
+    public record RuleIdRequest(long ruleId) {}
 }

@@ -1,0 +1,789 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "startedAt": "2026-11-16T13:55:10.629Z",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+    "sha256": "7b993f50b1b82ff02c3c3a9bafcde23c69e703dd79b87b76fe0acfd6ba1f58b4",
+    "bytes": 5769
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+    "sha256": "252fd459b14f871019c7f958f1fa568c28acbb7f34aa1b8a994321bc5fbac16e",
+    "bytes": 981096
+  },
+  "stages": {
+    "browser-check": {
+      "status": "not-run",
+      "execution": "not-requested"
+    },
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+        "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "7b993f50b1b82ff02c3c3a9bafcde23c69e703dd79b87b76fe0acfd6ba1f58b4",
+          "bytes": 5769
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 663,
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+        "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "7e466d67-aace-41c5-ac80-7f014bf2a3c2",
+        "ok": true,
+        "command": "deliver",
+        "type": "explainer",
+        "input": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+        "output": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+        "explainer": {
+          "preparedSha256": "3551935b912d9947a5fc55305060a2d2b6db532af9e3341c037ba43cbac1e69c",
+          "dependencies": [
+            {
+              "kind": "diagram-spec",
+              "id": "shape-compare",
+              "inline": true,
+              "sha256": "6d9fc03ecb4d2a6156cbfc46987819dab833f0c1307615ca90bc4c7e8401678d",
+              "bytes": 1693
+            },
+            {
+              "kind": "diagram-spec",
+              "id": "own-flow",
+              "inline": true,
+              "sha256": "36b36c611d622fe8f7668294f9a9ed61029a80f25f776103a0e34b3afb8aed80",
+              "bytes": 1079
+            }
+          ]
+        },
+        "specification": {
+          "sha256": "7b993f50b1b82ff02c3c3a9bafcde23c69e703dd79b87b76fe0acfd6ba1f58b4",
+          "bytes": 5769
+        },
+        "artifact": {
+          "sha256": "252fd459b14f871019c7f958f1fa568c28acbb7f34aa1b8a994321bc5fbac16e",
+          "bytes": 981096
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "diagnostics": [
+          {
+            "code": "explainer/writing-sentence-length",
+            "severity": "warning",
+            "message": "Sentence has 35 reading units, above the configured en limit of 28.",
+            "subject": {
+              "line": 3,
+              "component": "answer",
+              "input": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md"
+            },
+            "evidence": {
+              "rule": "sentence-length",
+              "reason": "Sentence has 35 reading units, above the configured en limit of 28.",
+              "example": "先查缓存。未命中时再查数据库。 / Check the cache first. Query the database on a miss.",
+              "units": 35,
+              "limit": 28
+            },
+            "supportedFixes": [
+              "Split at a logical action or condition boundary while preserving qualifications and causal links."
+            ]
+          }
+        ],
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "stderr": "archify: Sentence has 35 reading units, above the configured en limit of 28."
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 326,
+      "command": [
+        "/home/username01/.nvm/versions/node/v26.13.0/bin/node",
+        "/home/username01/agent-factory-poc-00/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.html",
+        "family": "explainer",
+        "artifact": {
+          "sha256": "252fd459b14f871019c7f958f1fa568c28acbb7f34aa1b8a994321bc5fbac16e",
+          "bytes": 981096
+        },
+        "checks": [
+          {
+            "name": "explainer_structure",
+            "ok": true,
+            "details": [
+              "72 unique DOM IDs"
+            ]
+          },
+          {
+            "name": "explainer_payload_identity",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "explainer_dependencies",
+            "ok": true,
+            "details": [
+              "2 frozen dependencies"
+            ]
+          },
+          {
+            "name": "explainer_native_diagrams",
+            "ok": true,
+            "details": [
+              "shape-compare: pass",
+              "own-flow: pass"
+            ]
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "issues": [],
+          "nativeDiagrams": [
+            {
+              "id": "shape-compare",
+              "receipt": {
+                "ok": true,
+                "file": "/tmp/archify-explainer-check-bkSyvX/child.html",
+                "artifact": {
+                  "sha256": "6c5c12471198994b13e760af42c0cae32cc4d4157aac7aa238a6acfe85c0c969",
+                  "bytes": 842728
+                },
+                "checks": [
+                  {
+                    "name": "single_svg",
+                    "ok": true,
+                    "details": [
+                      "found 1 <svg> block(s)"
+                    ]
+                  },
+                  {
+                    "name": "finite_svg",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "orthogonal_arrows",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "label_route_clearance",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_crossings",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_corridors",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "container_border_runs",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "route_rhythm",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "legend_clearance",
+                    "ok": true,
+                    "details": []
+                  }
+                ],
+                "composition": {
+                  "schemaVersion": 1,
+                  "profile": "showcase",
+                  "status": "pass",
+                  "summary": {
+                    "errors": 0,
+                    "warnings": 0
+                  },
+                  "metrics": {
+                    "properCrossings": 0,
+                    "resolvedCrossovers": 4,
+                    "ambiguousCorridors": 0,
+                    "arrowheadCollisions": 0,
+                    "containerBorderRuns": 0,
+                    "labelRouteClearanceIssues": 0,
+                    "labelCanvasOverflowIssues": 0,
+                    "minLabelRouteClearance": 6,
+                    "desktopReadabilityIssues": 0,
+                    "viewportHeightIssues": 0,
+                    "minProjectedNodeTextPx": 8,
+                    "maxBends": 4,
+                    "routesOverSuggestedBends": 4,
+                    "maxStretch": 1.258,
+                    "routesOverSuggestedStretch": 0,
+                    "minSegmentPx": 24,
+                    "minInteriorSegmentPx": 32.9,
+                    "shortSegmentCount": 0,
+                    "shortEndpointSegmentCount": 0,
+                    "shortInteriorSegmentCount": 0,
+                    "microSegmentCount": 0
+                  },
+                  "suggestedLimits": {
+                    "bendsPerRelationship": 2,
+                    "stretch": 1.35,
+                    "segmentPx": 16,
+                    "microSegmentPx": 8
+                  },
+                  "routeReview": {
+                    "crossings": [
+                      {
+                        "left": {
+                          "id": "gw-to-crm-1",
+                          "from": "gw",
+                          "to": "crm",
+                          "label": "",
+                          "collectionIndex": 1,
+                          "artifactIndex": 2
+                        },
+                        "right": {
+                          "id": "gw-to-quote-1",
+                          "from": "gw",
+                          "to": "quote",
+                          "label": "",
+                          "collectionIndex": 2,
+                          "artifactIndex": 3
+                        },
+                        "point": [
+                          163,
+                          482
+                        ],
+                        "sharedNode": "gw"
+                      },
+                      {
+                        "left": {
+                          "id": "gw-to-ai-1",
+                          "from": "gw",
+                          "to": "ai",
+                          "label": "workflow experiments",
+                          "collectionIndex": 4,
+                          "artifactIndex": 5
+                        },
+                        "right": {
+                          "id": "price-to-pg-1",
+                          "from": "price",
+                          "to": "pg",
+                          "label": "Flyway",
+                          "collectionIndex": 5,
+                          "artifactIndex": 6
+                        },
+                        "point": [
+                          21,
+                          1040.3846153846155
+                        ]
+                      },
+                      {
+                        "left": {
+                          "id": "gw-to-ai-1",
+                          "from": "gw",
+                          "to": "ai",
+                          "label": "workflow experiments",
+                          "collectionIndex": 4,
+                          "artifactIndex": 5
+                        },
+                        "right": {
+                          "id": "ai-to-gw-1",
+                          "from": "ai",
+                          "to": "gw",
+                          "label": "tool clients",
+                          "collectionIndex": 6,
+                          "artifactIndex": 7
+                        },
+                        "point": [
+                          93,
+                          1168
+                        ],
+                        "sharedNode": "gw"
+                      },
+                      {
+                        "left": {
+                          "id": "price-to-pg-1",
+                          "from": "price",
+                          "to": "pg",
+                          "label": "Flyway",
+                          "collectionIndex": 5,
+                          "artifactIndex": 6
+                        },
+                        "right": {
+                          "id": "ai-to-gw-1",
+                          "from": "ai",
+                          "to": "gw",
+                          "label": "tool clients",
+                          "collectionIndex": 6,
+                          "artifactIndex": 7
+                        },
+                        "point": [
+                          16,
+                          1071.7777777777778
+                        ]
+                      }
+                    ],
+                    "detours": [
+                      {
+                        "relationship": {
+                          "id": "gw-to-quote-1",
+                          "from": "gw",
+                          "to": "quote",
+                          "label": "",
+                          "collectionIndex": 2,
+                          "artifactIndex": 3
+                        },
+                        "bends": 4,
+                        "stretch": 1.192,
+                        "directCorridorBlockers": [
+                          {
+                            "id": "crm",
+                            "label": "crm-service",
+                            "box": [
+                              40,
+                              452,
+                              120,
+                              60
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "relationship": {
+                          "id": "gw-to-price-1",
+                          "from": "gw",
+                          "to": "price",
+                          "label": "execute simulate",
+                          "collectionIndex": 3,
+                          "artifactIndex": 4
+                        },
+                        "bends": 4,
+                        "stretch": 1.203,
+                        "directCorridorBlockers": [
+                          {
+                            "id": "crm",
+                            "label": "crm-service",
+                            "box": [
+                              40,
+                              452,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "quote",
+                            "label": "quote-service",
+                            "box": [
+                              40,
+                              638,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "pb",
+                            "label": "pricebook-service",
+                            "box": [
+                              40,
+                              824,
+                              129,
+                              60
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "relationship": {
+                          "id": "gw-to-ai-1",
+                          "from": "gw",
+                          "to": "ai",
+                          "label": "workflow experiments",
+                          "collectionIndex": 4,
+                          "artifactIndex": 5
+                        },
+                        "bends": 4,
+                        "stretch": 1.146,
+                        "directCorridorBlockers": [
+                          {
+                            "id": "crm",
+                            "label": "crm-service",
+                            "box": [
+                              40,
+                              452,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "quote",
+                            "label": "quote-service",
+                            "box": [
+                              40,
+                              638,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "pb",
+                            "label": "pricebook-service",
+                            "box": [
+                              40,
+                              824,
+                              129,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "price",
+                            "label": "pricing-service",
+                            "box": [
+                              40,
+                              1010,
+                              120,
+                              60
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "relationship": {
+                          "id": "ai-to-gw-1",
+                          "from": "ai",
+                          "to": "gw",
+                          "label": "tool clients",
+                          "collectionIndex": 6,
+                          "artifactIndex": 7
+                        },
+                        "bends": 4,
+                        "stretch": 1.132,
+                        "directCorridorBlockers": [
+                          {
+                            "id": "crm",
+                            "label": "crm-service",
+                            "box": [
+                              40,
+                              452,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "quote",
+                            "label": "quote-service",
+                            "box": [
+                              40,
+                              638,
+                              120,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "pb",
+                            "label": "pricebook-service",
+                            "box": [
+                              40,
+                              824,
+                              129,
+                              60
+                            ]
+                          },
+                          {
+                            "id": "price",
+                            "label": "pricing-service",
+                            "box": [
+                              40,
+                              1010,
+                              120,
+                              60
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "leadingSpace": {
+                    "measured": true,
+                    "emptyTopPx": 80,
+                    "emptyTopRatio": 0.047,
+                    "occupiedTop": 80,
+                    "viewBoxTop": 0,
+                    "canvasHeight": 1718,
+                    "typicalNodeHeight": 60,
+                    "reviewSuggested": false
+                  },
+                  "desktopReadability": {
+                    "budgetBasis": "legacy-930",
+                    "readerContract": "declared-wide-v1",
+                    "availableDiagramWidth": 930,
+                    "actualBudgetPx": 930,
+                    "limit": "legacy",
+                    "requestedTargetPx": 7.5,
+                    "requestedTargetMet": true,
+                    "hardFloorPx": 6,
+                    "hardFloorMet": true,
+                    "minimumOwner": {
+                      "kind": "edge",
+                      "id": "ui-to-gw-1",
+                      "from": "ui",
+                      "to": "gw"
+                    },
+                    "minimumSourceTextPx": 8,
+                    "minimumProjectedTextPx": 8,
+                    "semanticTextCount": 17
+                  },
+                  "issues": []
+                }
+              }
+            },
+            {
+              "id": "own-flow",
+              "receipt": {
+                "ok": true,
+                "file": "/tmp/archify-explainer-check-0r8xBp/child.html",
+                "artifact": {
+                  "sha256": "a622b34d446e970d7aa899316f07df582a8634a820788b45e3702468554ef0a9",
+                  "bytes": 830273
+                },
+                "checks": [
+                  {
+                    "name": "single_svg",
+                    "ok": true,
+                    "details": [
+                      "found 1 <svg> block(s)"
+                    ]
+                  },
+                  {
+                    "name": "finite_svg",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "orthogonal_arrows",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "label_route_clearance",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_crossings",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_corridors",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "container_border_runs",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "route_rhythm",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "legend_clearance",
+                    "ok": true,
+                    "details": []
+                  }
+                ],
+                "composition": {
+                  "schemaVersion": 1,
+                  "profile": "showcase",
+                  "status": "pass",
+                  "summary": {
+                    "errors": 0,
+                    "warnings": 0
+                  },
+                  "metrics": {
+                    "properCrossings": 0,
+                    "resolvedCrossovers": 0,
+                    "ambiguousCorridors": 0,
+                    "arrowheadCollisions": 0,
+                    "containerBorderRuns": 0,
+                    "labelRouteClearanceIssues": 0,
+                    "labelCanvasOverflowIssues": 0,
+                    "minLabelRouteClearance": 76.5,
+                    "desktopReadabilityIssues": 0,
+                    "viewportHeightIssues": 0,
+                    "minProjectedNodeTextPx": 7.576374745417516,
+                    "maxBends": 0,
+                    "routesOverSuggestedBends": 0,
+                    "maxStretch": 1,
+                    "routesOverSuggestedStretch": 0,
+                    "minSegmentPx": 32,
+                    "minInteriorSegmentPx": null,
+                    "shortSegmentCount": 0,
+                    "shortEndpointSegmentCount": 0,
+                    "shortInteriorSegmentCount": 0,
+                    "microSegmentCount": 0
+                  },
+                  "suggestedLimits": {
+                    "bendsPerRelationship": 2,
+                    "stretch": 1.35,
+                    "segmentPx": 16,
+                    "microSegmentPx": 8
+                  },
+                  "routeReview": {
+                    "crossings": [],
+                    "detours": []
+                  },
+                  "leadingSpace": {
+                    "measured": false,
+                    "reviewSuggested": false
+                  },
+                  "desktopReadability": {
+                    "budgetBasis": "legacy-930",
+                    "readerContract": "declared-wide-v1",
+                    "availableDiagramWidth": 930,
+                    "actualBudgetPx": 930,
+                    "limit": "legacy",
+                    "requestedTargetPx": null,
+                    "requestedTargetMet": null,
+                    "hardFloorPx": 6,
+                    "hardFloorMet": true,
+                    "minimumOwner": {
+                      "kind": "edge",
+                      "id": "crmq-to-cpq-1",
+                      "from": "crmq",
+                      "to": "cpq"
+                    },
+                    "minimumSourceTextPx": 8,
+                    "minimumProjectedTextPx": 7.576374745417516,
+                    "semanticTextCount": 8
+                  },
+                  "issues": []
+                }
+              }
+            }
+          ]
+        },
+        "diagnostics": [],
+        "provenance": "current",
+        "deliveryReceiptId": "7e466d67-aace-41c5-ac80-7f014bf2a3c2"
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "explainer/writing-sentence-length",
+      "severity": "warning",
+      "message": "Sentence has 35 reading units, above the configured en limit of 28.",
+      "subject": {
+        "input": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/candidate.archify.md",
+        "line": 3,
+        "component": "answer"
+      },
+      "evidence": {
+        "reason": "Sentence has 35 reading units, above the configured en limit of 28.",
+        "example": "先查缓存。未命中时再查数据库。 / Check the cache first. Query the database on a miss.",
+        "rule": "sentence-length",
+        "units": 35,
+        "limit": 28
+      },
+      "supportedFixes": [
+        "Split at a logical action or condition boundary while preserving qualifications and causal links."
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-functional-comparison-pdools-20261116-075425/functional-comparison.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "finishedAt": "2026-11-16T13:55:11.708Z",
+  "durationMs": 1078,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

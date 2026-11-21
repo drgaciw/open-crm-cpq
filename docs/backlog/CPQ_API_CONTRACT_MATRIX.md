@@ -63,7 +63,7 @@ Configuration **rule CRUD** is owned by **product-service** (`ConfigurationRuleC
 | POST | `/api/v1/configurations/{id}/complete` | configuration-engine (8088) | beta | — | Commit valid session. |
 | POST | `/api/v1/configurations/{id}/cancel` | configuration-engine (8088) | beta | — | Cancel session. |
 
-**Section row count:** 12
+**Section row count:** 14
 
 ---
 
@@ -77,13 +77,16 @@ Deterministic pricing execution and customer context for margin and validation a
 | POST | `/api/v1/pricing/simulate` | pricing-service (8082) | stable | — | No persistence; referenced by other agents, not the three PRDs. |
 | POST | `/api/v1/pricing/simulate/bulk` | pricing-service (8082) | beta | — | Implemented in `PricingExecutionController`; PRD §10.2 previously "not started". |
 | GET | `/api/v1/pricing/audit/{quoteExternalId}` | pricing-service (8082) | beta | — | Audit trail query; margin audit / compliance cross-ref. |
+| POST | `/api/v1/pricing/metrics-history/{customerExternalId}/snapshot` | pricing-service (8082) | beta | — | PD2; flag `opencrm.pricing.metrics-history.enabled` (default false). Stores `MetricsCalculator` outputs from simulate. |
+| GET | `/api/v1/pricing/metrics-history/{customerExternalId}` | pricing-service (8082) | beta | — | PD2; lookback days (default 30). Same flag. |
+| GET | `/api/v1/pricing/churn-risk/{customerExternalId}` | pricing-service (8082) | beta | — | PD2; latest snapshot `churnScore`. Same flag. |
 | POST | `/api/v1/pricing-customers` | pricing-service (8082) | stable | — | Admin/catalog; not in three agent PRDs. |
 | GET | `/api/v1/pricing-customers` | pricing-service (8082) | stable | — | List/filter by segment. FE portal (Wave N2). |
 | GET | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | **agent-contract** | cpq-agent-011, cpq-agent-016 | Segment, churn, margin policy context (`CustomerController`). |
 | PUT | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | stable | — | Update pricing customer. |
 | DELETE | `/api/v1/pricing-customers/{id}` | pricing-service (8082) | stable | — | Soft delete. |
 
-**Section row count:** 9
+**Section row count:** 12
 
 ---
 
@@ -122,6 +125,9 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 | DELETE | `/api/v1/rules/{id}` | pricing-service (8082) | stable | — | Soft delete. |
 | POST | `/api/v1/rules/{id}/validate` | pricing-service (8082) | **agent-contract** | cpq-agent-016 | DRL compile/syntax check via `RuleService.validate`; blocks activation of malformed rules. |
 | GET | `/api/v1/rules/{id}/impact` | pricing-service (8082) | beta | — | `RuleController.impact`; PRD §10.2 planned—**now implemented**. FE rule-set detail Impact dialog (Wave P2 `@frontend/cpq-rule-sets`). |
+| GET | `/api/v1/rules/by-rule-set/{ruleSetId}/conflicts` | pricing-service (8082) | beta | — | PD1-1 static conflict analysis. Flag `opencrm.pricing.rule-tools.enabled` (default false). |
+| POST | `/api/v1/rules/templates/{kind}` | pricing-service (8082) | beta | — | PD1-2 template → DRAFT via `RuleService.create`. Kinds: volume-discount, commitment, risk-adjustment, contract-length. Never auto-activates. Same flag. |
+| POST | `/api/v1/rules/test-suites/run` | pricing-service (8082) | beta | — | PD1-3 suite runner wrapping `simulate`. Same flag. |
 | POST | `/api/v1/rule-sets` | pricing-service (8082) | stable | — | Rule set lifecycle (`RuleSetController`). |
 | GET | `/api/v1/rule-sets` | pricing-service (8082) | stable | — | List rule sets. |
 | GET | `/api/v1/rule-sets/{id}` | pricing-service (8082) | stable | — | Get rule set. |
@@ -130,7 +136,7 @@ Pricing **Drools** rules (distinct from product **configuration** rules in §3).
 | POST | `/api/v1/rule-sets/{id}/activate` | pricing-service (8082) | stable | — | DRAFT → ACTIVE. FE ConfirmDialog (Wave O1 `@frontend/cpq-rule-sets`). |
 | POST | `/api/v1/rule-sets/{id}/deprecate` | pricing-service (8082) | stable | — | ACTIVE → DEPRECATED. FE ConfirmDialog (Wave O1). |
 
-**Section row count:** 14
+**Section row count:** 17
 
 ---
 

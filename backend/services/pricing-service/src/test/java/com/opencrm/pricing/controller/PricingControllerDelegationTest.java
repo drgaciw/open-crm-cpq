@@ -37,6 +37,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,7 +116,9 @@ class PricingControllerDelegationTest {
 
     @Test
     void executionController_coversEndpoints() {
-        PricingExecutionController controller = new PricingExecutionController(pricingExecutionService);
+        var priceOptimizationService = mock(com.opencrm.pricing.optimization.PriceOptimizationService.class);
+        PricingExecutionController controller =
+                new PricingExecutionController(pricingExecutionService, priceOptimizationService);
         PricingContext ctx = PricingContext.builder().quoteExternalId("Q1").build();
         PricingResult result = new PricingResult();
         BulkPricingSimulationResponse bulk = new BulkPricingSimulationResponse();

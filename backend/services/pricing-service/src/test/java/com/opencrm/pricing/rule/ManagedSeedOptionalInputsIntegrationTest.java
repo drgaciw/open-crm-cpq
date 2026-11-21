@@ -159,7 +159,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from pricing.rules where status = 'ACTIVE'", Long.class))
                 .isEqualTo(10L);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
+        assertThat(replayFromV9()).isGreaterThanOrEqualTo(1);
         latest.migrate();
 
         assertThat(rule007()).isEqualTo(disabled);
@@ -183,7 +183,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         awaitNoOpNotices(notices + 1);
         assertThat(v9NoOpNotices()).as("server log contains: %s", V9_NO_OP_NOTICE).isEqualTo(notices + 1);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
+        assertThat(replayFromV9()).isGreaterThanOrEqualTo(1);
         latest.migrate();
         awaitNoOpNotices(notices + 2);
         assertThat(rule007()).isEqualTo(row);
@@ -206,7 +206,7 @@ class ManagedSeedOptionalInputsIntegrationTest {
         awaitNoOpNotices(notices + 1);
         assertThat(v9NoOpNotices()).as("server log contains: %s", V9_NO_OP_NOTICE).isEqualTo(notices + 1);
 
-        assertThat(jdbc.update("delete from pricing.flyway_schema_history where version = '9'")).isEqualTo(1);
+        assertThat(replayFromV9()).isGreaterThanOrEqualTo(1);
         latest.migrate();
         awaitNoOpNotices(notices + 2);
         assertThat(rule007()).isEqualTo(row);
@@ -216,6 +216,12 @@ class ManagedSeedOptionalInputsIntegrationTest {
     private void migrateThroughV8() {
         Flyway.configure().dataSource(jdbc.getDataSource()).schemas("pricing").defaultSchema("pricing")
                 .locations("classpath:db/migration").target("8").load().migrate();
+    }
+
+    /** Drop V9 and later history so Flyway can replay V9 without out-of-order V10+. */
+    private int replayFromV9() {
+        return jdbc.update(
+                "delete from pricing.flyway_schema_history where version ~ '^[0-9]+$' and version::int >= 9");
     }
 
     private int v9NoOpNotices() {

@@ -75,4 +75,11 @@ public class ApprovalController {
         ApprovalRequestDto request = approvalService.reject(id, reason);
         return ApiResponse.success(request, "Approval request rejected");
     }
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel a pending request (quote BFF cascade; not a human decision)")
+    public ApiResponse<ApprovalRequestDto> cancel(@PathVariable Long id) {
+        ApprovalRequestDto request = approvalService.cancel(id);
+        return ApiResponse.success(request, "Approval request cancelled");
+    }
 }
