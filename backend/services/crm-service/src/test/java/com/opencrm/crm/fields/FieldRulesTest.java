@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,6 +112,108 @@ class FieldRulesTest {
                         assertThat(ex.getErrorCode()).isEqualTo("FIELD_RECORD_MISMATCH"));
         assertThatThrownBy(() -> FieldRules.requireRecord(FieldEntityKind.DEAL, null, 1L, 2L))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void selectFieldsRequireOptionsAndOtherTypesRejectThem() {
+        assertThatThrownBy(() -> FieldRules.requireSelectOptions(FieldType.SELECT, List.of()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_REQUIRED"));
+        assertThatThrownBy(() -> FieldRules.requireSelectOptions(FieldType.SELECT, null))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_REQUIRED"));
+        assertThatThrownBy(() -> FieldRules.requireSelectOptions(FieldType.TEXT, List.of("Red")))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_INVALID"));
+        FieldRules.requireSelectOptions(FieldType.SELECT, List.of("Red"));
+        FieldRules.requireSelectOptions(FieldType.TEXT, null);
+        FieldRules.requireSelectOptions(FieldType.TEXT, List.of());
+    }
+
+    @Test
+    void phoneValuesAreAcceptedOrRejected() {
+        assertThat(FieldRules.requireValue(FieldType.PHONE, FieldRules.StoredValue.text("+1 415 555 0100")).text())
+                .isEqualTo("+1 415 555 0100");
+        assertThat(FieldRules.requireValue(FieldType.PHONE, FieldRules.StoredValue.text("415-555-0100")).text())
+                .isEqualTo("415-555-0100");
+        assertInvalidValue(FieldType.PHONE, FieldRules.StoredValue.text("12345"));
+        assertInvalidValue(FieldType.PHONE, FieldRules.StoredValue.text("(415) 555-0100"));
+        assertInvalidValue(FieldType.PHONE, FieldRules.StoredValue.text("++1234567"));
+        assertInvalidValue(FieldType.PHONE, FieldRules.StoredValue.text("phone"));
+    }
+
+    @Test
+    void urlsAcceptHttpAndRejectFtpMissingHostAndMalformed() {
+        assertThat(FieldRules.requireValue(FieldType.URL, FieldRules.StoredValue.text("http://example.com")).text())
+                .isEqualTo("http://example.com");
+        assertInvalidValue(FieldType.URL, FieldRules.StoredValue.text("ftp://example.com/a"));
+        assertInvalidValue(FieldType.URL, FieldRules.StoredValue.text("http:///path"));
+        assertInvalidValue(FieldType.URL, FieldRules.StoredValue.text("http://["));
+    }
+
+    @Test
+    void labelRejectsEmptyNullAndTooLong() {
+        assertInvalidLabel("");
+        assertInvalidLabel(null);
+        assertInvalidLabel("a".repeat(256));
+        assertThat(FieldRules.requireLabel("a".repeat(255))).hasSize(255);
+        assertThat(FieldRules.requireLabel("  Region  ")).isEqualTo("Region");
+    }
+
+    @Test
+    void positionRejectsValuesOutsideTheRange() {
+        assertThatThrownBy(() -> FieldRules.requirePosition(-1))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_POSITION_INVALID"));
+        assertThatThrownBy(() -> FieldRules.requirePosition(100_001))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_POSITION_INVALID"));
+        FieldRules.requirePosition(0);
+        FieldRules.requirePosition(100_000);
+    }
+
+    @Test
+    void briefBlankBecomesNullAndTooLongIsRejected() {
+        assertThat(FieldRules.normalizeBrief(null)).isNull();
+        assertThat(FieldRules.normalizeBrief("")).isNull();
+        assertThat(FieldRules.normalizeBrief("   ")).isNull();
+        assertThat(FieldRules.normalizeBrief("  Find the region  ")).isEqualTo("Find the region");
+        assertThatThrownBy(() -> FieldRules.normalizeBrief("b".repeat(FieldRules.TEXT_MAX + 1)))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_BRIEF_INVALID"));
+    }
+
+    @Test
+    void missingDateCheckboxOptionAndUserValuesAreRejected() {
+        assertInvalidValue(FieldType.DATE, FieldRules.StoredValue.date(null));
+        assertInvalidValue(FieldType.CHECKBOX, FieldRules.StoredValue.bool(null));
+        assertInvalidValue(FieldType.SELECT, FieldRules.StoredValue.option(null));
+        assertInvalidValue(FieldType.USER, FieldRules.StoredValue.user(null));
+        assertInvalidValue(FieldType.USER, FieldRules.StoredValue.user("   "));
+    }
+
+    @Test
+    void textAndLongTextRejectValuesOverTheirMax() {
+        assertThat(FieldRules.requireValue(FieldType.TEXT,
+                FieldRules.StoredValue.text("a".repeat(FieldRules.TEXT_MAX))).text())
+                .hasSize(FieldRules.TEXT_MAX);
+        assertInvalidValue(FieldType.TEXT, FieldRules.StoredValue.text("a".repeat(FieldRules.TEXT_MAX + 1)));
+        assertThat(FieldRules.requireValue(FieldType.LONG_TEXT,
+                FieldRules.StoredValue.text("a".repeat(FieldRules.LONG_TEXT_MAX))).text())
+                .hasSize(FieldRules.LONG_TEXT_MAX);
+        assertInvalidValue(FieldType.LONG_TEXT, FieldRules.StoredValue.text("a".repeat(FieldRules.LONG_TEXT_MAX + 1)));
+    }
+
+    private static void assertInvalidLabel(String label) {
+        assertThatThrownBy(() -> FieldRules.requireLabel(label))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_LABEL_INVALID"));
+    }
+
+    private static void assertInvalidValue(FieldType type, FieldRules.StoredValue value) {
+        assertThatThrownBy(() -> FieldRules.requireValue(type, value))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VALUE_INVALID"));
     }
 
 }
