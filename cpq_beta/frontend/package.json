@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@twilio/voice-sdk": "^2.10.2",
+    "@vue/devtools-api": "^8.2.1",
     "@vueuse/core": "^10.3.0",
     "@vueuse/integrations": "^10.3.0",
     "feather-icons": "^4.28.0",
