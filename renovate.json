@@ -77,7 +77,7 @@
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Frontend TypeScript stays on Angular 22's supported range (>=6.0 <6.1). TypeScript 7.0 has no JS API; Angular compiler-cli and typescript-eslint 8.73 cannot consume it (angular#69719, typescript-eslint#12518).",
+      "description": "Frontend TypeScript stays inside the range Angular's compiler supports (@angular/compiler-cli and @angular/build peer typescript '>=6.0 <6.1' as of 22.3.0). TypeScript 7 is the native compiler and no longer exports the compiler API Angular uses (angular#69719, typescript-eslint#12518). Raise this cap only when Angular's peer range allows it. infra/alchemy is not covered.",
       "matchPackageNames": [
         "typescript"
       ],
