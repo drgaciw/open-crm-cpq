@@ -41,7 +41,7 @@ Introduce Jev into domain services as **advisory, shadow-mode decision support**
 | Discount approval tier (shadow only) | `approval-routing` | existing threshold rule | `choice` over `MANAGER` / `DIRECTOR` / `VP_SALES` |
 | Suggested quote approval tier | `quote-service` | the user's selection | `choice` over `DEAL_DESK` / `SALES_VP` / `CFO` |
 | Duplicate organization/contact hint | `crm-service` | the user | `noul` "same real-world entity?" |
-| Dependency update advisory (Renovate PRs) | CI, not a domain service (see below) | the human reviewer's merge or hold | `choice` over `MERGE_CANDIDATE` / `HOLD_FOR_REVIEW` / `ABSTAIN`, per open Renovate PR |
+| Dependency update advisory (Renovate PRs) *(proposed — see amendment below)* | CI, not a domain service (see below) | the human reviewer's merge or hold | `choice` over `MERGE_CANDIDATE` / `HOLD_FOR_REVIEW` / `ABSTAIN`, per open Renovate PR |
 
 Any further use case requires an amendment to this table.
 
@@ -51,7 +51,7 @@ Any further use case requires an amendment to this table.
 - **Data minimisation.** The feature state is the dependency name, the current and proposed versions, the update type, the ecosystem, the changelog excerpt from the PR body, and the CI status. Nothing about the repository's business data is sent.
 - **Off the merge path.** A failed or abstained evaluation posts no comment and blocks nothing.
 - **Pinned configuration.** Model, rubric version, and wire format are recorded in each comment. A model identifier ending in `latest` is rejected.
-- **Not yet provisioned.** No JEV endpoint, model, or key is configured for this repo, so the runner cannot run until those are set in CI. Choosing the CI environment that holds the key, and the rollout gates above, are open decisions.
+- **Not yet provisioned.** No JEV endpoint, model, or key is configured for this repo, and no runner exists yet; building one, and setting those in CI, are prerequisites. Choosing the CI environment that holds the key, and the rollout gates above, are open decisions.
 
 ## Scope and boundaries
 
