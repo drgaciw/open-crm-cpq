@@ -1,6 +1,6 @@
 # Angular Material CDK UX/UI Improvements Plan
 
-**Status:** In Progress  
+**Status:** Complete
 **Coordinator:** `pi-00` (`w3:p4`)  
 **Peers:** `pi-01` (`w3:p5`), `pi-decision` (`w3:pA`)  
 **Design Contract:** `docs/design/UI-CRM-SLDS-design-contract.md` (SLDS2-inspired Material Cosmos; `--crm-*` tokens; no LWC/SLDS vendor CSS; no `opencrm.jev.*.enabled` flips)

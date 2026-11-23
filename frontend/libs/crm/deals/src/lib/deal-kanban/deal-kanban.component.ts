@@ -366,7 +366,7 @@ export class DealKanbanComponent implements OnInit {
   }
 
   onDrop(event: CdkDragDrop<DealStage, DealStage, DealDto>): void {
-    if (event.previousContainer === event.container) {
+    if (!event.isPointerOverContainer || event.previousContainer === event.container) {
       return;
     }
     const deal = event.item.data;

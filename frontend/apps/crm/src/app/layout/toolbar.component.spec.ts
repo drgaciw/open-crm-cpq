@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SessionService } from '@frontend/shared-data-access';
-import { CommandPaletteService } from '@frontend/shared-ui/command-palette';
+import { CommandPaletteService } from '@frontend/shared-ui';
 import { ToolbarComponent } from './toolbar.component';
 
 describe('ToolbarComponent', () => {

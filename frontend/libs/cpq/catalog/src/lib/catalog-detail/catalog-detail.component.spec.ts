@@ -93,7 +93,7 @@ describe('CatalogDetailComponent', () => {
   let fixture: ComponentFixture<CatalogDetailComponent>;
   let component: CatalogDetailComponent;
   let router: Router;
-  let getByIdSpy: ReturnType<typeof vi.fn>;
+  let getByIdSpy: ReturnType<typeof vi.fn<(id: number) => void>>;
   let updateSpy: ReturnType<typeof vi.fn>;
   let deleteSpy: ReturnType<typeof vi.fn>;
   let activateSpy: ReturnType<typeof vi.fn>;

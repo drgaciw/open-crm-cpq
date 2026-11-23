@@ -70,6 +70,7 @@
       "executor": "@angular/build:unit-test",
       "options": {}
     },
+    "typecheck": {},
     "serve-static": {
       "continuous": true,
       "executor": "@nx/web:file-server",

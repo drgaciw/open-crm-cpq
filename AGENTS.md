@@ -89,14 +89,34 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 `autojev-completion-review` — always list these under known gaps when they apply, never omit them:
 
 - `*IntegrationTest` classes need Docker; a Docker-less run did not execute them.
-- `scripts/ci/frontend.sh` builds, lints and tests every Nx project (`--all`), but there is no
-  frontend typecheck target (DRG-527). Frontend runs in `.github/workflows/pr-check.yml` (**Frontend (PR gate)**),
-  the full `ci.yml` matrix and the primary Jenkins Frontend stage. `scripts/ci/backend-unit.sh` runs
-  every backend module's unit tests and fails if one starts a Testcontainer; tag Docker tests `integration`.
+- `scripts/ci/frontend.sh` builds, lints, typechecks (`nx run-many --target=typecheck --all`), and
+  tests every Nx project (`--all`). `.github/workflows/pr-check.yml` runs the `frontend` job via
+  `scripts/ci/run-core.sh frontend` alongside `backend-unit`, and `ci.yml` / Jenkins also run the
+  `frontend` stage. `scripts/ci/backend-unit.sh` runs every backend module's unit tests and fails if
+  one starts a Testcontainer; tag Docker tests `integration`.
 - CPQ services are often down during CRM UAT — empty lists or 503 fallbacks are expected then, and prove
   nothing about the feature.
 - A GitNexus result with `partial: true`, `truncated: true` or `risk: UNKNOWN` is not a clean check.
-- Browser UAT / chaos scripts are not wired into CI; "tests pass" does not include them.
+- CDK browser UAT (`frontend/e2e/uat-cdk-ux.mjs`) is wired into the `frontend-uat` SSOT stage in
+  `ci.yml` (nightly/full matrix) and `Jenkinsfile` (not `pr-check.yml`); other browser UAT / chaos
+  scripts (`uat-crm-smoke.mjs`, `uat-full.mjs`, `chaos-crm.mjs`, `uat-jev-local.mjs`) are not wired
+  into CI, so "tests pass" does not include them.
+
+## Multi-agent checkouts: one writer per checkout
+
+Several agents (Herdr panes: pi, codex, agy, …) often share this host. Only one agent writes in a
+given checkout at a time.
+
+- The main checkout (`~/open-crm-cpq`) belongs to the active Herdr p2p lane (architect + pi workers).
+  Any other agent, including a `codex` goal runner, writes only in its own git worktree
+  (`~/worktrees/goal-*`) and never edits, stages, or commits files in the main checkout. Read-only
+  commands there are fine.
+- Inside a lane, file ownership is assigned per task. Do not edit a file another worker owns; ask
+  that worker to make the change.
+- Optional guard: `scripts/dev/writer-lock.sh claim <agent>` records the writer in the checkout's
+  `.git/agent-writer.lock`, and `scripts/dev/pre-commit-writer-lock` (opt-in via `core.hooksPath`)
+  refuses commits when `$AGENT_NAME` is not the lock owner. It is not installed by default.
+- Do not stop, restart, or close another agent's servers, panes, containers, or worktrees.
 
 ## Learned User Preferences
 
@@ -104,8 +124,10 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - When given bug reports, verify each issue in the repo before changing code; leave false positives untouched.
 - When restarting local apps, kill all related dev servers first, then bring the stack back up cleanly; do not restart a healthy running stack unless it is broken or the user asks.
 - Keep committed `frontend/proxy.conf.json` targeting the gateway (`:8080`), not a temporary CRM-direct workaround.
-- When the user delegates product, architecture, or UX choices (including CPQ or open Notion questions) or asks to settle them with Clef, decide via Clef when available, record the choice in the plan/backlog, and proceed rather than blocking on owner reply.
-- For multi-phase goals, prefer subagent fan-out to finish the work, then Playwright (+ Jev when asked) UAT; when asked for a definition of done, use Jev to draft the rubric and validate against it when the goal is complete.
+- When the user delegates product, architecture, or UX choices (including CPQ or open Notion questions) or asks to settle them with Clef or the Decision grok bot (TypeSafe Jev), settle via that path when available, record the choice in the plan/backlog, and proceed rather than blocking on owner reply.
+- For multi-phase goals, prefer TDD red→green subagent fan-out to finish the work, then Playwright (+ Jev when asked) UAT; when asked for a definition of done, use Jev to draft the rubric and validate against it when the goal is complete.
+- Prefer Archify explainers for project comparisons and multi-section functional analyses when asked to illustrate differences or gaps.
+- Prefer implementing attached plans as specified without editing the plan file itself.
 
 ## Learned Workspace Facts
 
@@ -117,7 +139,7 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 - CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them); opportunity WON requires an accepted quote (`OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE`), so WON-stage UAT cannot complete while quote-service is down.
 - Sibling-service reuse gap analyses and harvest backlogs live under `docs/plans/`; `docs/plans/00-harvest-index.md` is the agentic index for that work.
 - CRM UI direction is SLDS2-inspired Angular Material (Material Cosmos), not LWC or a Salesforce look-alike; design contract is `docs/design/UI-CRM-SLDS-design-contract.md`; agent panel ships as UI shell first with `opencrm.jev.*.enabled` flags remaining off.
-- Shared `DataTableComponent` in `frontend/libs/shared/ui` is the target list pattern (`data-testid="data-table"`); CPQ lists already use it, and CRM entity lists are migrating off raw `mat-table`.
+- Shared `DataTableComponent` in `frontend/libs/shared/ui` is the target list pattern (`data-testid="data-table"`); CPQ lists already use it (including Pricing Simulator Bulk results), and CRM entity lists are migrating off raw `mat-table`. Pricing Simulator Bulk tab is JSON paste/upload (≥2 contexts) → one `simulateBulk` / `POST /api/v1/pricing/simulate/bulk` with per-context failure isolation; single-context Simulate stays on `execute`; side-by-side comparison is a separate follow-up; browser UAT is `frontend/e2e/uat-bulk-simulator.mjs`.
 - CRM user-facing copy uses Opportunities (not Deals) per the design contract; routes and libs may still use `deals` — keep UAT/search assertions aligned with Opportunities labels.
 
 ## Cursor Cloud specific instructions

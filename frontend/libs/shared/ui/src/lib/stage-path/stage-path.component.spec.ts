@@ -114,4 +114,47 @@ describe('StagePathComponent', () => {
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(selected).toEqual(['QUALIFICATION']);
   });
+
+  describe('non-interactive mode (interactive=false)', () => {
+    it('defaults interactive to true', () => {
+      expect(fixture.componentInstance.interactive()).toBe(true);
+    });
+
+    it('renders non-focusable, non-button steps in a list with aria-current="step" and visual states', () => {
+      fixture.componentRef.setInput('interactive', false);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelectorAll('button.stage-path__step').length).toBe(0);
+
+      const steps = Array.from(el.querySelectorAll('.stage-path__step')) as HTMLElement[];
+      expect(steps.length).toBe(4);
+      for (const step of steps) {
+        expect(step.tagName).not.toBe('BUTTON');
+        expect(step.getAttribute('tabindex')).toBeNull();
+      }
+
+      expect(steps[0].classList.contains('stage-path__step--completed')).toBe(true);
+      expect(steps[0].getAttribute('aria-current')).toBeNull();
+      expect(steps[1].classList.contains('stage-path__step--active')).toBe(true);
+      expect(steps[1].getAttribute('aria-current')).toBe('step');
+      expect(steps[2].classList.contains('stage-path__step--upcoming')).toBe(true);
+      expect(steps[2].getAttribute('aria-current')).toBeNull();
+    });
+
+    it('does not emit stageSelect when a non-interactive step is clicked', () => {
+      fixture.componentRef.setInput('interactive', false);
+      fixture.detectChanges();
+
+      const selected: string[] = [];
+      fixture.componentInstance.stageSelect.subscribe((id) => selected.push(id));
+
+      const step = fixture.nativeElement.querySelector(
+        '[data-stage-id="NEGOTIATION"]',
+      ) as HTMLElement;
+      step.click();
+
+      expect(selected).toEqual([]);
+    });
+  });
 });

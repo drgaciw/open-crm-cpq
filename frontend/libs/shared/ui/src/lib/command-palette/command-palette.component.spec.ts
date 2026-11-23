@@ -101,6 +101,64 @@ describe('CommandPaletteComponent & CommandPaletteService', () => {
       expect(selected).toEqual([sampleItems[1]]);
     });
 
+    it('resets active option and aria-activedescendant to the first filtered match after ArrowDown + filtering, and selects it on Enter', () => {
+      const fixture = TestBed.createComponent(CommandPaletteComponent);
+      fixture.componentRef.setInput('items', sampleItems);
+      fixture.detectChanges();
+
+      const selected: CommandPaletteItem[] = [];
+      fixture.componentInstance.itemSelected.subscribe((item) => selected.push(item));
+
+      const input = fixture.nativeElement.querySelector(
+        'input[role="combobox"]',
+      ) as HTMLInputElement;
+      expect(input.getAttribute('aria-activedescendant')).toContain('nav-accounts');
+
+      // Move active option down before filtering
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      fixture.detectChanges();
+      expect(input.getAttribute('aria-activedescendant')).toContain('nav-quotes');
+
+      // Filter down to the third item only
+      input.value = 'Create Lead';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('[role="option"]').length).toBe(1);
+      expect(input.getAttribute('aria-activedescendant')).toContain('new-lead');
+
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(selected).toEqual([sampleItems[2]]);
+    });
+
+    it('updates active option and aria-activedescendant when filtering from initial index 0 to a single different match', () => {
+      const fixture = TestBed.createComponent(CommandPaletteComponent);
+      fixture.componentRef.setInput('items', sampleItems);
+      fixture.detectChanges();
+
+      const selected: CommandPaletteItem[] = [];
+      fixture.componentInstance.itemSelected.subscribe((item) => selected.push(item));
+
+      const input = fixture.nativeElement.querySelector(
+        'input[role="combobox"]',
+      ) as HTMLInputElement;
+      expect(input.getAttribute('aria-activedescendant')).toContain('nav-accounts');
+
+      input.value = 'Create Lead';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('[role="option"]').length).toBe(1);
+      expect(input.getAttribute('aria-activedescendant')).toContain('new-lead');
+
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(selected).toEqual([sampleItems[2]]);
+    });
+
     it('emits closed on Escape', () => {
       const fixture = TestBed.createComponent(CommandPaletteComponent);
       fixture.componentRef.setInput('items', sampleItems);
