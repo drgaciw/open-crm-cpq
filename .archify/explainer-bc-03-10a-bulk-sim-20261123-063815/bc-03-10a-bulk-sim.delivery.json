@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "ac551113-3dfb-4e0b-b0f7-9ac92206f4a1",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/candidate.archify.md",
+  "output": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/bc-03-10a-bulk-sim.html",
+  "specification": {
+    "sha256": "ac754f26e6ca9e7977facf871534ea2e969f5f152db56dea685e48b79ec0f39a",
+    "bytes": 2846
+  },
+  "artifact": {
+    "sha256": "f42927afef9929cb89e59175084399aceac5325ac1fd13b5750be51cf929f757",
+    "bytes": 528015
+  },
+  "explainer": {
+    "preparedSha256": "d05b242097c1afb3303236550df098927f8da2061ca68c64f5dc357f7d9904a9",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "bulk-sim-flow",
+        "inline": true,
+        "sha256": "8c2833f17b8523e16853706ca22debbc0f01090fb1fc7c4ffb3caa237ce09728",
+        "bytes": 1237
+      }
+    ]
+  }
+}

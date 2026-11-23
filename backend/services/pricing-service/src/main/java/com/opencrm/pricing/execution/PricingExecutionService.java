@@ -120,7 +120,25 @@ public class PricingExecutionService {
         }
 
         List<PricingResult> results = contexts.stream()
-                .map(this::simulate)
+                .map(context -> {
+                    try {
+                        return simulate(context);
+                    } catch (BusinessException ex) {
+                        String message = ex.getErrorCode() == null
+                                ? ex.getMessage()
+                                : ex.getErrorCode() + ": " + ex.getMessage();
+                        return PricingResult.builder()
+                                .success(false)
+                                .errorMessage(message)
+                                .build();
+                    } catch (Exception ex) {
+                        log.warn("Bulk pricing simulation failed for one context: {}", ex.toString());
+                        return PricingResult.builder()
+                                .success(false)
+                                .errorMessage("Pricing simulation failed")
+                                .build();
+                    }
+                })
                 .toList();
 
         int successful = (int) results.stream().filter(PricingResult::isSuccess).count();

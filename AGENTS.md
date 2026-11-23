@@ -114,13 +114,14 @@ When the `autojev_*` tools are connected, these project-specific moments are **m
 
 ## Learned Workspace Facts
 
-- Local default ports: Angular CRM UI `:4200`, API gateway `:8080`, CRM service `:8081`; the UI proxies `/api` to the gateway.
+- Local default ports: CRM UI `:4200`, gateway `:8080`, CRM `:8081`; CPQ defaults: pricing `:8082`, product `:8083`, quote `:8084`, approval-routing `:8085`, configuration-engine `:8088`, pricebook `:8089`; the UI proxies `/api` to the gateway.
 - Spring Cloud Gateway 5 / Boot 4 registers routes and filters under `spring.cloud.gateway.server.webflux.*`; the old `spring.cloud.gateway.routes` root yields empty routes and API 404s through the proxy.
+- A gateway `spring.config.additional-location` YAML that replaces `spring.cloud.gateway.server.webflux.routes` must re-include CPQ routes; CRM-only overrides 404 `/api/v1/products|quotes|price-books|pricing-*` through the UI proxy even when those services are up.
 - Gateway actuator config belongs under `management.endpoint.gateway` (e.g. `access: read-only`), not under `server.webflux`.
 - Frontend unit tests use Vitest (`@nx/vitest:test`, `vitest/globals`, Analog `setupTestBed`); `TestBed` + `vi.fn()` is the intended pattern, not Jasmine spies.
 - Chrome DevTools MCP needs Google Chrome stable; hosts with only Chromium should rely on Playwright and the Cursor browser for UI automation.
 - CPQ services often need Azure Kafka/autoconfig excludes to boot locally and may be down during CRM-only UAT (list APIs empty or failing is expected without them); opportunity WON requires an accepted quote (`OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE`), so WON-stage UAT cannot complete while quote-service is down.
-- Sibling-service reuse harvest starts at `docs/plans/00-harvest-index.md` (matrices/backlogs under `docs/plans/`); Deal Desk maps to `approval-routing` + quote BFF (no `/api/v1/deals`, Easy Rules, Mongo deal API, or Salesforce sync); pricing-ai-rules maps to `pricing-service` / `ai-service` — obey index holds and source pins rather than inventing clone paths.
+- Sibling-service reuse harvest starts at `docs/plans/00-harvest-index.md` (matrices/backlogs under `docs/plans/`); Deal Desk maps to `approval-routing` + quote BFF (no `/api/v1/deals`, Easy Rules, Mongo deal API, or Salesforce sync); pricing-ai-rules and price-dools map to `pricing-service` / `ai-service` — obey index holds and source pins rather than inventing clone paths.
 - Archify explainers use the skill at `/home/username01/agent-factory-poc-00/.agents/skills/archify` (`node …/bin/archify.mjs finalize`); write artifacts under the compared repo's `.archify/`.
 - CRM UI direction is SLDS2-inspired Angular Material (Material Cosmos), not LWC or a Salesforce look-alike; design contract is `docs/design/UI-CRM-SLDS-design-contract.md`; agent panel ships as UI shell first with `opencrm.jev.*.enabled` flags remaining off.
 - Shared `DataTableComponent` in `frontend/libs/shared/ui` is the target list pattern (`data-testid="data-table"`); CPQ lists already use it, and CRM entity lists are migrating off raw `mat-table`.

@@ -15,6 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import {
   CurrencyFormatPipe,
   EmptyStateComponent,
@@ -26,6 +27,7 @@ import {
   SubscriptionType,
 } from '@frontend/shared-models';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
+import { BulkSimulatorComponent } from '../bulk-simulator/bulk-simulator.component';
 import { MOCK_PRICING_CONTEXT } from '../pricing-simulator.mock';
 
 /** Prefer message; append errorCode when present (H1 shape). */
@@ -54,15 +56,17 @@ function httpErrorMessage(err: unknown, fallback: string): string {
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatTabsModule,
     PageHeaderComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
+    BulkSimulatorComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-page-header
       title="Pricing Simulator"
-      subtitle="What-if sandbox — POST /api/v1/pricing/execute"
+      subtitle="What-if sandbox — POST /api/v1/pricing/execute or POST /api/v1/pricing/simulate/bulk"
     >
       <div actions>
         <button
@@ -78,6 +82,8 @@ function httpErrorMessage(err: unknown, fallback: string): string {
       </div>
     </app-page-header>
 
+    <mat-tab-group class="mode-tabs" animationDuration="0ms">
+      <mat-tab label="Single">
     <div class="simulator-layout">
       <mat-card class="panel form-panel" appearance="outlined">
         <mat-card-header>
@@ -177,13 +183,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
               <div class="metric">
                 <span class="metric-label">Net</span>
                 <span class="metric-value">{{
-                  $safeNavigationMigration(result()!.waterfall?.netPrice) | currencyFormat: currencyCode()
+                  result()!.waterfall?.netPrice | currencyFormat: currencyCode()
                 }}</span>
               </div>
               <div class="metric">
                 <span class="metric-label">ARR</span>
                 <span class="metric-value">{{
-                  $safeNavigationMigration(result()!.financialMetrics?.arr) | currencyFormat: currencyCode()
+                  result()!.financialMetrics?.arr | currencyFormat: currencyCode()
                 }}</span>
               </div>
               <div class="metric">
@@ -223,14 +229,29 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         </mat-card-content>
       </mat-card>
     </div>
+      </mat-tab>
+      <mat-tab label="Bulk">
+        <div class="bulk-tab">
+          <cpq-bulk-simulator />
+        </div>
+      </mat-tab>
+    </mat-tab-group>
   `,
   styles: [
     `
+      .mode-tabs {
+        padding: 0 32px;
+      }
+
+      .bulk-tab {
+        padding: 0 0 32px;
+      }
+
       .simulator-layout {
         display: grid;
         grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
         gap: 24px;
-        padding: 0 32px 32px;
+        padding: 16px 0 32px;
       }
 
       .panel {

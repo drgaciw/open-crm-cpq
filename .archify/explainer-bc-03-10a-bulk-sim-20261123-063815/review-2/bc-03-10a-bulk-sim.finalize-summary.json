@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/candidate.archify.md",
+    "sha256": "ac754f26e6ca9e7977facf871534ea2e969f5f152db56dea685e48b79ec0f39a",
+    "bytes": 2846
+  },
+  "artifact": {
+    "path": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/bc-03-10a-bulk-sim.html",
+    "sha256": "f42927afef9929cb89e59175084399aceac5325ac1fd13b5750be51cf929f757",
+    "bytes": 528015
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "not-run"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/review-2/bc-03-10a-bulk-sim.finalize.json",
+    "summaryReceipt": "/home/username01/open-crm-cpq/.archify/explainer-bc-03-10a-bulk-sim-20261123-063815/review-2/bc-03-10a-bulk-sim.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-10T17:35:24.229Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 861,
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  }
+}

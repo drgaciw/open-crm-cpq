@@ -195,6 +195,64 @@ class PricingExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("simulateBulk() should isolate per-context failures")
+    void simulateBulkShouldIsolatePerContextFailures() {
+        PricingContext okContext = PricingContext.builder()
+                .customerExternalId("CUST-OK")
+                .quoteExternalId("Q-OK")
+                .region("NA")
+                .durationInMonths(12)
+                .lineItems(List.of(
+                        PricingLineRequest.builder()
+                                .productExternalId("PROD-001")
+                                .quantity(5)
+                                .lineItemType("SUBSCRIPTION")
+                                .build()))
+                .build();
+        PricingContext missingContext = PricingContext.builder()
+                .customerExternalId("CUST-MISSING")
+                .quoteExternalId("Q-MISSING")
+                .region("NA")
+                .durationInMonths(12)
+                .lineItems(List.of(
+                        PricingLineRequest.builder()
+                                .productExternalId("PROD-001")
+                                .quantity(5)
+                                .lineItemType("SUBSCRIPTION")
+                                .build()))
+                .build();
+
+        doNothing().when(contextValidator).validate(any(PricingContext.class));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-OK"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-MISSING"))
+                .thenReturn(java.util.Optional.empty());
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(new ArrayList<>());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
+                .thenReturn(defaultMetrics);
+
+        BulkPricingSimulationResponse response = assertDoesNotThrow(
+                () -> executionService.simulateBulk(List.of(okContext, missingContext)));
+
+        assertNotNull(response);
+        assertEquals(2, response.getTotalRequests());
+        assertEquals(1, response.getSuccessfulRequests());
+        assertEquals(1, response.getFailedRequests());
+        assertEquals(2, response.getResults().size());
+        assertTrue(response.getResults().get(0).isSuccess());
+        assertFalse(response.getResults().get(1).isSuccess());
+        String errorMessage = response.getResults().get(1).getErrorMessage();
+        assertNotNull(errorMessage);
+        String normalized = errorMessage.toLowerCase();
+        assertTrue(normalized.contains("customer") || normalized.contains("not found"),
+                "error message should contain customer / not found wording but was: " + errorMessage);
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("simulateBulk() should throw when empty list provided")
     void simulateBulkShouldThrowWhenEmpty() {
         BusinessException ex = assertThrows(BusinessException.class, () -> {

@@ -1,4 +1,5 @@
 import {
+  BulkPricingSimulationResponse,
   PricingContext,
   PricingResult,
 } from '@frontend/shared-models';
@@ -132,8 +133,8 @@ export function mockExecuteOk(context: PricingContext): PricingResult {
       explanationCodes: ['LIST_PRICE_BASELINE'],
     },
     financialMetrics: {
-      // Stub metrics: treat finalPrice as period ACV; ARR annualizes by months.
-      arr: (finalPrice / Math.max(duration, 1)) * 12,
+      // Stub metrics: finalPrice is monthly MRR; ARR annualizes (matches golden fixture).
+      arr: finalPrice * 12,
       tcv: finalPrice * (duration / 12),
       acv: finalPrice,
       clv: finalPrice * 2,
@@ -144,5 +145,47 @@ export function mockExecuteOk(context: PricingContext): PricingResult {
       priceMultiplier: 1,
       estimatedMarginPct: 40,
     },
+  };
+}
+
+/** Two seeded contexts for bulk paste / load-sample (Vitest only). */
+export const MOCK_BULK_CONTEXTS: PricingContext[] = [
+  MOCK_PRICING_CONTEXT,
+  {
+    ...MOCK_PRICING_CONTEXT,
+    customerExternalId: 'CUST-SILVER-002',
+    quoteExternalId: 'Q-SIM-002',
+    lineItems: [
+      {
+        productExternalId: 'PROD-002',
+        lineItemType: 'SUBSCRIPTION',
+        quantity: 2,
+      },
+    ],
+  },
+];
+
+/**
+ * One success + one failure for POST /api/v1/pricing/simulate/bulk.
+ * Counts follow `contexts.length` (default two): 1 successful, the rest failed.
+ */
+export function mockBulkPartialResponse(
+  contexts: PricingContext[] = MOCK_BULK_CONTEXTS,
+): BulkPricingSimulationResponse {
+  const successContext = contexts[0] ?? MOCK_PRICING_CONTEXT;
+  const failedCount = Math.max(contexts.length - 1, 1);
+
+  return {
+    totalRequests: contexts.length,
+    successfulRequests: 1,
+    failedRequests: failedCount,
+    totalExecutionTimeMs: 21,
+    results: [
+      mockExecuteOk(successContext),
+      {
+        success: false,
+        errorMessage: 'No matching price book',
+      },
+    ],
   };
 }

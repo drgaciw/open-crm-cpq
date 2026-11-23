@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
@@ -85,6 +87,44 @@ describe('SimulatorPageComponent', () => {
     expect(compiled.textContent).toContain('Execute OK');
     expect(compiled.textContent).toContain('PROD-001');
     expect(compiled.querySelector('.success-banner')).toBeTruthy();
+  });
+
+  it('locks success panel Net and ARR metrics (safeNavigation)', () => {
+    const componentSource = readFileSync(
+      join(__dirname, 'simulator-page.component.ts'),
+      'utf8',
+    );
+    expect(componentSource).not.toContain('$safeNavigationMigration');
+
+    const ok = mockExecuteOk({
+      customerExternalId: 'CUST-GOLD-001',
+      quoteExternalId: 'Q-SIM-001',
+      region: 'NA',
+      currency: 'USD',
+      durationInMonths: 12,
+      subscriptionType: 'NEW',
+      lineItems: [
+        {
+          productExternalId: 'PROD-001',
+          lineItemType: 'SUBSCRIPTION',
+          quantity: 5,
+        },
+      ],
+    });
+    executeMock.mockReturnValue(of(ok));
+
+    component.form.patchValue({
+      productExternalId: 'PROD-001',
+      quantity: 5,
+      currency: 'USD',
+    });
+    component.onSimulate();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const text = compiled.textContent ?? '';
+    expect(text).toContain('$500.00');
+    expect(text).toContain('$6,000.00');
   });
 
   it('passes quantity and list override into execute context', () => {
