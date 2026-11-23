@@ -10,10 +10,12 @@ describe('BundleItemDialogComponent', () => {
   let fixture: ComponentFixture<BundleItemDialogComponent>;
   let component: BundleItemDialogComponent;
   let addItemSpy: ReturnType<typeof vi.fn>;
+  let updateItemSpy: ReturnType<typeof vi.fn>;
   let dialogClose: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     addItemSpy = vi.fn().mockReturnValue(of(MOCK_PRODUCT_BUNDLES[0]));
+    updateItemSpy = vi.fn().mockReturnValue(of(MOCK_PRODUCT_BUNDLES[0]));
     dialogClose = vi.fn();
 
     await TestBed.configureTestingModule({
@@ -22,7 +24,7 @@ describe('BundleItemDialogComponent', () => {
         provideNoopAnimations(),
         {
           provide: ProductBundleService,
-          useValue: { addItem: addItemSpy },
+          useValue: { addItem: addItemSpy, updateItem: updateItemSpy },
         },
         {
           provide: MatDialogRef,
@@ -62,6 +64,25 @@ describe('BundleItemDialogComponent', () => {
       optional: true,
       sortOrder: 3,
     });
+    expect(dialogClose).toHaveBeenCalledWith(MOCK_PRODUCT_BUNDLES[0]);
+  });
+
+  it('prefills the existing item and saves only its editable fields', () => {
+    TestBed.inject(MAT_DIALOG_DATA).item = {
+      id: 8, productId: 20, quantity: 2, optional: false, sortOrder: 3,
+    };
+    fixture.destroy();
+    fixture = TestBed.createComponent(BundleItemDialogComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.form.getRawValue()).toEqual({ productId: 20, quantity: 2, optional: false, sortOrder: 3 });
+    expect(component.form.controls.productId.disabled).toBe(true);
+    component.form.patchValue({ quantity: 4, optional: true, sortOrder: 5 });
+    component.onSubmit();
+
+    expect(updateItemSpy).toHaveBeenCalledWith(1, 8, { quantity: 4, optional: true, sortOrder: 5 });
+    expect(addItemSpy).not.toHaveBeenCalled();
     expect(dialogClose).toHaveBeenCalledWith(MOCK_PRODUCT_BUNDLES[0]);
   });
 

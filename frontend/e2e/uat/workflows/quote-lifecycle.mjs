@@ -393,15 +393,16 @@ export async function runHeaderEdit(ctx, quote) {
     return `${options.join(' | ')}; Hybrid saved as HYBRID`;
   }, { hypothesis: 'H-CPQ-Q-009' });
 
-  // H-CPQ-Q-008: no success feedback after a mutation (the only toasts are error toasts).
+  // H-CPQ-Q-008: confirm the successful update and its persisted value.
   await runCheck(ctx, 'quotes.feedback.success-snackbar', async () => {
     await startEdit();
     await fill(page, scope(), form('header').fields.find((f) => f.label === 'Notes'), 'UAT feedback probe');
     await scope().getByRole('button', { name: spec.submit.name, exact: true }).click();
     await scope().getByRole('button', { name: spec.open.action, exact: true }).waitFor({ state: 'visible', timeout: 10000 });
-    const appeared = await expectNoSnackbar(page, { windowMs: 2000 }).then(() => false, () => true);
-    if (!appeared) throw gap('header Save succeeded silently: no snackbar and no inline confirmation — the panel just leaves edit mode');
-    return 'a snackbar followed the successful save';
+    const notification = await expectSnackbar(page, 'Quote saved');
+    const persisted = await quoteDto(api, id);
+    if (persisted.notes !== 'UAT feedback probe') throw new Error('Save confirmation did not match persisted notes');
+    return notification;
   }, { hypothesis: 'H-CPQ-Q-008' });
 
   // H-CPQ-Q-004: this panel formats server errors `message (CODE)`; every other quote surface

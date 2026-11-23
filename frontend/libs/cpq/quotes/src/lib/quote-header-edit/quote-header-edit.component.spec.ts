@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { QuoteDto, QuoteUpdateRequest } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 import {
@@ -58,6 +59,7 @@ describe('QuoteHeaderEditComponent', () => {
   let component: QuoteHeaderEditComponent;
   let updateSpy: ReturnType<typeof vi.fn>;
   let getByIdSpy: ReturnType<typeof vi.fn>;
+  let notify: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     updateSpy = vi.fn(() =>
@@ -69,11 +71,13 @@ describe('QuoteHeaderEditComponent', () => {
       ),
     );
     getByIdSpy = vi.fn();
+    notify = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [QuoteHeaderEditComponent],
       providers: [
         provideNoopAnimations(),
+        { provide: MatSnackBar, useValue: { open: notify } },
         {
           provide: QuoteService,
           useValue: {
@@ -89,6 +93,18 @@ describe('QuoteHeaderEditComponent', () => {
     fixture.componentRef.setInput('quote', draftQuote());
     fixture.componentRef.setInput('editable', true);
     fixture.detectChanges();
+  });
+
+  it('confirms a persisted save and does not show confirmation on error', () => {
+    component.startEdit();
+    component.onSave();
+    expect(notify).toHaveBeenCalledWith('Quote saved', 'Dismiss', { duration: 3000 });
+    notify.mockClear();
+    updateSpy.mockReturnValue(throwError(() => ({ message: 'Write failed' })));
+    component.startEdit();
+    component.onSave();
+    expect(component.error()).toBe('Write failed');
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('shows Edit when editable and hides form until Edit', () => {

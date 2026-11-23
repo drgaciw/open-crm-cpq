@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { By } from '@angular/platform-browser';
 import { computed, signal } from '@angular/core';
 import { of } from 'rxjs';
+import { NotificationService } from '@frontend/shared-data-access';
 import { CatalogListComponent } from './catalog-list.component';
 import { ProductService } from '../product.service';
 import { ProductCreateDialogComponent } from '../product-create-dialog/product-create-dialog.component';
@@ -43,6 +44,7 @@ describe('CatalogListComponent', () => {
   let router: Router;
   let listSpy: ReturnType<typeof vi.fn>;
   let searchSpy: ReturnType<typeof vi.fn>;
+  let success: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
 
   const products = signal<ProductDto[]>(
@@ -112,6 +114,7 @@ describe('CatalogListComponent', () => {
       selectedProduct: signal<ProductDto | null>(null),
     };
 
+    success = vi.fn();
     dialogOpen = vi.fn().mockReturnValue({
       afterClosed: () => of(undefined),
     });
@@ -122,6 +125,7 @@ describe('CatalogListComponent', () => {
         provideRouter([]),
         provideNoopAnimations(),
         { provide: ProductService, useValue: serviceMock },
+        { provide: NotificationService, useValue: { success } },
         { provide: MatDialog, useValue: { open: dialogOpen } },
       ],
     }).compileComponents();
@@ -138,6 +142,15 @@ describe('CatalogListComponent', () => {
     products.set(MOCK_CATALOG_PRODUCTS.map(toProductDto));
     loading.set(false);
     error.set(null);
+  });
+
+  it('reports a successful create only when the dialog returns the saved product', () => {
+    component.openCreateDialog();
+    expect(success).not.toHaveBeenCalled();
+
+    dialogOpen.mockReturnValueOnce({ afterClosed: () => of(toProductDto(MOCK_CATALOG_PRODUCTS[0])) });
+    component.openCreateDialog();
+    expect(success).toHaveBeenCalledExactlyOnceWith('Product created');
   });
 
   it('loads products via ProductService on init and removes stub subtitle', () => {

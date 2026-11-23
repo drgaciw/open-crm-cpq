@@ -275,6 +275,8 @@ export interface PriceBookUpdateRequest {
   isDefault?: boolean;
   effectiveDate?: string;
   expirationDate?: string;
+  clearRegion?: boolean;
+  clearExpirationDate?: boolean;
 }
 
 /**

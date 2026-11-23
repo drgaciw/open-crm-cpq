@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -57,6 +58,50 @@ public class ProductBundleService {
     @Transactional(readOnly = true)
     public Page<ProductBundleDto> list(Pageable pageable) {
         return bundleRepository.findByDeletedFalse(pageable).map(bundleMapper::toDto);
+    }
+
+    public ProductBundleDto update(Long id, ProductBundleUpdateRequest request) {
+        ProductBundle bundle = bundleRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProductBundle", id));
+
+        Integer minItems = request.minItems();
+        Integer maxItems = request.maxItems();
+        if (minItems != null && maxItems != null && minItems > maxItems) {
+            throw new BusinessException("Minimum items cannot exceed maximum items", "BUNDLE_INVALID_ITEM_LIMITS");
+        }
+        if (maxItems != null && bundle.getItems().size() > maxItems) {
+            throw new BusinessException("Maximum items cannot be fewer than the current number of items",
+                    "BUNDLE_MAX_ITEMS_EXCEEDED");
+        }
+        if (request.discountType() == DiscountType.PERCENTAGE && request.discountValue() != null
+                && request.discountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new BusinessException("Percentage discount cannot exceed 100", "BUNDLE_INVALID_DISCOUNT");
+        }
+
+        bundle.setName(request.name().trim());
+        bundle.setDescription(request.description());
+        bundle.setDiscountType(request.discountType() == null ? DiscountType.NONE : request.discountType());
+        bundle.setDiscountValue(request.discountValue());
+        bundle.setMinItems(minItems);
+        bundle.setMaxItems(maxItems);
+        ProductBundle saved = bundleRepository.save(bundle);
+        publishBundleStructureChanged(saved, "BUNDLE_UPDATED");
+        return bundleMapper.toDto(saved);
+    }
+
+    public ProductBundleDto updateItem(Long bundleId, Long itemId, BundleItemUpdateRequest request) {
+        ProductBundle bundle = bundleRepository.findByIdAndDeletedFalse(bundleId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProductBundle", bundleId));
+        BundleItem item = bundleItemRepository.findByIdAndDeletedFalse(itemId)
+                .filter(candidate -> bundleId.equals(candidate.getBundle().getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("BundleItem", itemId));
+
+        item.setQuantity(request.quantity());
+        item.setOptional(request.optional());
+        item.setSortOrder(request.sortOrder());
+        bundleItemRepository.save(item);
+        publishBundleStructureChanged(bundle, "ITEM_UPDATED");
+        return bundleMapper.toDto(bundle);
     }
 
     public void delete(Long id) {

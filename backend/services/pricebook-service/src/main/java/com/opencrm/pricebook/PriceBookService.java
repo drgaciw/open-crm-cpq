@@ -66,15 +66,22 @@ public class PriceBookService {
     public PriceBookDto update(Long id, PriceBookUpdateRequest request) {
         PriceBook existing = requirePriceBookForUpdate(id);
         ensureNotPublished(existing);
+        boolean clearRegion = Boolean.TRUE.equals(request.getClearRegion());
+        boolean clearExpiration = Boolean.TRUE.equals(request.getClearExpirationDate());
+        if ((clearRegion && request.getRegion() != null)
+                || (clearExpiration && request.getExpirationDate() != null)) {
+            throw new BusinessException("Supply either a value or a clear instruction for each field",
+                    "PRICE_BOOK_FIELD_UPDATE_CONFLICT");
+        }
         normalizeUpdateRequest(request);
 
-        String targetRegion = request.getRegion() != null ? request.getRegion() : existing.getRegion();
+        String targetRegion = clearRegion ? null : request.getRegion() != null ? request.getRegion() : existing.getRegion();
         validateRegionUniqueness(targetRegion, id);
 
         LocalDate targetEffectiveDate =
                 request.getEffectiveDate() != null ? request.getEffectiveDate() : existing.getEffectiveDate();
-        LocalDate targetExpirationDate =
-                request.getExpirationDate() != null ? request.getExpirationDate() : existing.getExpirationDate();
+        LocalDate targetExpirationDate = clearExpiration ? null
+                : request.getExpirationDate() != null ? request.getExpirationDate() : existing.getExpirationDate();
         validateDateRange(targetEffectiveDate, targetExpirationDate);
 
         if (Boolean.TRUE.equals(request.getIsDefault())) {
@@ -82,6 +89,8 @@ public class PriceBookService {
         }
 
         priceBookMapper.updateEntity(request, existing);
+        existing.setRegion(targetRegion);
+        existing.setExpirationDate(targetExpirationDate);
         if (request.getCostBookId() != null) {
             existing.setCostBook(costBookService.requireCostBook(request.getCostBookId()));
         }

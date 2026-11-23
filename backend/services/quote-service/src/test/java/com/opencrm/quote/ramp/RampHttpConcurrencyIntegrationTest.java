@@ -252,6 +252,127 @@ class RampHttpConcurrencyIntegrationTest {
     private long waitingRampUpdates() {
         return jdbc.queryForObject("select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query ilike '%quote_ramp_steps%'",Long.class);
     }
+    @Test
+    void bulkRemoveDeletesThreeLinesAtomicallyAndRecalculatesOnce() throws Exception {
+        BulkFixture fixture = bulkFixture("HTTP-BULK", QuoteStatus.DRAFT, "40");
+        var selected = fixture.lineIds().subList(0, 3);
+        assertThat(bulkRemove(fixture, selected, fixture.version()).statusCode()).isEqualTo(204);
+
+        Quote persisted = quotes.findById(fixture.quoteId()).orElseThrow();
+        assertThat(persisted.getVersion()).isEqualTo(fixture.version() + 1);
+        assertThat(persisted.getTotalAmount()).isEqualByComparingTo("40");
+        assertThat(lineService.getLineItems(fixture.quoteId())).extracting(QuoteLineItemDto::getId)
+                .containsExactly(fixture.lineIds().getLast());
+    }
+
+    @Test
+    void bulkRemoveRejectsStaleForeignOrNoneditableSelectionsBeforeChangingAnyLine() throws Exception {
+        BulkFixture draft = bulkFixture("HTTP-BULK-VALIDATE", QuoteStatus.DRAFT, "40");
+        BulkFixture other = bulkFixture("HTTP-BULK-FOREIGN", QuoteStatus.DRAFT, "40");
+        BulkFixture sent = bulkFixture("HTTP-BULK-NONEDITABLE", QuoteStatus.SENT, "40");
+
+        var stale = bulkRemove(draft, draft.lineIds(), draft.version() - 1);
+        assertThat(stale.statusCode()).isEqualTo(409);
+        assertThat(stale.body()).contains("QUOTE_VERSION_CONFLICT");
+        var foreign = bulkRemove(draft, List.of(draft.lineIds().getFirst(), other.lineIds().getFirst()),
+                draft.version());
+        assertThat(foreign.statusCode()).isEqualTo(400);
+        assertThat(foreign.body()).contains("LINE_ITEM_QUOTE_MISMATCH");
+        var noneditable = bulkRemove(sent, sent.lineIds(), sent.version());
+        assertThat(noneditable.statusCode()).isEqualTo(400);
+        assertThat(noneditable.body()).contains("QUOTE_NOT_EDITABLE");
+        var duplicate = bulkRemove(draft, List.of(draft.lineIds().getFirst(), draft.lineIds().getFirst()),
+                draft.version());
+        assertThat(duplicate.statusCode()).isEqualTo(400);
+
+        for (BulkFixture unchanged : List.of(draft, other, sent)) {
+            assertThat(quotes.findById(unchanged.quoteId()).orElseThrow().getVersion())
+                    .isEqualTo(unchanged.version());
+            assertThat(lineService.getLineItems(unchanged.quoteId())).extracting(QuoteLineItemDto::getId)
+                    .containsExactlyInAnyOrderElementsOf(unchanged.lineIds());
+        }
+    }
+
+    @Test
+    void removingZeroPricedLinesStillAdvancesTheVersionExactlyOnce() throws Exception {
+        BulkFixture fixture = bulkFixture("HTTP-BULK-ZERO", QuoteStatus.DRAFT, "0");
+        assertThat(bulkRemove(fixture, fixture.lineIds(), fixture.version()).statusCode()).isEqualTo(204);
+        Quote persisted = quotes.findById(fixture.quoteId()).orElseThrow();
+        assertThat(persisted.getVersion()).isEqualTo(fixture.version() + 1);
+        assertThat(persisted.getTotalAmount()).isEqualByComparingTo("0");
+        assertThat(lineService.getLineItems(fixture.quoteId())).isEmpty();
+    }
+
+    @Test
+    void bulkRemoveLosesToConcurrentLineEditWithoutRemovingAnything() throws Exception {
+        BulkFixture fixture = bulkFixture("HTTP-BULK-RACE", QuoteStatus.DRAFT, "40");
+        var lineWritten = new CountDownLatch(1);
+        var releaseEdit = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var edit = pool.submit(() -> new TransactionTemplate(manager).executeWithoutResult(status -> {
+                lineService.updateLineItem(fixture.quoteId(), fixture.lineIds().getLast(),
+                        flatBulkLine(new BigDecimal("41"), 3));
+                lineWritten.countDown();
+                try {
+                    if (!releaseEdit.await(15, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("bulk remove did not reach the edit lock");
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(interrupted);
+                }
+            }));
+            try {
+                assertThat(lineWritten.await(10, TimeUnit.SECONDS)).isTrue();
+                var bulk = pool.submit(() -> bulkRemove(fixture, fixture.lineIds().subList(0, 3), fixture.version()));
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+                while (System.nanoTime() < until && waitingLocks() == 0 && !bulk.isDone()) {
+                    Thread.sleep(20);
+                }
+                assertThat(waitingLocks()).isGreaterThanOrEqualTo(1);
+                releaseEdit.countDown();
+                var result = bulk.get(15, TimeUnit.SECONDS);
+                assertThat(result.statusCode()).isEqualTo(409);
+                assertThat(result.body()).contains("QUOTE_VERSION_CONFLICT");
+            } finally {
+                releaseEdit.countDown();
+                edit.get(15, TimeUnit.SECONDS);
+            }
+        }
+        assertThat(lineService.getLineItems(fixture.quoteId())).extracting(QuoteLineItemDto::getId)
+                .containsExactlyElementsOf(fixture.lineIds());
+        assertThat(quotes.findById(fixture.quoteId()).orElseThrow().getTotalAmount())
+                .isEqualByComparingTo("161");
+    }
+
+    private BulkFixture bulkFixture(String quoteNumber, QuoteStatus finalStatus, String price) {
+        var transaction = new TransactionTemplate(manager);
+        BulkFixture inserted = transaction.execute(status -> {
+            Quote quote = quotes.saveAndFlush(Quote.builder().quoteNumber(quoteNumber).name("Bulk removal")
+                    .customerExternalId("customer").currency("USD").durationInMonths(12).build());
+            List<Long> ids = java.util.stream.IntStream.range(0, 4)
+                    .mapToObj(i -> lineService.addLineItem(quote.getId(), flatBulkLine(new BigDecimal(price), i)).getId())
+                    .toList();
+            quote.setStatus(finalStatus);
+            return new BulkFixture(quote.getId(), 0, ids);
+        });
+        long committedVersion = quotes.findById(inserted.quoteId()).orElseThrow().getVersion();
+        return new BulkFixture(inserted.quoteId(), committedVersion, inserted.lineIds());
+    }
+
+    private HttpResponse<String> bulkRemove(BulkFixture fixture, List<Long> ids, long version) throws Exception {
+        return send(HttpClient.newHttpClient(), new CountDownLatch(0), "POST",
+                "/api/v1/quotes/" + fixture.quoteId() + "/line-items/bulk-remove",
+                new ObjectMapper().writeValueAsString(Map.of("lineItemIds", ids, "expectedQuoteVersion", version)));
+    }
+
+    private static LineItemCreateRequest flatBulkLine(BigDecimal price, int sortOrder) {
+        return LineItemCreateRequest.builder().productExternalId("99").productName("Catalog line")
+                .quantity(1).listPrice(price).sortOrder(sortOrder).build();
+    }
+
+    private record BulkFixture(long quoteId, long version, List<Long> lineIds) {}
+
     private HttpResponse<String> send(HttpClient c, CountDownLatch start, String method, String path, String body) throws Exception {
         start.await(); var req=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).header("Content-Type","application/json")
                 .method(method,HttpRequest.BodyPublishers.ofString(body)).build();

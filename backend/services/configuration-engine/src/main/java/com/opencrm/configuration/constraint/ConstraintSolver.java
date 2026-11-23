@@ -82,7 +82,7 @@ public class ConstraintSolver {
         Set<Long> excluded = new LinkedHashSet<>();
         for (Long id : selectedIds) {
             for (ProductConfigurationRuleDto rule : ruleClient.getRulesForProduct(id)) {
-                if (rule == null || rule.getTargetProductId() == null) {
+                if (!ProductRuleEvaluationCore.isActiveRule(rule) || rule.getTargetProductId() == null) {
                     continue;
                 }
                 String type = rule.getRuleType() == null ? "" : rule.getRuleType().trim().toUpperCase();

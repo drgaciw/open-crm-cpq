@@ -20,10 +20,14 @@ const searchBox = (page) => page.getByRole('textbox', { name: list.searchPlaceho
 /** Search for a record by its run-unique name and return its table row. */
 async function findRow(page, name) {
   await goto(page, list.path);
-  const responded = page.waitForResponse((r) => r.url().includes(`${API}/search`) && r.ok(), { timeout: 10000 })
-    .catch(() => null); // never reject unhandled if fill() throws first
-  await searchBox(page).fill(name);
-  await responded;
+  await Promise.all([
+    page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === `${API}/search` && url.searchParams.get('q') === name
+        && response.request().method() === 'GET' && response.ok();
+    }, { timeout: 10000 }),
+    searchBox(page).fill(name),
+  ]);
   const row = page.getByRole('row').filter({ hasText: name }).first();
   await row.waitFor({ state: 'visible' });
   return row;
@@ -66,10 +70,15 @@ export default {
 
     await runCheck(ctx, 'organizations.search.clear-restores-list', async () => {
       await findRow(page, org.name);
-      await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+      await Promise.all([
+        page.waitForResponse((response) => new URL(response.url()).pathname === API
+          && response.request().method() === 'GET' && response.ok(), { timeout: 10000 }),
+        page.getByRole('button', { name: 'Clear search', exact: true }).click(),
+      ]);
       await waitUntil(() => searchBox(page).inputValue(), (value) => value === '', {
         describe: (value) => `search box still holds "${value}" after Clear`,
       });
+      return 'Clear reset the search box and fetched the unfiltered accounts list';
     });
 
     await runCheck(ctx, 'organizations.row.click-opens-detail', async () => {

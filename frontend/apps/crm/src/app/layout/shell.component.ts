@@ -32,7 +32,7 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell-container">
-      <a class="skip-link" href="#main-content">Skip to main content</a>
+      <a class="skip-link" href="#main-content" (click)="skipToMain($event, mainContent)">Skip to main content</a>
       <app-toolbar (toggleSidenav)="onToggleSidenav()" />
       @if (loadingService.loading()) {
         <mat-progress-bar
@@ -55,7 +55,7 @@ const MOBILE_QUERY = '(max-width: 767.98px)';
           <app-sidebar />
         </mat-sidenav>
         <mat-sidenav-content class="content">
-          <main id="main-content" class="page-container" tabindex="-1">
+          <main #mainContent id="main-content" class="page-container" tabindex="-1">
             <router-outlet />
           </main>
         </mat-sidenav-content>
@@ -144,6 +144,11 @@ export class ShellComponent implements OnInit {
 
   onToggleSidenav(): void {
     this.sidenavOpened.update((opened) => !opened);
+  }
+
+  skipToMain(event: MouseEvent, mainContent: HTMLElement): void {
+    event.preventDefault();
+    mainContent.focus();
   }
 
   onOpenedChange(opened: boolean): void {

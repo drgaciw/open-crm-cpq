@@ -5,7 +5,7 @@
  */
 import { goto } from '../../lib/browser.mjs';
 import { runCheck, defect, blocked, waitUntil } from '../../lib/health.mjs';
-import { WON_NEEDS_ACCEPTED_QUOTE, expectWinRefused } from '../workflows/deal-lifecycle.mjs';
+import { WON_NEEDS_ACCEPTED_QUOTE, acceptQuoteForDeal, canSeedWon, expectWinRefused } from '../workflows/deal-lifecycle.mjs';
 import { withNativeDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, fillField, readField } from '../../lib/fields.mjs';
@@ -65,9 +65,9 @@ async function isGone(api, id) {
 
 /** Drive a deal to a stage through the API (create ignores `stage`). */
 async function dealIn(ctx, stage, overrides = {}) {
+  if (stage === 'WON' && !canSeedWon(ctx)) return null;
   const deal = await ensure(ctx, 'deal', overrides);
-  // WON needs an accepted quote, which only a QuoteAccepted event can record; see WON_NEEDS_ACCEPTED_QUOTE.
-  if (stage === 'WON') return null;
+  if (stage === 'WON') return acceptQuoteForDeal(ctx, deal);
   if (stage === 'LOST') return ctx.api.post(`${API}/${deal.id}/lose`, { reason: 'UAT fixture' });
   let current = deal;
   for (let i = 0; i < STAGES.findIndex((s) => s.value === stage); i++) current = await ctx.api.post(`${API}/${deal.id}/advance`);
@@ -180,7 +180,7 @@ export default {
     await runFieldContract(ctx, { ...detail, path: `/deals/${bare.id}` }, detail.forms[0]);
 
     // ── workflows ─────────────────────────────────────────────────────────────
-    await runDealLifecycle(ctx, detail);
+    const lifecycle = await runDealLifecycle(ctx, detail);
     await runKanban(ctx, { kanban, detail });
 
     // H-CRM-018: Validators.required accepts "   ", and the component only tests truthiness.
@@ -282,11 +282,18 @@ export default {
 
     // One deal per stage so that every tab has something to show.
     const byStage = { PROSPECTING: full };
-    for (const stage of STAGES.slice(1)) byStage[stage.value] = await dealIn(ctx, stage.value);
+    for (const stage of STAGES.slice(1)) {
+      byStage[stage.value] = stage.value === 'WON' ? lifecycle.won : await dealIn(ctx, stage.value);
+    }
+    const findStageFixture = async stage => {
+      byStage[stage] ??= await dealIn(ctx, stage);
+      if (!byStage[stage]) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
+      return byStage[stage];
+    };
 
     for (const stage of STAGES) {
       await runCheck(ctx, `deals.tabs.${stage.label}`, async () => {
-        if (!byStage[stage.value]) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
+        await findStageFixture(stage.value);
         await goto(page, list.path);
         const requested = page.waitForRequest((r) => r.url().includes(`${API}?`) && r.url().includes(`stage=${stage.value}`), { timeout: 8000 })
           .catch(() => null);
@@ -309,8 +316,8 @@ export default {
     const menuFor = (stage) => list.actions.filter((a) => a.in === 'menu' && a.visibleWhen.includes(stage)).map((a) => a.name);
     for (const stage of ['PROSPECTING', 'NEGOTIATION', 'WON', 'LOST']) {
       await runCheck(ctx, `deals.row-menu.${stage}`, async () => {
-        if (!byStage[stage]) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
-        const items = await openRowMenu(page, byStage[stage].name);
+        const staged = await findStageFixture(stage);
+        const items = await openRowMenu(page, staged.name);
         const path = new URL(page.url()).pathname;
         await page.keyboard.press('Escape');
         await settleOverlays(page);

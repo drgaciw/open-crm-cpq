@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
   ConfigRuleCreateRequest,
+  ConfigRuleUpdateRequest,
   ConfigurationRuleDto,
 } from './configuration-rule.model';
 
@@ -24,6 +25,10 @@ export class ConfigurationRuleService {
 
   create(request: ConfigRuleCreateRequest): Observable<ConfigurationRuleDto> {
     return this.http.post<ConfigurationRuleDto>(this.basePath, request);
+  }
+
+  update(id: number, request: ConfigRuleUpdateRequest): Observable<ConfigurationRuleDto> {
+    return this.http.put<ConfigurationRuleDto>(`${this.basePath}/${id}`, request);
   }
 
   delete(id: number): Observable<void> {

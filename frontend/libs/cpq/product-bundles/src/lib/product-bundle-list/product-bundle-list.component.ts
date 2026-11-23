@@ -20,6 +20,7 @@ import {
   TableColumn,
 } from '@frontend/shared-ui';
 import { ProductBundleDto } from '../product-bundle.model';
+import { NotificationService } from '@frontend/shared-data-access';
 import { ProductBundleService } from '../product-bundle.service';
 import { ProductBundleCreateDialogComponent } from '../product-bundle-create-dialog/product-bundle-create-dialog.component';
 
@@ -164,6 +165,7 @@ export class ProductBundleListComponent implements OnInit {
   readonly service = inject(ProductBundleService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
 
   readonly columns: TableColumn[] = [
     { key: 'name', header: 'Name', sortable: true },
@@ -243,6 +245,7 @@ export class ProductBundleListComponent implements OnInit {
       if (!created?.id) {
         return;
       }
+      this.notification.success('Bundle created');
       void this.router.navigate(['/product-bundles', created.id]);
     });
   }

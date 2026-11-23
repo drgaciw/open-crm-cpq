@@ -18,6 +18,8 @@ import {
   EmptyStateComponent,
   PageHeaderComponent,
 } from '@frontend/shared-ui';
+import { NotificationService } from '@frontend/shared-data-access';
+import { ProductBundleCreateDialogComponent } from '../product-bundle-create-dialog/product-bundle-create-dialog.component';
 import { ProductBundleDto, BundleItemDto } from '../product-bundle.model';
 import { ProductBundleService } from '../product-bundle.service';
 import { bundleHttpErrorMessage } from '../bundle-http-error';
@@ -54,6 +56,10 @@ interface ItemTableRow {
     } @else if (bundle(); as bundle) {
       <app-page-header [title]="bundle.name" [subtitle]="subtitle(bundle)">
         <div actions class="header-actions">
+          <button mat-stroked-button type="button" [disabled]="mutating()" (click)="openEditBundle()">
+            <mat-icon>edit</mat-icon>
+            Edit bundle
+          </button>
           <button
             mat-stroked-button
             color="warn"
@@ -168,6 +174,9 @@ interface ItemTableRow {
                       <td>{{ row.optional }}</td>
                       <td>{{ row.sortOrder }}</td>
                       <td class="actions-col">
+                        <button mat-button type="button" [disabled]="mutating()" (click)="openEditItem(row)">
+                          Edit
+                        </button>
                         <button
                           mat-button
                           color="warn"
@@ -329,6 +338,7 @@ interface ItemTableRow {
 export class ProductBundleDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
   readonly service = inject(ProductBundleService);
 
   /** Route param `:id` (string from Angular router). */
@@ -355,7 +365,9 @@ export class ProductBundleDetailComponent implements OnInit {
   });
 
   readonly itemRows = computed<ItemTableRow[]>(() =>
-    (this.bundle()?.items ?? []).map((item) => this.toItemRow(item)),
+    [...(this.bundle()?.items ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+      .map((item) => this.toItemRow(item)),
   );
 
   ngOnInit(): void {
@@ -389,28 +401,55 @@ export class ProductBundleDetailComponent implements OnInit {
     void this.router.navigate(['/product-bundles']);
   }
 
-  openAddItem(): void {
-    if (this.mutating()) {
-      return;
-    }
+  openEditBundle(): void {
     const bundle = this.bundle();
-    if (!bundle) {
+    if (!bundle || this.mutating()) {
       return;
     }
 
-    const data: BundleItemDialogData = { bundleId: bundle.id };
+    const ref = this.dialog.open(ProductBundleCreateDialogComponent, {
+      width: '520px',
+      disableClose: true,
+      data: { bundle },
+    });
+    ref.afterClosed().subscribe((saved: ProductBundleDto | undefined) => {
+      if (saved) {
+        this.actionError.set(null);
+        this.service.selectedBundle.set(saved);
+        this.notification.success('Bundle updated');
+      }
+    });
+  }
+
+  openAddItem(): void {
+    const bundle = this.bundle();
+    if (!bundle || this.mutating()) {
+      return;
+    }
+    this.openItemDialog({ bundleId: bundle.id });
+  }
+
+  openEditItem(row: ItemTableRow): void {
+    const bundle = this.bundle();
+    const item = bundle?.items?.find(({ id }) => id === row.id);
+    if (!bundle || !item || this.mutating()) {
+      return;
+    }
+    this.openItemDialog({ bundleId: bundle.id, item });
+  }
+
+  private openItemDialog(data: BundleItemDialogData): void {
     const ref = this.dialog.open(BundleItemDialogComponent, {
       width: '520px',
       disableClose: true,
       data,
     });
-
     ref.afterClosed().subscribe((saved: ProductBundleDto | undefined) => {
-      if (!saved) {
-        return;
+      if (saved) {
+        this.actionError.set(null);
+        this.service.selectedBundle.set(saved);
+        this.notification.success(data.item ? 'Bundle item updated' : 'Bundle item added');
       }
-      this.actionError.set(null);
-      this.service.selectedBundle.set(saved);
     });
   }
 
@@ -444,6 +483,7 @@ export class ProductBundleDetailComponent implements OnInit {
         next: () => {
           this.mutating.set(false);
           this.service.getById(bundle.id);
+          this.notification.success('Bundle item removed');
         },
         error: (err: unknown) => {
           this.mutating.set(false);
@@ -485,6 +525,7 @@ export class ProductBundleDetailComponent implements OnInit {
         next: () => {
           this.mutating.set(false);
           this.service.selectedBundle.set(null);
+          this.notification.success('Bundle deleted');
           void this.router.navigate(['/product-bundles']);
         },
         error: (err: unknown) => {

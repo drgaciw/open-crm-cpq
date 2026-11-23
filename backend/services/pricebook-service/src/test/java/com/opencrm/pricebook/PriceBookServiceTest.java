@@ -45,6 +45,46 @@ class PriceBookServiceTest {
     private PriceBookService priceBookService;
 
     @Test
+    void clearsExplicitOptionalFieldsAndPreservesOmittedFields() throws Exception {
+        LocalDate expires = LocalDate.of(2099, 12, 31);
+        PriceBook book = PriceBook.builder().id(42L).name("Draft").region("NA").expirationDate(expires).build();
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(book));
+        when(priceBookRepository.save(book)).thenReturn(book);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        priceBookService.update(42L, mapper.readValue("{}", PriceBookUpdateRequest.class));
+        assertThat(book.getRegion()).isEqualTo("NA");
+        assertThat(book.getExpirationDate()).isEqualTo(expires);
+
+        priceBookService.update(42L, mapper.readValue("""
+                {"clearRegion":true,"clearExpirationDate":true}
+                """, PriceBookUpdateRequest.class));
+        assertThat(book.getRegion()).isNull();
+        assertThat(book.getExpirationDate()).isNull();
+    }
+
+    @Test
+    void doesNotApplyExplicitClearsToPublishedPriceBooks() throws Exception {
+        LocalDate expires = LocalDate.of(2099, 12, 31);
+        PriceBook book = PriceBook.builder().id(42L).region("NA").expirationDate(expires)
+                .status(PriceBookStatus.PUBLISHED).build();
+        when(priceBookRepository.findWithLockByIdAndDeletedFalse(42L)).thenReturn(Optional.of(book));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        PriceBookUpdateRequest request = mapper.readValue("""
+                {"clearRegion":true,"clearExpirationDate":true}
+                """, PriceBookUpdateRequest.class);
+
+        assertThatThrownBy(() -> priceBookService.update(42L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "PRICE_BOOK_PUBLISHED_IMMUTABLE");
+        assertThat(book.getRegion()).isEqualTo("NA");
+        assertThat(book.getExpirationDate()).isEqualTo(expires);
+        verify(priceBookRepository, never()).save(any());
+    }
+
+    @Test
     void createEntryAttachesEntryToPriceBookAggregate() {
         PriceBook priceBook = PriceBook.builder()
                 .id(42L)

@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,10 +41,37 @@ class FieldDefinitionControllerTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new FieldDefinitionController(fieldRegistryService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new FieldDefinitionController(fieldRegistryService,
+                        Optional.of(FieldDefinitionController.FixtureAccess.ENABLED)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
+    }
+
+    @Test
+    void shippedRegistryRefusesReadsAndWritesWithoutCallingTheStore() throws Exception {
+        MockMvc shippedMvc = MockMvcBuilders.standaloneSetup(
+                        new FieldDefinitionController(fieldRegistryService, Optional.empty()))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        shippedMvc.perform(get("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .param("entity", "ORGANIZATION"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("FIELD_REGISTRY_NOT_READY"));
+
+        shippedMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"entity":"ORGANIZATION","key":"region_code","label":"Region","type":"TEXT",
+                                "required":false,"showOnRecord":true,"showOnList":true,"position":1,"agentFilled":false}
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("FIELD_REGISTRY_NOT_READY"));
+
+        verifyNoInteractions(fieldRegistryService);
     }
 
     @Test

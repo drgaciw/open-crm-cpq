@@ -15,6 +15,7 @@ import {
   ConfirmDialogComponent,
   EmptyStateComponent,
 } from '@frontend/shared-ui';
+import { NotificationService } from '@frontend/shared-data-access';
 import { ConfigurationRuleDto } from '../configuration-rule.model';
 import { ConfigurationRuleService } from '../configuration-rule.service';
 import {
@@ -88,6 +89,8 @@ function httpErrorMessage(err: unknown, fallback: string): string {
               <th scope="col">Target</th>
               <th scope="col">Priority</th>
               <th scope="col">Condition</th>
+              <th scope="col">Status</th>
+              <th scope="col">Error message</th>
               <th scope="col">Actions</th>
             </tr>
           </thead>
@@ -101,7 +104,12 @@ function httpErrorMessage(err: unknown, fallback: string): string {
                 <td class="condition-cell">
                   {{ rule.conditionExpression || '—' }}
                 </td>
+                <td>{{ rule.status ?? 'ACTIVE' }}</td>
+                <td>{{ rule.errorMessage || '—' }}</td>
                 <td>
+                  <button mat-button type="button" [disabled]="busy()" (click)="openEdit(rule)">
+                    Edit
+                  </button>
                   <button
                     mat-button
                     color="warn"
@@ -212,6 +220,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 export class ConfigRulesPanelComponent {
   private readonly ruleService = inject(ConfigurationRuleService);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
 
   /** Source product id from catalog-detail. */
   readonly productId = input<number | null>(null);
@@ -231,14 +240,27 @@ export class ConfigRulesPanelComponent {
     if (id == null || this.busy()) {
       return;
     }
-    const data: ConfigRuleCreateDialogData = { productId: id };
+    this.openRuleDialog({ productId: id });
+  }
+
+  openEdit(rule: ConfigurationRuleDto): void {
+    if (this.busy() || this.productId() !== rule.sourceProductId) {
+      return;
+    }
+    this.openRuleDialog({ productId: rule.sourceProductId, rule });
+  }
+
+  private openRuleDialog(data: ConfigRuleCreateDialogData): void {
     const ref = this.dialog.open(ConfigRuleCreateDialogComponent, {
       width: '480px',
       data,
     });
-    ref.afterClosed().subscribe((created: ConfigurationRuleDto | null) => {
-      if (created) {
-        this.rules.update((list) => [...list, created]);
+    ref.afterClosed().subscribe((saved: ConfigurationRuleDto | null) => {
+      if (saved) {
+        this.rules.update((list) =>
+          [...list.filter(({ id }) => id !== saved.id), saved].sort((a, b) => b.priority - a.priority),
+        );
+        this.notification.success(data.rule ? 'Rule updated' : 'Rule created');
       }
     });
   }
@@ -267,6 +289,7 @@ export class ConfigRulesPanelComponent {
         next: () => {
           this.busy.set(false);
           this.rules.update((list) => list.filter((r) => r.id !== rule.id));
+          this.notification.success('Rule deleted');
         },
         error: (err: unknown) => {
           this.busy.set(false);

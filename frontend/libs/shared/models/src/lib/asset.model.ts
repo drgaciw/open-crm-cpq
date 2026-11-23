@@ -46,16 +46,16 @@ export interface AssetDto {
   accountId: string;
   contractLineId?: string;
   subscriptionId?: number;
-  entitlementId?: string;
-  productRef?: string;
-  quantity?: number;
+  entitlementId?: string | null;
+  productRef?: string | null;
+  quantity?: number | null;
   status: AssetStatus;
   effectiveStart?: string;
   effectiveEnd?: string;
-  supersededBy?: string;
-  supersedes?: string;
+  supersededBy?: string | null;
+  supersedes?: string | null;
   createdAt?: string;
-  updatedAt?: string;
+  updatedAt?: string | null;
 }
 
 /**
@@ -65,12 +65,12 @@ export interface AssetDto {
 export interface InstalledAssetDto {
   assetId: string;
   accountId: string;
-  contractLineId?: string;
-  subscriptionId?: number;
-  productRef?: string;
-  quantity?: number;
+  contractLineId?: string | null;
+  subscriptionId?: number | null;
+  productRef?: string | null;
+  quantity?: number | null;
   effectiveStart?: string;
-  effectiveEnd?: string;
+  effectiveEnd?: string | null;
   status: AssetStatus;
 }
 
@@ -83,15 +83,15 @@ export interface AssetHistoryEntryDto {
   accountId: string;
   eventType?: string;
   effectiveDate?: string;
-  effectiveEnd?: string;
-  sourceAmendmentId?: string;
-  sourceApplyUnit?: string;
-  predecessorAssetId?: string;
-  successorAssetId?: string;
-  contractLineId?: string;
-  subscriptionId?: number;
-  productRef?: string;
-  quantity?: number;
+  effectiveEnd?: string | null;
+  sourceAmendmentId?: string | null;
+  sourceApplyUnit?: string | null;
+  predecessorAssetId?: string | null;
+  successorAssetId?: string | null;
+  contractLineId?: string | null;
+  subscriptionId?: number | null;
+  productRef?: string | null;
+  quantity?: number | null;
 }
 
 /**
@@ -114,10 +114,10 @@ export interface AssetChurnEventDto {
   accountId: string;
   churnKind: AssetChurnKind;
   effectiveDate: string;
-  quantityBefore?: number;
+  quantityBefore?: number | null;
   quantityAfter?: number;
-  quantityChurned?: number;
-  productRef?: string;
+  quantityChurned?: number | null;
+  productRef?: string | null;
 }
 
 /**

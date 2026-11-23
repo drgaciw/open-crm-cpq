@@ -22,6 +22,7 @@ describe('PriceBookEditDialogComponent', () => {
     region: 'APAC',
     currency: 'USD',
     isDefault: false,
+    expirationDate: '2099-12-31',
     createdAt: '2026-04-01T00:00:00Z',
     updatedAt: '2026-04-01T00:00:00Z',
   };
@@ -90,7 +91,7 @@ describe('PriceBookEditDialogComponent', () => {
       currency: 'USD',
       isDefault: false,
       effectiveDate: '',
-      expirationDate: '',
+      expirationDate: '2099-12-31',
     });
   });
 
@@ -127,7 +128,7 @@ describe('PriceBookEditDialogComponent', () => {
     expect(component.error()).toBeNull();
   });
 
-  it('omits empty optional strings but always sends isDefault', () => {
+  it('sends explicit clears for persisted region and expiration date', () => {
     updateSpy.mockReturnValue(of(updatedBook));
     component.form.patchValue({
       name: 'Minimal',
@@ -143,6 +144,8 @@ describe('PriceBookEditDialogComponent', () => {
     expect(updateSpy).toHaveBeenCalledWith(3, {
       name: 'Minimal',
       isDefault: false,
+      clearRegion: true,
+      clearExpirationDate: true,
     });
   });
 

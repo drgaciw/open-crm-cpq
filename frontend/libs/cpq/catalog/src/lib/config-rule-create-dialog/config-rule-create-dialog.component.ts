@@ -21,8 +21,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import {
+  CONFIG_RULE_STATUSES,
   CONFIG_RULE_TYPES,
-  ConfigRuleCreateRequest,
+  ConfigRuleStatus,
   ConfigRuleType,
   ConfigurationRuleDto,
 } from '../configuration-rule.model';
@@ -30,6 +31,7 @@ import { ConfigurationRuleService } from '../configuration-rule.service';
 
 export interface ConfigRuleCreateDialogData {
   productId: number;
+  rule?: ConfigurationRuleDto;
 }
 
 function httpErrorMessage(err: unknown, fallback: string): string {
@@ -61,7 +63,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h2 mat-dialog-title>New configuration rule</h2>
+    <h2 mat-dialog-title>{{ editing ? 'Edit configuration rule' : 'New configuration rule' }}</h2>
     <mat-dialog-content>
       @if (error()) {
         <div class="error-banner" role="alert">
@@ -78,7 +80,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
             maxlength="255"
             autocomplete="off"
           />
-          @if (form.get('name')?.hasError('required')) {
+          @if (form.get('name')?.hasError('required') || form.get('name')?.hasError('pattern')) {
             <mat-error>Name is required</mat-error>
           }
         </mat-form-field>
@@ -122,6 +124,20 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Error message (optional)</mat-label>
+          <textarea matInput formControlName="errorMessage" rows="2" maxlength="500"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status">
+            @for (status of statuses; track status) {
+              <mat-option [value]="status">{{ status }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
           <mat-label>Priority</mat-label>
           <input matInput type="number" formControlName="priority" />
         </mat-form-field>
@@ -141,7 +157,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         @if (saving()) {
           <mat-spinner diameter="20" />
         } @else {
-          Create
+          {{ editing ? 'Save' : 'Create' }}
         }
       </button>
     </mat-dialog-actions>
@@ -183,16 +199,22 @@ export class ConfigRuleCreateDialogComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly ruleTypes: ConfigRuleType[] = [...CONFIG_RULE_TYPES];
+  readonly statuses = CONFIG_RULE_STATUSES;
+  readonly editing = this.data.rule !== undefined;
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    ruleType: this.fb.nonNullable.control<ConfigRuleType | ''>('', {
+    name: [this.data.rule?.name ?? '', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
+    ruleType: this.fb.nonNullable.control<ConfigRuleType | ''>(this.data.rule?.ruleType ?? '', {
       validators: [Validators.required],
     }),
-    targetProductId: this.fb.control<number | null>(null),
-    conditionExpression: [''],
-    description: [''],
-    priority: this.fb.nonNullable.control(0),
+    targetProductId: this.fb.control<number | null>(this.data.rule?.targetProductId ?? null, Validators.min(1)),
+    conditionExpression: [this.data.rule?.conditionExpression ?? ''],
+    description: [this.data.rule?.description ?? ''],
+    errorMessage: [this.data.rule?.errorMessage ?? '', Validators.maxLength(500)],
+    priority: this.fb.nonNullable.control(this.data.rule?.priority ?? 0),
+    status: this.fb.nonNullable.control<ConfigRuleStatus>(
+      this.statuses.find((status) => status === this.data.rule?.status) ?? 'ACTIVE',
+    ),
   });
 
   onCancel(): void {
@@ -205,28 +227,27 @@ export class ConfigRuleCreateDialogComponent {
       return;
     }
     const value = this.form.getRawValue();
-    const request: ConfigRuleCreateRequest = {
+    const details = {
       name: value.name.trim(),
       ruleType: value.ruleType as ConfigRuleType,
-      sourceProductId: this.data.productId,
       priority: Number(value.priority) || 0,
+      description: value.description.trim() || undefined,
+      targetProductId: value.targetProductId ?? undefined,
+      conditionExpression: value.conditionExpression.trim() || undefined,
+      errorMessage: value.errorMessage.trim() || undefined,
     };
-    if (value.description?.trim()) {
-      request.description = value.description.trim();
-    }
-    if (
-      value.targetProductId != null &&
-      !Number.isNaN(Number(value.targetProductId))
-    ) {
-      request.targetProductId = Number(value.targetProductId);
-    }
-    if (value.conditionExpression?.trim()) {
-      request.conditionExpression = value.conditionExpression.trim();
-    }
+    const rule = this.data.rule;
+    const request = rule
+      ? this.ruleService.update(rule.id, { ...details, status: value.status })
+      : this.ruleService.create({
+          ...details,
+          sourceProductId: this.data.productId,
+          ...(value.status === 'ACTIVE' ? {} : { status: value.status }),
+        });
 
     this.error.set(null);
     this.saving.set(true);
-    this.ruleService.create(request).subscribe({
+    request.subscribe({
       next: (created) => {
         this.saving.set(false);
         this.dialogRef.close(created);
@@ -234,7 +255,7 @@ export class ConfigRuleCreateDialogComponent {
       error: (err: unknown) => {
         this.saving.set(false);
         this.error.set(
-          httpErrorMessage(err, 'Failed to create configuration rule'),
+          httpErrorMessage(err, rule ? 'Failed to save configuration rule' : 'Failed to create configuration rule'),
         );
       },
     });

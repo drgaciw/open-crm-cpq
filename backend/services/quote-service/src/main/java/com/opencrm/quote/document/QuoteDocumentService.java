@@ -60,6 +60,11 @@ public class QuoteDocumentService {
         }
 
         Context ctx = new Context();
+        ctx.setVariable("documentTitle", switch (documentType) {
+            case PROPOSAL -> "Quote Proposal";
+            case ORDER_FORM -> "Order Form";
+            case SOW -> "Statement of Work";
+        });
         ctx.setVariable("quote", quote);
         ctx.setVariable("lineItems", lineItems);
         ctx.setVariable("rampLines", rampLines);

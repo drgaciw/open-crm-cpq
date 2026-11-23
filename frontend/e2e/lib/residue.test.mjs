@@ -30,3 +30,15 @@ test('reports a failed purge instead of throwing', () => {
   });
   assert.equal(out, 'local purge failed: docker: not found');
 });
+
+test('leaves accepted fixtures for teardown of an explicitly isolated stack', () => {
+  const calls = [];
+  const outcome = purgeLocalResidue({
+    base: 'http://127.0.0.1:14200',
+    residue: [accepted],
+    env: { UAT_ISOLATED_FIXTURES: '1' },
+    run: (...args) => { calls.push(args); },
+  });
+  assert.equal(outcome, null);
+  assert.deepEqual(calls, []);
+});

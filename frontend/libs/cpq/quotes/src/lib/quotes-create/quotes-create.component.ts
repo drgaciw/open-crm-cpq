@@ -105,6 +105,13 @@ function httpErrorMessage(err: unknown): string {
             </mat-form-field>
           </div>
 
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Deal type</mat-label>
+              <input matInput value="New" readonly />
+            </mat-form-field>
+          </div>
+
           <div class="form-row two-col">
             <mat-form-field appearance="outline">
               <mat-label>Deal external ID</mat-label>

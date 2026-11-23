@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { NotificationService } from '@frontend/shared-data-access';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -439,6 +440,7 @@ export function isPriceBookPublished(
 export class PriceBookDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
   readonly service = inject(PriceBookService);
 
   /** Route param `:id` (string from Angular router). */
@@ -537,6 +539,7 @@ export class PriceBookDetailComponent implements OnInit {
       }
       this.actionError.set(null);
       this.service.getById(book.id);
+      this.notification.success('Price book updated');
     });
   }
 

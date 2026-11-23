@@ -29,4 +29,5 @@ public class ProductConfigurationRuleDto {
     private String conditionExpression;
     private String errorMessage;
     private int priority;
+    private String status;
 }

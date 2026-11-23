@@ -58,6 +58,13 @@ public class ConfigurationRuleController {
         return ApiResponse.success(rules);
     }
 
+    @PutMapping("/rules/{id}")
+    @Operation(summary = "Update an existing configuration rule")
+    public ApiResponse<ConfigurationRuleDto> update(@PathVariable Long id,
+                                                    @Valid @RequestBody ConfigRuleUpdateRequest request) {
+        return ApiResponse.success(configRuleService.update(id, request), "Configuration rule updated");
+    }
+
     @PostMapping("/validate")
     @Operation(summary = "Validate a product configuration")
     public ApiResponse<List<String>> validate(@RequestBody List<Long> selectedProductIds) {

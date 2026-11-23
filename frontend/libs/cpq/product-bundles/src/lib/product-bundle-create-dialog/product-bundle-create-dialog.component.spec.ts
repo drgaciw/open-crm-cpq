@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { ProductBundleCreateDialogComponent } from './product-bundle-create-dialog.component';
 import { ProductBundleService } from '../product-bundle.service';
@@ -10,19 +10,22 @@ describe('ProductBundleCreateDialogComponent', () => {
   let fixture: ComponentFixture<ProductBundleCreateDialogComponent>;
   let component: ProductBundleCreateDialogComponent;
   let createSpy: ReturnType<typeof vi.fn>;
+  let updateSpy: ReturnType<typeof vi.fn>;
   let dialogClose: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     createSpy = vi.fn().mockReturnValue(of(MOCK_PRODUCT_BUNDLES[0]));
+    updateSpy = vi.fn().mockReturnValue(of(MOCK_PRODUCT_BUNDLES[0]));
     dialogClose = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [ProductBundleCreateDialogComponent],
       providers: [
         provideNoopAnimations(),
+        { provide: MAT_DIALOG_DATA, useValue: {} },
         {
           provide: ProductBundleService,
-          useValue: { create: createSpy },
+          useValue: { create: createSpy, update: updateSpy },
         },
         {
           provide: MatDialogRef,
@@ -64,6 +67,28 @@ describe('ProductBundleCreateDialogComponent', () => {
       minItems: 1,
       maxItems: 3,
     });
+    expect(dialogClose).toHaveBeenCalledWith(MOCK_PRODUCT_BUNDLES[0]);
+  });
+
+  it('edits bundle details without submitting its parent product identity', () => {
+    TestBed.inject(MAT_DIALOG_DATA).bundle = {
+      id: 7, productId: 45, name: 'Pack', description: 'Old details',
+      discountType: 'NONE', minItems: 0, maxItems: 3,
+    };
+    fixture.destroy();
+    fixture = TestBed.createComponent(ProductBundleCreateDialogComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.form.controls.productId.disabled).toBe(true);
+    expect(component.form.controls.name.value).toBe('Pack');
+    component.form.patchValue({ name: 'Edited pack', description: '' });
+    component.onSubmit();
+
+    expect(updateSpy).toHaveBeenCalledWith(7, {
+      name: 'Edited pack', discountType: 'NONE', minItems: 0, maxItems: 3,
+    });
+    expect(createSpy).not.toHaveBeenCalled();
     expect(dialogClose).toHaveBeenCalledWith(MOCK_PRODUCT_BUNDLES[0]);
   });
 

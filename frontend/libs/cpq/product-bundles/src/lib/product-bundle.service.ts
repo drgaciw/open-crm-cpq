@@ -5,7 +5,9 @@ import { PaginationMeta, SpringPageResponse } from '@frontend/shared-models';
 import {
   ProductBundleDto,
   ProductBundleCreateRequest,
+  ProductBundleUpdateRequest,
   BundleItemCreateRequest,
+  BundleItemUpdateRequest,
 } from './product-bundle.model';
 import { bundleHttpErrorMessage } from './bundle-http-error';
 
@@ -111,6 +113,21 @@ export class ProductBundleService {
 
   create(request: ProductBundleCreateRequest): Observable<ProductBundleDto> {
     return this.http.post<ProductBundleDto>(this.basePath, request);
+  }
+
+  update(id: number, request: ProductBundleUpdateRequest): Observable<ProductBundleDto> {
+    return this.http.put<ProductBundleDto>(`${this.basePath}/${id}`, request);
+  }
+
+  updateItem(
+    bundleId: number,
+    itemId: number,
+    request: BundleItemUpdateRequest,
+  ): Observable<ProductBundleDto> {
+    return this.http.put<ProductBundleDto>(
+      `${this.basePath}/${bundleId}/items/${itemId}`,
+      request,
+    );
   }
 
   delete(id: number): Observable<void> {

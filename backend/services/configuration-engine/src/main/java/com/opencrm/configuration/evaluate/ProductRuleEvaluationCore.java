@@ -86,7 +86,7 @@ public final class ProductRuleEvaluationCore {
             if (rules == null) {
                 continue;
             }
-            allRules.addAll(rules);
+            addActiveRules(allRules, rules);
         }
 
         // DEFAULT: expand working set with missing targets when source is selected
@@ -109,7 +109,7 @@ public final class ProductRuleEvaluationCore {
             }
             List<ProductConfigurationRuleDto> rules = rulesForProduct.apply(productId);
             if (rules != null) {
-                allRules.addAll(rules);
+                addActiveRules(allRules, rules);
             }
             fetched.add(productId);
         }
@@ -144,6 +144,20 @@ public final class ProductRuleEvaluationCore {
 
     private static String normalize(String ruleType) {
         return ruleType == null ? "" : ruleType.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static void addActiveRules(List<ProductConfigurationRuleDto> destination,
+                                       List<ProductConfigurationRuleDto> rules) {
+        for (ProductConfigurationRuleDto rule : rules) {
+            if (isActiveRule(rule)) {
+                destination.add(rule);
+            }
+        }
+    }
+
+    /** Older product-service responses did not expose a status. */
+    public static boolean isActiveRule(ProductConfigurationRuleDto rule) {
+        return rule != null && (rule.getStatus() == null || "ACTIVE".equals(normalize(rule.getStatus())));
     }
 
     private static void evaluateRequires(

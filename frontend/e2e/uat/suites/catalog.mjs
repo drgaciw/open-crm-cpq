@@ -10,7 +10,7 @@
 import { goto } from '../../lib/browser.mjs';
 import { runCheck, runSteps, defect, gap, waitUntil } from '../../lib/health.mjs';
 import { confirmMatDialog } from '../../lib/dialogs.mjs';
-import { expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
+import { expectSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, fillField, readField, fieldError, selectOptions, normalizeValue, readPath } from '../../lib/fields.mjs';
 import { ApiCallError } from '../../lib/api.mjs';
 import { ensure, uniqueName, runPrefix } from '../fixtures.mjs';
@@ -218,6 +218,7 @@ export default {
     await runSteps(ctx, [
       {
         id: 'catalog.crud.create',
+        hypothesis: 'H-CPQ-P-013',
         run: async () => {
           const dialog = await openForm(ctx, list, createForm);
           for (const f of createForm.fields) {
@@ -229,13 +230,9 @@ export default {
           await page.waitForURL(DETAIL_URL, { timeout: 15000 });
           state.id = page.url().match(DETAIL_URL)[1];
           api.track('product', state.id, `${API}/${state.id}`);
-          return `${name} -> /catalog/${state.id}`;
+          const toast = await expectSnackbar(page, 'Product created');
+          return `${name} -> /catalog/${state.id}; ${toast}`;
         },
-      },
-      {
-        // H-CPQ-P-013 (gap): success is silent by design — assert the documented behaviour.
-        id: 'catalog.crud.create.no-success-snackbar',
-        run: async () => { await expectNoSnackbar(page); return 'no snackbar after create'; },
       },
       {
         id: 'catalog.crud.persist.create',
@@ -323,7 +320,7 @@ export default {
           await headerButton('Save').click();
           await detailCard().waitFor({ state: 'visible' });
           await page.getByRole('heading', { level: 1 }).filter({ hasText: newName }).waitFor({ state: 'visible' });
-          await expectNoSnackbar(page); // H-CPQ-P-013: silent success
+          await expectSnackbar(page, 'Product updated');
           const text = (await detailCard().innerText()).replace(/\s+/g, ' ');
           const missing = ['Active', 'SERVICES', 'TRAINING', '99.25', 'Edited by the UAT.'].filter((t) => !text.includes(t));
           if (missing.length) throw new Error(`details card lacks ${missing.join(', ')} after save — shows "${text}"`);
@@ -360,7 +357,7 @@ export default {
           const confirm = detail.actions.find((a) => a.name === 'Delete').confirm;
           await confirmMatDialog(page, { title: confirm.title, message: confirm.message, click: confirm.confirmText });
           await page.waitForURL((url) => url.pathname === list.path, { timeout: 15000 });
-          await expectNoSnackbar(page); // H-CPQ-P-013: silent success
+          await expectSnackbar(page, 'Product deleted');
           const proof = await expectGone(api, `${API}/${state.id}`);
           api.untrack('product', state.id);
           return proof;
@@ -517,6 +514,7 @@ export default {
       const press = async (label, want) => {
         await page.getByRole('button', { name: label, exact: true }).click();
         await waitUntil(statusOf, (st) => st === want, { timeoutMs: 8000, describe: (st) => `after ${label} the API says ${st}, expected ${want}` });
+        await expectSnackbar(page, 'Product status updated');
       };
       await goto(page, `/catalog/${subject.id}`);
       await page.getByRole('button', { name: 'Edit', exact: true }).waitFor({ state: 'visible' });
@@ -529,8 +527,9 @@ export default {
       await dialog.getByRole('textbox', { name: 'Reason' }).fill('UAT end of life');
       await dialog.getByRole('button', { name: 'Retire', exact: true }).click();
       await waitUntil(statusOf, (st) => st === 'RETIRED', { timeoutMs: 8000, describe: (st) => `after Retire the API says ${st}` });
+      await expectSnackbar(page, 'Product status updated');
       for (const label of ['Activate', 'Deprecate', 'Retire']) {
-        if (await page.getByRole('button', { name: label, exact: true }).count()) throw new Error(`${label} is still offered on a RETIRED product`);
+        await page.getByRole('button', { name: label, exact: true }).waitFor({ state: 'hidden' });
       }
       return 'DRAFT -> ACTIVE -> DEPRECATED -> RETIRED through the detail page; nothing offered once retired';
     }, { hypothesis: 'H-CPQ-P-009' });

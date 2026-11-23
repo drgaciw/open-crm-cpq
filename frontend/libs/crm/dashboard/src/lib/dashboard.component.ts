@@ -218,11 +218,13 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
 
     .activity-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
       gap: var(--crm-space-md);
     }
+    .activity-grid > mat-card { min-width: 0; }
     .card-spacer { flex: 1; }
     .compact-table { width: 100%; }
+    .compact-table td { overflow-wrap: anywhere; }
     .stage-badge {
       color: var(--crm-color-on-brand);
       padding: 2px var(--crm-space-sm);

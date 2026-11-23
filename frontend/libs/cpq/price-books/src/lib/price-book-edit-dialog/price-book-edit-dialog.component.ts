@@ -239,6 +239,8 @@ export class PriceBookEditDialogComponent {
     const region = value.region?.trim();
     if (region) {
       request.region = region;
+    } else if (this.data.book.region) {
+      request.clearRegion = true;
     }
     const currency = value.currency?.trim();
     if (currency) {
@@ -249,6 +251,8 @@ export class PriceBookEditDialogComponent {
     }
     if (value.expirationDate) {
       request.expirationDate = value.expirationDate;
+    } else if (this.data.book.expirationDate) {
+      request.clearExpirationDate = true;
     }
 
     this.error.set(null);

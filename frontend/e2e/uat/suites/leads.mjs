@@ -40,8 +40,9 @@ async function findRow(page, title) {
 async function openRowMenu(page, title) {
   const row = await findRow(page, title);
   await row.getByRole('button', { name: `Actions for ${title}`, exact: true }).click();
-  await page.waitForTimeout(500); // menu animation; an empty menu never shows an item to wait for
-  const items = page.getByRole('menuitem');
+  const menu = page.getByRole('menu');
+  await menu.waitFor({ state: 'visible' });
+  const items = menu.getByRole('menuitem');
   return (await items.allInnerTexts()).map((t) => t.replace(/^[a-z_]+\s+/, '').replace(/\s+/g, ' ').trim());
 }
 
@@ -186,19 +187,24 @@ export default {
     // ── lifecycle workflow ────────────────────────────────────────────────────
     await runLeadLifecycle(ctx, detail);
 
-    // H-CRM-017: Validators.required accepts "   ", and the component only tests truthiness.
+    // H-CRM-017: a reason consisting entirely of whitespace must not advance the lead.
     await runCheck(ctx, 'leads.lost.whitespace-reason-rejected', async () => {
       const lead = await ensure(ctx, 'lead');
       const loseForm = detail.forms[0];
       await openLead(page, lead, 'NEW');
       await page.getByRole('button', { name: 'Mark Lost', exact: true }).click();
       const dialog = scopeLocator(page, loseForm.scope);
-      await controlLocator(dialog, loseForm.fields[0]).fill('   ');
+      await dialog.waitFor({ state: 'visible' });
+      const reason = controlLocator(dialog, loseForm.fields[0]);
+      await reason.fill('   ');
+      await reason.press('Tab');
       const submit = dialog.getByRole('button', { name: loseForm.submit.name, exact: true });
-      const enabled = await waitUntil(() => submit.isEnabled(), Boolean, { timeoutMs: 1500 }).catch(() => false);
-      if (!enabled) {
+      await submit.waitFor({ state: 'visible' });
+      if (!(await submit.isEnabled())) {
         await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-        return 'whitespace-only reason keeps the submit button disabled';
+        await dialog.waitFor({ state: 'hidden' });
+        await expectApiStatus(api, lead.id, 'NEW');
+        return 'whitespace-only reason keeps the submit button disabled and the lead stays NEW';
       }
       const responded = page.waitForResponse((r) => r.url().includes(`${API}/${lead.id}/lose`), { timeout: 8000 }).catch(() => null);
       await submit.click();

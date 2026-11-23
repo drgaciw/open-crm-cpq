@@ -7,9 +7,9 @@
  * ledger is torn down newest-first, so children go before their product.
  */
 import { goto } from '../../lib/browser.mjs';
-import { runCheck, runSteps, gap, waitUntil } from '../../lib/health.mjs';
+import { runCheck, runSteps, defect, waitUntil } from '../../lib/health.mjs';
 import { confirmMatDialog } from '../../lib/dialogs.mjs';
-import { expectNoSnackbar } from '../../lib/overlays.mjs';
+import { expectNoSnackbar, expectSnackbar } from '../../lib/overlays.mjs';
 import { scopeLocator, fillField, readField } from '../../lib/fields.mjs';
 import { ensure, uniqueName } from '../fixtures.mjs';
 import { optionGroupDialog, optionDialog, configRuleDialog } from '../specs/catalog.mjs';
@@ -62,13 +62,13 @@ async function optionGroups(ctx) {
           throw new Error(`dialog stayed open after Create — banner: "${banner.replace(/\s+/g, ' ').trim()}"`);
         }
         await groupCard().waitFor({ state: 'visible' });
-        await expectNoSnackbar(page);
         const subtitle = (await groupCard().locator('mat-card-subtitle').innerText()).replace(/\s+/g, ' ').trim();
         if (subtitle !== 'REQUIRED_SINGLE · min 1 · max 3') throw new Error(`group subtitle is "${subtitle}"`);
         const created = (await apiGroups()).find((g) => g.name === groupName);
         if (!created) throw new Error('group is shown in the UI but the API does not list it');
         state.groupId = created.id;
         api.track('optionGroup', created.id, `${GROUPS}/${created.id}`);
+        await expectSnackbar(page, 'Option group created');
         const wrong = [['selectionType', 'REQUIRED_SINGLE'], ['minSelections', 1], ['maxSelections', 3]]
           .filter(([key, want]) => created[key] !== want).map(([key, want]) => `${key}=${created[key]} (wanted ${want})`);
         if (wrong.length) throw new Error(`API holds ${wrong.join(', ')}`);
@@ -97,6 +97,7 @@ async function optionGroups(ctx) {
         const item = groupCard().getByRole('listitem').filter({ hasText: 'Gold tier' });
         await item.waitFor({ state: 'visible' });
         const text = (await item.innerText()).replace(/\s+/g, ' ').trim();
+        await expectSnackbar(page, 'Option added');
         if (!text.includes('default') || !text.includes('10%')) throw new Error(`option row reads "${text}", expected the default badge and "10%"`);
         const group = (await apiGroups()).find((g) => g.id === state.groupId);
         const option = group?.options?.find((o) => o.name === 'Gold tier');
@@ -122,6 +123,7 @@ async function optionGroups(ctx) {
         await dialog.waitFor({ state: 'hidden', timeout: 8000 });
         await groupCard().getByRole('listitem').filter({ hasText: 'Plain tier' }).waitFor({ state: 'visible' });
         const group = (await apiGroups()).find((g) => g.id === state.groupId);
+        await expectSnackbar(page, 'Option added');
         const option = group?.options?.find((o) => o.name === 'Plain tier');
         if (!option) throw new Error('option missing from the API');
         if (option.adjustmentType != null && option.adjustmentType !== 'ABSOLUTE' && option.adjustmentType !== 'PERCENTAGE') {
@@ -150,7 +152,7 @@ async function optionGroups(ctx) {
         await groupCard().getByRole('button', { name: 'Delete group', exact: true }).click();
         await confirmMatDialog(page, { title: 'Delete option group', click: 'Delete' });
         await groupCard().waitFor({ state: 'hidden' });
-        await expectNoSnackbar(page);
+        await expectSnackbar(page, 'Option group deleted');
         if ((await apiGroups()).some((g) => g.id === state.groupId)) throw new Error('group is still listed by the API after delete');
         api.untrack('optionGroup', state.groupId);
         await panel().getByRole('heading', { name: 'No option groups', exact: true }).waitFor({ state: 'visible' });
@@ -262,7 +264,7 @@ async function configRules(ctx) {
 
   await runFieldContract(ctx, spec, form);
 
-  // H-CPQ-P-012 (gap): the DTO has errorMessage + status; the dialog offers neither.
+  // Keep the original case ID as a regression check for the formerly missing inputs.
   await runCheck(ctx, 'catalog.gap.config-rule-fields', async () => {
     await goto(page, path);
     await panel().getByRole('button', { name: 'Add rule', exact: true }).click();
@@ -273,8 +275,8 @@ async function configRules(ctx) {
     await dialog.waitFor({ state: 'hidden' });
     const missing = ['error message', 'status'].filter((want) => !labels.some((l) => l.toLowerCase().includes(want)));
     if (!missing.length) return `dialog now offers: ${labels.join(', ')}`;
-    throw gap(`New configuration rule dialog has no ${missing.join(' / ')} field (fields: ${labels.join(', ')}); ConfigRuleCreateRequest.errorMessage can never be set from the UI`);
-  }, { hypothesis: 'H-CPQ-P-012' });
+    throw defect(`New configuration rule dialog has no ${missing.join(' / ')} field (fields: ${labels.join(', ')})`);
+  });
 
   await runSteps(ctx, [
     {
@@ -288,6 +290,8 @@ async function configRules(ctx) {
         await fillField(page, dialog, byLabel(form, 'Target product ID (optional)'), String(target.id));
         await fillField(page, dialog, byLabel(form, 'Condition expression (optional)'), 'quantity > 1');
         await fillField(page, dialog, byLabel(form, 'Description (optional)'), 'Created by the UAT.');
+        await fillField(page, dialog, byLabel(form, 'Error message (optional)'), 'Choose only one product.');
+        await fillField(page, dialog, byLabel(form, 'Status'), 'DRAFT');
         await fillField(page, dialog, byLabel(form, 'Priority'), '5');
         await dialog.getByRole('button', { name: 'Create', exact: true }).click();
         const closed = await dialog.waitFor({ state: 'hidden', timeout: 8000 }).then(() => true).catch(() => false);
@@ -296,19 +300,20 @@ async function configRules(ctx) {
           throw new Error(`dialog stayed open after Create — banner: "${banner.replace(/\s+/g, ' ').trim()}"`);
         }
         await ruleRow().waitFor({ state: 'visible' });
-        await expectNoSnackbar(page);
         const cells = (await ruleRow().getByRole('cell').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
-        const expected = [ruleName, 'EXCLUDES', String(target.id), '5', 'quantity > 1'];
-        if (JSON.stringify(cells.slice(0, 5)) !== JSON.stringify(expected)) throw new Error(`row reads [${cells.join(' | ')}], expected [${expected.join(' | ')}]`);
+        const expected = [ruleName, 'EXCLUDES', String(target.id), '5', 'quantity > 1', 'DRAFT', 'Choose only one product.'];
+        if (JSON.stringify(cells.slice(0, expected.length)) !== JSON.stringify(expected)) throw new Error(`row reads [${cells.join(' | ')}], expected [${expected.join(' | ')}]`);
         const created = (await apiRules()).find((r) => r.name === ruleName);
         if (!created) throw new Error('rule is shown in the UI but the API does not list it');
         state.ruleId = created.id;
         api.track('configRule', created.id, `${RULES}/${created.id}`);
+        await expectSnackbar(page, 'Rule created');
         const wrong = [['ruleType', 'EXCLUDES'], ['sourceProductId', product.id], ['targetProductId', target.id], ['priority', 5],
-          ['conditionExpression', 'quantity > 1'], ['description', 'Created by the UAT.']]
+          ['conditionExpression', 'quantity > 1'], ['description', 'Created by the UAT.'],
+          ['status', 'DRAFT'], ['errorMessage', 'Choose only one product.']]
           .filter(([key, want]) => created[key] !== want).map(([key, want]) => `${key}=${JSON.stringify(created[key])} (wanted ${JSON.stringify(want)})`);
         if (wrong.length) throw new Error(`API holds ${wrong.join(', ')}`);
-        return cells.slice(0, 5).join(' | ');
+        return cells.slice(0, expected.length).join(' | ');
       },
     },
     {
@@ -317,8 +322,36 @@ async function configRules(ctx) {
         await goto(page, path);
         await ruleRow().waitFor({ state: 'visible' });
         const headers = (await panel().getByRole('columnheader').allInnerTexts()).map((t) => t.trim());
-        const expected = ['Name', 'Type', 'Target', 'Priority', 'Condition', 'Actions'];
+        const expected = ['Name', 'Type', 'Target', 'Priority', 'Condition', 'Status', 'Error message', 'Actions'];
         if (JSON.stringify(headers) !== JSON.stringify(expected)) throw new Error(`headers are [${headers.join(', ')}]`);
+      },
+    },
+    {
+      id: 'catalog.rules.edit',
+      hypothesis: 'H-CPQ-P-012',
+      run: async () => {
+        await goto(page, path);
+        await ruleRow().getByRole('button', { name: 'Edit', exact: true }).click();
+        const dialog = dialogOf(page, 'Edit configuration rule');
+        const errorMessageField = byLabel(form, 'Error message (optional)');
+        const statusField = byLabel(form, 'Status');
+        const previousError = await readField(dialog, errorMessageField);
+        const previousStatus = await readField(dialog, statusField);
+        if (previousError !== 'Choose only one product.' || previousStatus !== 'DRAFT') {
+          throw defect(`edit dialog loaded status "${previousStatus}", error message "${previousError}"`);
+        }
+        const updatedError = 'Choose one product in this configuration.';
+        await fillField(page, dialog, errorMessageField, updatedError);
+        await fillField(page, dialog, statusField, 'ACTIVE');
+        await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+        await dialog.waitFor({ state: 'hidden' });
+        await expectSnackbar(page, 'Rule updated');
+        await ruleRow().getByRole('cell', { name: updatedError, exact: true }).waitFor({ state: 'visible' });
+        const stored = await api.get(`${RULES}/${state.ruleId}`);
+        if (stored.status !== 'ACTIVE' || stored.errorMessage !== updatedError || stored.sourceProductId !== product.id) {
+          throw defect(`rule reload held ${JSON.stringify(stored)} after changing status and error message`);
+        }
+        return `rule ${stored.id} is ACTIVE and retains source product ${product.id} after edit`;
       },
     },
     {
@@ -341,7 +374,7 @@ async function configRules(ctx) {
         await ruleRow().getByRole('button', { name: 'Delete', exact: true }).click();
         await confirmMatDialog(page, { title: 'Delete configuration rule', click: 'Delete' });
         await ruleRow().waitFor({ state: 'hidden' });
-        await expectNoSnackbar(page);
+        await expectSnackbar(page, 'Rule deleted');
         if ((await apiRules()).some((r) => r.id === state.ruleId)) throw new Error('rule is still listed by the API after delete');
         api.untrack('configRule', state.ruleId);
       },
