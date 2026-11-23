@@ -210,6 +210,32 @@ github_pr_integration:
     for pull_request only, with persist-credentials false and cancel-in-progress.
     Not added to the Protect main branch ruleset.
 
+# JEV advisory for Renovate PRs (ADR-015 amendment, dependency update advisory). Not a status check.
+github_jev_renovate_advisory:
+  workflow: .github/workflows/jev-renovate-advisory.yml
+  role: scheduled_advisory_comment
+  required_check: false
+  trigger:
+    schedule: "23 */2 * * *"
+    workflow_dispatch: true
+  job: advise
+  job_name: JEV Renovate advisory
+  runs_on: ubuntu-latest
+  timeout_minutes: 15
+  permissions:
+    contents: read
+    pull-requests: write
+    checks: read
+  runs:
+    - node --test scripts/ci/jev-renovate-advisory.test.mjs
+    - node scripts/ci/jev-renovate-advisory.mjs
+  ai_assist: false
+  notes: >-
+    Posts or updates one advisory comment per open Renovate PR. Never approves, merges, closes,
+    labels, or edits the Dependency Dashboard. Majors, owner-decision packages, paths no required
+    gate builds, and red checks are always held. Inert without an OPENROUTER_API_KEY or
+    TYPESAFE_API_KEY secret and a pinned JEV_MODEL repository variable.
+
 # Post-merge gate on main (ADR-003 section 8, 2026-10-16). Verifies the combined head after merges.
 github_main_gate:
   workflow: .github/workflows/main-verify.yml
