@@ -5,12 +5,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CopyButtonComponent } from '@frontend/shared-ui';
 import { ContactService } from '../contact.service';
 
 @Component({
   selector: 'app-contact-detail',
   standalone: true,
-  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule, MatProgressSpinnerModule],
+  imports: [RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule, MatProgressSpinnerModule, CopyButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (service.loading()) {
@@ -40,8 +41,24 @@ import { ContactService } from '../contact.service';
           <mat-card-header><mat-card-title>Contact Information</mat-card-title></mat-card-header>
           <mat-card-content>
             <div class="info-grid">
-              <div class="info-item"><span class="label">Email</span><span class="value">{{ contact.email }}</span></div>
-              <div class="info-item"><span class="label">Phone</span><span class="value">{{ contact.phone || '—' }}</span></div>
+              <div class="info-item">
+                <span class="label">Email</span>
+                <span class="value value-with-copy">
+                  <span>{{ contact.email || '—' }}</span>
+                  @if (contact.email) {
+                    <app-copy-button [value]="contact.email" label="email" />
+                  }
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="label">Phone</span>
+                <span class="value value-with-copy">
+                  <span>{{ contact.phone || '—' }}</span>
+                  @if (contact.phone) {
+                    <app-copy-button [value]="contact.phone" label="phone" />
+                  }
+                </span>
+              </div>
               <div class="info-item"><span class="label">Department</span><span class="value">{{ contact.department || '—' }}</span></div>
             </div>
           </mat-card-content>
@@ -93,6 +110,7 @@ import { ContactService } from '../contact.service';
     .info-item { display: flex; flex-direction: column; gap: 4px; }
     .label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
     .value { font-size: 0.95rem; }
+    .value-with-copy { display: inline-flex; align-items: center; gap: var(--crm-space-xs); }
     .org-link { display: flex; align-items: center; gap: 8px; padding: 16px 0; }
     .link { color: #1976d2; text-decoration: none; font-weight: 500; }
     .link:hover { text-decoration: underline; }

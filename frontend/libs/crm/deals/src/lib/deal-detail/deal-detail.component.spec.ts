@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
+import { StagePathComponent } from '@frontend/shared-ui';
 import { DealDetailComponent } from './deal-detail.component';
 import { DealService } from '../deal.service';
 import { DealDto } from '@frontend/shared-models';
@@ -105,5 +107,47 @@ describe('DealDetailComponent', () => {
     expect(banner?.textContent).toContain('OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE');
     expect(applyStageChange).not.toHaveBeenCalled();
     expect(selectedDeal()?.stage).toBe('PROPOSAL');
+  });
+
+  describe('StagePathComponent wiring (DoD P5.1)', () => {
+    it('renders app-stage-path with completed, active, and upcoming states for an open opportunity', () => {
+      const pathDe = fixture.debugElement.query(By.directive(StagePathComponent));
+      expect(pathDe).toBeTruthy();
+
+      const stages = component.stagePathItems();
+      expect(stages.map((s) => [s.id, s.state])).toEqual([
+        ['PROSPECTING', 'completed'],
+        ['QUALIFICATION', 'completed'],
+        ['NEEDS_ANALYSIS', 'completed'],
+        ['PROPOSAL', 'active'],
+        ['NEGOTIATION', 'upcoming'],
+        ['WON', 'upcoming'],
+        ['LOST', 'upcoming'],
+      ]);
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="stage-path"]')).toBeTruthy();
+      expect(el.querySelector('[data-stage-id="PROPOSAL"]')?.getAttribute('aria-current')).toBe('step');
+    });
+
+    it('marks open stages completed and WON active when opportunity is WON', () => {
+      selectedDeal.set({ ...openDeal, stage: 'WON' });
+      fixture.detectChanges();
+
+      const stages = component.stagePathItems();
+      expect(stages.find((s) => s.id === 'PROSPECTING')?.state).toBe('completed');
+      expect(stages.find((s) => s.id === 'NEGOTIATION')?.state).toBe('completed');
+      expect(stages.find((s) => s.id === 'WON')?.state).toBe('active');
+      expect(stages.find((s) => s.id === 'LOST')?.state).toBe('upcoming');
+    });
+
+    it('marks LOST with danger state when opportunity is LOST', () => {
+      selectedDeal.set({ ...openDeal, stage: 'LOST' });
+      fixture.detectChanges();
+
+      const stages = component.stagePathItems();
+      expect(stages.find((s) => s.id === 'LOST')?.state).toBe('danger');
+      expect(stages.find((s) => s.id === 'WON')?.state).toBe('upcoming');
+    });
   });
 });

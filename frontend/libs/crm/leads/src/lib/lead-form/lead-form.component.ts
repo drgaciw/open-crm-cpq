@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -19,7 +20,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
   selector: 'lib-lead-form',
   standalone: true,
   imports: [
-    ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
+    ReactiveFormsModule, TextFieldModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatAutocompleteModule, MatProgressSpinnerModule,
     MatSelectModule, PageHeaderComponent,
   ],
@@ -74,7 +75,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="4"
+              <textarea matInput formControlName="description" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="10"
                         placeholder="Describe the opportunity..."></textarea>
             </mat-form-field>
           </div>

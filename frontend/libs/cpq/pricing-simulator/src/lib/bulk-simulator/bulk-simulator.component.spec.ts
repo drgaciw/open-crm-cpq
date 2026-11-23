@@ -1,5 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
+import { CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
+import { CopyButtonComponent } from '@frontend/shared-ui';
 import { of } from 'rxjs';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
 import { PricingContext } from '@frontend/shared-models';
@@ -234,5 +238,86 @@ describe('BulkSimulatorComponent', () => {
     expect(contexts).toEqual(MOCK_BULK_CONTEXTS);
     expect(simulateBulkMock).not.toHaveBeenCalled();
     expect(host().querySelector('[data-testid="data-table"]')).toBeNull();
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the JSON input textarea', () => {
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(8);
+    expect(autosize.maxRows).toBe(24);
+  });
+
+  describe('CdkVirtualScrollViewport for large result sets (Phase 5.4)', () => {
+    function buildBulkContexts(count: number): PricingContext[] {
+      return Array.from({ length: count }, (_, idx) => ({
+        ...MOCK_PRICING_CONTEXT,
+        quoteExternalId: `Q-BULK-${idx + 1}`,
+        customerExternalId: `CUST-${idx + 1}`,
+      }));
+    }
+
+    it('auto-switches to cdk-virtual-scroll-viewport when rows exceed 25', () => {
+      const contexts = buildBulkContexts(30);
+      simulateBulkMock.mockReturnValue(
+        of({
+          totalRequests: 30,
+          successfulRequests: 30,
+          failedRequests: 0,
+          totalExecutionTimeMs: 42,
+          results: contexts.map((ctx) => ({
+            success: true,
+            lineResults: [{ productExternalId: 'PROD-001' }],
+            waterfall: { netPrice: 100 },
+            financialMetrics: { arr: 1200 },
+            approvalState: 'AUTO_APPROVED',
+          })),
+        }),
+      );
+      setJson(JSON.stringify(contexts));
+
+      clickControl('bulk-simulate');
+
+      const viewportDe = fixture.debugElement.query(
+        By.directive(CdkVirtualScrollViewport),
+      );
+      expect(viewportDe).toBeTruthy();
+      expect(host().querySelector('[data-testid="bulk-virtual-viewport"]')).toBeTruthy();
+      expect(host().querySelector('[data-testid="data-table"]')).toBeNull();
+    });
+
+    it('allows toggling between table and virtualized views via bulk-toggle-virtual-scroll', () => {
+      const response = mockBulkPartialResponse();
+      simulateBulkMock.mockReturnValue(of(response));
+      setJson(JSON.stringify(MOCK_BULK_CONTEXTS));
+
+      clickControl('bulk-simulate');
+      expect(host().querySelector('[data-testid="data-table"]')).toBeTruthy();
+      expect(host().querySelector('[data-testid="bulk-virtual-viewport"]')).toBeNull();
+
+      clickControl('bulk-toggle-virtual-scroll');
+      expect(host().querySelector('[data-testid="bulk-virtual-viewport"]')).toBeTruthy();
+      expect(host().querySelector('[data-testid="data-table"]')).toBeNull();
+
+      clickControl('bulk-toggle-virtual-scroll');
+      expect(host().querySelector('[data-testid="data-table"]')).toBeTruthy();
+      expect(host().querySelector('[data-testid="bulk-virtual-viewport"]')).toBeNull();
+    });
+  });
+
+  it('wires CopyButtonComponent for JSON payload and simulation results (DoD P1.2)', () => {
+    const response = mockBulkPartialResponse();
+    simulateBulkMock.mockReturnValue(of(response));
+    const payload = JSON.stringify(MOCK_BULK_CONTEXTS);
+    setJson(payload);
+
+    clickControl('bulk-simulate');
+
+    const copyButtons = fixture.debugElement
+      .queryAll(By.directive(CopyButtonComponent))
+      .map((de) => de.componentInstance as CopyButtonComponent);
+
+    expect(copyButtons.some((b) => b.label() === 'JSON payload' && b.value() === payload)).toBe(true);
+    expect(copyButtons.some((b) => b.label() === 'results JSON' && b.value().includes('"totalRequests": 2'))).toBe(true);
   });
 });

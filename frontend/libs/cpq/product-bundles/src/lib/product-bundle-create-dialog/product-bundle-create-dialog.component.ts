@@ -9,6 +9,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MatDialogModule,
@@ -37,6 +38,7 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -94,7 +96,9 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
           <textarea
             matInput
             formControlName="description"
-            rows="3"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="3"
+            cdkAutosizeMaxRows="8"
             maxlength="2000"
           ></textarea>
         </mat-form-field>

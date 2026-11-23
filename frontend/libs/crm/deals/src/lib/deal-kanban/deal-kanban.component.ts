@@ -1,5 +1,12 @@
 import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
+import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDropList,
+  DragDropModule,
+} from '@angular/cdk/drag-drop';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -35,6 +42,7 @@ interface KanbanColumn {
   selector: 'app-deal-kanban',
   standalone: true,
   imports: [
+    DragDropModule,
     MatCardModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
     MatMenuModule, CurrencyPipe,
   ],
@@ -73,7 +81,7 @@ interface KanbanColumn {
     @if (service.loading()) {
       <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (!service.error()) {
-      <div class="kanban-board">
+      <div class="kanban-board" cdkDropListGroup>
         @for (col of columns(); track col.stage) {
           <div class="kanban-column">
             <div class="column-header" [style.border-top-color]="col.color">
@@ -86,9 +94,23 @@ interface KanbanColumn {
                 <span class="column-unconverted">+{{ col.unconverted }} not converted</span>
               }
             </div>
-            <div class="column-cards">
+            <div
+              class="column-cards"
+              cdkDropList
+              [id]="'kanban-stage-' + col.stage"
+              [cdkDropListData]="col.stage"
+              [cdkDropListEnterPredicate]="canEnterStage"
+              (cdkDropListDropped)="onDrop($event)"
+            >
               @for (deal of col.deals; track deal.id) {
-                <mat-card class="deal-card" (click)="router.navigate(['/deals', deal.id])">
+                <mat-card
+                  class="deal-card"
+                  cdkDrag
+                  [cdkDragData]="deal"
+                  [cdkDragDisabled]="!canClose(deal.stage) || actionLoading()"
+                  (click)="router.navigate(['/deals', deal.id])"
+                >
+                  <div *cdkDragPlaceholder class="deal-card-placeholder" aria-hidden="true"></div>
                   <div class="card-top">
                     <div class="card-title">{{ deal.name }}</div>
                     @if (canClose(deal.stage)) {
@@ -189,14 +211,43 @@ interface KanbanColumn {
     .card-contact, .card-org { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: #666; }
     .card-icon { font-size: 16px; width: 16px; height: 16px; }
     .empty-column { text-align: center; color: #999; padding: 24px 8px; font-size: 0.85rem; }
+    .deal-card-placeholder {
+      min-height: 76px;
+      border-radius: var(--crm-radius-sm);
+      border: 2px dashed var(--crm-color-brand);
+      background: var(--crm-color-info-container);
+      opacity: 0.65;
+    }
+    .deal-card.cdk-drag-preview {
+      border: 1px solid var(--crm-color-brand);
+      border-radius: var(--crm-radius-sm);
+      background: var(--crm-color-surface);
+    }
+    .deal-card.cdk-drag-animating {
+      transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+    }
+    .column-cards.cdk-drop-list-dragging .deal-card:not(.cdk-drag-placeholder) {
+      transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+    }
+    .column-cards.cdk-drop-list-receiving {
+      background: var(--crm-color-track);
+      border-radius: 0 0 var(--crm-radius-sm) var(--crm-radius-sm);
+    }
   `,
 })
 export class DealKanbanComponent implements OnInit {
   readonly service = inject(DealService);
   readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly liveAnnouncer = inject(LiveAnnouncer);
 
   readonly actionLoading = signal(false);
+
+  /** Enter predicate shared across all stage columns (stable reference for CDK). */
+  readonly canEnterStage = (
+    drag: CdkDrag<DealDto>,
+    drop: CdkDropList<DealStage>,
+  ): boolean => this.canTransition(drag.data, drop.data);
 
   /**
    * Currency for every total on the board. Prefer the base currency already on the deal,
@@ -286,6 +337,43 @@ export class DealKanbanComponent implements OnInit {
     return canCloseDeal(stage);
   }
 
+  canTransition(deal: DealDto | undefined, targetStage: DealStage): boolean {
+    if (!deal || this.actionLoading()) {
+      return false;
+    }
+    if (deal.stage === targetStage) {
+      return true;
+    }
+    if (targetStage === 'WON' || targetStage === 'LOST') {
+      return canCloseDeal(deal.stage);
+    }
+    if (!canAdvanceDeal(deal.stage)) {
+      return false;
+    }
+    const sourceIndex = DEAL_STAGE_ORDER.indexOf(deal.stage);
+    return sourceIndex >= 0 && DEAL_STAGE_ORDER[sourceIndex + 1] === targetStage;
+  }
+
+  onDrop(event: CdkDragDrop<DealStage, DealStage, DealDto>): void {
+    if (event.previousContainer === event.container) {
+      return;
+    }
+    const deal = event.item.data;
+    const targetStage = event.container.data;
+    if (!deal || deal.stage === targetStage || !this.canTransition(deal, targetStage)) {
+      return;
+    }
+    if (targetStage === 'LOST') {
+      this.onLose(deal);
+      return;
+    }
+    if (targetStage === 'WON') {
+      this.executeWin(deal);
+      return;
+    }
+    this.onAdvance(deal);
+  }
+
   onAdvance(deal: DealDto): void {
     this.actionLoading.set(true);
     this.service.advanceStage(deal.id).subscribe({
@@ -296,6 +384,10 @@ export class DealKanbanComponent implements OnInit {
 
   onWin(deal: DealDto): void {
     if (!confirm(`Mark "${deal.name}" as Won?`)) return;
+    this.executeWin(deal);
+  }
+
+  private executeWin(deal: DealDto): void {
     this.actionLoading.set(true);
     this.service.markWon(deal.id).subscribe({
       next: (updated) => this.commitStage(updated),
@@ -319,11 +411,17 @@ export class DealKanbanComponent implements OnInit {
     this.service.applyStageChange(updated);
     this.actionLoading.set(false);
     this.refreshBoard();
+    void this.liveAnnouncer.announce(
+      `Moved "${updated.name}" to ${dealStageLabel(updated.stage)}`,
+      'polite',
+    );
   }
 
   private failStage(err: unknown, fallback: string): void {
     this.actionLoading.set(false);
-    this.service.error.set(dealActionErrorMessage(err, fallback));
+    const message = dealActionErrorMessage(err, fallback);
+    this.service.error.set(message);
+    void this.liveAnnouncer.announce(message, 'assertive');
   }
 
   private refreshBoard(): void {

@@ -1,9 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal,
 } from '@angular/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
 import {
@@ -11,10 +14,11 @@ import {
   PricingContext,
   PricingResult,
 } from '@frontend/shared-models';
-import { DataTableComponent, TableColumn } from '@frontend/shared-ui';
+import { CopyButtonComponent, DataTableComponent, TableColumn } from '@frontend/shared-ui';
 import { MOCK_BULK_CONTEXTS } from '../pricing-simulator.mock';
 
 const BULK_SOFT_CAP = 50;
+const VIRTUAL_SCROLL_THRESHOLD = 25;
 
 interface BulkResultRow {
   quoteExternalId: string;
@@ -94,7 +98,7 @@ function toRow(context: PricingContext, result: PricingResult | undefined): Bulk
 @Component({
   selector: 'cpq-bulk-simulator',
   standalone: true,
-  imports: [MatButtonModule, DataTableComponent],
+  imports: [ScrollingModule, TextFieldModule, MatButtonModule, CopyButtonComponent, DataTableComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section data-testid="bulk-simulator" class="bulk-simulator">
@@ -103,7 +107,9 @@ function toRow(context: PricingContext, result: PricingResult | undefined): Bulk
         id="bulk-json-input"
         data-testid="bulk-json-input"
         class="json-input"
-        rows="12"
+        cdkTextareaAutosize
+        cdkAutosizeMinRows="8"
+        cdkAutosizeMaxRows="24"
         [value]="jsonText()"
         (input)="onJsonInput($event)"
         placeholder="Paste a JSON array of pricing contexts, or { &quot;contexts&quot;: [...] }"
@@ -136,6 +142,9 @@ function toRow(context: PricingContext, result: PricingResult | undefined): Bulk
             (change)="onFileSelected($event)"
           />
         </label>
+        @if (jsonText().trim()) {
+          <app-copy-button [value]="jsonText()" label="JSON payload" />
+        }
       </div>
 
       @if (validationError(); as message) {
@@ -154,16 +163,63 @@ function toRow(context: PricingContext, result: PricingResult | undefined): Bulk
           <p>Successful requests: {{ result.successfulRequests }}</p>
           <p>Failed requests: {{ result.failedRequests }}</p>
           <p>Total execution time: {{ result.totalExecutionTimeMs }} ms</p>
-          <button
-            mat-stroked-button
-            type="button"
-            data-testid="bulk-download-results"
-            (click)="downloadResults()"
-          >
-            Download results JSON
-          </button>
+          <div class="summary-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="bulk-download-results"
+              (click)="downloadResults()"
+            >
+              Download results JSON
+            </button>
+            <app-copy-button [value]="resultsJson()" label="results JSON" />
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="bulk-toggle-virtual-scroll"
+              [attr.aria-pressed]="isVirtualized()"
+              (click)="toggleVirtualScroll()"
+            >
+              {{ isVirtualized() ? 'Switch to table view' : 'Switch to virtualized list' }}
+            </button>
+          </div>
         </div>
-        <app-data-table [columns]="columns" [data]="rows()" [clickable]="false" />
+        @if (isVirtualized()) {
+          <div class="virtual-results-shell" role="region" aria-label="Bulk simulation results">
+            <div class="virtual-header-row" role="row">
+              @for (col of columns; track col.key) {
+                <span class="virtual-cell virtual-header-cell" role="columnheader">{{ col.header }}</span>
+              }
+            </div>
+            <cdk-virtual-scroll-viewport
+              [itemSize]="44"
+              class="bulk-virtual-viewport"
+              data-testid="bulk-virtual-viewport"
+            >
+              <div
+                *cdkVirtualFor="let row of rows(); trackBy: trackResultRow"
+                class="virtual-data-row"
+                role="row"
+              >
+                <span class="virtual-cell">{{ row.quoteExternalId }}</span>
+                <span class="virtual-cell">{{ row.customerExternalId }}</span>
+                <span class="virtual-cell">{{ row.region }}</span>
+                <span class="virtual-cell">{{ row.subscriptionType }}</span>
+                <span
+                  class="virtual-cell virtual-status"
+                  [class.status-failed]="row.status === 'Failed'"
+                >{{ row.status }}</span>
+                <span class="virtual-cell">{{ row.productExternalId }}</span>
+                <span class="virtual-cell">{{ row.net }}</span>
+                <span class="virtual-cell">{{ row.arr }}</span>
+                <span class="virtual-cell">{{ row.approvalState }}</span>
+                <span class="virtual-cell">{{ row.errorMessage }}</span>
+              </div>
+            </cdk-virtual-scroll-viewport>
+          </div>
+        } @else {
+          <app-data-table [columns]="columns" [data]="rows()" [clickable]="false" />
+        }
       }
     </section>
   `,
@@ -215,6 +271,65 @@ function toRow(context: PricingContext, result: PricingResult | undefined): Bulk
       .summary p {
         margin: 0 0 4px;
       }
+
+      .summary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--crm-space-sm);
+        margin-top: var(--crm-space-sm);
+      }
+
+      .virtual-results-shell {
+        border: 1px solid var(--crm-color-line);
+        border-radius: var(--crm-radius-sm);
+        background: var(--crm-color-surface);
+        overflow: hidden;
+      }
+
+      .virtual-header-row,
+      .virtual-data-row {
+        display: grid;
+        grid-template-columns: repeat(10, minmax(96px, 1fr));
+        align-items: center;
+        gap: var(--crm-space-xs);
+        padding: 0 var(--crm-space-sm);
+        font-size: 0.8125rem;
+      }
+
+      .virtual-header-row {
+        min-height: 40px;
+        background: var(--crm-color-canvas);
+        border-bottom: 1px solid var(--crm-color-line);
+        font-weight: 600;
+        color: var(--crm-color-muted);
+      }
+
+      .bulk-virtual-viewport {
+        height: 440px;
+        width: 100%;
+        display: block;
+      }
+
+      .virtual-data-row {
+        height: 44px;
+        border-bottom: 1px solid var(--crm-color-line);
+        color: var(--crm-color-ink);
+      }
+
+      .virtual-cell {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .virtual-status {
+        font-weight: 600;
+        color: var(--crm-color-success-strong);
+      }
+
+      .virtual-status.status-failed {
+        color: var(--crm-color-danger);
+      }
     `,
   ],
 })
@@ -222,6 +337,7 @@ export class BulkSimulatorComponent {
   private readonly pricingExecution = inject(PricingExecutionService);
 
   readonly softCap = BULK_SOFT_CAP;
+  readonly virtualScrollThreshold = VIRTUAL_SCROLL_THRESHOLD;
   readonly columns: TableColumn[] = [
     { key: 'quoteExternalId', header: 'Quote', sortable: false },
     { key: 'customerExternalId', header: 'Customer', sortable: false },
@@ -240,6 +356,24 @@ export class BulkSimulatorComponent {
   readonly overCap = signal(false);
   readonly response = signal<BulkPricingSimulationResponse | null>(null);
   readonly rows = signal<BulkResultRow[]>([]);
+  readonly resultsJson = computed(() => {
+    const result = this.response();
+    return result ? JSON.stringify(result, null, 2) : '';
+  });
+  private readonly virtualScrollOverride = signal<boolean | null>(null);
+  readonly isVirtualized = computed(
+    () =>
+      this.virtualScrollOverride() ??
+      this.rows().length > this.virtualScrollThreshold,
+  );
+
+  toggleVirtualScroll(): void {
+    this.virtualScrollOverride.set(!this.isVirtualized());
+  }
+
+  trackResultRow(index: number, row: BulkResultRow): string {
+    return `${index}-${row.quoteExternalId}`;
+  }
 
   onJsonInput(event: Event): void {
     const target = event.target;
@@ -286,6 +420,7 @@ export class BulkSimulatorComponent {
     }
 
     this.validationError.set(null);
+    this.virtualScrollOverride.set(null);
     this.overCap.set(parsed.contexts.length > BULK_SOFT_CAP);
     this.pricingExecution.simulateBulk({ contexts: parsed.contexts }).subscribe({
       next: (response) => {

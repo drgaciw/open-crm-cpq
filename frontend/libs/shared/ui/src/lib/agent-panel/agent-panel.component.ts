@@ -6,6 +6,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { CdkAccordionModule } from '@angular/cdk/accordion';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
@@ -26,12 +27,22 @@ export type AgentPanelState =
 @Component({
   selector: 'app-agent-panel',
   standalone: true,
-  imports: [MatButtonModule, MatChipsModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [
+    CdkAccordionModule,
+    MatButtonModule,
+    MatChipsModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside
+      cdkAccordionItem
+      #accordionItem="cdkAccordionItem"
+      [expanded]="!collapsed()"
+      (expandedChange)="onExpandedChange($event)"
       class="agent-panel"
-      [class.agent-panel--collapsed]="collapsed()"
+      [class.agent-panel--collapsed]="!accordionItem.expanded"
       data-testid="agent-panel"
       [attr.aria-label]="title() + ' (advisory)'"
     >
@@ -45,16 +56,16 @@ export type AgentPanelState =
           mat-icon-button
           type="button"
           class="agent-panel__toggle"
-          (click)="toggleCollapsed()"
-          [attr.aria-expanded]="!collapsed()"
+          (click)="accordionItem.toggle()"
+          [attr.aria-expanded]="accordionItem.expanded"
           [attr.aria-controls]="bodyId"
-          [attr.aria-label]="collapsed() ? 'Expand agent panel' : 'Collapse agent panel'"
+          [attr.aria-label]="accordionItem.expanded ? 'Collapse agent panel' : 'Expand agent panel'"
         >
-          <mat-icon>{{ collapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+          <mat-icon>{{ accordionItem.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
         </button>
       </header>
 
-      @if (!collapsed()) {
+      @if (accordionItem.expanded) {
         <div class="agent-panel__body" [id]="bodyId">
           <div class="agent-panel__tools">
             <ng-content select="[tools]" />
@@ -234,5 +245,9 @@ export class AgentPanelComponent {
 
   toggleCollapsed(): void {
     this.collapseOverride.set(!this.collapsed());
+  }
+
+  protected onExpandedChange(expanded: boolean): void {
+    this.collapseOverride.set(!expanded);
   }
 }

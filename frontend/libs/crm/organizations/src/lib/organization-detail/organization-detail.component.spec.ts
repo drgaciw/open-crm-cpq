@@ -1,8 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { CopyButtonComponent } from '@frontend/shared-ui';
 import { OrganizationDetailComponent } from './organization-detail.component';
 import { OrganizationService } from '../organization.service';
 import { DealDto, OrganizationDto, QuoteDto } from '@frontend/shared-models';
@@ -262,6 +264,34 @@ describe('OrganizationDetailComponent account UX', () => {
     } finally {
       confirm.mockRestore();
     }
+  });
+
+  it('wires CopyButtonComponent for account phone and website (DoD P1.2)', () => {
+    httpMock.expectOne('/api/v1/organizations/7').flush({
+      ...account,
+      phone: '+1-555-0199',
+      website: 'https://acme.example.com',
+    });
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/organizations/7/contacts')
+      .flush({ content: [] });
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/v1/deals').flush({ content: [] });
+    httpMock
+      .expectOne('/api/v1/organizations/7/hierarchy')
+      .flush({ parent: null, ancestors: [], children: [] });
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url === '/api/v1/quotes').flush({ content: [] });
+    fixture.detectChanges();
+
+    const copyButtons = fixture.debugElement.queryAll(
+      By.directive(CopyButtonComponent),
+    );
+    const values = copyButtons.map((de) =>
+      (de.componentInstance as CopyButtonComponent).value(),
+    );
+    expect(values).toContain('+1-555-0199');
+    expect(values).toContain('https://acme.example.com');
   });
 
   function flushAccount(): void {

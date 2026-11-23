@@ -1,3 +1,4 @@
+import { SelectionModel } from '@angular/cdk/collections';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -31,6 +32,7 @@ import {
   AgentPanelComponent,
   AgentPanelState,
   ConfirmDialogComponent,
+  CopyButtonComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
@@ -90,6 +92,7 @@ function httpErrorMessage(err: unknown): string {
     MatTabsModule,
     PageHeaderComponent,
     StatusBadgeComponent,
+    CopyButtonComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
     QuoteDocumentsPanelComponent,
@@ -274,6 +277,19 @@ function httpErrorMessage(err: unknown): string {
         </div>
         <div highlights class="quote-highlights">
           <div class="highlight">
+            <span class="highlight-label">Quote #</span>
+            <span class="highlight-value highlight-copy-value">
+              <span>{{ quote.quoteNumber ?? 'Quote ' + quote.id }}</span>
+              @if (quote.quoteNumber) {
+                <app-copy-button
+                  [value]="quote.quoteNumber"
+                  label="quote number"
+                  tooltip="Copy quote number"
+                />
+              }
+            </span>
+          </div>
+          <div class="highlight">
             <span class="highlight-label">Status</span>
             <app-status-badge [status]="quote.status" type="quote" />
           </div>
@@ -383,6 +399,7 @@ function httpErrorMessage(err: unknown): string {
                           <span role="columnheader" class="select-col">
                             <mat-checkbox
                               [checked]="allLinesSelected()"
+                              [indeterminate]="someLinesSelected()"
                               (change)="toggleSelectAllLines()"
                               aria-label="Select all line items"
                             ></mat-checkbox>
@@ -717,6 +734,12 @@ function httpErrorMessage(err: unknown): string {
         font-size: 15px;
         color: var(--crm-color-ink, #212121);
       }
+
+      .highlight-copy-value {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--crm-space-xs);
+      }
       .error-banner {
         display: flex;
         align-items: center;
@@ -946,11 +969,32 @@ export class QuotesDetailComponent {
   readonly tierLabels: Record<string, string> = APPROVAL_TIER_LABELS;
   readonly editingLineId = signal<number | null>(null);
 
-  /** Bulk-select affordance for line items (Phase 4 workspace recipe); cleared on reload. */
-  readonly selectedLineIds = signal<ReadonlySet<number>>(new Set());
+  /** Bulk-select affordance for line items (Phase 3.4 CDK SelectionModel); cleared on reload. */
+  readonly lineSelection = new SelectionModel<number>(true, []);
+  private readonly lineSelectionVersion = signal(0);
+  private readonly lineSelectionSync = this.lineSelection.changed
+    .pipe(takeUntilDestroyed())
+    .subscribe(() => this.lineSelectionVersion.update((v) => v + 1));
+
+  readonly selectedLineIds = computed<ReadonlySet<number>>(() => {
+    this.lineSelectionVersion();
+    return new Set(this.lineSelection.selected);
+  });
+
   readonly allLinesSelected = computed(() => {
+    this.lineSelectionVersion();
     const ids = this.lineItems().map((line) => line.id);
-    return ids.length > 0 && ids.every((id) => this.selectedLineIds().has(id));
+    return ids.length > 0 && ids.every((id) => this.lineSelection.isSelected(id));
+  });
+
+  readonly someLinesSelected = computed(() => {
+    this.lineSelectionVersion();
+    const ids = this.lineItems().map((line) => line.id);
+    if (ids.length === 0) {
+      return false;
+    }
+    const selectedCount = ids.filter((id) => this.lineSelection.isSelected(id)).length;
+    return selectedCount > 0 && selectedCount < ids.length;
   });
 
   /** Reload when route `:id` changes (e.g. after clone navigation). */
@@ -1431,6 +1475,7 @@ export class QuotesDetailComponent {
         if (this.editingLineId() === line.id) {
           this.editingLineId.set(null);
         }
+        this.lineSelection.deselect(line.id);
         this.actionBusy.set(false);
         this.quoteService.getById(numericId);
       },
@@ -1471,43 +1516,35 @@ export class QuotesDetailComponent {
     });
   }
 
-  /** Toggle a single line in the bulk-select set (Phase 4 workspace recipe). */
+  /** Toggle a single line in the CDK SelectionModel. */
   toggleLineSelection(line: QuoteLineItemDto): void {
-    this.selectedLineIds.update((ids) => {
-      const next = new Set(ids);
-      if (next.has(line.id)) {
-        next.delete(line.id);
-      } else {
-        next.add(line.id);
-      }
-      return next;
-    });
+    this.lineSelection.toggle(line.id);
   }
 
   /** Select or clear every currently loaded line item. */
   toggleSelectAllLines(): void {
     if (this.allLinesSelected()) {
-      this.selectedLineIds.set(new Set());
+      this.lineSelection.clear();
       return;
     }
-    this.selectedLineIds.set(new Set(this.lineItems().map((line) => line.id)));
+    this.lineSelection.setSelection(...this.lineItems().map((line) => line.id));
   }
 
   /** Remove every selected line in one bulk action, then reload. */
   onRemoveSelectedLines(): void {
-    if (!this.canEditLines() || this.actionBusy() || this.selectedLineIds().size === 0) {
+    if (!this.canEditLines() || this.actionBusy() || this.lineSelection.isEmpty()) {
       return;
     }
     const numericId = this.numericId();
     if (numericId == null) {
       return;
     }
-    const ids = Array.from(this.selectedLineIds());
+    const ids = [...this.lineSelection.selected];
     this.actionBusy.set(true);
     this.actionError.set(null);
     forkJoin(ids.map((id) => this.quoteService.removeLineItem(numericId, id))).subscribe({
       next: () => {
-        this.selectedLineIds.set(new Set());
+        this.lineSelection.clear();
         this.actionBusy.set(false);
         this.quoteService.getById(numericId);
       },
@@ -1527,7 +1564,7 @@ export class QuotesDetailComponent {
   private load(): void {
     this.actionError.set(null);
     this.editingLineId.set(null);
-    this.selectedLineIds.set(new Set());
+    this.lineSelection.clear();
     const numericId = this.numericId();
     if (numericId == null) {
       this.quoteService.selectedQuote.set(null);

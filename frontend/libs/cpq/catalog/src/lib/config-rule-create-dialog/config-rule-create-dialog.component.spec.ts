@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import {
@@ -110,5 +112,17 @@ describe('ConfigRuleCreateDialogComponent', () => {
     component.onCancel();
     expect(dialogClose).toHaveBeenCalledWith(null);
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('applies cdkTextareaAutosize to conditionExpression and description textareas', () => {
+    const textareas = fixture.debugElement.queryAll(By.directive(CdkTextareaAutosize));
+    expect(textareas).toHaveLength(2);
+    const [condAutosize, descAutosize] = textareas.map((de) =>
+      de.injector.get(CdkTextareaAutosize),
+    );
+    expect(condAutosize.minRows).toBe(3);
+    expect(condAutosize.maxRows).toBe(10);
+    expect(descAutosize.minRows).toBe(2);
+    expect(descAutosize.maxRows).toBe(6);
   });
 });

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, input, effect, signal, computed, untracked, DestroyRef, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -19,6 +20,7 @@ import { OrganizationService } from '../organization.service';
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
@@ -142,7 +144,7 @@ import { OrganizationService } from '../organization.service';
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="4"></textarea>
+              <textarea matInput formControlName="description" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="10"></textarea>
             </mat-form-field>
           </div>
 

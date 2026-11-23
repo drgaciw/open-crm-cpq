@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, input, signal, effect, ChangeDetectionStrategy, Injector } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -30,7 +31,7 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
   selector: 'app-deal-form',
   standalone: true,
   imports: [
-    ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
+    ReactiveFormsModule, TextFieldModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatSelectModule, MatDatepickerModule,
     MatNativeDateModule, MatAutocompleteModule, MatProgressSpinnerModule,
     PageHeaderComponent,
@@ -143,7 +144,7 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel } from '../
           <div class="form-row">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="4"></textarea>
+              <textarea matInput formControlName="description" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="10"></textarea>
             </mat-form-field>
           </div>
 
