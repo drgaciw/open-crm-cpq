@@ -77,6 +77,16 @@
       "dependencyDashboardApproval": true
     },
     {
+      "description": "Frontend TypeScript stays on Angular 22's supported range (>=6.0 <6.1). TypeScript 7.0 has no JS API; Angular compiler-cli and typescript-eslint 8.73 cannot consume it (angular#69719, typescript-eslint#12518).",
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchFileNames": [
+        "frontend/package.json"
+      ],
+      "allowedVersions": "<6.1.0"
+    },
+    {
       "description": "Nx 24.0.x imports @angular-devkit/architect/node/index.js, which the exports map added in architect 0.2203.0 blocks. Hold architect on 0.2202.x (pinned via overrides in frontend/package.json) until an Nx release imports @angular-devkit/architect/node.",
       "matchPackageNames": [
         "@angular-devkit/architect"
