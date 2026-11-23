@@ -9,6 +9,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -67,6 +68,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -114,7 +116,9 @@ function httpErrorMessage(err: unknown, fallback: string): string {
           <textarea
             matInput
             formControlName="description"
-            rows="2"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="2"
+            cdkAutosizeMaxRows="6"
             maxlength="2000"
           ></textarea>
         </mat-form-field>
@@ -156,7 +160,9 @@ function httpErrorMessage(err: unknown, fallback: string): string {
           <textarea
             matInput
             formControlName="content"
-            rows="10"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="8"
+            cdkAutosizeMaxRows="24"
             class="drl-textarea"
             spellcheck="false"
             autocomplete="off"

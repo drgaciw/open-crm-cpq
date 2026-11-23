@@ -1,3 +1,4 @@
+import { TextFieldModule } from '@angular/cdk/text-field';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -60,6 +61,7 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -140,7 +142,13 @@ export function quoteHeaderHttpErrorMessage(err: unknown): string {
 
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Description</mat-label>
-              <textarea matInput formControlName="description" rows="3"></textarea>
+              <textarea
+                matInput
+                formControlName="description"
+                cdkTextareaAutosize
+                cdkAutosizeMinRows="3"
+                cdkAutosizeMaxRows="10"
+              ></textarea>
             </mat-form-field>
 
             <div class="row">

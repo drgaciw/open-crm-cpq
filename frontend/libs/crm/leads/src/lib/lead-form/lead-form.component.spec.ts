@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Subject } from 'rxjs';
@@ -147,5 +149,14 @@ describe('LeadFormComponent linked records and validation (H-CRM-016, H-CRM-023,
     component.onSubmit();
 
     expect(leadService.update).toHaveBeenCalledWith(9, expect.objectContaining({ organizationId: null, contactId: 5 }));
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the description textarea', async () => {
+    await setup();
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(10);
   });
 });

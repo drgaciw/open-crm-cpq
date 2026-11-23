@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatSelect } from '@angular/material/select';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -217,5 +218,15 @@ describe('OrganizationFormComponent reused edit route', () => {
     http.expectOne('/api/v1/organizations/8').flush(account(8, 'Second'));
     fixture.detectChanges();
     expect(fixture.componentInstance.form.get('name')?.value).toBe('Second');
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the description textarea', () => {
+    http.expectOne('/api/v1/organizations/7').flush(account(7, 'First'));
+    fixture.detectChanges();
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(10);
   });
 });

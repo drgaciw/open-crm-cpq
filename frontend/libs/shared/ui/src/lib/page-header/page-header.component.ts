@@ -10,6 +10,7 @@ import {
   inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { CdkObserveContent } from '@angular/cdk/observers';
 
 /**
  * Page header with title, subtitle, and projection slots for breadcrumb, actions,
@@ -27,7 +28,7 @@ import { CommonModule } from '@angular/common';
 @Component({
   selector: 'app-page-header',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CdkObserveContent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page-header" [class.page-header--record]="hasBreadcrumbSlot() || hasHighlightsSlot()">
@@ -36,6 +37,7 @@ import { CommonModule } from '@angular/common';
           class="page-header-breadcrumb"
           #breadcrumbContainer
           [hidden]="!hasBreadcrumbSlot()"
+          (cdkObserveContent)="checkProjectedSlots()"
         >
           <ng-content select="[breadcrumb]"></ng-content>
         </div>
@@ -57,6 +59,7 @@ import { CommonModule } from '@angular/common';
           class="page-header-highlights"
           #highlightsContainer
           [hidden]="!hasHighlightsSlot()"
+          (cdkObserveContent)="checkProjectedSlots()"
         >
           <ng-content select="[highlights]"></ng-content>
         </div>
@@ -67,6 +70,7 @@ import { CommonModule } from '@angular/common';
         class="page-header-search"
         #searchContainer
         [hidden]="!hasSearchSlot()"
+        (cdkObserveContent)="checkProjectedSlots()"
       >
         <ng-content select="[search]"></ng-content>
       </div>
@@ -215,15 +219,19 @@ export class PageHeaderComponent {
   constructor() {
     afterNextRender(
       () => {
-        const searchEl = this.searchContainer()?.nativeElement;
-        this.searchSlotPresent.set(!!searchEl && searchEl.childElementCount > 0);
-        const crumbEl = this.breadcrumbContainer()?.nativeElement;
-        this.breadcrumbSlotPresent.set(!!crumbEl && crumbEl.childElementCount > 0);
-        const highlightsEl = this.highlightsContainer()?.nativeElement;
-        this.highlightsSlotPresent.set(!!highlightsEl && highlightsEl.childElementCount > 0);
+        this.checkProjectedSlots();
       },
       { injector: this.injector },
     );
+  }
+
+  protected checkProjectedSlots(): void {
+    const searchEl = this.searchContainer()?.nativeElement;
+    this.searchSlotPresent.set(!!searchEl && searchEl.childElementCount > 0);
+    const crumbEl = this.breadcrumbContainer()?.nativeElement;
+    this.breadcrumbSlotPresent.set(!!crumbEl && crumbEl.childElementCount > 0);
+    const highlightsEl = this.highlightsContainer()?.nativeElement;
+    this.highlightsSlotPresent.set(!!highlightsEl && highlightsEl.childElementCount > 0);
   }
 
   protected hasSearchSlot(): boolean {
