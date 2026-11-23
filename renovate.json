@@ -75,6 +75,13 @@
         "minor"
       ],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Nx 24.0.x imports @angular-devkit/architect/node/index.js, which the exports map added in architect 0.2203.0 blocks. Hold architect on 0.2202.x (pinned via overrides in frontend/package.json) until an Nx release imports @angular-devkit/architect/node.",
+      "matchPackageNames": [
+        "@angular-devkit/architect"
+      ],
+      "allowedVersions": "<0.2203.0"
     }
   ]
 }
