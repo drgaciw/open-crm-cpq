@@ -83,6 +83,8 @@ def pr_gate_errors(repo: Path, contract: str) -> list[str]:
         errors.append(f"{rel} must not trigger on push")
     if not gha_has_run_core(text, "backend-unit"):
         errors.append(f"{rel} missing run-core.sh backend-unit")
+    if gha_has_run_core(text, "frontend-uat") or "frontend-uat" in text:
+        errors.append(f"{rel} must not run frontend-uat (nightly/full matrix only)")
     if "verify-drift.py" not in text:
         errors.append(f"{rel} must run verify-drift.py")
     if gha_has_ai_assist(text):
@@ -209,15 +211,24 @@ def main() -> int:
         "backend-integration",
         "cpq-beta-python",
         "frontend",
+        "frontend-uat",
         "security-audit",
     ]
+    run_core_text = load_text(repo / "scripts" / "ci" / "run-core.sh")
     for stage in run_core_stages:
+        if f"{stage})" not in run_core_text:
+            errors.append(f"scripts/ci/run-core.sh missing case arm for {stage}")
         if not jenkins_has_run_core(jenkins, stage):
             errors.append(f"Jenkinsfile missing run-core.sh {stage}")
         if stage != "toolchain" and not gha_has_run_core(gha, stage):
             if stage == "toolchain":
                 continue
             errors.append(f"GHA ci.yml missing run-core.sh {stage}")
+
+    if "id: frontend-uat" not in contract:
+        errors.append("docs/ci-contract.yaml missing scripts_ci stage id: frontend-uat")
+    if not re.search(r"frontend-uat:.*?needs:\s*(?:\[\s*frontend\s*\]|frontend\b)", gha, re.DOTALL):
+        errors.append("GHA ci.yml frontend-uat job must declare needs: [frontend] (or needs: frontend)")
 
     if gha_has_auto_triggers(gha):
         errors.append(
@@ -248,6 +259,7 @@ def main() -> int:
         "Backend Unit",
         "CPQ Beta Python",
         "Frontend",
+        "Frontend UAT",
         "Backend Integration",
         "Security Audit",
     }
@@ -264,7 +276,7 @@ def main() -> int:
             in_integration = True
         if in_integration and "stage('Parallel" in line:
             break
-        if in_integration and re.search(r"stage\('(Frontend|CPQ Beta)", line):
+        if in_integration and re.search(r"stage\('(Frontend|CPQ Beta Python)'\)", line):
             errors.append("Backend Integration must not be nested after parallel frontend/cpq stages")
 
     if errors:

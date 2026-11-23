@@ -52,3 +52,6 @@ lo
 # Local Playwright MCP & precommit scan artifacts
 .playwright-mcp/
 /precommit-scan-*.md
+
+# Machine-local Cursor continual-learning hook state (churns every session)
+.cursor/hooks/state/

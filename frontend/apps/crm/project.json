@@ -69,6 +69,7 @@
     "lint": {
       "executor": "@nx/eslint:lint"
     },
+    "typecheck": {},
     "test": {
       "executor": "@angular/build:unit-test",
       "options": {}

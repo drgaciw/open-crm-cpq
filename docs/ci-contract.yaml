@@ -72,6 +72,17 @@ scripts_ci:
       jenkins_stage: Frontend
       jenkins_parallel_group: Parallel — Fast checks
       blocking: true
+    - id: frontend-uat
+      script: scripts/ci/frontend-uat.sh
+      run_core_arg: frontend-uat
+      gha_job: frontend-uat
+      jenkins_stage: Frontend UAT
+      blocking: true
+      requires_docker: true
+      notes: >-
+        Nightly / full-matrix browser UAT (Playwright uat-cdk-ux.mjs against isolated
+        Postgres 16 + Redis 7 + crm-service + gateway-service + nx serve crm). Excluded
+        from pr-check.yml; never blocks backend-integration.
     - id: backend-integration
       script: scripts/ci/backend-integration.sh
       run_core_arg: backend-integration
@@ -146,6 +157,10 @@ github_actions:
       needs: []
       run: bash scripts/ci/run-core.sh frontend
       notes: actions/setup-node 22.23.4 (Angular 22 min)
+    frontend-uat:
+      needs: [frontend]
+      run: bash scripts/ci/run-core.sh frontend-uat
+      notes: actions/setup-java temurin 25 + actions/setup-node 22.23.4 + Playwright Chromium; uploads ci-reports/frontend-uat/** on failure
     security-audit:
       needs: []
       run: bash scripts/ci/run-core.sh security-audit
@@ -217,6 +232,9 @@ jenkins:
     - name: Backend Integration
       run: bash scripts/ci/run-core.sh backend-integration
       parity_note: Does not wait on frontend or cpq-beta (matches GHA needs)
+    - name: Frontend UAT
+      run: bash scripts/ci/run-core.sh frontend-uat
+      parity_note: Runs after Frontend and Backend Integration; never blocks Backend Integration
     - name: AI Assist
       when: AI_CI_ENABLED=true
       jenkins_only: true

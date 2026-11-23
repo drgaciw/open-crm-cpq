@@ -25,7 +25,10 @@ describe('NotificationService', () => {
     });
 
     service = TestBed.inject(NotificationService);
-    snackBarSpy = TestBed.inject(MatSnackBar) as { open: ReturnType<typeof vi.fn>; dismiss: ReturnType<typeof vi.fn> };
+    snackBarSpy = TestBed.inject(MatSnackBar) as unknown as {
+      open: ReturnType<typeof vi.fn>;
+      dismiss: ReturnType<typeof vi.fn>;
+    };
     liveAnnouncerSpy = TestBed.inject(LiveAnnouncer) as unknown as {
       announce: ReturnType<typeof vi.fn>;
       clear: ReturnType<typeof vi.fn>;

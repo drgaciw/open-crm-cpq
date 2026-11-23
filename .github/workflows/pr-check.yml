@@ -44,3 +44,17 @@ jobs:
           path: backend/**/target/surefire-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+
+  frontend:
+    name: Frontend (PR gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build, lint, typecheck, test
+        run: bash scripts/ci/run-core.sh frontend

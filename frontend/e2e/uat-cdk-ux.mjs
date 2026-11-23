@@ -16,18 +16,30 @@
  *   D) Smoke (Opportunities copy intact, data-testid="data-table" on CRM lists).
  */
 import { launch, goto, BASE } from './lib/browser.mjs';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const stamp = Date.now();
 const results = [];
+const artifactDir = process.env.UAT_ARTIFACT_DIR?.trim() || '';
 
 function ok(name, detail = '') {
   results.push({ name, status: 'PASS', detail });
   console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-function fail(name, detail) {
+async function fail(name, detail, page = null) {
   results.push({ name, status: 'FAIL', detail });
   console.error(`FAIL  ${name} — ${detail}`);
+  if (artifactDir && page) {
+    try {
+      mkdirSync(artifactDir, { recursive: true });
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60);
+      await page.screenshot({ path: join(artifactDir, `fail-${slug}.png`), fullPage: true });
+    } catch {
+      // Best-effort failure screenshot
+    }
+  }
 }
 
 /**
@@ -200,7 +212,7 @@ async function main() {
       });
       ok('A1 Kanban legal 1-step advance persists after reload & stays on board');
     } catch (e) {
-      fail('A1 Kanban legal 1-step advance persists after reload & stays on board', String(e.message || e));
+      await fail('A1 Kanban legal 1-step advance persists after reload & stays on board', String(e.message || e), page);
       await goto(page, '/deals/kanban');
     }
 
@@ -232,7 +244,7 @@ async function main() {
       });
       ok('A2 Kanban illegal skip refused and card stays in QUALIFICATION');
     } catch (e) {
-      fail('A2 Kanban illegal skip refused and card stays in QUALIFICATION', String(e.message || e));
+      await fail('A2 Kanban illegal skip refused and card stays in QUALIFICATION', String(e.message || e), page);
       await goto(page, '/deals/kanban');
     }
 
@@ -279,7 +291,7 @@ async function main() {
       });
       ok('A3 Kanban drop onto LOST opens dialog; Cancel keeps card, Confirm moves to LOST');
     } catch (e) {
-      fail('A3 Kanban drop onto LOST opens dialog; Cancel keeps card, Confirm moves to LOST', String(e.message || e));
+      await fail('A3 Kanban drop onto LOST opens dialog; Cancel keeps card, Confirm moves to LOST', String(e.message || e), page);
       await goto(page, '/deals/kanban');
     }
 
@@ -319,7 +331,7 @@ async function main() {
       await alert.getByRole('button', { name: 'Dismiss' }).click().catch(() => {});
       ok('A4 Kanban drop onto WON without accepted quote shows clean error & keeps card', alertText.slice(0, 80));
     } catch (e) {
-      fail('A4 Kanban drop onto WON without accepted quote shows clean error & keeps card', String(e.message || e));
+      await fail('A4 Kanban drop onto WON without accepted quote shows clean error & keeps card', String(e.message || e), page);
       await goto(page, '/deals/kanban');
     }
 
@@ -346,7 +358,7 @@ async function main() {
       });
       ok('A5 Kanban mat-menu Advance Stage still works');
     } catch (e) {
-      fail('A5 Kanban mat-menu Advance Stage still works', String(e.message || e));
+      await fail('A5 Kanban mat-menu Advance Stage still works', String(e.message || e), page);
     }
 
     // =========================================================================
@@ -397,7 +409,7 @@ async function main() {
       }
       ok('B1 Command palette Ctrl+K, toolbar button, Escape, backdrop close & focus return');
     } catch (e) {
-      fail('B1 Command palette Ctrl+K, toolbar button, Escape, backdrop close & focus return', String(e.message || e));
+      await fail('B1 Command palette Ctrl+K, toolbar button, Escape, backdrop close & focus return', String(e.message || e), page);
       await page.keyboard.press('Escape').catch(() => {});
     }
 
@@ -428,7 +440,7 @@ async function main() {
       }
       ok('B2 Command palette items match sidebar links', `${normalizedSidebar.length} sidebar links matched`);
     } catch (e) {
-      fail('B2 Command palette items match sidebar links', String(e.message || e));
+      await fail('B2 Command palette items match sidebar links', String(e.message || e), page);
       await page.keyboard.press('Escape').catch(() => {});
     }
 
@@ -460,7 +472,7 @@ async function main() {
       await palette.waitFor({ state: 'hidden', timeout: 5000 });
       ok('B3 Command palette filter, ArrowDown aria-activedescendant, Enter navigation');
     } catch (e) {
-      fail('B3 Command palette filter, ArrowDown aria-activedescendant, Enter navigation', String(e.message || e));
+      await fail('B3 Command palette filter, ArrowDown aria-activedescendant, Enter navigation', String(e.message || e), page);
     }
 
     // =========================================================================
@@ -496,7 +508,7 @@ async function main() {
       }
       ok('C1 Deal detail StagePath shows stages, 0 buttons/tab stops, 1 aria-current="step"');
     } catch (e) {
-      fail('C1 Deal detail StagePath shows stages, 0 buttons/tab stops, 1 aria-current="step"', String(e.message || e));
+      await fail('C1 Deal detail StagePath shows stages, 0 buttons/tab stops, 1 aria-current="step"', String(e.message || e), page);
     }
 
     // =========================================================================
@@ -515,10 +527,10 @@ async function main() {
       }
       ok('D1 Smoke: Opportunities copy intact & data-testid="data-table" on all 4 CRM lists');
     } catch (e) {
-      fail('D1 Smoke: Opportunities copy intact & data-testid="data-table" on all 4 CRM lists', String(e.message || e));
+      await fail('D1 Smoke: Opportunities copy intact & data-testid="data-table" on all 4 CRM lists', String(e.message || e), page);
     }
   } catch (e) {
-    fail('fatal', String(e.stack || e));
+    await fail('fatal', String(e.stack || e), page);
   } finally {
     await browser.close();
   }
