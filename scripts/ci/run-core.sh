@@ -17,6 +17,7 @@ Stages:
   backend-integration  Full Maven verify (Testcontainers)
   cpq-beta-python      cpq_beta pytest (best-effort)
   frontend             Nx build, lint, targeted tests
+  frontend-uat         Playwright CDK UX UAT against isolated Postgres/Redis + CRM + Gateway + UI
   security-audit       npm audit + OWASP dependency-check (non-blocking findings)
 EOF
   exit 2
@@ -34,6 +35,7 @@ case "${STAGE}" in
   backend-integration) exec bash "${SCRIPT_DIR}/backend-integration.sh" ;;
   cpq-beta-python) exec bash "${SCRIPT_DIR}/cpq-beta-python.sh" ;;
   frontend) exec bash "${SCRIPT_DIR}/frontend.sh" ;;
+  frontend-uat) exec bash "${SCRIPT_DIR}/frontend-uat.sh" ;;
   security-audit) exec bash "${SCRIPT_DIR}/security-audit.sh" ;;
   *)
     echo "Unknown CI stage: ${STAGE}" >&2

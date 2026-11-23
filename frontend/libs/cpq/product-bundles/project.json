@@ -18,6 +18,7 @@
       "options": {
         "coverage.reportsDirectory": "../../../coverage/libs/cpq/product-bundles"
       }
-    }
+    },
+    "typecheck": {}
   }
 }

@@ -152,6 +152,18 @@ pipeline {
       }
     }
 
+    // Runs after Frontend and Backend Integration (never blocks Backend Integration)
+    stage('Frontend UAT') {
+      steps {
+        sh 'bash scripts/ci/run-core.sh frontend-uat'
+      }
+      post {
+        failure {
+          archiveArtifacts artifacts: 'ci-reports/frontend-uat/**/*', allowEmptyArchive: true
+        }
+      }
+    }
+
     stage('AI Assist') {
       when {
         expression { return env.AI_CI_ENABLED == 'true' }

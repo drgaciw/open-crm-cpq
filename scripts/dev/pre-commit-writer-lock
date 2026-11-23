@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Opt-in Git pre-commit hook enforcing the per-checkout writer lock.
+#
+# Enable locally (not auto-installed):
+#   ln -sf ../../scripts/dev/pre-commit-writer-lock "$(git rev-parse --git-dir)/hooks/pre-commit"
+# or copy/wire into a directory configured via `git config core.hooksPath`.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/writer-lock.sh" check

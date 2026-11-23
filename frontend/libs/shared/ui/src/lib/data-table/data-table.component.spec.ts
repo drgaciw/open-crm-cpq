@@ -311,7 +311,7 @@ describe('DataTableComponent', () => {
     ] satisfies TableRowAction[]);
     component.detectChanges();
 
-    const events: RowActionEvent<(typeof mockData)[0]>[] = [];
+    const events: RowActionEvent[] = [];
     component.componentInstance.rowAction.subscribe((e) => events.push(e));
 
     component.componentInstance.emitRowAction('edit', mockData[0]);

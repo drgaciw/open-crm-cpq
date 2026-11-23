@@ -103,7 +103,9 @@ describe('quotes-list WebMCP', () => {
   });
 
   it('listQuotes execute hits QuoteService.list and quotes/pagination signals', () => {
-    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'listQuotes');
+    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'listQuotes') as
+      | { execute: (args: Record<string, unknown>) => unknown }
+      | undefined;
     expect(tool).toBeTruthy();
 
     const snapshot = TestBed.runInInjectionContext(() =>
@@ -119,7 +121,9 @@ describe('quotes-list WebMCP', () => {
   });
 
   it('filterQuotes execute hits QuoteService.list with status/dealType and filters quotes()', () => {
-    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'filterQuotes');
+    const tool = QUOTES_LIST_WEB_MCP_TOOLS.find((t) => t.name === 'filterQuotes') as
+      | { execute: (args: Record<string, unknown>) => unknown }
+      | undefined;
     expect(tool).toBeTruthy();
 
     const snapshot = TestBed.runInInjectionContext(() =>

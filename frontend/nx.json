@@ -37,7 +37,16 @@
           { "externalDependencies": ["eslint"] }
         ]
       }
-    ]
+    ],
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^production", "{workspaceRoot}/tsconfig.base.json"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "npx --no-install tsc -p $(test -f tsconfig.app.json && echo tsconfig.app.json || echo tsconfig.lib.json) --noEmit && npx --no-install tsc -p tsconfig.spec.json --noEmit"
+      }
+    }
   },
   "generators": {
     "@nx/angular:application": {

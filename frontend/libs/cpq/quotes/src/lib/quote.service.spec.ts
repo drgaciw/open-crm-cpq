@@ -423,7 +423,11 @@ describe('QuoteService', () => {
       startDate: '2027-01-31', endDate: '2028-01-30' }));
     const result = { steps: [], durationInMonths: 24, quoteVersion: 4, endDate: '2029-01-30' };
     const extension = firstValueFrom(service.extendRampSchedule(7, {
-      steps: [], durationInMonths: 24, lineItemId: 9, expectedQuoteVersion: 3,
+      steps: [],
+      durationInMonths: 24,
+      escalator: { startPrice: 100, mode: 'PERCENT', amount: 5, everyMonths: 12 },
+      lineItemId: 9,
+      expectedQuoteVersion: 3,
     }));
     httpMock.expectOne('/api/v1/quotes/7/ramp-schedule/extend').flush(result);
     service.applyRampExtension(7, 9, await extension);

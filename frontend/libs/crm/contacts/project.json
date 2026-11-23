@@ -14,6 +14,7 @@
       "options": {
         "coverage.reportsDirectory": "../../../coverage/libs/crm/contacts"
       }
-    }
+    },
+    "typecheck": {}
   }
 }

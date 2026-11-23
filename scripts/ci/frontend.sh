@@ -15,6 +15,7 @@ npx nx --version
 
 npx nx run-many --target=build --all --parallel=3
 npx nx run-many --target=lint --all --parallel=3
+npx nx run-many --target=typecheck --all --parallel=3
 
 # Test every project that declares a test target. A hand-kept allowlist silently skipped every cpq-*
 # project except cpq-quotes, and any new project (DRG-527); --all cannot drift.
