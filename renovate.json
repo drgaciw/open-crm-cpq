@@ -77,6 +77,16 @@
       "dependencyDashboardApproval": true
     },
     {
+      "description": "Frontend TypeScript stays inside the range Angular's compiler supports (@angular/compiler-cli and @angular/build peer typescript '>=6.0 <6.1' as of 22.3.0). TypeScript 7 is the native compiler and no longer exports the compiler API Angular uses. Raise this cap only when Angular's peer range allows it. infra/alchemy is not covered.",
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchFileNames": [
+        "frontend/package.json"
+      ],
+      "allowedVersions": "<6.1"
+    },
+    {
       "description": "Nx 24.0.x imports @angular-devkit/architect/node/index.js, which the exports map added in architect 0.2203.0 blocks. Hold architect on 0.2202.x (pinned via overrides in frontend/package.json) until an Nx release imports @angular-devkit/architect/node.",
       "matchPackageNames": [
         "@angular-devkit/architect"
