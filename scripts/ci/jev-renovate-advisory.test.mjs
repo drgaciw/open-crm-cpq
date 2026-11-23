@@ -70,6 +70,9 @@ test('maps changed files to the required gates that cover them', () => {
   });
   assert.deepEqual(gateCoverage(['cpq_beta/yarn.lock']).uncovered, ['cpq_beta/yarn.lock']);
   assert.equal(gateCoverage(['.github/workflows/ci.yml']).uncovered.length, 1);
+  assert.deepEqual(gateCoverage(['backend/docker-compose.yml']).uncovered, ['backend/docker-compose.yml']);
+  assert.deepEqual(gateCoverage(['backend/services/crm-service/Dockerfile']).coveredBy, []);
+  assert.deepEqual(gateCoverage(['frontend/Dockerfile.prod']).uncovered, ['frontend/Dockerfile.prod']);
   assert.equal(ecosystem(['backend/pom.xml']), 'maven');
   assert.equal(ecosystem(['cpq_beta/pyproject.toml']), 'python');
 });

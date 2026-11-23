@@ -35,8 +35,13 @@ export const REQUIRED_CHECKS = ['Backend Unit (PR gate)', 'Frontend (PR gate)', 
 const GATE_COVERAGE = [
   { prefix: 'backend/', gate: 'Backend Unit (PR gate)' },
   { prefix: 'frontend/', gate: 'Frontend (PR gate)' },
-  { prefix: '.github/workflows/', gate: 'workflow (not exercised by PR gates)' },
 ];
+
+/**
+ * Container and Compose definitions are never exercised by the gates: Backend Unit is Docker-free
+ * (backend-unit.sh fails if Testcontainers starts) and the frontend gate does not build images.
+ */
+const NEVER_COVERED = /(^|\/)(Dockerfile[^/]*|docker-compose[^/]*\.ya?ml|compose[^/]*\.ya?ml)$/i;
 
 /** Packages that renovate.json sends to dashboard approval for minors as well as majors. */
 const OWNER_DECISION_PACKAGES = [/^org\.springframework\.boot:spring-boot-starter-parent$/, /^typescript$/];
@@ -120,8 +125,8 @@ export function gateCoverage(files) {
   const gates = new Set();
   const uncovered = [];
   for (const file of files) {
-    const hit = GATE_COVERAGE.find((g) => file.startsWith(g.prefix));
-    if (hit && REQUIRED_CHECKS.includes(hit.gate)) gates.add(hit.gate);
+    const hit = !NEVER_COVERED.test(file) && GATE_COVERAGE.find((g) => file.startsWith(g.prefix));
+    if (hit) gates.add(hit.gate);
     else uncovered.push(file);
   }
   return { coveredBy: [...gates], uncovered };
@@ -259,6 +264,11 @@ async function main() {
         answer = (await decider.ask(state, { verdict: QUESTION })).verdict;
       } catch (err) {
         console.log(`#${pr.number}: JEV gave no usable answer (${err.name}); no comment posted.`);
+        continue;
+      }
+      if (answer.confidence < minConfidence) {
+        // ask() validates but does not gate; a low-confidence answer must not post or overwrite.
+        console.log(`#${pr.number}: JEV confidence ${answer.confidence.toFixed(2)} below ${minConfidence}; no comment posted.`);
         continue;
       }
       const verdict = finalVerdict(answer, reasons, minConfidence);
