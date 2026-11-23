@@ -323,12 +323,11 @@ export class CommandPaletteComponent {
     effect(() => {
       const currentOptions = this.options();
       if (currentOptions.length > 0) {
-        if (
-          this.keyManager.activeItemIndex === null ||
-          this.keyManager.activeItemIndex < 0 ||
-          this.keyManager.activeItemIndex >= currentOptions.length
-        ) {
-          this.keyManager.setFirstItemActive();
+        const currentActive = this.keyManager.activeItem;
+        const activeStillPresent =
+          currentActive !== null && currentOptions.includes(currentActive);
+        if (!activeStillPresent) {
+          this.keyManager.setActiveItem(currentOptions[0]);
         }
       } else {
         this.keyManager.updateActiveItem(-1);

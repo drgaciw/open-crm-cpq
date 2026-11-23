@@ -128,6 +128,8 @@ describe('DealDetailComponent', () => {
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('[data-testid="stage-path"]')).toBeTruthy();
       expect(el.querySelector('[data-stage-id="PROPOSAL"]')?.getAttribute('aria-current')).toBe('step');
+      expect((pathDe.componentInstance as StagePathComponent).interactive()).toBe(false);
+      expect(el.querySelectorAll('[data-testid="stage-path"] button').length).toBe(0);
     });
 
     it('marks open stages completed and WON active when opportunity is WON', () => {

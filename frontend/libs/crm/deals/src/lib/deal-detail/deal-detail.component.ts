@@ -73,6 +73,7 @@ import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealSta
       <app-stage-path
         class="deal-stage-path"
         [stages]="stagePathItems()"
+        [interactive]="false"
         ariaLabel="Opportunity stage progression"
       />
 

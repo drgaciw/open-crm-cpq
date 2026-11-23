@@ -78,6 +78,14 @@ interface KanbanColumn {
       </div>
     }
 
+    @if (actionError(); as message) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+        <button mat-button type="button" (click)="actionError.set(null)">Dismiss</button>
+      </div>
+    }
+
     @if (service.loading()) {
       <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
     } @else if (!service.error()) {
@@ -242,6 +250,8 @@ export class DealKanbanComponent implements OnInit {
   private readonly liveAnnouncer = inject(LiveAnnouncer);
 
   readonly actionLoading = signal(false);
+  /** Error from Advance / Won / Lost; kept apart from load error so the board stays visible. */
+  readonly actionError = signal<string | null>(null);
 
   /** Enter predicate shared across all stage columns (stable reference for CDK). */
   readonly canEnterStage = (
@@ -355,7 +365,7 @@ export class DealKanbanComponent implements OnInit {
   }
 
   onDrop(event: CdkDragDrop<DealStage, DealStage, DealDto>): void {
-    if (event.previousContainer === event.container) {
+    if (!event.isPointerOverContainer || event.previousContainer === event.container) {
       return;
     }
     const deal = event.item.data;
@@ -408,6 +418,7 @@ export class DealKanbanComponent implements OnInit {
   }
 
   private commitStage(updated: DealDto): void {
+    this.actionError.set(null);
     this.service.applyStageChange(updated);
     this.actionLoading.set(false);
     this.refreshBoard();
@@ -420,7 +431,7 @@ export class DealKanbanComponent implements OnInit {
   private failStage(err: unknown, fallback: string): void {
     this.actionLoading.set(false);
     const message = dealActionErrorMessage(err, fallback);
-    this.service.error.set(message);
+    this.actionError.set(message);
     void this.liveAnnouncer.announce(message, 'assertive');
   }
 

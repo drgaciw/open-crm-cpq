@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { of } from 'rxjs';
 import { LoadingService } from '@frontend/shared-data-access';
-import { CommandPaletteItem, CommandPaletteService } from '@frontend/shared-ui/command-palette';
+import { CommandPaletteItem, CommandPaletteService } from '@frontend/shared-ui';
 import { ShellComponent } from './shell.component';
 
 describe('ShellComponent', () => {
@@ -137,6 +137,7 @@ describe('ShellComponent', () => {
         '/quotes',
         '/catalog',
         '/price-books',
+        '/pricing-customers',
         '/pricing/simulator',
         '/approvals',
         '/product-bundles',

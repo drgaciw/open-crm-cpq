@@ -2,6 +2,17 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
+import { NAV_GROUPS, NAV_ITEMS, NavGroup, NavItem } from './nav-items';
+
+interface NavSection {
+  readonly group: NavGroup;
+  readonly items: readonly NavItem[];
+}
+
+const NAV_SECTIONS: readonly NavSection[] = NAV_GROUPS.map((group) => ({
+  group,
+  items: NAV_ITEMS.filter((item) => item.group === group),
+}));
 
 @Component({
   selector: 'app-sidebar',
@@ -13,61 +24,15 @@ import { MatIconModule } from '@angular/material/icon';
       <h2 class="sidebar-title">Open CRM CPQ</h2>
     </div>
     <mat-nav-list>
-      <h3 class="nav-group">CRM</h3>
-      <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>dashboard</mat-icon>
-        <span matListItemTitle>Dashboard</span>
-      </a>
-      <a mat-list-item routerLink="/organizations" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>business</mat-icon>
-        <span matListItemTitle>Accounts</span>
-      </a>
-      <a mat-list-item routerLink="/contacts" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>people</mat-icon>
-        <span matListItemTitle>Contacts</span>
-      </a>
-      <a mat-list-item routerLink="/leads" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>leaderboard</mat-icon>
-        <span matListItemTitle>Leads</span>
-      </a>
-      <a mat-list-item routerLink="/deals" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>handshake</mat-icon>
-        <span matListItemTitle>Opportunities</span>
-      </a>
-
-      <h3 class="nav-group">CPQ</h3>
-      <a mat-list-item routerLink="/catalog" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>inventory_2</mat-icon>
-        <span matListItemTitle>Catalog</span>
-      </a>
-      <a mat-list-item routerLink="/quotes" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>request_quote</mat-icon>
-        <span matListItemTitle>Quotes</span>
-      </a>
-      <a mat-list-item routerLink="/approvals" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>fact_check</mat-icon>
-        <span matListItemTitle>Approvals</span>
-      </a>
-      <a mat-list-item routerLink="/price-books" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>menu_book</mat-icon>
-        <span matListItemTitle>Price Books</span>
-      </a>
-      <a mat-list-item routerLink="/pricing-customers" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>groups</mat-icon>
-        <span matListItemTitle>Pricing Customers</span>
-      </a>
-      <a mat-list-item routerLink="/rule-sets" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>rule</mat-icon>
-        <span matListItemTitle>Rule Sets</span>
-      </a>
-      <a mat-list-item routerLink="/product-bundles" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>inventory</mat-icon>
-        <span matListItemTitle>Bundles</span>
-      </a>
-      <a mat-list-item routerLink="/pricing/simulator" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>science</mat-icon>
-        <span matListItemTitle>Pricing Simulator</span>
-      </a>
+      @for (section of sections; track section.group) {
+        <h3 class="nav-group">{{ section.group }}</h3>
+        @for (item of section.items; track item.route) {
+          <a mat-list-item [routerLink]="item.route" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+      }
     </mat-nav-list>
   `,
   styles: [
@@ -102,4 +67,6 @@ import { MatIconModule } from '@angular/material/icon';
     `,
   ],
 })
-export class SidebarComponent {}
+export class SidebarComponent {
+  readonly sections = NAV_SECTIONS;
+}

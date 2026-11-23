@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SessionService } from '@frontend/shared-data-access';
-import { CommandPaletteService } from '@frontend/shared-ui/command-palette';
+import { CommandPaletteService } from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-toolbar',

@@ -39,28 +39,47 @@ export interface StagePathItem {
       <ol class="stage-path__list" role="list">
         @for (stage of stages(); track stage.id; let i = $index) {
           <li class="stage-path__item">
-            <button
-              #stageButton
-              type="button"
-              class="stage-path__step"
-              [class.stage-path__step--completed]="stage.state === 'completed'"
-              [class.stage-path__step--active]="stage.state === 'active'"
-              [class.stage-path__step--upcoming]="stage.state === 'upcoming'"
-              [class.stage-path__step--danger]="stage.state === 'danger'"
-              [attr.aria-current]="stage.state === 'active' ? 'step' : null"
-              [attr.tabindex]="focusedIndex() === i ? 0 : -1"
-              [attr.data-stage-id]="stage.id"
-              (click)="selectStage(stage, i)"
-              (focus)="focusedIndex.set(i)"
-              (keydown)="onStepKeydown($event, i)"
-            >
-              @if (stage.state === 'completed') {
-                <mat-icon class="stage-path__icon" aria-hidden="true">check</mat-icon>
-              } @else if (stage.state === 'danger') {
-                <mat-icon class="stage-path__icon" aria-hidden="true">close</mat-icon>
-              }
-              <span class="stage-path__label">{{ stage.label }}</span>
-            </button>
+            @if (interactive()) {
+              <button
+                #stageButton
+                type="button"
+                class="stage-path__step"
+                [class.stage-path__step--completed]="stage.state === 'completed'"
+                [class.stage-path__step--active]="stage.state === 'active'"
+                [class.stage-path__step--upcoming]="stage.state === 'upcoming'"
+                [class.stage-path__step--danger]="stage.state === 'danger'"
+                [attr.aria-current]="stage.state === 'active' ? 'step' : null"
+                [attr.tabindex]="focusedIndex() === i ? 0 : -1"
+                [attr.data-stage-id]="stage.id"
+                (click)="selectStage(stage, i)"
+                (focus)="focusedIndex.set(i)"
+                (keydown)="onStepKeydown($event, i)"
+              >
+                @if (stage.state === 'completed') {
+                  <mat-icon class="stage-path__icon" aria-hidden="true">check</mat-icon>
+                } @else if (stage.state === 'danger') {
+                  <mat-icon class="stage-path__icon" aria-hidden="true">close</mat-icon>
+                }
+                <span class="stage-path__label">{{ stage.label }}</span>
+              </button>
+            } @else {
+              <span
+                class="stage-path__step stage-path__step--static"
+                [class.stage-path__step--completed]="stage.state === 'completed'"
+                [class.stage-path__step--active]="stage.state === 'active'"
+                [class.stage-path__step--upcoming]="stage.state === 'upcoming'"
+                [class.stage-path__step--danger]="stage.state === 'danger'"
+                [attr.aria-current]="stage.state === 'active' ? 'step' : null"
+                [attr.data-stage-id]="stage.id"
+              >
+                @if (stage.state === 'completed') {
+                  <mat-icon class="stage-path__icon" aria-hidden="true">check</mat-icon>
+                } @else if (stage.state === 'danger') {
+                  <mat-icon class="stage-path__icon" aria-hidden="true">close</mat-icon>
+                }
+                <span class="stage-path__label">{{ stage.label }}</span>
+              </span>
+            }
           </li>
         }
       </ol>
@@ -117,6 +136,30 @@ export interface StagePathItem {
       color: var(--crm-color-ink);
     }
 
+    .stage-path__step--static {
+      cursor: default;
+    }
+
+    .stage-path__step--static:hover {
+      border-color: var(--crm-color-line);
+      color: var(--crm-color-muted);
+    }
+
+    .stage-path__step--static.stage-path__step--completed:hover {
+      border-color: var(--crm-color-success);
+      color: var(--crm-color-success-strong);
+    }
+
+    .stage-path__step--static.stage-path__step--active:hover {
+      border-color: var(--crm-color-brand-strong);
+      color: var(--crm-color-on-brand);
+    }
+
+    .stage-path__step--static.stage-path__step--danger:hover {
+      border-color: var(--crm-color-danger);
+      color: var(--crm-color-danger);
+    }
+
     .stage-path__step:focus-visible {
       outline: 3px solid var(--crm-focus-ring);
       outline-offset: 2px;
@@ -163,6 +206,7 @@ export interface StagePathItem {
 export class StagePathComponent extends CdkStepper {
   stages = input.required<StagePathItem[]>();
   ariaLabel = input<string>('Stage progress');
+  interactive = input<boolean>(true);
 
   stageSelect = output<string>();
 
