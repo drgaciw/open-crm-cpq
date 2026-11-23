@@ -6,6 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,7 +42,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @Tag("integration")
 @Tag("docker")
+@Import(FieldRegistryPostgresTest.FixtureConfiguration.class)
 class FieldRegistryPostgresTest extends BaseIntegrationTest {
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FixtureConfiguration {
+        @Bean
+        FieldDefinitionController.FixtureAccess fieldRegistryFixtureAccess() {
+            return FieldDefinitionController.FixtureAccess.ENABLED;
+        }
+    }
 
     private static final String SENTINEL_TEXT = "sentinel-keep";
     private static final String CONTROL_TEXT = "control-keep";

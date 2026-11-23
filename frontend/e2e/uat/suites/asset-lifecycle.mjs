@@ -73,11 +73,15 @@ export default {
       throw gap('Renewal-from-assets behavior is not exercised by this suite; a visible label alone is not evidence of a working flow');
     });
 
-    // UAT-ALM-06 — Installed-base nav (GAP if absent)
     await runCheck(ctx, 'asset-lifecycle.ui.installed-base-nav', async () => {
       await goto(page, '/dashboard');
-      await page.getByRole('heading', { level: 1 }).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
-      throw gap('Installed-base page behavior is not exercised by this suite; an SPA HTTP 200 does not prove a route exists');
+      await page.getByRole('link', { name: 'Assets', exact: true }).click();
+      await page.waitForURL('**/assets');
+      await page.getByRole('heading', { name: 'Assets', exact: true }).waitFor();
+      const rendered = page.getByText(/Viewing assets requires the InstalledBase.Read role|Assets are created when a contract is activated/)
+        .or(page.getByRole('table', { name: 'Assets', exact: true }));
+      await rendered.first().waitFor();
+      return 'Assets navigation loaded a role, empty, or populated state';
     });
 
     // A read probe and source-code inspection cannot prove deployed apply behavior.

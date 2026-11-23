@@ -20,6 +20,11 @@ import {
   RampStep,
 } from '@frontend/shared-models';
 
+export interface BulkLineItemRemovalRequest {
+  lineItemIds: number[];
+  expectedQuoteVersion: number;
+}
+
 /** H1-shaped banner text: `message [CODE]` when errorCode is present. */
 function httpErrorMessage(err: unknown): string {
   const e = err as {
@@ -223,6 +228,10 @@ export class QuoteService {
     return this.http.delete<void>(
       `${this.basePath}/${quoteId}/line-items/${lineItemId}`,
     );
+  }
+
+  bulkRemoveLineItems(quoteId: number, request: BulkLineItemRemovalRequest): Observable<void> {
+    return this.http.post<void>(`${this.basePath}/${quoteId}/line-items/bulk-remove`, request);
   }
 
   /**

@@ -55,6 +55,15 @@ describe('QuotesCreateComponent', () => {
     expect(component.form.valid).toBe(true);
   });
 
+  it('shows New as the read-only commercial type on the standard create form', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const field = Array.from(host.querySelectorAll('mat-form-field'))
+      .find(el => el.querySelector('mat-label')?.textContent === 'Deal type');
+    const type = field?.querySelector('input');
+    expect(type?.value).toBe('New');
+    expect(type?.readOnly).toBe(true);
+  });
+
   it('creates via QuoteService and navigates to detail on success', () => {
     component.form.setValue({
       name: 'New Acme Quote',

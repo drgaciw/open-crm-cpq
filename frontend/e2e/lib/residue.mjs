@@ -10,11 +10,13 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 /**
  * After teardown, soft-delete the accepted UAT quotes (and their contracts) that the API refuses to
  * delete, when the run used a local stack. Returns a one-line outcome for the report, or null when
- * nothing applied: a non-local base URL, no accepted-quote residue, or UAT_KEEP_RESIDUE=1.
+ * nothing applied: a non-local base URL, no accepted-quote residue, or an isolated/keep-residue run.
  * Never throws.
  */
 export function purgeLocalResidue({ base, residue, env = process.env, run = defaultRun }) {
-  if (env.UAT_KEEP_RESIDUE === '1') return null;
+  // An isolated deployment can use a different database from the default
+  // local purge target. Its owner removes the dedicated database at teardown.
+  if (env.UAT_KEEP_RESIDUE === '1' || env.UAT_ISOLATED_FIXTURES === '1') return null;
   let host;
   try { host = new URL(base).hostname; } catch { return null; }
   if (!LOCAL_HOSTS.has(host)) return null;

@@ -45,6 +45,13 @@ public class QuoteLineItemController {
         return ApiResponse.success(item, "Line item updated successfully");
     }
 
+    @PostMapping("/bulk-remove")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Remove selected line items atomically from the displayed quote version")
+    public void bulkRemove(@PathVariable Long quoteId, @Valid @RequestBody BulkLineItemRemovalRequest request) {
+        lineItemService.bulkRemoveLineItems(quoteId, request);
+    }
+
     @DeleteMapping("/{lineItemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Remove a line item from a quote")

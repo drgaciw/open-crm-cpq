@@ -8,13 +8,15 @@
  *
  * Check ids: `deals.lifecycle.<step>` and `deals.lost.<step>`
  */
-import { goto } from '../../lib/browser.mjs';
+import { BASE, goto } from '../../lib/browser.mjs';
 import { runSteps, waitUntil, blocked } from '../../lib/health.mjs';
 import { withNativeDialog } from '../../lib/dialogs.mjs';
 import { expectNoSnackbar } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator } from '../../lib/fields.mjs';
 import { ensure } from '../fixtures.mjs';
 import { STAGES, stageLabel } from '../specs/deals.mjs';
+import { blockedReason } from '../../lib/preflight.mjs';
+import { draftWithLine } from './quote-lifecycle.mjs';
 
 const API = '/api/v1/deals';
 
@@ -43,13 +45,23 @@ export async function expectApiStage(api, id, stage) {
   });
 }
 
-/**
- * An opportunity can be WON only with an accepted quote (DealService, OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE).
- * Deal.acceptedQuoteId is recorded only from a QuoteAccepted event, which a local UAT stack without
- * the event pipeline cannot produce, so WON is not reachable here.
- */
 export const WON_NEEDS_ACCEPTED_QUOTE =
-  'WON needs an accepted quote (OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE); acceptedQuoteId is set only by a QuoteAccepted event, which this UAT stack cannot produce';
+  'A Won fixture requires an accepted quote and an isolated local CRM/CPQ stack with quote event delivery enabled';
+
+export function canSeedWon(ctx) {
+  return process.env.UAT_ISOLATED_FIXTURES === '1'
+    && ['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE).hostname)
+    && ['quote', 'product', 'pricing', 'pricebook', 'configValidate'].every(key => !blockedReason(ctx.preflight, key));
+}
+
+export async function acceptQuoteForDeal(ctx, deal) {
+  if (!canSeedWon(ctx)) throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
+  const { quote } = await draftWithLine(ctx, { dealExternalId: deal.uuid });
+  for (const transition of ['calculate', 'submit', 'approve', 'send', 'accept']) {
+    await ctx.api.post(`/api/v1/quotes/${quote.id}/${transition}`);
+  }
+  return expectApiStage(ctx.api, deal.id, 'WON');
+}
 
 /** After a confirmed Won: the refusal is shown in an alert and the stage is unchanged. */
 export async function expectWinRefused(page, api, id, stage) {
@@ -88,6 +100,7 @@ export async function runDealLifecycle(ctx, detail) {
   // ── PROSPECTING -> … -> NEGOTIATION -> WON ────────────────────────────────────
   const deal = await ensure(ctx, 'deal');
   let lastProbability = 10;
+  let won = null;
 
   const steps = [{
     id: 'deals.lifecycle.PROSPECTING.actions',
@@ -147,10 +160,11 @@ export async function runDealLifecycle(ctx, detail) {
       },
     },
     {
-      // Needs a WON opportunity, which is unreachable without an accepted quote.
       id: 'deals.lifecycle.WON.actions',
       run: async () => {
-        throw blocked(WON_NEEDS_ACCEPTED_QUOTE);
+        won = await acceptQuoteForDeal(ctx, deal);
+        await openDeal(page, won, 'WON');
+        return assertActionsFor(page, detail, 'WON');
       },
     },
   );
@@ -212,5 +226,5 @@ export async function runDealLifecycle(ctx, detail) {
     },
   ]);
 
-  return { won: deal, lost: loser };
+  return { won, lost: loser };
 }

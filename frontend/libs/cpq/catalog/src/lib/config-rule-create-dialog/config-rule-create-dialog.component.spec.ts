@@ -60,7 +60,7 @@ describe('ConfigRuleCreateDialogComponent', () => {
     };
     createSpy.mockReturnValue(of(created));
 
-    component.form.setValue({
+    component.form.patchValue({
       name: '  Requires addon  ',
       ruleType: 'REQUIRES',
       targetProductId: 99,
@@ -79,6 +79,28 @@ describe('ConfigRuleCreateDialogComponent', () => {
       priority: 1,
     });
     expect(dialogClose).toHaveBeenCalledWith(created);
+  });
+
+  it('sends chosen status and custom error message from the form', () => {
+    createSpy.mockReturnValue(of({ id: 3 }));
+    component.form.patchValue({
+      name: 'Requires addon',
+      ruleType: 'REQUIRES',
+      status: 'DRAFT',
+    });
+    const root = fixture.nativeElement as HTMLElement;
+    const message = root.querySelector<HTMLTextAreaElement>('[formControlName="errorMessage"]');
+    if (!message) {
+      throw new Error('Missing configuration error input');
+    }
+    message.value = 'Choose a supported add-on';
+    message.dispatchEvent(new Event('input'));
+    component.onSubmit();
+
+    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
+      errorMessage: 'Choose a supported add-on',
+      status: 'DRAFT',
+    }));
   });
 
   it('does not submit when form is invalid', () => {

@@ -149,6 +149,8 @@ export const configRuleDialog = dialogSpec('catalog.config-rule', {
     { label: 'Condition expression (optional)', kind: 'textarea',
       placeholder: 'Stored only — not evaluated in this UI' },
     { label: 'Description (optional)', kind: 'textarea' },
+    { label: 'Error message (optional)', kind: 'textarea' },
+    { label: 'Status', kind: 'select', default: 'ACTIVE', options: raw(STATUSES) },
     { label: 'Priority', kind: 'number', default: '0' },
   ],
 });

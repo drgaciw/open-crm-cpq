@@ -19,7 +19,6 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { forkJoin } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -1512,27 +1511,39 @@ export class QuotesDetailComponent {
     this.selectedLineIds.set(new Set(this.lineItems().map((line) => line.id)));
   }
 
-  /** Remove every selected line in one bulk action, then reload. */
+  /** Remove the current selection in a single quote transaction. */
   onRemoveSelectedLines(): void {
     if (!this.canEditLines() || this.actionBusy() || this.selectedLineIds().size === 0) {
       return;
     }
     const numericId = this.numericId();
+    const expectedQuoteVersion = this.quote()?.version;
     if (numericId == null) {
       return;
     }
-    const ids = Array.from(this.selectedLineIds());
+    if (expectedQuoteVersion == null) {
+      this.actionError.set('Reload the quote before removing selected lines.');
+      return;
+    }
+
+    const lineItemIds = Array.from(this.selectedLineIds());
     this.actionBusy.set(true);
     this.actionError.set(null);
-    forkJoin(ids.map((id) => this.quoteService.removeLineItem(numericId, id))).subscribe({
+    this.quoteService.bulkRemoveLineItems(numericId, { lineItemIds, expectedQuoteVersion }).subscribe({
       next: () => {
         this.selectedLineIds.set(new Set());
+        this.editingLineId.set(null);
         this.actionBusy.set(false);
         this.quoteService.getById(numericId);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.actionBusy.set(false);
         this.actionError.set(httpErrorMessage(err));
+        if ((err as { status?: number } | null)?.status === 409) {
+          this.selectedLineIds.set(new Set());
+          this.editingLineId.set(null);
+          this.quoteService.getById(numericId);
+        }
       },
     });
   }

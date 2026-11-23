@@ -37,10 +37,32 @@ public class ConfigurationRuleService {
         }
 
         ConfigurationRule rule = configRuleMapper.toEntity(request);
+        if (request.getStatus() != null) {
+            rule.setStatus(request.getStatus().name());
+        }
         ConfigurationRule saved = configRuleRepository.save(rule);
         log.info("Created config rule with ID: {}", saved.getId());
 
         return configRuleMapper.toDto(saved);
+    }
+
+    public ConfigurationRuleDto update(Long id, ConfigRuleUpdateRequest request) {
+        ConfigurationRule rule = configRuleRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ConfigurationRule", id));
+        if (request.targetProductId() != null) {
+            productRepository.findByIdAndDeletedFalse(request.targetProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Target Product", request.targetProductId()));
+        }
+
+        rule.setName(request.name().trim());
+        rule.setDescription(request.description());
+        rule.setRuleType(request.ruleType());
+        rule.setTargetProductId(request.targetProductId());
+        rule.setConditionExpression(request.conditionExpression());
+        rule.setErrorMessage(request.errorMessage());
+        rule.setPriority(request.priority());
+        rule.setStatus(request.status().name());
+        return configRuleMapper.toDto(configRuleRepository.save(rule));
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +108,9 @@ public class ConfigurationRuleService {
 
         // Flat O(rules): evaluate batched rules directly (no groupingBy + nested product loop).
         for (ConfigurationRule rule : allRules) {
+            if (!ConfigRuleStatus.ACTIVE.name().equals(rule.getStatus())) {
+                continue;
+            }
             if (rule.getRuleType() == ConfigRuleType.REQUIRES) {
                 if (rule.getTargetProductId() != null && !productSet.contains(rule.getTargetProductId())) {
                     errors.add(rule.getErrorMessage() != null ? rule.getErrorMessage() :

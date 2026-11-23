@@ -77,6 +77,7 @@ describe('QuotesDetailComponent', () => {
   let addLineItemSpy: ReturnType<typeof vi.fn>;
   let updateLineItemSpy: ReturnType<typeof vi.fn>;
   let removeLineItemSpy: ReturnType<typeof vi.fn>;
+  let bulkRemoveLineItemsSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let notificationSuccessSpy: ReturnType<typeof vi.fn>;
 
@@ -182,6 +183,7 @@ describe('QuotesDetailComponent', () => {
       } satisfies QuoteLineItemDto),
     );
     removeLineItemSpy = vi.fn(() => of(undefined));
+    bulkRemoveLineItemsSpy = vi.fn(() => of(undefined));
     dialogOpen = vi.fn(() => ({
       afterClosed: () => of(true),
     }));
@@ -212,6 +214,7 @@ describe('QuotesDetailComponent', () => {
       addLineItem: addLineItemSpy,
       updateLineItem: updateLineItemSpy,
       removeLineItem: removeLineItemSpy,
+      bulkRemoveLineItems: bulkRemoveLineItemsSpy,
       expandRampSchedule: vi.fn(() => of([])),
     };
 
@@ -1034,19 +1037,44 @@ describe('QuotesDetailComponent', () => {
     expect(table.querySelectorAll('mat-checkbox').length).toBe(0);
   });
 
-  it('selects lines in bulk and removes them together via the bulk action', () => {
+  it('removes three selected lines with the displayed quote version in one request', () => {
+    selectedQuote.update((quote) => {
+      const [first, second] = quote!.lineItems!;
+      return { ...quote!, version: 7, lineItems: [first, second, { ...first, id: 3, uuid: 'li-1-2' }] };
+    });
     getByIdSpy.mockClear();
-    const lines = selectedQuote()!.lineItems!;
-    component.toggleLineSelection(lines[0]);
-    component.toggleLineSelection(lines[1]);
-    expect(component.selectedLineIds().size).toBe(2);
+    const lines = selectedQuote()!.lineItems!.slice(0, 3);
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      component.toggleLineSelection(line);
+    }
 
     component.onRemoveSelectedLines();
 
-    expect(removeLineItemSpy).toHaveBeenCalledWith(1, lines[0].id);
-    expect(removeLineItemSpy).toHaveBeenCalledWith(1, lines[1].id);
+    expect(bulkRemoveLineItemsSpy).toHaveBeenCalledExactlyOnceWith(1, {
+      lineItemIds: lines.map((line) => line.id),
+      expectedQuoteVersion: 7,
+    });
+    expect(removeLineItemSpy).not.toHaveBeenCalled();
     expect(component.selectedLineIds().size).toBe(0);
-    expect(getByIdSpy).toHaveBeenCalledWith(1);
+    expect(getByIdSpy).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it('refreshes and clears the stale selection after a bulk version conflict', () => {
+    selectedQuote.update((quote) => quote && { ...quote, version: 7 });
+    getByIdSpy.mockClear();
+    bulkRemoveLineItemsSpy.mockReturnValue(throwError(() => ({
+      status: 409,
+      error: { message: 'Quote changed; reload before editing', errorCode: 'QUOTE_VERSION_CONFLICT' },
+    })));
+    component.toggleLineSelection(selectedQuote()!.lineItems![0]);
+
+    component.onRemoveSelectedLines();
+
+    expect(getByIdSpy).toHaveBeenCalledExactlyOnceWith(1);
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(component.actionBusy()).toBe(false);
+    expect(component.actionError()).toContain('QUOTE_VERSION_CONFLICT');
   });
 
   it('select-all toggles every current line and clears on reload', () => {

@@ -59,6 +59,20 @@ describe('ShellComponent', () => {
     expect(main).toBeTruthy();
   });
 
+  it('moves focus to the main landmark without navigating on skip-link activation', async () => {
+    await setup(false);
+    const root = fixture.nativeElement as HTMLElement;
+    const link = root.querySelector<HTMLAnchorElement>('a.skip-link')!;
+    const main = root.querySelector<HTMLElement>('main#main-content')!;
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+
+    link.focus();
+    link.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(main);
+  });
+
   it('exposes aria-label on sidenav navigation', async () => {
     await setup(false);
     const el = fixture.nativeElement as HTMLElement;

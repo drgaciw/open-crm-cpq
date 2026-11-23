@@ -21,7 +21,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import {
-  BundleItemCreateRequest,
+  BundleItemDto,
+  BundleItemUpdateRequest,
   ProductBundleDto,
 } from '../product-bundle.model';
 import { ProductBundleService } from '../product-bundle.service';
@@ -29,6 +30,7 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
 
 export interface BundleItemDialogData {
   bundleId: number;
+  item?: BundleItemDto;
 }
 
 /**
@@ -50,7 +52,7 @@ export interface BundleItemDialogData {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h2 mat-dialog-title>Add bundle item</h2>
+    <h2 mat-dialog-title>{{ editing ? 'Edit bundle item' : 'Add bundle item' }}</h2>
     <mat-dialog-content>
       @if (error()) {
         <div class="error-banner" role="alert">
@@ -115,7 +117,7 @@ export interface BundleItemDialogData {
         @if (saving()) {
           <mat-spinner diameter="20" />
         } @else {
-          Add
+          {{ editing ? 'Save' : 'Add' }}
         }
       </button>
     </mat-dialog-actions>
@@ -167,14 +169,15 @@ export class BundleItemDialogComponent {
   );
   private readonly data = inject<BundleItemDialogData>(MAT_DIALOG_DATA);
 
+  readonly editing = this.data.item !== undefined;
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    productId: [null as number | null, [Validators.required, Validators.min(1)]],
-    quantity: [1, [Validators.required, Validators.min(1)]],
-    optional: [false],
-    sortOrder: [0],
+    productId: [{ value: this.data.item?.productId ?? null, disabled: this.editing }, [Validators.required, Validators.min(1)]],
+    quantity: [this.data.item?.quantity ?? 1, [Validators.required, Validators.min(1)]],
+    optional: [this.data.item?.optional ?? false],
+    sortOrder: [this.data.item?.sortOrder ?? 0, Validators.min(0)],
   });
 
   onSubmit(): void {
@@ -190,8 +193,7 @@ export class BundleItemDialogComponent {
       return;
     }
 
-    const request: BundleItemCreateRequest = {
-      productId,
+    const request: BundleItemUpdateRequest = {
       quantity: Number(value.quantity) || 1,
       optional: !!value.optional,
       sortOrder: Number(value.sortOrder) || 0,
@@ -199,7 +201,10 @@ export class BundleItemDialogComponent {
 
     this.error.set(null);
     this.saving.set(true);
-    this.bundleService.addItem(this.data.bundleId, request).subscribe({
+    const save = this.data.item
+      ? this.bundleService.updateItem(this.data.bundleId, this.data.item.id, request)
+      : this.bundleService.addItem(this.data.bundleId, { ...request, productId });
+    save.subscribe({
       next: (bundle) => {
         this.saving.set(false);
         this.dialogRef.close(bundle);
@@ -207,7 +212,7 @@ export class BundleItemDialogComponent {
       error: (err: unknown) => {
         this.saving.set(false);
         this.error.set(
-          bundleHttpErrorMessage(err, 'Failed to add bundle item'),
+          bundleHttpErrorMessage(err, this.editing ? 'Failed to save bundle item' : 'Failed to add bundle item'),
         );
       },
     });

@@ -1,6 +1,7 @@
 package com.opencrm.crm.fields;
 
 import com.opencrm.common.dto.ApiResponse;
+import com.opencrm.common.exception.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Admin field registry. Routes stay under {@code /api/v1/field-definitions/**}.
@@ -32,6 +35,20 @@ import java.util.List;
 public class FieldDefinitionController {
 
     private final FieldRegistryService fieldRegistryService;
+    private final Optional<FixtureAccess> fixtureAccess;
+
+    /** Explicitly wired only by the integration test that installs the fixture schema. */
+    enum FixtureAccess {
+        ENABLED
+    }
+
+    @ModelAttribute
+    void requireFixtureAccess() {
+        if (fixtureAccess.isEmpty()) {
+            throw new BusinessException("The custom field registry is not available yet",
+                    HttpStatus.SERVICE_UNAVAILABLE, "FIELD_REGISTRY_NOT_READY");
+        }
+    }
 
     @GetMapping
     @Operation(summary = "List field definitions for one fixture tenant and entity")

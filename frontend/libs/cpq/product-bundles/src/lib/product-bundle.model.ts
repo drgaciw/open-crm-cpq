@@ -47,3 +47,11 @@ export interface BundleItemCreateRequest {
   optional?: boolean;
   sortOrder?: number;
 }
+
+export type ProductBundleUpdateRequest = Omit<ProductBundleCreateRequest, 'productId'>;
+
+export interface BundleItemUpdateRequest {
+  quantity: number;
+  optional: boolean;
+  sortOrder: number;
+}

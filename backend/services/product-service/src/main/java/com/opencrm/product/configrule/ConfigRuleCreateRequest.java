@@ -34,4 +34,7 @@ public class ConfigRuleCreateRequest {
     private String errorMessage;
 
     private int priority;
+
+    /** Defaults to ACTIVE for existing create clients. */
+    private ConfigRuleStatus status;
 }

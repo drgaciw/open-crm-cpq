@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
-    <title>Quote Proposal</title>
+    <title th:text="${documentTitle}">Quote Proposal</title>
     <style>
         body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 40px 40px 0; }
         .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
@@ -28,7 +28,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>Quote Proposal</h1>
+        <h1 th:text="${documentTitle}">Quote Proposal</h1>
         <div class="quote-number" th:text="${quote.quoteNumber}">Q-20260101-0001</div>
     </div>
 

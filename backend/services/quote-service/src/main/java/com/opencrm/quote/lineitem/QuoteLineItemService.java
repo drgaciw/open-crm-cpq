@@ -5,6 +5,7 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
+import com.opencrm.quote.ramp.RampPricingSnapshot;
 import com.opencrm.quote.ramp.RampScheduleAttacher;
 import com.opencrm.quote.ramp.RampScheduleViews;
 import lombok.RequiredArgsConstructor;
@@ -12,10 +13,13 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -108,6 +112,43 @@ public class QuoteLineItemService {
         rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
         recalculateQuoteTotals(quote);
         log.info("Removed line item {} from quote {}", lineItemId, quote.getQuoteNumber());
+    }
+
+    public void bulkRemoveLineItems(Long quoteId, BulkLineItemRemovalRequest request) {
+        var selectedIds = new HashSet<>(request.lineItemIds());
+        if (selectedIds.size() != request.lineItemIds().size()) {
+            throw new BusinessException("Line item selection contains duplicate IDs", "INVALID_LINE_ITEM_SELECTION");
+        }
+
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
+        // All line writers synchronize on the quote. Take the same lock before selecting or changing lines.
+        entityManager.lock(quote, LockModeType.PESSIMISTIC_WRITE);
+        if (!request.expectedQuoteVersion().equals(quote.getVersion())) {
+            throw new BusinessException("Quote changed; reload before editing", HttpStatus.CONFLICT,
+                    "QUOTE_VERSION_CONFLICT");
+        }
+        if (!canEdit(quote)) {
+            throw new BusinessException("Cannot modify line items in " + quote.getStatus() + " status",
+                    "QUOTE_NOT_EDITABLE");
+        }
+
+        List<QuoteLineItem> currentLines =
+                lineItemRepository.findByQuoteIdAndDeletedFalseOrderBySortOrderAsc(quoteId);
+        List<QuoteLineItem> selectedLines =
+                currentLines.stream().filter(line -> selectedIds.contains(line.getId())).toList();
+        if (selectedLines.size() != selectedIds.size()) {
+            throw new BusinessException("Every selected line must belong to the quote and still be active",
+                    "LINE_ITEM_QUOTE_MISMATCH");
+        }
+
+        String previousAuthoring = RampPricingSnapshot.authoringFingerprint(quote, currentLines);
+        selectedLines.forEach(QuoteLineItem::softDelete);
+        rampScheduleGuard.invalidateOnEdit(quote, previousAuthoring);
+        // Mark the aggregate changed even when deleting zero-priced lines leaves its totals unchanged.
+        quote.setUpdatedAt(Instant.now());
+        recalculateQuoteTotals(quote);
+        log.info("Removed {} line items from quote {}", selectedLines.size(), quote.getQuoteNumber());
     }
 
     public QuoteLineItemDto updateLineItem(Long quoteId, Long lineItemId, LineItemCreateRequest request) {

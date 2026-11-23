@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { NotificationService } from '@frontend/shared-data-access';
 import { Router } from '@angular/router';
 import {
   FormBuilder,
@@ -760,6 +761,7 @@ function httpErrorMessage(
 export class CatalogDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
   private readonly fb = inject(FormBuilder);
   readonly service = inject(ProductService);
   private readonly optionService = inject(ProductOptionService);
@@ -920,6 +922,7 @@ export class CatalogDetailComponent implements OnInit {
         this.service.selectedProduct.set(updated);
         this.saving.set(false);
         this.editing.set(false);
+        this.notification.success('Product updated');
       },
       error: (err: unknown) => {
         this.saving.set(false);
@@ -964,6 +967,7 @@ export class CatalogDetailComponent implements OnInit {
       next: (updated) => {
         this.service.selectedProduct.set(updated);
         this.transitioning.set(false);
+        this.notification.success('Product status updated');
       },
       error: (err: unknown) => {
         this.transitioning.set(false);
@@ -999,6 +1003,7 @@ export class CatalogDetailComponent implements OnInit {
         next: () => {
           this.deleting.set(false);
           this.service.selectedProduct.set(null);
+          this.notification.success('Product deleted');
           void this.router.navigate(['/catalog']);
         },
         error: (err: unknown) => {
@@ -1025,6 +1030,7 @@ export class CatalogDetailComponent implements OnInit {
         return;
       }
       this.optionGroups.update((groups) => [...groups, created]);
+      this.notification.success('Option group created');
       this.optionsError.set(null);
     });
   }
@@ -1050,6 +1056,7 @@ export class CatalogDetailComponent implements OnInit {
         groups.map((g) => (g.id === updated.id ? updated : g)),
       );
       this.optionsError.set(null);
+      this.notification.success('Option added');
     });
   }
 
@@ -1079,6 +1086,7 @@ export class CatalogDetailComponent implements OnInit {
           this.optionGroups.update((groups) =>
             groups.filter((g) => g.id !== group.id),
           );
+          this.notification.success('Option group deleted');
         },
         error: (err: unknown) => {
           this.optionsBusy.set(false);

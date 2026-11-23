@@ -20,6 +20,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { QuoteDto, QuoteUpdateRequest } from '@frontend/shared-models';
 import { QuoteService } from '../quote.service';
 
@@ -302,6 +303,7 @@ export class QuoteHeaderEditComponent {
   ] as const;
   private readonly fb = inject(FormBuilder);
   private readonly quoteService = inject(QuoteService);
+  private readonly snackBar = inject(MatSnackBar);
 
   /** Quote whose header is being edited. */
   readonly quote = input.required<QuoteDto>();
@@ -374,6 +376,7 @@ export class QuoteHeaderEditComponent {
         this.saving.set(false);
         this.editing.set(false);
         this.saved.emit(updated);
+        this.snackBar.open('Quote saved', 'Dismiss', { duration: 3000 });
         this.quoteService.getById(id);
       },
       error: (err) => {

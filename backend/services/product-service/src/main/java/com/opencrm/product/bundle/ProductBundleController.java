@@ -58,6 +58,23 @@ public class ProductBundleController {
         return ApiResponse.success(bundles);
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update bundle details")
+    public ApiResponse<ProductBundleDto> update(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductBundleUpdateRequest request) {
+        return ApiResponse.success(bundleService.update(id, request), "Bundle updated");
+    }
+
+    @PutMapping("/{bundleId}/items/{itemId}")
+    @Operation(summary = "Update an existing bundle item")
+    public ApiResponse<ProductBundleDto> updateItem(
+            @PathVariable Long bundleId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody BundleItemUpdateRequest request) {
+        return ApiResponse.success(bundleService.updateItem(bundleId, itemId, request), "Bundle item updated");
+    }
+
     @PostMapping("/{id}/items")
     @Operation(summary = "Add item to bundle")
     public ApiResponse<ProductBundleDto> addItem(

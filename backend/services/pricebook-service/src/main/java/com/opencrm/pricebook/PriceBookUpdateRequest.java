@@ -29,6 +29,10 @@ public class PriceBookUpdateRequest {
 
     private LocalDate expirationDate;
 
+    /** Explicit clears. Omitting a value keeps the stored field as before. */
+    private Boolean clearRegion;
+    private Boolean clearExpirationDate;
+
     /** DRG-431: the cost book that supplies this price book's costs. */
     private Long costBookId;
 }

@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { NotificationService } from '@frontend/shared-data-access';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -179,6 +180,7 @@ export class CatalogListComponent implements OnInit {
   readonly service = inject(ProductService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly notification = inject(NotificationService);
 
   readonly categories: ProductCategory[] = [
     'SUBSCRIPTION',
@@ -283,6 +285,7 @@ export class CatalogListComponent implements OnInit {
       if (!created?.id) {
         return;
       }
+      this.notification.success('Product created');
       void this.router.navigate(['/catalog', created.id]);
     });
   }

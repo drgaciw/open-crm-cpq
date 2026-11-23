@@ -248,6 +248,21 @@ class ConstraintSolverTest {
     }
 
     @Test
+    void inactiveRulesDoNotSuggestOrExcludeOptions() {
+        ConfigurationSession session = session("10", Map.of());
+        when(ruleClient.getRulesForProduct(10L)).thenReturn(List.of(
+                ProductConfigurationRuleDto.builder().id(1L).ruleType("RECOMMENDS")
+                        .sourceProductId(10L).targetProductId(20L).status("DRAFT").build(),
+                ProductConfigurationRuleDto.builder().id(2L).ruleType("REQUIRES")
+                        .sourceProductId(10L).targetProductId(30L).status("ACTIVE").build(),
+                ProductConfigurationRuleDto.builder().id(3L).ruleType("EXCLUDES")
+                        .sourceProductId(10L).targetProductId(30L).status("RETIRED").build()
+        ));
+
+        assertThat(solver.availableOptionIds(session)).containsExactly(30L);
+    }
+
+    @Test
     @DisplayName("available options is empty with no numeric selection to seed rule lookup")
     void availableOptionIdsEmptyWithoutSelection() {
         ConfigurationSession session = session("PROD-001", Map.of("color", "red"));

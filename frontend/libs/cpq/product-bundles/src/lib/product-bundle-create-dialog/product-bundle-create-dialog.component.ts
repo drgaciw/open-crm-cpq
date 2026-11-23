@@ -11,6 +11,7 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import {
+  MAT_DIALOG_DATA,
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
@@ -21,7 +22,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import {
   DiscountType,
-  ProductBundleCreateRequest,
+  ProductBundleUpdateRequest,
   ProductBundleDto,
 } from '../product-bundle.model';
 import { ProductBundleService } from '../product-bundle.service';
@@ -32,6 +33,10 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
  * Required: productId, name. Optional: description, discountType,
  * discountValue, minItems, maxItems.
  */
+export interface ProductBundleDialogData {
+  bundle?: ProductBundleDto;
+}
+
 @Component({
   selector: 'cpq-product-bundle-create-dialog',
   standalone: true,
@@ -47,7 +52,7 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h2 mat-dialog-title>New Product Bundle</h2>
+    <h2 mat-dialog-title>{{ existing ? 'Edit Product Bundle' : 'New Product Bundle' }}</h2>
     <mat-dialog-content>
       @if (error()) {
         <div class="error-banner" role="alert">
@@ -81,7 +86,7 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
             maxlength="255"
             autocomplete="off"
           />
-          @if (form.get('name')?.hasError('required')) {
+          @if (form.get('name')?.hasError('required') || form.get('name')?.hasError('pattern')) {
             <mat-error>Name is required</mat-error>
           }
           @if (form.get('name')?.hasError('maxlength')) {
@@ -148,7 +153,7 @@ import { bundleHttpErrorMessage } from '../bundle-http-error';
         @if (saving()) {
           <mat-spinner diameter="20" />
         } @else {
-          Create
+          {{ existing ? 'Save' : 'Create' }}
         }
       </button>
     </mat-dialog-actions>
@@ -199,17 +204,19 @@ export class ProductBundleCreateDialogComponent {
     MatDialogRef<ProductBundleCreateDialogComponent, ProductBundleDto>,
   );
 
+  readonly existing = inject<ProductBundleDialogData>(MAT_DIALOG_DATA, { optional: true })?.bundle;
+
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    productId: [null as number | null, [Validators.required, Validators.min(1)]],
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    description: [''],
-    discountType: ['NONE' as DiscountType],
-    discountValue: [null as number | null],
-    minItems: [null as number | null],
-    maxItems: [null as number | null],
+    productId: [{ value: this.existing?.productId ?? null, disabled: !!this.existing }, [Validators.required, Validators.min(1)]],
+    name: [this.existing?.name ?? '', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
+    description: [this.existing?.description ?? ''],
+    discountType: [this.existing?.discountType ?? 'NONE' as DiscountType],
+    discountValue: [this.existing?.discountValue ?? null, Validators.min(0)],
+    minItems: [this.existing?.minItems ?? null, Validators.min(0)],
+    maxItems: [this.existing?.maxItems ?? null, Validators.min(0)],
   });
 
   onSubmit(): void {
@@ -225,42 +232,21 @@ export class ProductBundleCreateDialogComponent {
       return;
     }
 
-    const request: ProductBundleCreateRequest = {
-      productId,
+    const request: ProductBundleUpdateRequest = {
       name: value.name.trim(),
+      discountType: value.discountType,
+      ...(value.description.trim() ? { description: value.description.trim() } : {}),
+      ...(value.discountValue == null ? {} : { discountValue: value.discountValue }),
+      ...(value.minItems == null ? {} : { minItems: value.minItems }),
+      ...(value.maxItems == null ? {} : { maxItems: value.maxItems }),
     };
-
-    const description = value.description?.trim();
-    if (description) {
-      request.description = description;
-    }
-    if (value.discountType && value.discountType !== 'NONE') {
-      request.discountType = value.discountType;
-    } else if (value.discountType === 'NONE') {
-      request.discountType = 'NONE';
-    }
-    if (value.discountValue != null && value.discountValue !== ('' as unknown)) {
-      const dv = Number(value.discountValue);
-      if (Number.isFinite(dv)) {
-        request.discountValue = dv;
-      }
-    }
-    if (value.minItems != null && value.minItems !== ('' as unknown)) {
-      const min = Number(value.minItems);
-      if (Number.isFinite(min)) {
-        request.minItems = min;
-      }
-    }
-    if (value.maxItems != null && value.maxItems !== ('' as unknown)) {
-      const max = Number(value.maxItems);
-      if (Number.isFinite(max)) {
-        request.maxItems = max;
-      }
-    }
 
     this.error.set(null);
     this.saving.set(true);
-    this.bundleService.create(request).subscribe({
+    const save = this.existing
+      ? this.bundleService.update(this.existing.id, request)
+      : this.bundleService.create({ ...request, productId });
+    save.subscribe({
       next: (bundle) => {
         this.saving.set(false);
         this.dialogRef.close(bundle);
@@ -268,7 +254,7 @@ export class ProductBundleCreateDialogComponent {
       error: (err: unknown) => {
         this.saving.set(false);
         this.error.set(
-          bundleHttpErrorMessage(err, 'Failed to create product bundle'),
+          bundleHttpErrorMessage(err, this.existing ? 'Failed to save product bundle' : 'Failed to create product bundle'),
         );
       },
     });

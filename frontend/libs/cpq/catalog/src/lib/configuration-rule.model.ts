@@ -14,6 +14,9 @@ export const CONFIG_RULE_TYPES = [
 
 export type ConfigRuleType = (typeof CONFIG_RULE_TYPES)[number];
 
+export const CONFIG_RULE_STATUSES = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'RETIRED'] as const;
+export type ConfigRuleStatus = (typeof CONFIG_RULE_STATUSES)[number];
+
 export interface ConfigurationRuleDto {
   id: number;
   uuid: string;
@@ -40,4 +43,10 @@ export interface ConfigRuleCreateRequest {
   conditionExpression?: string;
   errorMessage?: string;
   priority?: number;
+  status?: ConfigRuleStatus;
 }
+
+export type ConfigRuleUpdateRequest = Omit<
+  ConfigRuleCreateRequest,
+  'sourceProductId' | 'priority' | 'status'
+> & { priority: number; status: ConfigRuleStatus };
