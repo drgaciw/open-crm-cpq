@@ -378,20 +378,20 @@ describe('DataTableComponent', () => {
       expect(component.componentInstance.isRowSelected(mockData[0])).toBe(true);
       expect(component.componentInstance.isSomeSelected()).toBe(true);
       expect(component.componentInstance.isAllSelected()).toBe(false);
-      expect(emitted.at(-1)).toEqual([mockData[0]]);
+      expect(emitted[emitted.length - 1]).toEqual([mockData[0]]);
 
       // Toggle master -> selects all rows
       component.componentInstance.toggleAllRows();
       component.detectChanges();
       expect(component.componentInstance.isAllSelected()).toBe(true);
       expect(component.componentInstance.isSomeSelected()).toBe(false);
-      expect(emitted.at(-1)).toEqual(mockData);
+      expect(emitted[emitted.length - 1]).toEqual(mockData);
 
       // Toggle master again -> clears selection
       component.componentInstance.toggleAllRows();
       component.detectChanges();
       expect(component.componentInstance.isAllSelected()).toBe(false);
-      expect(emitted.at(-1)).toEqual([]);
+      expect(emitted[emitted.length - 1]).toEqual([]);
 
       // Select one, then replace data -> clears selection and emits []
       component.componentInstance.toggleRow(mockData[1]);
@@ -403,7 +403,7 @@ describe('DataTableComponent', () => {
       ]);
       component.detectChanges();
       expect(component.componentInstance.selection.isEmpty()).toBe(true);
-      expect(emitted.at(-1)).toEqual([]);
+      expect(emitted[emitted.length - 1]).toEqual([]);
     });
 
     it('uses selectionKey when matching rows for selection', () => {

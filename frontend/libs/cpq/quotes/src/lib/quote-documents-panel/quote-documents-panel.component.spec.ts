@@ -107,7 +107,7 @@ describe('QuoteDocumentsPanelComponent', () => {
     ).mock.results
       .map((r) => r.value as HTMLElement | undefined)
       .filter((el): el is HTMLElement => el?.tagName === 'A') as HTMLAnchorElement[];
-    expect(anchors.at(-1)?.download).toBe('quote-5-proposal.pdf');
+    expect(anchors[anchors.length - 1]?.download).toBe('quote-5-proposal.pdf');
   });
 
   it('shows error banner when list fails', () => {
