@@ -1,16 +1,16 @@
 # ADR-038: Standalone account-service, extract vs keep Account in crm-service
 
-**Status:** Proposed on 2026-11-11. Not accepted.
+**Status:** Accepted on 2026-11-23 by drg. Proposed on 2026-11-11.
 **Date:** 2026-11-11
-**Deciders:** Project owner (pending). Acceptance stays with drg.
+**Deciders:** Project owner (drg), accepted 2026-11-23.
 **Backlog:** [DRG-692](https://linear.app/drgamtd-workspace/issue/DRG-692) / [BC-12-19](https://app.notion.com/p/40bf7cb4e4df813fb8dfeabed1a92cb3), **scope item 1 (ADR) only**. Parent epic DRG-285 (BC-12).
 **Relates to:**
-- [ADR-036](ADR-036-account-tenant-ownership.md) (Proposed; crm-service would own the account-to-tenant link)
+- [ADR-036](ADR-036-account-tenant-ownership.md) (Proposed; crm-service owns the account-to-tenant link; Q-06: stands as written)
 - [ADR-008](ADR-008-postgres-schema-per-service.md) (schema per service; authorizes no new schema)
 - [ADR-009](ADR-009-gateway-edge-only.md) (gateway edge-only), [ADR-016](ADR-016-identity-authentication-service-trust.md) (security), [ADR-017](ADR-017-synchronous-inter-service-communication.md) (sync calls), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (events)
 - DRG-481 (BC-12-01), DRG-482 (BC-12-02 hierarchy), DRG-483 (BC-12-03 territory), DRG-484 (BC-12-04 merge), DRG-691 (BC-12-18 FE), DRG-687 (BC-13-08 opportunity-service, the parallel pattern)
 
-**Code stays held.** This ADR authorizes no code, module, schema, migration, gateway route, topic, registry entry, flag or deploy. DRG-692 says "Hold: do not start extract until ADR is decided." DRG-692 scope items 2 to 6 stay held until this ADR is Accepted (or Rejected with a keep-in-crm rationale), and each then needs its own story and PR.
+**No DRG-692 code change under option (a).** This ADR authorizes no code, module, schema, migration, gateway route, topic, registry entry, flag or deploy. DRG-692 says "Hold: do not start extract until ADR is decided." Option (a) keeps Account in crm-service, so there is no extract. Under option (a) there is no DRG-692 code change; the alias implementation scope is withdrawn (Decision, 2:09 PM CT). Any remaining work is docs/product-copy naming only.
 
 ---
 
@@ -29,47 +29,70 @@ What exists on `main` (`ae74f83d0d7489f634da2ac3d6fecb2d99fd38f0`):
 - **Frontend.** `frontend/libs/crm/organizations` (`organization.service.ts`, `organizations.routes.ts`, list, detail and form components).
 - **Consumers.** quote-service stores the account only as `quotes.customer_external_id` (`backend/services/quote-service/src/main/java/com/opencrm/quote/quote/Quote.java:22,41`). CAM assets store `account_id` from `QuoteAcceptedEvent.customerId` (`contract-asset-management/.../asset/Asset.java:40-44`).
 - **Topology.** Ports 8080 to 8090 are assigned ([ARCHITECTURE.md](../ARCHITECTURE.md) §4). There is no `account-service` module. ADR-008 "does not authorize new schemas".
-- **ADR-036.** That ADR (Proposed) puts the account-to-tenant link (`organization_tenant_assignments`, `AccountTenantAssigned`) in crm-service, next to the `organizations` aggregate. Whatever this ADR decides about the Account also decides where ADR-036's link would live.
+- **ADR-036.** That ADR (Proposed) puts the account-to-tenant link (`organization_tenant_assignments`, `AccountTenantAssigned`) in crm-service, next to the `organizations` aggregate. Under (a), that link stays there. Q-06 records that ADR-036 stands as written.
 
 ## Questions to decide (DRG-692 scope item 1)
 
-The options below each come from DRG-692 or from the repo facts above. Each cost is the repo fact behind it. This ADR records no recommendation. CPQ Decision scores the draft, and drg decides.
+The options below each come from DRG-692 or from the repo facts above. Each cost is the repo fact behind it. Q-01 was decided by drg on 2026-11-23. Q-02 to Q-07 are Decision rulings (source: Decision) that drg accepted the same day.
 
 ### Q-01: Extract or keep in crm
 - **(a) Keep in crm-service** and settle naming only (Q-02). Nothing to move. Hierarchy, territory, merge and contact counts stay same-schema.
 - **(b) Extract to `account-service`.** This needs a new module, a new schema (amending ADR-008, as ADR-024 did for `orders`), a new port, a gateway route, and a data migration out of `crm.organizations` and its V8 to V11 and V16 tables.
 
+**Decided (drg, owner, 2026-11-23): (a).** Keep Account in crm-service and settle naming only. This follows Decision's ruling (2026-11-23 1:38 PM CT, confidence 0.85). At 2026-11-23 1:40 PM CT, in Architecture compliance's chat, drg wrote: "Yes, I accept option (a) for ADR-038 Q-01. Record it and open the docs PR, don't merge."
+
 ### Q-02: Public API shape
 - `/api/v1/accounts` as a new path, or an alias of `/api/v1/organizations`, or both during a cutover. The gateway already rewrites CPQ aliases (ARCHITECTURE.md §4, gateway row). Under ADR-009, any alias is routing only.
+
+**Decision FINAL ruling (Decision, 2026-11-23 2:09 PM CT, confidence 0.85; supersedes the 1:41 PM CT alias ruling).** drg delegated Q-02 to Decision, confirmed verbatim by drg at 2:14 PM CT: "Yes, I delegated Q-02 to Decision. Update #1060 with its final ruling and draft the DRG-692 AC rewrite."
+
+Q-02 (final): `/api/v1/organizations` remains the only public path for the account aggregate. No `/api/v1/accounts` path or gateway alias is added under option (a). 'Account' naming is settled in product copy and docs only; DTO fields, routes and the `OrganizationCreated` event are unchanged. A `/api/v1/accounts` path is reconsidered only with a future extraction (option (b)) or a new ADR. Confidence 0.85. Not provisional.
 
 ### Q-03: Contacts
 - Contacts stay in crm-service unless this ADR moves them (DRG-692, "Out of scope (initial)"). If Accounts move and Contacts stay, `Organization.java:102` (contact count from `crm.contacts`) becomes a cross-service read, which ADR-008 rules out within one database.
 
+**Decision ruling (Decision, 2026-11-23 1:39 PM CT, confidence 0.95; accepted by drg 2026-11-23).** Contacts stay in crm-service. Under (a) there is no cross-service read.
+
 ### Q-04: Data ownership, migration, dual-read and cutover
 - DRG-692 requires "no long-lived dual write without an explicit dual-read plan" and "no silent dual-write". An extraction must name one writer at every step and include a cutover runbook (DRG-692 AC).
 
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** Not applicable under (a). crm-service remains the single writer. No migration, no dual-write or dual-read, and no cutover runbook. No alias is added and no rollout note is needed. `/api/v1/organizations` stays the only public path.
+
 ### Q-05: Events
 - Map `OrganizationCreated` to `AccountCreated` (DRG-692, BC-12-05). Under ADR-018, a rename is a new contract or version, not an in-place change. Any dual-emit period needs an end date.
+
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.7, provisional; accepted by drg 2026-11-23).** Keep `OrganizationCreated`. Add no `AccountCreated` here. Any later event would be a new ADR-018 contract with a dated end to dual-emit.
 
 ### Q-06: Relation to ADR-036
 - If (b): ADR-036's tenant link and its events would be owned by account-service, so ADR-036 needs an amendment before either is accepted.
 - If (a): ADR-036 stands as written.
 
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.95; accepted by drg 2026-11-23).** ADR-036 stands as written. This ruling is accepted; it is no longer pending confirmation.
+
 ### Q-07: Security
 - Any new service follows ADR-016 (per-service JWT, `/internal` service tokens). Authorization must match the current Organization policy in `dev` and JWT modes (DRG-692 AC).
+
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** No new service. The alias authorization-test requirement is moot (no new route; the existing Organization policy applies unchanged). `/internal` tokens unchanged.
 
 ## Out of scope
 
 Taken from DRG-692: PartnerAccount (BC-16), tenant and identity admin (BC-19; Account is the customer account, not the login tenant), and moving Lead or Deal out of crm-service. DRG-692 scope items 2 to 6 are covered only as consequences of Q-01.
 
-## Consequences (by option, not decided)
+## Consequences
 
-- **(a) Keep:** no migration. Naming drift (`Organization` in code, `Account` in product language) stays unless Q-02 adds an alias.
-- **(b) Extract:** one more service, schema, port and route. One-time data migration and cutover runbook. Event versioning work under ADR-018. ADR-036 must be amended. Delivery then follows the DRG-692 ACs (Flyway and health in CI, gateway authz parity, BC-12-01 behaviour, FE cutover, Testcontainers ITs).
+Option (a) was chosen on 2026-11-23. Account stays in crm-service. There is no migration. Naming drift stays in DTO fields, routes and `OrganizationCreated`. 'Account' naming is settled in product copy and docs only. `/api/v1/organizations` remains the only public path. No `/api/v1/accounts` path or gateway alias is added under option (a).
+
+The extraction consequences do not apply. There is no new service, schema or port, no data migration, no dual-write or dual-read, and no cutover runbook. crm-service remains the single writer. Contacts stay in crm-service. `OrganizationCreated` stays, and no `AccountCreated` is added here. ADR-036 stands as written. The alias authorization-test requirement is moot (no new route; the existing Organization policy applies unchanged). `/internal` tokens are unchanged.
 
 ## Acceptance
 
-This ADR stays **Proposed**. Acceptance needs drg's explicit decision on Q-01, plus answers to Q-02 to Q-06 for the chosen option. Until then, no DRG-692 implementation PR may open.
+Accepted on 2026-11-23 by drg. Acceptance is satisfied. Q-01 is owner-decided as (a). Q-03 to Q-07 are answered by Decision rulings that drg accepted at 2026-11-23 1:41 PM CT. Q-05 (confidence 0.7) stays provisional. Q-02 is final (Decision, 2026-11-23 2:09 PM CT, confidence 0.85), not provisional, and supersedes the 1:41 PM CT alias ruling. Q-06 is no longer pending: ADR-036 stands as written, and that ruling is accepted.
+
+At 2026-11-23 1:40 PM CT, in Architecture compliance's chat, drg wrote: "Yes, I accept option (a) for ADR-038 Q-01. Record it and open the docs PR, don't merge."
+
+At 2026-11-23 1:41 PM CT, in Decision's chat, directly after Decision's summary of the Q-02 to Q-07 rulings for option (a) (Decision's preceding message ended: "ADR-038 stays Proposed, and the DRG-692 hold stays, until you accept it yourself."), drg wrote: "I accept".
+
+Under option (a) there is no DRG-692 code change; the alias implementation scope is withdrawn (Decision, 2:09 PM CT). Any remaining work is docs/product-copy naming only.
 
 ## References
 
@@ -77,3 +100,4 @@ This ADR stays **Proposed**. Acceptance needs drg's explicit decision on Q-01, p
 - Notion [BC-12-19](https://app.notion.com/p/40bf7cb4e4df813fb8dfeabed1a92cb3) in Open-CRM-CPQ Backlog (Status "Not started"; "Hold: Do not start extraction until the ADR is decided").
 - Notion hub [Project OPEN-CRM-CPQ](https://app.notion.com/p/3e3f7cb4e4df8197abf7d804245c5df4).
 - Repo files cited above at `d3256ae4`; [ADR-036](ADR-036-account-tenant-ownership.md); [ARCHITECTURE.md](../ARCHITECTURE.md) §4.
+- Owner statements, 2026-11-23: Architecture compliance's chat at 1:40 PM CT, and Decision's chat at 1:41 PM CT. Q-02 final ruling is Decision at 2:09 PM CT; drg confirmed the delegation at 2:14 PM CT. Decision ruling times are in the question records above.
