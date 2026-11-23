@@ -14,16 +14,16 @@
   },
   "dependencies": {
     "@alchemy.run/fly": "2.0.0-beta.87",
-    "@effect/platform-node": "4.1.2",
-    "alchemy": "2.0.0-beta.85",
-    "effect": "4.1.2",
-    "rolldown": "1.3.0"
+    "@effect/platform-node": "4.1.4",
+    "alchemy": "2.0.0-beta.87",
+    "effect": "4.1.4",
+    "rolldown": "1.3.3"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "26.6.6",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "typescript": "7.0.2",
-    "typescript-eslint": "8.72.1"
+    "typescript-eslint": "8.73.0"
   }
 }
