@@ -10,7 +10,7 @@
 - [ADR-009](ADR-009-gateway-edge-only.md) (gateway edge-only), [ADR-016](ADR-016-identity-authentication-service-trust.md) (security), [ADR-017](ADR-017-synchronous-inter-service-communication.md) (sync calls), [ADR-018](ADR-018-event-delivery-guarantees-idempotency.md) (events)
 - DRG-481 (BC-12-01), DRG-482 (BC-12-02 hierarchy), DRG-483 (BC-12-03 territory), DRG-484 (BC-12-04 merge), DRG-691 (BC-12-18 FE), DRG-687 (BC-13-08 opportunity-service, the parallel pattern)
 
-**Code stays held until drg merges this docs PR.** This ADR authorizes no code, module, schema, migration, gateway route, topic, registry entry, flag or deploy before that merge. DRG-692 says "Hold: do not start extract until ADR is decided." Option (a) keeps Account in crm-service, so there is no extract. Implementation under DRG-692 is limited to the `/api/v1/accounts` gateway alias plus dev and JWT authorization tests, and may start only after this docs PR is merged by drg.
+**No DRG-692 code change under option (a).** This ADR authorizes no code, module, schema, migration, gateway route, topic, registry entry, flag or deploy. DRG-692 says "Hold: do not start extract until ADR is decided." Option (a) keeps Account in crm-service, so there is no extract. Under option (a) there is no DRG-692 code change; the alias implementation scope is withdrawn (Decision, 2:09 PM CT). Any remaining work is docs/product-copy naming only.
 
 ---
 
@@ -44,7 +44,9 @@ The options below each come from DRG-692 or from the repo facts above. Each cost
 ### Q-02: Public API shape
 - `/api/v1/accounts` as a new path, or an alias of `/api/v1/organizations`, or both during a cutover. The gateway already rewrites CPQ aliases (ARCHITECTURE.md §4, gateway row). Under ADR-009, any alias is routing only.
 
-**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.75, provisional; accepted by drg 2026-11-23).** `/api/v1/organizations` stays canonical. `/api/v1/accounts` is a gateway alias only, for routing under ADR-009. `/organizations` is not deprecated.
+**Decision FINAL ruling (Decision, 2026-11-23 2:09 PM CT, confidence 0.85; supersedes the 1:41 PM CT alias ruling).** drg delegated Q-02 to Decision, confirmed verbatim by drg at 2:14 PM CT: "Yes, I delegated Q-02 to Decision. Update #1060 with its final ruling and draft the DRG-692 AC rewrite."
+
+Q-02 (final): `/api/v1/organizations` remains the only public path for the account aggregate. No `/api/v1/accounts` path or gateway alias is added under option (a). 'Account' naming is settled in product copy and docs only; DTO fields, routes and the `OrganizationCreated` event are unchanged. A `/api/v1/accounts` path is reconsidered only with a future extraction (option (b)) or a new ADR. Confidence 0.85. Not provisional.
 
 ### Q-03: Contacts
 - Contacts stay in crm-service unless this ADR moves them (DRG-692, "Out of scope (initial)"). If Accounts move and Contacts stay, `Organization.java:102` (contact count from `crm.contacts`) becomes a cross-service read, which ADR-008 rules out within one database.
@@ -70,7 +72,7 @@ The options below each come from DRG-692 or from the repo facts above. Each cost
 ### Q-07: Security
 - Any new service follows ADR-016 (per-service JWT, `/internal` service tokens). Authorization must match the current Organization policy in `dev` and JWT modes (DRG-692 AC).
 
-**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** No new service. The alias must enforce the current Organization authorization exactly, in both dev and JWT modes, with tests for each. `/internal` tokens unchanged.
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** No new service. The alias authorization-test requirement is moot (no new route; the existing Organization policy applies unchanged). `/internal` tokens unchanged.
 
 ## Out of scope
 
@@ -78,19 +80,19 @@ Taken from DRG-692: PartnerAccount (BC-16), tenant and identity admin (BC-19; Ac
 
 ## Consequences
 
-Option (a) was chosen on 2026-11-23. Account stays in crm-service. There is no migration. Naming drift (`Organization` in code, `Account` in product language) stays. Q-02 adds a gateway alias and does not deprecate `/organizations`: `/api/v1/organizations` stays canonical, and `/api/v1/accounts` is a gateway alias only.
+Option (a) was chosen on 2026-11-23. Account stays in crm-service. There is no migration. Naming drift stays in DTO fields, routes and `OrganizationCreated`. 'Account' naming is settled in product copy and docs only. `/api/v1/organizations` remains the only public path. No `/api/v1/accounts` path or gateway alias is added under option (a).
 
-The extraction consequences do not apply. There is no new service, schema or port, no data migration, no dual-write or dual-read, and no cutover runbook beyond a note on rolling out the alias. crm-service remains the single writer. Contacts stay in crm-service. `OrganizationCreated` stays, and no `AccountCreated` is added here. ADR-036 stands as written. The alias enforces the current Organization authorization exactly, in both dev and JWT modes, with tests for each. `/internal` tokens are unchanged.
+The extraction consequences do not apply. There is no new service, schema or port, no data migration, no dual-write or dual-read, and no cutover runbook. crm-service remains the single writer. Contacts stay in crm-service. `OrganizationCreated` stays, and no `AccountCreated` is added here. ADR-036 stands as written. The alias authorization-test requirement is moot (no new route; the existing Organization policy applies unchanged). `/internal` tokens are unchanged.
 
 ## Acceptance
 
-Accepted on 2026-11-23 by drg. Acceptance is satisfied. Q-01 is owner-decided as (a). Q-02 to Q-07 are answered by Decision rulings that drg accepted at 2026-11-23 1:41 PM CT. Q-02 (confidence 0.75) and Q-05 (confidence 0.7) stay provisional. Q-06 is no longer pending: ADR-036 stands as written, and that ruling is accepted.
+Accepted on 2026-11-23 by drg. Acceptance is satisfied. Q-01 is owner-decided as (a). Q-03 to Q-07 are answered by Decision rulings that drg accepted at 2026-11-23 1:41 PM CT. Q-05 (confidence 0.7) stays provisional. Q-02 is final (Decision, 2026-11-23 2:09 PM CT, confidence 0.85), not provisional, and supersedes the 1:41 PM CT alias ruling. Q-06 is no longer pending: ADR-036 stands as written, and that ruling is accepted.
 
 At 2026-11-23 1:40 PM CT, in Architecture compliance's chat, drg wrote: "Yes, I accept option (a) for ADR-038 Q-01. Record it and open the docs PR, don't merge."
 
 At 2026-11-23 1:41 PM CT, in Decision's chat, directly after Decision's summary of the Q-02 to Q-07 rulings for option (a) (Decision's preceding message ended: "ADR-038 stays Proposed, and the DRG-692 hold stays, until you accept it yourself."), drg wrote: "I accept".
 
-Implementation under DRG-692 is limited to the `/api/v1/accounts` gateway alias plus dev and JWT authorization tests, and may start only after this docs PR is merged by drg. The DRG-692 code hold remains until that merge.
+Under option (a) there is no DRG-692 code change; the alias implementation scope is withdrawn (Decision, 2:09 PM CT). Any remaining work is docs/product-copy naming only.
 
 ## References
 
@@ -98,4 +100,4 @@ Implementation under DRG-692 is limited to the `/api/v1/accounts` gateway alias 
 - Notion [BC-12-19](https://app.notion.com/p/40bf7cb4e4df813fb8dfeabed1a92cb3) in Open-CRM-CPQ Backlog (Status "Not started"; "Hold: Do not start extraction until the ADR is decided").
 - Notion hub [Project OPEN-CRM-CPQ](https://app.notion.com/p/3e3f7cb4e4df8197abf7d804245c5df4).
 - Repo files cited above at `d3256ae4`; [ADR-036](ADR-036-account-tenant-ownership.md); [ARCHITECTURE.md](../ARCHITECTURE.md) §4.
-- Owner statements, 2026-11-23: Architecture compliance's chat at 1:40 PM CT, and Decision's chat at 1:41 PM CT. Decision ruling times are in the question records above.
+- Owner statements, 2026-11-23: Architecture compliance's chat at 1:40 PM CT, and Decision's chat at 1:41 PM CT. Q-02 final ruling is Decision at 2:09 PM CT; drg confirmed the delegation at 2:14 PM CT. Decision ruling times are in the question records above.
