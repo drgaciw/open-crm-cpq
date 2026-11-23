@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,7 +14,7 @@ import { FormValidators } from '@frontend/shared-utils';
 @Component({
   selector: 'lib-deal-lose-reason-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, ReactiveFormsModule],
+  imports: [TextFieldModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title>Mark Deal as Lost</h2>
@@ -24,7 +25,9 @@ import { FormValidators } from '@frontend/shared-utils';
           <textarea
             matInput
             formControlName="reason"
-            rows="4"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="3"
+            cdkAutosizeMaxRows="8"
             placeholder="Why was this deal lost?"
           ></textarea>
           @if (form.get('reason')?.hasError('required')) {

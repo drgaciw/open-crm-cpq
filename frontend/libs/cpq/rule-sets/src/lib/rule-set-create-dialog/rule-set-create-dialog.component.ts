@@ -9,6 +9,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MatDialogModule,
@@ -37,6 +38,7 @@ const ENGINE_TYPES: RulesEngineType[] = ['DROOLS', 'OPENL'];
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -77,7 +79,9 @@ const ENGINE_TYPES: RulesEngineType[] = ['DROOLS', 'OPENL'];
           <textarea
             matInput
             formControlName="description"
-            rows="3"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="3"
+            cdkAutosizeMaxRows="8"
             maxlength="2000"
           ></textarea>
         </mat-form-field>

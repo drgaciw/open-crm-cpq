@@ -1,10 +1,13 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
 
 describe('LoseReasonDialogComponent (H-CRM-017)', () => {
   let close: ReturnType<typeof vi.fn>;
+  let fixture: ComponentFixture<LoseReasonDialogComponent>;
   let component: LoseReasonDialogComponent;
 
   beforeEach(async () => {
@@ -13,7 +16,9 @@ describe('LoseReasonDialogComponent (H-CRM-017)', () => {
       imports: [LoseReasonDialogComponent],
       providers: [provideNoopAnimations(), { provide: MatDialogRef, useValue: { close } }],
     }).compileComponents();
-    component = TestBed.createComponent(LoseReasonDialogComponent).componentInstance;
+    fixture = TestBed.createComponent(LoseReasonDialogComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
   });
 
   it('rejects a whitespace-only reason', () => {
@@ -28,5 +33,13 @@ describe('LoseReasonDialogComponent (H-CRM-017)', () => {
     component.form.setValue({ reason: '  Went with a competitor  ' });
     component.onSubmit();
     expect(close).toHaveBeenCalledWith('Went with a competitor');
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the reason textarea', () => {
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(8);
   });
 });

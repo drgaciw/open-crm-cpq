@@ -6,7 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OrganizationService } from '../organization.service';
-import { PageHeaderComponent } from '@frontend/shared-ui';
+import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
   selector: 'app-organization-detail',
@@ -18,6 +18,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
     MatIconModule,
     MatProgressSpinnerModule,
     PageHeaderComponent,
+    CopyButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -82,7 +83,12 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
             <div class="info-grid">
               <div class="info-item">
                 <span class="label">Phone</span>
-                <span class="value">{{ org.phone || '—' }}</span>
+                <span class="value value-with-copy">
+                  <span>{{ org.phone || '—' }}</span>
+                  @if (org.phone) {
+                    <app-copy-button [value]="org.phone" label="phone" />
+                  }
+                </span>
               </div>
               <div class="info-item">
                 <span class="label">Territory</span>
@@ -94,7 +100,12 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
               </div>
               <div class="info-item">
                 <span class="label">Website</span>
-                <span class="value">{{ org.website || '—' }}</span>
+                <span class="value value-with-copy">
+                  <span>{{ org.website || '—' }}</span>
+                  @if (org.website) {
+                    <app-copy-button [value]="org.website" label="website" />
+                  }
+                </span>
               </div>
               @if (org.linkedinUrl) {
                 <div class="info-item">

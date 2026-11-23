@@ -1,4 +1,9 @@
+import { SelectionModel } from '@angular/cdk/collections';
+import { Clipboard } from '@angular/cdk/clipboard';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatCheckbox } from '@angular/material/checkbox';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
@@ -6,6 +11,7 @@ import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { NotificationService } from '@frontend/shared-data-access';
 import { QuoteRejectDialogComponent } from '../quote-reject-dialog/quote-reject-dialog.component';
+import { CopyButtonComponent } from '@frontend/shared-ui';
 import { QuotesDetailComponent } from './quotes-detail.component';
 import { QuoteService } from '../quote.service';
 import { MOCK_QUOTES } from '../quotes.mock';
@@ -80,6 +86,8 @@ describe('QuotesDetailComponent', () => {
   let bulkRemoveLineItemsSpy: ReturnType<typeof vi.fn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let notificationSuccessSpy: ReturnType<typeof vi.fn>;
+  let clipboardCopySpy: ReturnType<typeof vi.fn>;
+  let liveAnnouncerSpy: ReturnType<typeof vi.fn>;
 
   const selectedQuote = signal<QuoteDto | null>(null);
   const loading = signal(false);
@@ -188,6 +196,8 @@ describe('QuotesDetailComponent', () => {
       afterClosed: () => of(true),
     }));
     notificationSuccessSpy = vi.fn();
+    clipboardCopySpy = vi.fn(() => true);
+    liveAnnouncerSpy = vi.fn(() => Promise.resolve());
     selectedQuote.set(null);
     loading.set(false);
     error.set(null);
@@ -235,6 +245,8 @@ describe('QuotesDetailComponent', () => {
             dismiss: vi.fn(),
           },
         },
+        { provide: Clipboard, useValue: { copy: clipboardCopySpy } },
+        { provide: LiveAnnouncer, useValue: { announce: liveAnnouncerSpy } },
       ],
     }).compileComponents();
 
@@ -1037,6 +1049,29 @@ describe('QuotesDetailComponent', () => {
     expect(table.querySelectorAll('mat-checkbox').length).toBe(0);
   });
 
+  it('backs line selection with SelectionModel<number> and toggles single rows cleanly', () => {
+    const lines = selectedQuote()!.lineItems!;
+    expect(component.lineSelection).toBeInstanceOf(SelectionModel);
+    expect(component.lineSelection.isMultipleSelection()).toBe(true);
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(component.allLinesSelected()).toBe(false);
+    expect(component.someLinesSelected()).toBe(false);
+
+    component.toggleLineSelection(lines[0]);
+    fixture.detectChanges();
+    expect(component.lineSelection.isSelected(lines[0].id)).toBe(true);
+    expect(component.selectedLineIds().has(lines[0].id)).toBe(true);
+    expect(component.selectedLineIds().size).toBe(1);
+    expect(component.allLinesSelected()).toBe(false);
+    expect(component.someLinesSelected()).toBe(true);
+
+    component.toggleLineSelection(lines[0]);
+    fixture.detectChanges();
+    expect(component.lineSelection.isSelected(lines[0].id)).toBe(false);
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(component.someLinesSelected()).toBe(false);
+  });
+
   it('removes three selected lines with the displayed quote version in one request', () => {
     selectedQuote.update((quote) => {
       const [first, second] = quote!.lineItems!;
@@ -1057,6 +1092,7 @@ describe('QuotesDetailComponent', () => {
     });
     expect(removeLineItemSpy).not.toHaveBeenCalled();
     expect(component.selectedLineIds().size).toBe(0);
+    expect(component.lineSelection.isEmpty()).toBe(true);
     expect(getByIdSpy).toHaveBeenCalledExactlyOnceWith(1);
   });
 
@@ -1073,18 +1109,60 @@ describe('QuotesDetailComponent', () => {
 
     expect(getByIdSpy).toHaveBeenCalledExactlyOnceWith(1);
     expect(component.selectedLineIds().size).toBe(0);
+    expect(component.lineSelection.isEmpty()).toBe(true);
     expect(component.actionBusy()).toBe(false);
     expect(component.actionError()).toContain('QUOTE_VERSION_CONFLICT');
   });
 
-  it('select-all toggles every current line and clears on reload', () => {
+  it('select-all sets checked/indeterminate state, deselects all, and clears on reload', () => {
     const lines = selectedQuote()!.lineItems!;
+    const headerCheckbox = fixture.debugElement.query(By.directive(MatCheckbox))
+      .componentInstance as MatCheckbox;
+
+    // Partial selection -> indeterminate header checkbox
+    component.toggleLineSelection(lines[0]);
+    fixture.detectChanges();
+    expect(component.allLinesSelected()).toBe(false);
+    expect(component.someLinesSelected()).toBe(true);
+    expect(headerCheckbox.checked).toBe(false);
+    expect(headerCheckbox.indeterminate).toBe(true);
+
+    // Select all -> checked, not indeterminate
     component.toggleSelectAllLines();
+    fixture.detectChanges();
     expect(component.selectedLineIds().size).toBe(lines.length);
     expect(component.allLinesSelected()).toBe(true);
+    expect(component.someLinesSelected()).toBe(false);
+    expect(headerCheckbox.checked).toBe(true);
+    expect(headerCheckbox.indeterminate).toBe(false);
 
+    // Toggle select-all again -> deselect all
     component.toggleSelectAllLines();
+    fixture.detectChanges();
     expect(component.selectedLineIds().size).toBe(0);
+    expect(component.lineSelection.isEmpty()).toBe(true);
+    expect(component.allLinesSelected()).toBe(false);
+    expect(component.someLinesSelected()).toBe(false);
+    expect(headerCheckbox.checked).toBe(false);
+    expect(headerCheckbox.indeterminate).toBe(false);
+
+    // Reload via retry() clears selection
+    component.toggleSelectAllLines();
+    expect(component.selectedLineIds().size).toBe(lines.length);
+    component.retry();
+    fixture.detectChanges();
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(component.lineSelection.isEmpty()).toBe(true);
+    expect(component.allLinesSelected()).toBe(false);
+    expect(component.someLinesSelected()).toBe(false);
+
+    // Reload via route id change clears selection
+    component.toggleLineSelection(lines[0]);
+    expect(component.selectedLineIds().size).toBe(1);
+    fixture.componentRef.setInput('id', '2');
+    fixture.detectChanges();
+    expect(component.selectedLineIds().size).toBe(0);
+    expect(component.lineSelection.isEmpty()).toBe(true);
   });
 
   it('does not bulk-remove when lines are not editable or none selected', () => {
@@ -1153,5 +1231,42 @@ describe('QuotesDetailComponent', () => {
     component.onCalculate();
     expect(notificationSuccessSpy).not.toHaveBeenCalled();
     expect(component.actionError()).toBe('boom');
+  });
+
+  // --- Angular Material CDK Phase 1.2: CopyButtonComponent -----------------
+
+  it('renders app-copy-button for quote number and copies it to clipboard on click', () => {
+    const copyBtnDebug = fixture.debugElement.query(By.directive(CopyButtonComponent));
+    expect(copyBtnDebug).toBeTruthy();
+
+    const copyBtnInstance = copyBtnDebug.componentInstance as CopyButtonComponent;
+    expect(copyBtnInstance.value()).toBe('Q-2026-0001');
+    expect(copyBtnInstance.label()).toBe('quote number');
+
+    const nativeButton = (copyBtnDebug.nativeElement as HTMLElement).querySelector(
+      'button',
+    ) as HTMLButtonElement | null;
+    expect(nativeButton).toBeTruthy();
+    expect(nativeButton!.getAttribute('aria-label')).toBe('Copy quote number');
+
+    nativeButton!.click();
+    fixture.detectChanges();
+
+    expect(clipboardCopySpy).toHaveBeenCalledWith('Q-2026-0001');
+    expect(liveAnnouncerSpy).toHaveBeenCalledWith(
+      'Copied quote number to clipboard',
+      'polite',
+    );
+  });
+
+  it('omits app-copy-button when quoteNumber is absent', () => {
+    selectedQuote.set({
+      ...toQuoteDto(MOCK_QUOTES[0]),
+      quoteNumber: undefined,
+    });
+    fixture.detectChanges();
+
+    const copyBtnDebug = fixture.debugElement.query(By.directive(CopyButtonComponent));
+    expect(copyBtnDebug).toBeNull();
   });
 });

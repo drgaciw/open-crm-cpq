@@ -1,24 +1,35 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NotificationService } from './notification.service';
 
 describe('NotificationService', () => {
   let service: NotificationService;
   let snackBarSpy: { open: ReturnType<typeof vi.fn>; dismiss: ReturnType<typeof vi.fn> };
+  let liveAnnouncerSpy: { announce: ReturnType<typeof vi.fn>; clear: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     const spy = { open: vi.fn(), dismiss: vi.fn() };
+    const announcerSpy = {
+      announce: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn()
+    };
 
     TestBed.configureTestingModule({
       providers: [
         NotificationService,
-        { provide: MatSnackBar, useValue: spy }
+        { provide: MatSnackBar, useValue: spy },
+        { provide: LiveAnnouncer, useValue: announcerSpy }
       ]
     });
 
     service = TestBed.inject(NotificationService);
     snackBarSpy = TestBed.inject(MatSnackBar) as { open: ReturnType<typeof vi.fn>; dismiss: ReturnType<typeof vi.fn> };
+    liveAnnouncerSpy = TestBed.inject(LiveAnnouncer) as unknown as {
+      announce: ReturnType<typeof vi.fn>;
+      clear: ReturnType<typeof vi.fn>;
+    };
   });
 
   it('should be created', () => {
@@ -53,6 +64,13 @@ describe('NotificationService', () => {
         })
       );
     });
+
+    it('should announce the message politely via LiveAnnouncer', () => {
+      const message = 'Operation successful';
+      service.success(message);
+
+      expect(liveAnnouncerSpy.announce).toHaveBeenCalledWith(message, 'polite');
+    });
   });
 
   describe('error', () => {
@@ -83,6 +101,13 @@ describe('NotificationService', () => {
         })
       );
     });
+
+    it('should announce the message assertively via LiveAnnouncer', () => {
+      const message = 'An error occurred';
+      service.error(message);
+
+      expect(liveAnnouncerSpy.announce).toHaveBeenCalledWith(message, 'assertive');
+    });
   });
 
   describe('info', () => {
@@ -98,6 +123,13 @@ describe('NotificationService', () => {
           panelClass: ['snackbar-info']
         })
       );
+    });
+
+    it('should announce the message politely via LiveAnnouncer', () => {
+      const message = 'Information message';
+      service.info(message);
+
+      expect(liveAnnouncerSpy.announce).toHaveBeenCalledWith(message, 'polite');
     });
   });
 
@@ -115,12 +147,24 @@ describe('NotificationService', () => {
         })
       );
     });
+
+    it('should announce the message politely via LiveAnnouncer', () => {
+      const message = 'Warning message';
+      service.warning(message);
+
+      expect(liveAnnouncerSpy.announce).toHaveBeenCalledWith(message, 'polite');
+    });
   });
 
   describe('dismiss', () => {
     it('should call snackBar.dismiss', () => {
       service.dismiss();
       expect(snackBarSpy.dismiss).toHaveBeenCalled();
+    });
+
+    it('should not announce via LiveAnnouncer when dismissing', () => {
+      service.dismiss();
+      expect(liveAnnouncerSpy.announce).not.toHaveBeenCalled();
     });
   });
 });
