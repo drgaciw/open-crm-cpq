@@ -6,12 +6,14 @@ import com.opencrm.security.CurrentActor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -231,6 +233,260 @@ class FieldRegistryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test
+    void addOptionAppendsASelectLabelAndRejectsATextField() {
+        FieldDefinitionResponse select = selectField("segment");
+        FieldDefinitionResponse added = service.addOption(FixtureTenants.A, select.getId(), FieldOptionWriteRequest.builder()
+                .label("Blue")
+                .position(2)
+                .build());
+        assertThat(added.getOptions()).extracting(FieldOptionResponse::getLabel).containsExactly("Red", "Blue");
+        assertThat(added.getOptions()).extracting(FieldOptionResponse::getCreatedBy).containsOnly("person-create");
+
+        FieldDefinitionResponse text = service.create(FixtureTenants.A, createRequest());
+        assertThatThrownBy(() -> service.addOption(FixtureTenants.A, text.getId(), FieldOptionWriteRequest.builder()
+                .label("Nope")
+                .position(1)
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_INVALID"));
+        assertThat(store.options).extracting(FieldRows.Option::label).containsExactly("Red", "Blue");
+    }
+
+    @Test
+    void archiveOptionSucceedsAndRejectsAMissingOrStaleOption() {
+        FieldDefinitionResponse select = selectField("segment");
+        long optionId = select.getOptions().get(0).getId();
+
+        assertThatThrownBy(() -> service.archiveOption(FixtureTenants.A, select.getId(), 9_999L,
+                FieldArchiveRequest.builder().version(0L).build()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        assertThatThrownBy(() -> service.archiveOption(FixtureTenants.A, select.getId(), optionId,
+                FieldArchiveRequest.builder().version(4L).build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_VERSION_CONFLICT"));
+        assertThat(service.get(FixtureTenants.A, select.getId()).getOptions().get(0).getArchivedAt()).isNull();
+
+        FieldDefinitionResponse archived = service.archiveOption(FixtureTenants.A, select.getId(), optionId,
+                FieldArchiveRequest.builder().version(0L).build());
+        assertThat(archived.getOptions().get(0).getArchivedAt()).isNotNull();
+        assertThat(archived.getOptions().get(0).getVersion()).isEqualTo(1L);
+        assertThat(archived.getOptions().get(0).getUpdatedBy()).isEqualTo("person-create");
+        assertThat(archived.getOptions().get(0).getLabel()).isEqualTo("Red");
+    }
+
+    @Test
+    void getValueReturnsAStoredHitAndMissesWhenNothingIsStored() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+        assertThatThrownBy(() -> service.getValue(FixtureTenants.A, created.getId(), 9L, null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("west")
+                .build());
+        FieldValueResponse loaded = service.getValue(FixtureTenants.A, created.getId(), 9L, null, null);
+        assertThat(loaded.getText()).isEqualTo("west");
+        assertThat(loaded.getOrganizationId()).isEqualTo(9L);
+        assertThat(loaded.getCreatedBy()).isEqualTo("person-create");
+    }
+
+    @Test
+    void clearValueRemovesAnOptionalValue() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+        service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("west")
+                .build());
+
+        service.clearValue(FixtureTenants.A, created.getId(), 9L, null, null);
+
+        assertThat(store.values).isEmpty();
+        assertThatThrownBy(() -> service.getValue(FixtureTenants.A, created.getId(), 9L, null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void clearValueRejectsARequiredDefinition() {
+        FieldDefinitionResponse created = textOn(FieldEntityKind.ORGANIZATION, "priority", true);
+        service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("high")
+                .build());
+
+        assertThatThrownBy(() -> service.clearValue(FixtureTenants.A, created.getId(), 9L, null, null))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_REQUIRED"));
+        assertThat(service.getValue(FixtureTenants.A, created.getId(), 9L, null, null).getText()).isEqualTo("high");
+    }
+
+    @Test
+    void clearValueMissesWhenNothingIsStored() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+
+        assertThatThrownBy(() -> service.clearValue(FixtureTenants.A, created.getId(), 9L, null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void aServiceOrAgentCallerCannotClearAValue() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+        service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("west")
+                .build());
+        authenticate("enrichment-agent", true);
+
+        assertThatThrownBy(() -> service.clearValue(FixtureTenants.A, created.getId(), 9L, null, null))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(ex.getErrorCode()).isEqualTo("AGENT_FIELD_VALUE_FORBIDDEN");
+                });
+        assertThat(service.getValue(FixtureTenants.A, created.getId(), 9L, null, null).getText()).isEqualTo("west");
+    }
+
+    @Test
+    void upsertValueRejectsStandardFieldsArchivedOptionsAndArchivedDefinitions() {
+        FieldDefinitionResponse name = service.list(FixtureTenants.A, FieldEntityKind.ORGANIZATION).stream()
+                .filter(field -> field.getKey().equals("name"))
+                .findFirst()
+                .orElseThrow();
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, name.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("Acme")
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_STANDARD_LOCKED"));
+
+        FieldDefinitionResponse select = selectField("segment");
+        long optionId = select.getOptions().get(0).getId();
+        service.archiveOption(FixtureTenants.A, select.getId(), optionId,
+                FieldArchiveRequest.builder().version(0L).build());
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, select.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .optionId(optionId)
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_INVALID"));
+
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+        service.archive(FixtureTenants.A, created.getId(), FieldArchiveRequest.builder()
+                .version(created.getVersion())
+                .build());
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .text("west")
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_ARCHIVED"));
+        assertThat(store.values).isEmpty();
+    }
+
+    @Test
+    void aDuplicateFieldKeyOnCreateMapsToFieldKeyExists() {
+        store.failInsertDefinition(constraintViolation("uq_field_definition_tenant_entity_key"));
+
+        assertThatThrownBy(() -> service.create(FixtureTenants.A, createRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_KEY_EXISTS"));
+        assertThat(store.definitions).isEmpty();
+    }
+
+    @Test
+    void anUnknownConstraintOnUpdateIsRethrown() {
+        FieldDefinitionResponse created = service.create(FixtureTenants.A, createRequest());
+        DataIntegrityViolationException failure = constraintViolation("chk_field_unknown");
+        store.failUpdateDefinition(failure);
+
+        assertThatThrownBy(() -> service.update(FixtureTenants.A, created.getId(), FieldDefinitionUpdateRequest.builder()
+                .label("Territory code")
+                .version(created.getVersion())
+                .build()))
+                .isSameAs(failure);
+        assertThat(service.get(FixtureTenants.A, created.getId()).getLabel()).isEqualTo("Region");
+    }
+
+    @Test
+    void aDuplicateOptionLabelOnRenameMapsToFieldOptionExists() {
+        FieldDefinitionResponse select = selectField("segment");
+        long optionId = select.getOptions().get(0).getId();
+        store.failUpdateOption(constraintViolation("uq_field_option_active_label"));
+
+        assertThatThrownBy(() -> service.renameOption(FixtureTenants.A, select.getId(), optionId,
+                FieldOptionWriteRequest.builder().label("Crimson").position(1).version(0L).build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_EXISTS"));
+        assertThat(service.get(FixtureTenants.A, select.getId()).getOptions().get(0).getLabel()).isEqualTo("Red");
+    }
+
+    @Test
+    void valueForeignKeysMapToNotFoundOrAnInvalidOption() {
+        assertUpsertConstraint(FieldEntityKind.ORGANIZATION, "org_note", 11L, null, null, "fk_field_value_organization");
+        assertUpsertConstraint(FieldEntityKind.CONTACT, "contact_note", null, 12L, null, "fk_field_value_contact");
+        assertUpsertConstraint(FieldEntityKind.DEAL, "deal_note", null, null, 13L, "fk_field_value_deal");
+
+        FieldDefinitionResponse select = selectField("segment");
+        long optionId = select.getOptions().get(0).getId();
+        store.failUpsert(constraintViolation("fk_field_value_option"));
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, select.getId(), FieldValueWriteRequest.builder()
+                .organizationId(9L)
+                .optionId(optionId)
+                .build()))
+                .isInstanceOfSatisfying(BusinessException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo("FIELD_OPTION_INVALID"));
+        assertThat(store.values).isEmpty();
+    }
+
+    private void assertUpsertConstraint(FieldEntityKind entity, String key, Long organizationId, Long contactId,
+                                        Long dealId, String constraint) {
+        FieldDefinitionResponse created = textOn(entity, key, false);
+        store.failUpsert(constraintViolation(constraint));
+        assertThatThrownBy(() -> service.upsertValue(FixtureTenants.A, created.getId(), FieldValueWriteRequest.builder()
+                .organizationId(organizationId)
+                .contactId(contactId)
+                .dealId(dealId)
+                .text("west")
+                .build()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Field record");
+    }
+
+    private static DataIntegrityViolationException constraintViolation(String constraint) {
+        return new DataIntegrityViolationException(
+                "could not execute statement",
+                new SQLException("violates constraint \"" + constraint + "\""));
+    }
+
+    private FieldDefinitionResponse selectField(String key) {
+        return service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+                .entity(FieldEntityKind.ORGANIZATION)
+                .key(key)
+                .label("Segment")
+                .type(FieldType.SELECT)
+                .required(false)
+                .showOnRecord(true)
+                .showOnList(true)
+                .position(30)
+                .agentFilled(false)
+                .options(List.of(FieldOptionWriteRequest.builder().label("Red").position(1).build()))
+                .build());
+    }
+
+    private FieldDefinitionResponse textOn(FieldEntityKind entity, String key, boolean required) {
+        return service.create(FixtureTenants.A, FieldDefinitionCreateRequest.builder()
+                .entity(entity)
+                .key(key)
+                .label("Note")
+                .type(FieldType.TEXT)
+                .required(required)
+                .showOnRecord(true)
+                .showOnList(false)
+                .position(40)
+                .agentFilled(false)
+                .build());
+    }
+
     private static FieldDefinitionCreateRequest createRequest() {
         return FieldDefinitionCreateRequest.builder()
                 .entity(FieldEntityKind.ORGANIZATION)
@@ -261,9 +517,31 @@ class FieldRegistryServiceTest {
         private final List<FieldRows.Definition> definitions = new ArrayList<>();
         private final List<FieldRows.Option> options = new ArrayList<>();
         private final List<FieldRows.Value> values = new ArrayList<>();
+        private DataIntegrityViolationException insertDefinitionFailure;
+        private DataIntegrityViolationException updateDefinitionFailure;
+        private DataIntegrityViolationException updateOptionFailure;
+        private DataIntegrityViolationException upsertFailure;
+
+        void failInsertDefinition(DataIntegrityViolationException failure) {
+            this.insertDefinitionFailure = failure;
+        }
+
+        void failUpdateDefinition(DataIntegrityViolationException failure) {
+            this.updateDefinitionFailure = failure;
+        }
+
+        void failUpdateOption(DataIntegrityViolationException failure) {
+            this.updateOptionFailure = failure;
+        }
+
+        void failUpsert(DataIntegrityViolationException failure) {
+            this.upsertFailure = failure;
+        }
 
         @Override
         public FieldRows.Definition insertDefinition(FieldRows.Definition row) {
+            throwIfPending(insertDefinitionFailure);
+            insertDefinitionFailure = null;
             FieldRows.Definition saved = copy(ids.getAndIncrement(), row, 0, null);
             definitions.add(saved);
             return saved;
@@ -298,6 +576,8 @@ class FieldRegistryServiceTest {
 
         @Override
         public boolean updateDefinition(FieldRows.Definition row, String actor, long expectedVersion) {
+            throwIfPending(updateDefinitionFailure);
+            updateDefinitionFailure = null;
             for (int i = 0; i < definitions.size(); i++) {
                 FieldRows.Definition current = definitions.get(i);
                 if (current.id().equals(row.id()) && current.tenant().equals(row.tenant())
@@ -352,6 +632,8 @@ class FieldRegistryServiceTest {
 
         @Override
         public boolean updateOption(FieldRows.Option row, String actor, long expectedVersion) {
+            throwIfPending(updateOptionFailure);
+            updateOptionFailure = null;
             for (int i = 0; i < options.size(); i++) {
                 FieldRows.Option current = options.get(i);
                 if (current.id().equals(row.id()) && current.definitionId() == row.definitionId()
@@ -367,6 +649,17 @@ class FieldRegistryServiceTest {
 
         @Override
         public boolean archiveOption(long definitionId, long optionId, String actor, long expectedVersion) {
+            for (int i = 0; i < options.size(); i++) {
+                FieldRows.Option current = options.get(i);
+                if (current.id() != null && current.id() == optionId && current.definitionId() == definitionId
+                        && current.version() == expectedVersion && current.archivedAt() == null) {
+                    options.set(i, new FieldRows.Option(
+                            current.id(), current.definitionId(), current.label(), current.position(),
+                            Instant.parse("2026-11-06T00:00:00Z"),
+                            current.createdBy(), actor, current.version() + 1));
+                    return true;
+                }
+            }
             return false;
         }
 
@@ -380,7 +673,15 @@ class FieldRegistryServiceTest {
 
         @Override
         public void upsertValue(FieldRows.Value row) {
+            throwIfPending(upsertFailure);
+            upsertFailure = null;
             values.add(row);
+        }
+
+        private static void throwIfPending(DataIntegrityViolationException failure) {
+            if (failure != null) {
+                throw failure;
+            }
         }
 
         @Override
