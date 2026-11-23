@@ -2072,9 +2072,9 @@
   integrity sha512-9TvniWpzU0iy6SYFAcDP+HG+/mNz2yAHSs7+m0DZk86lE+LoTB6J/ZONTPuxXrXWi4tso/DulSHuA0w7nIQtGg==
 
 "@twilio/voice-sdk@^2.10.2":
-  version "2.18.5"
-  resolved "https://registry.yarnpkg.com/@twilio/voice-sdk/-/voice-sdk-2.18.5.tgz#11fe3904e7a984a611d7d074176cc8283a6aa7af"
-  integrity sha512-2/tw1IDAIn7j6yFDOln8p93v3aHIxNIN93JwL98cHIlbkSNeU/Jt9zGM/0TvDpNjo+k88lvAew4jgOjKlc9/KA==
+  version "2.19.0"
+  resolved "https://registry.yarnpkg.com/@twilio/voice-sdk/-/voice-sdk-2.19.0.tgz#dbce404b5652bcf326b7ff58edb86c7c7a8c6c9f"
+  integrity sha512-gXMCMtvu3Yn+MHYyrtLnqsoM82h74uFd1qfBU6AsWoW+fDEqQCI3mp4t2cHU5ORYbW0T0J3r3KIMyP4ecp1WXw==
   dependencies:
     "@twilio/voice-errors" "1.7.0"
     "@types/events" "3.0.3"
