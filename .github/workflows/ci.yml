@@ -276,7 +276,7 @@ jobs:
           distribution: temurin
           overwrite-settings: false
       - name: Cache OWASP dependency-check NVD data
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/m2/org/owasp/dependency-check-data
           key: owasp-dependency-check-data-${{ runner.os }}-${{ hashFiles('backend/pom.xml') }}
