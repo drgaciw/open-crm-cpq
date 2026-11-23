@@ -14,7 +14,7 @@
     <description>Open CRM/CPQ AI Agent Service</description>
 
     <properties>
-        <spring-ai.version>0.8.1</spring-ai.version>
+        <spring-ai.version>2.1.0</spring-ai.version>
     </properties>
 
     <dependencies>
