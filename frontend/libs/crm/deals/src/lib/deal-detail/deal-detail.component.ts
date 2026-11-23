@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, input, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, OnInit, input, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,8 +12,8 @@ import { DealDto, DealStage } from '@frontend/shared-models';
 import { DealService } from '../deal.service';
 import { DealLoseReasonDialogComponent } from '../lose-reason-dialog/lose-reason-dialog.component';
 import { dealActionErrorMessage } from '../deal-action-error';
-import { AgentPanelComponent } from '@frontend/shared-ui';
-import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '../deal-stage';
+import { AgentPanelComponent, StagePathComponent, StagePathItem, StagePathState } from '@frontend/shared-ui';
+import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '../deal-stage';
 
 @Component({
   selector: 'app-deal-detail',
@@ -21,7 +21,7 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
   imports: [
     RouterLink, MatCardModule, MatButtonModule, MatIconModule, MatChipsModule,
     MatProgressSpinnerModule, MatDividerModule, CurrencyPipe, DatePipe,
-    AgentPanelComponent,
+    AgentPanelComponent, StagePathComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -69,6 +69,12 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
           }
         </div>
       </div>
+
+      <app-stage-path
+        class="deal-stage-path"
+        [stages]="stagePathItems()"
+        ariaLabel="Opportunity stage progression"
+      />
 
       <app-agent-panel
         title="Opportunity advisory"
@@ -154,6 +160,7 @@ import { canAdvanceDeal, canCloseDeal, dealStageColor, dealStageLabel } from '..
       color: #c62828;
     }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .deal-stage-path { margin-bottom: var(--crm-space-md); }
     .header-info { flex: 1; display: flex; align-items: center; gap: 12px; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
     .stage-badge { color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
@@ -178,6 +185,39 @@ export class DealDetailComponent implements OnInit {
   readonly service = inject(DealService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+
+  readonly stagePathItems = computed<StagePathItem[]>(() => {
+    const deal = this.service.selectedDeal();
+    if (!deal) {
+      return [];
+    }
+    const currentIndex = DEAL_STAGE_ORDER.indexOf(deal.stage);
+    return DEAL_STAGE_ORDER.map((stage, index): StagePathItem => {
+      let state: StagePathState;
+      if (deal.stage === 'LOST') {
+        state = stage === 'LOST' ? 'danger' : 'upcoming';
+      } else if (deal.stage === 'WON') {
+        if (stage === 'WON') {
+          state = 'active';
+        } else if (stage === 'LOST') {
+          state = 'upcoming';
+        } else {
+          state = 'completed';
+        }
+      } else if (index < currentIndex) {
+        state = 'completed';
+      } else if (index === currentIndex) {
+        state = 'active';
+      } else {
+        state = 'upcoming';
+      }
+      return {
+        id: stage,
+        label: dealStageLabel(stage),
+        state,
+      };
+    });
+  });
 
   id = input.required<string>();
   readonly actionLoading = signal(false);

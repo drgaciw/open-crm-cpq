@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { RuleDialogComponent } from './rule-dialog.component';
@@ -124,5 +126,18 @@ describe('RuleDialogComponent', () => {
     expect(createSpy).toHaveBeenCalled();
     expect(component.error()).toBe('DRL parse error [RULE_DRL_INVALID]');
     expect(dialogClose).not.toHaveBeenCalled();
+  });
+
+  it('applies cdkTextareaAutosize to description and DRL content textareas', async () => {
+    await setup({ ruleSetId: 1 });
+    const textareas = fixture.debugElement.queryAll(By.directive(CdkTextareaAutosize));
+    expect(textareas).toHaveLength(2);
+    const [descAutosize, drlAutosize] = textareas.map((de) =>
+      de.injector.get(CdkTextareaAutosize),
+    );
+    expect(descAutosize.minRows).toBe(2);
+    expect(descAutosize.maxRows).toBe(6);
+    expect(drlAutosize.minRows).toBe(8);
+    expect(drlAutosize.maxRows).toBe(24);
   });
 });

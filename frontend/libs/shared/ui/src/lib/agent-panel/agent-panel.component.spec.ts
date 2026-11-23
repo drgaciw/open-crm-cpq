@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { CdkAccordionItem } from '@angular/cdk/accordion';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { AgentPanelComponent } from './agent-panel.component';
 
@@ -84,5 +86,30 @@ describe('AgentPanelComponent', () => {
     fixture.detectChanges();
     const alert = element.querySelector('[role="alert"]');
     expect(alert?.textContent).toContain('Backend advisory down');
+  });
+
+  it('uses CdkAccordionItem for expand/collapse while preserving aria-controls and initiallyCollapsed', () => {
+    fixture.componentRef.setInput('initiallyCollapsed', true);
+    fixture.detectChanges();
+
+    const accordionDebugEl = fixture.debugElement.query(By.directive(CdkAccordionItem));
+    expect(accordionDebugEl).toBeTruthy();
+
+    const accordionItem = accordionDebugEl.injector.get(CdkAccordionItem);
+    const toggle = element.querySelector('.agent-panel__toggle') as HTMLButtonElement;
+
+    expect(accordionItem.expanded).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.getAttribute('aria-controls')).toBe(fixture.componentInstance.bodyId);
+    expect(element.querySelector('.agent-panel__body')).toBeNull();
+
+    accordionItem.open();
+    fixture.detectChanges();
+
+    expect(accordionItem.expanded).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const body = element.querySelector('.agent-panel__body') as HTMLElement;
+    expect(body).toBeTruthy();
+    expect(body.id).toBe(fixture.componentInstance.bodyId);
   });
 });

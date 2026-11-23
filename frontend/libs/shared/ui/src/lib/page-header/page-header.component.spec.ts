@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PageHeaderComponent } from './page-header.component';
 
@@ -51,6 +51,31 @@ class HostWithSearchComponent {}
   `,
 })
 class HostWithRecordSlotsComponent {}
+
+@Component({
+  standalone: true,
+  imports: [PageHeaderComponent],
+  template: `
+    <app-page-header title="Async Record" subtitle="Loads later">
+      @if (showBreadcrumb()) {
+        <nav breadcrumb aria-label="Breadcrumb">
+          <a href="/deals">Opportunities</a>
+          <span> / </span>
+          <span>Async Record</span>
+        </nav>
+      }
+      @if (showHighlights()) {
+        <div highlights>
+          <span class="hl">ARR $120,000</span>
+        </div>
+      }
+    </app-page-header>
+  `,
+})
+class HostWithDynamicSlotsComponent {
+  showBreadcrumb = signal(false);
+  showHighlights = signal(false);
+}
 
 describe('PageHeaderComponent', () => {
   async function settle(fixture: ComponentFixture<unknown>): Promise<void> {
@@ -138,6 +163,42 @@ describe('PageHeaderComponent', () => {
       const el = listFixture.nativeElement as HTMLElement;
       expect((el.querySelector('.page-header-breadcrumb') as HTMLElement).hidden).toBe(true);
       expect((el.querySelector('.page-header-highlights') as HTMLElement).hidden).toBe(true);
+    });
+  });
+
+  describe('with dynamically projected breadcrumb and highlights', () => {
+    let fixture: ComponentFixture<HostWithDynamicSlotsComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [HostWithDynamicSlotsComponent],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(HostWithDynamicSlotsComponent);
+      await settle(fixture);
+    }, 30000);
+
+    it('reveals [breadcrumb] and [highlights] slots when content is projected after initial render', async () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const crumb = el.querySelector('.page-header-breadcrumb') as HTMLElement;
+      const highlights = el.querySelector('.page-header-highlights') as HTMLElement;
+
+      expect(crumb.hidden).toBe(true);
+      expect(highlights.hidden).toBe(true);
+
+      fixture.componentInstance.showBreadcrumb.set(true);
+      fixture.componentInstance.showHighlights.set(true);
+      await settle(fixture);
+
+      expect(crumb.hidden).toBe(false);
+      expect(crumb.textContent).toContain('Opportunities');
+      expect(highlights.hidden).toBe(false);
+      expect(highlights.textContent).toContain('ARR $120,000');
+      expect(el.querySelector('.page-header--record')).toBeTruthy();
+
+      fixture.componentInstance.showHighlights.set(false);
+      await settle(fixture);
+      expect(highlights.hidden).toBe(true);
     });
   });
 });

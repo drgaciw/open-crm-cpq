@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,7 +10,7 @@ import { FormValidators } from '@frontend/shared-utils';
 @Component({
   selector: 'lib-lose-reason-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, ReactiveFormsModule],
+  imports: [TextFieldModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title>Mark Lead as Lost</h2>
@@ -17,7 +18,7 @@ import { FormValidators } from '@frontend/shared-utils';
       <form [formGroup]="form">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Reason</mat-label>
-          <textarea matInput formControlName="reason" rows="4" placeholder="Why was this lead lost?"></textarea>
+          <textarea matInput formControlName="reason" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="8" placeholder="Why was this lead lost?"></textarea>
           @if (form.get('reason')?.hasError('required')) {
             <mat-error>Reason is required</mat-error>
           }

@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Subject } from 'rxjs';
@@ -148,5 +150,14 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
 
     const payload = contactService.create.mock.calls[0][0];
     expect(payload.organizationId).toBeUndefined();
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the notes textarea', async () => {
+    await setup();
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(10);
   });
 });

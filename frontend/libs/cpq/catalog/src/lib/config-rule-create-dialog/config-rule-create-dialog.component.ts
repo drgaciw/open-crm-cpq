@@ -9,6 +9,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -53,6 +54,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -112,7 +114,9 @@ function httpErrorMessage(err: unknown, fallback: string): string {
           <textarea
             matInput
             formControlName="conditionExpression"
-            rows="3"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="3"
+            cdkAutosizeMaxRows="10"
             placeholder="Stored only — not evaluated in this UI"
           ></textarea>
           <mat-hint>Stored as text; no SpEL evaluation here</mat-hint>
@@ -120,7 +124,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Description (optional)</mat-label>
-          <textarea matInput formControlName="description" rows="2"></textarea>
+          <textarea
+            matInput
+            formControlName="description"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="2"
+            cdkAutosizeMaxRows="6"
+          ></textarea>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
