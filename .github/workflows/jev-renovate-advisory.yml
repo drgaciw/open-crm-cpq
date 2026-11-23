@@ -1,0 +1,59 @@
+# JEV advisory for Renovate pull requests (ADR-015 amendment, "Dependency update advisory").
+#
+# Advisory only: posts or updates one comment per Renovate PR with JEV's recommendation
+# (MERGE_CANDIDATE / HOLD_FOR_REVIEW / ABSTAIN). It never approves, merges, closes, labels, or
+# edits the Dependency Dashboard, and it is not a status check. Majors, owner-decision packages,
+# paths no required gate builds, and red checks are always held regardless of JEV's answer.
+# PRs whose required checks are still running are skipped and picked up by the next run.
+#
+# Inert until configured: with no OPENROUTER_API_KEY / TYPESAFE_API_KEY secret, or no pinned
+# JEV_MODEL repository variable (must not end in "latest"), the job logs a notice and exits 0.
+name: JEV Renovate advisory
+
+on:
+  schedule:
+    - cron: '23 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Evaluate one PR only (blank = all open Renovate PRs)'
+        required: false
+      dry_run:
+        description: 'Print comments instead of posting them'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: jev-renovate-advisory
+  cancel-in-progress: false
+
+jobs:
+  advise:
+    name: JEV Renovate advisory
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.3'
+      - name: Unit tests
+        run: node --test scripts/ci/jev-renovate-advisory.test.mjs
+      - name: Advise on Renovate PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          JEV_MODEL: ${{ vars.JEV_MODEL }}
+          JEV_MIN_CONFIDENCE: ${{ vars.JEV_MIN_CONFIDENCE || '0.7' }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: node scripts/ci/jev-renovate-advisory.mjs
