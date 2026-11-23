@@ -105,8 +105,16 @@ CREATE UNIQUE INDEX uq_field_value_deal
     ON field_value (definition_id, deal_id)
     WHERE deal_id IS NOT NULL;
 
+-- "text" holds up to FieldRules.LONG_TEXT_MAX (20000) characters. A btree on the
+-- raw column exceeds Postgres's index row limit and the insert fails with
+-- SQLSTATE 54000. left("text", 256) keeps that key bounded.
+-- JdbcFieldRegistryStore.textValues filters by definition_id and
+-- "text" IS NOT NULL. It does not equality-match, prefix-match, or sort the
+-- text, so this index is usable for the leading definition_id column and the
+-- store SQL does not reference left(). md5("text") cannot order a list, and
+-- the store never compares text values.
 CREATE INDEX idx_field_value_text
-    ON field_value (definition_id, "text");
+    ON field_value (definition_id, left("text", 256));
 
 CREATE INDEX idx_field_value_numeric
     ON field_value (definition_id, "numeric");

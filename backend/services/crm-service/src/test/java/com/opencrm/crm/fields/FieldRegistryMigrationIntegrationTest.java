@@ -16,6 +16,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -95,6 +97,7 @@ class FieldRegistryMigrationIntegrationTest {
             try (Connection connection = jdbc(database); Statement statement = connection.createStatement()) {
                 assertRegistryCatalog(statement);
                 assertConstraintsRejectBadRows(statement);
+                assertLongIncompressibleTextInserts(connection);
             }
             assertThat(validatedEntityNames(database)).containsAll(REQUIRED_ENTITIES);
         }
@@ -144,7 +147,10 @@ class FieldRegistryMigrationIntegrationTest {
         assertThat(indexes.get("uq_field_value_contact")).contains("UNIQUE").contains("contact_id IS NOT NULL");
         assertThat(indexes.get("uq_field_value_deal")).contains("UNIQUE").contains("deal_id IS NOT NULL");
         assertThat(indexes.get("idx_field_value_numeric")).contains("numeric");
-        assertThat(indexes.get("idx_field_value_text")).contains("text");
+        String textIndex = indexes.get("idx_field_value_text");
+        assertThat(textIndex).containsIgnoringCase("left").contains("256");
+        assertThat(textIndex).doesNotContain("(definition_id, \"text\")");
+        assertThat(textIndex).doesNotContain("(definition_id, text)");
         assertThat(indexes.get("idx_field_value_date")).contains("date");
         assertThat(indexes.get("idx_field_value_bool")).contains("bool");
         assertThat(indexes.get("idx_field_value_option")).contains("option_id");
@@ -209,6 +215,63 @@ class FieldRegistryMigrationIntegrationTest {
                 VALUES (%d, 'no-record')
                 """.formatted(definitionId)))
                 .isInstanceOf(SQLException.class).hasMessageContaining("ck_field_value_one_record");
+    }
+
+    /**
+     * A 20_000-character value is the long-text maximum. Random characters do not
+     * shrink, so a btree on the raw column would fail with SQLSTATE 54000.
+     */
+    private static void assertLongIncompressibleTextInserts(Connection connection) throws SQLException {
+        String text = incompressibleText(20_000);
+        long organizationId;
+        long definitionId;
+        try (Statement statement = connection.createStatement()) {
+            organizationId = insertReturningId(statement, """
+                    INSERT INTO crm.organizations (uuid, name, created_by)
+                    VALUES ('%s', 'Long text', 'test') RETURNING id
+                    """.formatted(UUID.randomUUID()));
+            definitionId = insertReturningId(statement, """
+                    INSERT INTO crm.field_definition (
+                        tenant, entity, "key", label, type, required, show_on_record, show_on_list, position,
+                        agent_filled, created_by, updated_by
+                    ) VALUES (
+                        'tenant-a', 'organization', 'long_note', 'Long note', 'long_text', false, true, false, 2,
+                        false, 'test', 'test'
+                    ) RETURNING id
+                    """);
+        }
+        try (PreparedStatement insert = connection.prepareStatement("""
+                INSERT INTO crm.field_value (definition_id, organization_id, "text", created_by, updated_by)
+                VALUES (?, ?, ?, 'test', 'test') RETURNING length("text")
+                """)) {
+            insert.setLong(1, definitionId);
+            insert.setLong(2, organizationId);
+            insert.setString(3, text);
+            try (ResultSet rows = insert.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getInt(1)).isEqualTo(20_000);
+            }
+        }
+        try (PreparedStatement read = connection.prepareStatement("""
+                SELECT "text" FROM crm.field_value
+                WHERE definition_id = ? AND organization_id = ?
+                """)) {
+            read.setLong(1, definitionId);
+            read.setLong(2, organizationId);
+            try (ResultSet rows = read.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString(1)).isEqualTo(text);
+            }
+        }
+    }
+
+    private static String incompressibleText(int length) {
+        Random random = new Random(length);
+        char[] chars = new char[length];
+        for (int i = 0; i < chars.length; i++) {
+            chars[i] = (char) (0x21 + random.nextInt(0xD7FF - 0x21));
+        }
+        return new String(chars);
     }
 
     private static Set<String> validatedEntityNames(PostgreSQLContainer<?> database) throws ClassNotFoundException {

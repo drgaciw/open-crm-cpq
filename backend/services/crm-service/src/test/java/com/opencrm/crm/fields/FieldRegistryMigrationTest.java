@@ -60,6 +60,8 @@ class FieldRegistryMigrationTest {
         assertThat(sql).contains("CREATE UNIQUE INDEX uq_field_value_contact");
         assertThat(sql).contains("CREATE UNIQUE INDEX uq_field_value_deal");
         assertThat(sql).contains("CREATE INDEX idx_field_value_text");
+        assertThat(sql).contains("left(\"text\", 256)");
+        assertThat(sql).doesNotContain("ON field_value (definition_id, \"text\")");
         assertThat(sql).contains("CREATE INDEX idx_field_value_numeric");
         assertThat(sql).contains("CREATE INDEX idx_field_value_date");
         assertThat(sql).contains("CREATE INDEX idx_field_value_bool");
