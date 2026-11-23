@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@twilio/voice-sdk": "^2.10.2",
+    "@vue/devtools-api": "^8.2.1",
     "@vueuse/core": "^15.0.0",
     "@vueuse/integrations": "^15.0.0",
     "feather-icons": "^4.28.0",
@@ -17,7 +18,7 @@
     "gemoji": "^8.1.0",
     "lodash": "^4.17.21",
     "mime": "^4.0.1",
-    "pinia": "^3.0.0",
+    "pinia": "^4.0.0",
     "socket.io-client": "^4.7.2",
     "sortablejs": "^1.15.0",
     "sval": "^0.6.12",
