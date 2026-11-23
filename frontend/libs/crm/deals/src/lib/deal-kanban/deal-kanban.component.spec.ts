@@ -488,6 +488,10 @@ describe('DealKanbanComponent pipeline wiring', () => {
       expect(listSpy).not.toHaveBeenCalled();
       expect(deals().find((row) => row.id === 2)?.stage).toBe('PROPOSAL');
       expect(component.actionLoading()).toBe(false);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.kanban-board')).toBeTruthy();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')?.textContent).toContain(
+        'OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE',
+      );
       expect(announceSpy).toHaveBeenCalledWith(
         expect.stringContaining('OPPORTUNITY_WON_REQUIRES_ACCEPTED_QUOTE'),
         'assertive',
@@ -499,6 +503,20 @@ describe('DealKanbanComponent pipeline wiring', () => {
 
       component.onDrop(makeDropEvent(target, 'PROSPECTING', 'PROSPECTING'));
       component.onDrop(makeDropEvent(target, 'PROSPECTING', 'PROPOSAL'));
+
+      expect(advanceSpy).not.toHaveBeenCalled();
+      expect(markWonSpy).not.toHaveBeenCalled();
+      expect(markLostSpy).not.toHaveBeenCalled();
+    });
+
+    it('onDrop ignores drop when pointer was released outside container (e.g. over a refused skip column)', () => {
+      const target = deal({ id: 1, name: 'A', stage: 'QUALIFICATION' });
+      const event = {
+        ...makeDropEvent(target, 'QUALIFICATION', 'NEEDS_ANALYSIS'),
+        isPointerOverContainer: false,
+      };
+
+      component.onDrop(event);
 
       expect(advanceSpy).not.toHaveBeenCalled();
       expect(markWonSpy).not.toHaveBeenCalled();

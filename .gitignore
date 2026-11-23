@@ -47,3 +47,6 @@ ci-reports/*.md
 
 infra/jenkins/ai-assist/__pycache__/
 .forge-worktrees/
+# Local Playwright MCP & precommit scan artifacts
+.playwright-mcp/
+/precommit-scan-*.md
