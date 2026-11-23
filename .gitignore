@@ -47,3 +47,4 @@ ci-reports/*.md
 
 infra/jenkins/ai-assist/__pycache__/
 .forge-worktrees/
+lo
