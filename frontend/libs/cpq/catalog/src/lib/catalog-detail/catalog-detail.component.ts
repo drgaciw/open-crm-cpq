@@ -14,6 +14,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -24,6 +25,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import {
   ConfirmDialogComponent,
+  CopyButtonComponent,
   CurrencyFormatPipe,
   EmptyStateComponent,
   PageHeaderComponent,
@@ -81,6 +83,7 @@ function httpErrorMessage(
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    TextFieldModule,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -92,6 +95,7 @@ function httpErrorMessage(
     StatusBadgeComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
+    CopyButtonComponent,
     ConfigRulesPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -198,6 +202,15 @@ function httpErrorMessage(
             @if (!editing()) {
               <div class="info-grid">
                 <div class="info-item">
+                  <span class="label">SKU</span>
+                  <span class="value value-with-copy">
+                    <span>{{ product.sku || '—' }}</span>
+                    @if (product.sku) {
+                      <app-copy-button [value]="product.sku" label="SKU" />
+                    }
+                  </span>
+                </div>
+                <div class="info-item">
                   <span class="label">Status</span>
                   <app-status-badge [status]="product.status" type="product" />
                 </div>
@@ -244,7 +257,9 @@ function httpErrorMessage(
                   <textarea
                     matInput
                     formControlName="description"
-                    rows="3"
+                    cdkTextareaAutosize
+                    cdkAutosizeMinRows="3"
+                    cdkAutosizeMaxRows="8"
                   ></textarea>
                 </mat-form-field>
 

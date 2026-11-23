@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatSnackBar, MatSnackBarConfig } from '@angular/material/snack-bar';
 
 /**
@@ -29,6 +30,7 @@ import { MatSnackBar, MatSnackBarConfig } from '@angular/material/snack-bar';
 })
 export class NotificationService {
   private snackBar = inject(MatSnackBar);
+  private liveAnnouncer = inject(LiveAnnouncer);
 
   private readonly defaultConfig: MatSnackBarConfig = {
     duration: 5000,
@@ -48,6 +50,7 @@ export class NotificationService {
       duration: duration ?? this.defaultConfig.duration,
       panelClass: ['snackbar-success']
     });
+    void this.liveAnnouncer.announce(message, 'polite');
   }
 
   /**
@@ -62,6 +65,7 @@ export class NotificationService {
       duration: duration ?? 7000,
       panelClass: ['snackbar-error']
     });
+    void this.liveAnnouncer.announce(message, 'assertive');
   }
 
   /**
@@ -76,6 +80,7 @@ export class NotificationService {
       duration: duration ?? this.defaultConfig.duration,
       panelClass: ['snackbar-info']
     });
+    void this.liveAnnouncer.announce(message, 'polite');
   }
 
   /**
@@ -90,6 +95,7 @@ export class NotificationService {
       duration: duration ?? 6000,
       panelClass: ['snackbar-warning']
     });
+    void this.liveAnnouncer.announce(message, 'polite');
   }
 
   /**

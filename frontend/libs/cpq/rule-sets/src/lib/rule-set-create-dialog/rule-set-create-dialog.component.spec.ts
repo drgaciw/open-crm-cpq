@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { RuleSetCreateDialogComponent } from './rule-set-create-dialog.component';
@@ -78,5 +80,13 @@ describe('RuleSetCreateDialogComponent', () => {
     expect(
       (fixture.nativeElement as HTMLElement).textContent,
     ).toContain('Duplicate name');
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the description textarea', () => {
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(8);
   });
 });

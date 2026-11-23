@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { CdkTreeModule } from '@angular/cdk/tree';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -36,10 +37,19 @@ interface ItemTableRow {
   sortOrder: number;
 }
 
+export interface BundleTreeNode {
+  id: string;
+  label: string;
+  meta: string;
+  kind: 'bundle' | 'group' | 'option';
+  children?: BundleTreeNode[];
+}
+
 @Component({
   selector: 'cpq-product-bundle-detail',
   standalone: true,
   imports: [
+    CdkTreeModule,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -132,6 +142,68 @@ interface ItemTableRow {
             </div>
           </mat-card-content>
         </mat-card>
+
+        <section class="structure-section" aria-labelledby="structure-heading">
+          <h3 id="structure-heading" class="items-title">Bundle hierarchy</h3>
+          <cdk-tree
+            #bundleTree
+            class="bundle-tree"
+            data-testid="bundle-tree"
+            role="tree"
+            aria-label="Bundle hierarchy"
+            [dataSource]="treeData()"
+            [childrenAccessor]="treeChildrenAccessor"
+            [trackBy]="trackTreeNode"
+          >
+            <cdk-nested-tree-node
+              *cdkTreeNodeDef="let node"
+              class="bundle-tree-node bundle-tree-leaf"
+              role="treeitem"
+              [attr.data-node-kind]="node.kind"
+            >
+              <div class="tree-node-row">
+                <span class="tree-toggle-spacer" aria-hidden="true"></span>
+                <mat-icon class="tree-node-icon" aria-hidden="true">inventory_2</mat-icon>
+                <span class="tree-node-label">{{ node.label }}</span>
+                <span class="tree-node-meta">{{ node.meta }}</span>
+              </div>
+            </cdk-nested-tree-node>
+
+            <cdk-nested-tree-node
+              *cdkTreeNodeDef="let node; when: hasChild"
+              class="bundle-tree-node bundle-tree-branch"
+              role="treeitem"
+              [isExpandable]="true"
+              [attr.data-node-kind]="node.kind"
+            >
+              <div class="tree-node-row">
+                <button
+                  mat-icon-button
+                  type="button"
+                  cdkTreeNodeToggle
+                  class="tree-toggle-btn"
+                  [attr.aria-label]="'Toggle ' + node.label"
+                >
+                  <mat-icon aria-hidden="true">
+                    {{ bundleTree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+                  </mat-icon>
+                </button>
+                <mat-icon class="tree-node-icon" aria-hidden="true">
+                  {{ node.kind === 'bundle' ? 'category' : 'folder_open' }}
+                </mat-icon>
+                <span class="tree-node-label">{{ node.label }}</span>
+                <span class="tree-node-meta">{{ node.meta }}</span>
+              </div>
+              <div
+                class="tree-node-children"
+                role="group"
+                [class.tree-node-collapsed]="!bundleTree.isExpanded(node)"
+              >
+                <ng-container cdkTreeNodeOutlet></ng-container>
+              </div>
+            </cdk-nested-tree-node>
+          </cdk-tree>
+        </section>
 
         <section class="items-section" aria-labelledby="items-heading">
           <div class="items-header">
@@ -319,6 +391,81 @@ interface ItemTableRow {
         text-align: right;
       }
 
+      .structure-section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--crm-space-sm);
+      }
+
+      .bundle-tree {
+        display: block;
+        border: 1px solid var(--crm-color-line);
+        border-radius: var(--crm-radius-sm);
+        background: var(--crm-color-surface);
+        padding: var(--crm-space-sm);
+      }
+
+      .bundle-tree-node {
+        display: block;
+      }
+
+      .tree-node-row {
+        display: flex;
+        align-items: center;
+        gap: var(--crm-space-sm);
+        min-height: 36px;
+        padding: var(--crm-space-xs) var(--crm-space-sm);
+        border-radius: var(--crm-radius-sm);
+        color: var(--crm-color-ink);
+      }
+
+      .tree-node-row:hover {
+        background: var(--crm-color-canvas);
+      }
+
+      .tree-toggle-btn {
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        padding: 0;
+        color: var(--crm-color-brand);
+      }
+
+      .tree-toggle-spacer {
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+      }
+
+      .tree-node-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+        color: var(--crm-color-muted);
+      }
+
+      .tree-node-label {
+        font-weight: 500;
+        font-size: 0.875rem;
+        color: var(--crm-color-ink);
+      }
+
+      .tree-node-meta {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--crm-color-muted);
+      }
+
+      .tree-node-children {
+        padding-left: var(--crm-space-lg);
+        border-left: 1px solid var(--crm-color-line);
+        margin-left: 14px;
+      }
+
+      .tree-node-collapsed {
+        display: none;
+      }
+
       @media (max-width: 768px) {
         .detail-body {
           padding: 0 16px 24px;
@@ -369,6 +516,68 @@ export class ProductBundleDetailComponent implements OnInit {
       .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
       .map((item) => this.toItemRow(item)),
   );
+
+  readonly treeChildrenAccessor = (node: BundleTreeNode): BundleTreeNode[] =>
+    node.children ?? [];
+
+  readonly hasChild = (_index: number, node: BundleTreeNode): boolean =>
+    (node.children?.length ?? 0) > 0;
+
+  readonly trackTreeNode = (_index: number, node: BundleTreeNode): string =>
+    node.id;
+
+  readonly treeData = computed<BundleTreeNode[]>(() => {
+    const bundle = this.bundle();
+    if (!bundle) {
+      return [];
+    }
+    const items = [...(bundle.items ?? [])].sort(
+      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    );
+    const requiredItems = items.filter((item) => !item.optional);
+    const optionalItems = items.filter((item) => item.optional);
+    const groups: BundleTreeNode[] = [];
+
+    if (requiredItems.length > 0) {
+      groups.push({
+        id: `bundle-${bundle.id}-group-required`,
+        label: 'Required options',
+        meta: `${requiredItems.length} ${requiredItems.length === 1 ? 'item' : 'items'}`,
+        kind: 'group',
+        children: requiredItems.map((item) => ({
+          id: `bundle-${bundle.id}-item-${item.id}`,
+          label: `Product #${item.productId}`,
+          meta: `Qty ${item.quantity} · Sort ${item.sortOrder ?? 0}`,
+          kind: 'option',
+        })),
+      });
+    }
+
+    if (optionalItems.length > 0) {
+      groups.push({
+        id: `bundle-${bundle.id}-group-optional`,
+        label: 'Optional options',
+        meta: `${optionalItems.length} ${optionalItems.length === 1 ? 'item' : 'items'}`,
+        kind: 'group',
+        children: optionalItems.map((item) => ({
+          id: `bundle-${bundle.id}-item-${item.id}`,
+          label: `Product #${item.productId}`,
+          meta: `Qty ${item.quantity} · Sort ${item.sortOrder ?? 0}`,
+          kind: 'option',
+        })),
+      });
+    }
+
+    return [
+      {
+        id: `bundle-${bundle.id}`,
+        label: bundle.name,
+        meta: `Product #${bundle.productId} · ${items.length} ${items.length === 1 ? 'option' : 'options'}`,
+        kind: 'bundle',
+        children: groups,
+      },
+    ];
+  });
 
   ngOnInit(): void {
     const numericId = Number(this.id());

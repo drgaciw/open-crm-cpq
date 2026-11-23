@@ -1,12 +1,38 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { BehaviorSubject } from 'rxjs';
 import {
+  DataTableCellDefDirective,
   DataTableComponent,
   TableColumn,
   TableRowAction,
   RowActionEvent,
 } from './data-table.component';
 import { PaginationMeta } from '@frontend/shared-models';
+
+@Component({
+  standalone: true,
+  imports: [DataTableComponent, DataTableCellDefDirective],
+  template: `
+    <app-data-table [columns]="columns" [data]="rows">
+      <ng-template appDataTableCell="name" let-row let-value="value">
+        <span class="custom-name-cell" [attr.data-id]="row.id">Custom: {{ value }}</span>
+      </ng-template>
+    </app-data-table>
+  `,
+})
+class CustomCellHostComponent {
+  columns: TableColumn[] = [
+    { key: 'id', header: 'ID', type: 'number' },
+    { key: 'name', header: 'Name', type: 'text' },
+  ];
+  rows = [
+    { id: 1, name: 'Alpha' },
+    { id: 2, name: 'Beta' },
+  ];
+}
 
 describe('DataTableComponent', () => {
   let component: ComponentFixture<DataTableComponent>;
@@ -313,5 +339,160 @@ describe('DataTableComponent', () => {
     expect(component.componentInstance.visibleRowActions(mockData[1]).map((a) => a.action)).toEqual([
       'edit',
     ]);
+  });
+
+  describe('CDK enhancements (additive)', () => {
+    it('renders custom cell templates registered via [appDataTableCell]', async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [CustomCellHostComponent, NoopAnimationsModule],
+      }).compileComponents();
+
+      const hostFixture = TestBed.createComponent(CustomCellHostComponent);
+      hostFixture.detectChanges();
+
+      const customCells = Array.from(
+        hostFixture.nativeElement.querySelectorAll('.custom-name-cell'),
+      ) as HTMLElement[];
+      expect(customCells.map((el) => el.textContent?.trim())).toEqual([
+        'Custom: Alpha',
+        'Custom: Beta',
+      ]);
+      expect(customCells[0].getAttribute('data-id')).toBe('1');
+    });
+
+    it('supports opt-in row selection with master toggle, indeterminate state, and reset on data change', () => {
+      component.componentRef.setInput('columns', mockColumns);
+      component.componentRef.setInput('data', mockData);
+      component.componentRef.setInput('selectable', true);
+      component.detectChanges();
+
+      expect(component.componentInstance.displayedColumns()[0]).toBe('__select');
+
+      const emitted: unknown[][] = [];
+      component.componentInstance.selectionChange.subscribe((rows) => emitted.push(rows));
+
+      // Select single row -> indeterminate master checkbox
+      component.componentInstance.toggleRow(mockData[0]);
+      component.detectChanges();
+      expect(component.componentInstance.isRowSelected(mockData[0])).toBe(true);
+      expect(component.componentInstance.isSomeSelected()).toBe(true);
+      expect(component.componentInstance.isAllSelected()).toBe(false);
+      expect(emitted.at(-1)).toEqual([mockData[0]]);
+
+      // Toggle master -> selects all rows
+      component.componentInstance.toggleAllRows();
+      component.detectChanges();
+      expect(component.componentInstance.isAllSelected()).toBe(true);
+      expect(component.componentInstance.isSomeSelected()).toBe(false);
+      expect(emitted.at(-1)).toEqual(mockData);
+
+      // Toggle master again -> clears selection
+      component.componentInstance.toggleAllRows();
+      component.detectChanges();
+      expect(component.componentInstance.isAllSelected()).toBe(false);
+      expect(emitted.at(-1)).toEqual([]);
+
+      // Select one, then replace data -> clears selection and emits []
+      component.componentInstance.toggleRow(mockData[1]);
+      component.detectChanges();
+      expect(component.componentInstance.selection.selected).toEqual([mockData[1]]);
+
+      component.componentRef.setInput('data', [
+        { id: 3, name: 'Item 3', amount: 300, date: new Date('2024-01-03') },
+      ]);
+      component.detectChanges();
+      expect(component.componentInstance.selection.isEmpty()).toBe(true);
+      expect(emitted.at(-1)).toEqual([]);
+    });
+
+    it('uses selectionKey when matching rows for selection', () => {
+      const keyedRows = [
+        { code: 'A1', name: 'First' },
+        { code: 'B2', name: 'Second' },
+      ];
+      component.componentRef.setInput('columns', [
+        { key: 'code', header: 'Code' },
+        { key: 'name', header: 'Name' },
+      ]);
+      component.componentRef.setInput('data', keyedRows);
+      component.componentRef.setInput('selectable', true);
+      component.componentRef.setInput('selectionKey', 'code');
+      component.detectChanges();
+
+      component.componentInstance.toggleRow(keyedRows[0]);
+      expect(component.componentInstance.isRowSelected({ code: 'A1', name: 'First' })).toBe(true);
+      expect(component.componentInstance.isRowSelected({ code: 'B2', name: 'Second' })).toBe(false);
+    });
+
+    it('hides columns with hideBelow when BreakpointObserver reports a narrow viewport', async () => {
+      const breakpointSubject = new BehaviorSubject<BreakpointState>({
+        matches: false,
+        breakpoints: {
+          '(max-width: 639.98px)': false,
+          '(max-width: 959.98px)': false,
+          '(max-width: 1279.98px)': false,
+        },
+      });
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [DataTableComponent, NoopAnimationsModule],
+        providers: [
+          {
+            provide: BreakpointObserver,
+            useValue: {
+              observe: vi.fn().mockReturnValue(breakpointSubject.asObservable()),
+            },
+          },
+        ],
+      }).compileComponents();
+
+      const responsiveFixture = TestBed.createComponent(DataTableComponent);
+      const responsiveColumns: TableColumn[] = [
+        { key: 'name', header: 'Name' },
+        { key: 'amount', header: 'Amount', hideBelow: 'sm' },
+        { key: 'date', header: 'Date', hideBelow: 'md' },
+        { key: 'owner', header: 'Owner', hideBelow: 'lg' },
+      ];
+      responsiveFixture.componentRef.setInput('columns', responsiveColumns);
+      responsiveFixture.componentRef.setInput('data', [
+        { id: 1, name: 'Acme', amount: 100, date: '2026-01-01', owner: 'Alice' },
+      ]);
+      responsiveFixture.detectChanges();
+
+      expect(responsiveFixture.componentInstance.displayedColumns()).toEqual([
+        'name',
+        'amount',
+        'date',
+        'owner',
+      ]);
+
+      // Medium tablet viewport (< 960px, also < 1280px)
+      breakpointSubject.next({
+        matches: true,
+        breakpoints: {
+          '(max-width: 639.98px)': false,
+          '(max-width: 959.98px)': true,
+          '(max-width: 1279.98px)': true,
+        },
+      });
+      responsiveFixture.detectChanges();
+
+      expect(responsiveFixture.componentInstance.displayedColumns()).toEqual(['name', 'amount']);
+
+      // Mobile viewport (< 640px)
+      breakpointSubject.next({
+        matches: true,
+        breakpoints: {
+          '(max-width: 639.98px)': true,
+          '(max-width: 959.98px)': true,
+          '(max-width: 1279.98px)': true,
+        },
+      });
+      responsiveFixture.detectChanges();
+
+      expect(responsiveFixture.componentInstance.displayedColumns()).toEqual(['name']);
+    });
   });
 });

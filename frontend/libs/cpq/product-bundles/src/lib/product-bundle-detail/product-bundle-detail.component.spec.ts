@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTree, CdkTreeNodeToggle } from '@angular/cdk/tree';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
@@ -197,5 +199,58 @@ describe('ProductBundleDetailComponent', () => {
 
     expect(deleteSpy).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  describe('CdkTree bundle hierarchy (Phase 5.3)', () => {
+    it('renders CdkTree with role=tree and Bundle -> Option Groups -> Options hierarchy', () => {
+      selectedBundle.set({
+        ...selected,
+        items: [
+          { id: 101, productId: 20, quantity: 1, optional: false, sortOrder: 0 },
+          { id: 102, productId: 21, quantity: 2, optional: true, sortOrder: 1 },
+        ],
+      });
+      fixture.detectChanges();
+
+      const treeDe = fixture.debugElement.query(By.directive(CdkTree));
+      expect(treeDe).toBeTruthy();
+
+      const host = fixture.nativeElement as HTMLElement;
+      const treeEl = host.querySelector('[data-testid="bundle-tree"]');
+      expect(treeEl?.getAttribute('role')).toBe('tree');
+
+      const treeItems = host.querySelectorAll('[role="treeitem"]');
+      expect(treeItems.length).toBeGreaterThanOrEqual(1);
+
+      const data = component.treeData();
+      expect(data).toHaveLength(1);
+      expect(data[0].kind).toBe('bundle');
+      expect(data[0].label).toBe('Starter Pack');
+      expect(data[0].children?.map((g) => g.label)).toEqual([
+        'Required options',
+        'Optional options',
+      ]);
+      expect(data[0].children?.[0].children?.[0].label).toBe('Product #20');
+      expect(data[0].children?.[1].children?.[0].label).toBe('Product #21');
+    });
+
+    it('expands and collapses branch nodes using cdkTreeNodeToggle', () => {
+      fixture.detectChanges();
+
+      const toggleDe = fixture.debugElement.query(By.directive(CdkTreeNodeToggle));
+      expect(toggleDe).toBeTruthy();
+
+      const tree = fixture.debugElement.query(By.directive(CdkTree)).componentInstance as CdkTree<unknown>;
+      const rootNode = component.treeData()[0];
+
+      expect(tree.isExpanded(rootNode)).toBe(false);
+      (toggleDe.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(tree.isExpanded(rootNode)).toBe(true);
+
+      (toggleDe.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(tree.isExpanded(rootNode)).toBe(false);
+    });
   });
 });

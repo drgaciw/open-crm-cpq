@@ -2,6 +2,8 @@ import { CATALOG_PRODUCT_TYPE_LABELS, PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LA
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
@@ -19,7 +21,7 @@ import {
   ProductUpdateRequest,
   SpringPageResponse,
 } from '@frontend/shared-models';
-import { ConfirmDialogComponent } from '@frontend/shared-ui';
+import { ConfirmDialogComponent, CopyButtonComponent } from '@frontend/shared-ui';
 import { OptionGroupCreateDialogComponent } from '../option-group-create-dialog/option-group-create-dialog.component';
 import { OptionCreateDialogComponent } from '../option-create-dialog/option-create-dialog.component';
 import { RetireProductDialogComponent } from '../retire-product-dialog/retire-product-dialog.component';
@@ -765,5 +767,26 @@ describe('CatalogDetailComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Invalid attribute value [ATTR_VALUE_INVALID]',
     );
+  });
+
+  it('applies cdkTextareaAutosize with min/max rows to the edit description textarea', () => {
+    component.startEdit();
+    fixture.detectChanges();
+    const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
+    expect(textareaDe).toBeTruthy();
+    const autosize = textareaDe.injector.get(CdkTextareaAutosize);
+    expect(autosize.minRows).toBe(3);
+    expect(autosize.maxRows).toBe(8);
+  });
+
+  it('wires CopyButtonComponent for product SKU (DoD P1.2)', () => {
+    const copyButtons = fixture.debugElement.queryAll(
+      By.directive(CopyButtonComponent),
+    );
+    expect(copyButtons.length).toBeGreaterThanOrEqual(1);
+    const skuBtn = copyButtons
+      .map((de) => de.componentInstance as CopyButtonComponent)
+      .find((btn) => btn.label() === 'SKU');
+    expect(skuBtn?.value()).toBe(MOCK_CATALOG_PRODUCTS[0].sku);
   });
 });
