@@ -56,7 +56,7 @@ Q-02 (final): `/api/v1/organizations` remains the only public path for the accou
 ### Q-04: Data ownership, migration, dual-read and cutover
 - DRG-692 requires "no long-lived dual write without an explicit dual-read plan" and "no silent dual-write". An extraction must name one writer at every step and include a cutover runbook (DRG-692 AC).
 
-**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** Not applicable under (a). crm-service remains the single writer. No migration, no dual-write or dual-read, and no cutover runbook beyond a note on rolling out the alias.
+**Decision ruling (Decision, 2026-11-23 1:41 PM CT, confidence 0.9; accepted by drg 2026-11-23).** Not applicable under (a). crm-service remains the single writer. No migration, no dual-write or dual-read, and no cutover runbook. No alias is added and no rollout note is needed. `/api/v1/organizations` stays the only public path.
 
 ### Q-05: Events
 - Map `OrganizationCreated` to `AccountCreated` (DRG-692, BC-12-05). Under ADR-018, a rename is a new contract or version, not an in-place change. Any dual-emit period needs an end date.
