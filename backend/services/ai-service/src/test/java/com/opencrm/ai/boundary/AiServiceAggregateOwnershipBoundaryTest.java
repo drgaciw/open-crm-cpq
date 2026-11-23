@@ -1,6 +1,8 @@
 package com.opencrm.ai.boundary;
 
 import com.opencrm.ai.audit.entity.AiAuditLog;
+import com.opencrm.ai.experiment.entity.RuleExperiment;
+import com.opencrm.ai.experiment.entity.RuleExperimentVariant;
 import jakarta.persistence.Table;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,21 +27,33 @@ class AiServiceAggregateOwnershipBoundaryTest {
     assertNotNull(table);
     assertEquals("agent_audit_log", table.name());
     assertEquals("ai", table.schema());
+
+    Table experimentTable = RuleExperiment.class.getAnnotation(Table.class);
+    assertNotNull(experimentTable);
+    assertEquals("rule_experiment", experimentTable.name());
+    assertEquals("ai", experimentTable.schema());
+
+    Table variantTable = RuleExperimentVariant.class.getAnnotation(Table.class);
+    assertNotNull(variantTable);
+    assertEquals("rule_experiment_variant", variantTable.name());
+    assertEquals("ai", variantTable.schema());
   }
 
   @Test
-  void mainSourcesDeclareOnlyAiAuditLogEntity() throws IOException {
+  void mainSourcesDeclareOnlyAiOwnedEntities() throws IOException {
     Path aiSources = Path.of("src/main/java/com/opencrm/ai");
-    List<Path> entitySources;
+    Set<String> entityFileNames;
     try (Stream<Path> paths = Files.walk(aiSources)) {
-      entitySources = paths
+      entityFileNames = paths
           .filter(path -> path.toString().endsWith(".java"))
           .filter(this::declaresEntity)
-          .toList();
+          .map(path -> path.getFileName().toString())
+          .collect(Collectors.toSet());
     }
 
-    assertEquals(1, entitySources.size());
-    assertTrue(entitySources.get(0).toString().replace('\\', '/').endsWith("AiAuditLog.java"));
+    assertEquals(
+        Set.of("AiAuditLog.java", "RuleExperiment.java", "RuleExperimentVariant.java"),
+        entityFileNames);
   }
 
   @Test

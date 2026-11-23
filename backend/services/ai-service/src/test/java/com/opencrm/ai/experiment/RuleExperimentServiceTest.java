@@ -8,7 +8,9 @@ import com.opencrm.ai.experiment.repository.RuleExperimentRepository;
 import com.opencrm.ai.experiment.repository.RuleExperimentVariantRepository;
 import com.opencrm.ai.registry.CpqAgentToolClients;
 import com.opencrm.ai.registry.CpqToolResponse;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.security.test.TestCallers;
+import com.opencrm.security.test.TestTokens;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,7 +57,8 @@ class RuleExperimentServiceTest {
                 experimentRepository,
                 variantRepository,
                 toolClients,
-                new ChallengerVariantGenerator());
+                new ChallengerVariantGenerator(),
+                new CurrentActor("service:ai-service", false));
 
         lenient().when(experimentRepository.save(any(RuleExperiment.class))).thenAnswer(inv -> {
             RuleExperiment exp = inv.getArgument(0);
@@ -138,7 +141,7 @@ class RuleExperimentServiceTest {
 
         TestCallers.clear();
         ResponseStatusException forbidden = assertThrows(ResponseStatusException.class,
-                () -> service.applyWinningVariant(experimentId, new ApplyExperimentRequest("nobody")));
+                () -> service.applyWinningVariant(experimentId, new ApplyExperimentRequest()));
         assertEquals(403, forbidden.getStatusCode().value());
     }
 
@@ -167,11 +170,11 @@ class RuleExperimentServiceTest {
 
         TestCallers.signInUser("desk", "DealDesk");
         ExperimentResponse applied = service.applyWinningVariant(
-                experimentId, new ApplyExperimentRequest("desk@example.com"));
+                experimentId, new ApplyExperimentRequest());
 
         assertEquals(RuleExperimentStatus.APPLIED, applied.status());
         assertEquals(777L, applied.appliedDraftRuleId());
-        assertEquals("desk@example.com", applied.appliedBy());
+        assertEquals(TestTokens.oidOf("desk"), applied.appliedBy());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
@@ -198,10 +201,11 @@ class RuleExperimentServiceTest {
 
         TestCallers.signInUser("admin", "Admin");
         ExperimentResponse applied = service.applyWinningVariant(
-                experimentId, new ApplyExperimentRequest("admin@example.com"));
+                experimentId, new ApplyExperimentRequest());
 
         assertEquals(RuleExperimentStatus.APPLIED, applied.status());
         assertEquals(null, applied.appliedDraftRuleId());
+        assertEquals(TestTokens.oidOf("admin"), applied.appliedBy());
         verify(toolClients, never()).createDraftRule(anyMap());
     }
 

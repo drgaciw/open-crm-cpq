@@ -61,11 +61,12 @@ public class RuleExperimentController {
     @PostMapping("/{experimentId}/apply")
     public ResponseEntity<ExperimentResponse> apply(
             @PathVariable UUID experimentId,
-            @Valid @RequestBody ApplyExperimentRequest request) {
+            @RequestBody(required = false) ApplyExperimentRequest request) {
         if (!enabled) {
             return disabled();
         }
-        return ResponseEntity.ok(experimentService.applyWinningVariant(experimentId, request));
+        return ResponseEntity.ok(experimentService.applyWinningVariant(
+                experimentId, request == null ? new ApplyExperimentRequest() : request));
     }
 
     @GetMapping

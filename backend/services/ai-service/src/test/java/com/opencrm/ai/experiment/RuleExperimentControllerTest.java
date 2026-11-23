@@ -32,7 +32,7 @@ class RuleExperimentControllerTest {
         RuleExperimentController controller = new RuleExperimentController(service, false);
 
         ResponseEntity<ExperimentResponse> response = controller.apply(
-                UUID.randomUUID(), new ApplyExperimentRequest("desk@example.com"));
+                UUID.randomUUID(), new ApplyExperimentRequest());
 
         assertEquals(503, response.getStatusCode().value());
         verify(service, never()).applyWinningVariant(

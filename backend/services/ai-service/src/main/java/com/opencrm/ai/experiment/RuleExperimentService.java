@@ -7,6 +7,7 @@ import com.opencrm.ai.experiment.repository.RuleExperimentRepository;
 import com.opencrm.ai.experiment.repository.RuleExperimentVariantRepository;
 import com.opencrm.ai.registry.CpqAgentToolClients;
 import com.opencrm.ai.registry.CpqToolResponse;
+import com.opencrm.security.CurrentActor;
 import com.opencrm.security.SecurityUtils;
 import com.opencrm.security.UserContext;
 import org.slf4j.Logger;
@@ -39,16 +40,19 @@ public class RuleExperimentService {
     private final RuleExperimentVariantRepository variantRepository;
     private final CpqAgentToolClients toolClients;
     private final ChallengerVariantGenerator challengerVariantGenerator;
+    private final CurrentActor currentActor;
 
     public RuleExperimentService(
             RuleExperimentRepository experimentRepository,
             RuleExperimentVariantRepository variantRepository,
             CpqAgentToolClients toolClients,
-            ChallengerVariantGenerator challengerVariantGenerator) {
+            ChallengerVariantGenerator challengerVariantGenerator,
+            CurrentActor currentActor) {
         this.experimentRepository = experimentRepository;
         this.variantRepository = variantRepository;
         this.toolClients = toolClients;
         this.challengerVariantGenerator = challengerVariantGenerator;
+        this.currentActor = currentActor;
     }
 
     @Transactional
@@ -76,7 +80,7 @@ public class RuleExperimentService {
         experiment.setStatus(RuleExperimentStatus.CREATED);
         experiment.setControlTrafficPct(
                 request.controlTrafficPct() == null ? 0.20 : request.controlTrafficPct());
-        experiment.setCreatedBy(currentUserLabel());
+        experiment.setCreatedBy(currentActor.id());
         experiment = experimentRepository.save(experiment);
 
         List<RuleExperimentVariant> variants = new ArrayList<>();
@@ -237,10 +241,11 @@ public class RuleExperimentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Winning variant not found"));
 
+        String actor = currentActor.id();
         if (winner.isControlVariant()) {
             experiment.setStatus(RuleExperimentStatus.APPLIED);
             experiment.setAppliedAt(Instant.now());
-            experiment.setAppliedBy(request.approvedBy());
+            experiment.setAppliedBy(actor);
             experiment.setConclusion((experiment.getConclusion() == null ? "" : experiment.getConclusion() + " ")
                     + "Control won — no draft created.");
             experimentRepository.save(experiment);
@@ -274,14 +279,14 @@ public class RuleExperimentService {
 
         experiment.setAppliedDraftRuleId(draftId);
         experiment.setAppliedAt(Instant.now());
-        experiment.setAppliedBy(request.approvedBy());
+        experiment.setAppliedBy(actor);
         experiment.setStatus(RuleExperimentStatus.APPLIED);
         experiment.setConclusion((experiment.getConclusion() == null ? "" : experiment.getConclusion() + " ")
                 + "Draft rule id=" + draftId
                 + (validated.success() ? " validated" : " validation: " + validated.message()));
         experimentRepository.save(experiment);
 
-        log.info("Applied experiment {} as draft rule {} by {}", experimentId, draftId, request.approvedBy());
+        log.info("Applied experiment {} as draft rule {} by {}", experimentId, draftId, actor);
         return ExperimentResponse.from(experiment, variantsOf(experimentId));
     }
 
@@ -359,12 +364,6 @@ public class RuleExperimentService {
                 + variant.getConversionRateImpact() * 0.3
                 + variant.getCustomerSatisfaction() * 0.2
                 - Math.min(variant.getAverageExecutionMs(), 1000) / 1000.0 * 0.1;
-    }
-
-    private static String currentUserLabel() {
-        return SecurityUtils.getCurrentUser()
-                .map(u -> u.getEmail() != null ? u.getEmail() : u.getUserId())
-                .orElse("anonymous");
     }
 
     private static String textOrEmpty(JsonNode node, String field) {
