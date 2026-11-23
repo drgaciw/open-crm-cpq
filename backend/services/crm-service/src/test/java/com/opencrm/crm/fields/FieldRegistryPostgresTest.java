@@ -427,6 +427,108 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void addedOptionCanBeArchivedAndTheValueReadThenCleared() throws Exception {
+        authenticatePerson("person-create");
+        String key = freshKey("p_");
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"entity\":\"ORGANIZATION\",\"key\":\"" + key
+                                + "\",\"label\":\"Priority\",\"type\":\"SELECT\",\"required\":false,"
+                                + "\"showOnRecord\":true,\"showOnList\":true,\"position\":41,\"agentFilled\":false,"
+                                + "\"options\":[{\"label\":\"Red\",\"position\":1}]}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String created = createdResult.getResponse().getContentAsString();
+        long definitionId = idOf(created);
+        primaryDefinitionIds.add(definitionId);
+        long redOptionId = optionId(created, "Red");
+        primaryOptionIds.add(redOptionId);
+
+        MvcResult added = mockMvc.perform(post("/api/v1/field-definitions/" + definitionId + "/options")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"label\":\"Green\",\"position\":2}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.options[?(@.label=='Green')].createdBy").value("person-create"))
+                .andReturn();
+        long greenOptionId = optionId(added.getResponse().getContentAsString(), "Green");
+        primaryOptionIds.add(greenOptionId);
+
+        MvcResult valueResult = putOwnedValue(definitionId,
+                "{\"organizationId\":" + organizationId + ",\"optionId\":" + greenOptionId + "}");
+        long valueId = idOf(valueResult.getResponse().getContentAsString());
+
+        mockMvc.perform(get("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .param("organizationId", organizationId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value((int) valueId))
+                .andExpect(jsonPath("$.data.optionId").value((int) greenOptionId))
+                .andExpect(jsonPath("$.data.organizationId").value(organizationId.intValue()));
+        mockMvc.perform(get("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .param("contactId", contactId.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("FIELD_RECORD_MISMATCH"));
+
+        mockMvc.perform(post("/api/v1/field-definitions/" + definitionId + "/options/" + greenOptionId + "/archive")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.options[?(@.label=='Green')].archivedAt").exists());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT option_id FROM crm.field_value WHERE id = ?", Long.class, valueId))
+                .isEqualTo(greenOptionId);
+
+        authenticateService();
+        mockMvc.perform(delete("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .param("organizationId", organizationId.toString()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("AGENT_FIELD_VALUE_FORBIDDEN"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crm.field_value WHERE id = ?", Integer.class, valueId)).isEqualTo(1);
+
+        authenticatePerson("person-create");
+        mockMvc.perform(delete("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .param("organizationId", organizationId.toString()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/field-definitions/" + definitionId + "/values")
+                        .param("tenant", FixtureTenants.A)
+                        .param("organizationId", organizationId.toString()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crm.field_value WHERE id = ?", Integer.class, valueId)).isZero();
+    }
+
+    @Test
+    void optionsCannotBeAddedToATextField() throws Exception {
+        authenticatePerson("person-create");
+        MvcResult createdResult = mockMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(textField(freshKey("t_"), "Note")))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long definitionId = idOf(createdResult.getResponse().getContentAsString());
+        primaryDefinitionIds.add(definitionId);
+
+        mockMvc.perform(post("/api/v1/field-definitions/" + definitionId + "/options")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"label\":\"Nope\",\"position\":1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("FIELD_OPTION_INVALID"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crm.field_option WHERE definition_id = ?", Integer.class, definitionId))
+                .isZero();
+    }
+
     private void insertFreshSentinel() {
         sentinelKey = freshKey("s_");
         sentinelOrganizationId = insertOrganization("Sentinel " + sentinelKey);
