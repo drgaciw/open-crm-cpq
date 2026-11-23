@@ -8,6 +8,10 @@
   ],
   "minimumReleaseAge": "3 days",
   "prConcurrentLimit": 5,
+  "ignoreDeps": [
+    "com.opencrm:open-crm-backend",
+    "com.cpq:agentic-cpq-platform"
+  ],
   "packageRules": [
     {
       "description": "Major updates open only when ticked on the Dependency Dashboard.",
