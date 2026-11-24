@@ -51,7 +51,10 @@ class AssetReadJwtFilterTest {
                         .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
                 if ("app".equals(token)) builder.claim("idtyp", "app").claim("azp", "client");
                 else if ("blank".equals(token)) builder.claim("scp", " ");
-                else if (!"ambiguous".equals(token)) builder.claim("scp", "access_as_user");
+                else if (!"ambiguous".equals(token)) {
+                    builder.claim("scp", "access_as_user")
+                            .claim("tid", "11111111-1111-4111-8111-111111111111");
+                }
                 return builder.build();
             };
         }
