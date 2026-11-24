@@ -802,7 +802,7 @@ public class QuoteService {
                     BigDecimal.ZERO, governing.getDiscountPercent().divide(BigDecimal.valueOf(100)), quote.getCurrency(),
                     fingerprint, governing.getGoverningPeriod(), quote.getApprovalTier(),
                     "Ramp period " + governing.getGoverningPeriod() + ": " + String.join(", ", governing.getReasons()));
-            rampScheduleGuard.publishBinding(event);
+            rampScheduleGuard.publishBinding(quote, event);
         } else if (previouslyRequired) {
             QuoteLineItem line = lines.stream().filter(RampScheduleViews::hasSteps).findFirst().orElse(lines.getFirst());
             com.opencrm.common.event.dto.DiscountApprovalRequiredEvent retired = new com.opencrm.common.event.dto.DiscountApprovalRequiredEvent(
@@ -810,7 +810,7 @@ public class QuoteService {
                     quote.getCurrency(), fingerprint, 1,
                     "DEAL_DESK", "Ramp policy cleared; previous approval snapshot retired");
             retired.setApprovalRequired(false);
-            rampScheduleGuard.publishBinding(retired);
+            rampScheduleGuard.publishBinding(quote, retired);
         }
     }
 

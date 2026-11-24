@@ -157,12 +157,33 @@ class RampApprovalBindingKafkaIntegrationTest {
         assertThat(one(quoteId, ApprovalStatus.PENDING).getPricingFingerprint()).isEqualTo("1".repeat(64));
     }
 
+    @Test
+    void bindingWithoutTenantIsStoredButRefusedToEveryTenantCaller() throws Exception {
+        String quoteId = "ramp-it-" + UUID.randomUUID();
+        // A binding from a quote created before quote.tenant_id existed, or from a pre-H4 producer still in the outbox.
+        send(quoteId, binding(quoteId, "L-1", "2".repeat(64), 1, true, null), UUID.randomUUID().toString());
+        await(quoteId, ApprovalStatus.PENDING, 1);
+        ApprovalRequest pending = one(quoteId, ApprovalStatus.PENDING);
+        assertThat(pending.getTenantId()).isNull();
+        mvc.perform(post("/api/v1/approvals/{id}/approve", pending.getId())
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-any", "SalesVP").bearer()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.errorCode").value("CROSS_TENANT"));
+        assertThat(one(quoteId, ApprovalStatus.PENDING).getId()).isEqualTo(pending.getId());
+    }
+
+    /** A binding from the quote's tenant: quote-service stamps {@code Quote.tenantId}, the tid of the test tokens. */
     private static String binding(String quoteId, String lineId, String fingerprint, int period, boolean required) {
+        return binding(quoteId, lineId, fingerprint, period, required, TestTokens.TENANT);
+    }
+
+    private static String binding(String quoteId, String lineId, String fingerprint, int period, boolean required,
+                                  String tenantId) {
+        String tenant = tenantId == null ? "" : ",\"tenantId\":\"" + tenantId + "\"";
         return """
                 {"quoteId":"%s","lineId":"%s","marginDelta":0,"requestedDiscount":0.32,"currencyCode":"USD",
                  "pricingFingerprint":"%s","governingPeriod":%d,"approvalTier":"SALES_VP",
-                 "reason":"Ramp period %d: RAMP_DISCOUNT_THRESHOLD","approvalRequired":%s}
-                """.formatted(quoteId, lineId, fingerprint, period, period, required);
+                 "reason":"Ramp period %d: RAMP_DISCOUNT_THRESHOLD","approvalRequired":%s%s}
+                """.formatted(quoteId, lineId, fingerprint, period, period, required, tenant);
     }
 
     private List<ApprovalRequest> all(String quoteId) {

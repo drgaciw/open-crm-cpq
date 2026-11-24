@@ -87,6 +87,40 @@ class DiscountApprovalRampBindingTest {
                 .isInstanceOf(NonRetryableEventException.class).hasMessageContaining("requires a pricing fingerprint");
         verifyNoInteractions(repository);
     }
+    @Test void newRequestTakesTheTenantTheBindingCarries() throws Exception {
+        when(inbox.claim(any(), any())).thenReturn(true);
+        when(repository.findByQuoteIdAndStatus("1", ApprovalStatus.PENDING)).thenReturn(List.of());
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        DiscountApprovalRequiredEvent event = event("a".repeat(64), true);
+        event.setTenantId("tenant-a");
+        consumer.handleDiscountApprovalRequired(record(event));
+        var capture = org.mockito.ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(repository).save(capture.capture());
+        assertThat(capture.getValue().getTenantId()).isEqualTo("tenant-a");
+        assertThat(capture.getValue().getAccountId()).isNull();
+    }
+    @Test void bindingWithoutTenantIsStoredButNoTenantCallerCanDecideIt() throws Exception {
+        when(inbox.claim(any(), any())).thenReturn(true);
+        when(repository.findByQuoteIdAndStatus("1", ApprovalStatus.PENDING)).thenReturn(List.of());
+        when(repository.save(any())).thenAnswer(call -> { ApprovalRequest request = call.getArgument(0);
+            if (request.getId() == null) request.setId(300L); return request; });
+        consumer.handleDiscountApprovalRequired(record(event("a".repeat(64), true)));
+        var capture = org.mockito.ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(repository).save(capture.capture());
+        ApprovalRequest stored = capture.getValue();
+        assertThat(stored.getTenantId()).isNull();
+        stored.setApprovalTier("SALES_VP");
+        when(repository.findById(300L)).thenReturn(Optional.of(stored));
+        com.opencrm.security.test.TestCallers.signInUserInTenant("reviewer", "tenant-a", null, "SalesVP");
+        ApprovalService routing = new ApprovalService(repository, mock(OutboxEventPublisher.class),
+                mock(ApprovalRequestMapper.class), new CurrentActor("service:approval-routing", false));
+        try {
+            assertThatThrownBy(() -> routing.approve(300L)).isInstanceOf(BusinessException.class)
+                    .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("CROSS_TENANT");
+        } finally {
+            com.opencrm.security.test.TestCallers.clear();
+        }
+    }
     private ApprovalRequest open(String fingerprint) {
         ApprovalRequest request = ApprovalRequest.builder().quoteId("1").lineId("10").approvalType(ApprovalType.DISCOUNT)
                 .status(ApprovalStatus.PENDING).pricingFingerprint(fingerprint).governingPeriod(1)

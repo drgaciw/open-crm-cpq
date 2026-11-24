@@ -36,11 +36,15 @@ public class RampScheduleGuard {
                 String.valueOf(quote.getId()), lines.isEmpty() ? null : String.valueOf(lines.getFirst().getId()),
                 java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO, quote.getCurrency(),
                 RampPricingSnapshot.fingerprint(quote, lines), 1, "DEAL_DESK", "Ramp snapshot invalidated by commercial edit", false);
-        publishBinding(retired);
+        publishBinding(quote, retired);
     }
 
-    /** The one quote-owned producer for pending bindings and their retirement (ADR-018 D9). */
-    public void publishBinding(com.opencrm.common.event.dto.DiscountApprovalRequiredEvent event) {
+    /**
+     * The one quote-owned producer for pending bindings and their retirement (ADR-018 D9). It stamps the quote's
+     * tenant on every binding (Security H4): approval-routing refuses decisions on a request without one.
+     */
+    public void publishBinding(Quote quote, com.opencrm.common.event.dto.DiscountApprovalRequiredEvent event) {
+        event.setTenantId(quote.getTenantId());
         outboxEventPublisher.publish("Quote", event.getQuoteId(),
                 com.opencrm.common.event.EventContractRegistry.RAMP_APPROVAL_BINDING_CHANGED_V1, event);
     }
