@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { Observable, Subject, finalize, takeUntil } from 'rxjs';
 import { PaginationMeta, SpringPageResponse } from '@frontend/shared-models';
 import {
   ProductBundleDto,
@@ -20,11 +20,13 @@ import { bundleHttpErrorMessage } from './bundle-http-error';
 export class ProductBundleService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/product-bundles';
+  private readonly listSuperseded = new Subject<void>();
 
   readonly bundles = signal<ProductBundleDto[]>([]);
   readonly selectedBundle = signal<ProductBundleDto | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly detailReadFailure = signal<{ id: number; status: number; message: string } | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -37,8 +39,7 @@ export class ProductBundleService {
   );
 
   list(page = 0, size = 20, sort = 'name,asc'): void {
-    this.error.set(null);
-    this.loading.set(true);
+    this.beginListRead();
     const params = new HttpParams()
       .set('page', page)
       .set('size', size)
@@ -46,7 +47,7 @@ export class ProductBundleService {
 
     this.http
       .get<SpringPageResponse<ProductBundleDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.bundles.set(p.content ?? (p as unknown as ProductBundleDto[]));
@@ -71,11 +72,10 @@ export class ProductBundleService {
    * Optional product filter via GET /product/{productId} (non-paginated list).
    */
   listByProductId(productId: number): void {
-    this.error.set(null);
-    this.loading.set(true);
+    this.beginListRead();
     this.http
       .get<ProductBundleDto[]>(`${this.basePath}/product/${productId}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (rows) => {
           const list = Array.isArray(rows) ? rows : [];
@@ -95,7 +95,15 @@ export class ProductBundleService {
       });
   }
 
+  private beginListRead(): void {
+    // Finalize the superseded page read before marking the current request as loading.
+    this.listSuperseded.next();
+    this.error.set(null);
+    this.loading.set(true);
+  }
+
   getById(id: number): void {
+    this.detailReadFailure.set(null);
     this.error.set(null);
     this.loading.set(true);
     this.http
@@ -104,9 +112,9 @@ export class ProductBundleService {
       .subscribe({
         next: (bundle) => this.selectedBundle.set(bundle),
         error: (err) => {
-          this.error.set(
-            bundleHttpErrorMessage(err, 'An error occurred'),
-          );
+          const message = bundleHttpErrorMessage(err, 'An error occurred');
+          this.detailReadFailure.set({ id, status: err instanceof HttpErrorResponse ? err.status : 0, message });
+          this.error.set(message);
         },
       });
   }

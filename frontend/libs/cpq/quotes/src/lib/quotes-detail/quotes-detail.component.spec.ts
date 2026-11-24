@@ -8,7 +8,7 @@ import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { NotificationService } from '@frontend/shared-data-access';
 import { QuoteRejectDialogComponent } from '../quote-reject-dialog/quote-reject-dialog.component';
 import { CopyButtonComponent } from '@frontend/shared-ui';
@@ -92,8 +92,10 @@ describe('QuotesDetailComponent', () => {
   const selectedQuote = signal<QuoteDto | null>(null);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const missingQuoteId = signal<number | null>(null);
 
   beforeEach(async () => {
+    missingQuoteId.set(null);
     getByIdSpy = vi.fn((id: number) => {
       const match = MOCK_QUOTES.find((q) => q.id === id);
       selectedQuote.set(match ? toQuoteDto(match) : null);
@@ -206,6 +208,7 @@ describe('QuotesDetailComponent', () => {
       selectedQuote,
       loading,
       error,
+      missingQuoteId,
       getById: getByIdSpy,
       calculate: calculateSpy,
       submit: submitSpy,
@@ -278,6 +281,37 @@ describe('QuotesDetailComponent', () => {
     expect(getByIdSpy).toHaveBeenCalledWith(1);
   });
 
+  it('acknowledges the current advisory without submitting and dismisses it locally', () => {
+    component.tierSuggestion.set({
+      status: 'READY',
+      suggestion: {
+        value: 'SALES_VP',
+        confidence: 0.85,
+        probabilities: { SALES_VP: 0.85 },
+        rubricVersion: 'uat',
+        model: 'Fixture',
+        advisory: true,
+        computedAt: '2026-11-23T18:00:00Z',
+      },
+    });
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const panel = host.querySelector('app-agent-panel');
+    const button = (name: string) => Array.from(panel?.querySelectorAll('button') ?? [])
+      .find(item => item.textContent?.trim() === name);
+    const notification = TestBed.inject(NotificationService);
+    expect(button('Acknowledge')).toBeTruthy();
+    button('Acknowledge')?.click();
+    expect.soft(notification.info).toHaveBeenCalledWith('Advisory acknowledged (not a decision)');
+    expect.soft(component.tierSuggestion()?.status).toBe('READY');
+    expect.soft(submitSpy).not.toHaveBeenCalled();
+    expect(button('Dismiss')).toBeTruthy();
+    button('Dismiss')?.click();
+    fixture.detectChanges();
+    expect(component.tierSuggestion()).toBeNull();
+    expect(host.querySelector('app-agent-panel [aria-label="Evidence"]')).toBeNull();
+  });
+
   it('lists line items from quote.lineItems', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('prod-0');
@@ -285,12 +319,13 @@ describe('QuotesDetailComponent', () => {
     expect(compiled.textContent).toContain('prod-1');
   });
 
-  it('shows loading spinner while QuoteService.loading', () => {
+  it('names the loading progressbar while QuoteService.loading', () => {
     selectedQuote.set(null);
     loading.set(true);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('mat-spinner')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('mat-spinner[role="progressbar"]')
+      ?.getAttribute('aria-label')).toBe('Loading quote details');
   });
 
   it('shows error banner and retry calls getById again', () => {
@@ -314,6 +349,21 @@ describe('QuotesDetailComponent', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Quote not found');
+  });
+
+  it('shows the dedicated missing quote and Back control after a native detail 404', () => {
+    selectedQuote.set(null);
+    loading.set(false);
+    error.set('Missing quote [RESOURCE_NOT_FOUND]');
+    missingQuoteId.set(1);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const missing = host.querySelector('app-empty-state');
+    expect(missing?.textContent ?? '').toContain('Quote not found');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    missing?.querySelector('button')?.click();
+    expect(router.navigate).toHaveBeenCalledWith(['/quotes']);
   });
 
   it('navigates back to quotes list', () => {
@@ -613,6 +663,24 @@ describe('QuotesDetailComponent', () => {
     expect(getByIdSpy).toHaveBeenCalledWith(1);
   });
 
+  it.each([
+    { productExternalId: '   ', quantity: 2, control: 'productExternalId', error: 'required' },
+    { productExternalId: 'prod-owned', quantity: 2.5, control: 'quantity', error: 'wholeNumber' },
+  ] as const)('keeps invalid $control out of Add line requests', ({ productExternalId, quantity, control, error }) => {
+    component.lineForm.patchValue({ productExternalId, listPrice: 10, quantity });
+    component.onAddLineItem();
+
+    expect(component.lineForm.controls[control].hasError(error)).toBe(true);
+    expect(addLineItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the optional quantity default and trims a valid Product external ID', () => {
+    component.lineForm.patchValue({ productExternalId: '  prod-owned  ', listPrice: 10, quantity: null });
+    component.onAddLineItem();
+
+    expect(addLineItemSpy).toHaveBeenCalledWith(1, { productExternalId: 'prod-owned', listPrice: 10, quantity: 1 });
+  });
+
   it('omits blank productName/notes on add', () => {
     component.lineForm.setValue({
       productExternalId: 'prod-y',
@@ -701,6 +769,38 @@ describe('QuotesDetailComponent', () => {
     });
     expect(getByIdSpy).toHaveBeenCalledWith(1);
     expect(component.editingLineId()).toBeNull();
+  });
+
+  it('freezes the inline draft during a native save and unlocks it on error', () => {
+    const quote = selectedQuote()!;
+    const line = quote.lineItems![0];
+    const pending = new Subject<QuoteLineItemDto>();
+    updateLineItemSpy.mockReturnValueOnce(pending);
+    component.startLineEdit(line);
+    const draft = { productName: 'Saved draft line', listPrice: 175, quantity: 3 };
+    component.editForm.setValue(draft);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const fields = Array.from(host.querySelectorAll<HTMLInputElement>('[data-testid="quote-lines-table"] .edit-field input'));
+    expect(fields).toHaveLength(3);
+    expect(fields.map((field) => field.readOnly)).toEqual([false, false, false]);
+
+    component.onSaveLineEdit(line);
+    fixture.detectChanges();
+
+    expect(component.actionBusy()).toBe(true);
+    expect(fields.map((field) => field.readOnly)).toEqual([true, true, true]);
+    expect(component.editForm.getRawValue()).toEqual(draft);
+    expect(component.editForm.enabled).toBe(true);
+
+    pending.error({ status: 503, error: { message: 'Temporary unavailable' } });
+    fixture.detectChanges();
+
+    expect(component.actionBusy()).toBe(false);
+    expect(fields.map((field) => field.readOnly)).toEqual([false, false, false]);
+    expect(component.editingLineId()).toBe(line.id);
+    expect(component.editForm.getRawValue()).toEqual(draft);
   });
 
   it('removes a line item via removeLineItem and reloads', () => {
@@ -1020,6 +1120,21 @@ describe('QuotesDetailComponent', () => {
     expect(highlights.textContent).toMatch(/\$54,321|54321/);
   });
 
+  it('wraps the complete stored Description inside the read-only Pricing details card', () => {
+    const stored = 'Owned reference ' + 'X'.repeat(220);
+    selectedQuote.set({ ...selectedQuote()!, description: stored });
+    selectTab(fixture, 'Pricing');
+
+    const host = fixture.nativeElement as HTMLElement;
+    const card = Array.from(host.querySelectorAll('mat-card'))
+      .find(node => node.querySelector('mat-card-title')?.textContent?.trim() === 'Quote details');
+    const description = card?.querySelector<HTMLElement>('.info-item.full-width .value');
+
+    expect(description).toBeTruthy();
+    expect(description!.textContent?.trim()).toBe(stored);
+    expect(getComputedStyle(description!).overflowWrap).toBe('anywhere');
+  });
+
   it('organizes the detail body into Lines / Pricing / Documents tabs', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('mat-tab-group')).toBeTruthy();
@@ -1047,6 +1162,25 @@ describe('QuotesDetailComponent', () => {
     ) as HTMLElement;
     expect(table).toBeTruthy();
     expect(table.querySelectorAll('mat-checkbox').length).toBe(0);
+  });
+
+  it('names each native line checkbox, falling back to the product external ID', () => {
+    const quote = selectedQuote();
+    const [named, unnamed] = quote?.lineItems ?? [];
+    if (!quote || !named || !unnamed) {
+      throw new Error('Expected a quote fixture with two lines');
+    }
+    selectedQuote.set({ ...quote, lineItems: [named, { ...unnamed, productName: undefined }] });
+    fixture.detectChanges();
+
+    const checkboxes = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="quote-lines-table"] input[type="checkbox"]',
+    ));
+    expect(checkboxes.map((input) => input.getAttribute('aria-label'))).toEqual([
+      'Select all line items',
+      `Select line ${named.productName}`,
+      `Select line ${unnamed.productExternalId}`,
+    ]);
   });
 
   it('backs line selection with SelectionModel<number> and toggles single rows cleanly', () => {

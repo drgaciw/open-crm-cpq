@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   ElementRef,
+  computed,
   effect,
   input,
   output,
@@ -48,7 +49,7 @@ export interface StagePathItem {
                 [class.stage-path__step--active]="stage.state === 'active'"
                 [class.stage-path__step--upcoming]="stage.state === 'upcoming'"
                 [class.stage-path__step--danger]="stage.state === 'danger'"
-                [attr.aria-current]="stage.state === 'active' ? 'step' : null"
+                [attr.aria-current]="stage === currentStage() ? 'step' : null"
                 [attr.tabindex]="focusedIndex() === i ? 0 : -1"
                 [attr.data-stage-id]="stage.id"
                 (click)="selectStage(stage, i)"
@@ -69,7 +70,7 @@ export interface StagePathItem {
                 [class.stage-path__step--active]="stage.state === 'active'"
                 [class.stage-path__step--upcoming]="stage.state === 'upcoming'"
                 [class.stage-path__step--danger]="stage.state === 'danger'"
-                [attr.aria-current]="stage.state === 'active' ? 'step' : null"
+                [attr.aria-current]="stage === currentStage() ? 'step' : null"
                 [attr.data-stage-id]="stage.id"
               >
                 @if (stage.state === 'completed') {
@@ -205,11 +206,17 @@ export interface StagePathItem {
 })
 export class StagePathComponent extends CdkStepper {
   stages = input.required<StagePathItem[]>();
+  currentStageId = input<string>();
   ariaLabel = input<string>('Stage progress');
   interactive = input<boolean>(true);
 
   stageSelect = output<string>();
 
+  protected readonly currentStage = computed(() => {
+    const stages = this.stages();
+    const currentId = this.currentStageId();
+    return stages.find((stage) => stage.id === currentId) ?? stages.find((stage) => stage.state === 'active');
+  });
   protected readonly focusedIndex = signal(0);
   private readonly stageButtons = viewChildren<ElementRef<HTMLButtonElement>>('stageButton');
 
@@ -218,9 +225,8 @@ export class StagePathComponent extends CdkStepper {
 
     effect(() => {
       const items = this.stages();
-      const activeIdx = items.findIndex((stage) => stage.state === 'active');
-      const targetIndex = activeIdx >= 0 ? activeIdx : 0;
-      this.focusedIndex.set(targetIndex);
+      const current = this.currentStage();
+      this.focusedIndex.set(Math.max(0, items.findIndex((stage) => stage === current)));
     });
   }
 

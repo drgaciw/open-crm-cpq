@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, Subject, finalize, takeUntil } from 'rxjs';
 import {
   RuleSetDto,
   RuleSetCreateRequest,
@@ -34,9 +34,14 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 export class RuleSetService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/rule-sets';
+  private readonly listSuperseded = new Subject<void>();
+  private readonly detailSuperseded = new Subject<void>();
 
   readonly ruleSets = signal<RuleSetDto[]>([]);
   readonly selectedRuleSet = signal<RuleSetDto | null>(null);
+  readonly detailReadUnavailableId = signal<number | null>(null);
+  readonly detailLoading = signal(false);
+  readonly detailError = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly pagination = signal<PaginationMeta>({
@@ -49,6 +54,8 @@ export class RuleSetService {
   readonly isEmpty = computed(() => this.ruleSets().length === 0 && !this.loading());
 
   list(page = 0, size = 20, sort = 'name,asc', status?: RuleSetStatus): void {
+    // Finalize the superseded page read before marking the current request as loading.
+    this.listSuperseded.next();
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
@@ -61,7 +68,7 @@ export class RuleSetService {
 
     this.http
       .get<SpringPageResponse<RuleSetDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.ruleSets.set(p.content ?? (p as unknown as RuleSetDto[]));
@@ -85,15 +92,30 @@ export class RuleSetService {
   }
 
   getById(id: number): void {
-    this.error.set(null);
-    this.loading.set(true);
+    this.detailSuperseded.next();
+    this.detailReadUnavailableId.set(null);
+    this.detailError.set(null);
+    if (this.selectedRuleSet()?.id !== id) {
+      this.selectedRuleSet.set(null);
+    }
+    if (!Number.isFinite(id)) {
+      this.detailError.set('Invalid rule set id');
+      return;
+    }
+
+    this.detailLoading.set(true);
     this.http
       .get<RuleSetDto>(`${this.basePath}/${id}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.detailSuperseded), finalize(() => this.detailLoading.set(false)))
       .subscribe({
         next: (ruleSet) => this.selectedRuleSet.set(ruleSet),
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          if (err?.status === 404) {
+            this.selectedRuleSet.set(null);
+          } else {
+            this.detailReadUnavailableId.set(id);
+          }
+          this.detailError.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
   }

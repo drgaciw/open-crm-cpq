@@ -54,6 +54,59 @@ describe('DealService', () => {
     expect(service.loading()).toBe(false);
   });
 
+  it('keeps rows and pagination from the latest stage when an older stage completes last', () => {
+    service.list(0, 20, 'createdAt,desc', 'NEGOTIATION');
+    const older = httpMock.expectOne((r) => r.params.get('stage') === 'NEGOTIATION');
+    service.list(1, 25, 'createdAt,desc', 'PROPOSAL');
+    const latest = httpMock.expectOne((r) => r.params.get('stage') === 'PROPOSAL');
+    const proposal = deal({ id: 2, name: 'Proposal', stage: 'PROPOSAL' });
+    latest.flush({ content: [proposal], number: 1, size: 25, totalElements: 26, totalPages: 2 });
+
+    if (!older.cancelled) {
+      const negotiation = deal({ id: 1, name: 'Negotiation', stage: 'NEGOTIATION' });
+      older.flush({ content: [negotiation], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+    }
+
+    expect(service.deals()).toEqual([proposal]);
+    expect(service.pagination()).toEqual({ page: 1, size: 25, totalElements: 26, totalPages: 2 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps loading the current list when a superseded search fails', () => {
+    service.search('old');
+    const older = httpMock.expectOne((r) => r.url === '/api/v1/deals/search' && r.params.get('q') === 'old');
+    service.list();
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/deals');
+
+    if (!older.cancelled) {
+      older.flush({ message: 'Old search unavailable' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    latest.flush({ content: [], number: 0, totalElements: 0, totalPages: 0 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('reports the current search error without showing a superseded list', () => {
+    service.list();
+    const older = httpMock.expectOne((r) => r.url === '/api/v1/deals');
+    service.search('current');
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/deals/search' && r.params.get('q') === 'current');
+    latest.flush(
+      { message: 'Search unavailable', errorCode: 'DEAL_SEARCH_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+
+    if (!older.cancelled) {
+      older.flush([deal({ id: 1, name: 'Old list result', stage: 'PROSPECTING' })]);
+    }
+
+    expect(service.error()).toBe('Search unavailable [DEAL_SEARCH_UNAVAILABLE]');
+    expect(service.deals()).toEqual([]);
+    expect(service.loading()).toBe(false);
+  });
+
   it('advanceStage posts to /advance', async () => {
     const promise = firstValueFrom(service.advanceStage(5));
     const req = httpMock.expectOne('/api/v1/deals/5/advance');

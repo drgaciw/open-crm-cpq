@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { PageEvent } from '@angular/material/paginator';
+import { Subject, takeUntil } from 'rxjs';
 import {
   CurrencyFormatPipe,
   DataTableComponent,
@@ -78,6 +80,8 @@ interface ContractRow {
 export class ContractListComponent implements OnInit {
   private readonly service = inject(ContractService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly superseded = new Subject<void>();
   private readonly money = new CurrencyFormatPipe();
 
   readonly columns: TableColumn[] = [
@@ -103,9 +107,10 @@ export class ContractListComponent implements OnInit {
   }
 
   reload(page = this.pagination().page, size = this.pagination().size): void {
+    this.superseded.next();
     this.loading.set(true);
     this.error.set(null);
-    this.service.list(page, size, this.sort()).subscribe({
+    this.service.list(page, size, this.sort()).pipe(takeUntil(this.superseded), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (p) => {
         this.contracts.set(p.content ?? []);
         this.pagination.set({

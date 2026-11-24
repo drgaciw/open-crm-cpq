@@ -34,7 +34,7 @@ import { FormValidators } from '@frontend/shared-utils';
   `,
   styles: [`
     .full-width { width: 100%; }
-    mat-dialog-content { min-width: 400px; padding-top: 16px; }
+    mat-dialog-content { min-width: 0; padding-top: 16px; }
   `],
 })
 export class LoseReasonDialogComponent {

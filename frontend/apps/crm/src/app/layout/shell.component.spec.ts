@@ -1,12 +1,15 @@
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { of } from 'rxjs';
+import { filter, firstValueFrom, of } from 'rxjs';
 import { LoadingService } from '@frontend/shared-data-access';
 import { CommandPaletteItem, CommandPaletteService } from '@frontend/shared-ui';
 import { ShellComponent } from './shell.component';
+
+@Component({ template: '' })
+class RoutedPageComponent {}
 
 describe('ShellComponent', () => {
   let fixture: ComponentFixture<ShellComponent>;
@@ -38,7 +41,10 @@ describe('ShellComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ShellComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([
+          { path: 'organizations', component: RoutedPageComponent },
+          { path: 'quotes', component: RoutedPageComponent },
+        ]),
         provideNoopAnimations(),
         { provide: BreakpointObserver, useValue: { observe: observeSpy } },
         { provide: CommandPaletteService, useValue: commandPaletteMock },
@@ -109,6 +115,75 @@ describe('ShellComponent', () => {
     expect(component.sidenavOpened()).toBe(true);
     component.onToggleSidenav();
     expect(component.sidenavOpened()).toBe(false);
+  });
+
+  it('exposes the drawer relationship and tracks its expanded state', async () => {
+    await setup(true);
+    const root = fixture.nativeElement as HTMLElement;
+    const drawer = root.querySelector('mat-sidenav')!;
+    const toggle = root.querySelector<HTMLButtonElement>('button[aria-label="Toggle menu"]')!;
+
+    expect(drawer.id).not.toBe('');
+    expect(toggle.getAttribute('aria-controls')).toBe(drawer.id);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes the temporary drawer when selecting a sidebar route or the already active link', async () => {
+    await setup(true);
+    const root = fixture.nativeElement as HTMLElement;
+    const sidebarLink = root.querySelector<HTMLAnchorElement>('app-sidebar a[href="/organizations"]')!;
+    const toggle = root.querySelector<HTMLButtonElement>('button[aria-label="Toggle menu"]')!;
+
+    const open = async () => {
+      const drawerOpened = firstValueFrom(component.sidenav.openedChange.pipe(filter(Boolean)));
+      toggle.click();
+      fixture.detectChanges();
+      await drawerOpened;
+    };
+
+    await open();
+    expect(component.sidenavOpened()).toBe(true);
+    sidebarLink.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/organizations');
+    expect(component.sidenavOpened()).toBe(false);
+
+    await open();
+    sidebarLink.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/organizations');
+    expect(component.sidenavOpened()).toBe(false);
+  });
+
+  it('keeps the desktop drawer open and marks only the active sidebar destination as current', async () => {
+    await setup(false);
+    const root = fixture.nativeElement as HTMLElement;
+    const accounts = root.querySelector<HTMLAnchorElement>('app-sidebar a[href="/organizations"]')!;
+    const quotes = root.querySelector<HTMLAnchorElement>('app-sidebar a[href="/quotes"]')!;
+
+    accounts.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.sidenavOpened()).toBe(true);
+    expect(accounts.getAttribute('aria-current')).toBe('page');
+    expect(quotes.hasAttribute('aria-current')).toBe(false);
+
+    quotes.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.sidenavOpened()).toBe(true);
+    expect(accounts.hasAttribute('aria-current')).toBe(false);
+    expect(quotes.getAttribute('aria-current')).toBe('page');
   });
 
   it('shows a global progress bar while LoadingService reports loading', async () => {

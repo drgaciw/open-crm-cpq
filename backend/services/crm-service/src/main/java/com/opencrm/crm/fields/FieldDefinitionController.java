@@ -37,7 +37,7 @@ public class FieldDefinitionController {
     private final FieldRegistryService fieldRegistryService;
     private final Optional<FixtureAccess> fixtureAccess;
 
-    /** Explicitly wired only by the integration test that installs the fixture schema. */
+    /** Explicitly wired only by the PostgreSQL fixture test. */
     enum FixtureAccess {
         ENABLED
     }

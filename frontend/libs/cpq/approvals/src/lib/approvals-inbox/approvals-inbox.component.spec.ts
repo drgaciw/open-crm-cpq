@@ -20,11 +20,13 @@ describe('ApprovalsInboxComponent', () => {
 
   const pending = signal<ApprovalRequestDto[]>([...MOCK_PENDING_APPROVALS]);
   const loading = signal(false);
+  const listReadConfirmed = signal(true);
   const error = signal<string | null>(null);
 
   beforeEach(async () => {
     pending.set([...MOCK_PENDING_APPROVALS]);
     loading.set(false);
+    listReadConfirmed.set(true);
     error.set(null);
 
     listPendingSpy = vi.fn(() => {
@@ -52,7 +54,7 @@ describe('ApprovalsInboxComponent', () => {
       pending,
       loading,
       error,
-      isEmpty: computed(() => pending().length === 0 && !loading()),
+      isEmpty: computed(() => listReadConfirmed() && pending().length === 0 && !loading()),
       listPending: listPendingSpy,
       approve: approveSpy,
       reject: rejectSpy,
@@ -77,6 +79,17 @@ describe('ApprovalsInboxComponent', () => {
   it('loads pending on init via ApprovalService.listPending', () => {
     expect(listPendingSpy).toHaveBeenCalled();
     expect(component.pending()).toHaveLength(2);
+  });
+
+  it('names the initial approvals loading indicator', () => {
+    pending.set([]);
+    listReadConfirmed.set(false);
+    loading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Loading approvals');
+    expect(host.querySelector('app-empty-state')).toBeNull();
   });
 
   it('renders quote links and action buttons', () => {
@@ -187,5 +200,21 @@ describe('ApprovalsInboxComponent', () => {
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('No pending approvals');
+  });
+
+  it('keeps unresolved results hidden after dismissing a failed read', () => {
+    pending.set([]);
+    listReadConfirmed.set(false);
+    error.set('Pending approvals could not be loaded');
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    const dismiss: HTMLButtonElement = el.querySelector('[role="alert"] button')!;
+    dismiss.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(el.querySelector('table')).toBeNull();
+    expect(listPendingSpy).toHaveBeenCalledTimes(1);
   });
 });

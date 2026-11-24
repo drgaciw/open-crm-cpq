@@ -40,7 +40,7 @@ public class QuoteDocumentController {
     @GetMapping("/{documentId}/download")
     @Operation(summary = "Download a quote document")
     public ResponseEntity<byte[]> download(@PathVariable Long quoteId, @PathVariable Long documentId) {
-        byte[] content = documentService.getDocumentContent(documentId);
+        byte[] content = documentService.getDocumentContent(quoteId, documentId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"document.pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)

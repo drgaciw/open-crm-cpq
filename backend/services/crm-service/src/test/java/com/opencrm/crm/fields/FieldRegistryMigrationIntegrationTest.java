@@ -2,6 +2,7 @@ package com.opencrm.crm.fields;
 
 import jakarta.persistence.Entity;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationInfo;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.MetadataSources;
@@ -9,13 +10,13 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.boot.hibernate.SpringImplicitNamingStrategy;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -61,7 +62,9 @@ class FieldRegistryMigrationIntegrationTest {
     private static final Set<String> REGISTRY_INDEXES = Set.of(
             "field_definition_pkey",
             "uq_field_definition_tenant_entity_key",
+            "uq_field_definition_entity_storage",
             "field_option_pkey",
+            "uq_field_option_definition_id",
             "uq_field_option_active_label",
             "field_value_pkey",
             "uq_field_value_organization",
@@ -92,15 +95,148 @@ class FieldRegistryMigrationIntegrationTest {
                     versions.add(info.getVersion().getVersion());
                 }
             }
-            assertThat(versions).endsWith("20", "21");
+            assertThat(versions).endsWith("20", "21", "22");
 
             try (Connection connection = jdbc(database); Statement statement = connection.createStatement()) {
                 assertRegistryCatalog(statement);
                 assertConstraintsRejectBadRows(statement);
+                assertTypedConstraints(statement);
                 assertLongIncompressibleTextInserts(connection);
             }
             assertThat(validatedEntityNames(database)).containsAll(REQUIRED_ENTITIES);
         }
+    }
+
+    @Test
+    void upgradesOfficialV21AndPreservesCrmRecordsAndValidRegistryValues() throws Exception {
+        try (var database = new PostgreSQLContainer<>("postgres:16-alpine")) {
+            database.start();
+            Flyway latest = flyway(database);
+            Flyway.configure().configuration(latest.getConfiguration()).target("20").load().migrate();
+            try (Connection connection = jdbc(database); Statement statement = connection.createStatement()) {
+                long organizationId = insertOrganization(statement);
+                long contactId = insertReturningId(statement, """
+                        INSERT INTO crm.contacts (uuid, first_name, last_name, organization_id)
+                        VALUES ('v22-existing-contact', 'Ada', 'Lovelace', %d) RETURNING id
+                        """.formatted(organizationId));
+                long dealId = insertReturningId(statement, """
+                        INSERT INTO crm.deals (uuid, name, organization_id, stage)
+                        VALUES ('v22-existing-deal', 'Existing opportunity', %d, 'PROSPECTING') RETURNING id
+                        """.formatted(organizationId));
+                assertThat(scalar(statement, "SELECT coalesce(to_regclass('crm.field_value')::text, 'absent')"))
+                        .isEqualTo("absent");
+
+                Flyway.configure().configuration(latest.getConfiguration()).target("21").load().migrate();
+                assertThat(scalar(statement, "SELECT count(*)::text FROM crm.field_definition")).isEqualTo("0");
+                assertThat(scalar(statement, "SELECT count(*)::text FROM crm.field_option")).isEqualTo("0");
+                assertThat(scalar(statement, "SELECT count(*)::text FROM crm.field_value")).isEqualTo("0");
+                long definitionId = insertDefinition(statement, "registry-test", "legacy_notes", "text");
+                long valueId = insertReturningId(statement, """
+                        INSERT INTO crm.field_value (definition_id, organization_id, "text")
+                        VALUES (%d, %d, 'Existing notes') RETURNING id
+                        """.formatted(definitionId, organizationId));
+
+                var result = latest.migrate();
+
+                assertThat(result.migrations).extracting(migration -> migration.version).containsExactly("22");
+                latest.validate();
+                assertThat(scalar(statement, """
+                        SELECT script || ':' || checksum FROM crm.flyway_schema_history WHERE version = '21'
+                        """)).isEqualTo("V21__field_registry.sql:896777634");
+                assertThat(scalar(statement, "SELECT name FROM crm.organizations WHERE id = " + organizationId))
+                        .isEqualTo("Migration account");
+                assertThat(scalar(statement, "SELECT first_name FROM crm.contacts WHERE id = " + contactId))
+                        .isEqualTo("Ada");
+                assertThat(scalar(statement, "SELECT name FROM crm.deals WHERE id = " + dealId))
+                        .isEqualTo("Existing opportunity");
+                assertThat(scalar(statement, "SELECT \"text\" FROM crm.field_value WHERE id = " + valueId))
+                        .isEqualTo("Existing notes");
+                assertThat(statement.executeUpdate("UPDATE crm.field_definition SET type = 'long_text' WHERE id = "
+                        + definitionId)).isEqualTo(1);
+                assertThat(latest.migrate().migrationsExecuted).isZero();
+            }
+        }
+    }
+
+    @Test
+    void refusesToMigrateInvalidV21RowsAndLeavesDataAndHistoryIntact() throws Exception {
+        try (var database = new PostgreSQLContainer<>("postgres:16-alpine")) {
+            database.start();
+            Flyway latest = flyway(database);
+            Flyway.configure().configuration(latest.getConfiguration()).target("21").load().migrate();
+            try (Connection connection = jdbc(database); Statement statement = connection.createStatement()) {
+                long organizationId = insertOrganization(statement);
+                long definitionId = insertDefinition(statement, "registry-test", "invalid_value", "number");
+                long valueId = insertReturningId(statement, """
+                        INSERT INTO crm.field_value (definition_id, organization_id, "text")
+                        VALUES (%d, %d, 'Preserve for reconciliation') RETURNING id
+                        """.formatted(definitionId, organizationId));
+
+                assertThatThrownBy(latest::migrate).isInstanceOf(FlywayException.class)
+                        .hasMessageContaining("fk_field_value_definition");
+
+                assertThat(scalar(statement, "SELECT \"text\" FROM crm.field_value WHERE id = " + valueId))
+                        .isEqualTo("Preserve for reconciliation");
+                assertThat(scalar(statement, "SELECT count(*)::text FROM crm.flyway_schema_history WHERE version = '22'"))
+                        .isEqualTo("0");
+                assertThat(scalar(statement, """
+                        SELECT count(*)::text FROM information_schema.columns
+                        WHERE table_schema = 'crm' AND table_name = 'field_value' AND column_name = 'storage_class'
+                        """)).isEqualTo("0");
+            }
+        }
+    }
+
+    private static long insertOrganization(Statement statement) throws SQLException {
+        return insertReturningId(statement, """
+                INSERT INTO crm.organizations (uuid, name) VALUES ('v22-migration-account', 'Migration account')
+                RETURNING id
+                """);
+    }
+
+    private static long insertDefinition(Statement statement, String tenant, String key, String type)
+            throws SQLException {
+        return insertReturningId(statement, """
+                INSERT INTO crm.field_definition (tenant, entity, "key", label, type, required, show_on_record,
+                                                  show_on_list, position, agent_filled)
+                VALUES ('%s', 'organization', '%s', 'Registry test', '%s', false, true, false, 0, false)
+                RETURNING id
+                """.formatted(tenant, key, type));
+    }
+
+    private static void assertTypedConstraints(Statement statement) throws SQLException {
+        long organizationId = insertOrganization(statement);
+        long contactId = insertReturningId(statement, """
+                INSERT INTO crm.contacts (uuid, first_name, last_name, organization_id)
+                VALUES ('v22-test-contact', 'Ada', 'Lovelace', %d) RETURNING id
+                """.formatted(organizationId));
+        long textField = insertDefinition(statement, "registry-test", "typed_notes", "text");
+        long selectField = insertDefinition(statement, "registry-test", "select_one", "select");
+        long otherSelectField = insertDefinition(statement, "other-registry-test", "select_two", "select");
+        long foreignOption = insertReturningId(statement, """
+                INSERT INTO crm.field_option (definition_id, label, position) VALUES (%d, 'Other', 0) RETURNING id
+                """.formatted(otherSelectField));
+        long validOption = insertReturningId(statement, """
+                INSERT INTO crm.field_option (definition_id, label, position) VALUES (%d, 'Chosen', 0) RETURNING id
+                """.formatted(selectField));
+
+        assertThatThrownBy(() -> insertDefinition(statement, "  ", "missing_tenant", "text"))
+                .isInstanceOf(SQLException.class).hasMessageContaining("ck_field_definition_tenant");
+        assertThatThrownBy(() -> statement.executeUpdate("""
+                INSERT INTO crm.field_value (definition_id, contact_id, "text") VALUES (%d, %d, 'Wrong entity')
+                """.formatted(textField, contactId)))
+                .isInstanceOf(SQLException.class).hasMessageContaining("fk_field_value_definition");
+        assertThatThrownBy(() -> statement.executeUpdate("""
+                INSERT INTO crm.field_value (definition_id, organization_id, "numeric") VALUES (%d, %d, 7)
+                """.formatted(textField, organizationId)))
+                .isInstanceOf(SQLException.class).hasMessageContaining("fk_field_value_definition");
+        assertThatThrownBy(() -> statement.executeUpdate("""
+                INSERT INTO crm.field_value (definition_id, organization_id, option_id) VALUES (%d, %d, %d)
+                """.formatted(selectField, organizationId, foreignOption)))
+                .isInstanceOf(SQLException.class).hasMessageContaining("fk_field_value_option");
+        assertThat(statement.executeUpdate("""
+                INSERT INTO crm.field_value (definition_id, organization_id, option_id) VALUES (%d, %d, %d)
+                """.formatted(selectField, organizationId, validOption))).isEqualTo(1);
     }
 
     private static void assertRegistryCatalog(Statement statement) throws SQLException {
@@ -380,6 +516,7 @@ class FieldRegistryMigrationIntegrationTest {
         varchar(columns, "field_definition", "key", 64, false);
         varchar(columns, "field_definition", "label", 255, false);
         varchar(columns, "field_definition", "type", 32, false);
+        varchar(columns, "field_definition", "storage_class", 16, false);
         bool(columns, "field_definition", "required", false);
         bool(columns, "field_definition", "show_on_record", false);
         bool(columns, "field_definition", "show_on_list", false);
@@ -409,12 +546,14 @@ class FieldRegistryMigrationIntegrationTest {
         bigint(columns, "field_value", "organization_id", true);
         bigint(columns, "field_value", "contact_id", true);
         bigint(columns, "field_value", "deal_id", true);
+        varchar(columns, "field_value", "record_entity", 32, false);
         text(columns, "field_value", "text", true);
         columns.put("field_value.numeric", new Column("numeric", null, 24, 4, true));
         columns.put("field_value.date", new Column("date", null, null, null, true));
         bool(columns, "field_value", "bool", true);
         bigint(columns, "field_value", "option_id", true);
         varchar(columns, "field_value", "user_id", 255, true);
+        varchar(columns, "field_value", "storage_class", 16, false);
         timestamptz(columns, "field_value", "created_at", false);
         timestamptz(columns, "field_value", "updated_at", true);
         varchar(columns, "field_value", "created_by", 255, true);
@@ -457,8 +596,12 @@ class FieldRegistryMigrationIntegrationTest {
     }
 
     private static Connection jdbc(PostgreSQLContainer<?> database) throws SQLException {
-        return DriverManager.getConnection(
-                database.getJdbcUrl(), database.getUsername(), database.getPassword());
+        var dataSource = new PGSimpleDataSource();
+        dataSource.setUrl(database.getJdbcUrl());
+        dataSource.setUser(database.getUsername());
+        dataSource.setPassword(database.getPassword());
+        dataSource.setCurrentSchema("crm");
+        return dataSource.getConnection();
     }
 
     private record Column(String dataType, Integer length, Integer precision, Integer scale, boolean nullable) {

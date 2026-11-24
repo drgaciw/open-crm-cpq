@@ -40,12 +40,13 @@ public class LeadController {
      * List all leads with optional filters.
      */
     @GetMapping
-    @Operation(summary = "List leads", description = "Get a paginated list of leads with optional filtering")
+    @Operation(summary = "List leads", description = "Get leads matching optional title, status, and priority filters")
     public ApiResponse<List<LeadDto>> list(
             @PageableDefault(size = 20) Pageable pageable,
             @RequestParam(required = false) LeadStatus status,
-            @RequestParam(required = false) LeadPriority priority) {
-        Page<LeadDto> leads = leadService.list(pageable, status, priority);
+            @RequestParam(required = false) LeadPriority priority,
+            @RequestParam(name = "q", required = false) String query) {
+        Page<LeadDto> leads = leadService.list(pageable, status, priority, query);
 
         ApiResponse.PageInfo pageInfo = ApiResponse.PageInfo.builder()
                 .page(leads.getNumber())

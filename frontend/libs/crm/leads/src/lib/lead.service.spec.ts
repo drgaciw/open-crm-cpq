@@ -86,6 +86,100 @@ describe('LeadService', () => {
     });
   });
 
+  it('loads the last valid page without publishing an out-of-range empty result', () => {
+    service.list(1, 10, 'title,asc', 'NEW', 'HIGH', 'Enterprise');
+    const outside = httpMock.expectOne((r) => r.url === '/api/v1/leads' && r.params.get('page') === '1');
+    outside.flush({ content: [], number: 1, size: 10, totalElements: 10, totalPages: 1 });
+
+    expect(service.loading()).toBe(true);
+    expect(service.isEmpty()).toBe(false);
+    const recovered = httpMock.expectOne((r) =>
+      r.url === '/api/v1/leads' &&
+      r.params.get('page') === '0' &&
+      r.params.get('size') === '10' &&
+      r.params.get('sort') === 'title,asc' &&
+      r.params.get('status') === 'NEW' &&
+      r.params.get('priority') === 'HIGH' &&
+      r.params.get('q') === 'Enterprise',
+    );
+    const lead: LeadDto = {
+      id: 2, uuid: 'u2', title: 'Enterprise', status: 'NEW', priority: 'HIGH', createdAt: '', updatedAt: '',
+    };
+    recovered.flush({ content: [lead], number: 0, size: 10, totalElements: 10, totalPages: 1 });
+
+    expect(service.leads()).toEqual([lead]);
+    expect(service.pagination()).toEqual({ page: 0, size: 10, totalElements: 10, totalPages: 1 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps a genuine zero result without another page request', () => {
+    service.list(1, 10, 'title,asc', 'NEW', 'HIGH', 'Enterprise');
+    httpMock.expectOne((r) => r.params.get('page') === '1')
+      .flush({ content: [], number: 1, size: 10, totalElements: 0, totalPages: 0 });
+
+    httpMock.expectNone((r) => r.url === '/api/v1/leads');
+    expect(service.isEmpty()).toBe(true);
+    expect(service.pagination().totalElements).toBe(0);
+  });
+
+  it('cancels a pending last-page recovery when newer filters start loading', () => {
+    service.list(1, 10, 'title,asc', 'NEW', 'HIGH', 'Old query');
+    httpMock.expectOne((r) => r.params.get('page') === '1')
+      .flush({ content: [], number: 1, size: 10, totalElements: 10, totalPages: 1 });
+    const recovery = httpMock.expectOne((r) => r.params.get('page') === '0' && r.params.get('q') === 'Old query');
+
+    service.list(0, 20, 'createdAt,desc', 'CONTACTED', 'LOW', 'New query');
+    const current = httpMock.expectOne((r) => r.params.get('q') === 'New query');
+    expect(recovery.cancelled).toBe(true);
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    const lead: LeadDto = {
+      id: 3, uuid: 'u3', title: 'New query', status: 'CONTACTED', priority: 'LOW', createdAt: '', updatedAt: '',
+    };
+    current.flush({ content: [lead], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+
+    expect(service.leads()).toEqual([lead]);
+    expect(service.pagination()).toEqual({ page: 0, size: 20, totalElements: 1, totalPages: 1 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps filtered rows and pagination when an older unfiltered list finishes later', () => {
+    service.list();
+    const previous = httpMock.expectOne((r) => r.url === '/api/v1/leads' && !r.params.has('status'));
+
+    service.list(1, 10, 'title,asc', 'NEW');
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/leads' && r.params.get('status') === 'NEW');
+    const fresh: LeadDto = {
+      id: 1, uuid: 'u1', title: 'New lead', status: 'NEW', priority: 'MEDIUM', createdAt: '', updatedAt: '',
+    };
+    latest.flush({ content: [fresh], number: 1, size: 10, totalElements: 11, totalPages: 2 });
+    if (!previous.cancelled) {
+      const contacted: LeadDto = { ...fresh, id: 2, uuid: 'u2', title: 'Contacted lead', status: 'CONTACTED' };
+      previous.flush({ content: [contacted, fresh], number: 0, size: 20, totalElements: 22, totalPages: 2 });
+    }
+
+    expect(service.leads()).toEqual([fresh]);
+    expect(service.pagination()).toEqual({ page: 1, size: 10, totalElements: 11, totalPages: 2 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps the latest list loading without an error when a superseded search fails', () => {
+    service.search('old search');
+    const previous = httpMock.expectOne((r) => r.url === '/api/v1/leads/search');
+
+    service.list(0, 10, 'createdAt,desc', 'NEW');
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/leads' && r.params.get('status') === 'NEW');
+    if (!previous.cancelled) {
+      previous.flush({ message: 'Old search failed' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    latest.flush({ content: [], number: 0, size: 10, totalElements: 0, totalPages: 0 });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBeNull();
+  });
+
   it('qualify posts to /qualify', async () => {
     const promise = firstValueFrom(service.qualify(4));
     const req = httpMock.expectOne('/api/v1/leads/4/qualify');

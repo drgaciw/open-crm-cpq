@@ -28,17 +28,19 @@ describe('DealListComponent action wiring', () => {
   let dialogOpen: ReturnType<typeof vi.fn>;
   let applyStageChange: ReturnType<typeof vi.fn>;
 
-  const pagination = signal<PaginationMeta>({
+  const initialPagination: PaginationMeta = {
     page: 0,
     size: 20,
     totalElements: 1,
     totalPages: 1,
-  });
+  };
+  const pagination = signal(initialPagination);
   const deals = signal<DealDto[]>([]);
   const loading = signal(false);
   const error = signal<string | null>(null);
 
   beforeEach(async () => {
+    pagination.set(initialPagination);
     listSpy = vi.fn();
     searchSpy = vi.fn();
     advanceSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'QUALIFICATION' })));
@@ -162,6 +164,32 @@ describe('DealListComponent action wiring', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
   });
 
+  it('does not show an empty state after dismissing a failed read until a retry succeeds', () => {
+    deals.set([]);
+    loading.set(false);
+    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+    fixture.detectChanges();
+    listSpy.mockClear();
+    const el: HTMLElement = fixture.nativeElement;
+    const dismiss = [...el.querySelectorAll<HTMLButtonElement>('.error-banner button')]
+      .find(button => button.textContent?.trim() === 'Dismiss');
+    dismiss?.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.error-banner')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listSpy.mockImplementationOnce(() => loading.set(true));
+    component.onRetry();
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    loading.set(false);
+    fixture.detectChanges();
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No opportunities yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create opportunity');
+  });
+
   it('onRetry reloads list when not searching', () => {
     listSpy.mockClear();
     error.set('Failed to load deals [DEALS_UNAVAILABLE]');
@@ -279,6 +307,60 @@ describe('DealListComponent action wiring', () => {
     expect(listSpy).not.toHaveBeenCalled();
     expect(component.visibleDeals().map((row) => row.id)).toEqual([1]);
     expect(component.hasActiveFilters()).toBe(true);
+  });
+
+  it('keeps server paging available on an Owner miss and applies the same Owner to the next page', () => {
+    component.onOrganizationFilter('15');
+    component.onTabChange(2);
+    component.onOwnerFilter('  ADA  ');
+    deals.set([deal({ id: 1, name: 'Unmatched', stage: 'QUALIFICATION', ownerId: 'Grace' })]);
+    pagination.set({ page: 1, size: 10, totalElements: 21, totalPages: 3 });
+    loading.set(false);
+    fixture.detectChanges();
+    listSpy.mockClear();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const paginator = host.querySelector('mat-paginator[aria-label="Opportunity pages"]');
+    const previous = paginator?.querySelector<HTMLButtonElement>('button[aria-label="Previous page"]');
+    const next = paginator?.querySelector<HTMLButtonElement>('button[aria-label="Next page"]');
+    expect(host.querySelector('.empty-state-title')?.textContent?.trim()).toBe('No matching opportunities on this page');
+    expect(previous?.disabled).toBe(false);
+    expect(next?.disabled).toBe(false);
+    previous?.click();
+    expect(listSpy).toHaveBeenLastCalledWith(0, 10, 'createdAt,desc', 'QUALIFICATION', 15);
+
+    pagination.set({ page: 0, size: 10, totalElements: 21, totalPages: 3 });
+    fixture.detectChanges();
+    paginator?.querySelector<HTMLButtonElement>('button[aria-label="Next page"]')?.click();
+    expect(listSpy).toHaveBeenLastCalledWith(1, 10, 'createdAt,desc', 'QUALIFICATION', 15);
+
+    pagination.set({ page: 1, size: 10, totalElements: 21, totalPages: 3 });
+    deals.set([deal({ id: 2, name: 'Matching opportunity', stage: 'QUALIFICATION', ownerId: 'ada' })]);
+    fixture.detectChanges();
+
+    expect(host.querySelector('app-empty-state')).toBeNull();
+    expect(host.querySelector('app-data-table')?.textContent).toContain('Matching opportunity');
+    expect(host.querySelector<HTMLInputElement>('[data-testid="deal-owner-filter"]')?.value).toBe('  ADA  ');
+  });
+
+  it('keeps the ordinary empty state for a single server page and for zero server results', () => {
+    component.onOwnerFilter('Ada');
+    loading.set(false);
+    const host = fixture.nativeElement as HTMLElement;
+    const unchanged = () => {
+      fixture.detectChanges();
+      expect(host.querySelector('.empty-state-title')?.textContent?.trim()).toBe('No matching opportunities');
+      expect(host.querySelector('mat-paginator')).toBeNull();
+      expect(host.querySelector('.empty-state-action')).toBeNull();
+    };
+
+    pagination.set({ page: 0, size: 10, totalElements: 1, totalPages: 1 });
+    deals.set([deal({ id: 1, name: 'Unmatched', stage: 'PROSPECTING', ownerId: 'Grace' })]);
+    unchanged();
+
+    pagination.set({ page: 0, size: 10, totalElements: 0, totalPages: 0 });
+    deals.set([]);
+    unchanged();
   });
 
   it('sends organizationId to GET /api/v1/deals', () => {

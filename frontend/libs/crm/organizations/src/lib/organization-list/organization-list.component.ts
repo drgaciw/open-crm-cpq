@@ -112,7 +112,7 @@ export interface OrganizationTableRow {
       </div>
     }
 
-    @if (!orgService.loading() && !orgService.error() && orgService.isEmpty()) {
+    @if (!listErrorDismissed() && !orgService.loading() && !orgService.error() && orgService.isEmpty()) {
       <app-empty-state
         icon="business"
         [title]="hasActiveCriteria() ? 'No matching accounts' : 'No accounts yet'"
@@ -187,6 +187,7 @@ export class OrganizationListComponent implements OnInit {
   readonly territoryFilter = signal('');
   readonly ownerFilter = signal('');
   readonly searchQuery = signal('');
+  protected readonly listErrorDismissed = signal(false);
   readonly hasActiveCriteria = computed(
     () =>
       !!(
@@ -202,9 +203,10 @@ export class OrganizationListComponent implements OnInit {
   );
 
   private currentSort = 'name,asc';
+  private requestedPage = { page: 0, size: 20 };
 
   ngOnInit(): void {
-    this.orgService.list(0, 20, this.currentSort);
+    this.reload(0, 20);
   }
 
   onSearch(query: string): void {
@@ -213,6 +215,8 @@ export class OrganizationListComponent implements OnInit {
   }
 
   clearError(): void {
+    // A dismissed failure does not establish an empty result.
+    this.listErrorDismissed.set(true);
     this.orgService.error.set(null);
   }
 
@@ -232,7 +236,8 @@ export class OrganizationListComponent implements OnInit {
   }
 
   onRetry(): void {
-    this.reload(this.orgService.pagination().page);
+    const { page, size } = this.requestedPage;
+    this.reload(page, size);
   }
 
   onPageChange(event: PageEvent): void {
@@ -302,6 +307,8 @@ export class OrganizationListComponent implements OnInit {
   }
 
   private reload(page: number, size = this.orgService.pagination().size): void {
+    this.requestedPage = { page, size };
+    this.listErrorDismissed.set(false);
     const filters = this.currentFilters();
     if (this.searchQuery()) {
       if (filters) {

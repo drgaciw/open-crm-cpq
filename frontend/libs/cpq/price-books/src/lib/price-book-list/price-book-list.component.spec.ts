@@ -175,6 +175,42 @@ describe('PriceBookListComponent', () => {
     expect(error()).toBeNull();
   });
 
+  it('keeps the first-record card hidden when the initial read fails', () => {
+    priceBooks.set([]);
+    error.set('First read failed');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.error-banner[role="alert"]')?.textContent).toContain('First read failed');
+    expect(compiled.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('keeps dismissal from presenting the failed read as empty until a new query succeeds', () => {
+    priceBooks.set([]);
+    error.set('First read failed');
+    listSpy.mockClear();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('.error-banner button')?.click();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.error-banner')).toBeNull();
+    expect(compiled.querySelector('app-empty-state')).toBeNull();
+    expect(compiled.querySelector('app-data-table')).toBeNull();
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(listByRegionSpy).not.toHaveBeenCalled();
+
+    listByRegionSpy.mockImplementation(() => priceBooks.set([]));
+    component.regionFilter.set('ZZZ');
+    component.applyRegionFilter();
+    fixture.detectChanges();
+
+    const empty = compiled.querySelector('app-empty-state');
+    expect(empty?.textContent).toContain('No matching price books');
+    expect(empty?.querySelector('button')).toBeNull();
+  });
+
   it('navigates to detail on row click', () => {
     component.onRowClick({
       id: 2,
