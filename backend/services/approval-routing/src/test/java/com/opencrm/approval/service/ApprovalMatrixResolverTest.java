@@ -2,7 +2,6 @@ package com.opencrm.approval.service;
 
 import com.opencrm.approval.domain.MatrixStepMode;
 import com.opencrm.approval.domain.QuoteApprovalTier;
-import com.opencrm.approval.verdict.PolicyBreach;
 import com.opencrm.common.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,7 +102,7 @@ class ApprovalMatrixResolverTest {
                 order, mode, role);
     }
 
-    private static PolicyBreach breach(String type, String amount) {
-        return new PolicyBreach(type, new BigDecimal("30"), new BigDecimal("10"), new BigDecimal(amount), null);
+    private static ApprovalMatrixResolver.RoutedBreach breach(String type, String amount) {
+        return new ApprovalMatrixResolver.RoutedBreach(type, new BigDecimal(amount));
     }
 }

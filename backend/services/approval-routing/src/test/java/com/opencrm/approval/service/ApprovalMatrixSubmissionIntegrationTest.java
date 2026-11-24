@@ -10,7 +10,7 @@ import com.opencrm.approval.dto.DefineApprovalMatrixRequest;
 import com.opencrm.approval.dto.MatrixRuleRequest;
 import com.opencrm.approval.dto.PolicyBreachRequest;
 import com.opencrm.approval.dto.SubmitForApprovalRequest;
-import com.opencrm.approval.verdict.PolicyVerdict;
+import com.opencrm.approval.domain.PolicyVerdict;
 import com.opencrm.common.exception.BusinessException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
@@ -80,7 +80,7 @@ class ApprovalMatrixSubmissionIntegrationTest {
         List<ApprovalRequestDto> created = matrices.submitForApproval(submit(defined.getId()));
         assertThat(created).extracting(ApprovalRequestDto::getStatus)
                 .containsExactly(com.opencrm.approval.domain.ApprovalStatus.PENDING,
-                        com.opencrm.approval.domain.ApprovalStatus.WAITING);
+                        com.opencrm.approval.domain.ApprovalStatus.PENDING);
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM outbox_events WHERE topic = 'cpq.approval.requested' AND payload LIKE ?",
                 Integer.class, "%\"quoteId\":\"42\"%")).isEqualTo(1);
@@ -91,7 +91,7 @@ class ApprovalMatrixSubmissionIntegrationTest {
 
         MatrixSessions.user("vp", MatrixSessions.TENANT_A, "SalesVP");
         assertThat(inboxForQuote("42")).extracting(ApprovalRequestDto::getApprovalTier)
-                .containsExactly("DEAL_DESK");
+                .containsExactly("SALES_VP");
 
         MatrixSessions.user("other", MatrixSessions.TENANT_B, "DealDesk");
         assertThat(matrices.listPendingApprovals(null, null)).isEmpty();

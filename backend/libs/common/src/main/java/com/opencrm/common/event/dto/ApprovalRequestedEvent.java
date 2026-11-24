@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Emitted by approval-routing when {@code SubmitForApproval} creates the requests for one matrix route
- * (BC-04-03, DRG-443). Later serial steps are included with status {@code WAITING}; they are not yet inbox items.
+ * (BC-04-03, DRG-443). A Pass verdict does not emit this event. The approver role on each step comes from the matrix.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -17,6 +17,7 @@ public record ApprovalRequestedEvent(
         Long matrixId,
         Integer matrixVersion,
         String tenantId,
+        List<Long> approvalRequestIds,
         List<RequestedStep> steps) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)

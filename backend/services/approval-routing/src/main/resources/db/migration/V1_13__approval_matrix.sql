@@ -2,15 +2,10 @@
 -- Flyway Migration V1_13: Approval matrix (BC-04-03, DRG-443)
 -- =====================================================
 -- Versioned breach-to-role matrix, plus the columns a routed request needs
--- (tenant, bound matrix version, step, and WAITING for a later serial step).
--- Legacy rows stay valid: the new columns are nullable and WAITING is additive.
+-- (tenant, bound matrix version, and step). Legacy rows stay valid: the new columns are nullable.
+-- The approver tier is taken from the matrix. The submit body has no tier.
 -- =====================================================
 -- Rollback: db/rollback/V1_13__drop_approval_matrix.sql
-
-ALTER TABLE approval_requests DROP CONSTRAINT chk_approval_status;
-ALTER TABLE approval_requests ADD CONSTRAINT chk_approval_status CHECK (status IN (
-    'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'WAITING', 'SUPERSEDED'
-));
 
 ALTER TABLE approval_requests ADD COLUMN tenant_id VARCHAR(64);
 ALTER TABLE approval_requests ADD COLUMN matrix_id BIGINT;

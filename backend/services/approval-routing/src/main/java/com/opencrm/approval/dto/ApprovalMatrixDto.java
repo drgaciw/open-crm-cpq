@@ -24,5 +24,6 @@ public class ApprovalMatrixDto {
     private Long supersedesMatrixId;
     private String tenantId;
     private List<MatrixRuleDto> rules;
+    private List<MatrixStepDto> steps;
     private Instant createdAt;
 }

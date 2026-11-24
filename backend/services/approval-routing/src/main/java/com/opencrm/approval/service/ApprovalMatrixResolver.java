@@ -2,7 +2,6 @@ package com.opencrm.approval.service;
 
 import com.opencrm.approval.domain.MatrixStepMode;
 import com.opencrm.approval.domain.QuoteApprovalTier;
-import com.opencrm.approval.verdict.PolicyBreach;
 import com.opencrm.common.exception.BusinessException;
 
 import java.math.BigDecimal;
@@ -44,7 +43,11 @@ public final class ApprovalMatrixResolver {
     public record ResolvedRoute(long matrixId, int matrixVersion, List<ResolvedStep> steps) {
     }
 
-    public static ResolvedRoute resolve(long matrixId, int matrixVersion, List<Rule> rules, List<PolicyBreach> breaches) {
+    /** The breach facts the matrix uses. Amount selects the band. The approver role is not an input. */
+    public record RoutedBreach(String breachType, BigDecimal amount) {
+    }
+
+    public static ResolvedRoute resolve(long matrixId, int matrixVersion, List<Rule> rules, List<RoutedBreach> breaches) {
         if (rules == null || rules.isEmpty()) {
             throw new BusinessException("Approval matrix has no rules", "EMPTY_APPROVAL_MATRIX");
         }
@@ -53,7 +56,7 @@ public final class ApprovalMatrixResolver {
         }
 
         Map<Integer, StepBuilder> steps = new LinkedHashMap<>();
-        for (PolicyBreach breach : breaches) {
+        for (RoutedBreach breach : breaches) {
             if (breach == null || breach.breachType() == null || breach.breachType().isBlank()) {
                 throw new BusinessException("Breach type is required", "INVALID_BREACH");
             }

@@ -10,16 +10,15 @@ import com.opencrm.approval.domain.QuoteApprovalTier;
 import com.opencrm.approval.dto.ApprovalMatrixDto;
 import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.DefineApprovalMatrixRequest;
+import com.opencrm.approval.domain.PolicyVerdict;
 import com.opencrm.approval.dto.MatrixRuleDto;
 import com.opencrm.approval.dto.MatrixRuleRequest;
+import com.opencrm.approval.dto.MatrixStepDto;
 import com.opencrm.approval.dto.PolicyBreachRequest;
 import com.opencrm.approval.dto.SubmitForApprovalRequest;
 import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalMatrixRepository;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
-import com.opencrm.approval.verdict.PolicyBreach;
-import com.opencrm.approval.verdict.PolicyVerdict;
-import com.opencrm.approval.verdict.QuoteEvaluation;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ApprovalRequestedEvent;
@@ -39,6 +38,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -62,7 +62,7 @@ public class ApprovalMatrixService {
 
     private static final Set<String> DEFINERS = Set.of(DEAL_DESK, SALES_VP, CFO, ADMIN);
     private static final Set<String> SUBMITTERS = Set.of(CPQ_USER, DEAL_DESK, SALES_VP, CFO);
-    private static final Set<ApprovalStatus> OPEN = EnumSet.of(ApprovalStatus.PENDING, ApprovalStatus.WAITING);
+    private static final Set<ApprovalStatus> OPEN = EnumSet.of(ApprovalStatus.PENDING);
 
     private final ApprovalMatrixRepository approvalMatrixRepository;
     private final ApprovalRequestRepository approvalRequestRepository;
@@ -121,8 +121,9 @@ public class ApprovalMatrixService {
     }
 
     /**
-     * {@code SubmitForApproval}. Pass and Blocked create nothing. RequiresApproval creates one request per resolved
-     * role. The first step is {@link ApprovalStatus#PENDING}; later steps are {@link ApprovalStatus#WAITING}.
+     * {@code SubmitForApproval}. The matrix chooses every approver role. Pass creates nothing and emits nothing.
+     * Blocked is refused. RequiresApproval creates one {@link ApprovalStatus#PENDING} request per resolved role,
+     * including later serial steps.
      */
     public List<ApprovalRequestDto> submitForApproval(SubmitForApprovalRequest request) {
         Caller.User user = requireUser("Submitting for approval");
@@ -131,29 +132,26 @@ public class ApprovalMatrixService {
         if (!tenantId.equals(request.getQuoteTenantId().trim())) {
             throw crossTenant();
         }
-        QuoteEvaluation evaluation = new QuoteEvaluation(
-                request.getQuoteId().trim(),
-                request.getQuoteVersion().trim(),
-                request.getVerdict(),
-                toBreaches(request.getBreaches()));
-        if (evaluation.verdict() == PolicyVerdict.PASS) {
-            throw new BusinessException("The verdict is Pass; nothing is submitted",
-                    HttpStatus.CONFLICT, "NO_APPROVAL_REQUIRED");
+        String quoteId = request.getQuoteId().trim();
+        String quoteVersion = request.getQuoteVersion().trim();
+        ApprovalMatrix matrix = selectMatrix(tenantId, request.getMatrixId(), request.getMatrixVersion());
+        if (request.getVerdict() == PolicyVerdict.PASS) {
+            return List.of();
         }
-        if (evaluation.verdict() == PolicyVerdict.BLOCKED) {
+        if (request.getVerdict() == PolicyVerdict.BLOCKED) {
             throw new BusinessException("The verdict is Blocked; the quote is not routed for approval",
                     HttpStatus.CONFLICT, "POLICY_BLOCKED");
         }
-        if (evaluation.verdict() != PolicyVerdict.REQUIRES_APPROVAL) {
+        if (request.getVerdict() != PolicyVerdict.REQUIRES_APPROVAL) {
             throw new BusinessException("Unsupported verdict", "INVALID_VERDICT");
         }
 
         List<ApprovalRequest> open = approvalRequestRepository
-                .findByQuoteIdAndDeletedFalseAndStatusIn(evaluation.quoteId(), OPEN).stream()
+                .findByQuoteIdAndDeletedFalseAndStatusIn(quoteId, OPEN).stream()
                 .filter(row -> tenantId.equals(row.getTenantId()))
                 .toList();
         if (!open.isEmpty()) {
-            boolean sameVersion = open.stream().allMatch(row -> evaluation.quoteVersion().equals(row.getQuoteVersion()));
+            boolean sameVersion = open.stream().allMatch(row -> quoteVersion.equals(row.getQuoteVersion()));
             if (!sameVersion) {
                 throw new BusinessException("An approval route is already open for this quote",
                         HttpStatus.CONFLICT, "APPROVAL_ALREADY_OPEN");
@@ -161,25 +159,22 @@ public class ApprovalMatrixService {
             return approvalRequestMapper.toDtoList(open);
         }
 
-        ApprovalMatrix matrix = selectMatrix(tenantId, request.getMatrixId());
         ApprovalMatrixResolver.ResolvedRoute route = ApprovalMatrixResolver.resolve(
                 matrix.getId(),
                 matrix.getMatrixVersion(),
                 matrix.getRules().stream().map(ApprovalMatrixService::toResolverRule).toList(),
-                evaluation.breaches());
+                toBreaches(request.getBreaches()));
 
-        int firstOrder = route.steps().stream().mapToInt(ApprovalMatrixResolver.ResolvedStep::order).min().orElseThrow();
         List<ApprovalRequest> created = new ArrayList<>();
         for (ApprovalMatrixResolver.ResolvedStep step : route.steps()) {
-            ApprovalStatus status = step.order() == firstOrder ? ApprovalStatus.PENDING : ApprovalStatus.WAITING;
             String breaches = String.join(",", step.breachTypes());
             for (QuoteApprovalTier role : step.roles()) {
                 QuoteApprovalTierMapper.MappedApproval mapped = QuoteApprovalTierMapper.map(role);
                 ApprovalRequest entity = ApprovalRequest.builder()
-                        .quoteId(evaluation.quoteId())
-                        .quoteVersion(evaluation.quoteVersion())
+                        .quoteId(quoteId)
+                        .quoteVersion(quoteVersion)
                         .approvalType(mapped.approvalType())
-                        .status(status)
+                        .status(ApprovalStatus.PENDING)
                         .tenantId(tenantId)
                         .matrixId(matrix.getId())
                         .matrixVersion(matrix.getMatrixVersion())
@@ -196,15 +191,36 @@ public class ApprovalMatrixService {
             }
         }
 
-        publishRequested(evaluation, matrix, created);
+        publishRequested(quoteId, quoteVersion, matrix, created);
         log.info("Submitted quote {} version {} on matrix {} v{} as {} requests",
-                evaluation.quoteId(), evaluation.quoteVersion(), matrix.getId(), matrix.getMatrixVersion(), created.size());
+                quoteId, quoteVersion, matrix.getId(), matrix.getMatrixVersion(), created.size());
         return approvalRequestMapper.toDtoList(created);
     }
 
     /**
-     * {@code ListPendingApprovals} for the caller. Only {@link ApprovalStatus#PENDING} rows in the caller's tenant
-     * whose tier {@link ApprovalAuthority} allows them to decide. {@link ApprovalStatus#WAITING} stays out of the inbox.
+     * {@code ListPendingApprovals(approver)}. The queue is that role's pending rows only. A higher role does not
+     * see another role's items. The caller is not choosing a tier for a new route.
+     */
+    @Transactional(readOnly = true)
+    public List<ApprovalRequestDto> listPendingApprovals(QuoteApprovalTier approver) {
+        if (approver == null) {
+            throw new BusinessException("Approver role is required", "APPROVER_ROLE_REQUIRED");
+        }
+        String tenantId = ApprovalTenancy.currentTenantId();
+        List<ApprovalRequest> rows = tenantId == null
+                ? approvalRequestRepository.findByStatus(ApprovalStatus.PENDING)
+                : approvalRequestRepository.findPendingVisibleToTenant(tenantId);
+        List<ApprovalRequest> mine = rows.stream()
+                .filter(row -> approver.name().equals(row.getApprovalTier()))
+                .filter(row -> tenantId == null || tenantId.equals(row.getTenantId()))
+                .sorted(Comparator.comparing(ApprovalRequest::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        return approvalRequestMapper.toDtoList(mine);
+    }
+
+    /**
+     * Caller inbox. A person sees pending rows only for the approver roles they hold, in their tenant.
+     * Holding a higher role does not reveal another role's queue. Asking for a role they do not hold is refused.
      */
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> listPendingApprovals(String tier, String requestedTenantId) {
@@ -213,20 +229,30 @@ public class ApprovalMatrixService {
         if (requestedTenantId != null && !requestedTenantId.isBlank() && !tenantId.equals(requestedTenantId.trim())) {
             throw crossTenant();
         }
-        if (tier != null && !tier.isBlank() && !ApprovalAuthority.mayDecide(user.authorities(), tier)) {
-            throw new BusinessException("Listing a " + tier.trim() + " queue needs a role that may decide it",
+        Set<String> held = exactRoles(user);
+        if (tier != null && !tier.isBlank() && !held.contains(tier.trim().toUpperCase(Locale.ROOT))) {
+            throw new BusinessException("Listing a " + tier.trim() + " queue needs that approver role",
                     HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED");
         }
-        List<ApprovalRequest> rows = (tier == null || tier.isBlank())
-                ? approvalRequestRepository.findPendingVisibleToTenant(tenantId)
-                : approvalRequestRepository.findPendingVisibleToTenantAndTier(tenantId, tier.trim().toUpperCase(Locale.ROOT));
+        String requested = tier == null || tier.isBlank() ? null : tier.trim().toUpperCase(Locale.ROOT);
+        List<ApprovalRequest> rows = approvalRequestRepository.findPendingVisibleToTenant(tenantId);
         List<ApprovalRequest> mine = rows.stream()
                 .filter(row -> tenantId.equals(row.getTenantId()))
-                .filter(row -> ApprovalAuthority.mayDecide(user.authorities(), row.getApprovalTier()))
+                .filter(row -> held.contains(row.getApprovalTier()))
+                .filter(row -> requested == null || requested.equals(row.getApprovalTier()))
                 .sorted(Comparator.comparing(ApprovalRequest::getSubmittedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(ApprovalRequest::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
         return approvalRequestMapper.toDtoList(mine);
+    }
+
+    private ApprovalMatrix selectMatrix(String tenantId, Long matrixId, Integer matrixVersion) {
+        ApprovalMatrix matrix = selectMatrix(tenantId, matrixId);
+        if (matrixVersion != null && !matrixVersion.equals(matrix.getMatrixVersion())) {
+            throw new BusinessException("Approval matrix version does not match",
+                    HttpStatus.CONFLICT, "MATRIX_VERSION_MISMATCH");
+        }
+        return matrix;
     }
 
     private ApprovalMatrix selectMatrix(String tenantId, Long matrixId) {
@@ -253,7 +279,8 @@ public class ApprovalMatrixService {
         return active.get(0);
     }
 
-    private void publishRequested(QuoteEvaluation evaluation, ApprovalMatrix matrix, List<ApprovalRequest> created) {
+    private void publishRequested(String quoteId, String quoteVersion, ApprovalMatrix matrix, List<ApprovalRequest> created) {
+        List<Long> ids = created.stream().map(ApprovalRequest::getId).toList();
         List<ApprovalRequestedEvent.RequestedStep> steps = created.stream()
                 .map(row -> new ApprovalRequestedEvent.RequestedStep(
                         row.getId(),
@@ -264,17 +291,32 @@ public class ApprovalMatrixService {
                         row.getBreachTypes()))
                 .toList();
         ApprovalRequestedEvent event = new ApprovalRequestedEvent(
-                evaluation.quoteId(),
-                evaluation.quoteVersion(),
+                quoteId,
+                quoteVersion,
                 matrix.getId(),
                 matrix.getMatrixVersion(),
                 matrix.getTenantId(),
+                ids,
                 steps);
         outboxEventPublisher.publish(
                 "ApprovalRequest",
-                evaluation.quoteId(),
+                quoteId,
                 EventContractRegistry.APPROVAL_REQUESTED_V1,
                 event);
+    }
+
+    private static Set<String> exactRoles(Caller.User user) {
+        Set<String> held = new LinkedHashSet<>();
+        if (user.authorities().contains(DEAL_DESK)) {
+            held.add("DEAL_DESK");
+        }
+        if (user.authorities().contains(SALES_VP)) {
+            held.add("SALES_VP");
+        }
+        if (user.authorities().contains(CFO)) {
+            held.add("CFO");
+        }
+        return held;
     }
 
     private ApprovalMatrix requireMatrix(Long id) {
@@ -383,13 +425,12 @@ public class ApprovalMatrixService {
                 rule.getApproverRole());
     }
 
-    private static List<PolicyBreach> toBreaches(List<PolicyBreachRequest> breaches) {
+    private static List<ApprovalMatrixResolver.RoutedBreach> toBreaches(List<PolicyBreachRequest> breaches) {
         if (breaches == null) {
             return List.of();
         }
         return breaches.stream()
-                .map(row -> new PolicyBreach(row.getBreachType(), row.getActual(), row.getLimit(),
-                        row.getAmount(), row.getClauseCode()))
+                .map(row -> new ApprovalMatrixResolver.RoutedBreach(row.getBreachType(), row.getAmount()))
                 .toList();
     }
 
@@ -414,7 +455,43 @@ public class ApprovalMatrixService {
                 .supersedesMatrixId(matrix.getSupersedesId())
                 .tenantId(matrix.getTenantId())
                 .rules(rules)
+                .steps(groupSteps(matrix.getRules()))
                 .createdAt(matrix.getCreatedAt())
                 .build();
+    }
+
+    private static List<MatrixStepDto> groupSteps(List<ApprovalMatrixRule> rules) {
+        List<MatrixStepDto> steps = new ArrayList<>();
+        if (rules == null) {
+            return steps;
+        }
+        for (ApprovalMatrixRule rule : rules) {
+            MatrixStepDto current = steps.isEmpty() ? null : steps.get(steps.size() - 1);
+            if (current != null
+                    && current.getSequence().equals(rule.getStepOrder())
+                    && current.getMode() == rule.getStepMode()
+                    && sameAmount(current.getMinAmountInclusive(), rule.getAmountMin())
+                    && sameAmount(current.getMaxAmountExclusive(), rule.getAmountMax())) {
+                current.getRoles().add(rule.getApproverRole());
+            } else {
+                List<QuoteApprovalTier> roles = new ArrayList<>();
+                roles.add(rule.getApproverRole());
+                steps.add(MatrixStepDto.builder()
+                        .sequence(rule.getStepOrder())
+                        .mode(rule.getStepMode())
+                        .roles(roles)
+                        .minAmountInclusive(rule.getAmountMin())
+                        .maxAmountExclusive(rule.getAmountMax())
+                        .build());
+            }
+        }
+        return steps;
+    }
+
+    private static boolean sameAmount(BigDecimal left, BigDecimal right) {
+        if (left == null || right == null) {
+            return left == null && right == null;
+        }
+        return left.compareTo(right) == 0;
     }
 }

@@ -36,10 +36,6 @@ BEGIN
         EXECUTE 'ALTER TABLE approval_requests DROP COLUMN IF EXISTS routing_step';
         EXECUTE 'ALTER TABLE approval_requests DROP COLUMN IF EXISTS step_mode';
         EXECUTE 'ALTER TABLE approval_requests DROP COLUMN IF EXISTS breach_types';
-        EXECUTE 'ALTER TABLE approval_requests DROP CONSTRAINT IF EXISTS chk_approval_status';
-        EXECUTE $sql$ALTER TABLE approval_requests ADD CONSTRAINT chk_approval_status CHECK (status IN (
-            'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'SUPERSEDED'
-        ))$sql$;
     END IF;
 
     EXECUTE 'DROP TABLE IF EXISTS approval_matrix_rules';
