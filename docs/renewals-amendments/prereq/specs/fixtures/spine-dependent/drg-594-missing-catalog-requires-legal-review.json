@@ -1,0 +1,24 @@
+{
+    "issue": "DRG-594",
+    "ac_id": "AC-594-9",
+    "case": "missing-catalog-requires-legal-review",
+    "note": "Fail closed. Missing catalog data requires legal review even when the SKU is already on the quote.",
+    "status": "Decided",
+    "owner_decision": "B. drg owner ruling, 7:15 PM CT Nov 23 2026",
+    "input": {
+        "document_state_before": "DRAFT",
+        "quote_skus": ["SKU-A"],
+        "catalog": [],
+        "lines": [
+            {"action_code": "ADD", "target_sku": "SKU-A"}
+        ],
+        "header_edits": []
+    },
+    "expected": {
+        "legal_review_required": true,
+        "transition_to_in_review": "refused",
+        "document_state": "DRAFT",
+        "http_status": 409,
+        "error_code": "LEGAL_REVIEW_REQUIRED"
+    }
+}

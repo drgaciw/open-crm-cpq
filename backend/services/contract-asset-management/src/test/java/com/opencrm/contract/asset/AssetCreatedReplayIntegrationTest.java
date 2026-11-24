@@ -62,12 +62,13 @@ class AssetCreatedReplayIntegrationTest {
     @Test
     void replayingActivationTwiceYieldsOneAssetPerLine() throws Exception {
         QuoteAcceptedEvent event = AssetActivationTestSupport.twoLines(AssetActivationTestSupport.fixture());
+        event.setTenantId(AssetReadTestCaller.TENANT);
         String quoteId = "it-asset-" + UUID.randomUUID();
         event.setQuoteId(quoteId);
         event.getQuote().setQuoteId(quoteId);
 
-        activation.apply(event);
-        activation.apply(event);
+        activation.apply(event, AssetReadTestCaller.TENANT);
+        activation.apply(event, AssetReadTestCaller.TENANT);
 
         assertThat(AssetController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/api/v1/assets");

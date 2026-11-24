@@ -6,7 +6,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-/** Coarse installed-base read capability; this is not account or tenant isolation. */
+/** Role and delegated-scope gate. Tenant scope is {@link InstalledBaseReadScope}. This is not account isolation. */
 final class InstalledBaseReadAccess {
     private InstalledBaseReadAccess() { }
 
