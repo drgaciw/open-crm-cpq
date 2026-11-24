@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -34,12 +35,11 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * C16 for the price-book PUT clear flags. Ordinary field updates stay open to any authenticated caller.
- * Admin is the only role that may send {@code clearRegion} or {@code clearExpirationDate}.
+ * C16 for {@code PUT /api/v1/price-books/{id}}. The whole update, including a rename with no clear flags,
+ * is Admin-only, the same as the other catalog PUTs.
  */
 @ExtendWith(SpringExtension.class)
 @WebAppConfiguration
@@ -60,6 +60,7 @@ class PriceBookUpdateSecurityTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
+    @ComponentScan(basePackages = "com.opencrm.pricebook.security")
     @ImportAutoConfiguration(OpenCrmSecurityAutoConfiguration.class)
     @Import({TestJwtDecoderConfiguration.class, GlobalExceptionHandler.class, PriceBookController.class})
     static class App {
@@ -95,8 +96,7 @@ class PriceBookUpdateSecurityTest {
     void refusedRoleClearIs403(String role) throws Exception {
         mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(CLEAR)
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", role).bearer()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PRICE_BOOK_CLEAR_FORBIDDEN"));
+                .andExpect(status().isForbidden());
         verify(BOOKS, never()).update(any(), any());
     }
 
@@ -109,8 +109,7 @@ class PriceBookUpdateSecurityTest {
     void rolelessClearIs403() throws Exception {
         mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(CLEAR)
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice").bearer()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PRICE_BOOK_CLEAR_FORBIDDEN"));
+                .andExpect(status().isForbidden());
         verify(BOOKS, never()).update(any(), any());
     }
 
@@ -118,8 +117,7 @@ class PriceBookUpdateSecurityTest {
     void internalInvokeClearIs403() throws Exception {
         mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(CLEAR)
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.service("pricebook", "Internal.Invoke").bearer()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PRICE_BOOK_CLEAR_FORBIDDEN"));
+                .andExpect(status().isForbidden());
         verify(BOOKS, never()).update(any(), any());
     }
 
@@ -131,10 +129,48 @@ class PriceBookUpdateSecurityTest {
         verify(BOOKS).update(any(), any());
     }
 
-    @Test
-    void cpqUserRenameWithoutClearFlagsSucceeds() throws Exception {
+    @ParameterizedTest(name = "{0} rename without clear flags is 403")
+    @ValueSource(strings = {"CPQ.User", "DealDesk", "SalesVP", "CFO", "InstalledBase.Read", "NotARealRole"})
+    void refusedRoleRenameIs403(String role) throws Exception {
         mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(RENAME)
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", role).bearer()))
+                .andExpect(status().isForbidden());
+        verify(BOOKS, never()).update(any(), any());
+    }
+
+    @Test
+    void cpqUserRenameWithoutClearFlagsIs403() throws Exception {
+        refusedRoleRenameIs403("CPQ.User");
+    }
+
+    @Test
+    void rolelessRenameIs403() throws Exception {
+        mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(RENAME)
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice").bearer()))
+                .andExpect(status().isForbidden());
+        verify(BOOKS, never()).update(any(), any());
+    }
+
+    @Test
+    void internalInvokeRenameIs403() throws Exception {
+        mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(RENAME)
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.service("pricebook", "Internal.Invoke").bearer()))
+                .andExpect(status().isForbidden());
+        verify(BOOKS, never()).update(any(), any());
+    }
+
+    @Test
+    void cpqUserEntryUpdateIsNotAdminGated() throws Exception {
+        mvc.perform(put("/api/v1/price-books/42/entries/7").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"listPrice\":1}")
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("alice", "CPQ.User").bearer()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void adminRenameSucceeds() throws Exception {
+        mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(RENAME)
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("ada", "Admin").bearer()))
                 .andExpect(status().isOk());
         verify(BOOKS).update(any(), any());
     }
