@@ -83,18 +83,20 @@ Do **not** rewrite [#666](https://github.com/drgaciw/open-crm-cpq/pull/666) or [
 
 Every row below is **Proposed, unaccepted, owner decision required** (`Status: Proposed`). Alternatives sit beside the recommendation. Picking a row authorizes **no** code, migration, flag, dual-read flip, state-machine change, or deploy. Product code for commercial amendment approvals stays **NO-GO** until they are closed (or explicitly deferred).
 
-| ID | Question | Recommendation (Proposed) | Alternatives | Depends on / blocked by |
-|---|---|---|---|---|
-| **OQ-560-1** | **Route home** for an amendment commercial approval | One `CONTRACT_MODIFICATION` row in existing approval-routing. No second engine, no `InApproval`, no `supersedesChangeId` (#666 G1-A) | Map via `QUOTE`/`GOVERNANCE` as BFF does (G1-B); host DRG-601 chain tables (G1-C); research sketch `InApproval` + `supersedesChangeId` (G1-D) | DRG-443 backlog; parked DRG-601; Cluster E statuses |
-| **OQ-560-2** | **When** the commercial row fires | OQ17 unchanged: override, backdating, or total ARR delta above Finance-set threshold; otherwise no row and `approval_ref` null (#666 G2-A). Invent **no** threshold number here | Every submit opens a row (G2-B); `SYSTEM` approved row below threshold (G2-C) | OQ17 DEFAULT PROPOSED; Finance threshold; DRG-609 entitlements/conversion pending |
-| **OQ-560-3** | **Who decides** | Person ≠ requester; override → `SALES_VP`; backdating / ARR-delta-only → `DEAL_DESK`; no new Entra role; legal override stays refuse-until-named on DRG-594 (#666 G3-A) | `CFO` on every amendment (G3-B); seller self-approval (G3-C); name/grant legal role here (G3-D) | `ApprovalAuthority` / `authorizeDecision` as read; A4; #833 OQ-594-3 (cite only) |
-| **OQ-560-4** | **Boundary** vs legal (DRG-594 / #833) and parked DRG-591 | Legal = `DRAFT`→`IN_REVIEW` classification guard only (**not** an `approval_requests` row). Commercial row, when OQ-560-2 fires, blocks `IN_REVIEW`→`APPROVED`. Do **not** unpark DRG-591. Do **not** adopt open OQ-594-* (#666 G4-A; #833 OQ-594-4 cite) | Legal as `TERMS` / combined `CONTRACT_MODIFICATION` row (G4-B/C); fold legal into this story; unpark DRG-591 | #833 open OQs (cite-only); OQ25; DRG-591 park |
-| **OQ-560-5** | **Fields** the route uses | Existing columns only. `quote_id` = continuation quote; `line_id` null (whole-document); `approval_ref` holds request id when a row exists, else null (#666 G5-A). No CAM / approval-routing migration in this story | New document-id column before any route (G5-B); leave `approval_ref` empty and keep id only on the quote (G5-C) | `ApprovalService.submit` requires `quoteId`; D-RACE binding; CAM `V1_16`–`V1_21` reserved |
-| **OQ-560-6** | **Void on pre-execution revision** | Clear `approval_ref` on the new `DRAFT`. Map prior `PENDING` approval row to `SUPERSEDED` (`superseded_by` / `superseded_at`). Do **not** update an `APPROVED` row (#666 G6-A; OQ6 + D-STORAGE) | `cancel()` the pending row (G6-B); add `VOIDED` status via later approval-routing migration (G6-C) | OQ6 A1; ApprovalStatus.SUPERSEDED; D-PRICED-WRITE |
-| **OQ-560-7** | **Commercial audit home** vs price snapshot | Approval row is the commercial decision. Price snapshot stays the #663 pricing-owned store. Classification event type stays open with G9 / #833 OQ-594-5 — **not closed here** (#666 G7-A) | Classification only in `reason` (G7-B); approval columns on DRG-564 sketch (G7-C); new CAM classification table now (G7-D) | #663 pricing paragraph; DRG-564 stays proposal; G9 OPEN |
-| **OQ-560-8** | **Uplift / discount** vs this route | Precedence CLAUSE→LINE→AGREEMENT→ACCOUNT→RULES is not a route. Resolved uplift is not a trigger. Manual override is OQ17. Discount Kafka path stays `DISCOUNT` (#666 G8-A) | Every non-zero uplift opens `GOVERNANCE` (G8-B); route overrides as `DISCOUNT` (G8-C); hold price until approval row exists (G8-D) | Accepted uplift D-04; DRG-549 OVERRIDE out of first slice; discount consumer |
-| **OQ-560-9** | **Later local classification event** whose type is not chosen | **OPEN FORK.** No event name. No schema. No S6 topic. Aligns with #666 G9 and leaves naming to a later decision / #833 OQ-594-5 without adopting that OQ | Later named type + payload (G9-B); S6 domain topic now (G9-C) | D-RACE “no new S6 topic”; #833 OQ-594-5 cite-only |
-| **OQ-560-IMPL** | Implementation / migration / writer authorization | Separate implementation story **after** OQ-560-1..9 (or deferred subset) close; additive only; never edit landed V1_7/V1_8; never consume CAM `V1_16`–`V1_21`; never flip `approvals.legacy-local-read-enabled` | Piggy-back writer before forks close; alter V1_7 in place (forbidden); flip dual-read as a side effect (forbidden) | Owner implementation release; S3 / S5 timing; holds in [AGENT.md](../../../AGENT.md); ADR-005 |
+**Disposition (2026-11-24):** each open row is **carried into DRG-443** (BC-04-03 approval matrix). The ID is unchanged. Carrying a row does not close it, does not adopt its recommendation, and does not authorize a `CONTRACT_MODIFICATION` writer, a second routing engine, an `InApproval` state, a dual-read flip, or unparking DRG-591 / DRG-601. The tracking copy lives in [drg-443-carried-oq-560.md](drg-443-carried-oq-560.md).
+
+| ID | Question | Recommendation (Proposed) | Alternatives | Depends on / blocked by | Disposition |
+|---|---|---|---|---|---|
+| **OQ-560-1** | **Route home** for an amendment commercial approval | One `CONTRACT_MODIFICATION` row in existing approval-routing. No second engine, no `InApproval`, no `supersedesChangeId` (#666 G1-A) | Map via `QUOTE`/`GOVERNANCE` as BFF does (G1-B); host DRG-601 chain tables (G1-C); research sketch `InApproval` + `supersedesChangeId` (G1-D) | DRG-443; parked DRG-601; Cluster E statuses | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-2** | **When** the commercial row fires | OQ17 unchanged: override, backdating, or total ARR delta above Finance-set threshold; otherwise no row and `approval_ref` null (#666 G2-A). Invent **no** threshold number here | Every submit opens a row (G2-B); `SYSTEM` approved row below threshold (G2-C) | OQ17 DEFAULT PROPOSED; Finance threshold; DRG-609 entitlements/conversion pending | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-3** | **Who decides** | Person ≠ requester; override → `SALES_VP`; backdating / ARR-delta-only → `DEAL_DESK`; no new Entra role; legal override stays refuse-until-named on DRG-594 (#666 G3-A) | `CFO` on every amendment (G3-B); seller self-approval (G3-C); name/grant legal role here (G3-D) | `ApprovalAuthority` / `authorizeDecision` as read; A4; #833 OQ-594-3 (cite only) | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-4** | **Boundary** vs legal (DRG-594 / #833) and parked DRG-591 | Legal = `DRAFT`→`IN_REVIEW` classification guard only (**not** an `approval_requests` row). Commercial row, when OQ-560-2 fires, blocks `IN_REVIEW`→`APPROVED`. Do **not** unpark DRG-591. Do **not** adopt open OQ-594-* (#666 G4-A; #833 OQ-594-4 cite) | Legal as `TERMS` / combined `CONTRACT_MODIFICATION` row (G4-B/C); fold legal into this story; unpark DRG-591 | #833 open OQs (cite-only); OQ25; DRG-591 park | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-5** | **Fields** the route uses | Existing columns only. `quote_id` = continuation quote; `line_id` null (whole-document); `approval_ref` holds request id when a row exists, else null (#666 G5-A). No CAM / approval-routing migration in this story | New document-id column before any route (G5-B); leave `approval_ref` empty and keep id only on the quote (G5-C) | `ApprovalService.submit` requires `quoteId`; D-RACE binding; CAM `V1_16`–`V1_21` reserved | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-6** | **Void on pre-execution revision** | Clear `approval_ref` on the new `DRAFT`. Map prior `PENDING` approval row to `SUPERSEDED` (`superseded_by` / `superseded_at`). Do **not** update an `APPROVED` row (#666 G6-A; OQ6 + D-STORAGE) | `cancel()` the pending row (G6-B); add `VOIDED` status via later approval-routing migration (G6-C) | OQ6 A1; ApprovalStatus.SUPERSEDED; D-PRICED-WRITE | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-7** | **Commercial audit home** vs price snapshot | Approval row is the commercial decision. Price snapshot stays the #663 pricing-owned store. Classification event type stays open with G9 / #833 OQ-594-5 — **not closed here** (#666 G7-A) | Classification only in `reason` (G7-B); approval columns on DRG-564 sketch (G7-C); new CAM classification table now (G7-D) | #663 pricing paragraph; DRG-564 stays proposal; G9 OPEN | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-8** | **Uplift / discount** vs this route | Precedence CLAUSE→LINE→AGREEMENT→ACCOUNT→RULES is not a route. Resolved uplift is not a trigger. Manual override is OQ17. Discount Kafka path stays `DISCOUNT` (#666 G8-A) | Every non-zero uplift opens `GOVERNANCE` (G8-B); route overrides as `DISCOUNT` (G8-C); hold price until approval row exists (G8-D) | Accepted uplift D-04; DRG-549 OVERRIDE out of first slice; discount consumer | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-9** | **Later local classification event** whose type is not chosen | **OPEN FORK.** No event name. No schema. No S6 topic. Aligns with #666 G9 and leaves naming to a later decision / #833 OQ-594-5 without adopting that OQ | Later named type + payload (G9-B); S6 domain topic now (G9-C) | D-RACE “no new S6 topic”; #833 OQ-594-5 cite-only | Carried into DRG-443 (still Proposed, not closed) |
+| **OQ-560-IMPL** | Implementation / migration / writer authorization | Separate implementation story **after** OQ-560-1..9 (or deferred subset) close; additive only; never edit landed V1_7/V1_8; never consume CAM `V1_16`–`V1_21`; never flip `approvals.legacy-local-read-enabled` | Piggy-back writer before forks close; alter V1_7 in place (forbidden); flip dual-read as a side effect (forbidden) | Owner implementation release; S3 / S5 timing; holds in [AGENT.md](../../../AGENT.md); ADR-005 | Carried into DRG-443 (still Proposed, not closed) |
 
 `Owner decision: ___ (drg, time)` for every row above.
 
@@ -111,7 +113,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **C. DRG-601 skeleton tables** | Unparks parked chain/threshold design. |
 | **D. `InApproval` + `supersedesChangeId`** | New states / columns; contradicts Cluster E status list and OQ6 revision model. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-2 — When the commercial row fires
 
@@ -121,7 +123,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Every submit** | Always creates `approval_requests`. |
 | **C. System-approved row below threshold** | Forces non-null `approval_ref`; no such writer was read. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-3 — Who decides
 
@@ -132,7 +134,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **C. Seller self-approval** | Contradicts `SELF_APPROVAL` refuse. |
 | **D. Name legal role here** | Out of scope; belongs to DRG-594 / refuse-until-named. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-4 — Boundary vs DRG-594 / parked DRG-591
 
@@ -142,7 +144,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Legal as approval-routing row** | Couples legal to this engine / tiers. |
 | **C. Unpark DRG-591** | Forbidden by delivery holds for this residual brief. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-5 — Fields
 
@@ -152,7 +154,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Document id on the request first** | Blocks route on a new column. |
 | **C. Quote only** | Leaves `approval_ref` empty. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-6 — Void on revision
 
@@ -162,7 +164,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Cancel pending** | Uses `CANCELLED` instead of supersession history link. |
 | **C. New `VOIDED` status** | Extra approval-routing migration; not written here. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-7 — Audit entries
 
@@ -173,7 +175,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **C. DRG-564 sketch columns** | Takes a proposal that stays unaccepted. |
 | **D. New CAM classification table now** | Migration; reserved band risk. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-8 — Uplift and discount waivers
 
@@ -184,7 +186,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **C. Overrides as `DISCOUNT`** | Retargets the discount consumer. |
 | **D. Hold price until approval exists** | DRG-549 alternative not adopted for first slice. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-9 — Classification event type (OPEN)
 
@@ -194,7 +196,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Later named type** | Separate naming decision. |
 | **C. S6 topic now** | Contradicts delegated “no new S6 topic” unless a later story authorizes it. |
 
-**Recommended (Proposed):** A (OPEN). `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A (OPEN). `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ### OQ-560-IMPL — Implementation gate
 
@@ -204,7 +206,7 @@ Every row below is **Proposed, unaccepted, owner decision required** (`Status: P
 | **B. Fold into S3/S5 before forks close** | Couples unstarted delivery to open product forks. |
 | **C. Edit V1_7 / flip dual-read** | Forbidden. |
 
-**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`.
+**Recommended (Proposed):** A. `Status: Proposed`. `Owner decision: ___ (drg, time)`. Disposition: Carried into DRG-443 (still Proposed, not closed).
 
 ## Out of scope (explicit)
 
