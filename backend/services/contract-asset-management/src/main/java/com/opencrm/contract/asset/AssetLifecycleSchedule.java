@@ -31,7 +31,8 @@ public class AssetLifecycleSchedule {
     }
 
     public AssetLifecycleChange enqueue(Enqueue command) {
-        throw new UnsupportedOperationException("lifecycle schedule enqueue is not implemented");
+        return changes.findByDedupeKey(command.dedupeKey())
+                .orElseGet(() -> insert(command));
     }
 
     private AssetLifecycleChange insert(Enqueue command) {

@@ -7,6 +7,14 @@ package com.opencrm.contract.asset;
 public final class AssetLifecycleTransitions {
 
     public boolean allowed(AssetStatus from, AssetStatus to) {
-        return false;
+        if (from == null || to == null) {
+            return false;
+        }
+        return switch (from) {
+            case ACTIVE, AMENDED -> to == AssetStatus.AMENDED
+                    || to == AssetStatus.TERMINATED
+                    || to == AssetStatus.SUPERSEDED;
+            case SUPERSEDED, TERMINATED -> false;
+        };
     }
 }

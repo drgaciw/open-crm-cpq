@@ -63,7 +63,32 @@ public class AssetLifecycleDueRunner {
      */
     @Transactional
     public int runDue() {
-        return 0;
+        if (!readiness.isReady()) {
+            return 0;
+        }
+        LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
+        List<AssetLifecycleChange> due = changes.lockDue(today, batchSize);
+        Set<String> blockedLines = new HashSet<>();
+        int applied = 0;
+        for (AssetLifecycleChange change : due) {
+            if (change.getEffectiveDate().isAfter(today)) {
+                continue;
+            }
+            String line = lineKey(change);
+            if (blockedLines.contains(line) || earlierBlocking(change)) {
+                continue;
+            }
+            try {
+                applierFor(change.getKind()).apply(change);
+                change.markApplied(clock.instant());
+                applied++;
+            } catch (RuntimeException ex) {
+                change.markFailed(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+                blockedLines.add(line);
+                auditFailure(change);
+            }
+        }
+        return applied;
     }
 
     private boolean earlierBlocking(AssetLifecycleChange change) {
