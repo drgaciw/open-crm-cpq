@@ -2,7 +2,10 @@ package com.opencrm.approval.controller;
 
 import com.opencrm.approval.dto.CommercialPolicyCreateRequest;
 import com.opencrm.approval.dto.CommercialPolicyDto;
+import com.opencrm.approval.dto.QuoteEvaluationDto;
+import com.opencrm.approval.dto.QuoteEvaluationRequest;
 import com.opencrm.approval.service.CommercialPolicyService;
+import com.opencrm.approval.service.QuotePolicyEvaluationService;
 import com.opencrm.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +29,7 @@ import java.util.List;
 public class CommercialPolicyController {
 
     private final CommercialPolicyService commercialPolicyService;
+    private final QuotePolicyEvaluationService quotePolicyEvaluationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -54,6 +58,12 @@ public class CommercialPolicyController {
             @RequestParam(required = false) String productFamily,
             @RequestParam(required = false) String region) {
         return ApiResponse.success(commercialPolicyService.findApplicable(segment, productFamily, region));
+    }
+
+    @PostMapping("/evaluate")
+    @Operation(summary = "EvaluateQuote: verdict and breach explanations for one quote version")
+    public ApiResponse<QuoteEvaluationDto> evaluate(@Valid @RequestBody QuoteEvaluationRequest request) {
+        return ApiResponse.success(quotePolicyEvaluationService.evaluate(request));
     }
 
     @PostMapping("/{id}/deprecate")
