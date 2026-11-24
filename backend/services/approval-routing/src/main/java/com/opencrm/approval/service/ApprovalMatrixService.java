@@ -79,10 +79,7 @@ public class ApprovalMatrixService {
         ApprovalMatrix predecessor = null;
         int nextVersion = 1;
         if (request.getSupersedesMatrixId() != null) {
-            predecessor = requireMatrix(request.getSupersedesMatrixId());
-            if (!tenantId.equals(predecessor.getTenantId())) {
-                throw crossTenant();
-            }
+            predecessor = requireTenantMatrix(request.getSupersedesMatrixId(), tenantId);
             if (predecessor.getStatus() != MatrixStatus.ACTIVE) {
                 throw new BusinessException("Only an ACTIVE matrix version can be revised",
                         HttpStatus.CONFLICT, "MATRIX_NOT_ACTIVE");
@@ -113,10 +110,7 @@ public class ApprovalMatrixService {
     public ApprovalMatrixDto getById(Long id) {
         Caller.User user = requireUser("Reading an approval matrix");
         requireRole(user, DEFINERS, "MATRIX_ROLE_REQUIRED", "Reading an approval matrix");
-        ApprovalMatrix matrix = requireMatrix(id);
-        if (!requireTenant().equals(matrix.getTenantId())) {
-            throw crossTenant();
-        }
+        ApprovalMatrix matrix = requireTenantMatrix(id, requireTenant());
         return toDto(matrix);
     }
 
@@ -257,10 +251,7 @@ public class ApprovalMatrixService {
 
     private ApprovalMatrix selectMatrix(String tenantId, Long matrixId) {
         if (matrixId != null) {
-            ApprovalMatrix matrix = requireMatrix(matrixId);
-            if (!tenantId.equals(matrix.getTenantId())) {
-                throw crossTenant();
-            }
+            ApprovalMatrix matrix = requireTenantMatrix(matrixId, tenantId);
             if (matrix.getStatus() != MatrixStatus.ACTIVE) {
                 throw new BusinessException("Approval matrix " + matrixId + " is not active",
                         HttpStatus.CONFLICT, "MATRIX_NOT_ACTIVE");
@@ -324,6 +315,18 @@ public class ApprovalMatrixService {
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalMatrix", id));
     }
 
+    /**
+     * The matrix with this id in the caller's tenant. A matrix of another tenant answers exactly like a missing id
+     * (404), so a matrix id lookup is not an oracle for which ids exist in other tenants (H4 owner decision,
+     * 2026-11-24). A tenant parameter that does not match the token stays 403 {@code CROSS_TENANT}: see
+     * {@link #crossTenant()}.
+     */
+    private ApprovalMatrix requireTenantMatrix(Long id, String tenantId) {
+        return approvalMatrixRepository.findByIdAndDeletedFalse(id)
+                .filter(matrix -> tenantId.equals(matrix.getTenantId()))
+                .orElseThrow(() -> new ResourceNotFoundException("ApprovalMatrix", id));
+    }
+
     private Caller.User requireUser(String action) {
         return currentActor.caller()
                 .filter(Caller.User.class::isInstance)
@@ -348,6 +351,7 @@ public class ApprovalMatrixService {
         return tenantId;
     }
 
+    /** For a tenant request parameter that differs from the token tenant. It touches no stored row. */
     private static BusinessException crossTenant() {
         return new BusinessException("The quote tenant does not match the caller",
                 HttpStatus.FORBIDDEN, "CROSS_TENANT");
