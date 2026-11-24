@@ -63,7 +63,7 @@ class AssetRollbackIntegrationTest {
             assertThat(flyway.migrate().migrationsExecuted).isPositive();
             flyway.validate();
             List<String> versions = appliedVersions(flyway);
-            assertThat(versions).contains("1.13", "1.14").endsWith("1.22");
+            assertThat(versions).contains("1.13", "1.14").endsWith("1.23");
             assertVersionedScriptsStayInTheMigrationDirectory(flyway);
 
             try (Connection connection = jdbc(database)) {
@@ -102,7 +102,7 @@ class AssetRollbackIntegrationTest {
             assertThat(replay.migrate().migrationsExecuted).as("schema is current after the out-of-order re-apply").isZero();
             replay.validate();
             List<String> replayed = appliedVersions(replay);
-            assertThat(replayed).contains("1.15", "1.22");
+            assertThat(replayed).contains("1.15", "1.22", "1.23");
             assertThat(replayed).endsWith("1.13", "1.14");
             try (Connection connection = jdbc(database)) {
                 assertRelations(connection, ROLLED_BACK, true);
