@@ -3,12 +3,16 @@ package com.opencrm.quote.approval;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.client.ApprovalRoutingClient;
+import com.opencrm.quote.client.RoutingApprovalCommentRequest;
 import com.opencrm.quote.client.RoutingApprovalDto;
+import com.opencrm.quote.client.RoutingApprovalHistoryEntry;
 import com.opencrm.quote.client.RoutingApprovalSubmitRequest;
 import com.opencrm.quote.quote.ApprovalState;
 import com.opencrm.quote.quote.Quote;
+import com.opencrm.quote.quote.QuoteAccountResolver;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
+import com.opencrm.quote.quote.QuoteTenantResolver;
 import com.opencrm.security.Caller;
 import com.opencrm.security.SecurityUtils;
 import com.opencrm.security.UserContext;
@@ -208,10 +212,14 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {
-        refuseUndecidable(currentRouting(approvalId));
+        RoutingApprovalDto current = currentRouting(approvalId);
+        refuseUndecidable(current);
         try {
             String comments = request == null ? null : request.getComments();
-            RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId, comments);
+            Long quoteVersion = knownQuoteVersion(current);
+            RoutingApprovalDto remote = quoteVersion == null
+                    ? approvalRoutingClient.approve(approvalId, comments)
+                    : approvalRoutingClient.approve(approvalId, comments, quoteVersion);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.APPROVED, ApprovalState.APPROVED);
             log.info("Approval {} approved via routing for quote {} by {}",
                     approvalId, remote.getQuoteId(), remote.getApproverId());
@@ -223,9 +231,13 @@ public class ApprovalService {
 
     public ApprovalRequestDto rejectRequest(Long approvalId, ApprovalResponseRequest request) {
         String comments = request != null ? request.getComments() : null;
-        refuseUndecidable(currentRouting(approvalId));
+        RoutingApprovalDto current = currentRouting(approvalId);
+        refuseUndecidable(current);
         try {
-            RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);
+            Long quoteVersion = knownQuoteVersion(current);
+            RoutingApprovalDto remote = quoteVersion == null
+                    ? approvalRoutingClient.reject(approvalId, comments)
+                    : approvalRoutingClient.reject(approvalId, comments, quoteVersion);
             // A rejection returns the quote to Draft so the seller can revise it. The approval row stays REJECTED.
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.DRAFT, ApprovalState.REJECTED);
             log.info("Approval {} rejected via routing for quote {} by {}",
@@ -258,9 +270,13 @@ public class ApprovalService {
      * The write goes to approval-routing; this method only projects the quote.
      */
     public ApprovalRequestDto escalateRequest(Long approvalId) {
-        refuseUndecidable(currentRouting(approvalId));
+        RoutingApprovalDto current = currentRouting(approvalId);
+        refuseUndecidable(current);
         try {
-            RoutingApprovalDto remote = approvalRoutingClient.escalate(approvalId);
+            Long quoteVersion = knownQuoteVersion(current);
+            RoutingApprovalDto remote = quoteVersion == null
+                    ? approvalRoutingClient.escalate(approvalId)
+                    : approvalRoutingClient.escalate(approvalId, quoteVersion);
             Long quoteId = parseQuoteId(remote.getQuoteId());
             Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
                     .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
@@ -322,6 +338,110 @@ public class ApprovalService {
         }
 
         return result;
+    }
+
+    /**
+     * GetApprovalHistory for a quote. The lookup is scoped to the caller's tenant ({@code tid}) and
+     * account ({@code account_id} equals the quote's customer external id, ADR-016). A miss, another
+     * tenant, and another account are the same 404. The role check runs in approval-routing after this,
+     * and only for a quote in scope. H4 owns a tenant check on approval-routing itself.
+     */
+    @Transactional(readOnly = true)
+    public List<ApprovalHistoryEntryDto> getApprovalHistory(Long quoteId) {
+        Quote quote = quoteInCallerScope(quoteId);
+        return approvalRoutingClient.getApprovalHistory(quoteId).stream()
+                .filter(row -> String.valueOf(quote.getId()).equals(row.getQuoteId()))
+                .map(ApprovalService::toHistory)
+                .toList();
+    }
+
+    /**
+     * Writes a comment or thread reply through approval-routing. The quote version link is the
+     * quote's current version, not a value from the request body. Scope misses are the same 404
+     * as a missing quote, before approval-routing checks the role.
+     */
+    public ApprovalHistoryEntryDto addCaseComment(Long quoteId, Long approvalId, ApprovalCommentRequest request) {
+        Quote quote = quoteInCallerScope(quoteId);
+        RoutingApprovalDto remote = currentRouting(approvalId);
+        if (remote == null || !String.valueOf(quoteId).equals(remote.getQuoteId())) {
+            throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+        }
+        RoutingApprovalHistoryEntry saved = approvalRoutingClient.addComment(approvalId,
+                RoutingApprovalCommentRequest.builder()
+                        .body(request == null ? null : request.getBody())
+                        .parentCommentId(request == null ? null : request.getParentCommentId())
+                        .quoteVersion(quote.getVersion())
+                        .build());
+        return toHistory(saved);
+    }
+
+    /**
+     * Auth context (tid and account_id) first, then the scoped row. The thrown exception matches
+     * a missing quote: 404 {@code RESOURCE_NOT_FOUND}, message {@code Quote not found with identifier: id}.
+     */
+    private Quote quoteInCallerScope(Long quoteId) {
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId).orElse(null);
+        if (!visibleToCaller(quote)) {
+            if (quote != null) {
+                log.info("Hiding quote {} from approval history: caller tenant or account is outside its scope",
+                        quoteId);
+            }
+            throw new ResourceNotFoundException("Quote", quoteId);
+        }
+        return quote;
+    }
+
+    private static boolean visibleToCaller(Quote quote) {
+        if (quote == null) {
+            return false;
+        }
+        String tenant = QuoteTenantResolver.currentTenantId();
+        String account = QuoteAccountResolver.currentAccountId();
+        return tenant != null
+                && account != null
+                && tenant.equals(normalize(quote.getTenantId()))
+                && account.equals(normalize(quote.getCustomerExternalId()));
+    }
+
+    private static String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.strip();
+    }
+
+    private Long knownQuoteVersion(RoutingApprovalDto remote) {
+        if (remote == null || remote.getQuoteId() == null) {
+            return null;
+        }
+        try {
+            return quoteRepository.findByIdAndDeletedFalse(parseQuoteId(remote.getQuoteId()))
+                    .map(Quote::getVersion)
+                    .orElse(null);
+        } catch (BusinessException ex) {
+            return null;
+        }
+    }
+
+    private static ApprovalHistoryEntryDto toHistory(RoutingApprovalHistoryEntry row) {
+        if (row == null) {
+            return null;
+        }
+        return ApprovalHistoryEntryDto.builder()
+                .id(row.getId())
+                .approvalId(row.getApprovalId())
+                .quoteId(row.getQuoteId())
+                .quoteVersion(row.getQuoteVersion())
+                .commentId(row.getCommentId())
+                .parentCommentId(row.getParentCommentId())
+                .kind(row.getKind())
+                .eventName(row.getEventName())
+                .occurredAt(row.getOccurredAt())
+                .actorId(row.getActorId())
+                .body(row.getBody())
+                .fromTier(row.getFromTier())
+                .toTier(row.getToTier())
+                .build();
     }
 
     @Transactional(readOnly = true)

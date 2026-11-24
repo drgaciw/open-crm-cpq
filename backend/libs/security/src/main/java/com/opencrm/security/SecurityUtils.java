@@ -138,6 +138,7 @@ public final class SecurityUtils {
                     .email(jwt.getClaimAsString("email"))
                     .displayName(jwt.getClaimAsString("name"))
                     .tenantId(jwt.getClaimAsString("tid"))
+                    .accountId(jwt.getClaimAsString("account_id"))
                     .roles(roles)
                     .permissions(Collections.emptySet())
                     .build();

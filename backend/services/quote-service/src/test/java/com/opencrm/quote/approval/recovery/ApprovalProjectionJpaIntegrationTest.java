@@ -149,6 +149,7 @@ class ApprovalProjectionJpaIntegrationTest {
     void rejectedDecisionReturnsTheQuoteToDraft() {
         when(routing.getById(9001L)).thenReturn(canonical("PENDING"));
         when(routing.reject(9001L, "too steep")).thenReturn(canonical("REJECTED"));
+        when(routing.reject(eq(9001L), eq("too steep"), nullable(Long.class))).thenReturn(canonical("REJECTED"));
         tx.execute(s -> {
             Quote q = quotes.findById(initial.getId()).orElseThrow();
             q.setStatus(QuoteStatus.PENDING_APPROVAL);

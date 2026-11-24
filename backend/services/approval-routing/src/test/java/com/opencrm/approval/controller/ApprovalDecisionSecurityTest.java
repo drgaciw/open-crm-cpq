@@ -6,6 +6,7 @@ import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
 import com.opencrm.approval.mapper.ApprovalRequestMapperImpl;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
+import com.opencrm.approval.service.ApprovalHistoryService;
 import com.opencrm.approval.service.ApprovalService;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.security.OpenCrmActorAutoConfiguration;
@@ -87,6 +88,11 @@ class ApprovalDecisionSecurityTest {
         @Bean
         OutboxEventPublisher outboxEventPublisher() {
             return Mockito.mock(OutboxEventPublisher.class);
+        }
+
+        @Bean
+        ApprovalHistoryService approvalHistoryService() {
+            return Mockito.mock(ApprovalHistoryService.class);
         }
     }
 

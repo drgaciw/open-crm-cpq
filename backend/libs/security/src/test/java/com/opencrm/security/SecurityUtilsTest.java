@@ -59,12 +59,15 @@ class SecurityUtilsTest {
     @DisplayName("a user is identified by oid, the same in every client application, not by the pairwise sub")
     void userIsIdentifiedByOid() {
         authenticate(jwt().subject("pairwise-sub-for-the-gateway").claim("oid", "3f2a-oid").claim("scp", "access_as_user")
-                .claim("azp", "gateway-client").claim("email", "vp@example.com").build(), "ROLE_SALES_VP");
+                .claim("azp", "gateway-client").claim("email", "vp@example.com").claim("tid", "tenant-a")
+                .claim("account_id", "acct-1").build(), "ROLE_SALES_VP");
 
         assertThat(SecurityUtils.getCurrentCaller()).get().isInstanceOf(Caller.User.class)
                 .extracting(Caller::actorId).isEqualTo("3f2a-oid");
         assertThat(SecurityUtils.getCurrentUserId()).isEqualTo("3f2a-oid");
         assertThat(SecurityUtils.getCurrentUserEmail()).contains("vp@example.com");
+        assertThat(SecurityUtils.getCurrentUser()).get().extracting(UserContext::getTenantId, UserContext::getAccountId)
+                .containsExactly("tenant-a", "acct-1");
         assertThat(SecurityUtils.hasRole("ROLE_SALES_VP")).isTrue();
     }
 

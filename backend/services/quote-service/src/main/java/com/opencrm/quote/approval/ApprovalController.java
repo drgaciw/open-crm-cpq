@@ -41,6 +41,23 @@ public class ApprovalController {
         return ApiResponse.success(approvals);
     }
 
+    @GetMapping("/{quoteId}/approvals/history")
+    @Operation(summary = "GetApprovalHistory: decisions, escalations and comments, oldest first")
+    public ApiResponse<List<ApprovalHistoryEntryDto>> getApprovalHistory(@PathVariable Long quoteId) {
+        return ApiResponse.success(approvalService.getApprovalHistory(quoteId));
+    }
+
+    @PostMapping("/{quoteId}/approvals/{approvalId}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Add a deal-desk comment or thread reply on an approval case")
+    public ApiResponse<ApprovalHistoryEntryDto> addCaseComment(
+            @PathVariable Long quoteId,
+            @PathVariable Long approvalId,
+            @Valid @RequestBody ApprovalCommentRequest request) {
+        return ApiResponse.success(
+                approvalService.addCaseComment(quoteId, approvalId, request), "Comment added");
+    }
+
     @GetMapping("/approvals/pending")
     @Operation(summary = "Get all pending approvals")
     public ApiResponse<List<ApprovalRequestDto>> getPendingApprovals() {
