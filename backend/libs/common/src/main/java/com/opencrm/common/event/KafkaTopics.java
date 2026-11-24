@@ -96,6 +96,9 @@ public final class KafkaTopics {
     /** DRG-442 / BC-04-02. A quote version was evaluated against commercial policy. */
     public static final String QUOTE_EVALUATED = "cpq.approval.quote.evaluated";
 
+    /** DRG-443 / BC-04-03. SubmitForApproval created the requests for one matrix route. */
+    public static final String APPROVAL_REQUESTED = "cpq.approval.requested";
+
     /** DRG-445 / BC-04-05. A time-boxed exception was recorded for one quote version and policy. */
     public static final String EXCEPTION_RECORDED = "cpq.approval.policy.exception-recorded";
 

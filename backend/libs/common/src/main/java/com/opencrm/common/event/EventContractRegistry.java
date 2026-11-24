@@ -2,6 +2,7 @@ package com.opencrm.common.event;
 
 import com.opencrm.common.event.dto.AccountsMergedEvent;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
+import com.opencrm.common.event.dto.ApprovalRequestedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
 import com.opencrm.common.event.dto.CatalogPublishedEvent;
 import com.opencrm.common.event.dto.ConfigurationCommittedEvent;
@@ -250,6 +251,10 @@ public final class EventContractRegistry {
     public static final EventContract QUOTE_EVALUATED_V1 = published(
             "QuoteEvaluated", "approval-routing", KafkaTopics.QUOTE_EVALUATED, QuoteEvaluatedEvent.class);
 
+    /** DRG-443 / BC-04-03. SubmitForApproval created the requests for one matrix route. */
+    public static final EventContract APPROVAL_REQUESTED_V1 = published(
+            "ApprovalRequested", "approval-routing", KafkaTopics.APPROVAL_REQUESTED, ApprovalRequestedEvent.class);
+
     /** DRG-445 / BC-04-05. RecordException persisted a time-boxed exception for one quote version and policy. */
     public static final EventContract EXCEPTION_RECORDED_V1 = published(
             "ExceptionRecorded", "approval-routing", KafkaTopics.EXCEPTION_RECORDED, ExceptionRecordedEvent.class);
@@ -316,6 +321,7 @@ public final class EventContractRegistry {
             SOLUTION_DERIVED_V1,
             POLICY_DEFINED_V1,
             QUOTE_EVALUATED_V1,
+            APPROVAL_REQUESTED_V1,
             EXCEPTION_RECORDED_V1,
             ROLE_ASSIGNED_V1,
             CONFIGURATION_FROZEN_V1,
