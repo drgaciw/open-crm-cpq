@@ -5,6 +5,9 @@ import com.opencrm.common.event.dto.AssetCreatedEvent;
 import com.opencrm.common.event.dto.AssetSupersededEvent;
 import com.opencrm.common.event.dto.AssetTerminatedEvent;
 import com.opencrm.contract.ContractAssetManagementApplication;
+import com.opencrm.contract.domain.Subscription;
+import com.opencrm.contract.domain.SubscriptionStatus;
+import com.opencrm.contract.repository.SubscriptionRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -60,9 +64,12 @@ class AssetHistoryReplayIntegrationTest {
     @Autowired AssetHistoryProjection projection;
     @Autowired AssetQueryController api;
     @Autowired JdbcTemplate jdbc;
+    @Autowired SubscriptionRepository subscriptions;
+    @Autowired AssetRepository assetRows;
 
     @Test
     void droppedProjectionReplaysToTheSameHistory() {
+        seedVisibleAssets();
         applyAll();
         List<AssetHistoryEntryDto> first = api.history(ASSET).getData();
         SupersedeChainDto chain = api.supersedeChain(ASSET, "both").getData();
@@ -85,6 +92,33 @@ class AssetHistoryReplayIntegrationTest {
         assertThat(api.installedBase(ACCOUNT, LocalDate.parse("2026-05-01")).getData())
                 .extracting(InstalledAssetDto::getAssetId).containsExactly(ASSET);
         assertThat(api.installedBase(ACCOUNT, LocalDate.parse("2026-09-01")).getData()).isEmpty();
+    }
+
+    private void seedVisibleAssets() {
+        Subscription subscription = subscriptions.saveAndFlush(Subscription.builder()
+                .subscriptionNumber("SUB-replay")
+                .customerId(ACCOUNT)
+                .quoteId("Q-replay")
+                .status(SubscriptionStatus.ACTIVE)
+                .planName("Replay")
+                .startDate(LocalDate.parse("2026-01-01"))
+                .endDate(LocalDate.parse("2027-02-28"))
+                .tenantId(UUID.fromString(AssetReadTestCaller.TENANT))
+                .build());
+        assetRows.saveAndFlush(asset(subscription.getId(), ASSET, "line-1"));
+        assetRows.saveAndFlush(asset(subscription.getId(), SUCCESSOR, "line-2"));
+    }
+
+    private static Asset asset(Long subscriptionId, String uuid, String contractLineId) {
+        return Asset.builder()
+                .uuid(uuid)
+                .accountId(ACCOUNT)
+                .contractLineId(contractLineId)
+                .subscriptionId(subscriptionId)
+                .status(AssetStatus.ACTIVE)
+                .effectiveStart(LocalDate.parse("2026-03-01"))
+                .effectiveEnd(LocalDate.parse("2027-02-28"))
+                .build();
     }
 
     private void applyAll() {

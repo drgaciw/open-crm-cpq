@@ -99,6 +99,9 @@ public final class KafkaTopics {
     /** DRG-443 / BC-04-03. SubmitForApproval created the requests for one matrix route. */
     public static final String APPROVAL_REQUESTED = "cpq.approval.requested";
 
+    /** DRG-445 / BC-04-05. A time-boxed exception was recorded for one quote version and policy. */
+    public static final String EXCEPTION_RECORDED = "cpq.approval.policy.exception-recorded";
+
     /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
     public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
 

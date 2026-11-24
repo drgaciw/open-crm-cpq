@@ -53,11 +53,12 @@ class ApprovalPolicyGateTest {
         Quote quote = draft();
         when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
         when(quotePolicyEvaluation.evaluate(quote)).thenReturn(new QuotePolicyVerdict(true, "BLOCKED", 0L,
-                List.of(new QuotePolicyVerdict.Breach(7L, 1, "MARGIN_FLOOR", "15", "20"))));
+                List.of(new QuotePolicyVerdict.Breach(7L, 1, "MARGIN_FLOOR", "15", "20", "MARGIN_BELOW_FLOOR"))));
 
         assertThatThrownBy(() -> approvalService.submitForApproval(42L, command()))
-                .isInstanceOfSatisfying(com.opencrm.common.exception.BusinessException.class, ex -> {
+                .isInstanceOfSatisfying(PolicyBlockedException.class, ex -> {
                     assertThat(ex.getErrorCode()).isEqualTo("POLICY_BLOCKED");
+                    assertThat(ex.getReasonCodes()).containsExactly("MARGIN_BELOW_FLOOR");
                     assertThat(ex.getMessage()).contains("15").contains("20");
                 });
         verify(approvalRoutingClient, never()).submit(any());
@@ -70,7 +71,7 @@ class ApprovalPolicyGateTest {
         when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quotePolicyEvaluation.evaluate(quote)).thenReturn(new QuotePolicyVerdict(true, "REQUIRES_APPROVAL", 0L,
-                List.of(new QuotePolicyVerdict.Breach(7L, 1, "DISCOUNT_PERCENT", "32", "25"))));
+                List.of(new QuotePolicyVerdict.Breach(7L, 1, "DISCOUNT_PERCENT", "32", "25", null))));
         when(approvalRoutingClient.submit(any(RoutingApprovalSubmitRequest.class))).thenReturn(pending());
         when(approvalRoutingClient.getById(9001L)).thenReturn(pending());
 

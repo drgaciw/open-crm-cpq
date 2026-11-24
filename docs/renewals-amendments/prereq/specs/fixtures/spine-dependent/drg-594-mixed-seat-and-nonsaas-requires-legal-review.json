@@ -1,0 +1,29 @@
+{
+    "issue": "DRG-594",
+    "ac_id": "AC-594-8",
+    "case": "mixed-seat-and-nonsaas-requires-legal-review",
+    "note": "A SaaS seat change does not carry a non-SaaS add. The whole document requires legal review.",
+    "status": "Decided",
+    "owner_decision": "B. drg owner ruling, 7:15 PM CT Nov 23 2026",
+    "input": {
+        "document_state_before": "DRAFT",
+        "quote_skus": ["SKU-A", "SKU-HW"],
+        "catalog": [
+            {"sku": "SKU-A", "product_type": "SAAS_SEAT_NAMED"},
+            {"sku": "SKU-HW", "product_type": "HARDWARE"}
+        ],
+        "lines": [
+            {"action_code": "ADD", "target_sku": "SKU-A"},
+            {"action_code": "ADD", "target_sku": "SKU-HW"}
+        ],
+        "header_edits": []
+    },
+    "expected": {
+        "legal_review_required": true,
+        "per_line_skip": false,
+        "transition_to_in_review": "refused",
+        "document_state": "DRAFT",
+        "http_status": 409,
+        "error_code": "LEGAL_REVIEW_REQUIRED"
+    }
+}

@@ -1,4 +1,4 @@
--- Guarded rollback for V1_13. Not a Flyway migration.
+-- Guarded rollback for V1_14. Not a Flyway migration.
 -- Refuses while a matrix version or a routed approval request exists.
 
 DO $$
@@ -40,5 +40,5 @@ BEGIN
 
     EXECUTE 'DROP TABLE IF EXISTS approval_matrix_rules';
     EXECUTE 'DROP TABLE IF EXISTS approval_matrices';
-    DELETE FROM flyway_schema_history WHERE version = '1.13';
+    DELETE FROM flyway_schema_history WHERE version = '1.14';
 END $$;

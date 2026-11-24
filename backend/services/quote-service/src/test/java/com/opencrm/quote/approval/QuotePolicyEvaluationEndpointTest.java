@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.context.ContextConfiguration;
@@ -111,12 +112,14 @@ class QuotePolicyEvaluationEndpointTest {
     private QuoteRepository quotes;
     @Autowired
     private QuotePolicyEvaluation evaluation;
+    @Autowired
+    private ApprovalRoutingClient approvalRoutingClient;
 
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(quotes, evaluation);
+        Mockito.reset(quotes, evaluation, approvalRoutingClient);
         mvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(context.getBean("springSecurityFilterChain", Filter.class))
                 .build();
@@ -127,7 +130,7 @@ class QuotePolicyEvaluationEndpointTest {
         Quote quote = quote(TENANT);
         when(quotes.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
         when(evaluation.evaluate(quote)).thenReturn(new QuotePolicyVerdict(true, "REQUIRES_APPROVAL", 3L,
-                List.of(new QuotePolicyVerdict.Breach(7L, 1, "DISCOUNT_PERCENT", "32", "25"))));
+                List.of(new QuotePolicyVerdict.Breach(7L, 1, "DISCOUNT_PERCENT", "32", "25", null))));
 
         mvc.perform(post("/api/v1/quotes/42/policy-evaluation")
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("seller", "CPQ.User").bearer()))
@@ -135,6 +138,23 @@ class QuotePolicyEvaluationEndpointTest {
                 .andExpect(jsonPath("$.data.verdict").value("REQUIRES_APPROVAL"))
                 .andExpect(jsonPath("$.data.breaches[0].actual").value("32"))
                 .andExpect(jsonPath("$.data.breaches[0].limit").value("25"));
+    }
+
+    @Test
+    void blockedSubmitReturnsTheReasonCode() throws Exception {
+        Quote quote = quote(TENANT);
+        when(quotes.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        when(evaluation.evaluate(quote)).thenReturn(new QuotePolicyVerdict(true, "BLOCKED", 3L,
+                List.of(new QuotePolicyVerdict.Breach(7L, 1, "MARGIN_FLOOR", "unmeasured", "20", "MARGIN_UNKNOWN"))));
+
+        mvc.perform(post("/api/v1/quotes/42/approvals")
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("seller", "CPQ.User").bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tier\":\"DEAL_DESK\",\"expectedVersion\":3}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POLICY_BLOCKED"))
+                .andExpect(jsonPath("$.errors[0]").value("MARGIN_UNKNOWN"));
+        verify(approvalRoutingClient, never()).submit(any());
     }
 
     @Test

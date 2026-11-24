@@ -5,7 +5,7 @@
 -- (tenant, bound matrix version, and step). Legacy rows stay valid: the new columns are nullable.
 -- The approver tier is taken from the matrix. The submit body has no tier.
 -- =====================================================
--- Rollback: db/rollback/V1_13__drop_approval_matrix.sql
+-- Rollback: db/rollback/V1_14__drop_approval_matrix.sql
 
 ALTER TABLE approval_requests ADD COLUMN tenant_id VARCHAR(64);
 ALTER TABLE approval_requests ADD COLUMN matrix_id BIGINT;

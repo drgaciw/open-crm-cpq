@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -82,6 +83,7 @@ class QuotePolicyEvaluatorTest {
             assertThat(breach.actual()).isEqualTo("15");
             assertThat(breach.limit()).isEqualTo("20");
             assertThat(breach.effect()).isEqualTo(BreachEffect.BLOCKED);
+            assertThat(breach.reasonCode()).isEqualTo("MARGIN_BELOW_FLOOR");
         });
 
         QuotePolicyDecision both = QuotePolicyEvaluator.evaluateQuote(facts("32", "15", 12, List.of()),
@@ -94,7 +96,7 @@ class QuotePolicyEvaluatorTest {
     }
 
     @Test
-    @DisplayName("Blocked when a governed fact was not measured")
+    @DisplayName("Blocked when a governed fact was not measured, with a reason code per fact")
     void blockedWhenTheActualValueIsUnmeasured() {
         QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
                 facts(null, null, null, List.of()),
@@ -107,6 +109,43 @@ class QuotePolicyEvaluatorTest {
         });
         assertThat(decision.explainPolicyBreaches()).extracting(PolicyBreach::limit)
                 .containsExactly("25", "20", "36");
+        assertThat(decision.explainPolicyBreaches()).extracting(PolicyBreach::reasonCode)
+                .containsExactly("DISCOUNT_UNKNOWN", "MARGIN_UNKNOWN", "TERM_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("Missing marginPercent is Blocked with MARGIN_UNKNOWN")
+    void missingMarginIsBlockedAsMarginUnknown() {
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("10", null, 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.BLOCKED);
+        assertThat(decision.explainPolicyBreaches()).singleElement().satisfies(breach -> {
+            assertThat(breach.thresholdType()).isEqualTo(ThresholdType.MARGIN_FLOOR);
+            assertThat(breach.actual()).isEqualTo("unmeasured");
+            assertThat(breach.limit()).isEqualTo("20");
+            assertThat(breach.reasonCode()).isEqualTo("MARGIN_UNKNOWN");
+        });
+    }
+
+    @Test
+    @DisplayName("Margin above the floor passes, and a discount breach then requires approval only")
+    void marginAboveTheFloorDoesNotBlock() {
+        QuotePolicyDecision above = QuotePolicyEvaluator.evaluateQuote(
+                facts("10", "21", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+        assertThat(above.verdict()).isEqualTo(PolicyVerdict.PASS);
+        assertThat(above.explainPolicyBreaches()).isEmpty();
+
+        QuotePolicyDecision discountOnly = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "21", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+        assertThat(discountOnly.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(discountOnly.explainPolicyBreaches()).singleElement().satisfies(breach -> {
+            assertThat(breach.thresholdType()).isEqualTo(ThresholdType.DISCOUNT_PERCENT);
+            assertThat(breach.reasonCode()).isNull();
+        });
     }
 
     @Test
@@ -129,6 +168,72 @@ class QuotePolicyEvaluatorTest {
         assertThat(decision.verdict()).isEqualTo(PolicyVerdict.PASS);
         assertThat(decision.explainPolicyBreaches()).isEmpty();
         assertThat(decision.appliedPolicyIds()).isEmpty();
+    }
+
+    private static final Instant NOW = Instant.parse("2026-11-24T18:00:00Z");
+
+    @Test
+    @DisplayName("an active exception for this quote version and policy satisfies the breach")
+    void activeExceptionSatisfiesEvaluation() {
+        PolicyExceptionGrant active = grant(3L, "tenant-1", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(active),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.PASS);
+        assertThat(decision.explainPolicyBreaches()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an expired exception does not satisfy evaluation")
+    void expiredExceptionFailsEvaluation() {
+        PolicyExceptionGrant expired = grant(3L, "tenant-1", NOW.minusSeconds(1));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(expired),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(decision.explainPolicyBreaches()).singleElement()
+                .satisfies(breach -> assertThat(breach.thresholdType()).isEqualTo(ThresholdType.DISCOUNT_PERCENT));
+    }
+
+    @Test
+    @DisplayName("an exception for another quote version does not satisfy evaluation")
+    void wrongVersionExceptionFailsEvaluation() {
+        PolicyExceptionGrant otherVersion = grant(2L, "tenant-1", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(otherVersion),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(decision.explainPolicyBreaches()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("an active exception for another tenant does not satisfy evaluation")
+    void otherTenantExceptionFailsEvaluation() {
+        PolicyExceptionGrant otherTenant = grant(3L, "tenant-2", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(otherTenant),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+    }
+
+    private static PolicyExceptionGrant grant(long quoteVersion, String tenantId, Instant expiresAt) {
+        return new PolicyExceptionGrant("42", quoteVersion, 7L, tenantId, expiresAt);
     }
 
     private static QuoteVersionFacts facts(String discount, String margin, Integer term, List<String> clauses) {

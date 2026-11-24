@@ -1,6 +1,7 @@
 package com.opencrm.approval.domain;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,19 @@ public final class QuotePolicyEvaluator {
     }
 
     public static QuotePolicyDecision evaluateQuote(QuoteVersionFacts quoteVersion, List<CommercialPolicy> policies) {
+        return evaluateQuote(quoteVersion, policies, List.of(), null);
+    }
+
+    /**
+     * Same verdict as {@link #evaluateQuote(QuoteVersionFacts, List)}, after an active exception for this
+     * quote version and policy has satisfied the breaches it covers. An expired grant, or a grant for another
+     * quote version or policy, leaves the breach in place.
+     */
+    public static QuotePolicyDecision evaluateQuote(
+            QuoteVersionFacts quoteVersion,
+            List<CommercialPolicy> policies,
+            List<PolicyExceptionGrant> exceptions,
+            Instant now) {
         List<PolicyBreach> breaches = new ArrayList<>();
         List<Long> applied = new ArrayList<>();
         List<CommercialPolicy> applicable = policies == null ? List.of() : policies;
@@ -36,12 +50,53 @@ public final class QuotePolicyEvaluator {
                     continue;
                 }
                 PolicyBreach breach = breach(policy, threshold, quoteVersion);
-                if (breach != null) {
+                if (breach != null && !honored(quoteVersion, breach, exceptions, now)) {
                     breaches.add(breach);
                 }
             }
         }
         return new QuotePolicyDecision(verdict(breaches), breaches, applied);
+    }
+
+/**
+     * An exception covers a breach only when it names this quote, this quote version, this policy and the
+     * evaluation tenant, and its expiry is still strictly in the future. A missing evaluation tenant does not
+     * block a grant: quotes recorded before a tenant claim have none.
+     */
+    private static boolean honored(
+            QuoteVersionFacts quoteVersion,
+            PolicyBreach breach,
+            List<PolicyExceptionGrant> exceptions,
+            Instant now) {
+        if (quoteVersion == null || breach == null || breach.policyId() == null || exceptions == null || now == null
+                || quoteVersion.quoteId() == null || quoteVersion.quoteVersion() == null) {
+            return false;
+        }
+        for (PolicyExceptionGrant grant : exceptions) {
+            if (grant == null || grant.expiresAt() == null || grant.quoteId() == null) {
+                continue;
+            }
+            if (!grant.quoteId().equals(quoteVersion.quoteId()) || grant.quoteVersion() != quoteVersion.quoteVersion()) {
+                continue;
+            }
+            if (grant.policyId() != breach.policyId()) {
+                continue;
+            }
+            if (!sameTenant(quoteVersion.tenantId(), grant.tenantId())) {
+                continue;
+            }
+            if (grant.expiresAt().isAfter(now)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean sameTenant(String evaluationTenant, String grantTenant) {
+        if (evaluationTenant == null || evaluationTenant.isBlank()) {
+            return true;
+        }
+        return grantTenant != null && evaluationTenant.strip().equals(grantTenant.strip());
     }
 
     private static PolicyVerdict verdict(List<PolicyBreach> breaches) {
@@ -118,20 +173,22 @@ public final class QuotePolicyEvaluator {
             BreachEffect whenBreached) {
         BigDecimal limit = threshold.getLimitValue();
         if (actual == null || limit == null) {
+            String code = actual == null ? unknownCode(threshold.getThresholdType()) : "THRESHOLD_LIMIT_UNKNOWN";
             return breach(policy, threshold, actual == null ? "unmeasured" : plain(actual),
-                    limit == null ? "unmeasured" : plain(limit), BreachEffect.BLOCKED);
+                    limit == null ? "unmeasured" : plain(limit), BreachEffect.BLOCKED, code);
         }
         boolean breached = overLimit ? actual.compareTo(limit) > 0 : actual.compareTo(limit) < 0;
         if (!breached) {
             return null;
         }
-        return breach(policy, threshold, plain(actual), plain(limit), whenBreached);
+        String code = whenBreached == BreachEffect.BLOCKED ? blockCode(threshold.getThresholdType()) : null;
+        return breach(policy, threshold, plain(actual), plain(limit), whenBreached, code);
     }
 
     private static PolicyBreach clause(CommercialPolicy policy, PolicyThreshold threshold, QuoteVersionFacts facts) {
         String restricted = threshold.getClauseCode();
         if (restricted == null || restricted.isBlank()) {
-            return breach(policy, threshold, "unmeasured", "unmeasured", BreachEffect.BLOCKED);
+            return breach(policy, threshold, "unmeasured", "unmeasured", BreachEffect.BLOCKED, "CLAUSE_UNKNOWN");
         }
         String present = null;
         for (String code : facts.clauseCodes()) {
@@ -143,7 +200,27 @@ public final class QuotePolicyEvaluator {
         if (present == null) {
             return null;
         }
-        return breach(policy, threshold, present, restricted.trim(), BreachEffect.REQUIRES_APPROVAL);
+        return breach(policy, threshold, present, restricted.trim(), BreachEffect.REQUIRES_APPROVAL, null);
+    }
+
+    /** A missing measurement. Margin uses the owner-confirmed code {@code MARGIN_UNKNOWN}. */
+    private static String unknownCode(ThresholdType type) {
+        return switch (type) {
+            case MARGIN_FLOOR -> "MARGIN_UNKNOWN";
+            case DISCOUNT_PERCENT -> "DISCOUNT_UNKNOWN";
+            case TERM_MONTHS -> "TERM_UNKNOWN";
+            case NON_STANDARD_CLAUSE -> "CLAUSE_UNKNOWN";
+        };
+    }
+
+    /** A measured value that fails a hard stop. */
+    private static String blockCode(ThresholdType type) {
+        return switch (type) {
+            case MARGIN_FLOOR -> "MARGIN_BELOW_FLOOR";
+            case DISCOUNT_PERCENT -> "DISCOUNT_PERCENT";
+            case TERM_MONTHS -> "TERM_MONTHS";
+            case NON_STANDARD_CLAUSE -> "NON_STANDARD_CLAUSE";
+        };
     }
 
     private static PolicyBreach breach(
@@ -151,14 +228,16 @@ public final class QuotePolicyEvaluator {
             PolicyThreshold threshold,
             String actual,
             String limit,
-            BreachEffect effect) {
+            BreachEffect effect,
+            String reasonCode) {
         return new PolicyBreach(
                 policy.getId(),
                 policy.getPolicyVersion(),
                 threshold.getThresholdType(),
                 actual,
                 limit,
-                effect);
+                effect,
+                reasonCode);
     }
 
     private static String plain(BigDecimal value) {

@@ -160,7 +160,7 @@ public class ApprovalService {
 
         QuotePolicyVerdict policyVerdict = quotePolicyEvaluation.evaluate(quote);
         if (policyVerdict.refusesSubmission()) {
-            throw new BusinessException(policyVerdict.summary(), HttpStatus.CONFLICT, "POLICY_BLOCKED");
+            throw new PolicyBlockedException(policyVerdict.summary(), policyVerdict.reasonCodes());
         }
 
         Long submissionVersion = quote.getVersion();

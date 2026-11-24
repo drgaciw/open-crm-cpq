@@ -3,6 +3,8 @@ package com.opencrm.approval.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.approval.domain.PolicyBreach;
+import com.opencrm.approval.domain.PolicyException;
+import com.opencrm.approval.domain.PolicyExceptionGrant;
 import com.opencrm.approval.domain.PolicyStatus;
 import com.opencrm.approval.domain.QuotePolicyDecision;
 import com.opencrm.approval.domain.QuotePolicyEvaluator;
@@ -11,6 +13,7 @@ import com.opencrm.approval.dto.PolicyBreachDto;
 import com.opencrm.approval.dto.QuoteEvaluationDto;
 import com.opencrm.approval.dto.QuoteEvaluationRequest;
 import com.opencrm.approval.repository.CommercialPolicyRepository;
+import com.opencrm.approval.repository.PolicyExceptionRepository;
 import com.opencrm.audit.AuditTrailService;
 import com.opencrm.audit.dto.AppendAuditEntryCommand;
 import com.opencrm.common.event.EventContractRegistry;
@@ -48,6 +51,7 @@ import java.util.UUID;
 public class QuotePolicyEvaluationService {
 
     private final CommercialPolicyRepository commercialPolicyRepository;
+    private final PolicyExceptionRepository policyExceptionRepository;
     private final OutboxEventPublisher outboxEventPublisher;
     private final AuditTrailService auditTrailService;
     private final ObjectMapper objectMapper;
@@ -71,9 +75,18 @@ public class QuotePolicyEvaluationService {
                 request.getClauseCodes(),
                 request.getAsOf() != null ? request.getAsOf() : LocalDate.now(ZoneOffset.UTC));
 
+        List<PolicyException> stored = actor.tenantId() == null
+                ? List.of()
+                : policyExceptionRepository.findByQuoteIdAndQuoteVersionAndTenantIdAndDeletedFalse(
+                        facts.quoteId(), facts.quoteVersion(), actor.tenantId());
+        List<PolicyExceptionGrant> exceptions = stored == null
+                ? List.of()
+                : stored.stream().map(PolicyException::toGrant).toList();
         QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
                 facts,
-                commercialPolicyRepository.findByStatusAndDeletedFalse(PolicyStatus.ACTIVE));
+                commercialPolicyRepository.findByStatusAndDeletedFalse(PolicyStatus.ACTIVE),
+                exceptions,
+                Instant.now());
 
         UUID eventId = UUID.randomUUID();
         List<QuoteEvaluatedEvent.BreachExplained> explained = decision.explainPolicyBreaches().stream()
@@ -159,6 +172,7 @@ public class QuotePolicyEvaluationService {
             row.put("thresholdType", breach.thresholdType().name());
             row.put("actual", breach.actual());
             row.put("limit", breach.limit());
+            row.put("reasonCode", breach.reasonCode());
             return row;
         }).toList());
         try {
@@ -174,7 +188,8 @@ public class QuotePolicyEvaluationService {
                 breach.policyVersion(),
                 breach.thresholdType().name(),
                 breach.actual(),
-                breach.limit());
+                breach.limit(),
+                breach.reasonCode());
     }
 
     private static PolicyBreachDto toDto(PolicyBreach breach) {
@@ -184,6 +199,7 @@ public class QuotePolicyEvaluationService {
                 .thresholdType(breach.thresholdType())
                 .actual(breach.actual())
                 .limit(breach.limit())
+                .reasonCode(breach.reasonCode())
                 .build();
     }
 

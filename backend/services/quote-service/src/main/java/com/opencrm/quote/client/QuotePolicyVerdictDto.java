@@ -32,5 +32,6 @@ public class QuotePolicyVerdictDto {
         private String thresholdType;
         private String actual;
         private String limit;
+        private String reasonCode;
     }
 }

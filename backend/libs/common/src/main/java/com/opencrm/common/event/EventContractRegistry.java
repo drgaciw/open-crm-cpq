@@ -14,6 +14,7 @@ import com.opencrm.common.event.dto.DealClosedEvent;
 import com.opencrm.common.event.dto.DealCreatedEvent;
 import com.opencrm.common.event.dto.DealStageChangedEvent;
 import com.opencrm.common.event.dto.DiscountApprovalRequiredEvent;
+import com.opencrm.common.event.dto.ExceptionRecordedEvent;
 import com.opencrm.common.event.dto.PriceCalculatedEvent;
 import com.opencrm.common.event.dto.HierarchyChangedEvent;
 import com.opencrm.common.event.dto.OrganizationCreatedEvent;
@@ -254,6 +255,10 @@ public final class EventContractRegistry {
     public static final EventContract APPROVAL_REQUESTED_V1 = published(
             "ApprovalRequested", "approval-routing", KafkaTopics.APPROVAL_REQUESTED, ApprovalRequestedEvent.class);
 
+    /** DRG-445 / BC-04-05. RecordException persisted a time-boxed exception for one quote version and policy. */
+    public static final EventContract EXCEPTION_RECORDED_V1 = published(
+            "ExceptionRecorded", "approval-routing", KafkaTopics.EXCEPTION_RECORDED, ExceptionRecordedEvent.class);
+
     /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
     public static final EventContract ROLE_ASSIGNED_V1 = published(
             "RoleAssigned", "authorization-service", KafkaTopics.ROLE_ASSIGNED, RoleAssignedEvent.class);
@@ -317,6 +322,7 @@ public final class EventContractRegistry {
             POLICY_DEFINED_V1,
             QUOTE_EVALUATED_V1,
             APPROVAL_REQUESTED_V1,
+            EXCEPTION_RECORDED_V1,
             ROLE_ASSIGNED_V1,
             CONFIGURATION_FROZEN_V1,
             PRICE_BOOK_PUBLISHED_V1,
