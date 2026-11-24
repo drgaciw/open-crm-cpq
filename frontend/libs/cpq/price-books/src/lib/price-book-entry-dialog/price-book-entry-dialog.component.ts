@@ -146,10 +146,14 @@ function entryHttpErrorMessage(err: unknown, fallback: string): string {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? (isEdit ? 'Save' : 'Create') : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner
+            diameter="20"
+            [attr.aria-label]="isEdit ? 'Saving price book entry' : 'Creating price book entry'"
+          />
         } @else {
           {{ isEdit ? 'Save' : 'Create' }}
         }

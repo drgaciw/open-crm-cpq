@@ -6,7 +6,7 @@ import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { type Observable, of, Subject, throwError } from 'rxjs';
 import { CatalogDetailComponent } from './catalog-detail.component';
 import { ProductService } from '../product.service';
 import { ProductOptionService } from '../product-option.service';
@@ -111,8 +111,10 @@ describe('CatalogDetailComponent', () => {
   const selectedProduct = signal<ProductDto | null>(null);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadStatus = signal<number | null>(null);
 
   beforeEach(async () => {
+    detailReadStatus.set(null);
     getByIdSpy = vi.fn((id: number) => {
       const found = MOCK_CATALOG_PRODUCTS.find((p) => p.id === id);
       selectedProduct.set(found ? toProductDto(found) : null);
@@ -149,6 +151,7 @@ describe('CatalogDetailComponent', () => {
       selectedProduct,
       loading,
       error,
+      detailReadStatus,
       products: signal<ProductDto[]>([]),
       getById: getByIdSpy,
       update: updateSpy,
@@ -234,7 +237,22 @@ describe('CatalogDetailComponent', () => {
     expect(compiled.textContent?.toLowerCase()).not.toContain('validate configuration');
   });
 
-  it('shows empty state when product is missing', () => {
+  it('shows a transient detail failure and retains Back after HTTP 503', () => {
+    selectedProduct.set(null);
+    loading.set(false);
+    error.set('Controlled detail unavailable');
+    detailReadStatus.set(503);
+    fixture.detectChanges();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(card?.querySelector('.empty-state-title')?.textContent).toContain('Unable to load product');
+    expect(card?.textContent).toContain('Controlled detail unavailable');
+    expect(card?.textContent).not.toContain('Product not found');
+    expect(card?.querySelector('button')?.textContent).toContain('Back to catalog');
+  });
+
+  it('shows the missing-product state after HTTP 404', () => {
+    detailReadStatus.set(404);
     fixture.componentRef.setInput('id', '999');
     getByIdSpy(999);
     fixture.detectChanges();
@@ -395,6 +413,46 @@ describe('CatalogDetailComponent', () => {
     component.form.patchValue({ name: '' });
     component.onSave();
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('names the initial progress indicator while the product detail loads', () => {
+    selectedProduct.set(null);
+    loading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.loading [role="progressbar"]')?.getAttribute('aria-label')).toBe('Loading product');
+  });
+
+  it('rejects a whitespace-only edited name before sending the update', () => {
+    component.startEdit();
+    component.form.controls.name.setValue('   ');
+    component.onSave();
+
+    expect(component.form.controls.name.hasError('required')).toBe(true);
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps Save named and locks the product draft until a pending write fails', () => {
+    const response = new Subject<ProductDto>();
+    updateSpy.mockReturnValue(response);
+    component.startEdit();
+    component.form.controls.name.setValue('Scoped product draft');
+
+    component.onSave();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>('.header-actions button[aria-label="Save"]');
+    expect(submit?.disabled).toBe(true);
+    expect(submit?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving product');
+    expect(component.form.disabled).toBe(true);
+
+    response.error({ error: { message: 'Save failed' } });
+    fixture.detectChanges();
+    expect(component.form.enabled).toBe(true);
+    expect(component.form.controls.name.value).toBe('Scoped product draft');
+    expect(component.editing()).toBe(true);
   });
 
   it('cancelEdit exits edit mode without calling update', () => {
@@ -589,6 +647,22 @@ describe('CatalogDetailComponent', () => {
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps Delete named during the confirmed pending request', () => {
+    const response = new Subject<void>();
+    deleteSpy.mockReturnValueOnce(response);
+    component.onDelete();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const deleting = host.querySelector<HTMLButtonElement>('.header-actions button[aria-label="Delete"]');
+    expect(deleting?.disabled).toBe(true);
+    expect(deleting?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Deleting product');
+
+    response.next();
+    response.complete();
+    expect(navigateSpy).toHaveBeenCalledWith(['/catalog']);
+  });
+
   it('shows error banner on delete failure and stays on detail', () => {
     deleteSpy.mockReturnValueOnce(
       throwError(() => ({
@@ -624,6 +698,57 @@ describe('CatalogDetailComponent', () => {
     expect(deleteSpy).not.toHaveBeenCalled();
   });
 
+  describe('option group read state', () => {
+    function renderWithOptionRead(result: Observable<ProductOptionGroupDto[]>): HTMLElement {
+      fixture.destroy();
+      listGroupsSpy.mockReturnValueOnce(result);
+      fixture = TestBed.createComponent(CatalogDetailComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('id', '1');
+      fixture.detectChanges();
+      return (fixture.nativeElement as HTMLElement).querySelector('section[aria-labelledby="options-heading"]')!;
+    }
+
+    it('names the pending read and holds Create until the actual result arrives', () => {
+      const pending = new Subject<ProductOptionGroupDto[]>();
+      const section = renderWithOptionRead(pending);
+      const add = section.querySelector<HTMLButtonElement>('button.create-group-btn')!;
+      dialogOpen.mockReturnValue({ afterClosed: () => of(null) });
+
+      expect.soft(section.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+        .toBe('Loading option groups');
+      expect.soft(add.disabled).toBe(true);
+      component.openCreateGroup();
+      expect.soft(dialogOpen).not.toHaveBeenCalled();
+
+      pending.next([]);
+      pending.complete();
+      fixture.detectChanges();
+      expect(add.disabled).toBe(false);
+      expect(section.querySelector('app-empty-state')?.textContent).toContain('No option groups');
+    });
+
+    it('shows a read failure with Retry and restores groups after a successful retry', () => {
+      const section = renderWithOptionRead(throwError(() => ({
+        error: { message: 'Option groups unavailable', errorCode: 'OPTION_READ_FAILED' },
+      })));
+      const buttons = [...section.querySelectorAll('button')];
+      const retry = buttons.find(button => button.textContent?.trim() === 'Retry');
+
+      expect.soft(section.querySelector('[role="alert"]')?.textContent).toContain('OPTION_READ_FAILED');
+      expect.soft(section.querySelector('app-empty-state')).toBeNull();
+      expect.soft(section.querySelector<HTMLButtonElement>('button.create-group-btn')?.disabled).toBe(true);
+      expect(retry).toBeDefined();
+      listGroupsSpy.mockReturnValueOnce(of([SAMPLE_GROUP]));
+      retry?.click();
+      fixture.detectChanges();
+
+      expect(section.querySelector('[role="alert"]')).toBeNull();
+      expect(section.querySelector('mat-card-title')?.textContent).toContain(SAMPLE_GROUP.name);
+      expect(listGroupsSpy).toHaveBeenLastCalledWith(1);
+    });
+  });
+
   it('opens create-group dialog and appends created group', () => {
     const created: ProductOptionGroupDto = {
       id: 99,
@@ -651,6 +776,26 @@ describe('CatalogDetailComponent', () => {
     expect(component.optionGroups().some((g) => g.id === 99)).toBe(true);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Hardware',
+    );
+  });
+
+  it('starts focus trapping immediately for the add-option dialog', () => {
+    dialogOpen.mockReturnValueOnce({
+      afterClosed: () => of(null),
+    });
+
+    component.openAddOption(SAMPLE_GROUP);
+
+    expect(dialogOpen).toHaveBeenCalledWith(
+      OptionCreateDialogComponent,
+      expect.objectContaining({
+        delayFocusTrap: false,
+        data: {
+          groupId: 50,
+          groupName: 'Tier features',
+          productId: 1,
+        },
+      }),
     );
   });
 
@@ -702,6 +847,7 @@ describe('CatalogDetailComponent', () => {
     expect(dialogOpen).toHaveBeenCalledWith(
       ConfirmDialogComponent,
       expect.objectContaining({
+        autoFocus: 'button.cancel-button',
         data: expect.objectContaining({
           title: 'Delete option group',
           confirmColor: 'warn',
@@ -721,6 +867,98 @@ describe('CatalogDetailComponent', () => {
 
     expect(deleteGroupSpy).not.toHaveBeenCalled();
     expect(component.optionGroups().some((g) => g.id === 50)).toBe(true);
+  });
+
+  describe('attribute values empty state', () => {
+    function renderWithAttributeRead(result: Observable<AttributeValueDto[]>): HTMLElement {
+      fixture.destroy();
+      listValuesSpy.mockReturnValueOnce(result);
+      fixture = TestBed.createComponent(CatalogDetailComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('id', '1');
+      fixture.detectChanges();
+      return (fixture.nativeElement as HTMLElement).querySelector('section[aria-labelledby="attrs-heading"]')!;
+    }
+
+    it('names the progress indicator while reading attribute values', () => {
+      const pendingRead = new Subject<AttributeValueDto[]>();
+      const section = renderWithAttributeRead(pendingRead);
+
+      expect(section.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+        .toBe('Loading attribute values');
+      expect(section.querySelector('app-empty-state')).toBeNull();
+
+      pendingRead.next([]);
+      pendingRead.complete();
+      fixture.detectChanges();
+      expect(section.querySelector('[role="progressbar"]')).toBeNull();
+      expect(section.querySelector('app-empty-state')?.textContent).toContain('No attribute values');
+    });
+
+    it('shows a failed attribute read without claiming there are no values', () => {
+      const section = renderWithAttributeRead(throwError(() => ({
+        status: 503,
+        error: { message: 'Attribute values temporarily unavailable', errorCode: 'ATTR_READ_FAILED' },
+      })));
+
+      expect(section.querySelector('[role="alert"]')?.textContent).toContain('ATTR_READ_FAILED');
+      expect(section.querySelector('app-empty-state')).toBeNull();
+      expect(section.querySelector('table')).toBeNull();
+      expect(section.querySelector('form.attr-form')).not.toBeNull();
+    });
+
+    it('shows the empty state when the attribute read succeeds with no values', () => {
+      const section = renderWithAttributeRead(of([]));
+
+      expect(section.querySelector('app-empty-state')?.textContent).toContain('No attribute values');
+      expect(section.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('keeps the confirmed empty state when setting an attribute is rejected', () => {
+      const section = renderWithAttributeRead(of([]));
+      setValueSpy.mockReturnValue(throwError(() => ({
+        error: { message: 'Invalid attribute value', errorCode: 'ATTR_VALUE_INVALID' },
+      })));
+
+      component.attrForm.setValue({ attributeId: 9, value: 'invalid' });
+      component.onSetAttributeValue();
+      fixture.detectChanges();
+
+      expect(section.querySelector('[role="alert"]')?.textContent).toContain('ATTR_VALUE_INVALID');
+      expect(section.querySelector('app-empty-state')?.textContent).toContain('No attribute values');
+      expect(component.attrForm.getRawValue().value).toBe('invalid');
+    });
+  });
+
+  it('names the pending attribute save and locks the draft until failure restores it', () => {
+    const pendingSave = new Subject<AttributeValueDto>();
+    setValueSpy.mockReturnValue(pendingSave);
+    const form = (fixture.nativeElement as HTMLElement).querySelector('form.attr-form')!;
+    const button = form.querySelector('button')!;
+    const select = form.querySelector('mat-select')!;
+    const value = form.querySelector('input')!;
+    component.attrForm.setValue({ attributeId: 9, value: 'draft' });
+
+    component.onSetAttributeValue();
+    fixture.detectChanges();
+
+    expect.soft(button.disabled).toBe(true);
+    expect.soft(button.getAttribute('aria-label')).toBe('Set value');
+    expect.soft(form.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Saving attribute value');
+    expect.soft(select.getAttribute('aria-disabled')).toBe('true');
+    expect.soft(value.disabled).toBe(true);
+    component.onSetAttributeValue();
+    expect(setValueSpy).toHaveBeenCalledTimes(1);
+
+    pendingSave.error(new Error('Unavailable'));
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(false);
+    expect(form.querySelector('[role="progressbar"]')).toBeNull();
+    expect(select.getAttribute('aria-disabled')).toBe('false');
+    expect(value.disabled).toBe(false);
+    expect(value.value).toBe('draft');
   });
 
   it('sets attribute value via ProductAttributeService.setValue', () => {

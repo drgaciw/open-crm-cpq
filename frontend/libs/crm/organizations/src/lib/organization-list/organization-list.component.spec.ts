@@ -14,18 +14,20 @@ describe('OrganizationListComponent SearchInput wiring', () => {
   let listSpy: ReturnType<typeof vi.fn>;
   let searchSpy: ReturnType<typeof vi.fn>;
 
-  const pagination = signal<PaginationMeta>({
+  const initialPagination: PaginationMeta = {
     page: 0,
     size: 20,
     totalElements: 0,
     totalPages: 0,
-  });
+  };
+  const pagination = signal(initialPagination);
   const organizations = signal<OrganizationDto[]>([]);
   const loading = signal(false);
   const error = signal<string | null>(null);
 
   // Angular TestBed compile can exceed Vitest's default 10s hookTimeout under load.
   beforeEach(async () => {
+    pagination.set(initialPagination);
     listSpy = vi.fn();
     searchSpy = vi.fn();
     error.set(null);
@@ -106,11 +108,92 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
   });
 
+  it('keeps an unresolved first page out of the empty state after Dismiss until a successful retry', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    organizations.set([]);
+    loading.set(false);
+    error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+    listSpy.mockClear();
+
+    const dismiss = [...el.querySelectorAll<HTMLButtonElement>('[role="alert"] button')]
+      .find((button) => button.textContent?.trim() === 'Dismiss')!;
+    dismiss.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(el.querySelector('h1')?.textContent).toContain('Accounts');
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listSpy.mockImplementationOnce(() => loading.set(true));
+    component.onRetry();
+    fixture.detectChanges();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    organizations.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No accounts yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
+  });
+
+  it('keeps the loaded account visible when dismissing a later list error', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    organizations.set([org({ id: 12, name: 'Persisted account' })]);
+    loading.set(false);
+    error.set('Failed to refresh organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+
+    component.clearError();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-data-table')?.textContent).toContain('Persisted account');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+  });
+
   it('onRetry reloads list when not searching', () => {
     listSpy.mockClear();
     error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
     component.onRetry();
     expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
+  });
+
+  it('retries the first page requested by the filtered search after a later page was displayed', () => {
+    pagination.set({ page: 1, size: 10, totalElements: 11, totalPages: 2 });
+    loading.set(false);
+    component.onSearch('  enterprise  ');
+    component.onIndustryFilter('Technology');
+    component.onTerritoryFilter('  West  ');
+    component.onSort({ active: 'owner', direction: 'desc' });
+    component.onOwnerFilter('  ada  ');
+
+    const filters = { industry: 'Technology', territory: 'West', ownerId: 'ada' };
+    expect(searchSpy).toHaveBeenLastCalledWith('enterprise', 0, 10, 'ownerId,desc', filters);
+
+    error.set('Search unavailable [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+    searchSpy.mockClear();
+    const host = fixture.nativeElement as HTMLElement;
+    const retry = [...host.querySelectorAll<HTMLButtonElement>('[role="alert"] button')]
+      .find(button => button.textContent?.trim() === 'Retry');
+    expect(retry).toBeDefined();
+    retry?.click();
+    expect(searchSpy).toHaveBeenCalledWith('enterprise', 0, 10, 'ownerId,desc', filters);
+  });
+
+  it('retries the requested page size when changing page size failed', () => {
+    pagination.set({ page: 0, size: 20, totalElements: 21, totalPages: 2 });
+    component.onPageChange({ pageIndex: 0, pageSize: 50, length: 21 });
+    expect(listSpy).toHaveBeenLastCalledWith(0, 50, 'name,asc');
+
+    listSpy.mockClear();
+    error.set('List unavailable [ORGS_UNAVAILABLE]');
+    component.onRetry();
+
+    expect(listSpy).toHaveBeenCalledWith(0, 50, 'name,asc');
   });
 
   it('loading spinner wrapper exposes role=status and aria-live=polite', () => {

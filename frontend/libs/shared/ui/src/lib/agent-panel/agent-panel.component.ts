@@ -73,7 +73,7 @@ export type AgentPanelState =
           @switch (state()) {
             @case ('loading') {
               <div class="agent-panel__state" role="status" aria-live="polite">
-                <mat-spinner diameter="32"></mat-spinner>
+                <mat-spinner diameter="32" [attr.aria-label]="loadingMessage()" />
                 <p>{{ loadingMessage() }}</p>
               </div>
             }

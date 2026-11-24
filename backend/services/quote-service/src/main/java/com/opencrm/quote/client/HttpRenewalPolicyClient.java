@@ -51,6 +51,13 @@ public final class HttpRenewalPolicyClient implements RenewalPolicyClient {
             if (response == null || !response.isSuccess() || response.getData() == null) {
                 throw new IllegalArgumentException("Missing renewal policy data");
             }
+            for (RenewalPolicyView policy : response.getData()) {
+                if (policy == null || policy.id() == null || policy.scopeRef() == null || policy.policyVersion() < 1
+                        || policy.scopeKind() == null || policy.scopeKind().isBlank()
+                        || policy.mode() == null || policy.mode().isBlank()) {
+                    throw new IllegalArgumentException("Incomplete renewal policy facts");
+                }
+            }
             return List.copyOf(response.getData());
         } catch (BusinessException ex) {
             throw ex;

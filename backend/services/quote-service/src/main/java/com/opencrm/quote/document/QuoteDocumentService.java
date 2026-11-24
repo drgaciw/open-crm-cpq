@@ -101,15 +101,23 @@ public class QuoteDocumentService {
 
     @Transactional(readOnly = true)
     public List<QuoteDocumentDto> getDocuments(Long quoteId) {
+        requireActiveQuote(quoteId);
         return documentRepository.findByQuoteIdAndDeletedFalse(quoteId)
                 .stream().map(this::toDto).toList();
     }
 
     @Transactional(readOnly = true)
-    public byte[] getDocumentContent(Long documentId) {
+    public byte[] getDocumentContent(Long quoteId, Long documentId) {
+        requireActiveQuote(quoteId);
         QuoteDocument doc = documentRepository.findByIdAndDeletedFalse(documentId)
+                .filter(document -> quoteId.equals(document.getQuoteId()))
                 .orElseThrow(() -> new ResourceNotFoundException("QuoteDocument", documentId));
         return doc.getContent();
+    }
+
+    private void requireActiveQuote(Long quoteId) {
+        quoteRepository.findByIdAndDeletedFalse(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
     }
 
     private QuoteDocumentDto toDto(QuoteDocument doc) {

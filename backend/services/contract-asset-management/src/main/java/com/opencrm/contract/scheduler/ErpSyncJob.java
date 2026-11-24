@@ -2,6 +2,7 @@ package com.opencrm.contract.scheduler;
 
 import com.opencrm.contract.acl.ErpAdapter;
 import com.opencrm.contract.acl.ErpRateLimitException;
+import com.opencrm.contract.acl.ErpSyncException;
 import com.opencrm.contract.domain.ErpSyncStatus;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionStatus;
@@ -32,7 +33,7 @@ import java.util.UUID;
  * never sync the same row), call the ERP with no transaction open, then record the outcome in a second short
  * transaction:
  * <ul>
- *   <li>success: {@code SYNCED}, ERP id stored, subscription activated (the previous consumer behaviour);</li>
+ *   <li>success with a nonblank ERP id: {@code SYNCED}, ERP id stored, subscription activated;</li>
  *   <li>{@link ErpRateLimitException}: back to {@code QUEUED} for the next run;</li>
  *   <li>any other failure: {@code FAILED}, and the subscription stays PENDING, as before. An operator can retry by
  *       activating it through the API, which syncs again.</li>
@@ -110,6 +111,9 @@ public class ErpSyncJob {
         String erpSubscriptionId;
         try {
             erpSubscriptionId = erpAdapter.syncToErp(subscription);
+            if (erpSubscriptionId == null || erpSubscriptionId.isBlank()) {
+                throw new ErpSyncException("ERP sync did not return a subscription ID");
+            }
         } catch (ErpRateLimitException e) {
             log.info("ERP rate limit reached; subscription {} stays queued", subscription.getSubscriptionNumber());
             finishClaim(id, claimToken, claimedRevision, ErpSyncStatus.QUEUED);

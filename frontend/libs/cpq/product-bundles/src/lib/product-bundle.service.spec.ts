@@ -106,6 +106,38 @@ describe('ProductBundleService', () => {
     expect(service.bundles().length).toBe(2);
   });
 
+  it('keeps the empty product result when the superseded paged response arrives last', () => {
+    service.list();
+    const earlier = httpMock.expectOne((req) => req.url === '/api/v1/product-bundles');
+
+    service.listByProductId(99);
+    httpMock.expectOne('/api/v1/product-bundles/product/99').flush([]);
+    if (!earlier.cancelled) {
+      earlier.flush({ content: [MOCK_PRODUCT_BUNDLES[0]], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+    }
+
+    expect(service.bundles()).toEqual([]);
+    expect(service.pagination().totalElements).toBe(0);
+    expect(service.isEmpty()).toBe(true);
+  });
+
+  it('keeps the latest unfiltered page loading when a superseded product filter fails', () => {
+    service.listByProductId(10);
+    const earlier = httpMock.expectOne('/api/v1/product-bundles/product/10');
+
+    service.list();
+    const latest = httpMock.expectOne((req) => req.url === '/api/v1/product-bundles');
+    if (!earlier.cancelled) {
+      earlier.flush({ message: 'Old filter failed' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    latest.flush({ content: [MOCK_PRODUCT_BUNDLES[0]], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+    expect(service.bundles()).toEqual([MOCK_PRODUCT_BUNDLES[0]]);
+    expect(service.error()).toBeNull();
+  });
+
   it('list sets error banner with message [errorCode]', () => {
     service.list();
 

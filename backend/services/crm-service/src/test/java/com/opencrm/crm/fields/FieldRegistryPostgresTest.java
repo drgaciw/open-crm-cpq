@@ -18,8 +18,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,8 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * PostgreSQL coverage for the registry. The Flyway version is not allocated, so this test
- * applies {@link CustomFieldSchema} itself.
+ * PostgreSQL coverage for the registry against the schema installed by CRM Flyway.
  * <p>
  * Cleanup deletes only ids returned by this test's own SQL inserts and successful API calls.
  * GET-seeded standard definitions, including {@code name}, are not owned and are not deleted.
@@ -99,7 +100,6 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
         controlValueId = null;
         controlKey = null;
 
-        CustomFieldSchema.apply(jdbcTemplate);
         organizationId = insertOrganization("Acme");
         contactId = insertContact(organizationId);
         dealId = insertDeal(organizationId);
@@ -344,6 +344,33 @@ class FieldRegistryPostgresTest extends BaseIntegrationTest {
                         .content("{\"dealId\":" + dealId + ",\"text\":\"deal@example.com\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("FIELD_RECORD_MISMATCH"));
+    }
+
+    @Test
+    void longTextAtTheSupportedLimitRoundTrips() throws Exception {
+        authenticatePerson("person-create");
+        MvcResult definition = mockMvc.perform(post("/api/v1/field-definitions")
+                        .param("tenant", FixtureTenants.A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"entity":"ORGANIZATION","key":"detailed_notes","label":"Detailed notes",
+                                 "type":"LONG_TEXT","required":false,"showOnRecord":true,"showOnList":false,
+                                 "position":100,"agentFilled":false}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long definitionId = idOf(definition.getResponse().getContentAsString());
+        primaryDefinitionIds.add(definitionId);
+
+        byte[] bytes = new byte[15_000];
+        new Random(42).nextBytes(bytes);
+        String notes = Base64.getEncoder().encodeToString(bytes);
+        MvcResult value = putOwnedValue(definitionId, """
+                {"organizationId":%d,"text":"%s"}
+                """.formatted(organizationId, notes));
+        jsonPath("$.data.text").value(notes).match(value);
+        assertThat(jdbcTemplate.queryForObject("SELECT \"text\" FROM crm.field_value WHERE definition_id = ?",
+                String.class, definitionId)).isEqualTo(notes);
     }
 
     @Test

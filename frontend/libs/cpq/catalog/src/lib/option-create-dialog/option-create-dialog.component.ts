@@ -21,6 +21,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { FormValidators } from '@frontend/shared-utils';
+import { finalize } from 'rxjs';
 import {
   ADJUSTMENT_TYPES,
   AdjustmentType,
@@ -124,10 +126,11 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? 'Add' : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Adding option" />
         } @else {
           Add
         }
@@ -186,13 +189,14 @@ export class OptionCreateDialogComponent {
   readonly adjustmentTypes: AdjustmentType[] = [...ADJUSTMENT_TYPES];
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [FormValidators.requiredTrimmed, Validators.maxLength(255)]],
     priceAdjustment: this.fb.control<number | null>(null),
     adjustmentType: this.fb.control<AdjustmentType | null>(null),
     defaultOption: this.fb.nonNullable.control(false),
   });
 
   onCancel(): void {
+    if (this.saving()) return;
     this.dialogRef.close(null);
   }
 
@@ -219,15 +223,22 @@ export class OptionCreateDialogComponent {
       request.adjustmentType = value.adjustmentType;
     }
 
+    const previousDisableClose = this.dialogRef.disableClose;
+    this.dialogRef.disableClose = true;
     this.error.set(null);
     this.saving.set(true);
-    this.optionService.addOption(this.data.groupId, request).subscribe({
-      next: (updated) => {
+    this.form.disable({ emitEvent: false });
+    this.optionService.addOption(this.data.groupId, request).pipe(
+      finalize(() => {
+        this.dialogRef.disableClose = previousDisableClose;
+        this.form.enable({ emitEvent: false });
         this.saving.set(false);
+      }),
+    ).subscribe({
+      next: (updated) => {
         this.dialogRef.close(updated);
       },
       error: (err: unknown) => {
-        this.saving.set(false);
         this.error.set(httpErrorMessage(err, 'Failed to add option'));
       },
     });

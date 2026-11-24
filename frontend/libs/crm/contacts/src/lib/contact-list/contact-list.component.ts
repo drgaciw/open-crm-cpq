@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy, computed } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -69,12 +69,12 @@ export interface ContactTableRow {
       </div>
     }
 
-    @if (!service.loading() && !service.error() && service.isEmpty()) {
+    @if (service.hasConfirmedPage() && !service.error() && service.isEmpty()) {
       <app-empty-state
         icon="people"
-        title="No contacts yet"
-        message="Add your first contact to get started."
-        actionLabel="Create Contact"
+        [title]="searchQuery() ? 'No matching contacts' : 'No contacts yet'"
+        [message]="searchQuery() ? 'Try changing your search.' : 'Add your first contact to get started.'"
+        [actionLabel]="searchQuery() ? '' : 'Create Contact'"
         (action)="onCreate()"
       />
     } @else if (!service.error() && !service.isEmpty()) {
@@ -113,6 +113,7 @@ export class ContactListComponent implements OnInit {
   readonly service = inject(ContactService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  protected readonly searchQuery = signal('');
 
   readonly columns: TableColumn[] = [
     { key: 'name', header: 'Name', sortable: true },
@@ -138,8 +139,10 @@ export class ContactListComponent implements OnInit {
   }
 
   onSearch(q: string): void {
-    if (q.trim()) {
-      this.service.search(q.trim());
+    const query = q.trim();
+    this.searchQuery.set(query);
+    if (query) {
+      this.service.search(query);
     } else {
       this.service.list(0, 20, this.currentSort);
     }

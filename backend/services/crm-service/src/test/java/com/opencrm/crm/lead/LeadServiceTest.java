@@ -354,10 +354,10 @@ class LeadServiceTest {
         @DisplayName("should list all leads without filter")
         void shouldListAllLeads() {
             Page<Lead> page = new PageImpl<>(List.of(lead));
-            when(leadRepository.findAllByDeletedFalse(pageable)).thenReturn(page);
+            when(leadRepository.findMatching(null, null, "", pageable)).thenReturn(page);
             when(leadMapper.toDto(lead)).thenReturn(leadDto);
 
-            Page<LeadDto> result = leadService.list(pageable, null, null);
+            Page<LeadDto> result = leadService.list(pageable, null, null, null);
 
             assertThat(result.getContent()).hasSize(1);
         }
@@ -366,10 +366,10 @@ class LeadServiceTest {
         @DisplayName("should list leads with status filter")
         void shouldListLeadsWithStatusFilter() {
             Page<Lead> page = new PageImpl<>(List.of(lead));
-            when(leadRepository.findByStatusAndDeletedFalse(LeadStatus.NEW, pageable)).thenReturn(page);
+            when(leadRepository.findMatching(LeadStatus.NEW, null, "", pageable)).thenReturn(page);
             when(leadMapper.toDto(lead)).thenReturn(leadDto);
 
-            Page<LeadDto> result = leadService.list(pageable, LeadStatus.NEW, null);
+            Page<LeadDto> result = leadService.list(pageable, LeadStatus.NEW, null, null);
 
             assertThat(result.getContent()).hasSize(1);
         }
@@ -378,10 +378,10 @@ class LeadServiceTest {
         @DisplayName("should list leads with priority filter")
         void shouldListLeadsWithPriorityFilter() {
             Page<Lead> page = new PageImpl<>(List.of(lead));
-            when(leadRepository.findByPriorityAndDeletedFalse(LeadPriority.HIGH, pageable)).thenReturn(page);
+            when(leadRepository.findMatching(null, LeadPriority.HIGH, "", pageable)).thenReturn(page);
             when(leadMapper.toDto(lead)).thenReturn(leadDto);
 
-            Page<LeadDto> result = leadService.list(pageable, null, LeadPriority.HIGH);
+            Page<LeadDto> result = leadService.list(pageable, null, LeadPriority.HIGH, null);
 
             assertThat(result.getContent()).hasSize(1);
         }

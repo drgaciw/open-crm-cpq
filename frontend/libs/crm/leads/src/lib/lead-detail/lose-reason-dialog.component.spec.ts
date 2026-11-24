@@ -35,6 +35,12 @@ describe('LoseReasonDialogComponent (H-CRM-017)', () => {
     expect(close).toHaveBeenCalledWith('Went with a competitor');
   });
 
+  it('allows the dialog content to shrink with the viewport-sized pane', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const content = host.querySelector('mat-dialog-content')!;
+    expect(getComputedStyle(content).minWidth).toBe('0px');
+  });
+
   it('applies cdkTextareaAutosize with min/max rows to the reason textarea', () => {
     const textareaDe = fixture.debugElement.query(By.directive(CdkTextareaAutosize));
     expect(textareaDe).toBeTruthy();

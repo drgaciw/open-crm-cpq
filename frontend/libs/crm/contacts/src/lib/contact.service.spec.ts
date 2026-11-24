@@ -49,6 +49,55 @@ describe('ContactService', () => {
     expect(service.loading()).toBe(false);
   });
 
+  const matchingContact: ContactDto = {
+    id: 1, uuid: 'u1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', createdAt: '', updatedAt: '',
+  };
+  const otherContact: ContactDto = {
+    id: 2, uuid: 'u2', firstName: 'Grace', lastName: 'Hopper', email: 'grace@example.com', createdAt: '', updatedAt: '',
+  };
+  const resultPage = (content: ContactDto[]): SpringPageResponse<ContactDto> => ({
+    content, number: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0,
+  });
+
+  it.each([
+    { query: 'Lovelace', rows: [matchingContact] },
+    { query: 'unmatched', rows: [] },
+  ])('keeps the confirmed $query search result when the old list response arrives later', ({ query, rows }) => {
+    service.list();
+    const earlier = httpMock.expectOne((req) => req.url === '/api/v1/contacts');
+
+    service.search(query);
+    const latest = httpMock.expectOne((req) => req.url === '/api/v1/contacts/search' && req.params.get('q') === query);
+    latest.flush(resultPage(rows));
+    if (!earlier.cancelled) {
+      earlier.flush(resultPage([otherContact, matchingContact]));
+    }
+
+    expect(service.contacts()).toEqual(rows);
+    expect(service.pagination().totalElements).toBe(rows.length);
+    expect(service.hasConfirmedPage()).toBe(true);
+    expect(service.isEmpty()).toBe(rows.length === 0);
+  });
+
+  it('keeps a newer list loading when a superseded search fails', () => {
+    service.search('old search');
+    const earlier = httpMock.expectOne((req) => req.url === '/api/v1/contacts/search');
+
+    service.list();
+    const latest = httpMock.expectOne((req) => req.url === '/api/v1/contacts');
+    if (!earlier.cancelled) {
+      earlier.flush({ message: 'Old search failed' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    expect(service.hasConfirmedPage()).toBe(false);
+    latest.flush(resultPage([matchingContact]));
+    expect(service.contacts()).toEqual([matchingContact]);
+    expect(service.loading()).toBe(false);
+    expect(service.hasConfirmedPage()).toBe(true);
+  });
+
   it('list error.set is message [CODE] when errorCode present', () => {
     service.list();
     const req = httpMock.expectOne((r) => r.url === '/api/v1/contacts');

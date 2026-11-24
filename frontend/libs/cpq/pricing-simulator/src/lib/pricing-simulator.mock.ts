@@ -1,4 +1,5 @@
 import {
+  BulkPricingSimulationResponse,
   PricingContext,
   PricingResult,
 } from '@frontend/shared-models';
@@ -144,5 +145,36 @@ export function mockExecuteOk(context: PricingContext): PricingResult {
       priceMultiplier: 1,
       estimatedMarginPct: 40,
     },
+  };
+}
+
+/** Sample input for the Bulk JSON editor. */
+export const MOCK_BULK_CONTEXTS: PricingContext[] = [
+  MOCK_PRICING_CONTEXT,
+  {
+    ...MOCK_PRICING_CONTEXT,
+    customerExternalId: 'CUST-SILVER-002',
+    quoteExternalId: 'Q-SIM-002',
+    lineItems: [
+      {
+        productExternalId: 'PROD-002',
+        lineItemType: 'SUBSCRIPTION',
+        quantity: 2,
+      },
+    ],
+  },
+];
+
+/** A two-context response fixture for component tests. */
+export function mockBulkPartialResponse(): BulkPricingSimulationResponse {
+  return {
+    totalRequests: 2,
+    successfulRequests: 1,
+    failedRequests: 1,
+    totalExecutionTimeMs: 21,
+    results: [
+      mockExecuteOk(MOCK_PRICING_CONTEXT),
+      { success: false, errorMessage: 'No matching price book' },
+    ],
   };
 }

@@ -273,6 +273,105 @@ describe('QuoteRampEditorComponent', () => {
     expect(text()).toContain('No periods yet.');
   });
 
+  it.each([
+    {
+      initial: { priceBasis: 'ABSOLUTE', unitPrice: 40, discountFraction: undefined },
+      nextLabel: 'Discount fraction off list',
+      nextControl: 'discountFraction', inactiveControl: 'unitPrice', entered: 0.05,
+    },
+    {
+      initial: { priceBasis: 'DISCOUNT_FRACTION', unitPrice: undefined, discountFraction: 0.05 },
+      nextLabel: 'Absolute unit price',
+      nextControl: 'unitPrice', inactiveControl: 'discountFraction', entered: 28.5,
+    },
+  ] as const)('clears the previous price when selecting $nextLabel', ({
+    initial, nextLabel, nextControl, inactiveControl, entered,
+  }) => {
+    fixture.componentRef.setInput('lines', [line({ schedule: { steps: [
+      step({ ...initial, months: 12, quantity: 2 }),
+      step({ sequence: 2, startMonth: 13, months: 24, unitPrice: 55 }),
+    ] } })]);
+    fixture.detectChanges();
+
+    const firstBasis = (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLElement>('mat-select[formcontrolname="priceBasis"]')!;
+    firstBasis.click();
+    fixture.detectChanges();
+    const option = Array.from(document.querySelectorAll<HTMLElement>('mat-option'))
+      .find((node) => node.textContent?.trim() === nextLabel);
+    expect(option).toBeDefined();
+    option!.click();
+    fixture.detectChanges();
+    const [first, other] = component.form.controls.steps.controls;
+    first.controls[nextControl].setValue(entered);
+    fixture.detectChanges();
+
+    expect(first.controls[inactiveControl].value).toBeNull();
+    expect(other.controls.unitPrice.value).toBe(55);
+    expect(component.issues()).toEqual([]);
+    expect(component.canSave()).toBe(true);
+  });
+
+  it.each(['quantity', 'everyMonths'] as const)('re-enables Save after repairing invalid %s', (field) => {
+    fill([{ months: 36, quantity: 3, unitPrice: 40 }]);
+    const save = fixture.nativeElement.querySelector('[data-testid="save-schedule"]') as HTMLButtonElement;
+    const control = field === 'quantity' ? component.form.controls.steps.at(0).controls.quantity
+      : component.form.controls.escalator.controls.everyMonths;
+    expect(save.disabled).toBe(false);
+
+    control.setValue(field === 'quantity' ? null : 0);
+    fixture.detectChanges();
+    expect(component.form.invalid).toBe(true);
+    expect(save.disabled).toBe(true);
+
+    control.setValue(field === 'quantity' ? 3 : 5);
+    fixture.detectChanges();
+    expect(component.form.valid).toBe(true);
+    expect(component.issues()).toEqual([]);
+    expect(save.disabled).toBe(false);
+  });
+
+  it.each([
+    ['fractional month lengths', 'RAMP_PERIOD_EMPTY'],
+    ['fractional quantity', 'RAMP_PERIOD_EMPTY'],
+    ['discount fraction above one', 'RAMP_PRICE_BASIS'],
+  ] as const)('blocks Save for %s in the authored draft', (state, reason) => {
+    fill([
+      { startMonth: 1, months: 15, quantity: 2, unitPrice: 40 },
+      { startMonth: 16, months: 21, quantity: 2, unitPrice: 40 },
+    ]);
+    const [first, second] = component.form.controls.steps.controls;
+    const save = fixture.nativeElement.querySelector('[data-testid="save-schedule"]') as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+
+    if (state === 'fractional month lengths') {
+      first.controls.months.setValue(15.5);
+      second.controls.months.setValue(20.5);
+    } else if (state === 'fractional quantity') {
+      first.controls.quantity.setValue(2.5);
+    } else {
+      second.controls.priceBasis.setValue('DISCOUNT_FRACTION');
+      component.onPriceBasisChange(second, 'DISCOUNT_FRACTION');
+      second.controls.discountFraction.setValue(1.25);
+    }
+    fixture.detectChanges();
+
+    expect(component.issues().map(issue => issue.code)).toContain(reason);
+    expect(save.disabled).toBe(true);
+    component.onSave();
+    expect(updateLineItem).not.toHaveBeenCalled();
+  });
+
+  it('allows whole periods with zero quantity and both valid discount endpoints', () => {
+    const steps = [
+      step({ months: 5, quantity: 0, priceBasis: 'DISCOUNT_FRACTION', unitPrice: undefined, discountFraction: 0 }),
+      step({ sequence: 2, startMonth: 6, months: 7, quantity: 2, priceBasis: 'DISCOUNT_FRACTION',
+        unitPrice: undefined, discountFraction: 1 }),
+    ];
+
+    expect(validateRampSchedule(steps, 12, true)).toEqual([]);
+  });
+
   it('shows inline gap, overlap, term, empty, and negative checks', () => {
     fill([
       { startMonth: 1, months: 12, quantity: 50, unitPrice: 40 },
@@ -352,6 +451,55 @@ describe('QuoteRampEditorComponent', () => {
       durationInMonths: 36,
       escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 10 },
     });
+  });
+
+  it('keeps Generate and its spinner named while a ramp preview is pending', () => {
+    const pending = new Subject<RampStep[]>();
+    expandRampSchedule.mockReturnValueOnce(pending);
+    component.form.controls.escalator.patchValue({ startPrice: 24, amount: 5, everyMonths: 5 });
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const button = host.querySelector<HTMLButtonElement>('[data-testid="expand-escalator"]')!;
+
+    button.click();
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-label')).toBe('Generate periods');
+    expect(button.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Generating ramp periods');
+
+    pending.error({ error: { errorCode: 'RAMP_NOT_SUPPORTED', message: 'Ramp preview unavailable' } });
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(false);
+    expect(button.textContent?.trim()).toBe('Generate periods');
+    expect(button.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it('keeps Save schedule and its progressbar named during a pending line update', () => {
+    const pending = new Subject<QuoteLineItemDto>();
+    updateLineItem.mockReturnValueOnce(pending);
+    fill([{ startMonth: 1, months: 36, quantity: 50, unitPrice: 40 }]);
+    const button = fixture.nativeElement.querySelector('[data-testid="save-schedule"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+
+    button.click();
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(true);
+    expect({
+      action: button.getAttribute('aria-label'),
+      progress: button.querySelector('[role="progressbar"]')?.getAttribute('aria-label'),
+    }).toEqual({ action: 'Save schedule', progress: 'Saving ramp schedule' });
+
+    pending.error({ error: { message: 'Ramp save unavailable' } });
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-label')).toBeNull();
+    expect(button.textContent?.trim()).toBe('Save schedule');
+    expect(button.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('generates and saves a short tail with the explicit non-compounding option', () => {
@@ -473,6 +621,9 @@ describe('QuoteRampEditorComponent', () => {
     component.onExtend();
     fixture.detectChanges();
     expect(component.form.disabled).toBe(true);
+    const extend = fixture.nativeElement.querySelector('[data-testid="extend-escalator"]') as HTMLButtonElement;
+    expect(extend.getAttribute('aria-label')).toBe('Extend ramp periods');
+    expect(extend.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Extending ramp periods');
     component.onLineChange(99);
     component.addPeriod();
     expect(component.selectedLineId()).toBe(1);
@@ -488,6 +639,7 @@ describe('QuoteRampEditorComponent', () => {
     expect(component.extending()).toBe(false);
     expect(component.form.enabled).toBe(true);
     expect(component.error()).toBeNull();
+    expect(extend.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('saves a discount fraction of 0.05 and an escalator of 5 percent points', () => {

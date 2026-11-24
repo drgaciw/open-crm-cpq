@@ -1,9 +1,11 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import {
   FormBuilder,
@@ -69,7 +71,8 @@ function httpErrorMessage(err: unknown): string {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Name</mat-label>
               <input matInput formControlName="name" autocomplete="off" />
-              @if (form.controls.name.hasError('required') && form.controls.name.touched) {
+              @if ((form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) &&
+                form.controls.name.touched) {
                 <mat-error>Name is required</mat-error>
               }
             </mat-form-field>
@@ -80,7 +83,8 @@ function httpErrorMessage(err: unknown): string {
               <mat-label>Customer external ID</mat-label>
               <input matInput formControlName="customerExternalId" autocomplete="off" />
               @if (
-                form.controls.customerExternalId.hasError('required') &&
+                (form.controls.customerExternalId.hasError('required') ||
+                  form.controls.customerExternalId.hasError('pattern')) &&
                 form.controls.customerExternalId.touched
               ) {
                 <mat-error>Customer external ID is required</mat-error>
@@ -222,13 +226,14 @@ export class QuotesCreateComponent {
   private readonly fb = inject(FormBuilder);
   private readonly quoteService = inject(QuoteService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', Validators.required],
-    customerExternalId: ['', Validators.required],
+    name: ['', [Validators.required, Validators.pattern(/\S/)]],
+    customerExternalId: ['', [Validators.required, Validators.pattern(/\S/)]],
     currency: [''],
     durationInMonths: [null as number | null],
     dealExternalId: [''],
@@ -244,15 +249,17 @@ export class QuotesCreateComponent {
     this.saving.set(true);
     this.error.set(null);
 
-    this.quoteService.create(this.toRequest()).subscribe({
-      next: (quote) => {
-        void this.router.navigate(['/quotes', quote.id]);
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.error.set(httpErrorMessage(err));
-      },
-    });
+    this.quoteService.create(this.toRequest())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (quote) => {
+          void this.router.navigate(['/quotes', quote.id]);
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.error.set(httpErrorMessage(err));
+        },
+      });
   }
 
   goBack(): void {
