@@ -122,7 +122,7 @@ public final class CustomFieldSchema {
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_field_value_text
-                ON crm.field_value (definition_id, left("text", 256))
+                ON crm.field_value (definition_id, "text")
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_field_value_numeric
