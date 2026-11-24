@@ -4,8 +4,8 @@
 **Date:** 2026-11-24
 **Deciders:** Project owner (drg). Requested by Projects Manager (drg's asset-mgmt workstream, 2026-11-23), task W0-4.
 **Backlog:** [DRG-652](https://linear.app/drgamtd-workspace/issue/DRG-652) (epic). Task W0-4 of the asset-management sprint.
-**Relates to:** [ADR-037](ADR-037-asset-installed-base.md) (Proposed; Asset / installed base; placement vs CAM stays open), [ADR-035](../renewals-amendments/adr-035-amendment-document-placement.md) (amendment document and contract header in contract-asset-management; does not place the Asset), [ADR-008](ADR-008-postgres-schema-per-service.md) (no new schema), [ADR-038](ADR-038-account-service-extraction.md) (a keep-in-place decision for a different aggregate).
-**Does not authorize:** any extraction, move, new module, schema, migration, registry entry, flag change, code change or deploy. Does not accept [ADR-037](ADR-037-asset-installed-base.md) and does not change its status. Does not close placement vs CAM (DRG-561).
+**Relates to:** [ADR-037](ADR-037-asset-installed-base.md) (Accepted; Asset / installed base; placement vs CAM stays open), [ADR-035](../renewals-amendments/adr-035-amendment-document-placement.md) (amendment document and contract header in contract-asset-management; does not place the Asset), [ADR-008](ADR-008-postgres-schema-per-service.md) (no new schema), [ADR-038](ADR-038-account-service-extraction.md) (a keep-in-place decision for a different aggregate).
+**Does not authorize:** any extraction, move, new module, schema, migration, registry entry, flag change, code change or deploy. Leaves [ADR-037](ADR-037-asset-installed-base.md) in effect. Does not close placement vs CAM (DRG-561).
 
 ---
 
@@ -28,7 +28,7 @@ The package that stays is `com.opencrm.contract.asset` (main and test) inside `b
 ### Scope
 
 - In scope: where that package lives for this sprint.
-- Out of scope: accepting ADR-037; the lasting placement question (DRG-561); amendment documents (ADR-035); subscriptions and entitlements; a new service or schema; asset holds, read roles, migrations and event shapes. Those stay as ADR-037 and their own stories left them.
+- Out of scope: revising ADR-037; the lasting placement question (DRG-561); amendment documents (ADR-035); subscriptions and entitlements; a new service or schema; asset holds, read roles, migrations and event shapes. Those stay as ADR-037 and their own stories left them.
 
 ### Time-box
 
@@ -40,7 +40,7 @@ This sprint only (epic DRG-652, task W0-4). It does not outlive the sprint.
 
 - Sprint stories keep the Asset package in `backend/services/contract-asset-management`. They do not add a module, rename the package, or move the files.
 - A later extraction or move needs its own decision after a revisit trigger. ADR-008 still authorizes no new schema.
-- ADR-037 stays Proposed. Its status is unchanged. Accepting ADR-037 remains the owner's gate, separate from accepting this record.
+- ADR-037 was accepted on 2026-11-23. Acceptance of this sprint placement proposal is a separate owner decision.
 - While this record is Proposed it authorizes nothing. Accepting it still authorizes no code, migration, flag or deploy. It only records that this sprint does not extract or move the package.
 
 ## Alternatives considered
