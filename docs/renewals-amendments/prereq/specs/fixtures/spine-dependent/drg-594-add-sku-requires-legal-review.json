@@ -1,13 +1,19 @@
 {
     "issue": "DRG-594",
     "ac_id": "AC-594-2",
-    "case": "add-sku-requires-legal-review",
+    "case": "new-saas-sku-add-requires-legal-review",
+    "note": "594-F1-C stays held. drg owner ruling, 7:15 PM CT Nov 23 2026, option B: a new SaaS SKU that is not already on the quote still requires legal review. This fixture is that case, so the review expectation below stays.",
     "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
-    "status": "Proposed",
-    "owner_decision": "___ (drg, time)",
-    "follows_proposed_option": "594-F1-A, 594-F2-A, 594-F6-A",
+    "status": "Decided",
+    "owner_decision": "B. drg owner ruling, 7:15 PM CT Nov 23 2026",
+    "follows_proposed_option": "594-F1-B, 594-F1-C held, 594-F2-A, 594-F6-A",
     "input": {
         "document_state_before": "DRAFT",
+        "quote_skus": ["SKU-A"],
+        "catalog": [
+            {"sku": "SKU-A", "product_type": "SAAS_SEAT_NAMED"},
+            {"sku": "SKU-B", "product_type": "SAAS_SEAT_NAMED"}
+        ],
         "lines": [
             {
                 "action_code": "ADD",

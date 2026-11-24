@@ -74,7 +74,7 @@ Every row is Proposed, unaccepted, owner decision required. The default is the r
 | 554-F6 Merge versus co-term, OQ7 regrouping | DRG-554 | Adopted OQ7: one thin contract per subscription. The backfill does not regroup. Regrouping is not selected | Follow-up options only: a later merge that retargets `contract_id`; a DRG-592 new contract as the survivor; never regroup |
 | 554-F7 Source after merge | DRG-554 | Source stays active as a reference until a later executed close | Source is cancelled when the survivor pointer is written; source row is deleted |
 | 554-F8 Home versus DRG-461 | DRG-554 | DRG-461 stays the capability item; this note is the policy frame | DRG-554 replaces DRG-461 |
-| 594-F1 Seats versus Add and Remove | DRG-594 | Business policy, owner option, not adopted: a same-SKU quantity `UPDATE` is seats; `ADD` of a SKU and `REMOVE` of a product line require review | Same-SKU Add and Remove count as seats; any quantity change, including a new SKU, is free |
+| 594-F1 Seats versus Add and Remove | DRG-594 | Owner ruling 7:15 PM CT Nov 23 2026, option B: adding or removing a SaaS SKU that is already on the quote is a seat change and skips legal review. A new SaaS SKU (594-F1-C) still requires legal review and is held. Non-SaaS add and remove still require legal review. A same-SKU quantity `UPDATE` stays seats | Superseded conservative default: every `ADD` and `REMOVE` requires review. Option C, a new SaaS SKU is also free, stays held |
 | 594-F2 Where the gate sits | DRG-594 | A guard on `DRAFT` to `IN_REVIEW`, no new state | A new `LEGAL_REVIEW` state; the document may enter `IN_REVIEW` and stops before `APPROVED` |
 | 594-F3 Override | DRG-594 | A named legal role may override, and until that role is named the guard refuses; sales cannot override | No override ever; the seller may override |
 | 594-F4 Mixed edits | DRG-594 | Business policy, owner option, not adopted: one edit outside the free set makes the whole document require review; free header fields are price and term | Per-line skip; governing agreement and clauses are free as well |
@@ -369,13 +369,13 @@ Legal-review-free classes are business policy. 594-F1 and 594-F4 stay options fo
 
 | Option | Meaning |
 |---|---|
-| A. Same-SKU quantity Update | `UPDATE` of quantity, price, or term on the existing SKU is free. `ADD` of a SKU and `REMOVE` of a product line require review. |
-| B. Same-SKU Add and Remove are seats | A different SKU requires review. |
-| C. Any quantity change is free | Includes a new SKU. |
+| A. Same-SKU quantity Update | `UPDATE` of quantity, price, or term on the existing SKU is free. `ADD` of a SKU and `REMOVE` of a product line require review. Superseded for SaaS add and remove by the ruling below. |
+| B. SaaS SKU already on the quote | Adding or removing that line is a seat change and skips legal review. A new SaaS SKU still requires review. Non-SaaS add and remove still require review. |
+| C. Any quantity change is free | Includes a new SaaS SKU. Held. Not chosen. |
 
-**Recommendation:** A.
+**Recommendation:** B, as ruled. Option C stays held.
 
-**Default:** Proposed, unaccepted, owner decision required. Business policy, and it stays an option for the owner: a same-SKU quantity `UPDATE` is seats; `ADD` of a SKU and `REMOVE` of a product line require review (option A). Alternatives written out: same-SKU Add and Remove count as seats (option B); any quantity change, including a new SKU, is free (option C). This default does not edit the first-slice text and does not add a gate to S3. It does not adopt the class list.
+**Owner decision:** B. drg owner ruling, 7:15 PM CT Nov 23 2026. Adding or removing a line whose SaaS SKU is already on the quote skips legal review. A new SaaS SKU (option C) still requires legal review until Decision rules on it. Non-SaaS add and remove still require legal review. A same-SKU quantity `UPDATE` stays seats. This replaces the conservative default that every add and remove required review.
 
 **594-F2. Where the gate sits.**
 
