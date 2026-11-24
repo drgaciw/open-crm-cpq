@@ -151,6 +151,7 @@ class AmendmentDocumentWorkflowIntegrationTest {
         assertThat(reasonCodes(draft.id())).contains("V9");
 
         AmendmentView priced = revisions.installPricing(draft.id(), 1, pricing(fixture, draft), context(fixture, "s2-price"));
+        seedExistingSaasSeat(fixture);
         AmendmentView submitted = documents.submit(priced.id(), priced.version(), context(fixture, "s2-submit-ok"));
         assertThat(submitted.status()).isEqualTo(AmendmentDocumentStatus.IN_REVIEW);
         assertThat(submitted.contentDigest()).matches("^[0-9a-f]{64}$");
@@ -449,7 +450,49 @@ class AmendmentDocumentWorkflowIntegrationTest {
     private AmendmentView submitPriced(Fixture fixture, String seed) {
         AmendmentView draft = documents.create(fixture.contract.getId(), create(fixture), context(fixture, seed + "-create"));
         AmendmentView priced = revisions.installPricing(draft.id(), 1, pricing(fixture, draft), context(fixture, seed + "-price"));
+        seedExistingSaasSeat(fixture);
         return documents.submit(priced.id(), priced.version(), context(fixture, seed + "-submit"));
+    }
+
+    /** sku-1 is the priced ADD. Option B skips legal review only when that SaaS SKU is already on the quote. */
+    private void seedExistingSaasSeat(Fixture fixture) {
+        jdbc.execute("create schema if not exists quote");
+        jdbc.execute("create schema if not exists product");
+        jdbc.execute("""
+                create table if not exists quote.quotes (
+                    id bigserial primary key,
+                    uuid varchar(36) not null unique,
+                    is_deleted boolean not null default false)
+                """);
+        jdbc.execute("""
+                create table if not exists quote.quote_line_items (
+                    id bigserial primary key,
+                    quote_id bigint not null,
+                    product_external_id varchar(255) not null,
+                    is_deleted boolean not null default false)
+                """);
+        jdbc.execute("""
+                create table if not exists product.products (
+                    id bigserial primary key,
+                    sku varchar(100) not null,
+                    product_type varchar(50) not null,
+                    is_deleted boolean not null default false)
+                """);
+        jdbc.update("insert into quote.quotes (uuid) values (?) on conflict (uuid) do nothing",
+                fixture.targetQuoteId.toString());
+        Long quoteRow = jdbc.queryForObject("select id from quote.quotes where uuid = ?", Long.class,
+                fixture.targetQuoteId.toString());
+        Long lineCount = jdbc.queryForObject(
+                "select count(*) from quote.quote_line_items where quote_id = ? and product_external_id = 'sku-1'",
+                Long.class, quoteRow);
+        if (lineCount == 0) {
+            jdbc.update("insert into quote.quote_line_items (quote_id, product_external_id) values (?, 'sku-1')", quoteRow);
+        }
+        Long productCount = jdbc.queryForObject(
+                "select count(*) from product.products where sku = 'sku-1' and is_deleted = false", Long.class);
+        if (productCount == 0) {
+            jdbc.update("insert into product.products (sku, product_type) values ('sku-1', 'SAAS_SEAT_NAMED')");
+        }
     }
 
     private AmendmentCommandException catchCommand(Runnable call) {

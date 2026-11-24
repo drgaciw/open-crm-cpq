@@ -1,13 +1,14 @@
 package com.opencrm.contract.asset;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AssetRepository extends JpaRepository<Asset, Long> {
+public interface AssetRepository extends JpaRepository<Asset, Long>, JpaSpecificationExecutor<Asset> {
 
     Optional<Asset> findBySubscriptionIdAndContractLineIdAndDeletedFalse(Long subscriptionId, String contractLineId);
 
@@ -16,6 +17,4 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
     List<Asset> findByAccountIdAndDeletedFalse(String accountId);
 
     List<Asset> findByContractLineIdAndDeletedFalse(String contractLineId);
-
-    List<Asset> findByDeletedFalse();
 }

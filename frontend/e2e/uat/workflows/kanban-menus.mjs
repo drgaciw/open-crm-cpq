@@ -1,6 +1,6 @@
 /**
- * Kanban board (`/deals/kanban`). There is NO drag-and-drop: a card changes column only through
- * its "Deal stage actions" menu (Advance Stage / Mark Won / Mark Lost) or the detail page.
+ * Kanban board (`/deals/kanban`). An eligible card can advance by pointer drag or through
+ * its "Deal stage actions" menu.
  *
  * The menu trigger's aria-label is identical on every card, so every lookup is scoped to the card
  * of a run-unique fixture deal. The board loads the newest 200 deals; fixtures are always newest.
@@ -8,6 +8,7 @@
  * Check ids: `deals.kanban.<aspect>`
  */
 import { goto } from '../../lib/browser.mjs';
+import { cdkDragTo } from '../../lib/kanban-drag.mjs';
 import { runCheck, runSteps, waitUntil } from '../../lib/health.mjs';
 import { withNativeDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectNoSnackbar } from '../../lib/overlays.mjs';
@@ -74,11 +75,22 @@ export async function runKanban(ctx, { kanban, detail }) {
     await page.waitForURL((url) => url.pathname === '/deals');
   });
 
-  await runCheck(ctx, 'deals.kanban.no-drag-and-drop', async () => {
+  await runCheck(ctx, 'deals.kanban.drag-advances-stage', async () => {
+    const dragged = await ensure(ctx, 'deal');
     await openBoard(page);
-    const draggable = await page.locator('[cdkdrag], [cdkDrag], .cdk-drag, [draggable="true"]').count();
-    if (draggable) throw new Error(`${draggable} draggable element(s) found — the spec says the board has no drag-and-drop; update the suite`);
-    return 'no cdkDrag / draggable elements (H-CRM-029 gap still holds)';
+    await expectCardIn(page, dragged, 'PROSPECTING');
+    const advanced = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === `${API}/${dragged.id}/advance` && response.request().method() === 'POST',
+    ).catch(() => null);
+    await cdkDragTo(page, card(page, dragged), page.locator('#kanban-stage-QUALIFICATION'));
+    const response = await advanced;
+    if (!response?.ok()) throw new Error(`drag advance returned ${response?.status() ?? 'no response'}`);
+    await expectApiStage(api, dragged.id, 'QUALIFICATION');
+    await expectCardIn(page, dragged, 'QUALIFICATION');
+    if (new URL(page.url()).pathname !== '/deals/kanban') throw new Error('dragging navigated away from the board');
+    await openBoard(page);
+    await expectCardIn(page, dragged, 'QUALIFICATION');
+    return 'drag advanced the opportunity to Qualification and persisted after reload';
   });
 
   // Counts: the badge of each column equals its rendered cards and what the API reports.

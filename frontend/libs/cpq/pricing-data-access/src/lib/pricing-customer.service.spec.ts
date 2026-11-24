@@ -65,6 +65,47 @@ describe('PricingCustomerService', () => {
     );
   });
 
+  it('keeps the newer segment rows and pagination after a superseded success', () => {
+    service.listBySegment('ENTERPRISE');
+    const older = httpMock.expectOne(
+      (r) => r.url === '/api/v1/pricing-customers' && r.params.get('segment') === 'ENTERPRISE',
+    );
+    service.listBySegment('SMB', 0, 10);
+    const current = httpMock.expectOne(
+      (r) => r.url === '/api/v1/pricing-customers' && r.params.get('segment') === 'SMB',
+    );
+    const currentRow = customer({ id: 2, externalId: 'c', name: 'Current result', segment: 'SMB' });
+    current.flush({ content: [currentRow], number: 0, size: 10, totalElements: 1, totalPages: 1 });
+    older.flush({
+      content: [customer({ id: 1, externalId: 'c', name: 'Older result', segment: 'ENTERPRISE' })],
+      number: 0, size: 20, totalElements: 1, totalPages: 1,
+    });
+
+    expect(service.customers()).toEqual([currentRow]);
+    expect(service.pagination()).toEqual({ page: 0, size: 10, totalElements: 1, totalPages: 1 });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBeNull();
+  });
+
+  it('keeps the current list loading and error when a superseded request fails', () => {
+    service.listBySegment('ENTERPRISE');
+    const older = httpMock.expectOne(
+      (r) => r.url === '/api/v1/pricing-customers' && r.params.get('segment') === 'ENTERPRISE',
+    );
+    service.listBySegment('SMB');
+    const current = httpMock.expectOne(
+      (r) => r.url === '/api/v1/pricing-customers' && r.params.get('segment') === 'SMB',
+    );
+
+    older.flush({ message: 'Superseded query failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+
+    current.flush({ message: 'Current query failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBe('Current query failed');
+  });
+
   it('getById error.set appends errorCode as message [CODE]', () => {
     service.getById(99);
     const req = httpMock.expectOne('/api/v1/pricing-customers/99');

@@ -66,7 +66,7 @@ const ENGINE_TYPES: RulesEngineType[] = ['DROOLS', 'OPENL'];
             maxlength="255"
             autocomplete="off"
           />
-          @if (form.get('name')?.hasError('required')) {
+          @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
             <mat-error>Name is required</mat-error>
           }
           @if (form.get('name')?.hasError('maxlength')) {
@@ -125,10 +125,11 @@ const ENGINE_TYPES: RulesEngineType[] = ['DROOLS', 'OPENL'];
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? 'Create' : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Creating rule set" />
         } @else {
           Create
         }
@@ -187,7 +188,7 @@ export class RuleSetCreateDialogComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
     description: [''],
     engineType: ['DROOLS' as RulesEngineType],
     effectiveDate: [''],

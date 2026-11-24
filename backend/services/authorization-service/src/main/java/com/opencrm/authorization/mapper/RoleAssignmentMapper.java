@@ -6,7 +6,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /** ADR-006: the entity never crosses the API boundary; this is the one place {@link RoleAssignment} is mapped. */
-@Mapper
+@Mapper(componentModel = "spring")
 public interface RoleAssignmentMapper {
 
     @Mapping(target = "roleName", source = "role.name")

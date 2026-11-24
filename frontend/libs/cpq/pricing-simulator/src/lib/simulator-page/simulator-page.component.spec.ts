@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
 import { PricingContext, PricingResult } from '@frontend/shared-models';
 import { SimulatorPageComponent } from './simulator-page.component';
@@ -46,6 +46,16 @@ describe('SimulatorPageComponent', () => {
     expect(compiled.textContent).toContain('No simulation yet');
     expect(component.result()).toBeNull();
     expect(component.error()).toBeNull();
+    expect(executeMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the Single and Bulk modes and opens Single by default', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const tabs = Array.from(compiled.querySelectorAll('[role="tab"]'));
+    expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(['Single', 'Bulk']);
+    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(tabs[1]?.getAttribute('aria-selected')).toBe('false');
+    expect(compiled.textContent).toContain('No simulation yet');
     expect(executeMock).not.toHaveBeenCalled();
   });
 
@@ -127,6 +137,60 @@ describe('SimulatorPageComponent', () => {
     expect(line.quantity).toBe(10);
     expect(line.listPrice).toBe(50);
     expect(line.finalPrice).toBe(500);
+  });
+
+  it.each([
+    ['quantity', 2.5, 3, 'Enter a whole quantity.'],
+    ['durationInMonths', 7.5, 7, 'Enter a whole number of months.'],
+  ] as const)('blocks fractional %s before execution', (field, invalid, valid, message) => {
+    executeMock.mockReturnValue(of(MOCK_PRICING_EXECUTE_OK));
+    const control = component.form.controls[field];
+    const host = fixture.nativeElement as HTMLElement;
+    const simulate = host.querySelector<HTMLButtonElement>('app-page-header button')!;
+
+    control.setValue(invalid);
+    control.markAsTouched();
+    fixture.detectChanges();
+    expect.soft(simulate.disabled).toBe(true);
+    expect.soft(host.querySelector('mat-error')?.textContent ?? '').toContain(message);
+    component.onSimulate();
+    expect.soft(executeMock).not.toHaveBeenCalled();
+
+    control.setValue(valid);
+    fixture.detectChanges();
+    expect(simulate.disabled).toBe(false);
+  });
+
+  it('formats each result in its submitted currency while draft currency changes', () => {
+    const eur = new Subject<PricingResult>();
+    executeMock.mockReturnValueOnce(eur).mockReturnValueOnce(of(MOCK_PRICING_EXECUTE_OK));
+    const host = fixture.nativeElement as HTMLElement;
+    const net = () => host.querySelector('.metric-value')?.textContent?.trim();
+    const arr = () => host.querySelectorAll('.metric-value')[1]?.textContent?.trim();
+    const linePrices = () => [...host.querySelectorAll('tbody tr:first-child td')].slice(2);
+
+    component.form.controls.currency.setValue('EUR');
+    component.onSimulate();
+    component.form.controls.currency.setValue('GBP');
+    eur.next(MOCK_PRICING_EXECUTE_OK);
+    eur.complete();
+    fixture.detectChanges();
+    expect.soft(net()).toContain('€');
+    expect.soft(arr()).toContain('€');
+    expect.soft(linePrices()).toHaveLength(3);
+    expect.soft(linePrices().every(cell => cell.textContent?.includes('€'))).toBe(true);
+
+    component.form.controls.currency.setValue('USD');
+    fixture.detectChanges();
+    expect.soft(net()).toContain('€');
+    expect(executeMock).toHaveBeenCalledTimes(1);
+    expect(executeMock.mock.calls[0][0].currency).toBe('EUR');
+
+    component.form.controls.currency.setValue('GBP');
+    component.onSimulate();
+    fixture.detectChanges();
+    expect(net()).toContain('£');
+    expect(executeMock.mock.calls[1][0].currency).toBe('GBP');
   });
 
   it('shows error empty-state when execute HTTP fails', () => {
@@ -211,4 +275,39 @@ describe('SimulatorPageComponent', () => {
     expect(component.result()).toBeNull();
     expect(component.form.invalid).toBe(true);
   });
+
+  it.each(['customerExternalId', 'productExternalId'] as const)(
+    'blocks Single simulation for whitespace-only %s',
+    (field) => {
+      executeMock.mockReturnValue(of(MOCK_PRICING_EXECUTE_OK));
+      component.form.controls[field].setValue(' \t ');
+      fixture.detectChanges();
+
+      const submit = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('app-page-header button');
+      expect(submit?.disabled).toBe(true);
+      component.onSimulate();
+      expect(executeMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('trims padded nonblank IDs when executing the default context', () => {
+    executeMock.mockReturnValue(of(MOCK_PRICING_EXECUTE_OK));
+    component.form.patchValue({
+      customerExternalId: '  CUST-GOLD-001  ',
+      productExternalId: '\tPROD-001 ',
+    });
+
+    expect(component.form.valid).toBe(true);
+    component.onSimulate();
+    expect(executeMock).toHaveBeenCalledWith({
+      customerExternalId: 'CUST-GOLD-001',
+      quoteExternalId: 'Q-SIM-001',
+      region: 'NA',
+      currency: 'USD',
+      durationInMonths: 12,
+      subscriptionType: 'NEW',
+      lineItems: [{ productExternalId: 'PROD-001', lineItemType: 'SUBSCRIPTION', quantity: 5 }],
+    } satisfies PricingContext);
+  });
+
 });

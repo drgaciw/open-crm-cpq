@@ -75,6 +75,12 @@ describe('ContractDetailComponent', () => {
     expect(table?.textContent).toContain('Active');
   });
 
+  it('places the populated asset table in a named, keyboard-focusable scroll area', async () => {
+    await render();
+    const table = el().querySelector('table[aria-label="Assets on this contract"]');
+    expect(table?.closest('[role="region"][aria-label="Contract asset columns"][tabindex="0"]')).toBeTruthy();
+  });
+
   it('explains a refused asset read instead of showing an error or an empty list', async () => {
     await render(of(MOCK_CONTRACTS[0]), throwError(() => new HttpErrorResponse({ status: 403 })));
     expect(text()).toContain('Viewing assets requires the InstalledBase.Read role.');

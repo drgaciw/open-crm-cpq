@@ -172,11 +172,27 @@ public class QuoteService {
         Quote quote = quoteRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
 
-        if (!EDITABLE_STATUSES.contains(quote.getStatus()) && !(quote.getStatus() == QuoteStatus.PENDING_APPROVAL
-                && com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null)) {
+        boolean clearStartDate = Boolean.TRUE.equals(request.getClearStartDate());
+        boolean clearEndDate = Boolean.TRUE.equals(request.getClearEndDate());
+        boolean clearingDates = clearStartDate || clearEndDate;
+        boolean editableRampApproval = !clearingDates && quote.getStatus() == QuoteStatus.PENDING_APPROVAL
+                && com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote) != null;
+        if (!EDITABLE_STATUSES.contains(quote.getStatus()) && !editableRampApproval) {
             throw new BusinessException(
                     "Quote can only be edited in DRAFT or REJECTED status. Current: " + quote.getStatus(),
                     "QUOTE_NOT_EDITABLE"
+            );
+        }
+
+        if ((clearStartDate && request.getStartDate() != null) || (clearEndDate && request.getEndDate() != null)) {
+            throw new BusinessException("A quote date cannot be set and cleared in the same update", "VALIDATION_ERROR");
+        }
+        if (clearingDates && (quote.getDealType() != DealType.NEW
+                || quote.getTargetSubscriptionNumber() != null || request.getTargetSubscriptionNumber() != null
+                || quote.getContinuationOperation() != null || quote.getContinuationRequestJson() != null)) {
+            throw new BusinessException(
+                    "Quote dates can only be cleared on ordinary new quotes. Use continuation authoring to change subscription dates.",
+                    "SUBSCRIPTION_CONTINUATION_INVALID"
             );
         }
 
@@ -189,6 +205,8 @@ public class QuoteService {
         java.time.LocalDate previousStart = quote.getStartDate();
         java.time.LocalDate previousEnd = quote.getEndDate();
         quoteMapper.updateEntity(request, quote);
+        if (clearStartDate) quote.setStartDate(null);
+        if (clearEndDate) quote.setEndDate(null);
         rampScheduleGuard.markIfContextChanged(quote, previousDuration, previousCurrency, previousRegion);
         if (!Objects.equals(previousStart, quote.getStartDate()) || !Objects.equals(previousEnd, quote.getEndDate())
                 || !Objects.equals(previousSubscriptionType, quote.getSubscriptionType())) {

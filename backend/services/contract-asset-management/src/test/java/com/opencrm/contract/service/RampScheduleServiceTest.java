@@ -1,5 +1,6 @@
 package com.opencrm.contract.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionRatePeriod;
@@ -11,12 +12,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -24,11 +30,12 @@ import static org.mockito.Mockito.*;
 class RampScheduleServiceTest {
     @Mock SubscriptionRepository subscriptions;
     @Mock SubscriptionRatePeriodRepository periods;
+    @Mock JdbcTemplate jdbc;
     RampScheduleService service;
     Subscription subscription;
 
     @BeforeEach void setUp() {
-        service = new RampScheduleService(subscriptions, periods);
+        service = new RampScheduleService(subscriptions, periods, jdbc);
         subscription = Subscription.builder().id(42L).subscriptionNumber("SUB-RAMP").customerId("C-1")
                 .currencyCode("USD").commercialRevision(7L).status(SubscriptionStatus.ACTIVE)
                 .startDate(LocalDate.of(2027,1,1)).endDate(LocalDate.of(2029,12,31)).build();
@@ -45,6 +52,41 @@ class RampScheduleServiceTest {
         assertThat(result.exitMrr()).isEqualByComparingTo("2500");
         assertThat(result.commercialRevision()).isEqualTo(7L);
         assertThat(result.lines().getFirst().billingAnchorDate()).isEqualTo(subscription.getStartDate());
+    }
+
+    @Test void verifiedCustomerAccountIsOnlySerializedOnTheInternalSchedule() throws Exception {
+        UUID account = UUID.randomUUID();
+        UUID lineId = UUID.randomUUID();
+        subscription.setContractLineId(lineId);
+        when(subscriptions.findBySubscriptionNumberAndDeletedFalse("SUB-RAMP")).thenReturn(Optional.of(subscription));
+        var accepted = period(1, "2027-01-01", "2029-12-31", "100");
+        accepted.setProductExternalId("verified-product");
+        when(periods.findBySubscriptionIdAndDeletedFalseOrderByStartDateAscAcceptedLineUuidAscSequenceAsc(42L))
+                .thenReturn(List.of(accepted));
+        var row = mock(ResultSet.class);
+        when(row.getObject(anyString(), eq(UUID.class))).thenAnswer(call -> {
+            String column = call.getArgument(0);
+            return switch (column) {
+                case "id" -> lineId;
+                case "customer_account_id" -> account;
+                default -> throw new AssertionError("Unexpected result column " + column);
+            };
+        });
+        when(row.getString("accepted_line_uuid")).thenReturn("line-1");
+        when(row.getString("product_external_id")).thenReturn("verified-product");
+        when(jdbc.query(anyString(), ArgumentMatchers.<RowMapper<Object>>any(), eq(42L), eq(lineId), eq(7L)))
+                .thenAnswer(call -> {
+                    RowMapper<?> mapper = call.getArgument(1);
+                    return List.of(mapper.mapRow(row, 0));
+                });
+        var json = new ObjectMapper().findAndRegisterModules();
+
+        var internal = service.internalByNumber("SUB-RAMP", null);
+        var publicSchedule = service.byNumber("SUB-RAMP", null);
+
+        assertThat(internal.canonicalLinkageVerified()).isTrue();
+        assertThat(json.valueToTree(internal).path("canonicalCustomerAccountId").asText()).isEqualTo(account.toString());
+        assertThat(json.valueToTree(publicSchedule).has("canonicalCustomerAccountId")).isFalse();
     }
 
     @Test void unknownOrDeletedSubscriptionIsNotExposed() {

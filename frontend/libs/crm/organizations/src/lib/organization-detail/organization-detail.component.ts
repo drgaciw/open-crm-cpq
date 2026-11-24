@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, input, ChangeDetectionStrategy, signal, effect, Injector, untracked, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -32,7 +33,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
     }
 
     @if (orgService.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40" aria-label="Loading account"></mat-spinner></div>
     } @else if (orgService.selectedOrganization(); as org) {
       <app-page-header
         [title]="org.name"
@@ -50,8 +51,14 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
           <button mat-stroked-button type="button" (click)="onEdit()">
             <mat-icon>edit</mat-icon> Edit
           </button>
-          <button mat-stroked-button color="warn" type="button" (click)="onDelete()">
-            <mat-icon>archive</mat-icon> Archive
+          <button mat-stroked-button color="warn" type="button" (click)="onDelete()"
+                  [disabled]="archiving()" [attr.aria-label]="archiving() ? 'Archive' : null">
+            @if (archiving()) {
+              <mat-spinner diameter="18" aria-label="Archiving account"></mat-spinner>
+            } @else {
+              <mat-icon>archive</mat-icon>
+            }
+            Archive
           </button>
         </div>
         <div highlights class="record-highlights">
@@ -196,7 +203,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
 
         <mat-card class="full-width" data-testid="account-deals">
           <mat-card-header>
-            <mat-card-title>Deals</mat-card-title>
+            <mat-card-title>Opportunities</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             @if (orgService.relatedDealsLoading()) {
@@ -204,7 +211,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
             } @else if (orgService.relatedDealsError()) {
               <p class="empty-text" role="alert">{{ orgService.relatedDealsError() }}</p>
             } @else if (orgService.relatedDeals().length === 0) {
-              <p class="empty-text">No deals linked to this account.</p>
+              <p class="empty-text">No opportunities linked to this account.</p>
             } @else {
               <ul class="contact-list">
                 @for (deal of orgService.relatedDeals(); track deal.id) {
@@ -216,8 +223,8 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
               </ul>
             }
             <p class="section-links">
-              <a routerLink="/deals">Browse deals</a>
-              <a routerLink="/deals/new">New deal</a>
+              <a routerLink="/deals">Browse opportunities</a>
+              <a routerLink="/deals/new">New opportunity</a>
             </p>
           </mat-card-content>
         </mat-card>
@@ -348,8 +355,9 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
     }
     .detail-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
       gap: var(--crm-space-md, 16px);
+      overflow-wrap: anywhere;
     }
     .full-width { grid-column: 1 / -1; }
     .loading-inline { display: flex; justify-content: center; padding: var(--crm-space-md, 16px); }
@@ -385,11 +393,11 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
     }
     .info-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
       gap: var(--crm-space-md, 16px);
       padding: var(--crm-space-md, 16px) 0;
     }
-    .info-item { display: flex; flex-direction: column; gap: var(--crm-space-xs, 4px); }
+    .info-item { display: flex; flex-direction: column; gap: var(--crm-space-xs, 4px); min-width: 0; }
     .label {
       font-size: 0.75rem;
       color: var(--crm-color-muted, #666);
@@ -407,6 +415,7 @@ export class OrganizationDetailComponent implements OnInit {
 
   id = input.required<string>();
   readonly parentIdDraft = signal('');
+  protected readonly archiving = signal(false);
   private quotesLoadedFor: number | null = null;
 
   /** Reload when route `:id` changes (component input binding; not ngOnChanges). */
@@ -475,9 +484,14 @@ export class OrganizationDetailComponent implements OnInit {
   }
 
   onDelete(): void {
+    if (this.archiving()) return;
     const org = this.orgService.selectedOrganization();
     if (org && confirm(`Archive "${org.name}"? The account will be hidden from lists.`)) {
-      this.orgService.delete(org.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      this.archiving.set(true);
+      this.orgService.delete(org.id).pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.archiving.set(false)),
+      ).subscribe({
         next: () => { if (Number(this.id()) === org.id) this.router.navigate(['/organizations']); },
         error: (error: { error?: { errorCode?: string } }) => {
           if (Number(this.id()) !== org.id) return;

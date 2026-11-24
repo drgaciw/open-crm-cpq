@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { PricingCustomerCreateDialogComponent } from './pricing-customer-create-dialog.component';
 import { PricingCustomerService } from '@frontend/cpq-pricing-data-access';
 import { MOCK_PRICING_CUSTOMERS } from '../pricing-customers.mock';
@@ -71,6 +71,44 @@ describe('PricingCustomerCreateDialogComponent', () => {
     expect(component.saving()).toBe(false);
   });
 
+  it('keeps Create and progress named during the single pending request', () => {
+    const created = MOCK_PRICING_CUSTOMERS[0];
+    const pending = new Subject<typeof created>();
+    createSpy.mockReturnValueOnce(pending);
+    component.form.patchValue({
+      externalId: ' CUST-NEW ',
+      name: ' New Customer ',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+
+    component.onSubmit();
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    const [cancel, create] = Array.from(view.querySelectorAll<HTMLButtonElement>('mat-dialog-actions button'));
+    expect(cancel.disabled).toBe(true);
+    expect(create.disabled).toBe(true);
+    expect(create.getAttribute('aria-label')).toBe('Create');
+    expect(create.querySelector('mat-spinner')?.getAttribute('aria-label'))
+      .toBe('Creating pricing customer');
+
+    component.onSubmit();
+    expect(createSpy).toHaveBeenCalledOnce();
+    expect(createSpy).toHaveBeenCalledWith({
+      externalId: 'CUST-NEW',
+      name: 'New Customer',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+    expect(dialogClose).not.toHaveBeenCalled();
+
+    pending.next(created);
+    pending.complete();
+
+    expect(dialogClose).toHaveBeenCalledWith(created);
+  });
+
   it('surfaces create error in dialog banner', () => {
     createSpy.mockReturnValueOnce(
       throwError(() => ({ error: { message: 'Duplicate externalId' } })),
@@ -88,4 +126,53 @@ describe('PricingCustomerCreateDialogComponent', () => {
       (fixture.nativeElement as HTMLElement).textContent,
     ).toContain('Duplicate externalId');
   });
+
+  it.each([
+    ['externalId', 'External ID is required'],
+    ['name', 'Name is required'],
+  ] as const)('rejects whitespace-only %s with the required message', (field, message) => {
+    component.form.patchValue({ externalId: 'CUST-NEW', name: 'New Customer' });
+    component.form.controls[field].setValue(' \t ');
+    component.form.controls[field].markAsTouched();
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(component.form.invalid).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(message);
+  });
+
+  it('requires Type to fit the 30-character API contract', () => {
+    component.form.patchValue({ externalId: 'CUST-NEW', name: 'New Customer', type: 'T'.repeat(31) });
+    component.onSubmit();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(component.form.controls.type.hasError('maxlength')).toBe(true);
+    expect(fixture.nativeElement.querySelector('input[formControlName="type"]').maxLength).toBe(30);
+
+    const allowedType = 'T'.repeat(30);
+    component.form.controls.type.setValue(allowedType);
+    component.onSubmit();
+    expect(createSpy).toHaveBeenCalledWith({ externalId: 'CUST-NEW', name: 'New Customer', type: allowedType });
+  });
+
+  it('trims valid required fields and omits blank optionals without losing zeros', () => {
+    component.form.patchValue({
+      externalId: '  CUST-NEW  ',
+      name: '  New Customer  ',
+      type: '   ',
+      industry: '   ',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+    component.onSubmit();
+
+    expect(createSpy).toHaveBeenCalledWith({
+      externalId: 'CUST-NEW',
+      name: 'New Customer',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+  });
+
 });

@@ -29,6 +29,7 @@ import {
   RuleUpdateRequest,
 } from '@frontend/shared-models';
 import { RuleService } from '@frontend/cpq-pricing-data-access';
+import { FormValidators } from '@frontend/shared-utils';
 import { Observable, catchError, map, of, switchMap } from 'rxjs';
 
 const RULE_TYPES: RuleType[] = [
@@ -188,10 +189,11 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? (isEdit ? 'Save' : 'Create') : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Saving rule" />
         } @else {
           {{ isEdit ? 'Save' : 'Create' }}
         }
@@ -287,7 +289,7 @@ export class RuleDialogComponent {
   readonly form = this.fb.nonNullable.group({
     name: [
       this.data.rule?.name ?? '',
-      [Validators.required, Validators.maxLength(255)],
+      [FormValidators.requiredTrimmed, Validators.maxLength(255)],
     ],
     description: [this.data.rule?.description ?? ''],
     ruleType: [
@@ -298,7 +300,7 @@ export class RuleDialogComponent {
       this.data.rule?.priority ?? 100,
       [Validators.required, Validators.min(100), Validators.max(1000)],
     ],
-    content: [this.data.rule?.content ?? '', [Validators.required]],
+    content: [this.data.rule?.content ?? '', [FormValidators.requiredTrimmed]],
   });
 
   onSubmit(): void {

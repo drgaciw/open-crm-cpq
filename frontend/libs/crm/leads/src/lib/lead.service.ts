@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize, map } from 'rxjs';
+import { Observable, Subject, finalize, map, of, switchMap, takeUntil } from 'rxjs';
 import {
   LeadDto,
   LeadCreateRequest,
@@ -28,6 +28,7 @@ function httpErrorMessage(err: unknown): string {
 export class LeadService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/leads';
+  private readonly listSuperseded = new Subject<void>();
 
   readonly leads = signal<LeadDto[]>([]);
   readonly selectedLead = signal<LeadDto | null>(null);
@@ -45,30 +46,14 @@ export class LeadService {
     sort = 'createdAt,desc',
     status?: LeadStatus,
     priority?: LeadPriority,
+    query?: string,
   ): void {
-    this.error.set(null);
-    this.loading.set(true);
     let params = new HttpParams()
       .set('page', page).set('size', size).set('sort', sort);
     if (status) params = params.set('status', status);
     if (priority) params = params.set('priority', priority);
-
-    this.http.get<SpringPageResponse<LeadDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (p) => {
-          this.leads.set(p.content ?? p);
-          if (p.totalElements !== undefined) {
-            this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? size,
-              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
-            });
-          }
-        },
-        error: (err) => {
-          this.error.set(httpErrorMessage(err));
-        }
-      });
+    if (query) params = params.set('q', query);
+    this.loadPage(this.basePath, params, size);
   }
 
   getById(id: number): void {
@@ -97,18 +82,22 @@ export class LeadService {
   }
 
   search(query: string): void {
+    this.loadPage(`${this.basePath}/search`, new HttpParams().set('q', query), 20);
+  }
+
+  private loadPage(path: string, params: HttpParams, size: number): void {
+    // Let the previous request's finalizer run before starting the latest list or search.
+    this.listSuperseded.next();
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams().set('q', query);
-    // Interceptor rebuilds List+PageInfo into SpringPageResponse
-    this.http.get<SpringPageResponse<LeadDto>>(`${this.basePath}/search`, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+    this.fetchPage(path, params)
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.leads.set(p.content ?? p);
           if (p.totalElements !== undefined) {
             this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? 20,
+              page: p.number ?? 0, size: p.size ?? size,
               totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
             });
           }
@@ -117,6 +106,20 @@ export class LeadService {
           this.error.set(httpErrorMessage(err));
         }
       });
+  }
+
+  private fetchPage(path: string, params: HttpParams): Observable<SpringPageResponse<LeadDto>> {
+    const requestedPage = Number(params.get('page') ?? 0);
+    return this.http.get<SpringPageResponse<LeadDto>>(path, { params }).pipe(
+      switchMap((page) => {
+        const lastPage = page.totalPages - 1;
+        if (page.content?.length === 0 && page.totalElements > 0 && lastPage >= 0 && lastPage < requestedPage) {
+          // Keep the same query and move strictly backward if concurrent changes remove more pages.
+          return this.fetchPage(path, params.set('page', lastPage));
+        }
+        return of(page);
+      }),
+    );
   }
 
   markContacted(id: number): Observable<LeadDto> {
