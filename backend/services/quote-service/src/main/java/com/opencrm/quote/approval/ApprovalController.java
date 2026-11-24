@@ -18,6 +18,12 @@ public class ApprovalController {
 
     private final ApprovalService approvalService;
 
+    @PostMapping("/{quoteId}/policy-evaluation")
+    @Operation(summary = "Evaluate a quote version against commercial policy")
+    public ApiResponse<QuotePolicyEvaluationResponse> evaluatePolicy(@PathVariable Long quoteId) {
+        return ApiResponse.success(approvalService.evaluatePolicy(quoteId));
+    }
+
     @PostMapping("/{quoteId}/approvals")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Submit a quote for approval")
