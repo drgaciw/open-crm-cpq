@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -66,18 +67,21 @@ class AmendmentWorkflow {
     private final AmendmentOperationReceiptRepository receipts;
     private final AmendmentEventWriter events;
     private final ObjectMapper json;
+    private final LegalReviewEvidence legalReviewEvidence;
     private final TransactionTemplate business;
     private final TransactionTemplate auditTx;
 
     AmendmentWorkflow(EntityManager entityManager, AmendmentDocumentRepository documents,
                       AmendmentCommercialEnvelopeRepository envelopes, AmendmentOperationReceiptRepository receipts,
-                      AmendmentEventWriter events, ObjectMapper json, PlatformTransactionManager transactions) {
+                      AmendmentEventWriter events, ObjectMapper json, LegalReviewEvidence legalReviewEvidence,
+                      PlatformTransactionManager transactions) {
         this.entityManager = entityManager;
         this.documents = documents;
         this.envelopes = envelopes;
         this.receipts = receipts;
         this.events = events;
         this.json = json;
+        this.legalReviewEvidence = legalReviewEvidence;
         this.business = new TransactionTemplate(transactions);
         this.auditTx = new TransactionTemplate(transactions);
         this.auditTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -175,6 +179,7 @@ class AmendmentWorkflow {
                 .backdatingReasonCode(blankToNull(command.backdatingReasonCode()))
                 .currencyCode(command.currency())
                 .evidenceClass(EvidenceClass.STANDARD)
+                // Retention flag. Legal-review classification is derived on submit from the quote and catalog.
                 .legalHold(false)
                 .deleted(false)
                 .createdBy(context.actorId())
@@ -315,7 +320,8 @@ class AmendmentWorkflow {
         if (!submit.allowed()) {
             throw refusal(document, submit, context);
         }
-        if (lines(document.getId(), document.getCurrentRevisionNo()).stream().anyMatch(line -> line.getConfigurationHash() == null
+        List<AmendmentDocumentLine> submittedLines = lines(document.getId(), document.getCurrentRevisionNo());
+        if (submittedLines.stream().anyMatch(line -> line.getConfigurationHash() == null
                 || line.getProductExternalId() == null || line.getPricebookVersion() == null)) {
             throw AmendmentCommandException.rule(document.getId(), "V9", "product, pricebook or configuration pin is missing", context);
         }
@@ -323,6 +329,17 @@ class AmendmentWorkflow {
             throw AmendmentCommandException.rule(document.getId(), failure.ruleId(), failure.message(), context);
         }
         AmendmentDocumentRevision revision = revision(document.getId(), document.getCurrentRevisionNo());
+        LegalReviewClassifier.Decision legalReview = LegalReviewClassifier.classify(
+                legalReviewEvidence,
+                revision.getTargetQuoteId(),
+                submittedLines.stream()
+                        .map(line -> new LegalReviewClassifier.Line(line.getActionCode(), line.getProductExternalId()))
+                        .toList(),
+                Set.of());
+        if (legalReview.legalReviewRequired()) {
+            throw AmendmentCommandException.conflict(document.getId(), LegalReviewClassifier.LEGAL_REVIEW_REQUIRED,
+                    "legal review is required", context);
+        }
         String content = currentDigest(document, revision);
         document.setContentDigest(content);
         revision.setContentDigest(content);

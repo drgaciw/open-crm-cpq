@@ -8,6 +8,10 @@ import com.opencrm.quote.config.QuoteLineConcurrencyAdvice;
 import com.opencrm.quote.lineitem.*;
 import com.opencrm.quote.quote.*;
 import jakarta.persistence.EntityManager;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +22,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +44,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -55,6 +68,8 @@ import static org.mockito.Mockito.mock;
                         + "com.azure.spring.cloud.autoconfigure.implementation.aadb2c.configuration.AadB2cResourceServerAutoConfiguration,"
                         + "com.azure.spring.cloud.autoconfigure.implementation.kafka.AzureEventHubsKafkaOAuth2AutoConfiguration"})
 class RampHttpConcurrencyIntegrationTest {
+    /** Same interim Entra tid the bulk-remove HTTP filter presents. Dev mode has no caller token of its own. */
+    static final String BULK_REMOVE_TENANT = "00000000-0000-4000-8000-00000000c0de";
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
     @DynamicPropertySource static void database(DynamicPropertyRegistry props) {
         props.add("spring.datasource.url", () -> POSTGRES.getJdbcUrl() + "?currentSchema=quote");
@@ -85,6 +100,39 @@ class RampHttpConcurrencyIntegrationTest {
                     mock(com.opencrm.quote.client.ProductServiceClient.class),mapper,mock(OutboxEventPublisher.class),actor,g);
         }
         @Bean RampScheduleQueryService rampService(QuoteRepository q, RampPricingProperties p, RampEscalatorExpander e, QuoteLineItemService l) { return new RampScheduleQueryService(q,p,e,l); }
+        @Bean
+        @Order(Ordered.LOWEST_PRECEDENCE)
+        OncePerRequestFilter bulkRemoveTenantFilter() {
+            return new OncePerRequestFilter() {
+                @Override
+                protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+                        throws IOException, ServletException {
+                    if (request.getRequestURI() == null || !request.getRequestURI().contains("/line-items/bulk-remove")) {
+                        chain.doFilter(request, response);
+                        return;
+                    }
+                    var previous = SecurityContextHolder.getContext();
+                    var context = SecurityContextHolder.createEmptyContext();
+                    Jwt jwt = Jwt.withTokenValue("bulk-remove-dev")
+                            .header("alg", "none")
+                            .subject("bulk-editor")
+                            .claim("oid", "bulk-editor")
+                            .claim("tid", BULK_REMOVE_TENANT)
+                            .claim("scp", "access_as_user")
+                            .issuedAt(Instant.now())
+                            .expiresAt(Instant.now().plusSeconds(300))
+                            .build();
+                    context.setAuthentication(new JwtAuthenticationToken(jwt,
+                            List.of(new SimpleGrantedAuthority("ROLE_CPQ_USER"))));
+                    SecurityContextHolder.setContext(context);
+                    try {
+                        chain.doFilter(request, response);
+                    } finally {
+                        SecurityContextHolder.setContext(previous);
+                    }
+                }
+            };
+        }
     }
     @LocalServerPort int port;
     @Autowired QuoteRepository quotes;
@@ -349,7 +397,8 @@ class RampHttpConcurrencyIntegrationTest {
         var transaction = new TransactionTemplate(manager);
         BulkFixture inserted = transaction.execute(status -> {
             Quote quote = quotes.saveAndFlush(Quote.builder().quoteNumber(quoteNumber).name("Bulk removal")
-                    .customerExternalId("customer").currency("USD").durationInMonths(12).build());
+                    .customerExternalId("customer").currency("USD").durationInMonths(12)
+                    .tenantId(BULK_REMOVE_TENANT).build());
             List<Long> ids = java.util.stream.IntStream.range(0, 4)
                     .mapToObj(i -> lineService.addLineItem(quote.getId(), flatBulkLine(new BigDecimal(price), i)).getId())
                     .toList();

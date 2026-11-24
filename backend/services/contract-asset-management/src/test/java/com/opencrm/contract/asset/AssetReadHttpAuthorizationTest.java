@@ -3,6 +3,7 @@ package com.opencrm.contract.asset;
 import com.opencrm.contract.config.GlobalExceptionHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,7 +15,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.Optional;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,9 +51,14 @@ class AssetReadHttpAuthorizationTest {
     }
 
     @Test void authorizedCallerCanRead() throws Exception {
-        signIn("ROLE_INSTALLED_BASE_READ");
+        Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject("caller")
+                .claim("scp", "access_as_user")
+                .claim("tid", "11111111-1111-4111-8111-111111111111")
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt,
+                List.of(new SimpleGrantedAuthority("ROLE_INSTALLED_BASE_READ"))));
         Asset asset = Asset.builder().id(1L).build();
-        when(assets.findById(1L)).thenReturn(Optional.of(asset));
+        when(assets.findOne(any(Specification.class))).thenReturn(Optional.of(asset));
         when(mapper.toDto(asset)).thenReturn(AssetDto.builder().id(1L).build());
         mvc.perform(get("/api/v1/assets")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/assets/1")).andExpect(status().isOk());
