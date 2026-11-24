@@ -36,6 +36,7 @@ class WriteRouteRateLimitCoverageTest {
         String dev = documents[1];
 
         assertThat(defaults).contains("name: RequestRateLimiter");
+        assertThat(defaults).contains("key-resolver: \"#{@clientKeyResolver}\"");
         assertThat(defaults).contains("redis-rate-limiter.replenishRate: ${RATE_LIMIT_REPLENISH_RATE:50}");
         assertThat(defaults).contains("redis-rate-limiter.burstCapacity: ${RATE_LIMIT_BURST_CAPACITY:100}");
         assertThat(defaults).contains("redis-rate-limiter.requestedTokens: ${RATE_LIMIT_REQUESTED_TOKENS:1}");

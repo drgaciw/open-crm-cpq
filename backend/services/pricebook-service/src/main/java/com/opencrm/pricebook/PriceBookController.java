@@ -51,7 +51,6 @@ public class PriceBookController {
     public ApiResponse<PriceBookDto> update(
             @PathVariable Long id,
             @Valid @RequestBody PriceBookUpdateRequest request) {
-        PriceBookClearAuthorization.requireAdminWhenClearing(request);
         PriceBookDto priceBook = priceBookService.update(id, request);
         return ApiResponse.success(priceBook, "Price book updated successfully");
     }
