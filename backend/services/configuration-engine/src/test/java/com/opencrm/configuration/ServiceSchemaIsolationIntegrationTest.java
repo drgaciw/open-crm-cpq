@@ -49,6 +49,7 @@ class ServiceSchemaIsolationIntegrationTest {
             "asset_activation_receipts",
             "asset_history",
             "asset_history_replay_events",
+            "asset_lifecycle_changes",
             "assets",
             "contract_lines",
             "contracts",
