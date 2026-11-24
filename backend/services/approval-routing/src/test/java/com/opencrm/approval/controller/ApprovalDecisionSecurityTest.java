@@ -179,8 +179,8 @@ class ApprovalDecisionSecurityTest {
     }
 
     @Test
-    @DisplayName("C16: a body tenant or account is ignored, and another tenant is 403 CROSS_TENANT")
-    void bodyCannotChooseTenantAndOtherTenantIsForbidden() throws Exception {
+    @DisplayName("C16: a body tenant or account is ignored, and another tenant gets 404 like a missing id")
+    void bodyCannotChooseTenantAndOtherTenantIsNotFound() throws Exception {
         mvc.perform(post("/api/v1/approvals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -201,12 +201,12 @@ class ApprovalDecisionSecurityTest {
         when(repository.findById(9001L)).thenReturn(Optional.of(foreign));
         mvc.perform(post("/api/v1/approvals/9001/approve")
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-1", "SalesVP").tenant("tenant-b").bearer()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("CROSS_TENANT"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         mvc.perform(post("/api/v1/approvals/9001/reject").param("reason", "no")
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-1", "SalesVP").tenant("tenant-b").bearer()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("CROSS_TENANT"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         verify(repository, never()).save(any());
     }
 }

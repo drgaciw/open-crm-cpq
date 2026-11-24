@@ -116,7 +116,7 @@ class DiscountApprovalRampBindingTest {
                 mock(ApprovalRequestMapper.class), new CurrentActor("service:approval-routing", false));
         try {
             assertThatThrownBy(() -> routing.approve(300L)).isInstanceOf(BusinessException.class)
-                    .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("CROSS_TENANT");
+                    .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND");
         } finally {
             com.opencrm.security.test.TestCallers.clear();
         }

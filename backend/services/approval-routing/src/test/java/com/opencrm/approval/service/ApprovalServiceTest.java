@@ -450,16 +450,16 @@ class ApprovalServiceTest {
 
         @Test
         @DisplayName("C16: tenant A cannot read, approve, reject, or see tenant B in the inbox")
-        void otherTenantIsCrossTenant() {
+        void otherTenantIsNotFound() {
             signIn("manager-1", "DealDesk");
             when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
             when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, null))
                     .thenReturn(List.of());
             when(approvalRequestRepository.findScopedByQuoteId("Q-001", TENANT, null)).thenReturn(List.of());
 
-            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.getById(1L));
-            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.approve(1L));
-            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.reject(1L, "no"));
+            assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.getById(1L));
+            assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.approve(1L));
+            assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.reject(1L, "no"));
             assertTrue(approvalService.getPendingApprovals().isEmpty());
             assertTrue(approvalService.getByQuoteId("Q-001").isEmpty());
             verify(approvalRequestRepository, never()).save(any());

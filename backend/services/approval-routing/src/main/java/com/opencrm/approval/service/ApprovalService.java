@@ -206,9 +206,10 @@ public class ApprovalService {
     }
 
     /**
-     * H4 owns this check. DRG-444 escalate must call it after the role check: a different tenant is 403
-     * {@code CROSS_TENANT} and the row is not returned. A row with no tenant is refused the same way, so an
-     * unbackfilled row is not shared. Dev mode returns before this method.
+     * H4 owns this check. DRG-444 escalate must call it after the role check. A different tenant, a row with
+     * no tenant (so an unbackfilled row is not shared), and a different account when the caller is
+     * account-scoped all answer 404, exactly like a missing id, so a caller cannot learn which ids exist in
+     * another tenant (user decision, 2026-11-24). Dev mode returns before this method.
      */
     void requireSameTenant(ApprovalRequest request) {
         ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
@@ -217,8 +218,7 @@ public class ApprovalService {
         }
         String owner = request.getTenantId() == null ? null : request.getTenantId().strip();
         if (owner == null || owner.isEmpty() || !owner.equals(scope.tenantId())) {
-            throw new BusinessException("Approval belongs to another tenant",
-                    HttpStatus.FORBIDDEN, "CROSS_TENANT");
+            throw new ResourceNotFoundException("ApprovalRequest", request.getId());
         }
         if (scope.accountId() != null && !scope.accountId().equals(request.getAccountId())) {
             throw new ResourceNotFoundException("ApprovalRequest", request.getId());

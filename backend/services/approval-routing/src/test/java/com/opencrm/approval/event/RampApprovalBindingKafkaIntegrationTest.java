@@ -167,7 +167,7 @@ class RampApprovalBindingKafkaIntegrationTest {
         assertThat(pending.getTenantId()).isNull();
         mvc.perform(post("/api/v1/approvals/{id}/approve", pending.getId())
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-any", "SalesVP").bearer()))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.errorCode").value("CROSS_TENANT"));
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         assertThat(one(quoteId, ApprovalStatus.PENDING).getId()).isEqualTo(pending.getId());
     }
 

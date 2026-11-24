@@ -111,7 +111,7 @@ public class DiscountApprovalEventConsumer {
                 .build();
         if (request.getTenantId() == null) {
             // Stored, not dead-lettered: an event from a pre-H4 producer may still be in the outbox. With no tenant,
-            // ApprovalService refuses every tenant caller (403 CROSS_TENANT), so the request fails closed.
+            // ApprovalService answers every tenant caller 404, as for a missing id, so the request fails closed.
             log.warn("Approval request for quote {} line {} has no tenant; decisions on it will be refused",
                     event.getQuoteId(), event.getLineId());
         }

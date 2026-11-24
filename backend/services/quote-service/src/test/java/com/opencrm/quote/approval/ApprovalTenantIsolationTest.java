@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,21 +66,23 @@ class ApprovalTenantIsolationTest {
         TestCallers.signInUserInTenant("seller", TENANT_A, null, "DealDesk");
         Quote foreign = quote(42L, TENANT_B, "acct-b");
         when(quoteRepository.findByIdAndTenantIdAndDeletedFalse(42L, TENANT_A)).thenReturn(Optional.empty());
-        when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(foreign));
+        // Quote 42 exists, in tenant B. Tenant A must still get the same 404 as for a missing quote, so the
+        // service never reads it unscoped: this stub documents the row and is expected to stay unused.
+        lenient().when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(foreign));
         when(approvalRoutingClient.getById(7L)).thenReturn(routing(7L, "42", "PENDING"));
 
         assertThatThrownBy(() -> approvalService.getByQuoteId(42L))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CROSS_TENANT"));
+                        assertThat(ex.getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND"));
         assertThatThrownBy(() -> approvalService.submitForApproval(42L, submit()))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CROSS_TENANT"));
+                        assertThat(ex.getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND"));
         assertThatThrownBy(() -> approvalService.approveRequest(7L, null))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CROSS_TENANT"));
+                        assertThat(ex.getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND"));
         assertThatThrownBy(() -> approvalService.rejectRequest(7L, null))
                 .isInstanceOfSatisfying(BusinessException.class, ex ->
-                        assertThat(ex.getErrorCode()).isEqualTo("CROSS_TENANT"));
+                        assertThat(ex.getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND"));
 
         verify(approvalRoutingClient, never()).getByQuoteId(any());
         verify(approvalRoutingClient, never()).submit(any());

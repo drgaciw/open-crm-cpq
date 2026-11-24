@@ -424,12 +424,8 @@ public class ApprovalService {
             }
             return own.get();
         }
-        quoteRepository.findByIdAndDeletedFalse(id).ifPresent(quote -> {
-            if (quote.getTenantId() != null && !scope.tenantId().equals(quote.getTenantId())) {
-                throw new BusinessException("Approval belongs to another tenant",
-                        HttpStatus.FORBIDDEN, "CROSS_TENANT");
-            }
-        });
+        // Another tenant's quote, a quote with no tenant, and a missing quote all answer the same 404,
+        // so a caller cannot learn which quote ids exist in another tenant (user decision, 2026-11-24).
         throw new ResourceNotFoundException("Quote", id);
     }
 
