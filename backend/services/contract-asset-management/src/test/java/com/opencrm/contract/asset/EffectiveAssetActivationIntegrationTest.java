@@ -234,7 +234,7 @@ class EffectiveAssetActivationIntegrationTest {
     }
 
     private Fixture fixture() {
-        UUID tenant = UUID.randomUUID();
+        UUID tenant = UUID.fromString(AssetReadTestCaller.TENANT);
         UUID account = UUID.randomUUID();
         UUID contract = UUID.randomUUID();
         UUID line = UUID.randomUUID();
