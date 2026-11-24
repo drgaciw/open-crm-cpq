@@ -65,6 +65,7 @@ public class ApprovalService {
             throw new BusinessException("Invalid ramp approval binding", "INVALID_APPROVAL_SUBMIT");
         }
 
+        ApprovalPrincipal.Scope scope = writeScope();
         ApprovalRequest entity = ApprovalRequest.builder()
                 .quoteId(request.getQuoteId().trim())
                 .lineId(request.getLineId())
@@ -79,6 +80,8 @@ public class ApprovalService {
                 .submittedAt(Instant.now())
                 .approvalTier(mapped.approvalTier())
                 .reason(request.getReason() != null ? request.getReason() : "Quote approval submitted via BFF")
+                .tenantId(scope.tenantId())
+                .accountId(scope.accountId())
                 .build();
 
         ApprovalRequest saved = approvalRequestRepository.save(entity);
@@ -89,30 +92,37 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public ApprovalRequestDto getById(Long id) {
-        return approvalRequestMapper.toDto(findEntityById(id));
+        readScope();
+        ApprovalRequest entity = approvalRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
+        requireSameTenant(entity);
+        return approvalRequestMapper.toDto(entity);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getByQuoteId(String quoteId) {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(quoteId));
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByQuoteId(quoteId, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(quoteId);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovals() {
-        String tenantId = ApprovalTenancy.currentTenantId();
-        List<ApprovalRequest> rows = tenantId == null
-                ? approvalRequestRepository.findByStatus(ApprovalStatus.PENDING)
-                : approvalRequestRepository.findPendingVisibleToTenant(tenantId);
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByStatus(ApprovalStatus.PENDING);
         return approvalRequestMapper.toDtoList(rows);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovalsByTier(String tier) {
-        String tenantId = ApprovalTenancy.currentTenantId();
-        List<ApprovalRequest> rows = tenantId == null
-                ? approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING)
-                : approvalRequestRepository.findPendingVisibleToTenantAndTier(tenantId, tier);
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByTierAndStatus(tier, ApprovalStatus.PENDING, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING);
         return approvalRequestMapper.toDtoList(rows);
     }
 
@@ -161,8 +171,10 @@ public class ApprovalService {
     }
 
     /**
-     * Who decides, after checking they may (ADR-016 decision 7). Refusals are 401 without a verified caller, and 403
-     * for a service, a role that does not satisfy the tier, or the requester deciding their own request.
+     * Who decides, after checking they may (ADR-016 decision 7). Refusals are 401 without a verified caller; then
+     * 404 for another tenant's row, exactly like a missing id (H4), before any other check so the answer cannot
+     * reveal that the id exists; then 403 for a service, a role that does not satisfy the tier, or the requester
+     * deciding their own request.
      */
     private String authorizeDecision(ApprovalRequest request) {
         Optional<Caller> caller = currentActor.caller();
@@ -175,6 +187,7 @@ public class ApprovalService {
                     request.getId(), currentActor.self());
             return currentActor.self();
         }
+        requireSameTenant(request);
         if (!(caller.get() instanceof Caller.User user)) {
             throw new BusinessException("Approvals are decided by people, not by services",
                     HttpStatus.FORBIDDEN, "APPROVER_MUST_BE_A_USER");
@@ -195,6 +208,28 @@ public class ApprovalService {
     }
 
     /**
+     * H4 owns this check. Decisions (and DRG-444 escalate) must call it BEFORE the role, self-approval and
+     * people-only checks, so a caller without the role cannot tell another tenant's id from a missing one
+     * (a 403 there would be an existence oracle). A different tenant, a row with
+     * no tenant (so an unbackfilled row is not shared), and a different account when the caller is
+     * account-scoped all answer 404, exactly like a missing id, so a caller cannot learn which ids exist in
+     * another tenant (user decision, 2026-11-24). Dev mode returns before this method.
+     */
+    void requireSameTenant(ApprovalRequest request) {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (!scope.enforced()) {
+            return;
+        }
+        String owner = request.getTenantId() == null ? null : request.getTenantId().strip();
+        if (owner == null || owner.isEmpty() || !owner.equals(scope.tenantId())) {
+            throw new ResourceNotFoundException("ApprovalRequest", request.getId());
+        }
+        if (scope.accountId() != null && !scope.accountId().equals(request.getAccountId())) {
+            throw new ResourceNotFoundException("ApprovalRequest", request.getId());
+        }
+    }
+
+    /**
      * A superseded request was replaced by a newer one for the same quote line, carrying different figures (owner
      * decision 9), so a decision on it would approve or reject figures nobody is asking about any more. Checked after
      * {@link #authorizeDecision}, so a caller who may not decide learns nothing about the request's state.
@@ -207,8 +242,41 @@ public class ApprovalService {
         }
     }
 
+    /**
+     * Writes require a tenant from the verified token. Dev mode, with no token, may still record a null tenant.
+     * A token without {@code tid} is refused. The request body is not a source.
+     */
+    private ApprovalPrincipal.Scope writeScope() {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant() || (!scope.enforced() && !currentActor.unverifiedCallersAllowed())) {
+            throw tenantRequired();
+        }
+        return scope;
+    }
+
+    /**
+     * Reads outside dev mode require a tenant. A different tenant, or a different account when the caller
+     * is account-scoped, is not found. Dev mode with no token keeps the unscoped queries.
+     */
+    private ApprovalPrincipal.Scope readScope() {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant() || (!scope.enforced() && !currentActor.unverifiedCallersAllowed())) {
+            throw tenantRequired();
+        }
+        return scope;
+    }
+
     private ApprovalRequest findEntityById(Long id) {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant()) {
+            throw tenantRequired();
+        }
         return approvalRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
+    }
+
+    private static BusinessException tenantRequired() {
+        return new BusinessException("Tenant is not on the verified token",
+                HttpStatus.FORBIDDEN, "TENANT_REQUIRED");
     }
 }

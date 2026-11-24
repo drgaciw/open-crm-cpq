@@ -33,6 +33,24 @@ public final class TestCallers {
         return signIn(jwt.build());
     }
 
+    /**
+     * A person in {@code tenantId}, optionally scoped to {@code accountId} ({@code account_id} claim).
+     * A null account means the caller is not account-scoped.
+     */
+    public static String signInUserInTenant(String name, String tenantId, String accountId, String... appRoles) {
+        Jwt.Builder jwt = base(name, appRoles)
+                .claim("oid", TestTokens.oidOf(name))
+                .claim("azp", TestTokens.USER_CLIENT_ID)
+                .claim("scp", TestTokens.USER_SCOPE);
+        if (tenantId != null) {
+            jwt.claim("tid", tenantId);
+        }
+        if (accountId != null) {
+            jwt.claim("account_id", accountId);
+        }
+        return signIn(jwt.build());
+    }
+
     /** An application with a client-credentials token; returns its actor id, {@code service:<clientId>}. */
     public static String signInService(String clientId, String... appRoles) {
         String servicePrincipal = TestTokens.oidOf("service:" + clientId);
@@ -40,6 +58,18 @@ public final class TestCallers {
                 .claim("oid", servicePrincipal)
                 .claim("azp", clientId)
                 .claim("idtyp", "app");
+        signIn(jwt.build());
+        return "service:" + clientId;
+    }
+
+    /** A service token whose {@code tid} is {@code tenantId}. */
+    public static String signInServiceInTenant(String clientId, String tenantId, String... appRoles) {
+        String servicePrincipal = TestTokens.oidOf("service:" + clientId);
+        Jwt.Builder jwt = base(servicePrincipal, appRoles)
+                .claim("oid", servicePrincipal)
+                .claim("azp", clientId)
+                .claim("idtyp", "app")
+                .claim("tid", tenantId);
         signIn(jwt.build());
         return "service:" + clientId;
     }

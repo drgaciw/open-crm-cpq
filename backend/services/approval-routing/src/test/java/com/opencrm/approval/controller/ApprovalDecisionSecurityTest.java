@@ -111,6 +111,7 @@ class ApprovalDecisionSecurityTest {
                 .requestedDiscount(BigDecimal.TEN).requesterId(requester).submittedAt(Instant.now())
                 .approvalTier("SALES_VP").build();
         pending.setId(9001L);
+        pending.setTenantId(TestTokens.TENANT);
         when(repository.findById(9001L)).thenReturn(Optional.of(pending));
         when(repository.save(any(ApprovalRequest.class))).thenAnswer(call -> call.getArgument(0));
     }
@@ -170,5 +171,42 @@ class ApprovalDecisionSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION, TestTokens.user("rep-1", "CPQ.User").bearer()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.requesterId").value(requester));
+
+        ArgumentCaptor<ApprovalRequest> saved = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getTenantId()).isEqualTo(TestTokens.TENANT);
+        assertThat(saved.getValue().getAccountId()).isNull();
+    }
+
+    @Test
+    @DisplayName("C16: a body tenant or account is ignored, and another tenant gets 404 like a missing id")
+    void bodyCannotChooseTenantAndOtherTenantIsNotFound() throws Exception {
+        mvc.perform(post("/api/v1/approvals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quoteId":"1001","tier":"DEAL_DESK","tenantId":"tenant-b","accountId":"acct-b"}""")
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("rep-1", "CPQ.User").bearer()))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<ApprovalRequest> saved = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getTenantId()).isEqualTo(TestTokens.TENANT);
+        assertThat(saved.getValue().getAccountId()).isNull();
+
+        reset(repository);
+        ApprovalRequest foreign = ApprovalRequest.builder()
+                .quoteId("1001").approvalType(ApprovalType.QUOTE).status(ApprovalStatus.PENDING)
+                .requesterId(requester).submittedAt(Instant.now()).approvalTier("SALES_VP")
+                .tenantId(TestTokens.TENANT).build();
+        foreign.setId(9001L);
+        when(repository.findById(9001L)).thenReturn(Optional.of(foreign));
+        mvc.perform(post("/api/v1/approvals/9001/approve")
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-1", "SalesVP").tenant("tenant-b").bearer()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        mvc.perform(post("/api/v1/approvals/9001/reject").param("reason", "no")
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.user("vp-1", "SalesVP").tenant("tenant-b").bearer()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        verify(repository, never()).save(any());
     }
 }

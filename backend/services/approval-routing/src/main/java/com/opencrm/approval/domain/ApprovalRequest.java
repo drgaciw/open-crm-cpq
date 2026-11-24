@@ -16,7 +16,9 @@ import java.time.Instant;
 @Table(name = "approval_requests", indexes = {
     @Index(name = "idx_approval_quote", columnList = "quote_id"),
     @Index(name = "idx_approval_status", columnList = "status"),
-    @Index(name = "idx_approval_type", columnList = "approval_type")
+    @Index(name = "idx_approval_type", columnList = "approval_type"),
+    @Index(name = "idx_approval_tenant_status", columnList = "tenant_id, status"),
+    @Index(name = "idx_approval_tenant_quote", columnList = "tenant_id, quote_id")
 })
 @Getter
 @Setter
@@ -27,6 +29,23 @@ public class ApprovalRequest extends BaseEntity {
     
     @Column(name = "quote_id", nullable = false)
     private String quoteId;
+
+    /**
+     * Entra {@code tid} of the principal that created this request, or the quote's tenant for a Kafka ramp
+     * binding; a matrix route stamps it from the token too. Never taken from a header or body. The column is
+     * created by V1_14 (approval matrix) and widened to 128 by V1_15 (H4), which owns its semantics: a row with
+     * no tenant is refused to every tenant caller. DRG-444 does not add another definition.
+     */
+    @Column(name = "tenant_id", length = 128, updatable = false)
+    private String tenantId;
+
+    /**
+     * Account this request belongs to, when known: the principal {@code account_id} claim, or the owning
+     * quote's customer after backfill. Null when the account is not known. An account-scoped caller does
+     * not see a different account.
+     */
+    @Column(name = "account_id", length = 255, updatable = false)
+    private String accountId;
     
     @Column(name = "line_id")
     private String lineId;
@@ -54,10 +73,6 @@ public class ApprovalRequest extends BaseEntity {
 
     @Column(name = "governing_period")
     private Integer governingPeriod;
-
-    /** Entra {@code tid} stamped from the token when a matrix route created this row. Null on legacy rows. */
-    @Column(name = "tenant_id", length = 64)
-    private String tenantId;
 
     @Column(name = "matrix_id")
     private Long matrixId;

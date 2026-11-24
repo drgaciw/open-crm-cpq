@@ -21,9 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -112,8 +114,7 @@ public class ApprovalService {
     public ApprovalRequestDto submitForApproval(Long quoteId, ApprovalSubmitRequest request) {
         log.debug("Submitting quote {} for approval at tier {} via approval-routing", quoteId, request.getTier());
 
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
+        Quote quote = requireQuote(quoteId);
 
         if (request.getExpectedVersion() == null || request.getExpectedVersion() < 0) {
             throw new BusinessException("expectedVersion is required for retry-safe approval submission",
@@ -238,7 +239,7 @@ public class ApprovalService {
      * that would skip approval-routing's role check (ADR-016 decision 7) and write a second store (ADR-013).
      */
     private RuntimeException notInRouting(Long approvalId, ResourceNotFoundException notFound) {
-        if (legacyLocalReadEnabled && approvalRepository.findByIdAndDeletedFalse(approvalId).isPresent()) {
+        if (legacyLocalReadEnabled && legacyVisible(approvalId).isPresent()) {
             log.warn("Refused a decision on legacy local approval {}: it predates approval-routing", approvalId);
             return new BusinessException(
                     "Approval " + approvalId + " predates approval-routing and can no longer be decided; "
@@ -252,6 +253,9 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getByQuoteId(Long quoteId) {
+        if (ApprovalAccess.current().enforced()) {
+            requireQuote(quoteId);
+        }
         List<ApprovalRequestDto> result = new ArrayList<>();
         Set<Long> seenIds = new HashSet<>();
 
@@ -297,6 +301,10 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovals() {
+        ApprovalAccess.Scope scope = ApprovalAccess.current();
+        if (scope.enforced()) {
+            return pendingForScope(scope);
+        }
         List<ApprovalRequestDto> result = new ArrayList<>();
         Set<String> routingQuoteKeys = new HashSet<>();
 
@@ -333,10 +341,47 @@ public class ApprovalService {
         return result;
     }
 
+    private List<ApprovalRequestDto> pendingForScope(ApprovalAccess.Scope scope) {
+        List<ApprovalRequestDto> result = new ArrayList<>();
+        Set<String> routingQuoteKeys = new HashSet<>();
+        List<RoutingApprovalDto> remoteRows = new ArrayList<>();
+        try {
+            remoteRows.addAll(approvalRoutingClient.getPending());
+        } catch (BusinessException ex) {
+            log.warn("Dual-read: routing pending unavailable: {}", ex.getMessage());
+            if (!legacyLocalReadEnabled) {
+                throw ex;
+            }
+        }
+        Map<Long, Quote> visible = visibleQuotes(remoteRows, scope);
+        for (RoutingApprovalDto remote : remoteRows) {
+            Optional<ApprovalTier> tier = mapQuoteTier(remote.getApprovalTier());
+            if (tier.isEmpty()) {
+                continue;
+            }
+            Long quoteId = tryParseQuoteId(remote.getQuoteId());
+            if (quoteId == null || !visible.containsKey(quoteId)) {
+                continue;
+            }
+            result.add(toDtoFromRouting(remote));
+            routingQuoteKeys.add(remote.getQuoteId() + "|" + tier.get().name());
+        }
+        if (legacyLocalReadEnabled) {
+            for (ApprovalRequest local : approvalRepository.findByStatusForTenant(
+                    ApprovalStatus.PENDING, scope.tenantId(), scope.accountId())) {
+                String key = local.getQuoteId() + "|" + local.getTier().name();
+                if (routingQuoteKeys.contains(key)) {
+                    continue;
+                }
+                result.add(toDto(local));
+            }
+        }
+        return result;
+    }
+
     private void applyQuoteDecision(String quoteIdRaw, QuoteStatus status, ApprovalState state) {
         Long quoteId = parseQuoteId(quoteIdRaw);
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
+        Quote quote = requireQuote(quoteId);
         quote.setStatus(status);
         quote.setApprovalState(state);
         quoteRepository.save(quote);
@@ -357,13 +402,69 @@ public class ApprovalService {
      */
     private void refuseUndecidable(RoutingApprovalDto remote) {
         if (remote == null) return;
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(parseQuoteId(remote.getQuoteId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Quote", remote.getQuoteId()));
+        Quote quote = requireQuote(parseQuoteId(remote.getQuoteId()));
         if (remote.getPricingFingerprint() == null) return;
         if (quote.isRampScheduleStale()
                 || !remote.getPricingFingerprint().equals(com.opencrm.quote.ramp.RampPricingSnapshot.fingerprint(quote))) {
             throw new BusinessException("Approval belongs to an older ramp pricing snapshot",
                     HttpStatus.CONFLICT, "APPROVAL_SUPERSEDED");
+        }
+    }
+
+    private Quote requireQuote(Long id) {
+        ApprovalAccess.Scope scope = ApprovalAccess.current();
+        if (!scope.enforced()) {
+            return quoteRepository.findByIdAndDeletedFalse(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Quote", id));
+        }
+        Optional<Quote> own = quoteRepository.findByIdAndTenantIdAndDeletedFalse(id, scope.tenantId());
+        if (own.isPresent()) {
+            if (scope.accountId() != null && !scope.accountId().equals(own.get().getCustomerExternalId())) {
+                throw new ResourceNotFoundException("Quote", id);
+            }
+            return own.get();
+        }
+        // Another tenant's quote, a quote with no tenant, and a missing quote all answer the same 404,
+        // so a caller cannot learn which quote ids exist in another tenant (user decision, 2026-11-24).
+        throw new ResourceNotFoundException("Quote", id);
+    }
+
+    private Optional<ApprovalRequest> legacyVisible(Long id) {
+        ApprovalAccess.Scope scope = ApprovalAccess.current();
+        if (!scope.enforced()) {
+            return approvalRepository.findByIdAndDeletedFalse(id);
+        }
+        return approvalRepository.findVisibleById(id, scope.tenantId(), scope.accountId());
+    }
+
+    private Map<Long, Quote> visibleQuotes(List<RoutingApprovalDto> remoteRows, ApprovalAccess.Scope scope) {
+        List<Long> ids = new ArrayList<>();
+        for (RoutingApprovalDto remote : remoteRows) {
+            Long quoteId = tryParseQuoteId(remote.getQuoteId());
+            if (quoteId != null) {
+                ids.add(quoteId);
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Quote> visible = new HashMap<>();
+        for (Quote quote : quoteRepository.findByIdInAndTenantIdAndDeletedFalse(ids, scope.tenantId())) {
+            if (scope.accountId() == null || scope.accountId().equals(quote.getCustomerExternalId())) {
+                visible.put(quote.getId(), quote);
+            }
+        }
+        return visible;
+    }
+
+    private static Long tryParseQuoteId(String quoteIdRaw) {
+        if (quoteIdRaw == null || quoteIdRaw.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(quoteIdRaw.trim());
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 

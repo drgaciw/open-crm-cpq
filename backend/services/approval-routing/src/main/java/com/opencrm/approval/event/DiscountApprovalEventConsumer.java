@@ -106,7 +106,15 @@ public class DiscountApprovalEventConsumer {
                 .approvalTier(ruleTier)
                 .reason(event.getPricingFingerprint() == null
                         ? "Discount exceeds standard threshold" : event.getReason())
+                // Security H4: the quote's tenant, stamped by the quote-owned producer. The event carries no account.
+                .tenantId(blankToNull(event.getTenantId()))
                 .build();
+        if (request.getTenantId() == null) {
+            // Stored, not dead-lettered: an event from a pre-H4 producer may still be in the outbox. With no tenant,
+            // ApprovalService answers every tenant caller 404, as for a missing id, so the request fails closed.
+            log.warn("Approval request for quote {} line {} has no tenant; decisions on it will be refused",
+                    event.getQuoteId(), event.getLineId());
+        }
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
         supersedeAll(open, saved, event);
@@ -179,6 +187,10 @@ public class DiscountApprovalEventConsumer {
                     older.getRequestedDiscount(), older.getMarginDelta(), older.getCurrencyCode(),
                     event.getRequestedDiscount(), event.getMarginDelta(), event.getCurrencyCode());
         }
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     /** Scale-insensitive: the columns are NUMERIC(19,2) and (19,4), the event carries whatever scale it has. */
