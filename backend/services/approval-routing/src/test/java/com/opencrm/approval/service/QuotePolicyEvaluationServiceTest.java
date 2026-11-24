@@ -2,6 +2,7 @@ package com.opencrm.approval.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.approval.domain.CommercialPolicy;
+import com.opencrm.approval.domain.PolicyException;
 import com.opencrm.approval.domain.PolicyStatus;
 import com.opencrm.approval.domain.PolicyThreshold;
 import com.opencrm.approval.domain.PolicyVerdict;
@@ -9,6 +10,7 @@ import com.opencrm.approval.domain.ThresholdType;
 import com.opencrm.approval.dto.QuoteEvaluationDto;
 import com.opencrm.approval.dto.QuoteEvaluationRequest;
 import com.opencrm.approval.repository.CommercialPolicyRepository;
+import com.opencrm.approval.repository.PolicyExceptionRepository;
 import com.opencrm.audit.AuditTrailService;
 import com.opencrm.audit.dto.AppendAuditEntryCommand;
 import com.opencrm.common.event.EventContractRegistry;
@@ -50,6 +52,8 @@ class QuotePolicyEvaluationServiceTest {
     @Mock
     private CommercialPolicyRepository repository;
     @Mock
+    private PolicyExceptionRepository exceptions;
+    @Mock
     private OutboxEventPublisher outbox;
     @Mock
     private AuditTrailService audit;
@@ -60,7 +64,8 @@ class QuotePolicyEvaluationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new QuotePolicyEvaluationService(repository, outbox, audit, new ObjectMapper(), currentActor);
+        service = new QuotePolicyEvaluationService(
+                repository, exceptions, outbox, audit, new ObjectMapper(), currentActor);
         lenient().when(currentActor.unverifiedCallersAllowed()).thenReturn(false);
     }
 
@@ -143,6 +148,34 @@ class QuotePolicyEvaluationServiceTest {
         verify(outbox, never()).publish(any(), any(), any(), any(), any());
         verify(audit, never()).append(any());
         verify(repository, never()).findByStatusAndDeletedFalse(any());
+    }
+
+    @Test
+    @DisplayName("an active stored exception satisfies the discount breach; an expired one does not")
+    void evaluatorHonorsOnlyAnActiveStoredException() {
+        when(repository.findByStatusAndDeletedFalse(PolicyStatus.ACTIVE)).thenReturn(List.of(policy()));
+        asUser("tenant-1", "seller-oid");
+        when(exceptions.findByQuoteIdAndQuoteVersionAndTenantIdAndDeletedFalse("42", 3L, "tenant-1"))
+                .thenReturn(List.of(stored(Instant.now().plusSeconds(600))));
+
+        assertThat(service.evaluate(request("32", "40", "tenant-1")).getVerdict()).isEqualTo(PolicyVerdict.PASS);
+
+        when(exceptions.findByQuoteIdAndQuoteVersionAndTenantIdAndDeletedFalse("42", 3L, "tenant-1"))
+                .thenReturn(List.of(stored(Instant.now().minusSeconds(60))));
+        assertThat(service.evaluate(request("32", "40", "tenant-1")).getVerdict())
+                .isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+    }
+
+    private static PolicyException stored(Instant expiresAt) {
+        return PolicyException.builder()
+                .tenantId("tenant-1")
+                .quoteId("42")
+                .quoteVersion(3L)
+                .policyId(7L)
+                .justification("one-off")
+                .expiresAt(expiresAt)
+                .recordedBy("user:seller-oid")
+                .build();
     }
 
     private static QuoteEvaluationRequest request(String discount, String margin, String tenant) {

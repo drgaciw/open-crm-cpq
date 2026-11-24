@@ -36,6 +36,8 @@ public class ApprovalRoutingClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<QuotePolicyVerdictDto>> VERDICT =
             new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<ApiResponse<RoutingPolicyExceptionDto>> EXCEPTION =
+            new ParameterizedTypeReference<>() {};
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RestClient approvalRoutingRestClient;
@@ -111,6 +113,43 @@ public class ApprovalRoutingClient {
         } catch (RestClientException ex) {
             throw new BusinessException(
                     "Failed to call approval-routing evaluation: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
+    /** Canonical RecordException write. Identity stays on the relayed token. */
+    public RoutingPolicyExceptionDto recordPolicyException(RoutingRecordPolicyExceptionRequest request) {
+        log.debug("Recording policy exception for quote {} version {}", request.getQuoteId(), request.getQuoteVersion());
+        try {
+            ApiResponse<RoutingPolicyExceptionDto> response = approvalRoutingRestClient.post()
+                    .uri("/api/v1/policy-exceptions")
+                    .body(request)
+                    .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "POLICY_EXCEPTION_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing exception record failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "POLICY_EXCEPTION_FAILED"
+                        );
+                    })
+                    .body(EXCEPTION);
+            if (response == null || !response.isSuccess() || response.getData() == null || response.getData().getId() == null) {
+                throw new BusinessException(
+                        "approval-routing exception record returned an empty body",
+                        HttpStatus.BAD_GATEWAY,
+                        "POLICY_EXCEPTION_FAILED");
+            }
+            return response.getData();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing exception record: " + ex.getMessage(),
                     HttpStatus.BAD_GATEWAY,
                     "APPROVAL_ROUTING_UNAVAILABLE"
             );

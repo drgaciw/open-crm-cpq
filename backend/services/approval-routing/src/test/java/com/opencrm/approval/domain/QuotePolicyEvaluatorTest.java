@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -129,6 +130,72 @@ class QuotePolicyEvaluatorTest {
         assertThat(decision.verdict()).isEqualTo(PolicyVerdict.PASS);
         assertThat(decision.explainPolicyBreaches()).isEmpty();
         assertThat(decision.appliedPolicyIds()).isEmpty();
+    }
+
+    private static final Instant NOW = Instant.parse("2026-11-24T18:00:00Z");
+
+    @Test
+    @DisplayName("an active exception for this quote version and policy satisfies the breach")
+    void activeExceptionSatisfiesEvaluation() {
+        PolicyExceptionGrant active = grant(3L, "tenant-1", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(active),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.PASS);
+        assertThat(decision.explainPolicyBreaches()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an expired exception does not satisfy evaluation")
+    void expiredExceptionFailsEvaluation() {
+        PolicyExceptionGrant expired = grant(3L, "tenant-1", NOW.minusSeconds(1));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(expired),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(decision.explainPolicyBreaches()).singleElement()
+                .satisfies(breach -> assertThat(breach.thresholdType()).isEqualTo(ThresholdType.DISCOUNT_PERCENT));
+    }
+
+    @Test
+    @DisplayName("an exception for another quote version does not satisfy evaluation")
+    void wrongVersionExceptionFailsEvaluation() {
+        PolicyExceptionGrant otherVersion = grant(2L, "tenant-1", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(otherVersion),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(decision.explainPolicyBreaches()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("an active exception for another tenant does not satisfy evaluation")
+    void otherTenantExceptionFailsEvaluation() {
+        PolicyExceptionGrant otherTenant = grant(3L, "tenant-2", NOW.plusSeconds(3600));
+
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "40", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))),
+                List.of(otherTenant),
+                NOW);
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+    }
+
+    private static PolicyExceptionGrant grant(long quoteVersion, String tenantId, Instant expiresAt) {
+        return new PolicyExceptionGrant("42", quoteVersion, 7L, tenantId, expiresAt);
     }
 
     private static QuoteVersionFacts facts(String discount, String margin, Integer term, List<String> clauses) {

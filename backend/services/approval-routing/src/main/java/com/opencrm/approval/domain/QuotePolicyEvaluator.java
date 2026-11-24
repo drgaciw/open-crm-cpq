@@ -1,6 +1,7 @@
 package com.opencrm.approval.domain;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,19 @@ public final class QuotePolicyEvaluator {
     }
 
     public static QuotePolicyDecision evaluateQuote(QuoteVersionFacts quoteVersion, List<CommercialPolicy> policies) {
+        return evaluateQuote(quoteVersion, policies, List.of(), null);
+    }
+
+    /**
+     * Same verdict as {@link #evaluateQuote(QuoteVersionFacts, List)}, after an active exception for this
+     * quote version and policy has satisfied the breaches it covers. An expired grant, or a grant for another
+     * quote version or policy, leaves the breach in place.
+     */
+    public static QuotePolicyDecision evaluateQuote(
+            QuoteVersionFacts quoteVersion,
+            List<CommercialPolicy> policies,
+            List<PolicyExceptionGrant> exceptions,
+            Instant now) {
         List<PolicyBreach> breaches = new ArrayList<>();
         List<Long> applied = new ArrayList<>();
         List<CommercialPolicy> applicable = policies == null ? List.of() : policies;
@@ -36,12 +50,53 @@ public final class QuotePolicyEvaluator {
                     continue;
                 }
                 PolicyBreach breach = breach(policy, threshold, quoteVersion);
-                if (breach != null) {
+                if (breach != null && !honored(quoteVersion, breach, exceptions, now)) {
                     breaches.add(breach);
                 }
             }
         }
         return new QuotePolicyDecision(verdict(breaches), breaches, applied);
+    }
+
+/**
+     * An exception covers a breach only when it names this quote, this quote version, this policy and the
+     * evaluation tenant, and its expiry is still strictly in the future. A missing evaluation tenant does not
+     * block a grant: quotes recorded before a tenant claim have none.
+     */
+    private static boolean honored(
+            QuoteVersionFacts quoteVersion,
+            PolicyBreach breach,
+            List<PolicyExceptionGrant> exceptions,
+            Instant now) {
+        if (quoteVersion == null || breach == null || breach.policyId() == null || exceptions == null || now == null
+                || quoteVersion.quoteId() == null || quoteVersion.quoteVersion() == null) {
+            return false;
+        }
+        for (PolicyExceptionGrant grant : exceptions) {
+            if (grant == null || grant.expiresAt() == null || grant.quoteId() == null) {
+                continue;
+            }
+            if (!grant.quoteId().equals(quoteVersion.quoteId()) || grant.quoteVersion() != quoteVersion.quoteVersion()) {
+                continue;
+            }
+            if (grant.policyId() != breach.policyId()) {
+                continue;
+            }
+            if (!sameTenant(quoteVersion.tenantId(), grant.tenantId())) {
+                continue;
+            }
+            if (grant.expiresAt().isAfter(now)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean sameTenant(String evaluationTenant, String grantTenant) {
+        if (evaluationTenant == null || evaluationTenant.isBlank()) {
+            return true;
+        }
+        return grantTenant != null && evaluationTenant.strip().equals(grantTenant.strip());
     }
 
     private static PolicyVerdict verdict(List<PolicyBreach> breaches) {
