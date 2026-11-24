@@ -88,31 +88,31 @@ class AssetReconciliationIntegrationTest {
         assertThat(empty.getContractLineCount()).isZero();
 
         UUID contractId = UUID.randomUUID();
-        UUID tenantId = UUID.fromString(AssetReadTestCaller.TENANT);
+        UUID tenantId = UUID.randomUUID();
         insertContract(contractId, tenantId);
         insertContractLine(contractId, tenantId, 1, LINE_GAP);
         insertContractLine(contractId, tenantId, 2, LINE_LEGACY);
         insertContractLine(contractId, tenantId, 3, LINE_MISMATCH);
         insertContractLine(contractId, tenantId, 4, LINE_CLEAN);
 
-        long gapSubscription = insertSubscription("SUB-GAP", tenantId);
+        long gapSubscription = insertSubscription("SUB-GAP");
         insertAcceptance(gapSubscription, "quote-gap");
         insertRatePeriod(gapSubscription, LINE_GAP);
 
-        long legacySubscription = insertSubscription("SUB-LEGACY", tenantId);
+        long legacySubscription = insertSubscription("SUB-LEGACY");
         insertAsset(LEGACY_ASSET, "acct-legacy", LINE_LEGACY, legacySubscription, "ACTIVE");
         insertHistory("hist-legacy", LEGACY_ASSET, "acct-legacy", "CREATED", "2026-01-01",
                 LINE_LEGACY, legacySubscription, 1);
 
         insertOutbox("evt-orphan", ORPHAN_ASSET, KafkaTopics.ASSET_CREATED);
 
-        long successorSubscription = insertSubscription("SUB-SUCCESSOR", tenantId);
+        long successorSubscription = insertSubscription("SUB-SUCCESSOR");
         insertAsset(SUCCESSOR_ASSET, "acct-successor", SUCCESSOR_LINE, successorSubscription, "ACTIVE");
         insertHistory("hist-successor", SUCCESSOR_ASSET, "acct-successor", "CREATED", "2026-01-01",
                 SUCCESSOR_LINE, successorSubscription, 1);
         insertOutbox("evt-successor", SUCCESSOR_ASSET, KafkaTopics.ASSET_CREATED);
 
-        long mismatchSubscription = insertSubscription("SUB-MISMATCH", tenantId);
+        long mismatchSubscription = insertSubscription("SUB-MISMATCH");
         insertAsset(MISMATCH_ASSET, "acct-mismatch", LINE_MISMATCH, mismatchSubscription, "TERMINATED");
         insertHistory("hist-mismatch", MISMATCH_ASSET, "acct-mismatch", "CREATED", "2026-01-01",
                 LINE_MISMATCH, mismatchSubscription, 1);
@@ -120,7 +120,7 @@ class AssetReconciliationIntegrationTest {
                 LINE_MISMATCH, mismatchSubscription, 2);
         insertOutbox("evt-mismatch", MISMATCH_ASSET, KafkaTopics.ASSET_CREATED);
 
-        long cleanSubscription = insertSubscription("SUB-CLEAN", tenantId);
+        long cleanSubscription = insertSubscription("SUB-CLEAN");
         insertAsset(CLEAN_ASSET, "acct-clean", LINE_CLEAN, cleanSubscription, "ACTIVE");
         insertHistory("hist-clean", CLEAN_ASSET, "acct-clean", "CREATED", "2026-01-01",
                 LINE_CLEAN, cleanSubscription, 1);
@@ -225,7 +225,12 @@ class AssetReconciliationIntegrationTest {
                 """, UUID.randomUUID(), tenantId, contractId, lineNo, acceptedLineUuid);
     }
 
-    private long insertSubscription(String number, UUID tenantId) {
+    /**
+     * The installed-base projection is tenant-scoped through {@code subscriptions.tenant_id} (DRG-906, #1077): it
+     * shows only assets of the signed-in caller's tenant. Seed subscriptions under that tenant so the projection
+     * sees the fixture data.
+     */
+    private long insertSubscription(String number) {
         Long id = jdbc.queryForObject("""
                 INSERT INTO subscriptions(
                     uuid, subscription_number, customer_id, quote_id, plan_name,
@@ -233,7 +238,7 @@ class AssetReconciliationIntegrationTest {
                 VALUES (?, ?, 'customer', 'quote', 'Plan', DATE '2026-01-01', DATE '2026-12-31',
                         'ACTIVE', 'USD', 0, ?)
                 RETURNING id
-                """, Long.class, UUID.randomUUID().toString(), number, tenantId);
+                """, Long.class, UUID.randomUUID().toString(), number, UUID.fromString(AssetReadTestCaller.TENANT));
         if (id == null) {
             throw new IllegalStateException("subscription id");
         }
