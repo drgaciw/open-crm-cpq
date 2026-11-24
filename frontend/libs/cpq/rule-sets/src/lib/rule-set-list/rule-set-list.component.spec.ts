@@ -138,6 +138,38 @@ describe('RuleSetListComponent', () => {
     expect(compiled.textContent).toContain('No rule sets yet');
   });
 
+  it('keeps a failed first read out of the empty state until a new read succeeds', () => {
+    ruleSets.set([]);
+    loading.set(false);
+    error.set('Scoped list unavailable');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const alert = el.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Scoped list unavailable');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    listSpy.mockClear();
+    alert!.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(el.querySelector('app-data-table')).toBeNull();
+    expect(el.querySelector('h1')).toBeTruthy();
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listByStatusSpy.mockImplementationOnce(() => loading.set(true));
+    component.onStatusChange('ACTIVE');
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    ruleSets.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')?.textContent).toContain('No matching rule sets');
+    expect(el.querySelector('app-empty-state button')).toBeNull();
+  });
+
   it('shows error banner when RuleSetService.error is set', () => {
     error.set('Failed to load rule sets');
     fixture.detectChanges();

@@ -75,6 +75,8 @@ const WORKSPACE_COMMANDS: CommandPaletteItem[] = [
     <div class="shell-container">
       <a class="skip-link" href="#main-content" (click)="skipToMain($event, mainContent)">Skip to main content</a>
       <app-toolbar
+        [sidenavId]="sidenavId"
+        [sidenavOpened]="sidenavOpened()"
         (toggleSidenav)="onToggleSidenav()"
         (openCommandPalette)="openCommandPalette()"
       />
@@ -89,6 +91,7 @@ const WORKSPACE_COMMANDS: CommandPaletteItem[] = [
       <mat-sidenav-container class="sidenav-container">
         <mat-sidenav
           #sidenavRef
+          [id]="sidenavId"
           class="sidenav"
           role="navigation"
           aria-label="Main navigation"
@@ -96,7 +99,7 @@ const WORKSPACE_COMMANDS: CommandPaletteItem[] = [
           [opened]="sidenavOpened()"
           (openedChange)="onOpenedChange($event)"
         >
-          <app-sidebar />
+          <app-sidebar (destinationSelected)="onSidebarDestinationSelected()" />
         </mat-sidenav>
         <mat-sidenav-content class="content">
           <main #mainContent id="main-content" class="page-container" tabindex="-1">
@@ -168,6 +171,8 @@ export class ShellComponent implements OnInit {
   readonly loadingService = inject(LoadingService);
   readonly commandItems: CommandPaletteItem[] = WORKSPACE_COMMANDS;
 
+  readonly sidenavId = 'main-navigation';
+
   /** `over` below 768px; `side` at desktop. */
   readonly sidenavMode = signal<'side' | 'over'>('side');
   /** Desktop starts open; mobile starts closed. */
@@ -190,6 +195,12 @@ export class ShellComponent implements OnInit {
 
   onToggleSidenav(): void {
     this.sidenavOpened.update((opened) => !opened);
+  }
+
+  onSidebarDestinationSelected(): void {
+    if (this.sidenavMode() === 'over') {
+      this.sidenavOpened.set(false);
+    }
   }
 
   skipToMain(event: MouseEvent, mainContent: HTMLElement): void {

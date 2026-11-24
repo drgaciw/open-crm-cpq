@@ -168,20 +168,10 @@ public class LeadService {
      * List leads with optional filtering.
      */
     @Transactional(readOnly = true)
-    public Page<LeadDto> list(Pageable pageable, LeadStatus status, LeadPriority priority) {
+    public Page<LeadDto> list(Pageable pageable, LeadStatus status, LeadPriority priority, String query) {
         log.debug("Listing leads with status: {}, priority: {}", status, priority);
-
-        Page<Lead> leads;
-
-        if (status != null) {
-            leads = leadRepository.findByStatusAndDeletedFalse(status, pageable);
-        } else if (priority != null) {
-            leads = leadRepository.findByPriorityAndDeletedFalse(priority, pageable);
-        } else {
-            leads = leadRepository.findAllByDeletedFalse(pageable);
-        }
-
-        return leads.map(leadMapper::toDto);
+        String titleQuery = query == null ? "" : query.strip();
+        return leadRepository.findMatching(status, priority, titleQuery, pageable).map(leadMapper::toDto);
     }
 
     /**

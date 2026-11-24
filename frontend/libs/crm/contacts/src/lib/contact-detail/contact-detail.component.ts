@@ -15,7 +15,7 @@ import { ContactService } from '../contact.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40" aria-label="Loading contact"></mat-spinner></div>
     } @else if (service.error(); as err) {
       <div class="error-banner" role="alert">
         <mat-icon>error_outline</mat-icon>
@@ -91,6 +91,7 @@ import { ContactService } from '../contact.service';
     .loading { display: flex; justify-content: center; padding: 48px; }
     .error-banner {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       margin: 0 0 16px;
@@ -99,12 +100,13 @@ import { ContactService } from '../contact.service';
       background: #ffebee;
       color: #c62828;
     }
+    .error-banner > span { overflow-wrap: anywhere; }
     .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .header-info { flex: 1; }
     .header-info h1 { margin: 0; font-size: 1.5rem; }
     .subtitle { color: #666; }
     .header-actions { display: flex; gap: 8px; }
-    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 16px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr)); gap: 16px; }
     .full-width { grid-column: 1 / -1; }
     .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 16px 0; }
     .info-item { display: flex; flex-direction: column; gap: 4px; }

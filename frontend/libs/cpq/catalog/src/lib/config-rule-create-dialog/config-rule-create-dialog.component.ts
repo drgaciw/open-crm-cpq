@@ -162,10 +162,11 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? (editing ? 'Save' : 'Create') : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Saving configuration rule" />
         } @else {
           {{ editing ? 'Save' : 'Create' }}
         }
@@ -255,6 +256,8 @@ export class ConfigRuleCreateDialogComponent {
           ...(value.status === 'ACTIVE' ? {} : { status: value.status }),
         });
 
+    const previousDisableClose = this.dialogRef.disableClose;
+    this.dialogRef.disableClose = true;
     this.error.set(null);
     this.saving.set(true);
     request.subscribe({
@@ -263,6 +266,7 @@ export class ConfigRuleCreateDialogComponent {
         this.dialogRef.close(created);
       },
       error: (err: unknown) => {
+        this.dialogRef.disableClose = previousDisableClose;
         this.saving.set(false);
         this.error.set(
           httpErrorMessage(err, rule ? 'Failed to save configuration rule' : 'Failed to create configuration rule'),

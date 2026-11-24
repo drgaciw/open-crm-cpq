@@ -75,6 +75,40 @@ describe('OrganizationFormComponent saving flag (OnPush / chaos)', () => {
     expect(submit.textContent).toContain('Create');
   });
 
+  it('shows the required error and prevents creating an Account with a whitespace-only name', () => {
+    component.form.patchValue({ name: '   ' });
+    component.form.get('name')?.markAsTouched();
+    fixture.detectChanges();
+
+    const service = TestBed.inject(OrganizationService);
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.disabled).toBe(true);
+    expect(host.querySelector('mat-error')?.textContent?.trim()).toBe('Name is required');
+    component.onSubmit();
+    expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it('names the pending Create action and keeps the accepted Account payload', () => {
+    const service = TestBed.inject(OrganizationService);
+    component.form.patchValue({ name: '  Acme Account  ', territory: 'West', ownerId: '', type: '' });
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.textContent?.trim()).toBe('Create');
+    submit.click();
+    fixture.detectChanges();
+
+    expect(service.create).toHaveBeenCalledWith(expect.objectContaining({
+      name: '  Acme Account  ', territory: 'West', ownerId: '',
+    }));
+    expect(vi.mocked(service.create).mock.calls[0][0]).not.toHaveProperty('type');
+    expect(submit.disabled).toBe(true);
+    expect(submit.getAttribute('aria-label')).toBe('Create');
+    expect(submit.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving account');
+  });
+
   it('uses Account copy and captures territory and owner', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('h1')?.textContent).toContain('New Account');
@@ -180,6 +214,22 @@ describe('OrganizationFormComponent reused edit route', () => {
     update.flush(account(8, 'Second'));
     await fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/organizations/8');
+  });
+
+  it('names the pending Update action while the native edit is in flight', () => {
+    http.expectOne('/api/v1/organizations/7').flush(account(7, 'First'));
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.textContent?.trim()).toBe('Update');
+    submit.click();
+    fixture.detectChanges();
+    http.expectOne(request => request.method === 'PUT' && request.url === '/api/v1/organizations/7');
+
+    expect(submit.disabled).toBe(true);
+    expect(submit.getAttribute('aria-label')).toBe('Update');
+    expect(submit.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving account');
   });
 
   it('cancels an old load before accepting a new account', () => {

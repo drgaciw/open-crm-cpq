@@ -97,7 +97,7 @@ interface RuleSetTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (!listErrorDismissed() && !loading() && !error() && isEmpty()) {
       <app-empty-state
         icon="rule"
         [title]="
@@ -111,7 +111,7 @@ interface RuleSetTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New rule set'"
         (action)="openCreateDialog()"
       />
-    } @else {
+    } @else if (!isEmpty()) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -181,6 +181,8 @@ export class RuleSetListComponent implements OnInit {
 
   readonly statusFilter = signal<RuleSetStatus | ''>('');
 
+  protected readonly listErrorDismissed = signal(false);
+
   readonly loading = computed(() => this.service.loading());
   readonly error = computed(() => this.service.error());
   readonly pagination = computed(() => this.service.pagination());
@@ -233,10 +235,13 @@ export class RuleSetListComponent implements OnInit {
   }
 
   clearError(): void {
+    // A dismissed failure does not establish an empty result.
+    this.listErrorDismissed.set(true);
     this.service.error.set(null);
   }
 
   private reload(page = 0, size = this.service.pagination().size || 20): void {
+    this.listErrorDismissed.set(false);
     const status = this.statusFilter();
     if (status) {
       this.service.listByStatus(status, page, size);

@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Throwaway PostgreSQL 16 proof for the CAM V1_14 and V1_13 rollbacks.
  *
- * <p>The empty database is migrated to the latest CAM version. V1_14's rollback
+ * <p>The empty database is migrated to the historical V1_22 CAM baseline. V1_14's rollback
  * runs before V1_13's. Flyway 11 {@code repair()} does not forget a successful
  * version, and {@code clean()} would drop the rest of the schema, so this test
  * deletes only versions 1.13 and 1.14 from {@code contract.flyway_schema_history}
@@ -63,7 +63,7 @@ class AssetRollbackIntegrationTest {
             assertThat(flyway.migrate().migrationsExecuted).isPositive();
             flyway.validate();
             List<String> versions = appliedVersions(flyway);
-            assertThat(versions).contains("1.13", "1.14").endsWith("1.23");
+            assertThat(versions).contains("1.13", "1.14").endsWith("1.25");
             assertVersionedScriptsStayInTheMigrationDirectory(flyway);
 
             try (Connection connection = jdbc(database)) {
@@ -102,7 +102,7 @@ class AssetRollbackIntegrationTest {
             assertThat(replay.migrate().migrationsExecuted).as("schema is current after the out-of-order re-apply").isZero();
             replay.validate();
             List<String> replayed = appliedVersions(replay);
-            assertThat(replayed).contains("1.15", "1.22", "1.23");
+            assertThat(replayed).contains("1.15", "1.22", "1.23", "1.24", "1.25");
             assertThat(replayed).endsWith("1.13", "1.14");
             try (Connection connection = jdbc(database)) {
                 assertRelations(connection, ROLLED_BACK, true);
@@ -199,6 +199,7 @@ class AssetRollbackIntegrationTest {
                 .schemas(SCHEMA)
                 .defaultSchema(SCHEMA)
                 .locations("classpath:db/migration")
+                .target("1.22")
                 .outOfOrder(outOfOrder)
                 .load();
     }

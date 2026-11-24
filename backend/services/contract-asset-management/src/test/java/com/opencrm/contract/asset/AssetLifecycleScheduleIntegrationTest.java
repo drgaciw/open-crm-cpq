@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * DRG-902 AC5 / P02 / AM05 / AM09. Postgres 16: Hibernate validate, dedupe, SKIP LOCKED,
- * check constraints, and an empty-schema migrate to V1_23.
+ * check constraints, and an empty-schema migrate to V1_25.
  */
 @Tag("integration")
 @Testcontainers
@@ -77,8 +77,8 @@ class AssetLifecycleScheduleIntegrationTest {
     @Autowired PlatformTransactionManager transactionManager;
 
     @Test
-    void migratesAnEmptyDatabaseToV1_23ValidatesAndRemigratesWithNothingPending() throws Exception {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1.23");
+    void migratesAnEmptyDatabaseToV1_25ValidatesAndRemigratesWithNothingPending() throws Exception {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1.25");
         flyway.validate();
 
         try (Connection admin = admin()) {
@@ -96,16 +96,16 @@ class AssetLifecycleScheduleIntegrationTest {
                 .load();
         MigrateResult first = fresh.migrate();
         assertThat(first.migrationsExecuted).isPositive();
-        assertThat(fresh.info().current().getVersion().getVersion()).isEqualTo("1.23");
+        assertThat(fresh.info().current().getVersion().getVersion()).isEqualTo("1.25");
         fresh.validate();
         assertThat(fresh.info().pending()).isEmpty();
         MigrateResult second = fresh.migrate();
         assertThat(second.migrationsExecuted).isZero();
         assertThat(fresh.info().pending()).isEmpty();
 
-        String rollback = read("/db/rollback/V1_23__drop_asset_lifecycle_changes.sql");
-        assertThat(read("/db/migration/V1_23__create_asset_lifecycle_changes.sql"))
-                .contains("-- Rollback: db/rollback/V1_23__drop_asset_lifecycle_changes.sql");
+        String rollback = read("/db/rollback/V1_25__drop_asset_lifecycle_changes.sql");
+        assertThat(read("/db/migration/V1_25__create_asset_lifecycle_changes.sql"))
+                .contains("-- Rollback: db/rollback/V1_25__drop_asset_lifecycle_changes.sql");
         try (Connection admin = admin()) {
             admin.setAutoCommit(true);
             try (var statement = admin.createStatement()) {

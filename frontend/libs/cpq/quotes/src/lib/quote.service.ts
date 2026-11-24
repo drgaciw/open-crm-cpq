@@ -1,7 +1,7 @@
 import { JevSuggestionEnvelope } from '@frontend/shared-models';
 import { Service, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { Observable, finalize, type Subscription } from 'rxjs';
 import {
   QuoteDto,
   QuoteCreateRequest,
@@ -49,12 +49,16 @@ function httpErrorMessage(err: unknown): string {
 export class QuoteService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/quotes';
+  private pendingDetailRead?: Subscription;
+  private viewRead = 0;
+  private latestListRead = 0;
 
   readonly quotes = signal<QuoteDto[]>([]);
   readonly selectedQuote = signal<QuoteDto | null>(null);
   readonly lineItems = signal<QuoteLineItemDto[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly missingQuoteId = signal<number | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -74,8 +78,8 @@ export class QuoteService {
       customerExternalId?: string;
     },
   ): void {
-    this.error.set(null);
-    this.loading.set(true);
+    const listRead = ++this.latestListRead;
+    const read = this.beginViewRead();
     let params = new HttpParams()
       .set('page', page)
       .set('size', size)
@@ -92,9 +96,13 @@ export class QuoteService {
 
     this.http
       .get<SpringPageResponse<QuoteDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => this.finishViewRead(read)))
       .subscribe({
         next: (p) => {
+          // Only list queries supersede list results. Detail reads own view status separately.
+          if (listRead !== this.latestListRead) {
+            return;
+          }
           this.quotes.set(p.content ?? (p as unknown as QuoteDto[]));
           if (p.totalElements !== undefined) {
             this.pagination.set({
@@ -106,24 +114,45 @@ export class QuoteService {
           }
         },
         error: (err) => {
-          this.error.set(httpErrorMessage(err));
+          if (read === this.viewRead) {
+            this.error.set(httpErrorMessage(err));
+          }
         },
       });
   }
 
   getById(id: number): void {
-    this.error.set(null);
+    const read = this.beginViewRead();
     this.selectedQuote.set(null);
-    this.loading.set(true);
-    this.http
+    this.missingQuoteId.set(null);
+    this.pendingDetailRead = this.http
       .get<QuoteDto>(`${this.basePath}/${id}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => this.finishViewRead(read)))
       .subscribe({
         next: (quote) => this.selectedQuote.set(quote),
         error: (err) => {
+          if (err instanceof HttpErrorResponse && err.status === 404) {
+            this.missingQuoteId.set(id);
+          }
           this.error.set(httpErrorMessage(err));
         },
       });
+  }
+
+  private beginViewRead(): number {
+    // Claim shared view status before canceling the outgoing detail read's finalizer.
+    const read = ++this.viewRead;
+    this.pendingDetailRead?.unsubscribe();
+    this.pendingDetailRead = undefined;
+    this.error.set(null);
+    this.loading.set(true);
+    return read;
+  }
+
+  private finishViewRead(read: number): void {
+    if (read === this.viewRead) {
+      this.loading.set(false);
+    }
   }
 
   getByQuoteNumber(quoteNumber: string): Observable<QuoteDto> {

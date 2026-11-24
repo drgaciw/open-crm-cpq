@@ -76,7 +76,7 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Acme Account');
   });
 
-  it('links related contacts, deals, and quotes without dead ends', () => {
+  it('links related contacts, opportunities, and quotes without dead ends', () => {
     flushAccount();
     const deals = httpMock.expectOne(
       (r) => r.url === '/api/v1/deals' && r.params.get('organizationId') === '7',
@@ -125,6 +125,10 @@ describe('OrganizationDetailComponent account UX', () => {
     const quoteLink = el.querySelector('a[href="/quotes/9"]');
     const browseDeals = el.querySelector('a[href="/deals"]');
     const browseQuotes = el.querySelector('a[href="/quotes"]');
+    const opportunities = el.querySelector('[data-testid="account-deals"]');
+    expect(opportunities?.querySelector('mat-card-title')?.textContent).toBe('Opportunities');
+    expect(browseDeals?.textContent?.trim()).toBe('Browse opportunities');
+    expect(opportunities?.querySelector('a[href="/deals/new"]')?.textContent?.trim()).toBe('New opportunity');
     expect(dealLink?.textContent).toContain('Renewal');
     expect(quoteLink?.textContent).toContain('Platform quote');
     TestBed.inject(OrganizationService).relatedQuotesTruncated.set(true);
@@ -186,6 +190,56 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(el.querySelector('[data-testid="hierarchy-error"]')?.textContent).toContain(
       'This parent would create a cycle',
     );
+  });
+
+  it('names the progress indicator while the account detail is loading', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const status = host.querySelector('[role="status"]');
+    const rootProgressName = status?.querySelector('[role="progressbar"]')?.getAttribute('aria-label');
+
+    flushAccount();
+    httpMock.expectOne((request) => request.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne((request) => request.url === '/api/v1/quotes').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush({ message: 'Not found' },
+      { status: 404, statusText: 'Not Found' });
+
+    expect(status?.getAttribute('aria-live')).toBe('polite');
+    expect(rootProgressName).toBe('Loading account');
+  });
+
+  it('blocks repeat Archive confirmations and keeps the pending action accessible until failure', () => {
+    flushAccount();
+    httpMock.expectOne((request) => request.url === '/api/v1/deals').flush({ content: [] });
+    httpMock.expectOne((request) => request.url === '/api/v1/quotes').flush({ content: [] });
+    httpMock.expectOne('/api/v1/organizations/7/hierarchy').flush({ message: 'Not found' },
+      { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      const host = fixture.nativeElement as HTMLElement;
+      const archive = [...host.querySelectorAll<HTMLButtonElement>('app-page-header button')]
+        .find(button => button.textContent?.includes('Archive'))!;
+      archive.click();
+      const request = httpMock.expectOne(req => req.method === 'DELETE' && req.url === '/api/v1/organizations/7');
+      fixture.detectChanges();
+
+      expect(archive.disabled).toBe(true);
+      expect(archive.getAttribute('aria-label')).toBe('Archive');
+      expect(archive.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Archiving account');
+      fixture.componentInstance.onDelete();
+      expect(confirm).toHaveBeenCalledTimes(1);
+      httpMock.expectNone(req => req.method === 'DELETE');
+
+      request.flush({ message: 'Archive unavailable' }, { status: 503, statusText: 'Unavailable' });
+      fixture.detectChanges();
+
+      expect(archive.disabled).toBe(false);
+      expect(archive.querySelector('[role="progressbar"]')).toBeNull();
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not archive this account');
+    } finally {
+      confirm.mockRestore();
+    }
   });
 
   it('explains why an account with children cannot be archived', () => {

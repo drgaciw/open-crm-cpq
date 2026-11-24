@@ -29,6 +29,7 @@ describe('ProductBundleDetailComponent', () => {
   const selectedBundle = signal<ProductBundleDto | null>(selected);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadFailure = signal<{ id: number; status: number; message: string } | null>(null);
 
   beforeEach(async () => {
     getByIdSpy = vi.fn((id: number) => {
@@ -44,6 +45,7 @@ describe('ProductBundleDetailComponent', () => {
       selectedBundle,
       loading,
       error,
+      detailReadFailure,
       getById: getByIdSpy,
       delete: deleteSpy,
       removeItem: removeItemSpy,
@@ -72,6 +74,7 @@ describe('ProductBundleDetailComponent', () => {
     selectedBundle.set(selected);
     loading.set(false);
     error.set(null);
+    detailReadFailure.set(null);
   });
 
   it('loads bundle via ProductBundleService.getById on init', () => {
@@ -80,6 +83,45 @@ describe('ProductBundleDetailComponent', () => {
     expect(compiled.textContent).toContain('Starter Pack');
     expect(compiled.textContent).toContain('Items');
     expect(compiled.textContent).toContain('Add item');
+  });
+
+  it('names the indicator while waiting for the bundle detail', () => {
+    selectedBundle.set(null);
+    loading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Loading bundle details');
+    expect(host.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('offers Retry for a transient read failure without saying the bundle is missing', () => {
+    selectedBundle.set(null);
+    detailReadFailure.set({ id: selected.id, status: 503, message: 'Bundle service unavailable' });
+    error.set('Bundle service unavailable');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const alert = host.querySelector('[role="alert"]');
+    expect(host.textContent).not.toContain('Bundle not found');
+    expect(alert?.textContent).toContain('Bundle service unavailable');
+    getByIdSpy.mockClear();
+    const retry = [...(alert?.querySelectorAll('button') ?? [])].find(button => button.textContent?.trim() === 'Retry');
+    expect(retry).toBeTruthy();
+    retry?.click();
+    expect(getByIdSpy).toHaveBeenCalledOnce();
+    expect(getByIdSpy).toHaveBeenCalledWith(selected.id);
+  });
+
+  it('keeps the existing not-found card for an actual 404', () => {
+    selectedBundle.set(null);
+    detailReadFailure.set({ id: selected.id, status: 404, message: 'Bundle missing' });
+    error.set('Bundle missing');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-empty-state')?.textContent).toContain('Bundle not found');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('renders items table rows from selected bundle', () => {
@@ -232,6 +274,43 @@ describe('ProductBundleDetailComponent', () => {
       ]);
       expect(data[0].children?.[0].children?.[0].label).toBe('Product #20');
       expect(data[0].children?.[1].children?.[0].label).toBe('Product #21');
+    });
+
+    it('refreshes nested item views after edit and retains existing expansions', () => {
+      const moved = { id: 101, productId: 20, quantity: 1, optional: false, sortOrder: 0 };
+      const required = { id: 102, productId: 21, quantity: 2, optional: false, sortOrder: 1 };
+      const optional = { id: 103, productId: 22, quantity: 3, optional: true, sortOrder: 2 };
+      const original = { ...selected, items: [moved, required, optional] };
+      fixture.destroy();
+      getByIdSpy.mockImplementationOnce(() => selectedBundle.set(original));
+      fixture = TestBed.createComponent(ProductBundleDetailComponent);
+      fixture.componentRef.setInput('id', String(original.id));
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      const toggle = (label: string) => host.querySelector<HTMLButtonElement>(`[aria-label="Toggle ${label}"]`)!;
+      const branch = (label: string) => toggle(label).closest('[role="treeitem"]')!;
+      for (const label of [original.name, 'Required options', 'Optional options']) {
+        toggle(label).click();
+        fixture.detectChanges();
+        expect(branch(label).getAttribute('aria-expanded')).toBe('true');
+      }
+
+      const updated = { ...original, items: [{ ...moved, quantity: 4, optional: true, sortOrder: 7 }, required, optional] };
+      dialogOpen.mockReturnValueOnce({ afterClosed: () => of(updated) });
+      component.openEditItem(component.itemRows()[0]);
+      fixture.detectChanges();
+
+      expect(branch(original.name).getAttribute('aria-expanded')).toBe('true');
+      expect(branch('Required options').getAttribute('aria-expanded')).toBe('true');
+      expect(branch('Optional options').getAttribute('aria-expanded')).toBe('true');
+      const requiredBranch = branch('Required options');
+      const optionalBranch = branch('Optional options');
+      expect(requiredBranch.textContent).toContain('Product #21');
+      expect(requiredBranch.textContent).not.toContain('Product #20');
+      expect(optionalBranch.textContent).toContain('Product #20');
+      expect(optionalBranch.textContent).toContain('Qty 4 · Sort 7');
     });
 
     it('expands and collapses branch nodes using cdkTreeNodeToggle', () => {

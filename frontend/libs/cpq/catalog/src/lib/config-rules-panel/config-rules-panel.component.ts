@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
@@ -16,6 +17,7 @@ import {
   EmptyStateComponent,
 } from '@frontend/shared-ui';
 import { NotificationService } from '@frontend/shared-data-access';
+import type { Subscription } from 'rxjs';
 import { ConfigurationRuleDto } from '../configuration-rule.model';
 import { ConfigurationRuleService } from '../configuration-rule.service';
 import {
@@ -58,7 +60,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
           color="primary"
           type="button"
           class="add-rule-btn"
-          [disabled]="busy() || productId() === null || productId() === undefined"
+          [disabled]="actionsDisabled()"
           (click)="openCreate()"
         >
           <mat-icon>add</mat-icon>
@@ -70,16 +72,29 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         <div class="section-error" role="alert">{{ err }}</div>
       }
 
+      @if (loadError(); as err) {
+        <div class="section-error" role="alert">{{ err }}</div>
+        <button mat-button type="button" [disabled]="busy()" (click)="retry()">
+          Retry
+        </button>
+      }
+
       @if (loading()) {
         <div class="section-loading" role="status">
-          <mat-spinner diameter="32"></mat-spinner>
+          <mat-spinner
+            diameter="32"
+            aria-label="Loading configuration rules"
+          />
         </div>
-      } @else if (rules().length === 0) {
-        <app-empty-state
-          icon="rule"
-          title="No configuration rules"
-          message="Add REQUIRES / EXCLUDES / RECOMMENDS / DEFAULT / VALIDATES rules for this product."
-        />
+      }
+      @if (rules().length === 0) {
+        @if (!loading() && !loadError()) {
+          <app-empty-state
+            icon="rule"
+            title="No configuration rules"
+            message="Add REQUIRES / EXCLUDES / RECOMMENDS / DEFAULT / VALIDATES rules for this product."
+          />
+        }
       } @else {
         <table class="rules-table">
           <thead>
@@ -107,7 +122,12 @@ function httpErrorMessage(err: unknown, fallback: string): string {
                 <td>{{ rule.status ?? 'ACTIVE' }}</td>
                 <td>{{ rule.errorMessage || '—' }}</td>
                 <td>
-                  <button mat-button type="button" [disabled]="busy()" (click)="openEdit(rule)">
+                  <button
+                    mat-button
+                    type="button"
+                    [disabled]="actionsDisabled()"
+                    (click)="openEdit(rule)"
+                  >
                     Edit
                   </button>
                   <button
@@ -115,7 +135,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
                     color="warn"
                     type="button"
                     class="delete-rule-btn"
-                    [disabled]="busy()"
+                    [disabled]="actionsDisabled()"
                     (click)="confirmDelete(rule)"
                   >
                     <mat-icon>delete</mat-icon>
@@ -229,22 +249,38 @@ export class ConfigRulesPanelComponent {
   readonly loading = signal(false);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly actionsDisabled = computed(
+    () => this.busy() || this.loading() || this.productId() == null,
+  );
 
-  private readonly loadOnProductId = effect(() => {
-    const _id = this.productId();
-    untracked(() => this.reload());
+  private loadRequest?: Subscription;
+  private readonly loadOnProductId = effect((onCleanup) => {
+    const id = this.productId();
+    untracked(() => {
+      this.rules.set([]);
+      this.error.set(null);
+      this.reload(id);
+    });
+    onCleanup(() => this.loadRequest?.unsubscribe());
   });
+
+  protected retry(): void {
+    if (!this.loading() && !this.busy()) {
+      this.reload(this.productId());
+    }
+  }
 
   openCreate(): void {
     const id = this.productId();
-    if (id == null || this.busy()) {
+    if (id == null || this.actionsDisabled()) {
       return;
     }
     this.openRuleDialog({ productId: id });
   }
 
   openEdit(rule: ConfigurationRuleDto): void {
-    if (this.busy() || this.productId() !== rule.sourceProductId) {
+    if (this.actionsDisabled() || this.productId() !== rule.sourceProductId) {
       return;
     }
     this.openRuleDialog({ productId: rule.sourceProductId, rule });
@@ -256,7 +292,7 @@ export class ConfigRulesPanelComponent {
       data,
     });
     ref.afterClosed().subscribe((saved: ConfigurationRuleDto | null) => {
-      if (saved) {
+      if (saved && this.productId() === data.productId) {
         this.rules.update((list) =>
           [...list.filter(({ id }) => id !== saved.id), saved].sort((a, b) => b.priority - a.priority),
         );
@@ -266,7 +302,7 @@ export class ConfigRulesPanelComponent {
   }
 
   confirmDelete(rule: ConfigurationRuleDto): void {
-    if (this.busy()) {
+    if (this.actionsDisabled() || this.productId() !== rule.sourceProductId) {
       return;
     }
     const ref = this.dialog.open(ConfirmDialogComponent, {
@@ -280,7 +316,11 @@ export class ConfigRulesPanelComponent {
       },
     });
     ref.afterClosed().subscribe((confirmed: boolean) => {
-      if (!confirmed) {
+      if (
+        !confirmed ||
+        this.actionsDisabled() ||
+        this.productId() !== rule.sourceProductId
+      ) {
         return;
       }
       this.busy.set(true);
@@ -288,37 +328,39 @@ export class ConfigRulesPanelComponent {
       this.ruleService.delete(rule.id).subscribe({
         next: () => {
           this.busy.set(false);
-          this.rules.update((list) => list.filter((r) => r.id !== rule.id));
-          this.notification.success('Rule deleted');
+          if (this.productId() === rule.sourceProductId) {
+            this.rules.update((list) => list.filter((r) => r.id !== rule.id));
+            this.notification.success('Rule deleted');
+          }
         },
         error: (err: unknown) => {
           this.busy.set(false);
-          this.error.set(
-            httpErrorMessage(err, 'Failed to delete configuration rule'),
-          );
+          if (this.productId() === rule.sourceProductId) {
+            this.error.set(
+              httpErrorMessage(err, 'Failed to delete configuration rule'),
+            );
+          }
         },
       });
     });
   }
 
-  private reload(): void {
-    const id = this.productId();
+  private reload(id: number | null): void {
+    this.loadRequest?.unsubscribe();
+    this.loadError.set(null);
     if (id == null) {
-      this.rules.set([]);
       this.loading.set(false);
       return;
     }
     this.loading.set(true);
-    this.error.set(null);
-    this.ruleService.listByProduct(id).subscribe({
+    this.loadRequest = this.ruleService.listByProduct(id).subscribe({
       next: (list) => {
         this.rules.set(list ?? []);
         this.loading.set(false);
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        this.rules.set([]);
-        this.error.set(
+        this.loadError.set(
           httpErrorMessage(err, 'Failed to load configuration rules'),
         );
       },

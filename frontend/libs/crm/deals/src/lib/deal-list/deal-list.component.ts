@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
-import { PageEvent } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -50,6 +50,7 @@ export interface DealTableRow {
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
+    MatPaginatorModule,
     MatTabsModule,
     PageHeaderComponent,
     SearchInputComponent,
@@ -117,16 +118,32 @@ export interface DealTableRow {
       </div>
     }
 
-    @if (!service.loading() && !service.error() && visibleDeals().length === 0) {
+    @if (!service.loading() && !service.error() && !listErrorDismissed() && visibleDeals().length === 0) {
       <app-empty-state
         icon="handshake"
-        [title]="hasActiveFilters() ? 'No matching opportunities' : 'No opportunities yet'"
-        [message]="hasActiveFilters()
-          ? 'Try another stage, organization, owner, or search.'
-          : 'Create your first opportunity or convert a lead.'"
+        [title]="ownerPageMiss()
+          ? 'No matching opportunities on this page'
+          : hasActiveFilters() ? 'No matching opportunities' : 'No opportunities yet'"
+        [message]="ownerPageMiss()
+          ? 'Check another page or adjust your filters.'
+          : hasActiveFilters()
+            ? 'Try another stage, organization, owner, or search.'
+            : 'Create your first opportunity or convert a lead.'"
         [actionLabel]="hasActiveFilters() ? '' : 'Create opportunity'"
         (action)="onCreate()"
       />
+      @if (ownerPageMiss()) {
+        @let page = service.pagination();
+        <mat-paginator
+          aria-label="Opportunity pages"
+          [length]="page.totalElements"
+          [pageIndex]="page.page"
+          [pageSize]="page.size"
+          [pageSizeOptions]="pageSizes"
+          (page)="onPageChange($event)"
+          showFirstLastButtons
+        />
+      }
     } @else if (!service.error() && (service.loading() || visibleDeals().length > 0)) {
       <app-data-table
         [columns]="columns"
@@ -136,7 +153,7 @@ export interface DealTableRow {
         [rowActions]="rowActions"
         [rowActionsAriaLabel]="rowActionsLabel"
         [rowActionsDisabled]="actionLoading()"
-        [pageSizeOptions]="[10, 20, 50]"
+        [pageSizeOptions]="pageSizes"
         (pageChange)="onPageChange($event)"
         (sortChange)="onSort($event)"
         (rowClick)="onRowClick($event)"
@@ -223,6 +240,14 @@ export class DealListComponent implements OnInit {
     maximumFractionDigits: 0,
   });
   private readonly dates = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+  protected readonly listErrorDismissed = signal(false);
+  protected readonly pageSizes = [10, 20, 50];
+  protected readonly ownerPageMiss = computed(() =>
+    this.ownerFilter().trim().length > 0 &&
+    this.searchQuery().trim().length === 0 &&
+    this.service.deals().length > 0 &&
+    this.service.pagination().totalPages > 1,
+  );
 
   readonly visibleDeals = computed(() => {
     let rows = this.service.deals();
@@ -293,6 +318,7 @@ export class DealListComponent implements OnInit {
   }
 
   clearError(): void {
+    this.listErrorDismissed.set(true);
     this.service.error.set(null);
   }
 
@@ -432,6 +458,7 @@ export class DealListComponent implements OnInit {
   }
 
   private reload(page: number, size = this.service.pagination().size || 20): void {
+    this.listErrorDismissed.set(false);
     const query = this.searchQuery().trim();
     if (query) {
       this.service.search(query);

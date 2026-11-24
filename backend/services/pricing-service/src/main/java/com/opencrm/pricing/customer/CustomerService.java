@@ -80,6 +80,8 @@ public class CustomerService {
         customerMapper.updateEntity(request, customer);
 
         Customer updated = customerRepository.save(customer);
+        // JPA sets the audit fields and optimistic-lock version when the update is flushed.
+        customerRepository.flush();
         log.info("Updated customer ID: {}", updated.getId());
 
         return customerMapper.toDto(updated);

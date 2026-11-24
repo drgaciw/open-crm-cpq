@@ -1,7 +1,7 @@
 -- DRG-902 (902-A) durable ordered asset lifecycle schedule.
 -- Nothing in production enqueues rows yet. The due runner stays inert while
 -- AssetLifecycleReadiness.isReady() is false.
--- Rollback: db/rollback/V1_23__drop_asset_lifecycle_changes.sql
+-- Rollback: db/rollback/V1_25__drop_asset_lifecycle_changes.sql
 
 CREATE SEQUENCE asset_lifecycle_change_seq AS BIGINT;
 

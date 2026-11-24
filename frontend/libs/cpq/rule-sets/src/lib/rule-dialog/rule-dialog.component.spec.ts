@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { RuleDialogComponent } from './rule-dialog.component';
 import { RuleService } from '@frontend/cpq-pricing-data-access';
 import { MOCK_RULES } from '../rule-sets.mock';
@@ -16,7 +16,10 @@ describe('RuleDialogComponent', () => {
   let validateSpy: ReturnType<typeof vi.fn>;
   let dialogClose: ReturnType<typeof vi.fn>;
 
-  async function setup(data: { ruleSetId: number; rule?: (typeof MOCK_RULES)[0] }) {
+  async function setup(data: {
+    ruleSetId: number;
+    rule?: (typeof MOCK_RULES)[0];
+  }) {
     createSpy = vi.fn().mockReturnValue(of(MOCK_RULES[0]));
     updateSpy = vi.fn().mockReturnValue(of(MOCK_RULES[0]));
     validateSpy = vi.fn().mockReturnValue(of(null));
@@ -57,6 +60,104 @@ describe('RuleDialogComponent', () => {
     expect(createSpy).not.toHaveBeenCalled();
     expect(component.form.invalid).toBe(true);
   });
+
+  it.each(['name', 'content'] as const)(
+    'blocks a whitespace-only %s on create',
+    async (field) => {
+      await setup({ ruleSetId: 1 });
+      component.form.patchValue({
+        name: 'Floor',
+        content: 'rule "x" when then end',
+        [field]: ' \t\n ',
+      });
+      fixture.detectChanges();
+
+      component.onSubmit();
+
+      const submit = fixture.debugElement.query(
+        By.css('button[mat-raised-button]'),
+      ).nativeElement as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(validateSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['name', 'content'] as const)(
+    'blocks a whitespace-only %s on edit',
+    async (field) => {
+      await setup({ ruleSetId: 1, rule: MOCK_RULES[0] });
+      component.form.patchValue({
+        name: 'Floor',
+        content: 'rule "x" when then end',
+        [field]: ' \t\n ',
+      });
+      fixture.detectChanges();
+
+      component.onSubmit();
+
+      const submit = fixture.debugElement.query(
+        By.css('button[mat-raised-button]'),
+      ).nativeElement as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      expect(updateSpy).not.toHaveBeenCalled();
+      expect(validateSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['Create', 'Save'] as const)(
+    'keeps %s and progress named through persistence and validation',
+    async (action) => {
+      const editing = action === 'Save';
+      await setup({ ruleSetId: 1, rule: editing ? MOCK_RULES[0] : undefined });
+      component.form.patchValue({
+        name: 'Floor',
+        content: 'rule "x" when then end',
+      });
+      const save = new Subject<(typeof MOCK_RULES)[number]>();
+      const validation = new Subject<null>();
+      if (editing) {
+        updateSpy.mockReturnValue(save);
+        validateSpy.mockReturnValueOnce(of(null));
+      } else {
+        createSpy.mockReturnValue(save);
+      }
+      validateSpy.mockReturnValue(validation);
+
+      const expectNamedPendingAction = () => {
+        fixture.detectChanges();
+        const actions = (fixture.nativeElement as HTMLElement).querySelector(
+          'mat-dialog-actions',
+        );
+        const submit = actions?.querySelector<HTMLButtonElement>(
+          'button[mat-raised-button]',
+        );
+        const cancel = actions?.querySelector<HTMLButtonElement>(
+          'button[mat-dialog-close]',
+        );
+        expect(submit?.getAttribute('aria-label')).toBe(action);
+        expect(submit?.disabled).toBe(true);
+        expect(cancel?.disabled).toBe(true);
+        expect(
+          actions
+            ?.querySelector('[role="progressbar"]')
+            ?.getAttribute('aria-label'),
+        ).toBe('Saving rule');
+        expect(dialogClose).not.toHaveBeenCalled();
+      };
+
+      component.onSubmit();
+      expectNamedPendingAction();
+
+      save.next(MOCK_RULES[0]);
+      save.complete();
+      expectNamedPendingAction();
+
+      validation.next(null);
+      validation.complete();
+      expect(dialogClose).toHaveBeenCalledWith(MOCK_RULES[0]);
+    },
+  );
 
   it('creates rule then calls validateSyntax after save', async () => {
     await setup({ ruleSetId: 1 });

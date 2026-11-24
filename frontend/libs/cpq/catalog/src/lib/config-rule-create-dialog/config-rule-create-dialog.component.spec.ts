@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   ConfigRuleCreateDialogComponent,
   ConfigRuleCreateDialogData,
@@ -103,6 +103,42 @@ describe('ConfigRuleCreateDialogComponent', () => {
       errorMessage: 'Choose a supported add-on',
       status: 'DRAFT',
     }));
+  });
+
+  it('blocks external dismissal and names the controls while create is pending', () => {
+    const ref = TestBed.inject(MatDialogRef);
+    ref.disableClose = false;
+    const pending = new Subject<ConfigurationRuleDto>();
+    createSpy.mockReturnValue(pending);
+    component.form.patchValue({ name: 'Draft rule', ruleType: 'EXCLUDES' });
+
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(ref.disableClose).toBe(true);
+    expect(component.saving()).toBe(true);
+    expect(dialogClose).not.toHaveBeenCalled();
+    const actions = (fixture.nativeElement as HTMLElement).querySelector('mat-dialog-actions');
+    const submit = actions?.querySelector<HTMLButtonElement>('button:last-of-type');
+    expect(submit?.disabled).toBe(true);
+    expect(submit?.getAttribute('aria-label')).toBe('Create');
+    expect(actions?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving configuration rule');
+  });
+
+  it.each([false, true])('restores the original close policy (%s) after a failed create', (disableClose) => {
+    const ref = TestBed.inject(MatDialogRef);
+    ref.disableClose = disableClose;
+    const pending = new Subject<ConfigurationRuleDto>();
+    createSpy.mockReturnValue(pending);
+    component.form.patchValue({ name: 'Draft rule', ruleType: 'EXCLUDES' });
+
+    component.onSubmit();
+    pending.error({ error: { message: 'Duplicate rule', errorCode: 'CONFIG_RULE_DUPLICATE' } });
+
+    expect(ref.disableClose).toBe(disableClose);
+    expect(component.saving()).toBe(false);
+    expect(component.error()).toBe('Duplicate rule [CONFIG_RULE_DUPLICATE]');
+    expect(dialogClose).not.toHaveBeenCalled();
   });
 
   it('does not submit when form is invalid', () => {
