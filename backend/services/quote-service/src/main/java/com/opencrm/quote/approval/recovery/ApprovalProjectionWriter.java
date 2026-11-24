@@ -31,8 +31,13 @@ public class ApprovalProjectionWriter {
                 || quote.getVersion() != quote.getApprovalSubmissionVersion() + 1
                 || !Objects.equals(quote.getApprovalTier(), canonical.getApprovalTier())
                 || quote.isRampScheduleStale() || RampPricingSnapshot.fingerprint(quote) != null) return Outcome.STALE_BINDING;
-        quote.setStatus(QuoteStatus.valueOf(canonical.getStatus()));
-        quote.setApprovalState(ApprovalState.valueOf(canonical.getStatus()));
+        if ("REJECTED".equals(canonical.getStatus())) {
+            quote.setStatus(QuoteStatus.DRAFT);
+            quote.setApprovalState(ApprovalState.REJECTED);
+        } else {
+            quote.setStatus(QuoteStatus.APPROVED);
+            quote.setApprovalState(ApprovalState.APPROVED);
+        }
         // JPA @Version fences a concurrent mutation after the checks above, including another worker.
         quotes.saveAndFlush(quote);
         return Outcome.APPLIED;

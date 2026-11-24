@@ -121,6 +121,9 @@ class EventContractRegistryTest {
         expected.put("cpq.contract.signature.completed",
                 "SignatureCompleted v1, contract-asset-management, PUBLISHED");
         expected.put("cpq.quote.created", "QuoteCreated v1, quote-service, PUBLISHED");
+        expected.put("cpq.approval.granted", "ApprovalGranted v1, approval-routing, PUBLISHED");
+        expected.put("cpq.approval.rejected", "ApprovalRejected v1, approval-routing, PUBLISHED");
+        expected.put("cpq.approval.escalated", "ApprovalEscalated v1, approval-routing, PUBLISHED");
         Map<String, String> actual = new LinkedHashMap<>();
         for (EventContract contract : EventContractRegistry.all()) {
             actual.put(contract.topic(), contract.eventType() + " v" + contract.eventVersion() + ", "

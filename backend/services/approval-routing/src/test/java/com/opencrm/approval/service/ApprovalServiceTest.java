@@ -1,6 +1,9 @@
 package com.opencrm.approval.service;
 
 import com.opencrm.common.event.EventContractRegistry;
+import com.opencrm.common.event.dto.ApprovalEscalatedEvent;
+import com.opencrm.common.event.dto.ApprovalGrantedEvent;
+import com.opencrm.common.event.dto.ApprovalRejected;
 import com.opencrm.approval.domain.ApprovalRequest;
 import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
@@ -31,7 +34,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,6 +80,7 @@ class ApprovalServiceTest {
     void setUp() {
         pendingRequest = pending("MANAGER", TestTokens.oidOf("rep-1"));
 
+        approvalService.setClock(java.time.Clock.systemUTC());
         lenient().when(approvalRequestMapper.toDto(any(ApprovalRequest.class)))
                 .thenAnswer(inv -> toDto(inv.getArgument(0)));
         lenient().when(approvalRequestMapper.toDtoList(anyList()))
@@ -432,6 +439,166 @@ class ApprovalServiceTest {
         assertTrue(approvalService.getByQuoteId("unknown").isEmpty());
     }
 
+    @Nested
+    @DisplayName("DRG-444 approve, reject, and escalate")
+    class Decisions {
+
+        private final Instant now = Instant.parse("2026-11-24T12:00:00Z");
+
+        @BeforeEach
+        void pinClock() {
+            approvalService.setClock(Clock.fixed(now, ZoneOffset.UTC));
+            approvalService.setSlaWindow(Duration.ofHours(24));
+        }
+
+        @Test
+        @DisplayName("approve stores the comment and emits ApprovalGranted")
+        void approveStoresCommentAndEmitsGranted() {
+            // Also covers the DRG-444 test-first specs (#1076) approveRecordsCommentsAndApprover and
+            // approveEmitsApprovalGranted: the comment and the deciding approver are recorded and emitted.
+            String approver = signIn("manager-1", "DealDesk");
+            stubFind(pendingRequest);
+            when(approvalRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            ApprovalRequestDto result = approvalService.approve(1L, "ship it");
+
+            assertEquals(ApprovalStatus.APPROVED, result.getStatus());
+            assertEquals("ship it", result.getDecisionComment());
+            assertEquals(approver, result.getApproverId());
+            ArgumentCaptor<ApprovalGrantedEvent> event = ArgumentCaptor.forClass(ApprovalGrantedEvent.class);
+            verify(outboxEventPublisher).publish(
+                    eq("ApprovalRequest"), eq("Q-001"), eq(EventContractRegistry.APPROVAL_GRANTED_V1), event.capture());
+            assertEquals(pendingRequest.getId(), event.getValue().approvalId());
+            assertEquals(approver, event.getValue().approverId());
+            assertEquals("ship it", event.getValue().comment());
+            assertEquals("Q-001", event.getValue().quoteId());
+            assertEquals("MANAGER", event.getValue().approvalTier());
+        }
+
+        @Test
+        @DisplayName("reject stores the comment and emits ApprovalRejected plus the legacy contract")
+        void rejectStoresCommentAndEmitsRejected() {
+            // Also covers the DRG-444 test-first specs (#1076) rejectRecordsCommentsAndApprover and
+            // rejectEmitsApprovalRejected. Unlike the spec's single event, reject also keeps the legacy contract.
+            String approver = signIn("manager-1", "DealDesk");
+            stubFind(pendingRequest);
+            when(approvalRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            ApprovalRequestDto result = approvalService.reject(1L, "revise the discount");
+
+            assertEquals(ApprovalStatus.REJECTED, result.getStatus());
+            assertEquals("revise the discount", result.getDecisionComment());
+            assertEquals("revise the discount", result.getRejectionReason());
+            assertEquals(approver, result.getApproverId());
+            ArgumentCaptor<ApprovalRejected> event = ArgumentCaptor.forClass(ApprovalRejected.class);
+            verify(outboxEventPublisher).publish(
+                    eq("ApprovalRequest"), eq("Q-001"), eq(EventContractRegistry.APPROVAL_REJECTED_V1), event.capture());
+            assertEquals(pendingRequest.getId(), event.getValue().approvalId());
+            assertEquals("Q-001", event.getValue().quoteId());
+            assertEquals(approver, event.getValue().approverId());
+            assertEquals("revise the discount", event.getValue().comment());
+            verify(outboxEventPublisher).publish(
+                    eq("ApprovalRequest"), eq("Q-001"), eq(EventContractRegistry.QUOTE_APPROVAL_REJECTED_V1), any());
+        }
+
+        @Test
+        @DisplayName("a role that cannot decide the tier is refused")
+        void wrongRoleCannotApproveRejectOrEscalate() {
+            signIn("someone", "CPQ.User");
+            pendingRequest.setSlaDeadline(now.minusSeconds(60));
+            stubFind(pendingRequest);
+
+            assertRefused(HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED", () -> approvalService.approve(1L, "no"));
+            assertRefused(HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED", () -> approvalService.reject(1L, "no"));
+            assertRefused(HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED", () -> approvalService.escalate(1L));
+            verify(approvalRequestRepository, never()).save(any());
+            verifyNoInteractions(outboxEventPublisher);
+        }
+
+        @Test
+        @DisplayName("escalation before the SLA window is refused")
+        void escalateBeforeWindowIsRefused() {
+            signIn("manager-1", "DealDesk");
+            pendingRequest.setSlaDeadline(now.plusSeconds(60));
+            stubFind(pendingRequest);
+
+            assertRefused(HttpStatus.CONFLICT, "SLA_WINDOW_OPEN", () -> approvalService.escalate(1L));
+            verify(approvalRequestRepository, never()).save(any());
+            verifyNoInteractions(outboxEventPublisher);
+        }
+
+        @Test
+        @DisplayName("after the SLA window the request follows the escalation path and emits ApprovalEscalated")
+        void escalateAfterWindowFollowsPath() {
+            signIn("manager-1", "DealDesk");
+            pendingRequest.setApprovalTier("DEAL_DESK");
+            pendingRequest.setEscalationPath("DEAL_DESK,SALES_VP,CFO");
+            pendingRequest.setSlaDeadline(now.minusSeconds(1));
+            stubFind(pendingRequest);
+            when(approvalRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            ApprovalRequestDto result = approvalService.escalate(1L);
+
+            assertEquals(ApprovalStatus.PENDING, result.getStatus());
+            assertEquals("SALES_VP", result.getApprovalTier());
+            assertEquals("DEAL_DESK", result.getEscalatedFromTier());
+            assertEquals(now, result.getEscalatedAt());
+            assertEquals(now.plus(Duration.ofHours(24)), result.getSlaDeadline());
+            ArgumentCaptor<ApprovalEscalatedEvent> event = ArgumentCaptor.forClass(ApprovalEscalatedEvent.class);
+            verify(outboxEventPublisher).publish(
+                    eq("ApprovalRequest"), eq("Q-001"), eq(EventContractRegistry.APPROVAL_ESCALATED_V1), event.capture());
+            // Also covers #1076's escalateFollowsEscalationPathAfterSlaWindow and escalateEmitsApprovalEscalated.
+            assertEquals(pendingRequest.getId(), event.getValue().approvalId());
+            assertEquals("Q-001", event.getValue().quoteId());
+            assertEquals("DEAL_DESK", event.getValue().fromTier());
+            assertEquals("SALES_VP", event.getValue().toTier());
+        }
+
+        @Test
+        @DisplayName("a tier with no further step is not escalated")
+        void escalateAtEndOfPathIsRefused() {
+            signIn("cfo-1", "CFO");
+            pendingRequest.setApprovalTier("CFO");
+            pendingRequest.setEscalationPath("DEAL_DESK,SALES_VP,CFO");
+            pendingRequest.setSlaDeadline(now.minusSeconds(1));
+            stubFind(pendingRequest);
+
+            assertRefused(HttpStatus.CONFLICT, "NO_ESCALATION_PATH", () -> approvalService.escalate(1L));
+            verifyNoInteractions(outboxEventPublisher);
+        }
+
+        @Test
+        @DisplayName("DealDesk cannot escalate a CFO request")
+        void lowerRoleCannotEscalateHigherTier() {
+            signIn("manager-1", "DealDesk");
+            pendingRequest.setApprovalTier("CFO");
+            pendingRequest.setSlaDeadline(now.minusSeconds(1));
+            stubFind(pendingRequest);
+
+            assertRefused(HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED", () -> approvalService.escalate(1L));
+        }
+
+        @Test
+        @DisplayName("submit stamps an SLA deadline and the escalation path")
+        void submitStampsDeadlineAndPath() {
+            signIn("rep-1", "CPQ.User");
+            when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            approvalService.submit(ApprovalSubmitRequest.builder()
+                    .quoteId("1001")
+                    .tier(QuoteApprovalTier.DEAL_DESK)
+                    .escalationPath("DEAL_DESK,CFO")
+                    .build());
+
+            ArgumentCaptor<ApprovalRequest> saved = ArgumentCaptor.forClass(ApprovalRequest.class);
+            verify(approvalRequestRepository).save(saved.capture());
+            assertEquals(TENANT, saved.getValue().getTenantId());
+            assertEquals("DEAL_DESK,CFO", saved.getValue().getEscalationPath());
+            assertEquals(now.plus(Duration.ofHours(24)), saved.getValue().getSlaDeadline());
+            verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());
+        }
+    }
+
     private String savedTenant() {
         ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
         verify(approvalRequestRepository, atLeastOnce()).save(captor.capture());
@@ -462,6 +629,7 @@ class ApprovalServiceTest {
             for (long id : new long[] {1L, 99L}) {
                 assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.approve(id));
                 assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.reject(id, "no"));
+                assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.escalate(id));
             }
 
             signIn("rep-1", "DealDesk");
@@ -560,6 +728,11 @@ class ApprovalServiceTest {
                 .approvalTier(a.getApprovalTier())
                 .reason(a.getReason())
                 .rejectionReason(a.getRejectionReason())
+                .decisionComment(a.getDecisionComment())
+                .slaDeadline(a.getSlaDeadline())
+                .escalationPath(a.getEscalationPath())
+                .escalatedFromTier(a.getEscalatedFromTier())
+                .escalatedAt(a.getEscalatedAt())
                 .submittedAt(a.getSubmittedAt())
                 .approvedAt(a.getApprovedAt())
                 .rejectedAt(a.getRejectedAt())

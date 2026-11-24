@@ -31,6 +31,12 @@ public class RoutingApprovalDto {
     private Integer governingPeriod;
     private java.math.BigDecimal requestedDiscount;
     private String rejectionReason;
+    /** Approver comment on grant or rejection (DRG-444). */
+    private String decisionComment;
+    private String escalationPath;
+    private String escalatedFromTier;
+    private Instant escalatedAt;
+    private Instant slaDeadline;
     private Instant submittedAt;
     private Instant approvedAt;
     private Instant rejectedAt;

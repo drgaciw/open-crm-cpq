@@ -1,6 +1,9 @@
 package com.opencrm.common.event;
 
 import com.opencrm.common.event.dto.AccountsMergedEvent;
+import com.opencrm.common.event.dto.ApprovalEscalatedEvent;
+import com.opencrm.common.event.dto.ApprovalGrantedEvent;
+import com.opencrm.common.event.dto.ApprovalRejected;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.event.dto.ApprovalRequestedEvent;
 import com.opencrm.common.event.dto.AmendmentAuditEvent;
@@ -284,6 +287,22 @@ public final class EventContractRegistry {
     public static final EventContract QUOTE_CREATED_V1 = published(
             "QuoteCreated", "quote-service", KafkaTopics.QUOTE_CREATED, QuoteCreatedEvent.class);
 
+    /** DRG-444 / BC-04-04. Approve, with the approver's comment. */
+    public static final EventContract APPROVAL_GRANTED_V1 = published(
+            "ApprovalGranted", "approval-routing", KafkaTopics.APPROVAL_GRANTED, ApprovalGrantedEvent.class);
+
+    /**
+     * DRG-444 / BC-04-04. Reject, with the approver's comment. The older
+     * {@link #QUOTE_APPROVAL_REJECTED_V1} contract stays published as well.
+     */
+    public static final EventContract APPROVAL_REJECTED_V1 = published(
+            "ApprovalRejected", "approval-routing", KafkaTopics.APPROVAL_REJECTED, ApprovalRejected.class);
+
+    /** DRG-444 / BC-04-04. SLA breach advanced the request along its escalation path. */
+    public static final EventContract APPROVAL_ESCALATED_V1 = published(
+            "ApprovalEscalated", "approval-routing", KafkaTopics.APPROVAL_ESCALATED,
+            ApprovalEscalatedEvent.class);
+
     private static final List<EventContract> ALL = List.of(
             QUOTE_ACCEPTED_V1,
             AMENDMENT_AUDIT_RECORDED_V1,
@@ -327,7 +346,10 @@ public final class EventContractRegistry {
             CONFIGURATION_FROZEN_V1,
             PRICE_BOOK_PUBLISHED_V1,
             SIGNATURE_COMPLETED_V1,
-            QUOTE_CREATED_V1);
+            QUOTE_CREATED_V1,
+            APPROVAL_GRANTED_V1,
+            APPROVAL_REJECTED_V1,
+            APPROVAL_ESCALATED_V1);
 
     /** Every registered contract, published and reserved. */
     public static List<EventContract> all() {

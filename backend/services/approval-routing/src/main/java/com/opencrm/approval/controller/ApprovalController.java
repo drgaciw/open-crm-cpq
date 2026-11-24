@@ -64,8 +64,10 @@ public class ApprovalController {
 
     @PostMapping("/{id}/approve")
     @Operation(summary = "Approve a pending request as the authenticated user (role must satisfy the tier)")
-    public ApiResponse<ApprovalRequestDto> approve(@PathVariable Long id) {
-        ApprovalRequestDto request = approvalService.approve(id);
+    public ApiResponse<ApprovalRequestDto> approve(
+            @PathVariable Long id,
+            @RequestParam(required = false) String comment) {
+        ApprovalRequestDto request = approvalService.approve(id, comment);
         return ApiResponse.success(request, "Approval request approved");
     }
 
@@ -76,5 +78,12 @@ public class ApprovalController {
             @RequestParam String reason) {
         ApprovalRequestDto request = approvalService.reject(id, reason);
         return ApiResponse.success(request, "Approval request rejected");
+    }
+
+    @PostMapping("/{id}/escalate")
+    @Operation(summary = "Escalate a pending request after its SLA window, along its escalation path")
+    public ApiResponse<ApprovalRequestDto> escalate(@PathVariable Long id) {
+        ApprovalRequestDto request = approvalService.escalate(id);
+        return ApiResponse.success(request, "Approval request escalated");
     }
 }

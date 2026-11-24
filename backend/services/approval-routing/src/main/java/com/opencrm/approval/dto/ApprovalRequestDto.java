@@ -54,6 +54,11 @@ public class ApprovalRequestDto {
     /** Set when the status is SUPERSEDED: the request that replaced this one, and when. */
     private Long supersededBy;
     private Instant supersededAt;
+    private String decisionComment;
+    private Instant slaDeadline;
+    private String escalationPath;
+    private String escalatedFromTier;
+    private Instant escalatedAt;
     private Instant createdAt;
     private Instant updatedAt;
     private String createdBy;

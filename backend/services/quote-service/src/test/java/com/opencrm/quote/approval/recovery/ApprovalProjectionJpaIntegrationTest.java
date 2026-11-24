@@ -144,4 +144,24 @@ class ApprovalProjectionJpaIntegrationTest {
         assertThat(stored().getStatus()).isEqualTo(QuoteStatus.APPROVED);
         assertThat(stored().getVersion()).isEqualTo(candidate.getVersion() + 1);
     }
+
+    @Test
+    void rejectedDecisionReturnsTheQuoteToDraft() {
+        when(routing.getById(9001L)).thenReturn(canonical("PENDING"));
+        when(routing.reject(9001L, "too steep")).thenReturn(canonical("REJECTED"));
+        tx.execute(s -> {
+            Quote q = quotes.findById(initial.getId()).orElseThrow();
+            q.setStatus(QuoteStatus.PENDING_APPROVAL);
+            q.setApprovalState(ApprovalState.PENDING);
+            return quotes.saveAndFlush(q);
+        });
+        tx.execute(s -> submitter.rejectRequest(9001L,
+                ApprovalResponseRequest.builder().comments("too steep").build()));
+        Quote drafted = stored();
+        assertThat(drafted.getStatus()).isEqualTo(QuoteStatus.DRAFT);
+        assertThat(drafted.getApprovalState()).isEqualTo(ApprovalState.REJECTED);
+        assertThat(tx.<ApprovalProjectionWriter.Outcome>execute(s -> writer.reconcile(
+                drafted.getId(), drafted.getVersion(), 9001L, canonical("REJECTED"))))
+                .isEqualTo(ApprovalProjectionWriter.Outcome.ALREADY_FINAL);
+    }
 }

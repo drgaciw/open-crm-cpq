@@ -117,6 +117,27 @@ public class ApprovalRequest extends BaseEntity {
     @Column(name = "rejected_at")
     private Instant rejectedAt;
 
+    /** Approver comment on grant or rejection (DRG-444). Rejection also keeps {@link #rejectionReason}. */
+    @Column(name = "decision_comment", columnDefinition = "TEXT")
+    private String decisionComment;
+
+    /** Instant after which {@link com.opencrm.approval.service.EscalationPath} may advance this request. */
+    @Column(name = "sla_deadline")
+    private Instant slaDeadline;
+
+    /**
+     * Comma-separated tiers from the approval matrix (DRG-443). Null uses the default chain for the
+     * current tier.
+     */
+    @Column(name = "escalation_path", columnDefinition = "TEXT")
+    private String escalationPath;
+
+    @Column(name = "escalated_from_tier", length = 50)
+    private String escalatedFromTier;
+
+    @Column(name = "escalated_at")
+    private Instant escalatedAt;
+
     /** The request that replaced this one, when {@link ApprovalStatus#SUPERSEDED}. */
     @Column(name = "superseded_by")
     private Long supersededBy;

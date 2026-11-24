@@ -110,5 +110,17 @@ public final class KafkaTopics {
 
     /** DRG-457 / BC-06-04. Every required signer completed an e-signature envelope. */
     public static final String SIGNATURE_COMPLETED = "cpq.contract.signature.completed";
+
+    /** DRG-444 / BC-04-04. An approver granted the request. */
+    public static final String APPROVAL_GRANTED = "cpq.approval.granted";
+
+    /**
+     * DRG-444 / BC-04-04. An approver rejected the request. Distinct from
+     * {@link #QUOTE_APPROVAL_REJECTED}, which stays the older published contract.
+     */
+    public static final String APPROVAL_REJECTED = "cpq.approval.rejected";
+
+    /** DRG-444 / BC-04-04. The SLA window elapsed and the request followed its escalation path. */
+    public static final String APPROVAL_ESCALATED = "cpq.approval.escalated";
 }
 
