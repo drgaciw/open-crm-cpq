@@ -23,6 +23,7 @@ import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.event.dto.ApprovalRequestedEvent;
 import com.opencrm.common.exception.BusinessException;
+import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.security.CurrentActor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -327,6 +328,56 @@ class ApprovalMatrixServiceTest {
         assertThatThrownBy(() -> service.listPendingApprovals(null, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo("REQUESTER_MUST_BE_A_USER");
+    }
+
+    // H4 (owner decision 2026-11-24): a matrix id that belongs to another tenant answers exactly like a missing id,
+    // so the response is not an oracle for which matrix ids exist in other tenants. A tenant parameter that does
+    // not match the token (submit quoteTenantId, inbox ?tenantId) stays 403 CROSS_TENANT: it reveals nothing.
+
+    @Test
+    @DisplayName("reading another tenant's matrix id answers exactly like a missing id")
+    void getByIdOfAnotherTenantIsIndistinguishableFromMissing() {
+        MatrixSessions.user("desk", MatrixSessions.TENANT_A, "DealDesk");
+        assertNoMatrixOracle(() -> service.getById(9L));
+    }
+
+    @Test
+    @DisplayName("revising another tenant's matrix answers exactly like a missing predecessor")
+    void supersedingAnotherTenantsMatrixIsIndistinguishableFromMissing() {
+        MatrixSessions.user("desk", MatrixSessions.TENANT_A, "DealDesk");
+        assertNoMatrixOracle(() -> service.define(DefineApprovalMatrixRequest.builder()
+                .name("Discount route")
+                .supersedesMatrixId(9L)
+                .rules(List.of(rule(ThresholdType.DISCOUNT_PERCENT, 1, MatrixStepMode.SERIAL, QuoteApprovalTier.CFO)))
+                .build()));
+        verify(matrices, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a seller submitting with another tenant's matrix id gets the same answer as a missing id")
+    void submittingWithAnotherTenantsMatrixIsIndistinguishableFromMissing() {
+        MatrixSessions.user("seller", MatrixSessions.TENANT_A, "CPQ.User");
+        SubmitForApprovalRequest request = submission(PolicyVerdict.REQUIRES_APPROVAL);
+        request.setMatrixId(9L);
+        assertNoMatrixOracle(() -> service.submitForApproval(request));
+        verify(requests, never()).save(any());
+    }
+
+    /** Runs the call with matrix 9 missing, then with matrix 9 owned by tenant B; both must fail identically (404). */
+    private void assertNoMatrixOracle(Runnable call) {
+        when(matrices.findByIdAndDeletedFalse(9L)).thenReturn(Optional.empty());
+        Throwable missing = org.assertj.core.api.Assertions.catchThrowable(call::run);
+
+        ApprovalMatrix otherTenants = matrix(9L, 1);
+        otherTenants.setTenantId(MatrixSessions.TENANT_B);
+        when(matrices.findByIdAndDeletedFalse(9L)).thenReturn(Optional.of(otherTenants));
+        Throwable foreign = org.assertj.core.api.Assertions.catchThrowable(call::run);
+
+        assertThat(missing).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(((BusinessException) missing).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(foreign).isExactlyInstanceOf(missing.getClass()).hasMessage(missing.getMessage());
+        assertThat(((BusinessException) foreign).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(((BusinessException) foreign).getErrorCode()).isEqualTo(((BusinessException) missing).getErrorCode());
     }
 
     private static SubmitForApprovalRequest submission(PolicyVerdict verdict) {
