@@ -5,6 +5,7 @@ import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
+import com.opencrm.quote.quote.QuoteTenantResolver;
 import com.opencrm.quote.ramp.RampPricingSnapshot;
 import com.opencrm.quote.ramp.RampScheduleAttacher;
 import com.opencrm.quote.ramp.RampScheduleViews;
@@ -120,7 +121,8 @@ public class QuoteLineItemService {
             throw new BusinessException("Line item selection contains duplicate IDs", "INVALID_LINE_ITEM_SELECTION");
         }
 
-        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
+        // Tenant comes from the caller token (QuoteTenantResolver), never from the body or the path.
+        Quote quote = quoteRepository.findByIdAndTenantIdAndDeletedFalse(quoteId, QuoteTenantResolver.currentTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
         // All line writers synchronize on the quote. Take the same lock before selecting or changing lines.
         entityManager.lock(quote, LockModeType.PESSIMISTIC_WRITE);
