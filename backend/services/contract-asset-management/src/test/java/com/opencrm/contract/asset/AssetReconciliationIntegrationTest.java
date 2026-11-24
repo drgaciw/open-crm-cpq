@@ -225,15 +225,20 @@ class AssetReconciliationIntegrationTest {
                 """, UUID.randomUUID(), tenantId, contractId, lineNo, acceptedLineUuid);
     }
 
+    /**
+     * The installed-base projection is tenant-scoped through {@code subscriptions.tenant_id} (DRG-906, #1077): it
+     * shows only assets of the signed-in caller's tenant. Seed subscriptions under that tenant so the projection
+     * sees the fixture data.
+     */
     private long insertSubscription(String number) {
         Long id = jdbc.queryForObject("""
                 INSERT INTO subscriptions(
                     uuid, subscription_number, customer_id, quote_id, plan_name,
-                    start_date, end_date, status, currency_code, commercial_revision)
+                    start_date, end_date, status, currency_code, commercial_revision, tenant_id)
                 VALUES (?, ?, 'customer', 'quote', 'Plan', DATE '2026-01-01', DATE '2026-12-31',
-                        'ACTIVE', 'USD', 0)
+                        'ACTIVE', 'USD', 0, ?)
                 RETURNING id
-                """, Long.class, UUID.randomUUID().toString(), number);
+                """, Long.class, UUID.randomUUID().toString(), number, UUID.fromString(AssetReadTestCaller.TENANT));
         if (id == null) {
             throw new IllegalStateException("subscription id");
         }
