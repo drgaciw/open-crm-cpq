@@ -247,6 +247,38 @@ class AssetLifecycleScheduleIntegrationTest {
         assertThat(changes.existsEarlierBlocking(subscriptionId, "line-2", today, 3L)).isFalse();
     }
 
+    /**
+     * Code-owner review on #1078: one failed line must not starve the schedule. A FAILED row followed by a full
+     * batch of due successors on the same line used to fill {@code lockDue}'s LIMIT; the runner skipped all of them
+     * every tick and never reached a due row on another line.
+     */
+    @Test
+    void blockedSuccessorsOfAFailedRowDoNotStarveDueRowsOnOtherLines() {
+        long subscriptionId = insertSubscription();
+        long otherSubscriptionId = insertSubscription();
+        LocalDate today = LocalDate.parse("2000-02-01");
+        int batchSize = 50;
+        insertChange(subscriptionId, "starve-failed-" + UUID.randomUUID(), "AMEND", "FAILED", "DOCUMENT_APPLY",
+                today.minusDays(10), 900_000L, "line-a");
+        for (int i = 0; i < batchSize; i++) {
+            insertChange(subscriptionId, "starve-blocked-" + i + "-" + UUID.randomUUID(), "AMEND", "PENDING",
+                    "DOCUMENT_APPLY", today.minusDays(9), 900_001L + i, "line-a");
+        }
+        insertChange(subscriptionId, "starve-other-line-" + UUID.randomUUID(), "AMEND", "PENDING", "ACTIVATION",
+                today.minusDays(1), 900_100L, "line-b");
+        insertChange(otherSubscriptionId, "starve-other-sub-" + UUID.randomUUID(), "AMEND", "PENDING", "ACTIVATION",
+                today, 900_101L, "line-a");
+
+        TransactionTemplate transactions = new TransactionTemplate(transactionManager);
+        List<Long> sequences = transactions.execute(status -> changes.lockDue(today, batchSize).stream()
+                .map(AssetLifecycleChange::getSequenceNo)
+                .toList());
+
+        assertThat(sequences)
+                .as("successors of the failed line-a row are excluded before the LIMIT")
+                .containsExactly(900_100L, 900_101L);
+    }
+
     @Test
     void checkConstraintsRejectUnknownKindStatusAndSource() {
         long subscriptionId = insertSubscription();

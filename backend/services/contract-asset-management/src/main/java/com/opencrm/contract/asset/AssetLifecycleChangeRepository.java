@@ -24,12 +24,26 @@ public interface AssetLifecycleChangeRepository extends JpaRepository<AssetLifec
      * Due pending rows, oldest effective date first, then sequence. {@code FOR UPDATE SKIP LOCKED}
      * so two runners never claim the same row and never wait on each other. Must run inside the
      * caller's transaction so the lock is held until that transaction ends.
+     * <p>
+     * Rows behind an earlier FAILED row on the same line are excluded <em>before</em> the limit, so a
+     * failed line cannot fill every batch and starve due rows on other lines. An earlier PENDING row
+     * cannot starve the batch: it sorts ahead of its successors in this same ordering, and the runner
+     * still checks {@link #existsEarlierBlocking} per row (which also covers a predecessor that another
+     * runner holds locked).
      */
     @Query(nativeQuery = true, value = """
             SELECT c.* FROM {h-schema}asset_lifecycle_changes c
             WHERE c.status = 'PENDING'
               AND c.is_deleted = false
               AND c.effective_date <= :today
+              AND NOT EXISTS (
+                  SELECT 1 FROM {h-schema}asset_lifecycle_changes f
+                  WHERE f.subscription_id = c.subscription_id
+                    AND f.contract_line_id = c.contract_line_id
+                    AND f.is_deleted = false
+                    AND f.status = 'FAILED'
+                    AND (f.effective_date < c.effective_date
+                         OR (f.effective_date = c.effective_date AND f.sequence_no < c.sequence_no)))
             ORDER BY c.effective_date, c.sequence_no
             LIMIT :limit
             FOR UPDATE OF c SKIP LOCKED
