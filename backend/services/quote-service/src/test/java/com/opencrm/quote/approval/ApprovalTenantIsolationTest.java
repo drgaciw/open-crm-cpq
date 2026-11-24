@@ -86,7 +86,7 @@ class ApprovalTenantIsolationTest {
 
         verify(approvalRoutingClient, never()).getByQuoteId(any());
         verify(approvalRoutingClient, never()).submit(any());
-        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).approve(any(), any());
         verify(approvalRoutingClient, never()).reject(any(), any());
         verify(quoteRepository, never()).save(any());
     }
@@ -131,7 +131,7 @@ class ApprovalTenantIsolationTest {
         assertThatThrownBy(() -> approvalService.approveRequest(7L, null)).isInstanceOf(ResourceNotFoundException.class);
         assertThatThrownBy(() -> approvalService.rejectRequest(7L, null)).isInstanceOf(ResourceNotFoundException.class);
         assertThat(approvalService.getPendingApprovals()).isEmpty();
-        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).approve(any(), any());
         verify(approvalRoutingClient, never()).reject(any(), any());
         verify(approvalRoutingClient, never()).submit(any());
     }
@@ -152,7 +152,7 @@ class ApprovalTenantIsolationTest {
 
         assertThat(submitted.getId()).isEqualTo(9L);
         assertThat(own.getTenantId()).isEqualTo(TENANT_A);
-        when(approvalRoutingClient.approve(9L)).thenReturn(routing(9L, "42", "APPROVED"));
+        when(approvalRoutingClient.approve(9L, null)).thenReturn(routing(9L, "42", "APPROVED"));
         own.setStatus(QuoteStatus.PENDING_APPROVAL);
         ApprovalRequestDto approved = approvalService.approveRequest(9L, null);
         assertThat(approved.getStatus()).isEqualTo(ApprovalStatus.APPROVED);
@@ -174,7 +174,7 @@ class ApprovalTenantIsolationTest {
     @DisplayName("a legacy row in another tenant is 404, not a conflict that admits it exists")
     void legacyRowInAnotherTenantIsNotFound() {
         TestCallers.signInUserInTenant("manager", TENANT_A, null, "DealDesk");
-        when(approvalRoutingClient.approve(7L)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
+        when(approvalRoutingClient.approve(7L, null)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
         when(approvalRepository.findVisibleById(7L, TENANT_A, null)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> approvalService.approveRequest(7L, null))
@@ -186,7 +186,7 @@ class ApprovalTenantIsolationTest {
     @DisplayName("a legacy row in the caller's tenant stays read-only")
     void legacyRowInOwnTenantIsReadOnly() {
         TestCallers.signInUserInTenant("manager", TENANT_A, null, "DealDesk");
-        when(approvalRoutingClient.approve(7L)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
+        when(approvalRoutingClient.approve(7L, null)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
         when(approvalRepository.findVisibleById(7L, TENANT_A, null)).thenReturn(Optional.of(local(7L, 42L)));
 
         assertThatThrownBy(() -> approvalService.approveRequest(7L, null))
