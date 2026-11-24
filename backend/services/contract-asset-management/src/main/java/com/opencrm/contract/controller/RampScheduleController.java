@@ -15,11 +15,15 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class RampScheduleController {
     private final RampScheduleService schedules;
-    @GetMapping({"/api/v1/subscriptions/by-number/{number}/ramp-schedule",
-            "/internal/v1/subscriptions/by-number/{number}/ramp-schedule"})
+    @GetMapping("/api/v1/subscriptions/by-number/{number}/ramp-schedule")
     public ApiResponse<RampScheduleDto> byNumber(@PathVariable String number,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
         return ApiResponse.success(schedules.byNumber(number, asOf));
+    }
+    @GetMapping("/internal/v1/subscriptions/by-number/{number}/ramp-schedule")
+    public ApiResponse<RampScheduleDto> internalByNumber(@PathVariable String number,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
+        return ApiResponse.success(schedules.internalByNumber(number, asOf));
     }
     @GetMapping("/api/v1/subscriptions/{id}/ramp-schedule")
     public ApiResponse<RampScheduleDto> byId(@PathVariable Long id,

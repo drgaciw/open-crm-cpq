@@ -95,7 +95,7 @@ export const detail = validateSpec({
     { title: 'Address', labels: ['Address Line 1', 'City', 'State', 'Postal Code', 'Country'] },
     { title: 'Description', optional: true },
     { title: 'Contacts at this account', emptyText: 'No linked contacts yet.' },
-    { title: 'Deals', emptyText: 'No deals linked to this account.' },
+    { title: 'Opportunities', emptyText: 'No opportunities linked to this account.' },
     { title: 'Quotes', emptyText: 'No quotes found for this account ID.' },
   ],
 });

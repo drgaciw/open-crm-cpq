@@ -9,10 +9,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { finalize } from 'rxjs';
 import { ContactService } from '../contact.service';
 import { OrganizationService } from '@frontend/crm-organizations';
 import { OrganizationDto } from '@frontend/shared-models';
-import { displayLookup, resolveLookupId } from '@frontend/shared-utils';
+import { displayLookup, FormValidators, resolveLookupId } from '@frontend/shared-utils';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 
 @Component({
@@ -27,7 +28,7 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
   template: `
     <app-page-header [title]="isEditMode ? 'Edit Contact' : 'New Contact'">
       <nav breadcrumb aria-label="Breadcrumb">
-        <button mat-button type="button" (click)="goBack()">
+        <button mat-button type="button" [disabled]="saving()" (click)="goBack()">
           <mat-icon>arrow_back</mat-icon>
           {{ isEditMode ? 'Contact' : 'Contacts' }}
         </button>
@@ -103,9 +104,10 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
           </div>
 
           <div class="form-actions">
-            <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
-              @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
+            <button mat-button type="button" [disabled]="saving()" (click)="goBack()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()"
+                    [attr.aria-label]="saving() ? (isEditMode ? 'Update' : 'Create') : null">
+              @if (saving()) { <mat-spinner diameter="20" aria-label="Saving contact"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
           </div>
@@ -146,8 +148,8 @@ export class ContactFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.form = this.fb.group({
-      firstName: ['', Validators.required],
-      lastName: ['', Validators.required],
+      firstName: ['', FormValidators.requiredTrimmed],
+      lastName: ['', FormValidators.requiredTrimmed],
       email: ['', Validators.email],
       phone: [''],
       jobTitle: [''],
@@ -195,7 +197,7 @@ export class ContactFormComponent implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.saving()) return;
     // H-CRM-022: typed-but-not-picked text is resolved or blocked, never silently dropped.
     const org = resolveLookupId(
       this.form.value.organizationSearch,
@@ -209,7 +211,6 @@ export class ContactFormComponent implements OnInit {
       control?.markAsTouched();
       return;
     }
-    this.saving.set(true);
     const { organizationSearch, email, phone, jobTitle, department, notes, ...rest } =
       this.form.value;
     const data = {
@@ -223,21 +224,23 @@ export class ContactFormComponent implements OnInit {
       primary: false,
     };
 
-    const idVal = this.id();
-    if (this.isEditMode && idVal) {
-      this.contactService.update(Number(idVal), data).subscribe({
-        next: () => this.router.navigate(['/contacts', idVal]),
-        error: () => this.saving.set(false),
-      });
-    } else {
-      this.contactService.create(data).subscribe({
-        next: (c) => this.router.navigate(['/contacts', c.id]),
-        error: () => this.saving.set(false),
-      });
-    }
+    const editId = this.isEditMode ? this.id() : undefined;
+    const request = editId
+      ? this.contactService.update(Number(editId), data)
+      : this.contactService.create(data);
+    this.saving.set(true);
+    this.form.disable({ emitEvent: false });
+    request.pipe(finalize(() => {
+      this.form.enable({ emitEvent: false });
+      this.saving.set(false);
+    })).subscribe({
+      next: (contact) => this.router.navigate(['/contacts', editId ?? contact.id]),
+      error: () => undefined,
+    });
   }
 
   goBack(): void {
+    if (this.saving()) return;
     const idVal = this.id();
     this.router.navigate(this.isEditMode && idVal ? ['/contacts', idVal] : ['/contacts']);
   }

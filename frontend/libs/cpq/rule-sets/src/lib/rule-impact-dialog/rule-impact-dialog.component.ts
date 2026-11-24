@@ -74,7 +74,7 @@ function displayOrDash(value: string | number | boolean | null | undefined): str
     <mat-dialog-content>
       @if (loading()) {
         <div class="loading" role="status" aria-live="polite">
-          <mat-spinner diameter="36"></mat-spinner>
+          <mat-spinner diameter="36" aria-label="Loading rule impact" />
           <span>Loading impact from /api/v1/rules/{{ data.ruleId }}/impact…</span>
         </div>
       } @else if (error(); as err) {

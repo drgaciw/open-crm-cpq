@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { DealFormComponent } from './deal-form.component';
 import { DealService } from '../deal.service';
 import { OrganizationService } from '@frontend/crm-organizations';
@@ -17,9 +17,18 @@ describe('DealFormComponent amount validation (chaos)', () => {
   let fixture: ComponentFixture<DealFormComponent>;
   let component: DealFormComponent;
   let create: ReturnType<typeof vi.fn>;
+  let update: ReturnType<typeof vi.fn>;
+
+  function mount(id?: string): void {
+    fixture = TestBed.createComponent(DealFormComponent);
+    component = fixture.componentInstance;
+    if (id) fixture.componentRef.setInput('id', id);
+    fixture.detectChanges();
+  }
 
   beforeEach(async () => {
     create = vi.fn(() => of({ id: 3, name: 'New opp', stage: 'PROSPECTING' }));
+    update = vi.fn(() => NEVER);
     await TestBed.configureTestingModule({
       imports: [DealFormComponent],
       providers: [
@@ -32,7 +41,7 @@ describe('DealFormComponent amount validation (chaos)', () => {
           provide: DealService,
           useValue: {
             create,
-            update: vi.fn(),
+            update,
             getById: vi.fn(),
             selectedDeal: () => null,
             error: signal<string | null>(null),
@@ -57,9 +66,7 @@ describe('DealFormComponent amount validation (chaos)', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(DealFormComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
+    mount();
   });
 
   it('marks form invalid for negative amount so Create stays disabled', () => {
@@ -73,6 +80,60 @@ describe('DealFormComponent amount validation (chaos)', () => {
       'button[type="submit"]',
     ) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
+  });
+
+  it('explains an invalid expected close date and enables Create again after correction', () => {
+    component.form.patchValue({ name: 'Dated opportunity' });
+    const host = fixture.nativeElement as HTMLElement;
+    const date = host.querySelector<HTMLInputElement>('input[formcontrolname="expectedCloseDate"]')!;
+    const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    date.value = 'not-a-calendar-date';
+    date.dispatchEvent(new Event('input'));
+    date.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(component.form.get('expectedCloseDate')?.hasError('matDatepickerParse')).toBe(true);
+    expect(submit.disabled).toBe(true);
+    const error = date.closest('mat-form-field')?.querySelector('mat-error');
+    expect(error?.textContent?.trim()).toBe('Enter a valid expected close date');
+    expect(date.getAttribute('aria-describedby')?.split(' ')).toContain(error?.id);
+
+    date.value = '12/19/2026';
+    date.dispatchEvent(new Event('input'));
+    date.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(host.textContent).not.toContain('Enter a valid expected close date');
+    expect(submit.disabled).toBe(false);
+  });
+
+  it.each([
+    ['Create', undefined],
+    ['Update', '9'],
+  ])('keeps the %s action and save progress named while the request is pending', (label, id) => {
+    if (id) {
+      fixture.destroy();
+      mount(id);
+    }
+    component.form.patchValue({ name: 'Opportunity ready to save' });
+    fixture.detectChanges();
+
+    const submit = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.textContent?.trim()).toBe(label);
+    expect(submit.disabled).toBe(false);
+
+    if (!id) create.mockReturnValueOnce(NEVER);
+    submit.click();
+    fixture.detectChanges();
+
+    expect(submit.disabled).toBe(true);
+    expect(id ? update : create).toHaveBeenCalledOnce();
+    const progress = submit.querySelector('[role="progressbar"]');
+    expect([submit.getAttribute('aria-label'), progress?.getAttribute('aria-label')]).toEqual([
+      label,
+      'Saving opportunity',
+    ]);
   });
 
   it('allows zero and positive amounts', () => {

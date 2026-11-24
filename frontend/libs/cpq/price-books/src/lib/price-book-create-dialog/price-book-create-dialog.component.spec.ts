@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { PriceBookCreateDialogComponent } from './price-book-create-dialog.component';
 import { PriceBookService } from '@frontend/cpq-pricing-data-access';
 import {
@@ -68,6 +68,17 @@ describe('PriceBookCreateDialogComponent', () => {
       control.setValue(good);
       expect(control.valid).toBe(true);
     }
+  });
+
+  it('blocks a whitespace-only name before sending the create request', () => {
+    createSpy.mockReturnValue(of(createdBook));
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
   });
 
   it('requires name', () => {
@@ -152,4 +163,38 @@ describe('PriceBookCreateDialogComponent', () => {
     );
     expect(component.saving()).toBe(false);
   });
+
+  it('keeps Create and its progress indicator named during a pending nondefault create', () => {
+    const pending = new Subject<PriceBookDto>();
+    createSpy.mockReturnValueOnce(pending);
+    component.form.patchValue({
+      name: '  Draft book  ',
+      region: ' NA ',
+      currency: 'eur',
+      isDefault: false,
+    });
+
+    component.onSubmit();
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    const spinner = view.querySelector('mat-dialog-actions button mat-spinner');
+    const create = spinner?.closest('button');
+    const cancel = [...view.querySelectorAll<HTMLButtonElement>('mat-dialog-actions button')].find(
+      (button) => button.textContent?.trim() === 'Cancel',
+    );
+    expect(create?.disabled).toBe(true);
+    expect(cancel?.disabled).toBe(true);
+    expect(create?.getAttribute('aria-label')).toBe('Create');
+    expect(spinner?.getAttribute('aria-label')).toBe('Creating price book');
+    expect(createSpy).toHaveBeenCalledWith({ name: 'Draft book', region: 'NA', currency: 'EUR' });
+    expect(dialogClose).not.toHaveBeenCalled();
+
+    const draft = { ...createdBook, isDefault: false };
+    pending.next(draft);
+    pending.complete();
+    expect(createSpy).toHaveBeenCalledOnce();
+    expect(dialogClose).toHaveBeenCalledWith(draft);
+  });
+
 });

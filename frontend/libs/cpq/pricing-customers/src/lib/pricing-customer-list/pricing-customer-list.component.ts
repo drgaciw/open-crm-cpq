@@ -99,7 +99,7 @@ interface PricingCustomerTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (isEmpty()) {
       <app-empty-state
         icon="groups"
         [title]="
@@ -115,7 +115,7 @@ interface PricingCustomerTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New pricing customer'"
         (action)="openCreateDialog()"
       />
-    } @else {
+    } @else if (loading() || tableRows().length > 0) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -184,6 +184,7 @@ export class PricingCustomerListComponent implements OnInit {
   ];
 
   readonly segmentFilter = signal<CustomerSegment | ''>('');
+  private readonly dismissedReadError = signal(false);
 
   readonly loading = computed(() => this.service.loading());
   readonly error = computed(() => this.service.error());
@@ -194,7 +195,8 @@ export class PricingCustomerListComponent implements OnInit {
   );
 
   readonly isEmpty = computed(
-    () => this.tableRows().length === 0 && !this.loading(),
+    () => !this.loading() && !this.error() && !this.dismissedReadError() &&
+      this.tableRows().length === 0,
   );
 
   ngOnInit(): void {
@@ -237,10 +239,14 @@ export class PricingCustomerListComponent implements OnInit {
   }
 
   clearError(): void {
+    if (this.error()) {
+      this.dismissedReadError.set(true);
+    }
     this.service.error.set(null);
   }
 
   private reload(page = 0, size = this.service.pagination().size || 20): void {
+    this.dismissedReadError.set(false);
     const segment = this.segmentFilter();
     if (segment) {
       this.service.listBySegment(segment, page, size);

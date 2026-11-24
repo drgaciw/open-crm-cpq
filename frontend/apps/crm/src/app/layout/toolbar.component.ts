@@ -1,4 +1,4 @@
-import { Component, output, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy, inject } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,6 +18,8 @@ import { CommandPaletteService } from '@frontend/shared-ui';
         type="button"
         (click)="toggleSidenav.emit()"
         aria-label="Toggle menu"
+        [attr.aria-controls]="sidenavId()"
+        [attr.aria-expanded]="sidenavOpened()"
       >
         <mat-icon>menu</mat-icon>
       </button>
@@ -95,6 +97,14 @@ import { CommandPaletteService } from '@frontend/shared-ui';
           display: none;
         }
       }
+      @media (max-width: 359.98px) {
+        mat-toolbar {
+          padding-inline: var(--crm-space-sm, 8px);
+        }
+        .toolbar-title {
+          font-size: 1rem;
+        }
+      }
     `,
   ],
 })
@@ -108,6 +118,8 @@ export class ToolbarComponent {
 
   readonly shortcutLabel = this.commandPalette.shortcutLabel();
 
+  readonly sidenavId = input<string>();
+  readonly sidenavOpened = input<boolean>();
   toggleSidenav = output<void>();
   openCommandPalette = output<void>();
 

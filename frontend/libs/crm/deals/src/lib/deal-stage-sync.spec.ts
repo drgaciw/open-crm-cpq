@@ -38,6 +38,7 @@ describe('list and kanban share stage changes', () => {
   const selectedDeal = signal<DealDto | null>(null);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const listResultVersion = signal(0);
   const pagination = signal({ page: 0, size: 20, totalElements: 1, totalPages: 1 });
   const pipelineSummary = signal<PipelineSummaryDto[] | null>([
     { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD' },
@@ -48,10 +49,11 @@ describe('list and kanban share stage changes', () => {
     selectedDeal,
     loading,
     error,
+    listResultVersion,
     pagination,
     pipelineSummary,
     isEmpty: computed(() => deals().length === 0 && !loading()),
-    list: vi.fn(),
+    list: vi.fn(() => listResultVersion.update(version => version + 1)),
     search: vi.fn(),
     loadPipelineSummary: vi.fn(),
     delete: vi.fn(() => of(undefined)),
@@ -92,6 +94,7 @@ describe('list and kanban share stage changes', () => {
     ]);
     loading.set(false);
     error.set(null);
+    listResultVersion.set(0);
 
     await TestBed.configureTestingModule({
       imports: [DealListComponent, DealKanbanComponent],

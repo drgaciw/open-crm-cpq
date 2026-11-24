@@ -111,7 +111,7 @@ interface CatalogTableRow {
       </div>
     }
 
-    @if (!loading() && !error() && isEmpty()) {
+    @if (!listErrorDismissed() && !loading() && !error() && isEmpty()) {
       <app-empty-state
         icon="inventory_2"
         [title]="hasActiveFilters() ? 'No matching products' : 'No products yet'"
@@ -123,7 +123,7 @@ interface CatalogTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Product'"
         (action)="openCreateDialog()"
       />
-    } @else if (!error() || tableRows().length > 0) {
+    } @else if (!isEmpty() && (!error() || tableRows().length > 0)) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -215,6 +215,8 @@ export class CatalogListComponent implements OnInit {
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  protected readonly listErrorDismissed = signal(false);
+
   readonly loading = computed(() => this.service.loading());
   readonly error = computed(() => this.service.error());
   readonly pagination = computed(() => this.service.pagination());
@@ -291,10 +293,13 @@ export class CatalogListComponent implements OnInit {
   }
 
   clearError(): void {
+    // A dismissed failure does not establish an empty result.
+    this.listErrorDismissed.set(true);
     this.service.error.set(null);
   }
 
   private reload(page = 0, size = this.service.pagination().size || 10): void {
+    this.listErrorDismissed.set(false);
     const q = this.searchTerm().trim();
     const sort = this.sort();
     const category = this.categoryFilter();

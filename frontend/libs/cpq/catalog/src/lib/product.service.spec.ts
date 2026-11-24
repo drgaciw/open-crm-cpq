@@ -61,6 +61,76 @@ describe('ProductService', () => {
     expect(service.pagination().totalElements).toBe(1);
   });
 
+  it('keeps the latest search rows and pagination when an earlier list resolves last', () => {
+    service.list(2, 10, 'name,asc', { productType: 'SAAS_FLAT_RATE' });
+    const older = httpMock.expectOne((r) => r.url === '/api/v1/products');
+    service.search('SKU-2', 1, 25, 'sku,desc', { category: 'SUPPORT', status: 'DRAFT' });
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/products/search' && r.params.get('q') === 'SKU-2');
+    const match = product({ id: 2, sku: 'SKU-2', name: 'Support', status: 'DRAFT', category: 'SUPPORT' });
+    latest.flush({ content: [match], number: 1, size: 25, totalElements: 26, totalPages: 2 });
+
+    if (!older.cancelled) {
+      const stale = product({ id: 1, sku: 'SKU-1', name: 'Core' });
+      older.flush({ content: [stale], number: 2, size: 10, totalElements: 21, totalPages: 3 });
+    }
+
+    expect(service.products()).toEqual([match]);
+    expect(service.pagination()).toEqual({ page: 1, size: 25, totalElements: 26, totalPages: 2 });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps loading the current list when an older search fails', () => {
+    service.search('obsolete');
+    const older = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+    service.list();
+    const latest = httpMock.expectOne((r) => r.url === '/api/v1/products');
+
+    if (!older.cancelled) {
+      older.flush({ message: 'Old search unavailable' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    latest.flush([]);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps the current search error and excludes an older search response', () => {
+    service.search('old');
+    const older = httpMock.expectOne((r) => r.params.get('q') === 'old');
+    service.search('current');
+    const latest = httpMock.expectOne((r) => r.params.get('q') === 'current');
+    latest.flush(
+      { message: 'Search unavailable', errorCode: 'PRODUCT_SEARCH_UNAVAILABLE' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+
+    if (!older.cancelled) {
+      older.flush([product({ id: 1, sku: 'SKU-1', name: 'Old result' })]);
+    }
+
+    expect(service.products()).toEqual([]);
+    expect(service.error()).toBe('Search unavailable [PRODUCT_SEARCH_UNAVAILABLE]');
+    expect(service.loading()).toBe(false);
+  });
+
+  it('lets the product detail read complete independently of collection supersession', () => {
+    service.getById(9);
+    const detail = httpMock.expectOne('/api/v1/products/9');
+    service.list();
+    const list = httpMock.expectOne((r) => r.url === '/api/v1/products');
+    service.search('current');
+    const search = httpMock.expectOne((r) => r.url === '/api/v1/products/search');
+
+    if (!list.cancelled) list.flush([]);
+    search.flush([]);
+    expect(detail.cancelled).toBe(false);
+    detail.flush(product({ id: 9, sku: 'SKU-9', name: 'Detail' }));
+
+    expect(service.selectedProduct()?.id).toBe(9);
+    expect(service.products()).toEqual([]);
+  });
+
   it('getById sets selectedProduct', () => {
     service.getById(9);
     const req = httpMock.expectOne('/api/v1/products/9');
@@ -119,6 +189,23 @@ describe('ProductService', () => {
       { status: 403, statusText: 'Forbidden' },
     );
     expect(service.error()).toBe('List failed [PRODUCT_LIST_DENIED]');
+  });
+
+  it('retains native status for a detail-read failure and resets it on the next detail request', () => {
+    service.getById(99);
+    httpMock.expectOne('/api/v1/products/99').flush(
+      { message: 'Temporarily unavailable' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.detailReadStatus()).toBe(503);
+
+    service.getById(100);
+    expect(service.detailReadStatus()).toBeNull();
+    httpMock.expectOne('/api/v1/products/100').flush(
+      { message: 'Missing fixture' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.detailReadStatus()).toBe(404);
   });
 
   it('getById error.set is message [CODE] when errorCode present', () => {

@@ -237,6 +237,30 @@ describe('QuotesListComponent', () => {
     expect(compiled.textContent).not.toContain('No quotes yet');
   });
 
+  it('does not show an empty state after dismissing a failed read until another list request', () => {
+    quotes.set([]);
+    error.set('Service unavailable');
+    fixture.detectChanges();
+    listSpy.mockClear();
+    const compiled = fixture.nativeElement as HTMLElement;
+    compiled.querySelector<HTMLButtonElement>('.error-banner button')?.click();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.error-banner')).toBeNull();
+    expect(compiled.querySelector('app-empty-state')).toBeNull();
+    expect(compiled.querySelector('app-data-table')).toBeNull();
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listSpy.mockImplementationOnce(() => loading.set(true));
+    component.onStatusChange('DRAFT');
+    fixture.detectChanges();
+    expect(compiled.querySelector('app-empty-state')).toBeNull();
+    loading.set(false);
+    fixture.detectChanges();
+    expect(compiled.querySelector('app-empty-state')?.textContent).toContain('No matching quotes');
+    expect(compiled.querySelector('app-empty-state button')).toBeNull();
+  });
+
   it('shows error banner when QuoteService error is set', () => {
     error.set('Failed to load quotes');
     fixture.detectChanges();

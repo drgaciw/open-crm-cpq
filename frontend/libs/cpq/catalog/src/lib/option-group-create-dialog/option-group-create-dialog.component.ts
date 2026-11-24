@@ -20,6 +20,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { FormValidators } from '@frontend/shared-utils';
+import { finalize } from 'rxjs';
 import {
   OptionGroupCreateRequest,
   ProductOptionGroupDto,
@@ -116,10 +118,11 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? 'Create' : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Creating option group" />
         } @else {
           Create
         }
@@ -173,7 +176,7 @@ export class OptionGroupCreateDialogComponent {
   readonly selectionTypes: SelectionType[] = [...SELECTION_TYPES];
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [FormValidators.requiredTrimmed, Validators.maxLength(255)]],
     selectionType: this.fb.nonNullable.control<SelectionType | ''>('', {
       validators: [Validators.required],
     }),
@@ -182,6 +185,7 @@ export class OptionGroupCreateDialogComponent {
   });
 
   onCancel(): void {
+    if (this.saving()) return;
     this.dialogRef.close(null);
   }
 
@@ -203,15 +207,22 @@ export class OptionGroupCreateDialogComponent {
       request.maxSelections = Number(value.maxSelections);
     }
 
+    const previousDisableClose = this.dialogRef.disableClose;
+    this.dialogRef.disableClose = true;
     this.error.set(null);
     this.saving.set(true);
-    this.optionService.createGroup(request).subscribe({
-      next: (created) => {
+    this.form.disable({ emitEvent: false });
+    this.optionService.createGroup(request).pipe(
+      finalize(() => {
+        this.dialogRef.disableClose = previousDisableClose;
+        this.form.enable({ emitEvent: false });
         this.saving.set(false);
+      }),
+    ).subscribe({
+      next: (created) => {
         this.dialogRef.close(created);
       },
       error: (err: unknown) => {
-        this.saving.set(false);
         this.error.set(httpErrorMessage(err, 'Failed to create option group'));
       },
     });

@@ -82,6 +82,24 @@ describe('DealDetailComponent', () => {
     vi.restoreAllMocks();
   });
 
+  it('names the progress indicator while reading an opportunity', () => {
+    loading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="status"] [role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Loading opportunity');
+  });
+
+  it('names the progress indicator during a pending stage update', () => {
+    component.actionLoading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.header-actions [role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Updating opportunity stage');
+  });
+
   it('shows organization, amount, currency, stage, and owner', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Northwind');
@@ -161,13 +179,20 @@ describe('DealDetailComponent', () => {
       expect(stages.find((s) => s.id === 'LOST')?.state).toBe('upcoming');
     });
 
-    it('marks LOST with danger state when opportunity is LOST', () => {
+    it('marks the persisted LOST stage as current and keeps the danger style on the read-only path', () => {
       selectedDeal.set({ ...openDeal, stage: 'LOST' });
       fixture.detectChanges();
 
       const stages = component.stagePathItems();
       expect(stages.find((s) => s.id === 'LOST')?.state).toBe('danger');
       expect(stages.find((s) => s.id === 'WON')?.state).toBe('upcoming');
+
+      const el = fixture.nativeElement as HTMLElement;
+      const path = el.querySelector('[data-testid="stage-path"]');
+      const lost = path?.querySelector('[data-stage-id="LOST"]');
+      expect(lost?.classList.contains('stage-path__step--danger')).toBe(true);
+      expect(path?.querySelector('[aria-current="step"]')).toBe(lost);
+      expect(path?.querySelector('button, [tabindex]')).toBeNull();
     });
   });
 });

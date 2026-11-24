@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Observable, finalize } from 'rxjs';
 import {
   PricingCustomerDto,
@@ -34,11 +34,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 export class PricingCustomerService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/pricing-customers';
+  private latestListRequest = 0;
 
   readonly customers = signal<PricingCustomerDto[]>([]);
   readonly selectedCustomer = signal<PricingCustomerDto | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly detailReadFailure = signal<{ id: number; status: number; message: string } | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -49,6 +51,7 @@ export class PricingCustomerService {
   readonly isEmpty = computed(() => this.customers().length === 0 && !this.loading());
 
   list(page = 0, size = 20, sort = 'name,asc', segment?: CustomerSegment): void {
+    const request = ++this.latestListRequest;
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
@@ -61,9 +64,16 @@ export class PricingCustomerService {
 
     this.http
       .get<SpringPageResponse<PricingCustomerDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => {
+        if (request === this.latestListRequest) {
+          this.loading.set(false);
+        }
+      }))
       .subscribe({
         next: (p) => {
+          if (request !== this.latestListRequest) {
+            return;
+          }
           this.customers.set(p.content ?? (p as unknown as PricingCustomerDto[]));
           if (p.totalElements !== undefined) {
             this.pagination.set({
@@ -75,7 +85,9 @@ export class PricingCustomerService {
           }
         },
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          if (request === this.latestListRequest) {
+            this.error.set(httpErrorMessage(err, 'An error occurred'));
+          }
         },
       });
   }
@@ -86,6 +98,7 @@ export class PricingCustomerService {
   }
 
   getById(id: number): void {
+    this.detailReadFailure.set(null);
     this.error.set(null);
     this.loading.set(true);
     this.http
@@ -94,7 +107,9 @@ export class PricingCustomerService {
       .subscribe({
         next: (customer) => this.selectedCustomer.set(customer),
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          const message = httpErrorMessage(err, 'An error occurred');
+          this.detailReadFailure.set({ id, status: err instanceof HttpErrorResponse ? err.status : 0, message });
+          this.error.set(message);
         },
       });
   }

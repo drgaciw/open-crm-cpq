@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Observable, finalize } from 'rxjs';
 import {
   PriceBookDto,
@@ -36,12 +36,16 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 export class PriceBookService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/price-books';
+  private latestListRequest = 0;
 
   readonly priceBooks = signal<PriceBookDto[]>([]);
   readonly selectedPriceBook = signal<PriceBookDto | null>(null);
   readonly entries = signal<PriceBookEntryDto[]>([]);
   readonly loading = signal(false);
+  readonly detailLoading = signal(false);
+  readonly entriesLoading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly detailReadStatus = signal<number | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -58,6 +62,7 @@ export class PriceBookService {
   readonly isEmpty = computed(() => this.priceBooks().length === 0 && !this.loading());
 
   list(page = 0, size = 20, sort = 'name,asc', region?: string): void {
+    const request = ++this.latestListRequest;
     this.error.set(null);
     this.loading.set(true);
     let params = new HttpParams()
@@ -70,9 +75,16 @@ export class PriceBookService {
 
     this.http
       .get<SpringPageResponse<PriceBookDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => {
+        if (request === this.latestListRequest) {
+          this.loading.set(false);
+        }
+      }))
       .subscribe({
         next: (p) => {
+          if (request !== this.latestListRequest) {
+            return;
+          }
           this.priceBooks.set(p.content ?? (p as unknown as PriceBookDto[]));
           if (p.totalElements !== undefined) {
             this.pagination.set({
@@ -84,7 +96,9 @@ export class PriceBookService {
           }
         },
         error: (err) => {
-          this.error.set(httpErrorMessage(err, 'An error occurred'));
+          if (request === this.latestListRequest) {
+            this.error.set(httpErrorMessage(err, 'An error occurred'));
+          }
         },
       });
   }
@@ -94,14 +108,16 @@ export class PriceBookService {
   }
 
   getById(id: number): void {
+    this.detailReadStatus.set(null);
     this.error.set(null);
-    this.loading.set(true);
+    this.detailLoading.set(true);
     this.http
       .get<PriceBookDto>(`${this.basePath}/${id}`)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => this.detailLoading.set(false)))
       .subscribe({
         next: (book) => this.selectedPriceBook.set(book),
         error: (err) => {
+          this.detailReadStatus.set(err instanceof HttpErrorResponse ? err.status : null);
           this.error.set(httpErrorMessage(err, 'An error occurred'));
         },
       });
@@ -121,13 +137,13 @@ export class PriceBookService {
 
   getEntries(bookId: number, page = 0, size = 20): void {
     this.error.set(null);
-    this.loading.set(true);
+    this.entriesLoading.set(true);
     const params = new HttpParams().set('page', page).set('size', size);
     this.http
       .get<SpringPageResponse<PriceBookEntryDto>>(`${this.basePath}/${bookId}/entries`, {
         params,
       })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => this.entriesLoading.set(false)))
       .subscribe({
         next: (p) => {
           this.entries.set(p.content ?? (p as unknown as PriceBookEntryDto[]));

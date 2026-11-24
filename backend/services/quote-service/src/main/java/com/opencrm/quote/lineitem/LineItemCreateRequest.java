@@ -1,5 +1,6 @@
 package com.opencrm.quote.lineitem;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.opencrm.quote.ramp.RampScheduleDto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -24,7 +25,7 @@ public class LineItemCreateRequest {
     private String productType;
     private String lineItemType;
 
-    @Min(value = 1, message = "Quantity must be at least 1")
+    @Min(value = 1, message = "Quantity must be a positive whole number")
     @Builder.Default
     private int quantity = 1;
 
@@ -41,4 +42,14 @@ public class LineItemCreateRequest {
     private RampScheduleDto schedule;
     private String sourceSubscriptionLineUuid;
     private com.opencrm.quote.ramp.HybridMigrationContext hybridMigration;
+
+    @JsonSetter("quantity")
+    private void readQuantity(BigDecimal value) {
+        try {
+            quantity = value == null ? 0 : value.intValueExact();
+        } catch (ArithmeticException invalid) {
+            // Let the existing quantity constraint report invalid numeric values to HTTP callers.
+            quantity = 0;
+        }
+    }
 }

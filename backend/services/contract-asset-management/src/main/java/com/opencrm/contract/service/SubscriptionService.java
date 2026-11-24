@@ -2,6 +2,7 @@ package com.opencrm.contract.service;
 
 import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.contract.acl.ErpAdapter;
+import com.opencrm.contract.acl.ErpSyncException;
 import com.opencrm.contract.domain.Subscription;
 import com.opencrm.contract.domain.SubscriptionStatus;
 import com.opencrm.contract.dto.SubscriptionDto;
@@ -61,6 +62,9 @@ public class SubscriptionService {
         // Sync to ERP on activation — do not remove or bypass ErpAdapter
         try {
             String erpId = erpAdapter.syncToErp(subscription);
+            if (erpId == null || erpId.isBlank()) {
+                throw new ErpSyncException("ERP sync did not return a subscription ID");
+            }
             subscription.setErpSubscriptionId(erpId);
             subscription.setErpSyncStatus("SYNCED");
         } catch (Exception e) {
