@@ -311,7 +311,8 @@ class QuoteApprovalIsolationTest {
 
     private void stubDecision(long approvalId, long quoteId, String status) {
         when(approvalRoutingClient.getById(approvalId)).thenReturn(remote(approvalId, quoteId, null, null, "PENDING"));
-        when(approvalRoutingClient.approve(approvalId, "ok")).thenReturn(remote(approvalId, quoteId, null, null, status));
+        when(approvalRoutingClient.approve(approvalId, "ok", 3L))
+                .thenReturn(remote(approvalId, quoteId, null, null, status));
         when(approvalRoutingClient.reject(approvalId, "no")).thenReturn(remote(approvalId, quoteId, null, null, status));
         when(approvalRoutingClient.reject(approvalId, "ok")).thenReturn(remote(approvalId, quoteId, null, null, status));
         when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));

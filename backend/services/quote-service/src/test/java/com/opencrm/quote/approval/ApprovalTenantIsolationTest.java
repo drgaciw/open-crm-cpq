@@ -87,7 +87,9 @@ class ApprovalTenantIsolationTest {
         verify(approvalRoutingClient, never()).getByQuoteId(any());
         verify(approvalRoutingClient, never()).submit(any());
         verify(approvalRoutingClient, never()).approve(any(), any());
+        verify(approvalRoutingClient, never()).approve(any(), any(), any());
         verify(approvalRoutingClient, never()).reject(any(), any());
+        verify(approvalRoutingClient, never()).reject(any(), any(), any());
         verify(quoteRepository, never()).save(any());
     }
 
@@ -132,7 +134,9 @@ class ApprovalTenantIsolationTest {
         assertThatThrownBy(() -> approvalService.rejectRequest(7L, null)).isInstanceOf(ResourceNotFoundException.class);
         assertThat(approvalService.getPendingApprovals()).isEmpty();
         verify(approvalRoutingClient, never()).approve(any(), any());
+        verify(approvalRoutingClient, never()).approve(any(), any(), any());
         verify(approvalRoutingClient, never()).reject(any(), any());
+        verify(approvalRoutingClient, never()).reject(any(), any(), any());
         verify(approvalRoutingClient, never()).submit(any());
     }
 
