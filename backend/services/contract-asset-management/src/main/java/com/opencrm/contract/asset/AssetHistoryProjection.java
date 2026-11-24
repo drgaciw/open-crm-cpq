@@ -4,6 +4,8 @@ import com.opencrm.common.event.dto.AssetAmendedEvent;
 import com.opencrm.common.event.dto.AssetCreatedEvent;
 import com.opencrm.common.event.dto.AssetSupersededEvent;
 import com.opencrm.common.event.dto.AssetTerminatedEvent;
+import com.opencrm.common.exception.ResourceNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +17,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Builds asset history, the supersede chain, and an account's installed base from facts.
@@ -29,9 +33,18 @@ import java.util.Set;
 public class AssetHistoryProjection {
 
     private final AssetHistoryStore store;
+    /** Null only for fixture constructors that do not bind a repository. Production always injects one. */
+    private final AssetRepository assets;
 
-    public AssetHistoryProjection(AssetHistoryStore store) {
+    @Autowired
+    public AssetHistoryProjection(AssetHistoryStore store, AssetRepository assets) {
         this.store = store;
+        this.assets = assets;
+    }
+
+    /** Fixture and apply-path tests. Reads are not tenant-joined until a repository is supplied. */
+    public AssetHistoryProjection(AssetHistoryStore store) {
+        this(store, null);
     }
 
     public void apply(AssetCreatedEvent event, String eventId) {
@@ -150,20 +163,24 @@ public class AssetHistoryProjection {
 
     @Transactional(readOnly = true)
     public List<AssetHistoryEntryDto> history(String assetId) {
-        InstalledBaseReadAccess.require();
-        if (blank(assetId)) {
-            return List.of();
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open() || !visible(scope, assetId)) {
+            throw new ResourceNotFoundException("Asset", assetId);
         }
         return store.findByAssetId(assetId).stream().map(this::toHistory).toList();
     }
 
     @Transactional(readOnly = true)
     public SupersedeChainDto chain(String assetId, String direction) {
-        InstalledBaseReadAccess.require();
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open() || !visible(scope, assetId)) {
+            throw new ResourceNotFoundException("Asset", assetId);
+        }
         String selected = directionOf(direction);
+        Set<String> visible = visibleIds(scope.tenantId(), null);
         Map<String, List<AssetHistoryEntry>> successorsOf = new HashMap<>();
         Map<String, List<AssetHistoryEntry>> predecessorsOf = new HashMap<>();
-        for (AssetHistoryEntry link : store.findByEventType(AssetHistoryKind.SUPERSEDED)) {
+        for (AssetHistoryEntry link : supersededLinks(visible)) {
             if (blank(link.getSuccessorAssetId())) {
                 continue;
             }
@@ -174,10 +191,10 @@ public class AssetHistoryProjection {
         List<SupersedeHopDto> predecessors = List.of();
         List<SupersedeHopDto> successors = List.of();
         if ("predecessors".equals(selected) || "both".equals(selected)) {
-            predecessors = walk(assetId, predecessorsOf, false);
+            predecessors = walk(assetId, predecessorsOf, visible, false);
         }
         if ("successors".equals(selected) || "both".equals(selected)) {
-            successors = walk(assetId, successorsOf, true);
+            successors = walk(assetId, successorsOf, visible, true);
         }
         return SupersedeChainDto.builder()
                 .assetId(assetId)
@@ -189,12 +206,12 @@ public class AssetHistoryProjection {
 
     @Transactional(readOnly = true)
     public List<InstalledAssetDto> installedBase(String accountId, LocalDate asOf) {
-        InstalledBaseReadAccess.require();
-        if (blank(accountId) || asOf == null) {
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open() || blank(accountId) || asOf == null) {
             return List.of();
         }
         Map<String, List<AssetHistoryEntry>> byAsset = new LinkedHashMap<>();
-        for (AssetHistoryEntry row : store.findByAccountId(accountId)) {
+        for (AssetHistoryEntry row : loadAccount(scope, accountId)) {
             byAsset.computeIfAbsent(row.getAssetId(), ignored -> new ArrayList<>()).add(row);
         }
         List<InstalledAssetDto> installed = new ArrayList<>();
@@ -210,7 +227,54 @@ public class AssetHistoryProjection {
         return installed;
     }
 
-    private List<SupersedeHopDto> walk(String start, Map<String, List<AssetHistoryEntry>> edges, boolean forward) {
+    /** History rows for one account that stay inside the caller tenant. Empty when the scope is closed. */
+    List<AssetHistoryEntry> accountRows(String accountId) {
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open() || blank(accountId)) {
+            return List.of();
+        }
+        return loadAccount(scope, accountId);
+    }
+
+    private boolean visible(InstalledBaseReadScope scope, String assetId) {
+        if (blank(assetId)) {
+            return false;
+        }
+        Set<String> ids = visibleIds(scope.tenantId(), null);
+        return ids == null || ids.contains(assetId);
+    }
+
+    /** {@code null} means the fixture constructor is not enforcing a repository join. */
+    private Set<String> visibleIds(UUID tenantId, String accountId) {
+        if (assets == null || tenantId == null) {
+            return assets == null ? null : Set.of();
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        for (Asset asset : assets.findAll(InstalledBaseQueries.matching(tenantId, accountId, null, null, null))) {
+            if (!blank(asset.getUuid())) {
+                ids.add(asset.getUuid());
+            }
+        }
+        return ids;
+    }
+
+    private List<AssetHistoryEntry> loadAccount(InstalledBaseReadScope scope, String accountId) {
+        Set<String> visible = visibleIds(scope.tenantId(), accountId);
+        if (visible == null) {
+            return store.findByAccountId(accountId);
+        }
+        return store.findByAccountIdAndAssetIdIn(accountId, visible);
+    }
+
+    private List<AssetHistoryEntry> supersededLinks(Set<String> visible) {
+        if (visible == null) {
+            return store.findByEventType(AssetHistoryKind.SUPERSEDED);
+        }
+        return store.findByEventTypeAndAssetIdIn(AssetHistoryKind.SUPERSEDED, visible);
+    }
+
+    private List<SupersedeHopDto> walk(String start, Map<String, List<AssetHistoryEntry>> edges,
+                                       Set<String> visible, boolean forward) {
         List<SupersedeHopDto> result = new ArrayList<>();
         if (blank(start)) {
             return result;
@@ -228,7 +292,7 @@ public class AssetHistoryProjection {
                     .thenComparingLong(AssetHistoryEntry::getAppliedOrder));
             for (AssetHistoryEntry link : next) {
                 String target = forward ? link.getSuccessorAssetId() : link.getPredecessorAssetId();
-                if (blank(target) || !seen.add(target)) {
+                if (blank(target) || (visible != null && !visible.contains(target)) || !seen.add(target)) {
                     continue;
                 }
                 int hop = distance.get(current) + 1;

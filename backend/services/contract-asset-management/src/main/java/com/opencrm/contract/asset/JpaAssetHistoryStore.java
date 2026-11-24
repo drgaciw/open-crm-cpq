@@ -2,6 +2,7 @@ package com.opencrm.contract.asset;
 
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -34,8 +35,24 @@ public class JpaAssetHistoryStore implements AssetHistoryStore {
     }
 
     @Override
+    public List<AssetHistoryEntry> findByAccountIdAndAssetIdIn(String accountId, Collection<String> assetIds) {
+        if (assetIds == null || assetIds.isEmpty()) {
+            return List.of();
+        }
+        return history.findByAccountIdAndAssetIdIn(accountId, assetIds);
+    }
+
+    @Override
     public List<AssetHistoryEntry> findByEventType(AssetHistoryKind eventType) {
         return history.findByEventTypeOrderByEffectiveDateAscAppliedOrderAsc(eventType);
+    }
+
+    @Override
+    public List<AssetHistoryEntry> findByEventTypeAndAssetIdIn(AssetHistoryKind eventType, Collection<String> assetIds) {
+        if (assetIds == null || assetIds.isEmpty()) {
+            return List.of();
+        }
+        return history.findByEventTypeAndAssetIdIn(eventType, assetIds);
     }
 
     @Override

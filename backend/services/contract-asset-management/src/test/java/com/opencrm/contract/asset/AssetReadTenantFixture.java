@@ -136,7 +136,7 @@ final class AssetReadTenantFixture {
         history.apply(new AssetCreatedEvent(
                 holding.assetUuid, holding.accountId, holding.contractLineId, holding.subscriptionId, null,
                 "prod-" + holding.contractLineId, new BigDecimal(holding.quantity), "ACTIVE",
-                LocalDate.parse("2026-01-01"), LocalDate.parse(holding.end)), "evt-" + holding.assetUuid);
+                LocalDate.parse("2026-01-01"), LocalDate.parse(holding.end)), holding.assetUuid);
     }
 
     private record Holding(String assetUuid, String accountId, String contractLineId, Long subscriptionId,
