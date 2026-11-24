@@ -12,12 +12,12 @@ class ApprovalTenantMigrationTest {
 
     @Test
     void migrationBackfillsFromTheOwningQuoteAndHasARollbackScript() throws Exception {
-        Path migration = Path.of("src/main/resources/db/migration/V1_12__approval_request_tenant.sql");
-        Path rollback = Path.of("src/main/resources/db/rollback/V1_12__drop_approval_request_tenant.sql");
+        Path migration = Path.of("src/main/resources/db/migration/V1_15__approval_request_tenant.sql");
+        Path rollback = Path.of("src/main/resources/db/rollback/V1_15__drop_approval_request_tenant.sql");
         String sql = Files.readString(migration);
         String undo = Files.readString(rollback);
 
-        assertThat(sql).contains("-- Rollback: db/rollback/V1_12__drop_approval_request_tenant.sql");
+        assertThat(sql).contains("-- Rollback: db/rollback/V1_15__drop_approval_request_tenant.sql");
         assertThat(sql).contains("ADD COLUMN tenant_id VARCHAR(128)");
         assertThat(sql).contains("ADD COLUMN account_id VARCHAR(255)");
         assertThat(sql).contains("quote.quotes");

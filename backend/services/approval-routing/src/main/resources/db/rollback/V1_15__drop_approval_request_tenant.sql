@@ -1,4 +1,4 @@
--- Manual rollback for V1_12__approval_request_tenant.sql.
+-- Manual rollback for V1_15__approval_request_tenant.sql.
 -- Flyway Community does not run this script. Apply it in the approval schema.
 -- Do not drop the columns while approval-routing code that reads tenant_id is deployed.
 

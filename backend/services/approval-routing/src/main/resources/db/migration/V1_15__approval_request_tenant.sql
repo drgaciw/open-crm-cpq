@@ -6,7 +6,7 @@
 -- A caller whose tid differs, or a row whose tenant could not be backfilled, is 403 CROSS_TENANT.
 -- The row is not returned.
 -- account_id is the principal account_id claim when the token carries one.
--- Rollback: db/rollback/V1_12__drop_approval_request_tenant.sql
+-- Rollback: db/rollback/V1_15__drop_approval_request_tenant.sql
 --
 -- Backfill: when this database also has quote.quotes, copy that quote's tenant_id and,
 -- when the approval has no account yet, its customer_external_id. quote_id is VARCHAR, so

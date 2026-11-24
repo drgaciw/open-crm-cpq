@@ -16,7 +16,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Applies V1_12 on PostgreSQL. Rows whose owning quote has a tenant are backfilled.
+ * Applies V1_15 on PostgreSQL. Rows whose owning quote has a tenant are backfilled.
  * A quote with no tenant, a non-numeric quote id, or no quote row stays null.
  */
 @Tag("integration")
@@ -70,7 +70,7 @@ class ApprovalTenantMigrationIntegrationTest {
         jdbc.update("INSERT INTO approval_requests (quote_id) VALUES ('99')");
         jdbc.update("INSERT INTO approval_requests (quote_id) VALUES ('Q-NO')");
 
-        String sql = Files.readString(Path.of("src/main/resources/db/migration/V1_12__approval_request_tenant.sql"));
+        String sql = Files.readString(Path.of("src/main/resources/db/migration/V1_15__approval_request_tenant.sql"));
         jdbc.execute(sql);
 
         Map<String, Object> fromQuote = row(jdbc, "10");
@@ -93,7 +93,7 @@ class ApprovalTenantMigrationIntegrationTest {
         jdbc.execute(sql.substring(sql.indexOf("DO $$")));
         assertThat(row(jdbc, "10")).containsEntry("tenant_id", "pinned").containsEntry("account_id", "keep");
 
-        jdbc.execute(Files.readString(Path.of("src/main/resources/db/rollback/V1_12__drop_approval_request_tenant.sql")));
+        jdbc.execute(Files.readString(Path.of("src/main/resources/db/rollback/V1_15__drop_approval_request_tenant.sql")));
         Integer tenantColumn = jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.columns
                 WHERE table_schema = 'approval' AND table_name = 'approval_requests' AND column_name = 'tenant_id'
