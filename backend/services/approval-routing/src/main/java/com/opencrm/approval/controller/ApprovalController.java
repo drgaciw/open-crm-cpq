@@ -1,7 +1,10 @@
 package com.opencrm.approval.controller;
 
+import com.opencrm.approval.dto.ApprovalCommentRequest;
+import com.opencrm.approval.dto.ApprovalHistoryEntryDto;
 import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.ApprovalSubmitRequest;
+import com.opencrm.approval.service.ApprovalHistoryService;
 import com.opencrm.approval.service.ApprovalService;
 import com.opencrm.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +30,7 @@ import java.util.List;
 public class ApprovalController {
 
     private final ApprovalService approvalService;
+    private final ApprovalHistoryService approvalHistoryService;
     private final com.opencrm.approval.service.IdempotentApprovalSubmission idempotentSubmission;
 
     @PostMapping
@@ -50,6 +54,26 @@ public class ApprovalController {
         return ApiResponse.success(approvalService.getByQuoteId(quoteId));
     }
 
+    @GetMapping("/quote/{quoteId}/history")
+    @Operation(summary = "GetApprovalHistory: decisions, escalations and comments for a quote, oldest first")
+    public ApiResponse<List<ApprovalHistoryEntryDto>> getApprovalHistory(@PathVariable String quoteId) {
+        return ApiResponse.success(approvalHistoryService.getApprovalHistory(quoteId));
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "GetApprovalHistory for one approval case")
+    public ApiResponse<List<ApprovalHistoryEntryDto>> getApprovalHistoryForCase(@PathVariable Long id) {
+        return ApiResponse.success(approvalHistoryService.getApprovalHistoryForCase(id));
+    }
+
+    @PostMapping("/{id}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Add a deal-desk comment or thread reply on an approval case")
+    public ApiResponse<ApprovalHistoryEntryDto> addComment(
+            @PathVariable Long id, @Valid @RequestBody ApprovalCommentRequest request) {
+        return ApiResponse.success(approvalHistoryService.addComment(id, request), "Comment added");
+    }
+
     @GetMapping("/pending")
     @Operation(summary = "List all pending approval requests")
     public ApiResponse<List<ApprovalRequestDto>> getPendingApprovals() {
@@ -66,8 +90,9 @@ public class ApprovalController {
     @Operation(summary = "Approve a pending request as the authenticated user (role must satisfy the tier)")
     public ApiResponse<ApprovalRequestDto> approve(
             @PathVariable Long id,
-            @RequestParam(required = false) String comment) {
-        ApprovalRequestDto request = approvalService.approve(id, comment);
+            @RequestParam(required = false) String comment,
+            @RequestParam(required = false) Long quoteVersion) {
+        ApprovalRequestDto request = approvalService.approve(id, comment, quoteVersion);
         return ApiResponse.success(request, "Approval request approved");
     }
 
@@ -75,15 +100,18 @@ public class ApprovalController {
     @Operation(summary = "Reject a pending request as the authenticated user (role must satisfy the tier)")
     public ApiResponse<ApprovalRequestDto> reject(
             @PathVariable Long id,
-            @RequestParam String reason) {
-        ApprovalRequestDto request = approvalService.reject(id, reason);
+            @RequestParam String reason,
+            @RequestParam(required = false) Long quoteVersion) {
+        ApprovalRequestDto request = approvalService.reject(id, reason, quoteVersion);
         return ApiResponse.success(request, "Approval request rejected");
     }
 
     @PostMapping("/{id}/escalate")
     @Operation(summary = "Escalate a pending request after its SLA window, along its escalation path")
-    public ApiResponse<ApprovalRequestDto> escalate(@PathVariable Long id) {
-        ApprovalRequestDto request = approvalService.escalate(id);
+    public ApiResponse<ApprovalRequestDto> escalate(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long quoteVersion) {
+        ApprovalRequestDto request = approvalService.escalate(id, quoteVersion);
         return ApiResponse.success(request, "Approval request escalated");
     }
 }

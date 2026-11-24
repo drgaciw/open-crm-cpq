@@ -34,6 +34,10 @@ public class ApprovalRoutingClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<List<RoutingApprovalDto>>> LIST =
             new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<ApiResponse<List<RoutingApprovalHistoryEntry>>> HISTORY =
+            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<ApiResponse<RoutingApprovalHistoryEntry>> HISTORY_ENTRY =
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<QuotePolicyVerdictDto>> VERDICT =
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<RoutingPolicyExceptionDto>> EXCEPTION =
@@ -323,6 +327,10 @@ public class ApprovalRoutingClient {
     }
 
     public RoutingApprovalDto approve(Long approvalId, String comment) {
+        return approve(approvalId, comment, null);
+    }
+
+    public RoutingApprovalDto approve(Long approvalId, String comment, Long quoteVersion) {
         log.debug("Approving routing approval {}", approvalId);
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
@@ -330,6 +338,9 @@ public class ApprovalRoutingClient {
                         var builder = uriBuilder.path("/api/v1/approvals/{id}/approve");
                         if (comment != null && !comment.isBlank()) {
                             builder.queryParam("comment", comment);
+                        }
+                        if (quoteVersion != null) {
+                            builder.queryParam("quoteVersion", quoteVersion);
                         }
                         return builder.build(approvalId);
                     })
@@ -361,14 +372,23 @@ public class ApprovalRoutingClient {
     }
 
     public RoutingApprovalDto reject(Long approvalId, String reason) {
+        return reject(approvalId, reason, null);
+    }
+
+    public RoutingApprovalDto reject(Long approvalId, String reason, Long quoteVersion) {
         log.debug("Rejecting routing approval {}", approvalId);
         String safeReason = (reason == null || reason.isBlank()) ? "Rejected via quote BFF" : reason;
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/v1/approvals/{id}/reject")
-                            .queryParam("reason", safeReason)
-                            .build(approvalId))
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder
+                                .path("/api/v1/approvals/{id}/reject")
+                                .queryParam("reason", safeReason);
+                        if (quoteVersion != null) {
+                            builder.queryParam("quoteVersion", quoteVersion);
+                        }
+                        return builder.build(approvalId);
+                    })
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
                         throw new ResourceNotFoundException("ApprovalRequest", approvalId);
@@ -397,10 +417,20 @@ public class ApprovalRoutingClient {
     }
 
     public RoutingApprovalDto escalate(Long approvalId) {
+        return escalate(approvalId, null);
+    }
+
+    public RoutingApprovalDto escalate(Long approvalId, Long quoteVersion) {
         log.debug("Escalating routing approval {}", approvalId);
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
-                    .uri("/api/v1/approvals/{id}/escalate", approvalId)
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/api/v1/approvals/{id}/escalate");
+                        if (quoteVersion != null) {
+                            builder.queryParam("quoteVersion", quoteVersion);
+                        }
+                        return builder.build(approvalId);
+                    })
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
                         throw new ResourceNotFoundException("ApprovalRequest", approvalId);
@@ -422,6 +452,81 @@ public class ApprovalRoutingClient {
         } catch (RestClientException ex) {
             throw new BusinessException(
                     "Failed to call approval-routing escalate: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
+    /** GetApprovalHistory. Refusals (401, 403) pass through. The quote BFF has already checked the quote tenant. */
+    public List<RoutingApprovalHistoryEntry> getApprovalHistory(Long quoteId) {
+        log.debug("Fetching approval timeline for quote {} from routing", quoteId);
+        try {
+            ApiResponse<List<RoutingApprovalHistoryEntry>> response = approvalRoutingRestClient.get()
+                    .uri("/api/v1/approvals/quote/{quoteId}/history", quoteId)
+                    .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_HISTORY_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing history failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_HISTORY_FAILED"
+                        );
+                    })
+                    .body(HISTORY);
+            if (response == null || !response.isSuccess()) {
+                String message = response != null && response.getMessage() != null
+                        ? response.getMessage()
+                        : "approval-routing history returned an empty response";
+                throw new BusinessException(message, HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_HISTORY_FAILED");
+            }
+            return response.getData() != null ? response.getData() : Collections.emptyList();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing history: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
+    public RoutingApprovalHistoryEntry addComment(Long approvalId, RoutingApprovalCommentRequest request) {
+        log.debug("Adding a case comment on routing approval {}", approvalId);
+        try {
+            ApiResponse<RoutingApprovalHistoryEntry> response = approvalRoutingRestClient.post()
+                    .uri("/api/v1/approvals/{id}/comments", approvalId)
+                    .body(request)
+                    .retrieve()
+                    .onStatus(status -> status.value() == 404, (req, res) -> {
+                        throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+                    })
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_COMMENT_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing comment failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_COMMENT_FAILED"
+                        );
+                    })
+                    .body(HISTORY_ENTRY);
+            if (response == null || !response.isSuccess() || response.getData() == null) {
+                String message = response != null && response.getMessage() != null
+                        ? response.getMessage()
+                        : "approval-routing returned an empty comment";
+                throw new BusinessException(message, HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_COMMENT_FAILED");
+            }
+            return response.getData();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing comment: " + ex.getMessage(),
                     HttpStatus.BAD_GATEWAY,
                     "APPROVAL_ROUTING_UNAVAILABLE"
             );

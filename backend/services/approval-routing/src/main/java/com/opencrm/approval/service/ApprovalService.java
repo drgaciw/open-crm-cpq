@@ -19,6 +19,7 @@ import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,8 @@ public class ApprovalService {
     private final ApprovalRequestMapper approvalRequestMapper;
     private final CurrentActor currentActor;
 
+    private ApprovalHistoryRecorder historyRecorder = ApprovalHistoryRecorder.noop();
+
     private Clock clock = Clock.systemUTC();
 
     /**
@@ -63,6 +66,14 @@ public class ApprovalService {
     private String slaWindowText = "PT24H";
 
     private Duration slaWindow = Duration.ofHours(24);
+
+    /** Present in the running service. Absent when a test constructs this class directly. */
+    @Autowired(required = false)
+    void attachHistory(ApprovalHistoryRecorder historyRecorder) {
+        if (historyRecorder != null) {
+            this.historyRecorder = historyRecorder;
+        }
+    }
 
     /** Tests and the escalation sweep pin the clock. Production uses {@link Clock#systemUTC()}. */
     public void setClock(Clock clock) {
@@ -169,6 +180,10 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto approve(Long id, String comment) {
+        return approve(id, comment, null);
+    }
+
+    public ApprovalRequestDto approve(Long id, String comment, Long quoteVersion) {
         log.debug("Approving request ID: {}", id);
 
         ApprovalRequest request = findEntityById(id);
@@ -178,18 +193,19 @@ public class ApprovalService {
         request.setDecisionComment(blankToNull(comment));
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
+        ApprovalGrantedEvent granted = new ApprovalGrantedEvent(
+                saved.getId(),
+                saved.getQuoteId(),
+                saved.getApproverId(),
+                saved.getApprovalTier(),
+                saved.getDecisionComment(),
+                saved.getApprovedAt());
         outboxEventPublisher.publish(
                 "ApprovalRequest",
                 saved.getQuoteId(),
                 EventContractRegistry.APPROVAL_GRANTED_V1,
-                new ApprovalGrantedEvent(
-                        saved.getId(),
-                        saved.getQuoteId(),
-                        saved.getApproverId(),
-                        saved.getApprovalTier(),
-                        saved.getDecisionComment(),
-                        saved.getApprovedAt())
-        );
+                granted);
+        historyRecorder.recordGranted(granted, quoteVersion);
 
         log.info("Approved request ID: {} for quote: {} by {}", id, request.getQuoteId(), request.getApproverId());
 
@@ -197,6 +213,10 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto reject(Long id, String rejectionReason) {
+        return reject(id, rejectionReason, null);
+    }
+
+    public ApprovalRequestDto reject(Long id, String rejectionReason, Long quoteVersion) {
         log.debug("Rejecting request ID: {}", id);
 
         ApprovalRequest request = findEntityById(id);
@@ -220,18 +240,19 @@ public class ApprovalService {
                 EventContractRegistry.QUOTE_APPROVAL_REJECTED_V1,
                 event
         );
+        ApprovalRejected rejected = new ApprovalRejected(
+                saved.getId(),
+                saved.getQuoteId(),
+                saved.getApproverId(),
+                saved.getApprovalTier(),
+                saved.getDecisionComment(),
+                saved.getRejectedAt());
         outboxEventPublisher.publish(
                 "ApprovalRequest",
                 saved.getQuoteId(),
                 EventContractRegistry.APPROVAL_REJECTED_V1,
-                new ApprovalRejected(
-                        saved.getId(),
-                        saved.getQuoteId(),
-                        saved.getApproverId(),
-                        saved.getApprovalTier(),
-                        saved.getDecisionComment(),
-                        saved.getRejectedAt())
-        );
+                rejected);
+        historyRecorder.recordRejected(rejected, quoteVersion);
 
         log.info("Rejected request ID: {} for quote: {} by {}", id, request.getQuoteId(), request.getApproverId());
 
@@ -243,6 +264,10 @@ public class ApprovalService {
      * allowed to decide the current tier. The requester may escalate; this is not a grant or a rejection.
      */
     public ApprovalRequestDto escalate(Long id) {
+        return escalate(id, null);
+    }
+
+    public ApprovalRequestDto escalate(Long id, Long quoteVersion) {
         ApprovalRequest request = findEntityById(id);
         authorize(request, false);
         requireNotSuperseded(request);
@@ -255,7 +280,7 @@ public class ApprovalService {
             throw new BusinessException("SLA window has not elapsed",
                     HttpStatus.CONFLICT, "SLA_WINDOW_OPEN");
         }
-        if (!advance(request, now, false)) {
+        if (!advance(request, now, false, quoteVersion)) {
             throw new BusinessException("Escalation path has no further tier",
                     HttpStatus.CONFLICT, "NO_ESCALATION_PATH");
         }
@@ -271,14 +296,14 @@ public class ApprovalService {
         int advanced = 0;
         for (ApprovalRequest request : approvalRequestRepository
                 .findByStatusAndDeletedFalseAndSlaDeadlineLessThanEqual(ApprovalStatus.PENDING, now)) {
-            if (advance(request, now, true)) {
+            if (advance(request, now, true, null)) {
                 advanced++;
             }
         }
         return advanced;
     }
 
-    private boolean advance(ApprovalRequest request, Instant now, boolean clearWhenExhausted) {
+    private boolean advance(ApprovalRequest request, Instant now, boolean clearWhenExhausted, Long quoteVersion) {
         if (request.getStatus() != ApprovalStatus.PENDING) {
             return false;
         }
@@ -296,18 +321,19 @@ public class ApprovalService {
         request.setEscalatedAt(now);
         request.setSlaDeadline(now.plus(slaWindow));
         ApprovalRequest saved = approvalRequestRepository.save(request);
+        ApprovalEscalatedEvent escalated = new ApprovalEscalatedEvent(
+                saved.getId(),
+                saved.getQuoteId(),
+                fromTier,
+                next.get(),
+                now,
+                saved.getSlaDeadline());
         outboxEventPublisher.publish(
                 "ApprovalRequest",
                 saved.getQuoteId(),
                 EventContractRegistry.APPROVAL_ESCALATED_V1,
-                new ApprovalEscalatedEvent(
-                        saved.getId(),
-                        saved.getQuoteId(),
-                        fromTier,
-                        next.get(),
-                        now,
-                        saved.getSlaDeadline())
-        );
+                escalated);
+        historyRecorder.recordEscalated(escalated, quoteVersion);
         log.info("Escalated approval {} from {} to {}", saved.getId(), fromTier, next.get());
         return true;
     }

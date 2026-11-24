@@ -216,6 +216,33 @@ class ApprovalRoutingClientTest {
 
         assertThat(client.approve(9L).getApproverId()).isEqualTo("oid-1");
     }
+
+    @Test
+    @DisplayName("approve forwards the quote version the BFF stamped")
+    void approveSendsQuoteVersion() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/9/approve?comment=ship%20it&quoteVersion=5"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":{"id":9,"quoteId":"42","status":"APPROVED"}}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.approve(9L, "ship it", 5L).getStatus()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    @DisplayName("GetApprovalHistory calls the quote timeline")
+    void approvalHistoryUsesTheTimelineEndpoint() {
+        server.expect(requestTo("http://routing.test/api/v1/approvals/quote/42/history"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":[
+                          {"id":1,"approvalId":7,"quoteId":"42","kind":"ESCALATED","eventName":"ApprovalEscalated","quoteVersion":2},
+                          {"id":2,"approvalId":7,"quoteId":"42","kind":"COMMENT","commentId":100,"quoteVersion":4,"body":"try 12 percent"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.getApprovalHistory(42L)).extracting(RoutingApprovalHistoryEntry::getKind)
+                .containsExactly("ESCALATED", "COMMENT");
+    }
     @Test
     void keyedSubmissionSendsKeyAsHeaderNotPayload() {
         server.expect(requestTo("http://routing.test/api/v1/approvals"))

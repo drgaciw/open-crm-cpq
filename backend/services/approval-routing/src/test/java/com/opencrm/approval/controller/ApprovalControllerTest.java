@@ -8,6 +8,7 @@ import com.opencrm.approval.domain.ApprovalStatus;
 import com.opencrm.approval.domain.ApprovalType;
 import com.opencrm.approval.dto.ApprovalRequestDto;
 import com.opencrm.approval.dto.ApprovalSubmitRequest;
+import com.opencrm.approval.service.ApprovalHistoryService;
 import com.opencrm.approval.service.ApprovalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,9 @@ class ApprovalControllerTest {
 
     @Mock
     private ApprovalService approvalService;
+
+    @Mock
+    private ApprovalHistoryService approvalHistoryService;
 
     @Mock
     private com.opencrm.approval.service.IdempotentApprovalSubmission idempotentSubmission;
@@ -208,7 +212,7 @@ class ApprovalControllerTest {
                 .approverId("mgr-1")
                 .approvedAt(Instant.parse("2026-09-01T11:00:00Z"))
                 .build();
-        when(approvalService.approve(eq(9001L), isNull())).thenReturn(approved);
+        when(approvalService.approve(eq(9001L), isNull(), isNull())).thenReturn(approved);
 
         MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/approve")
                         .accept(MediaType.APPLICATION_JSON))
@@ -232,7 +236,7 @@ class ApprovalControllerTest {
                 .rejectionReason("Too steep")
                 .rejectedAt(Instant.parse("2026-09-01T11:30:00Z"))
                 .build();
-        when(approvalService.reject(eq(9001L), eq("Too steep"))).thenReturn(rejected);
+        when(approvalService.reject(eq(9001L), eq("Too steep"), isNull())).thenReturn(rejected);
 
         MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/reject")
                         .param("reason", "Too steep")

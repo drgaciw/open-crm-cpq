@@ -16,6 +16,8 @@ public class UserContext {
     private String email;
     private String displayName;
     private String tenantId;
+    /** ADR-016 {@code account_id} claim. Compared with a quote's customer external id. */
+    private String accountId;
     private Set<String> roles;
     private Set<String> permissions;
 
