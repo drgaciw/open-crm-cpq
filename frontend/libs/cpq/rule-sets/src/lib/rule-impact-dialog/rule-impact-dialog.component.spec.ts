@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { RuleImpactDto } from '@frontend/shared-models';
 import { RuleService } from '@frontend/cpq-pricing-data-access';
 import { RuleImpactDialogComponent } from './rule-impact-dialog.component';
@@ -94,6 +94,22 @@ describe('RuleImpactDialogComponent', () => {
     fixture.detectChanges();
     expect(component.error()).toBeNull();
     expect(component.impact()?.ruleId).toBe(10);
+  });
+
+  it('names the progress indicator during the impact request', async () => {
+    await setup({ ruleId: 10 });
+    const pendingImpact = new Subject<RuleImpactDto>();
+    analyzeImpactSpy.mockReturnValueOnce(pendingImpact);
+    component.load();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Loading rule impact');
+
+    pendingImpact.next(IMPACT);
+    pendingImpact.complete();
+    fixture.detectChanges();
+    expect(host.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('closes the dialog', async () => {

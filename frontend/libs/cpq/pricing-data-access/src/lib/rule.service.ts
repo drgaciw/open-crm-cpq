@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, Subject, finalize, takeUntil } from 'rxjs';
 import {
   RuleDto,
   RuleCreateRequest,
@@ -34,8 +34,11 @@ function httpErrorMessage(err: unknown, fallback: string): string {
 export class RuleService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/rules';
+  private readonly listSuperseded = new Subject<void>();
+  private listRuleSetId: number | null = null;
 
   readonly rules = signal<RuleDto[]>([]);
+  readonly confirmedRuleSetId = signal<number | null>(null);
   readonly selectedRule = signal<RuleDto | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -49,6 +52,13 @@ export class RuleService {
   readonly isEmpty = computed(() => this.rules().length === 0 && !this.loading());
 
   listByRuleSet(ruleSetId: number, page = 0, size = 20): void {
+    this.listSuperseded.next();
+    if (this.listRuleSetId !== ruleSetId) {
+      this.listRuleSetId = ruleSetId;
+      this.rules.set([]);
+      this.confirmedRuleSetId.set(null);
+      this.pagination.set({ page, size, totalElements: 0, totalPages: 0 });
+    }
     this.error.set(null);
     this.loading.set(true);
     const params = new HttpParams().set('page', page).set('size', size);
@@ -56,10 +66,11 @@ export class RuleService {
       .get<SpringPageResponse<RuleDto>>(`${this.basePath}/by-rule-set/${ruleSetId}`, {
         params,
       })
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.rules.set(p.content ?? (p as unknown as RuleDto[]));
+          this.confirmedRuleSetId.set(ruleSetId);
           if (p.totalElements !== undefined) {
             this.pagination.set({
               page: p.number ?? 0,

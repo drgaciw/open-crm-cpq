@@ -93,7 +93,7 @@ export function isPriceBookPublished(
   template: `
     @if (loading() && !book()) {
       <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner diameter="40" aria-label="Loading price book"></mat-spinner>
       </div>
     } @else if (book(); as book) {
       <app-page-header [title]="book.name" [subtitle]="subtitle(book)">
@@ -209,7 +209,7 @@ export function isPriceBookPublished(
             <div class="entries-table-wrap">
               @if (entriesLoading()) {
                 <div class="entries-loading" role="status">
-                  <mat-spinner diameter="32"></mat-spinner>
+                  <mat-spinner diameter="32" aria-label="Loading price book entries"></mat-spinner>
                 </div>
               }
               <table class="entries-table">
@@ -287,8 +287,8 @@ export function isPriceBookPublished(
       </div>
     } @else {
       <app-empty-state
-        icon="search_off"
-        title="Price book not found"
+        [icon]="service.detailReadStatus() === 404 ? 'search_off' : 'error_outline'"
+        [title]="service.detailReadStatus() === 404 ? 'Price book not found' : 'Unable to load price book'"
         [message]="
           bannerError() ||
           'This price book could not be loaded from /api/v1/price-books.'
@@ -449,10 +449,8 @@ export class PriceBookDetailComponent implements OnInit {
   readonly mutating = signal(false);
   readonly actionError = signal<string | null>(null);
 
-  readonly loading = computed(() => this.service.loading() && !this.book());
-  readonly entriesLoading = computed(
-    () => this.service.loading() && !!this.book(),
-  );
+  readonly loading = computed(() => this.service.detailLoading() && !this.book());
+  readonly entriesLoading = this.service.entriesLoading;
   readonly bannerError = computed(
     () => this.actionError() ?? this.service.error(),
   );
@@ -485,10 +483,10 @@ export class PriceBookDetailComponent implements OnInit {
   ngOnInit(): void {
     const numericId = Number(this.id());
     if (!Number.isFinite(numericId)) {
+      this.service.detailReadStatus.set(null);
       this.service.selectedPriceBook.set(null);
       this.service.entries.set([]);
       this.service.error.set('Invalid price book id');
-      this.service.loading.set(false);
       return;
     }
     this.service.getById(numericId);

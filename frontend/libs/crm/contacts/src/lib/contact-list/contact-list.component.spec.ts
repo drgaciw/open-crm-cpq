@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
@@ -58,6 +60,7 @@ describe('ContactListComponent shared-ui wiring', () => {
             loading,
             error,
             pagination,
+            hasConfirmedPage: signal(false),
             isEmpty: computed(() => contacts().length === 0 && !loading()),
             list: listSpy,
             search: searchSpy,
@@ -156,5 +159,87 @@ describe('ContactListComponent shared-ui wiring', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('button[aria-label^="Actions for"]'),
     ).map((b) => b.getAttribute('aria-label'));
     expect(labels).toEqual(['Actions for Ada Lovelace', 'Actions for Alan Turing']);
+  });
+});
+
+describe('ContactListComponent list result messaging', () => {
+  let fixture: ComponentFixture<ContactListComponent>;
+  let http: HttpTestingController;
+  let host: HTMLElement;
+
+  const ada = contact({ id: 1, firstName: 'Ada', lastName: 'Lovelace' });
+  const page = (content: ContactDto[]) => ({
+    content, number: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0,
+  });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [ContactListComponent],
+      providers: [provideRouter([]), provideNoopAnimations(), provideHttpClient(), provideHttpClientTesting()],
+    });
+    fixture = TestBed.createComponent(ContactListComponent);
+    http = TestBed.inject(HttpTestingController);
+    host = fixture.nativeElement;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => http.verify());
+
+  it('shows no matching contacts and keeps the header action when a search is empty', () => {
+    http.expectOne((req) => req.url === '/api/v1/contacts').flush(page([ada]));
+    fixture.detectChanges();
+    expect(host.querySelector('app-data-table')?.textContent).toContain('Ada Lovelace');
+
+    fixture.componentInstance.onSearch('  unmatched  ');
+    http.expectOne((req) => req.url === '/api/v1/contacts/search' && req.params.get('q') === 'unmatched')
+      .flush(page([]));
+    fixture.detectChanges();
+
+    const card = host.querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No matching contacts');
+    expect(card?.querySelector('button')).toBeNull();
+    expect(host.querySelector('app-page-header')?.textContent).toContain('New Contact');
+  });
+
+  it('does not show an empty dataset after dismissing a failed initial request', () => {
+    http.expectOne((req) => req.url === '/api/v1/contacts')
+      .flush({ message: 'Contacts unavailable' }, { status: 503, statusText: 'Service Unavailable' });
+    fixture.detectChanges();
+    const dismiss = Array.from(host.querySelectorAll<HTMLButtonElement>('[role="alert"] button'))
+      .find((button) => button.textContent?.trim() === 'Dismiss');
+    expect(dismiss).toBeTruthy();
+    dismiss?.click();
+    fixture.detectChanges();
+
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('app-empty-state')).toBeNull();
+    expect(host.querySelector('app-data-table')).toBeNull();
+    expect(host.querySelector('app-page-header')?.textContent).toContain('New Contact');
+  });
+
+  it('preserves previously loaded contacts when a search failure is dismissed', () => {
+    http.expectOne((req) => req.url === '/api/v1/contacts').flush(page([ada]));
+    fixture.componentInstance.onSearch('new search');
+    http.expectOne((req) => req.url === '/api/v1/contacts/search')
+      .flush({ message: 'Search unavailable' }, { status: 503, statusText: 'Service Unavailable' });
+    fixture.detectChanges();
+    fixture.componentInstance.clearError();
+    fixture.detectChanges();
+
+    expect(host.querySelector('app-data-table')?.textContent).toContain('Ada Lovelace');
+    expect(host.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('offers the first-contact action after the cleared list returns an empty page', () => {
+    http.expectOne((req) => req.url === '/api/v1/contacts').flush(page([]));
+    fixture.componentInstance.onSearch('unmatched');
+    http.expectOne((req) => req.url === '/api/v1/contacts/search').flush(page([]));
+    fixture.componentInstance.onSearch('   ');
+    http.expectOne((req) => req.url === '/api/v1/contacts').flush(page([]));
+    fixture.detectChanges();
+
+    const card = host.querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No contacts yet');
+    expect(card?.querySelector('button')?.textContent?.trim()).toBe('Create Contact');
   });
 });

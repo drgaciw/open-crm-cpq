@@ -18,6 +18,8 @@ import com.opencrm.security.CurrentActor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,6 +47,7 @@ class AssetRenewalDraftsTest {
 
     private static final UUID ACCOUNT = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID POLICY = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID CANONICAL_LINE = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
     private static final LocalDate TERM_END = LocalDate.of(2029, 12, 31);
 
     private SubscriptionScheduleClient schedules;
@@ -131,6 +134,129 @@ class AssetRenewalDraftsTest {
     }
 
     @Test
+    void canonicalAssetRenewsThroughVerifiedAcceptedRateSource() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        when(assets.installedBase("synthetic-customer", TERM_END))
+                .thenReturn(List.of(asset("asset-canonical", CANONICAL_LINE.toString(), "7", "ACTIVE")));
+        when(policies.fetchRungs(eq(ACCOUNT), isNull(), eq(CANONICAL_LINE), eq(TERM_END)))
+                .thenReturn(List.of(policy("UPLIFT_PCT", "10")));
+        var request = assetRequest();
+        request.setContractLineId(CANONICAL_LINE.toString());
+
+        QuoteDto draft = continuations.author(request);
+
+        assertThat(draft.getLineItems()).singleElement().satisfies(item -> {
+            assertThat(item.getSourceSubscriptionLineUuid()).isEqualTo("source-line");
+            assertThat(item.getQuantity()).isEqualTo(7);
+            assertThat(item.getUnitPrice()).isEqualByComparingTo("55.00");
+        });
+        assertThat(saved.getContinuationRequestJson()).contains("asset-canonical");
+    }
+
+    @Test
+    void verifiedAccountPricesRenewalWhenCallerOmitsPolicyAccount() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        when(assets.installedBase("synthetic-customer", TERM_END))
+                .thenReturn(List.of(asset("asset-canonical", CANONICAL_LINE.toString(), "7", "ACTIVE")));
+        when(policies.fetchRungs(ACCOUNT, null, CANONICAL_LINE, TERM_END))
+                .thenReturn(List.of(policy("UPLIFT_PCT", "10")));
+        var request = assetRequest();
+        request.setRenewalPolicyAccountId(null);
+
+        assertThat(continuations.author(request).getLineItems()).singleElement()
+                .satisfies(line -> assertThat(line.getUnitPrice()).isEqualByComparingTo("55.00"));
+        assertThat(saved.getContinuationRequestJson()).contains(ACCOUNT.toString());
+    }
+
+    @Test
+    void verifiedAccountRejectsAnUnrelatedPolicyAccountBeforeReadingAssets() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        var request = assetRequest();
+        request.setRenewalPolicyAccountId(UUID.randomUUID());
+
+        assertThatThrownBy(() -> continuations.author(request)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("verified customer account");
+        verifyNoInteractions(assets, policies);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void verifiedTargetRejectsAnUnlinkedAgreementBeforeReadingAssets() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        var request = assetRequest();
+        request.setRenewalPolicyAgreementId(UUID.randomUUID());
+
+        assertThatThrownBy(() -> continuations.author(request)).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("verified renewal-policy agreement");
+        verifyNoInteractions(assets, policies);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void acceptedLineAliasUsesTheVerifiedCanonicalLinePolicy() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        when(assets.installedBase("synthetic-customer", TERM_END))
+                .thenReturn(List.of(asset("asset-accepted-key", "source-line", "7", "ACTIVE")));
+        when(policies.fetchRungs(ACCOUNT, null, CANONICAL_LINE, TERM_END)).thenReturn(List.of(
+                new RenewalPolicyView(POLICY, "LINE", CANONICAL_LINE, 1, "SAME", "CONTRACTED_NET", null, null, null)));
+
+        assertThat(continuations.author(assetRequest()).getLineItems()).singleElement()
+                .satisfies(line -> assertThat(line.getUnitPrice()).isEqualByComparingTo("50.00"));
+    }
+
+    @Test
+    void acceptedLineAliasCannotBypassTheVerifiedProductCheck() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        when(assets.installedBase("synthetic-customer", TERM_END)).thenReturn(List.of(
+                new InstalledAssetView("asset-accepted-key", "synthetic-customer", "source-line", 42L,
+                        "other-product", BigDecimal.valueOf(7), LocalDate.of(2027, 1, 1), TERM_END, "ACTIVE")));
+
+        assertThatThrownBy(() -> continuations.author(assetRequest())).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("product does not match the canonical contract line");
+        verifyNoInteractions(policies);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void inconsistentCanonicalLinkageCannotUseAnExistingLegacyAssetKey() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(false));
+
+        assertThatThrownBy(() -> continuations.author(assetRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("canonical contract line");
+        verifyNoInteractions(assets, policies);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void staleAssetRenewalPinIsRejectedBeforeReadingAssetsOrWriting() {
+        var request = assetRequest();
+        request.setObservedRevision(6L);
+
+        assertThatThrownBy(() -> continuations.preview(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("observed revision");
+        assertThatThrownBy(() -> continuations.author(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("observed revision");
+        verifyNoInteractions(assets, policies);
+        verify(repository, never()).save(any());
+    }
+
+    private SubscriptionScheduleView linkedSchedule(boolean verified) throws Exception {
+        var json = new ObjectMapper().findAndRegisterModules();
+        com.fasterxml.jackson.databind.node.ObjectNode body = json.valueToTree(schedule());
+        body.put("subscriptionId", 42);
+        body.put("canonicalLinkageVerified", verified);
+        if (verified) {
+            body.put("canonicalCustomerAccountId", ACCOUNT.toString());
+            ((com.fasterxml.jackson.databind.node.ObjectNode) body.path("lines").get(0))
+                    .put("canonicalContractLineId", CANONICAL_LINE.toString());
+        }
+        return json.treeToValue(body, SubscriptionScheduleView.class);
+    }
+
+    @Test
     void pricingIsDelegatedToTheRenewalPolicyClient() {
         QuoteDto draft = continuations.author(assetRequest());
         verify(policies).fetchRungs(ACCOUNT, null, null, TERM_END);
@@ -188,6 +314,76 @@ class AssetRenewalDraftsTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("renewal source mode");
         verifyNoInteractions(assets);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "\"maxIncreasePct\":5", "\"minIncreasePct\":15", "\"minUnitAmount\":60",
+            "\"notAboveList\":true", "\"maxDecreasePct\":5", "\"priceAsOf\":\"ACTION_DATE\""
+    })
+    void controlledRenewalWithoutAuthoritativePricingFactsRefusesPreviewAndAuthoring(String control) throws Exception {
+        var controlled = decodedPolicy("ACCOUNT", ACCOUNT, "CONTRACTED_NET", control);
+        when(policies.fetchRungs(eq(ACCOUNT), isNull(), isNull(), eq(TERM_END))).thenReturn(List.of(controlled));
+
+        assertThatThrownBy(() -> continuations.preview(assetRequest()))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("UNRESOLVED_BASIS"));
+        assertThatThrownBy(() -> continuations.author(assetRequest()))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("UNRESOLVED_BASIS"));
+        verifyNoInteractions(repository, lines, jdbc);
+    }
+
+    @Test
+    void lessSpecificCapCannotBeSilentlyDiscardedWhenTheLineSuppliesTheMode() throws Exception {
+        when(schedules.byNumber("SUB-R3")).thenReturn(linkedSchedule(true));
+        when(assets.installedBase("synthetic-customer", TERM_END))
+                .thenReturn(List.of(asset("asset-canonical", CANONICAL_LINE.toString(), "7", "ACTIVE")));
+        var linePolicy = decodedPolicy("LINE", CANONICAL_LINE, "CONTRACTED_NET", "\"status\":\"ACTIVE\"");
+        var accountCap = decodedPolicy("ACCOUNT", ACCOUNT, "CONTRACTED_NET", "\"maxIncreasePct\":5");
+        when(policies.fetchRungs(eq(ACCOUNT), isNull(), eq(CANONICAL_LINE), eq(TERM_END)))
+                .thenReturn(List.of(linePolicy, accountCap));
+        var request = assetRequest();
+        request.setContractLineId(CANONICAL_LINE.toString());
+
+        assertThatThrownBy(() -> continuations.author(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("UNRESOLVED_BASIS"));
+        verifyNoInteractions(repository, lines, jdbc);
+    }
+
+    @Test
+    void listBasedUpliftWithoutPinnedListFactsDoesNotBecomeAnExitRateUplift() throws Exception {
+        var listBasis = decodedPolicy("ACCOUNT", ACCOUNT, "CURRENT_LIST", "\"status\":\"ACTIVE\"");
+        when(policies.fetchRungs(eq(ACCOUNT), isNull(), isNull(), eq(TERM_END))).thenReturn(List.of(listBasis));
+
+        assertThatThrownBy(() -> continuations.preview(assetRequest()))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo("UNRESOLVED_BASIS"));
+        verifyNoInteractions(repository, lines, jdbc);
+    }
+
+    @Test
+    void inactiveControlsAndAdditiveMetadataPreserveTheExistingExitRateUplift() throws Exception {
+        var ordinary = decodedPolicy("ACCOUNT", ACCOUNT, "CONTRACTED_NET", """
+                "status":"ACTIVE","notAboveList":false,"notBelowExitNet":false,
+                "priceAsOf":"EFFECTIVE_DATE","retentionMarker":"REVIEW_LATER"
+                """);
+        when(policies.fetchRungs(eq(ACCOUNT), isNull(), isNull(), eq(TERM_END))).thenReturn(List.of(ordinary));
+
+        var preview = continuations.preview(assetRequest());
+
+        assertThat(preview.periods()).hasSize(2);
+        assertThat(preview.periods().getFirst().unitPrice()).isEqualByComparingTo("55.00");
+        verifyNoInteractions(repository, lines, jdbc);
+    }
+
+    private static RenewalPolicyView decodedPolicy(String scopeKind, UUID scopeRef, String basis, String control)
+            throws Exception {
+        return new ObjectMapper().readValue("""
+                {"id":"%s","scopeKind":"%s","scopeRef":"%s","policyVersion":1,"mode":"UPLIFT_PCT",
+                 "basis":"%s","upliftPercentPoints":10,%s}
+                """.formatted(POLICY, scopeKind, scopeRef, basis, control), RenewalPolicyView.class);
     }
 
     private QuoteContinuationRequest assetRequest() {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,7 +28,7 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40" aria-label="Loading lead details"></mat-spinner></div>
     } @else if (service.error(); as err) {
       <div class="error-banner" role="alert">
         <mat-icon>error_outline</mat-icon>
@@ -75,42 +75,63 @@ import { LoseReasonDialogComponent } from './lose-reason-dialog.component';
 
       <div class="action-bar">
         @if (lead.status === 'NEW') {
-          <button mat-raised-button color="primary" (click)="onMarkContacted()" [disabled]="actionLoading()">
-            @if (actionLoading()) {
-              <mat-spinner diameter="20"></mat-spinner>
+          <button mat-raised-button color="primary" (click)="onMarkContacted()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'contact' ? 'Mark Contacted' : null">
+            @if (pendingAction() === 'contact') {
+              <mat-spinner diameter="20" aria-label="Marking lead contacted"></mat-spinner>
             } @else {
               <mat-icon>phone</mat-icon>
             }
             Mark Contacted
           </button>
-          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
-            <mat-icon>close</mat-icon> Mark Lost
+          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'lose' ? 'Mark Lost' : null">
+            @if (pendingAction() === 'lose') {
+              <mat-spinner diameter="20" aria-label="Marking lead lost"></mat-spinner>
+            } @else {
+              <mat-icon>close</mat-icon>
+            }
+            Mark Lost
           </button>
         }
         @if (lead.status === 'CONTACTED') {
-          <button mat-raised-button color="primary" (click)="onQualify()" [disabled]="actionLoading()">
-            @if (actionLoading()) {
-              <mat-spinner diameter="20"></mat-spinner>
+          <button mat-raised-button color="primary" (click)="onQualify()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'qualify' ? 'Qualify' : null">
+            @if (pendingAction() === 'qualify') {
+              <mat-spinner diameter="20" aria-label="Qualifying lead"></mat-spinner>
             } @else {
               <mat-icon>check_circle</mat-icon>
             }
             Qualify
           </button>
-          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
-            <mat-icon>close</mat-icon> Mark Lost
+          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'lose' ? 'Mark Lost' : null">
+            @if (pendingAction() === 'lose') {
+              <mat-spinner diameter="20" aria-label="Marking lead lost"></mat-spinner>
+            } @else {
+              <mat-icon>close</mat-icon>
+            }
+            Mark Lost
           </button>
         }
         @if (lead.status === 'QUALIFIED') {
-          <button mat-raised-button color="primary" (click)="onConvertToDeal()" [disabled]="actionLoading()">
-            @if (actionLoading()) {
-              <mat-spinner diameter="20"></mat-spinner>
+          <button mat-raised-button color="primary" (click)="onConvertToDeal()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'convert' ? 'Convert to Deal' : null">
+            @if (pendingAction() === 'convert') {
+              <mat-spinner diameter="20" aria-label="Converting lead to deal"></mat-spinner>
             } @else {
               <mat-icon>arrow_forward</mat-icon>
             }
             Convert to Deal
           </button>
-          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()">
-            <mat-icon>close</mat-icon> Mark Lost
+          <button mat-stroked-button color="warn" (click)="onMarkLost()" [disabled]="actionLoading()"
+            [attr.aria-label]="pendingAction() === 'lose' ? 'Mark Lost' : null">
+            @if (pendingAction() === 'lose') {
+              <mat-spinner diameter="20" aria-label="Marking lead lost"></mat-spinner>
+            } @else {
+              <mat-icon>close</mat-icon>
+            }
+            Mark Lost
           </button>
         }
         @if (lead.status === 'CONVERTED') {
@@ -250,7 +271,8 @@ export class LeadDetailComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   id = input.required<string>();
-  actionLoading = signal(false);
+  protected readonly pendingAction = signal<'contact' | 'qualify' | 'convert' | 'lose' | null>(null);
+  readonly actionLoading = computed(() => this.pendingAction() !== null);
 
   ngOnInit(): void {
     this.service.getById(Number(this.id()));
@@ -304,71 +326,71 @@ export class LeadDetailComponent implements OnInit {
 
   onMarkContacted(): void {
     const lead = this.service.selectedLead();
-    if (!lead) return;
+    if (!lead || this.actionLoading()) return;
 
-    this.actionLoading.set(true);
+    this.pendingAction.set('contact');
     this.service.markContacted(lead.id).subscribe({
       next: (updated) => {
         this.service.selectedLead.set(updated);
-        this.actionLoading.set(false);
+        this.pendingAction.set(null);
       },
-      error: () => this.actionLoading.set(false),
+      error: () => this.pendingAction.set(null),
     });
   }
 
   onQualify(): void {
     const lead = this.service.selectedLead();
-    if (!lead) return;
+    if (!lead || this.actionLoading()) return;
 
-    this.actionLoading.set(true);
+    this.pendingAction.set('qualify');
     this.service.qualify(lead.id).subscribe({
       next: (updated) => {
         this.service.selectedLead.set(updated);
-        this.actionLoading.set(false);
+        this.pendingAction.set(null);
       },
-      error: () => this.actionLoading.set(false),
+      error: () => this.pendingAction.set(null),
     });
   }
 
   onConvertToDeal(): void {
     const lead = this.service.selectedLead();
-    if (!lead) return;
+    if (!lead || this.actionLoading()) return;
 
     if (!confirm(`Convert "${lead.title}" to a deal?`)) return;
 
-    this.actionLoading.set(true);
+    this.pendingAction.set('convert');
     this.service.convertToDeal(lead.id).subscribe({
       next: (convertedLead) => {
-        this.actionLoading.set(false);
+        this.pendingAction.set(null);
         this.service.selectedLead.set(convertedLead);
         const dealId = convertedLead.convertedDealId;
         if (dealId != null) {
           this.router.navigate(['/deals', dealId]);
         }
       },
-      error: () => this.actionLoading.set(false),
+      error: () => this.pendingAction.set(null),
     });
   }
 
   onMarkLost(): void {
     const lead = this.service.selectedLead();
-    if (!lead) return;
+    if (!lead || this.actionLoading()) return;
 
     const dialogRef = this.dialog.open(LoseReasonDialogComponent, {
       width: '500px',
     });
 
     dialogRef.afterClosed().subscribe((reason: string) => {
-      if (reason && lead) {
-        this.actionLoading.set(true);
-        this.service.markLost(lead.id, reason).subscribe({
-          next: (updated) => {
-            this.service.selectedLead.set(updated);
-            this.actionLoading.set(false);
-          },
-          error: () => this.actionLoading.set(false),
-        });
-      }
+      if (!reason || this.actionLoading()) return;
+
+      this.pendingAction.set('lose');
+      this.service.markLost(lead.id, reason).subscribe({
+        next: (updated) => {
+          this.service.selectedLead.set(updated);
+          this.pendingAction.set(null);
+        },
+        error: () => this.pendingAction.set(null),
+      });
     });
   }
 

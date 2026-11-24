@@ -46,6 +46,7 @@ import {
   ProductStatus,
   ProductUpdateRequest,
 } from '@frontend/shared-models';
+import { FormValidators } from '@frontend/shared-utils';
 import { ProductService } from '../product.service';
 import { ProductOptionService } from '../product-option.service';
 import { ProductAttributeService } from '../product-attribute.service';
@@ -59,7 +60,7 @@ import {
 } from '../option-create-dialog/option-create-dialog.component';
 import { ConfigRulesPanelComponent } from '../config-rules-panel/config-rules-panel.component';
 import { RetireProductDialogComponent } from '../retire-product-dialog/retire-product-dialog.component';
-import { Observable } from 'rxjs';
+import { type Observable, finalize } from 'rxjs';
 
 function httpErrorMessage(
   err: unknown,
@@ -102,7 +103,7 @@ function httpErrorMessage(
   template: `
     @if (loading() && !product()) {
       <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner diameter="40" aria-label="Loading product"></mat-spinner>
       </div>
     } @else if (product(); as product) {
       <app-page-header [title]="product.name" [subtitle]="product.sku">
@@ -149,9 +150,10 @@ function httpErrorMessage(
               type="button"
               (click)="onDelete()"
               [disabled]="deleting()"
+              [attr.aria-label]="deleting() ? 'Delete' : null"
             >
               @if (deleting()) {
-                <mat-spinner diameter="20" />
+                <mat-spinner diameter="20" aria-label="Deleting product" />
               } @else {
                 <ng-container>
                   <mat-icon>delete</mat-icon>
@@ -169,9 +171,10 @@ function httpErrorMessage(
               type="button"
               (click)="onSave()"
               [disabled]="form.invalid || saving()"
+              [attr.aria-label]="saving() ? 'Save' : null"
             >
               @if (saving()) {
-                <mat-spinner diameter="20" />
+                <mat-spinner diameter="20" aria-label="Saving product" />
               } @else {
                 <ng-container>
                   <mat-icon>save</mat-icon>
@@ -339,7 +342,7 @@ function httpErrorMessage(
               mat-stroked-button
               type="button"
               class="create-group-btn"
-              [disabled]="optionsBusy()"
+              [disabled]="optionActionsDisabled()"
               (click)="openCreateGroup()"
             >
               <mat-icon>add</mat-icon>
@@ -351,16 +354,25 @@ function httpErrorMessage(
             <div class="section-error" role="alert">{{ err }}</div>
           }
 
+          @if (optionsLoadError(); as err) {
+            <div class="section-error" role="alert">
+              {{ err }}
+              <button mat-button type="button" (click)="retryOptionGroups()">Retry</button>
+            </div>
+          }
+
           @if (optionsLoading()) {
             <div class="section-loading" role="status">
-              <mat-spinner diameter="32"></mat-spinner>
+              <mat-spinner diameter="32" aria-label="Loading option groups" />
             </div>
           } @else if (optionGroups().length === 0) {
-            <app-empty-state
-              icon="tune"
-              title="No option groups"
-              message="This product has no option groups yet."
-            />
+            @if (!optionsLoadError()) {
+              <app-empty-state
+                icon="tune"
+                title="No option groups"
+                message="This product has no option groups yet."
+              />
+            }
           } @else {
             <div class="groups-list">
               @for (group of optionGroups(); track group.id) {
@@ -405,7 +417,7 @@ function httpErrorMessage(
                       mat-button
                       type="button"
                       class="add-option-btn"
-                      [disabled]="optionsBusy()"
+                      [disabled]="optionActionsDisabled()"
                       (click)="openAddOption(group)"
                     >
                       <mat-icon>add</mat-icon>
@@ -416,7 +428,7 @@ function httpErrorMessage(
                       color="warn"
                       type="button"
                       class="delete-group-btn"
-                      [disabled]="optionsBusy()"
+                      [disabled]="optionActionsDisabled()"
                       (click)="confirmDeleteGroup(group)"
                     >
                       <mat-icon>delete</mat-icon>
@@ -440,16 +452,16 @@ function httpErrorMessage(
 
           @if (attrsLoading()) {
             <div class="section-loading" role="status">
-              <mat-spinner diameter="32"></mat-spinner>
+              <mat-spinner diameter="32" aria-label="Loading attribute values" />
             </div>
           } @else {
-            @if (attributeValues().length === 0) {
+            @if (attrsReadSucceeded() && attributeValues().length === 0) {
               <app-empty-state
                 icon="label"
                 title="No attribute values"
                 message="Set a value using the form below."
               />
-            } @else {
+            } @else if (attributeValues().length > 0) {
               <table class="attrs-table">
                 <thead>
                   <tr>
@@ -500,9 +512,10 @@ function httpErrorMessage(
                 type="submit"
                 class="set-attr-btn"
                 [disabled]="attrForm.invalid || attrsBusy()"
+                [attr.aria-label]="attrsBusy() ? 'Set value' : null"
               >
                 @if (attrsBusy()) {
-                  <mat-spinner diameter="20" />
+                  <mat-spinner diameter="20" aria-label="Saving attribute value" />
                 } @else {
                   Set value
                 }
@@ -515,8 +528,8 @@ function httpErrorMessage(
       </div>
     } @else {
       <app-empty-state
-        icon="search_off"
-        title="Product not found"
+        [icon]="service.detailReadStatus() === 404 ? 'search_off' : 'error_outline'"
+        [title]="service.detailReadStatus() === 404 ? 'Product not found' : 'Unable to load product'"
         [message]="
           error() ||
           'This catalog item could not be loaded from the product catalog API.'
@@ -798,10 +811,15 @@ export class CatalogDetailComponent implements OnInit {
   readonly optionsLoading = signal(false);
   readonly optionsBusy = signal(false);
   readonly optionsError = signal<string | null>(null);
+  protected readonly optionsLoadError = signal<string | null>(null);
+  protected readonly optionActionsDisabled = computed(
+    () => this.optionsLoading() || this.optionsBusy() || this.optionsLoadError() !== null,
+  );
 
   readonly attributeValues = signal<AttributeValueDto[]>([]);
   readonly attributeDefinitions = signal<ProductAttributeDto[]>([]);
   readonly attrsLoading = signal(false);
+  protected readonly attrsReadSucceeded = signal(false);
   readonly attrsBusy = signal(false);
   readonly attrsError = signal<string | null>(null);
 
@@ -825,7 +843,7 @@ export class CatalogDetailComponent implements OnInit {
   ];
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [FormValidators.requiredTrimmed, Validators.maxLength(255)]],
     description: [''],
     productType: this.fb.nonNullable.control<CatalogProductType | ''>('', {
       validators: [Validators.required],
@@ -863,6 +881,7 @@ export class CatalogDetailComponent implements OnInit {
   ngOnInit(): void {
     const numericId = Number(this.id());
     if (!Number.isFinite(numericId)) {
+      this.service.detailReadStatus.set(null);
       this.service.selectedProduct.set(null);
       this.service.error.set('Invalid product id');
       this.service.loading.set(false);
@@ -932,15 +951,19 @@ export class CatalogDetailComponent implements OnInit {
 
     this.saveError.set(null);
     this.saving.set(true);
-    this.service.update(product.id, request).subscribe({
+    this.form.disable({ emitEvent: false });
+    this.service.update(product.id, request).pipe(
+      finalize(() => {
+        this.form.enable({ emitEvent: false });
+        this.saving.set(false);
+      }),
+    ).subscribe({
       next: (updated) => {
         this.service.selectedProduct.set(updated);
-        this.saving.set(false);
         this.editing.set(false);
         this.notification.success('Product updated');
       },
       error: (err: unknown) => {
-        this.saving.set(false);
         this.saveError.set(httpErrorMessage(err));
       },
     });
@@ -1033,7 +1056,7 @@ export class CatalogDetailComponent implements OnInit {
 
   openCreateGroup(): void {
     const product = this.product();
-    if (!product || this.optionsBusy()) {
+    if (!product || this.optionActionsDisabled()) {
       return;
     }
     const ref = this.dialog.open(OptionGroupCreateDialogComponent, {
@@ -1052,11 +1075,13 @@ export class CatalogDetailComponent implements OnInit {
 
   openAddOption(group: ProductOptionGroupDto): void {
     const product = this.product();
-    if (!product || this.optionsBusy()) {
+    if (!product || this.optionActionsDisabled()) {
       return;
     }
     const ref = this.dialog.open(OptionCreateDialogComponent, {
       width: '480px',
+      // Capture initial focus at attachment so it cannot displace an open select.
+      delayFocusTrap: false,
       data: {
         groupId: group.id,
         groupName: group.name,
@@ -1076,11 +1101,12 @@ export class CatalogDetailComponent implements OnInit {
   }
 
   confirmDeleteGroup(group: ProductOptionGroupDto): void {
-    if (this.optionsBusy()) {
+    if (this.optionActionsDisabled()) {
       return;
     }
     const ref = this.dialog.open(ConfirmDialogComponent, {
       width: '400px',
+      autoFocus: 'button.cancel-button',
       data: {
         title: 'Delete option group',
         message: `Delete option group "${group.name}"? Options in the group will be removed.`,
@@ -1129,9 +1155,14 @@ export class CatalogDetailComponent implements OnInit {
     };
     this.attrsError.set(null);
     this.attrsBusy.set(true);
-    this.attributeService.setValue(product.id, request).subscribe({
-      next: (saved) => {
+    this.attrForm.disable({ emitEvent: false });
+    this.attributeService.setValue(product.id, request).pipe(
+      finalize(() => {
+        this.attrForm.enable({ emitEvent: false });
         this.attrsBusy.set(false);
+      }),
+    ).subscribe({
+      next: (saved) => {
         this.attributeValues.update((rows) => {
           const without = rows.filter(
             (r) => r.attributeId !== saved.attributeId,
@@ -1141,7 +1172,6 @@ export class CatalogDetailComponent implements OnInit {
         this.attrForm.patchValue({ value: '' });
       },
       error: (err: unknown) => {
-        this.attrsBusy.set(false);
         this.attrsError.set(
           httpErrorMessage(err, 'Failed to set attribute value'),
         );
@@ -1153,9 +1183,16 @@ export class CatalogDetailComponent implements OnInit {
     void this.router.navigate(['/catalog']);
   }
 
+  protected retryOptionGroups(): void {
+    const product = this.product();
+    if (product && !this.optionsLoading() && !this.optionsBusy()) {
+      this.loadOptionGroups(product.id);
+    }
+  }
+
   private loadOptionGroups(productId: number): void {
     this.optionsLoading.set(true);
-    this.optionsError.set(null);
+    this.optionsLoadError.set(null);
     this.optionService.listGroupsByProduct(productId).subscribe({
       next: (groups) => {
         this.optionGroups.set(groups ?? []);
@@ -1163,7 +1200,7 @@ export class CatalogDetailComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.optionsLoading.set(false);
-        this.optionsError.set(
+        this.optionsLoadError.set(
           httpErrorMessage(err, 'Failed to load option groups'),
         );
       },
@@ -1172,10 +1209,12 @@ export class CatalogDetailComponent implements OnInit {
 
   private loadAttributeValues(productId: number): void {
     this.attrsLoading.set(true);
+    this.attrsReadSucceeded.set(false);
     this.attrsError.set(null);
     this.attributeService.listValues(productId).subscribe({
       next: (values) => {
         this.attributeValues.set(values ?? []);
+        this.attrsReadSucceeded.set(true);
         this.attrsLoading.set(false);
       },
       error: (err: unknown) => {

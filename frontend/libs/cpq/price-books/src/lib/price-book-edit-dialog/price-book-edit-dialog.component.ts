@@ -80,7 +80,7 @@ function bookHttpErrorMessage(err: unknown, fallback: string): string {
             maxlength="255"
             autocomplete="off"
           />
-          @if (form.get('name')?.hasError('required')) {
+          @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
             <mat-error>Name is required</mat-error>
           }
           @if (form.get('name')?.hasError('maxlength')) {
@@ -143,10 +143,11 @@ function bookHttpErrorMessage(err: unknown, fallback: string): string {
         type="button"
         class="save-btn"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? 'Save' : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Saving price book" />
         } @else {
           Save
         }
@@ -204,7 +205,7 @@ export class PriceBookEditDialogComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
     region: [''],
     currency: ['', [Validators.maxLength(3), Validators.pattern(/^[A-Za-z]{3}$/)]],
     isDefault: [false],

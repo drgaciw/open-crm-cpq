@@ -143,6 +143,49 @@ describe('QuoteDocumentsPanelComponent', () => {
     );
   });
 
+  it('keeps a failed Documents read unknown through Dismiss until a successful list read', () => {
+    listDocumentsSpy.mockReturnValueOnce(
+      throwError(() => ({ error: { message: 'Documents unavailable' } })),
+    );
+    fixture.componentRef.setInput('quoteId', 6);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const alert = el.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Documents unavailable');
+    expect(el.querySelector('.empty-docs')).toBeNull();
+    expect(el.querySelector('[role="table"]')).toBeNull();
+    listDocumentsSpy.mockClear();
+    alert!.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('.empty-docs')).toBeNull();
+    expect(el.querySelector('[role="table"]')).toBeNull();
+    expect(listDocumentsSpy).not.toHaveBeenCalled();
+    expect(generateDocumentsSpy).not.toHaveBeenCalled();
+
+    listDocumentsSpy.mockReturnValueOnce(of([]));
+    fixture.componentRef.setInput('quoteId', 7);
+    fixture.detectChanges();
+    expect(el.querySelector('.empty-docs')?.textContent).toContain('No documents generated yet');
+  });
+
+  it('keeps listed documents visible on a generation error', () => {
+    listDocumentsSpy.mockClear();
+    generateDocumentsSpy.mockReturnValueOnce(
+      throwError(() => ({ error: { message: 'Generation unavailable' } })),
+    );
+
+    component.onGenerate();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Generation unavailable');
+    expect(el.querySelector('[role="table"]')?.textContent).toContain(DOC.fileName);
+    expect(listDocumentsSpy).not.toHaveBeenCalled();
+  });
+
   it('shows empty state when no documents', () => {
     listDocumentsSpy.mockReturnValue(of([]));
     fixture.componentRef.setInput('quoteId', 7);

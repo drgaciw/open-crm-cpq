@@ -28,13 +28,15 @@ describe('AgentPanelComponent', () => {
     );
   });
 
-  it('shows loading live region', () => {
+  it('names the progress indicator with its advisory loading message', () => {
     fixture.componentRef.setInput('state', 'loading');
+    fixture.componentRef.setInput('loadingMessage', 'Evaluating advisory tier…');
     fixture.detectChanges();
     const state = element.querySelector('.agent-panel__state') as HTMLElement;
     expect(state.getAttribute('role')).toBe('status');
     expect(state.getAttribute('aria-live')).toBe('polite');
-    expect(element.querySelector('mat-spinner')).toBeTruthy();
+    expect(element.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Evaluating advisory tier…');
   });
 
   it('shows disabled copy without projecting ready content', () => {

@@ -50,28 +50,20 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     Optional<Lead> findByUuid(String uuid);
 
     /**
-     * Find leads by status (excluding deleted).
-     */
-    @EntityGraph(attributePaths = {"contact", "organization"})
-    Page<Lead> findByStatusAndDeletedFalse(LeadStatus status, Pageable pageable);
-
-    /**
      * Find leads by owner (excluding deleted).
      */
     @EntityGraph(attributePaths = {"contact", "organization"})
     Page<Lead> findByOwnerIdAndDeletedFalse(String ownerId, Pageable pageable);
 
-    /**
-     * Find all non-deleted leads.
-     */
     @EntityGraph(attributePaths = {"contact", "organization"})
-    Page<Lead> findAllByDeletedFalse(Pageable pageable);
-
-    /**
-     * Find leads by priority (excluding deleted).
-     */
-    @EntityGraph(attributePaths = {"contact", "organization"})
-    Page<Lead> findByPriorityAndDeletedFalse(LeadPriority priority, Pageable pageable);
+    @Query("""
+            SELECT l FROM Lead l WHERE l.deleted = false
+              AND (:status IS NULL OR l.status = :status)
+              AND (:priority IS NULL OR l.priority = :priority)
+              AND (:query = '' OR LOWER(l.title) LIKE LOWER(CONCAT('%', :query, '%')))
+            """)
+    Page<Lead> findMatching(@Param("status") LeadStatus status, @Param("priority") LeadPriority priority,
+                            @Param("query") String query, Pageable pageable);
 
     /**
      * Search leads by title using case-insensitive partial match.

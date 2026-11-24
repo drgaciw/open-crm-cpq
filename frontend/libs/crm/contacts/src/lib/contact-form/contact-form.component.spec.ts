@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Subject } from 'rxjs';
 import { ContactFormComponent } from './contact-form.component';
@@ -150,6 +150,51 @@ describe('ContactFormComponent organization field (H-CRM-022, H-CRM-033)', () =>
 
     const payload = contactService.create.mock.calls[0][0];
     expect(payload.organizationId).toBeUndefined();
+  });
+
+  it.each(['firstName', 'lastName'])('rejects whitespace-only %s before submission', async (field) => {
+    await setup();
+    fillRequired();
+    component.form.controls[field].setValue('   ');
+
+    component.onSubmit();
+
+    expect(component.form.controls[field].hasError('required')).toBe(true);
+    expect(contactService.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'Create', method: 'create' as const, id: undefined },
+    { label: 'Update', method: 'update' as const, id: '42' },
+  ])('keeps pending $label named and restores the draft after failure', async ({ label, method, id }) => {
+    await setup(id);
+    fillRequired();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+
+    component.onSubmit();
+    component.onSubmit();
+    component.goBack();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+    const cancel = host.querySelector<HTMLButtonElement>('.form-actions button[type="button"]');
+    const back = host.querySelector<HTMLButtonElement>('nav button');
+    expect(submit?.disabled).toBe(true);
+    expect(submit?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving contact');
+    expect(cancel?.disabled).toBe(true);
+    expect(back?.disabled).toBe(true);
+    expect(component.form.disabled).toBe(true);
+    expect(contactService[method]).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+
+    saveSubject.error(new Error('Controlled save error'));
+    fixture.detectChanges();
+    expect(component.saving()).toBe(false);
+    expect(component.form.enabled).toBe(true);
+    expect(component.form.controls['firstName'].value).toBe('Ada');
+    expect(cancel?.disabled).toBe(false);
+    expect(back?.disabled).toBe(false);
   });
 
   it('applies cdkTextareaAutosize with min/max rows to the notes textarea', async () => {

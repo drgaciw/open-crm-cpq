@@ -1,11 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -40,6 +41,7 @@ import {
 
 interface RuleTableRow {
   id: number;
+  ruleSetId: number;
   name: string;
   ruleType: string;
   priority: number | null;
@@ -182,13 +184,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
             </button>
           </div>
 
-          @if (!rulesLoading() && ruleRows().length === 0) {
+          @if (!rulesLoading() && rulesConfirmed() && ruleRows().length === 0) {
             <app-empty-state
               icon="code"
               title="No rules"
               message="This rule set has no DRL rules yet. Rules load via /api/v1/rules/by-rule-set/{id}."
             />
-          } @else {
+          } @else if (rulesLoading() || ruleRows().length > 0) {
             <div class="rules-table-wrap">
               @if (rulesLoading()) {
                 <div class="rules-loading" role="status">
@@ -262,7 +264,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
     } @else {
       <app-empty-state
         icon="search_off"
-        title="Rule set not found"
+        [title]="detailReadUnavailable() ? 'Could not load rule set' : 'Rule set not found'"
         [message]="
           bannerError() ||
           'This rule set could not be loaded from /api/v1/rule-sets.'
@@ -427,7 +429,7 @@ function httpErrorMessage(err: unknown, fallback: string): string {
     `,
   ],
 })
-export class RuleSetDetailComponent implements OnInit {
+export class RuleSetDetailComponent {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   readonly ruleSetService = inject(RuleSetService);
@@ -440,9 +442,12 @@ export class RuleSetDetailComponent implements OnInit {
 
   readonly mutating = signal(false);
   readonly actionError = signal<string | null>(null);
+  readonly detailReadUnavailable = computed(
+    () => this.ruleSetService.detailReadUnavailableId() === Number(this.id()),
+  );
 
   readonly loading = computed(
-    () => this.ruleSetService.loading() && !this.ruleSet(),
+    () => this.ruleSetService.detailLoading() && !this.ruleSet(),
   );
   readonly rulesLoading = computed(
     () => this.ruleService.loading() && !!this.ruleSet(),
@@ -450,7 +455,7 @@ export class RuleSetDetailComponent implements OnInit {
   readonly bannerError = computed(
     () =>
       this.actionError() ??
-      this.ruleSetService.error() ??
+      this.ruleSetService.detailError() ??
       this.ruleService.error(),
   );
   readonly rulesPagination = computed(() => this.ruleService.pagination());
@@ -470,22 +475,27 @@ export class RuleSetDetailComponent implements OnInit {
   readonly canActivate = computed(() => this.ruleSet()?.status === 'DRAFT');
   readonly canDeprecate = computed(() => this.ruleSet()?.status === 'ACTIVE');
 
-  readonly ruleRows = computed<RuleTableRow[]>(() =>
-    this.ruleService.rules().map((r) => this.toRuleRow(r)),
+  readonly rulesConfirmed = computed(
+    () => this.ruleService.confirmedRuleSetId() === this.ruleSet()?.id,
   );
 
-  ngOnInit(): void {
+  readonly ruleRows = computed<RuleTableRow[]>(() => {
+    const ruleSetId = this.ruleSet()?.id;
+    return this.ruleService.rules()
+      .filter((rule) => rule.ruleSetId === ruleSetId)
+      .map((rule) => this.toRuleRow(rule));
+  });
+
+  private readonly loadSelection = effect(() => {
     const numericId = Number(this.id());
-    if (!Number.isFinite(numericId)) {
-      this.ruleSetService.selectedRuleSet.set(null);
-      this.ruleService.rules.set([]);
-      this.ruleSetService.error.set('Invalid rule set id');
-      this.ruleSetService.loading.set(false);
-      return;
-    }
-    this.ruleSetService.getById(numericId);
-    this.ruleService.listByRuleSet(numericId);
-  }
+    untracked(() => {
+      this.actionError.set(null);
+      this.ruleSetService.getById(numericId);
+      if (Number.isFinite(numericId)) {
+        this.ruleService.listByRuleSet(numericId);
+      }
+    });
+  });
 
   subtitle(ruleSet: RuleSetDto): string {
     const parts = [
@@ -505,7 +515,7 @@ export class RuleSetDetailComponent implements OnInit {
 
   clearError(): void {
     this.actionError.set(null);
-    this.ruleSetService.error.set(null);
+    this.ruleSetService.detailError.set(null);
     this.ruleService.error.set(null);
   }
 
@@ -601,7 +611,7 @@ export class RuleSetDetailComponent implements OnInit {
       data,
     });
     ref.afterClosed().subscribe((created: RuleDto | undefined) => {
-      if (!created) {
+      if (!created || this.ruleSet()?.id !== ruleSet.id) {
         return;
       }
       this.actionError.set(null);
@@ -610,7 +620,7 @@ export class RuleSetDetailComponent implements OnInit {
   }
 
   openRuleImpact(row: RuleTableRow): void {
-    if (this.mutating()) {
+    if (row.ruleSetId !== this.ruleSet()?.id || this.mutating()) {
       return;
     }
     const data: RuleImpactDialogData = {
@@ -625,10 +635,10 @@ export class RuleSetDetailComponent implements OnInit {
 
   openEditRule(row: RuleTableRow): void {
     const ruleSet = this.ruleSet();
-    if (!ruleSet || this.mutating()) {
+    if (!ruleSet || row.ruleSetId !== ruleSet.id || this.mutating()) {
       return;
     }
-    const rule = this.ruleService.rules().find((r) => r.id === row.id);
+    const rule = this.ruleService.rules().find((r) => r.id === row.id && r.ruleSetId === ruleSet.id);
     if (!rule) {
       return;
     }
@@ -639,7 +649,7 @@ export class RuleSetDetailComponent implements OnInit {
       data,
     });
     ref.afterClosed().subscribe((saved: RuleDto | undefined) => {
-      if (!saved) {
+      if (!saved || this.ruleSet()?.id !== ruleSet.id) {
         return;
       }
       this.actionError.set(null);
@@ -653,7 +663,7 @@ export class RuleSetDetailComponent implements OnInit {
 
   confirmDeleteRule(row: RuleTableRow): void {
     const ruleSet = this.ruleSet();
-    if (!ruleSet || this.mutating()) {
+    if (!ruleSet || row.ruleSetId !== ruleSet.id || this.mutating()) {
       return;
     }
 
@@ -669,7 +679,7 @@ export class RuleSetDetailComponent implements OnInit {
     });
 
     ref.afterClosed().subscribe((confirmed) => {
-      if (confirmed !== true) {
+      if (confirmed !== true || this.ruleSet()?.id !== ruleSet.id) {
         return;
       }
       this.actionError.set(null);
@@ -677,11 +687,13 @@ export class RuleSetDetailComponent implements OnInit {
       this.ruleService.delete(row.id).subscribe({
         next: () => {
           this.mutating.set(false);
-          this.ruleService.listByRuleSet(
-            ruleSet.id,
-            this.rulesPagination().page,
-            this.rulesPagination().size,
-          );
+          if (this.ruleSet()?.id === ruleSet.id) {
+            this.ruleService.listByRuleSet(
+              ruleSet.id,
+              this.rulesPagination().page,
+              this.rulesPagination().size,
+            );
+          }
         },
         error: (err: unknown) => {
           this.mutating.set(false);
@@ -694,6 +706,7 @@ export class RuleSetDetailComponent implements OnInit {
   private toRuleRow(r: RuleDto): RuleTableRow {
     return {
       id: r.id,
+      ruleSetId: r.ruleSetId,
       name: r.name,
       ruleType: r.ruleType,
       priority: r.priority ?? null,
