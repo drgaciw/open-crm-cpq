@@ -14,7 +14,6 @@ import org.springframework.cloud.gateway.filter.ratelimit.RateLimiter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -91,7 +90,11 @@ class WriteRouteRateLimit429Test {
         }
     }
 
-    @Configuration
+    /**
+     * Registered only through {@code withUserConfiguration}. Deliberately not a {@code @Configuration}
+     * stereotype: component scan from {@code GatewayApplication} would otherwise pick it up and add a
+     * second {@code RateLimiter} bean, breaking {@code GatewayApplicationStartupTest}.
+     */
     static class PriceBookRoute {
         static String upstreamUri;
 
