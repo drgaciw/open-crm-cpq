@@ -50,14 +50,16 @@ public class AssetReportService {
 
     public UpcomingRenewalsReport upcomingRenewals(String accountId, LocalDate windowStart, LocalDate windowEnd,
                                                    Integer withinDays, LocalDate asOf) {
-        InstalledBaseReadAccess.require();
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
         requireAccount(accountId);
         Window window = window(windowStart, windowEnd, withinDays, asOf);
-        List<InstalledAssetDto> assets = history.installedBase(accountId, window.end()).stream()
-                .filter(asset -> endsInWindow(asset, window))
-                .sorted(Comparator.comparing(InstalledAssetDto::getEffectiveEnd)
-                        .thenComparing(InstalledAssetDto::getAssetId))
-                .toList();
+        List<InstalledAssetDto> assets = scope.open()
+                ? history.installedBase(accountId, window.end()).stream()
+                    .filter(asset -> endsInWindow(asset, window))
+                    .sorted(Comparator.comparing(InstalledAssetDto::getEffectiveEnd)
+                            .thenComparing(InstalledAssetDto::getAssetId))
+                    .toList()
+                : List.of();
         return UpcomingRenewalsReport.builder()
                 .accountId(accountId)
                 .windowStart(window.start())
@@ -68,10 +70,11 @@ public class AssetReportService {
     }
 
     public AssetChurnReport churn(String accountId, LocalDate periodStart, LocalDate periodEnd) {
-        InstalledBaseReadAccess.require();
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
         requireAccount(accountId);
         requirePeriod(periodStart, periodEnd);
-        List<AssetChurnEventDto> events = churnEvents(store.findByAccountId(accountId), periodStart, periodEnd);
+        List<AssetHistoryEntry> rows = scope.open() ? history.accountRows(accountId) : List.of();
+        List<AssetChurnEventDto> events = churnEvents(rows, periodStart, periodEnd);
         BigDecimal quantity = events.stream()
                 .map(AssetChurnEventDto::getQuantityChurned)
                 .filter(Objects::nonNull)

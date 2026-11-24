@@ -1,0 +1,27 @@
+{
+    "issue": "DRG-594",
+    "ac_id": "AC-594-4",
+    "case": "existing-saas-sku-add-skips-legal-review",
+    "note": "drg owner ruling, 7:15 PM CT Nov 23 2026, option B. SKU-A is SaaS and already on the quote, so ADD is a seat change.",
+    "status": "Decided",
+    "owner_decision": "B. drg owner ruling, 7:15 PM CT Nov 23 2026",
+    "input": {
+        "document_state_before": "DRAFT",
+        "quote_skus": ["SKU-A"],
+        "catalog": [
+            {"sku": "SKU-A", "product_type": "SAAS_SEAT_NAMED"}
+        ],
+        "lines": [
+            {"action_code": "ADD", "target_sku": "SKU-A"}
+        ],
+        "header_edits": []
+    },
+    "expected": {
+        "legal_review_required": false,
+        "transition_to_in_review": "allowed",
+        "document_state": "IN_REVIEW",
+        "error_code": null,
+        "approval_row_written": false,
+        "approval_type_written": null
+    }
+}
