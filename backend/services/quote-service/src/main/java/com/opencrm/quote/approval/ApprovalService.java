@@ -9,7 +9,11 @@ import com.opencrm.quote.quote.ApprovalState;
 import com.opencrm.quote.quote.Quote;
 import com.opencrm.quote.quote.QuoteRepository;
 import com.opencrm.quote.quote.QuoteStatus;
+import com.opencrm.security.Caller;
+import com.opencrm.security.SecurityUtils;
+import com.opencrm.security.UserContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,18 +51,64 @@ public class ApprovalService {
     private final ApprovalRoutingClient approvalRoutingClient;
     private final boolean legacyLocalReadEnabled;
     private final com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard;
+    private final QuotePolicyEvaluation quotePolicyEvaluation;
 
+    @Autowired
     public ApprovalService(
             ApprovalRequestRepository approvalRepository,
             QuoteRepository quoteRepository,
             ApprovalRoutingClient approvalRoutingClient,
             @Value("${approvals.legacy-local-read-enabled:true}") boolean legacyLocalReadEnabled,
-            com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard) {
+            com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard,
+            QuotePolicyEvaluation quotePolicyEvaluation) {
         this.approvalRepository = approvalRepository;
         this.quoteRepository = quoteRepository;
         this.approvalRoutingClient = approvalRoutingClient;
         this.legacyLocalReadEnabled = legacyLocalReadEnabled;
         this.rampScheduleGuard = rampScheduleGuard;
+        this.quotePolicyEvaluation = quotePolicyEvaluation;
+    }
+
+    /** Tests that predate EvaluateQuote keep the submit path that does not call approval-routing for a verdict. */
+    public ApprovalService(
+            ApprovalRequestRepository approvalRepository,
+            QuoteRepository quoteRepository,
+            ApprovalRoutingClient approvalRoutingClient,
+            boolean legacyLocalReadEnabled,
+            com.opencrm.quote.ramp.RampScheduleGuard rampScheduleGuard) {
+        this(approvalRepository, quoteRepository, approvalRoutingClient, legacyLocalReadEnabled, rampScheduleGuard,
+                QuotePolicyEvaluation.notConfigured());
+    }
+
+    /**
+     * EvaluateQuote for the seller entry point. Does not write an approval. A blocked verdict is also enforced
+     * by {@link #submitForApproval} before any approval-routing write.
+     */
+    public QuotePolicyEvaluationResponse evaluatePolicy(Long quoteId) {
+        requireSeller();
+        Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
+        String tenantId = SecurityUtils.getCurrentUser().map(UserContext::getTenantId)
+                .filter(value -> !value.isBlank()).orElseThrow(() -> new BusinessException(
+                        "Tenant identity is required", HttpStatus.FORBIDDEN, "TENANT_REQUIRED"));
+        if (quote.getTenantId() != null && !tenantId.equals(quote.getTenantId())) {
+            throw new BusinessException(
+                    "Quote tenant does not match the caller", HttpStatus.FORBIDDEN, "TENANT_MISMATCH");
+        }
+        QuotePolicyVerdict verdict = quotePolicyEvaluation.evaluate(quote);
+        if (!verdict.configured()) {
+            throw new BusinessException(
+                    "Commercial policy evaluation is not available",
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "POLICY_EVALUATOR_UNAVAILABLE");
+        }
+        return new QuotePolicyEvaluationResponse(quote.getId(), verdict.quoteVersion(), verdict.verdict(), verdict.breaches());
+    }
+
+    private static void requireSeller() {
+        if (SecurityUtils.getCurrentCaller().filter(Caller.User.class::isInstance).isEmpty()) {
+            throw new BusinessException("A user must evaluate the quote", HttpStatus.FORBIDDEN, "ACTOR_REQUIRED");
+        }
     }
 
     public ApprovalRequestDto submitForApproval(Long quoteId, ApprovalSubmitRequest request) {
@@ -107,6 +157,11 @@ public class ApprovalService {
             quote.setApprovalTier(pending.getApprovalTier());
             quoteRepository.save(quote);
             return toDtoFromRouting(pending);
+        }
+
+        QuotePolicyVerdict policyVerdict = quotePolicyEvaluation.evaluate(quote);
+        if (policyVerdict.refusesSubmission()) {
+            throw new PolicyBlockedException(policyVerdict.summary(), policyVerdict.reasonCodes());
         }
 
         Long submissionVersion = quote.getVersion();
