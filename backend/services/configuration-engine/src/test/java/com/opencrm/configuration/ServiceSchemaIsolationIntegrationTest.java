@@ -47,6 +47,7 @@ class ServiceSchemaIsolationIntegrationTest {
             "amendment_operation_receipts",
             "applied_quote_acceptances",
             "asset_history",
+            "asset_lifecycle_changes",
             "assets",
             "contract_lines",
             "contracts",
