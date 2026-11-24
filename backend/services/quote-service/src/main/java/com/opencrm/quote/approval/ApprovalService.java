@@ -192,7 +192,7 @@ public class ApprovalService {
         quote.setApprovalSubmissionId(remote.getId());
         quote.setApprovalSubmissionVersion(submissionVersion);
         // Single-writer: do NOT persist a local ApprovalRequest on submit.
-        quote.setStatus("PENDING".equals(current.getStatus()) ? QuoteStatus.PENDING_APPROVAL : QuoteStatus.valueOf(current.getStatus()));
+        quote.setStatus(quoteStatusFor(current.getStatus()));
         quote.setApprovalState(ApprovalState.valueOf(current.getStatus()));
         quote.setApprovalTier(request.getTier().name());
         quoteRepository.save(quote);
@@ -210,7 +210,8 @@ public class ApprovalService {
     public ApprovalRequestDto approveRequest(Long approvalId, ApprovalResponseRequest request) {
         refuseUndecidable(currentRouting(approvalId));
         try {
-            RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId);
+            String comments = request == null ? null : request.getComments();
+            RoutingApprovalDto remote = approvalRoutingClient.approve(approvalId, comments);
             applyQuoteDecision(remote.getQuoteId(), QuoteStatus.APPROVED, ApprovalState.APPROVED);
             log.info("Approval {} approved via routing for quote {} by {}",
                     approvalId, remote.getQuoteId(), remote.getApproverId());
@@ -225,7 +226,8 @@ public class ApprovalService {
         refuseUndecidable(currentRouting(approvalId));
         try {
             RoutingApprovalDto remote = approvalRoutingClient.reject(approvalId, comments);
-            applyQuoteDecision(remote.getQuoteId(), QuoteStatus.REJECTED, ApprovalState.REJECTED);
+            // A rejection returns the quote to Draft so the seller can revise it. The approval row stays REJECTED.
+            applyQuoteDecision(remote.getQuoteId(), QuoteStatus.DRAFT, ApprovalState.REJECTED);
             log.info("Approval {} rejected via routing for quote {} by {}",
                     approvalId, remote.getQuoteId(), remote.getApproverId());
             return toDtoFromRouting(remote);
@@ -249,6 +251,29 @@ public class ApprovalService {
             );
         }
         return notFound;
+    }
+
+    /**
+     * Advances a stalled approval after its SLA window. The quote stays pending for the next tier.
+     * The write goes to approval-routing; this method only projects the quote.
+     */
+    public ApprovalRequestDto escalateRequest(Long approvalId) {
+        refuseUndecidable(currentRouting(approvalId));
+        try {
+            RoutingApprovalDto remote = approvalRoutingClient.escalate(approvalId);
+            Long quoteId = parseQuoteId(remote.getQuoteId());
+            Quote quote = quoteRepository.findByIdAndDeletedFalse(quoteId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Quote", quoteId));
+            quote.setStatus(QuoteStatus.PENDING_APPROVAL);
+            quote.setApprovalState(ApprovalState.PENDING);
+            quote.setApprovalTier(remote.getApprovalTier());
+            quoteRepository.save(quote);
+            log.info("Approval {} escalated via routing for quote {} to {}",
+                    approvalId, remote.getQuoteId(), remote.getApprovalTier());
+            return toDtoFromRouting(remote);
+        } catch (ResourceNotFoundException ex) {
+            throw notInRouting(approvalId, ex);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -496,7 +521,9 @@ public class ApprovalService {
         ApprovalStatus status = mapStatus(remote.getStatus());
 
         Instant respondedAt = remote.getApprovedAt() != null ? remote.getApprovedAt() : remote.getRejectedAt();
-        String comments = remote.getRejectionReason() != null ? remote.getRejectionReason() : remote.getReason();
+        String comments = remote.getDecisionComment() != null
+                ? remote.getDecisionComment()
+                : remote.getRejectionReason() != null ? remote.getRejectionReason() : remote.getReason();
         if (status == ApprovalStatus.SUPERSEDED) {
             // Nobody responded: routing replaced it. Say by what, so the history reads without the reason column.
             respondedAt = remote.getSupersededAt();
@@ -521,6 +548,19 @@ public class ApprovalService {
                 .supersededBy(status == ApprovalStatus.SUPERSEDED ? remote.getSupersededBy() : null)
                 .createdAt(remote.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Routing REJECTED is an approval outcome. The quote itself goes back to Draft (DRG-444).
+     */
+    private static QuoteStatus quoteStatusFor(String routingStatus) {
+        if ("PENDING".equals(routingStatus)) {
+            return QuoteStatus.PENDING_APPROVAL;
+        }
+        if ("REJECTED".equals(routingStatus)) {
+            return QuoteStatus.DRAFT;
+        }
+        return QuoteStatus.valueOf(routingStatus);
     }
 
     private static Optional<ApprovalTier> mapQuoteTier(String approvalTier) {

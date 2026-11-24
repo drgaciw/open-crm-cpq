@@ -8,6 +8,9 @@ import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.EventContractRegistry;
 import com.opencrm.common.event.OutboxEventPublisher;
+import com.opencrm.common.event.dto.ApprovalEscalatedEvent;
+import com.opencrm.common.event.dto.ApprovalGrantedEvent;
+import com.opencrm.common.event.dto.ApprovalRejected;
 import com.opencrm.common.event.dto.ApprovalRejectedEvent;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
@@ -15,10 +18,14 @@ import com.opencrm.security.Caller;
 import com.opencrm.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +54,34 @@ public class ApprovalService {
     private final ApprovalRequestMapper approvalRequestMapper;
     private final CurrentActor currentActor;
 
+    private Clock clock = Clock.systemUTC();
+
+    /**
+     * ISO-8601 text, not {@link Duration}: the approval security slice has no Boot conversion service.
+     */
+    @Value("${opencrm.approvals.sla-window:PT24H}")
+    private String slaWindowText = "PT24H";
+
+    private Duration slaWindow = Duration.ofHours(24);
+
+    /** Tests and the escalation sweep pin the clock. Production uses {@link Clock#systemUTC()}. */
+    public void setClock(Clock clock) {
+        this.clock = clock == null ? Clock.systemUTC() : clock;
+    }
+
+    void setSlaWindow(Duration slaWindow) {
+        if (slaWindow != null && !slaWindow.isZero() && !slaWindow.isNegative()) {
+            this.slaWindow = slaWindow;
+        }
+    }
+
+    @PostConstruct
+    void parseSlaWindow() {
+        if (slaWindowText != null && !slaWindowText.isBlank()) {
+            slaWindow = Duration.parse(slaWindowText.trim());
+        }
+    }
+
     /**
      * Create a PENDING approval for quote BFF orchestration (S2C-12).
      * Additive to {@link com.opencrm.approval.event.DiscountApprovalEventConsumer}.
@@ -66,6 +101,7 @@ public class ApprovalService {
         }
 
         ApprovalPrincipal.Scope scope = writeScope();
+        Instant submittedAt = clock.instant();
         ApprovalRequest entity = ApprovalRequest.builder()
                 .quoteId(request.getQuoteId().trim())
                 .lineId(request.getLineId())
@@ -77,11 +113,13 @@ public class ApprovalService {
                 .pricingFingerprint(request.getPricingFingerprint())
                 .governingPeriod(request.getGoverningPeriod())
                 .requesterId(currentActor.id())
-                .submittedAt(Instant.now())
+                .submittedAt(submittedAt)
                 .approvalTier(mapped.approvalTier())
                 .reason(request.getReason() != null ? request.getReason() : "Quote approval submitted via BFF")
                 .tenantId(scope.tenantId())
                 .accountId(scope.accountId())
+                .escalationPath(blankToNull(request.getEscalationPath()))
+                .slaDeadline(request.getSlaDeadline() != null ? request.getSlaDeadline() : submittedAt.plus(slaWindow))
                 .build();
 
         ApprovalRequest saved = approvalRequestRepository.save(entity);
@@ -127,14 +165,31 @@ public class ApprovalService {
     }
 
     public ApprovalRequestDto approve(Long id) {
+        return approve(id, null);
+    }
+
+    public ApprovalRequestDto approve(Long id, String comment) {
         log.debug("Approving request ID: {}", id);
 
         ApprovalRequest request = findEntityById(id);
         String approver = authorizeDecision(request);
         requireNotSuperseded(request);
         request.approve(approver);
+        request.setDecisionComment(blankToNull(comment));
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
+        outboxEventPublisher.publish(
+                "ApprovalRequest",
+                saved.getQuoteId(),
+                EventContractRegistry.APPROVAL_GRANTED_V1,
+                new ApprovalGrantedEvent(
+                        saved.getId(),
+                        saved.getQuoteId(),
+                        saved.getApproverId(),
+                        saved.getApprovalTier(),
+                        saved.getDecisionComment(),
+                        saved.getApprovedAt())
+        );
 
         log.info("Approved request ID: {} for quote: {} by {}", id, request.getQuoteId(), request.getApproverId());
 
@@ -148,6 +203,7 @@ public class ApprovalService {
         String approver = authorizeDecision(request);
         requireNotSuperseded(request);
         request.reject(approver, rejectionReason);
+        request.setDecisionComment(blankToNull(rejectionReason));
 
         ApprovalRequest saved = approvalRequestRepository.save(request);
 
@@ -164,10 +220,96 @@ public class ApprovalService {
                 EventContractRegistry.QUOTE_APPROVAL_REJECTED_V1,
                 event
         );
+        outboxEventPublisher.publish(
+                "ApprovalRequest",
+                saved.getQuoteId(),
+                EventContractRegistry.APPROVAL_REJECTED_V1,
+                new ApprovalRejected(
+                        saved.getId(),
+                        saved.getQuoteId(),
+                        saved.getApproverId(),
+                        saved.getApprovalTier(),
+                        saved.getDecisionComment(),
+                        saved.getRejectedAt())
+        );
 
         log.info("Rejected request ID: {} for quote: {} by {}", id, request.getQuoteId(), request.getApproverId());
 
         return approvalRequestMapper.toDto(saved);
+    }
+
+    /**
+     * Person-triggered escalation. The SLA window must already have elapsed, and the caller must be
+     * allowed to decide the current tier. The requester may escalate; this is not a grant or a rejection.
+     */
+    public ApprovalRequestDto escalate(Long id) {
+        ApprovalRequest request = findEntityById(id);
+        authorize(request, false);
+        requireNotSuperseded(request);
+        if (request.getStatus() != ApprovalStatus.PENDING) {
+            throw new BusinessException("Only a PENDING approval can be escalated",
+                    HttpStatus.CONFLICT, "APPROVAL_NOT_PENDING");
+        }
+        Instant now = clock.instant();
+        if (request.getSlaDeadline() == null || now.isBefore(request.getSlaDeadline())) {
+            throw new BusinessException("SLA window has not elapsed",
+                    HttpStatus.CONFLICT, "SLA_WINDOW_OPEN");
+        }
+        if (!advance(request, now, false)) {
+            throw new BusinessException("Escalation path has no further tier",
+                    HttpStatus.CONFLICT, "NO_ESCALATION_PATH");
+        }
+        return approvalRequestMapper.toDto(request);
+    }
+
+    /**
+     * System sweep. Advances every pending request whose deadline is at or before the clock.
+     * A request already at the end of its path drops its deadline so the sweep does not retry it.
+     */
+    public int escalateDue() {
+        Instant now = clock.instant();
+        int advanced = 0;
+        for (ApprovalRequest request : approvalRequestRepository
+                .findByStatusAndDeletedFalseAndSlaDeadlineLessThanEqual(ApprovalStatus.PENDING, now)) {
+            if (advance(request, now, true)) {
+                advanced++;
+            }
+        }
+        return advanced;
+    }
+
+    private boolean advance(ApprovalRequest request, Instant now, boolean clearWhenExhausted) {
+        if (request.getStatus() != ApprovalStatus.PENDING) {
+            return false;
+        }
+        Optional<String> next = EscalationPath.next(request.getApprovalTier(), request.getEscalationPath());
+        if (next.isEmpty()) {
+            if (clearWhenExhausted && request.getSlaDeadline() != null) {
+                request.setSlaDeadline(null);
+                approvalRequestRepository.save(request);
+            }
+            return false;
+        }
+        String fromTier = request.getApprovalTier();
+        request.setEscalatedFromTier(fromTier);
+        request.setApprovalTier(next.get());
+        request.setEscalatedAt(now);
+        request.setSlaDeadline(now.plus(slaWindow));
+        ApprovalRequest saved = approvalRequestRepository.save(request);
+        outboxEventPublisher.publish(
+                "ApprovalRequest",
+                saved.getQuoteId(),
+                EventContractRegistry.APPROVAL_ESCALATED_V1,
+                new ApprovalEscalatedEvent(
+                        saved.getId(),
+                        saved.getQuoteId(),
+                        fromTier,
+                        next.get(),
+                        now,
+                        saved.getSlaDeadline())
+        );
+        log.info("Escalated approval {} from {} to {}", saved.getId(), fromTier, next.get());
+        return true;
     }
 
     /**
@@ -177,6 +319,14 @@ public class ApprovalService {
      * deciding their own request.
      */
     private String authorizeDecision(ApprovalRequest request) {
+        return authorize(request, true);
+    }
+
+    /**
+     * @param forbidSelf grant and rejection refuse the requester. Escalation does not: moving a stalled
+     *                   request is not deciding it.
+     */
+    private String authorize(ApprovalRequest request, boolean forbidSelf) {
         Optional<Caller> caller = currentActor.caller();
         if (caller.isEmpty()) {
             if (!currentActor.unverifiedCallersAllowed()) {
@@ -199,12 +349,20 @@ public class ApprovalService {
                     + new TreeSet<>(ApprovalAuthority.decidersOf(request.getApprovalTier())),
                     HttpStatus.FORBIDDEN, "APPROVER_ROLE_REQUIRED");
         }
-        if (user.actorId().equals(request.getRequesterId())) {
+        if (forbidSelf && user.actorId().equals(request.getRequesterId())) {
             log.warn("Refused self-approval of approval {} by its requester {}", request.getId(), user.actorId());
             throw new BusinessException("The requester cannot decide their own approval",
                     HttpStatus.FORBIDDEN, "SELF_APPROVAL");
         }
         return user.actorId();
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.strip();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

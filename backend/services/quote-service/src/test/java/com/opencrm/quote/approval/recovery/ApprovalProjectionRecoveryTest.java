@@ -22,7 +22,8 @@ class ApprovalProjectionRecoveryTest {
     @Test void appliesTerminalDecisionWithVersionAndCanonicalBinding() {
         Quote q = pending(); when(quotes.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(q));
         assertThat(writer.reconcile(42L, 8L, 90L, canonical("REJECTED"))).isEqualTo(ApprovalProjectionWriter.Outcome.APPLIED);
-        assertThat(q.getStatus()).isEqualTo(QuoteStatus.REJECTED);
+        assertThat(q.getStatus()).isEqualTo(QuoteStatus.DRAFT);
+        assertThat(q.getApprovalState()).isEqualTo(ApprovalState.REJECTED);
         verify(quotes).saveAndFlush(q);
     }
     @Test void pendingCanonicalNeedsNoWriteAndNoTransactionRead() {

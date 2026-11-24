@@ -31,6 +31,7 @@ import java.util.stream.StreamSupport;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -207,7 +208,7 @@ class ApprovalControllerTest {
                 .approverId("mgr-1")
                 .approvedAt(Instant.parse("2026-09-01T11:00:00Z"))
                 .build();
-        when(approvalService.approve(eq(9001L))).thenReturn(approved);
+        when(approvalService.approve(eq(9001L), isNull())).thenReturn(approved);
 
         MvcResult result = mockMvc.perform(post("/api/v1/approvals/9001/approve")
                         .accept(MediaType.APPLICATION_JSON))

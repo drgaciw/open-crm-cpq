@@ -319,12 +319,20 @@ public class ApprovalRoutingClient {
     }
 
     public RoutingApprovalDto approve(Long approvalId) {
+        return approve(approvalId, null);
+    }
+
+    public RoutingApprovalDto approve(Long approvalId, String comment) {
         log.debug("Approving routing approval {}", approvalId);
         try {
             ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/v1/approvals/{id}/approve")
-                            .build(approvalId))
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/api/v1/approvals/{id}/approve");
+                        if (comment != null && !comment.isBlank()) {
+                            builder.queryParam("comment", comment);
+                        }
+                        return builder.build(approvalId);
+                    })
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, res) -> {
                         throw new ResourceNotFoundException("ApprovalRequest", approvalId);
@@ -382,6 +390,38 @@ public class ApprovalRoutingClient {
         } catch (RestClientException ex) {
             throw new BusinessException(
                     "Failed to call approval-routing reject: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
+    public RoutingApprovalDto escalate(Long approvalId) {
+        log.debug("Escalating routing approval {}", approvalId);
+        try {
+            ApiResponse<RoutingApprovalDto> response = approvalRoutingRestClient.post()
+                    .uri("/api/v1/approvals/{id}/escalate", approvalId)
+                    .retrieve()
+                    .onStatus(status -> status.value() == 404, (req, res) -> {
+                        throw new ResourceNotFoundException("ApprovalRequest", approvalId);
+                    })
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_ESCALATE_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing escalate failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_ESCALATE_FAILED"
+                        );
+                    })
+                    .body(SINGLE);
+            return requireData(response, "APPROVAL_ROUTING_ESCALATE_FAILED");
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing escalate: " + ex.getMessage(),
                     HttpStatus.BAD_GATEWAY,
                     "APPROVAL_ROUTING_UNAVAILABLE"
             );

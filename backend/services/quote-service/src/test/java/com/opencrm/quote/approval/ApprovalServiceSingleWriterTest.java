@@ -64,7 +64,8 @@ class ApprovalServiceSingleWriterTest {
                 .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
         assertThatThrownBy(() -> approvalService.rejectRequest(9L, null)).isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getErrorCode()).isEqualTo("APPROVAL_SUPERSEDED");
-        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).approve(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.nullable(String.class));
         verify(approvalRoutingClient, never()).reject(any(), any());
         verify(quoteRepository, never()).save(any());
     }
@@ -182,7 +183,8 @@ class ApprovalServiceSingleWriterTest {
         assertThatThrownBy(() -> approvalService.rejectRequest(9001L, null))
                 .isInstanceOf(com.opencrm.common.exception.ResourceNotFoundException.class);
 
-        verify(approvalRoutingClient, never()).approve(any());
+        verify(approvalRoutingClient, never()).approve(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.nullable(String.class));
         verify(approvalRoutingClient, never()).reject(any(), any());
         verify(quoteRepository, never()).save(any());
     }
@@ -190,7 +192,7 @@ class ApprovalServiceSingleWriterTest {
     @Test
     @DisplayName("approveRequest updates Quote via routing and does not save local ApprovalRequest")
     void approveViaRoutingDoesNotWriteLocal() {
-        when(approvalRoutingClient.approve(9001L))
+        when(approvalRoutingClient.approve(9001L, "ok"))
                 .thenReturn(RoutingApprovalDto.builder()
                         .id(9001L)
                         .quoteId("42")
@@ -214,7 +216,7 @@ class ApprovalServiceSingleWriterTest {
                 ApprovalResponseRequest.builder().comments("ok").build()
         );
 
-        verify(approvalRoutingClient).approve(9001L);
+        verify(approvalRoutingClient).approve(9001L, "ok");
         verify(approvalRepository, never()).save(any());
         assertThat(quote.getStatus()).isEqualTo(QuoteStatus.APPROVED);
         assertThat(quote.getApprovalState()).isEqualTo(ApprovalState.APPROVED);
@@ -330,6 +332,53 @@ class ApprovalServiceSingleWriterTest {
         assertThat(replaced.getRespondedAt()).isEqualTo(supersededAt);
         assertThat(replaced.getComments()).isEqualTo("Superseded by request 2");
         assertThat(history.get(1).getSupersededBy()).as("only a superseded row names a replacement").isNull();
+    }
+
+    @Test
+    @DisplayName("reject returns the quote to Draft and keeps the approval outcome REJECTED")
+    void rejectReturnsQuoteToDraft() {
+        Quote quote = Quote.builder().quoteNumber("Q-100").status(QuoteStatus.PENDING_APPROVAL)
+                .approvalState(ApprovalState.PENDING).build();
+        quote.setId(42L);
+        when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(approvalRoutingClient.getById(9001L)).thenReturn(RoutingApprovalDto.builder()
+                .id(9001L).quoteId("42").status("PENDING").approvalTier("DEAL_DESK").build());
+        when(approvalRoutingClient.reject(9001L, "too steep")).thenReturn(RoutingApprovalDto.builder()
+                .id(9001L).quoteId("42").status("REJECTED").approvalTier("DEAL_DESK")
+                .decisionComment("too steep").rejectionReason("too steep").build());
+
+        ApprovalRequestDto dto = approvalService.rejectRequest(9001L,
+                ApprovalResponseRequest.builder().comments("too steep").build());
+
+        assertThat(quote.getStatus()).isEqualTo(QuoteStatus.DRAFT);
+        assertThat(quote.getApprovalState()).isEqualTo(ApprovalState.REJECTED);
+        assertThat(dto.getComments()).isEqualTo("too steep");
+        assertThat(dto.getStatus()).isEqualTo(ApprovalStatus.REJECTED);
+        verify(approvalRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("escalate keeps the quote pending and projects the next tier")
+    void escalateProjectsNextTier() {
+        Quote quote = Quote.builder().quoteNumber("Q-100").status(QuoteStatus.PENDING_APPROVAL)
+                .approvalState(ApprovalState.PENDING).approvalTier("DEAL_DESK").build();
+        quote.setId(42L);
+        when(quoteRepository.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(approvalRoutingClient.getById(9001L)).thenReturn(RoutingApprovalDto.builder()
+                .id(9001L).quoteId("42").status("PENDING").approvalTier("DEAL_DESK").build());
+        when(approvalRoutingClient.escalate(9001L)).thenReturn(RoutingApprovalDto.builder()
+                .id(9001L).quoteId("42").status("PENDING").approvalTier("SALES_VP")
+                .escalatedFromTier("DEAL_DESK").build());
+
+        ApprovalRequestDto dto = approvalService.escalateRequest(9001L);
+
+        assertThat(quote.getStatus()).isEqualTo(QuoteStatus.PENDING_APPROVAL);
+        assertThat(quote.getApprovalState()).isEqualTo(ApprovalState.PENDING);
+        assertThat(quote.getApprovalTier()).isEqualTo("SALES_VP");
+        assertThat(dto.getTier()).isEqualTo(ApprovalTier.SALES_VP);
+        verify(approvalRepository, never()).save(any());
     }
 
     private RoutingApprovalDto historyRow(Long id, String quoteId, String status) {

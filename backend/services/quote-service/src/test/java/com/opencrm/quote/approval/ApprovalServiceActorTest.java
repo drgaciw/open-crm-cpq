@@ -57,7 +57,7 @@ class ApprovalServiceActorTest {
     void approveShowsTheRecordedApprover() {
         Quote quote = quote(QuoteStatus.PENDING_APPROVAL);
         when(quoteRepository.save(quote)).thenReturn(quote);
-        when(approvalRoutingClient.approve(7L)).thenReturn(RoutingApprovalDto.builder()
+        when(approvalRoutingClient.approve(7L, null)).thenReturn(RoutingApprovalDto.builder()
                 .id(7L).quoteId("42").status("APPROVED").approvalTier("CFO").approverId("cfo-oid").build());
 
         ApprovalRequestDto dto = service(false).approveRequest(7L, ApprovalResponseRequest.builder().build());
@@ -85,7 +85,7 @@ class ApprovalServiceActorTest {
     @Test
     @DisplayName("a legacy local approval is history only: deciding it is 409, it would bypass the role check")
     void legacyLocalApprovalIsReadOnly() {
-        when(approvalRoutingClient.approve(7L)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
+        when(approvalRoutingClient.approve(7L, null)).thenThrow(new ResourceNotFoundException("ApprovalRequest", 7L));
         when(approvalRepository.findByIdAndDeletedFalse(7L)).thenReturn(Optional.of(new ApprovalRequest()));
 
         assertThatThrownBy(() -> service(true).approveRequest(7L, ApprovalResponseRequest.builder().build()))

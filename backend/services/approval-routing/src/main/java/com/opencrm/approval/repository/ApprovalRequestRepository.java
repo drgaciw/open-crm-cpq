@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,9 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     List<ApprovalRequest> findByStatus(ApprovalStatus status);
 
     List<ApprovalRequest> findByApprovalTierAndStatus(String approvalTier, ApprovalStatus status);
+
+    List<ApprovalRequest> findByStatusAndDeletedFalseAndSlaDeadlineLessThanEqual(
+            ApprovalStatus status, Instant deadline);
 
     /**
      * A null {@code accountId} does not filter by account. A non-null account hides every other account,

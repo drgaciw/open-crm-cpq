@@ -61,6 +61,11 @@ opencrm:
     inbox:
       # ADR-018 D6: consumers deduplicate on the eventId header via processed_events (V1_5).
       enabled: true
+  approvals:
+    sla-window: ${APPROVAL_SLA_WINDOW:PT24H}
+    escalation:
+      sweep-enabled: ${APPROVAL_ESCALATION_SWEEP_ENABLED:true}
+      sweep-delay-ms: ${APPROVAL_ESCALATION_SWEEP_DELAY_MS:60000}
   jev:
     enabled: ${JEV_ENABLED:false}
     transport: ${JEV_TRANSPORT:noop}

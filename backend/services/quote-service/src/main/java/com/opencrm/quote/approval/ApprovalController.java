@@ -65,4 +65,11 @@ public class ApprovalController {
         ApprovalRequestDto approval = approvalService.rejectRequest(approvalId, request);
         return ApiResponse.success(approval, "Approval rejected");
     }
+
+    @PostMapping("/approvals/{approvalId}/escalate")
+    @Operation(summary = "Escalate a pending approval after its SLA window")
+    public ApiResponse<ApprovalRequestDto> escalate(@PathVariable Long approvalId) {
+        ApprovalRequestDto approval = approvalService.escalateRequest(approvalId);
+        return ApiResponse.success(approval, "Approval escalated");
+    }
 }
