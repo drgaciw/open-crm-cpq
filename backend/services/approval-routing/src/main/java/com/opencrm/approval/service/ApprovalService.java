@@ -100,14 +100,20 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovals() {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByStatus(ApprovalStatus.PENDING));
+        String tenantId = ApprovalTenancy.currentTenantId();
+        List<ApprovalRequest> rows = tenantId == null
+                ? approvalRequestRepository.findByStatus(ApprovalStatus.PENDING)
+                : approvalRequestRepository.findPendingVisibleToTenant(tenantId);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovalsByTier(String tier) {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING));
+        String tenantId = ApprovalTenancy.currentTenantId();
+        List<ApprovalRequest> rows = tenantId == null
+                ? approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING)
+                : approvalRequestRepository.findPendingVisibleToTenantAndTier(tenantId, tier);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     public ApprovalRequestDto approve(Long id) {

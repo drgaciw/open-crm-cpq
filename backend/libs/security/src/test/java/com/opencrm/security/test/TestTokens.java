@@ -102,6 +102,7 @@ public final class TestTokens {
         private final boolean appOnly;
         private String issuer = ISSUER;
         private String audience = AUDIENCE;
+        private String tenantId = "00000000-0000-4000-8000-00000000c0de";
         private Instant issuedAt = Instant.now().minusSeconds(5);
         private Instant expiresAt = issuedAt.plus(Duration.ofMinutes(10));
         private RSAKey signingKey = KEY;
@@ -114,6 +115,12 @@ public final class TestTokens {
 
         public Builder issuer(String issuer) {
             this.issuer = issuer;
+            return this;
+        }
+
+        /** Overrides the Entra {@code tid} claim. The default stays the made-up tenant in {@link #ISSUER}. */
+        public Builder tenantId(String tenantId) {
+            this.tenantId = tenantId;
             return this;
         }
 
@@ -145,7 +152,7 @@ public final class TestTokens {
                     .issuedAt(issuedAt)
                     .notBefore(issuedAt)
                     .expiresAt(expiresAt)
-                    .claim("tid", "00000000-0000-4000-8000-00000000c0de")
+                    .claim("tid", tenantId)
                     .claim("ver", "2.0");
             if (appOnly) {
                 claims.claim("oid", servicePrincipal).claim("azp", subject).claim("idtyp", "app");

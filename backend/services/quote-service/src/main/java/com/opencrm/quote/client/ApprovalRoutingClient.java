@@ -210,6 +210,75 @@ public class ApprovalRoutingClient {
         }
     }
 
+    public List<RoutingApprovalDto> submitMatrix(RoutingMatrixSubmitRequest request) {
+        log.debug("Submitting matrix approval for quoteId={}", request.getQuoteId());
+        try {
+            ApiResponse<List<RoutingApprovalDto>> response = approvalRoutingRestClient.post()
+                    .uri("/api/v1/approvals/matrix-submissions")
+                    .body(request)
+                    .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_SUBMIT_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing matrix submit failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_SUBMIT_FAILED");
+                    })
+                    .body(LIST);
+            if (response == null || !response.isSuccess() || response.getData() == null) {
+                throw new BusinessException("approval-routing matrix submit returned an empty response",
+                        HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_SUBMIT_FAILED");
+            }
+            return response.getData();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing matrix submit: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE");
+        }
+    }
+
+    public List<RoutingApprovalDto> listInbox(String tier) {
+        log.debug("Fetching approval inbox tier={}", tier);
+        try {
+            ApiResponse<List<RoutingApprovalDto>> response = approvalRoutingRestClient.get()
+                    .uri(uriBuilder -> {
+                        uriBuilder.path("/api/v1/approvals/inbox");
+                        if (tier != null && !tier.isBlank()) {
+                            uriBuilder.queryParam("tier", tier);
+                        }
+                        return uriBuilder.build();
+                    })
+                    .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "APPROVAL_ROUTING_PENDING_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing inbox failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "APPROVAL_ROUTING_PENDING_FAILED");
+                    })
+                    .body(LIST);
+            if (response == null || !response.isSuccess()) {
+                throw new BusinessException("approval-routing inbox returned an empty response",
+                        HttpStatus.BAD_GATEWAY, "APPROVAL_ROUTING_PENDING_FAILED");
+            }
+            return response.getData() != null ? response.getData() : Collections.emptyList();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing inbox: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE");
+        }
+    }
+
     public RoutingApprovalDto approve(Long approvalId) {
         log.debug("Approving routing approval {}", approvalId);
         try {
