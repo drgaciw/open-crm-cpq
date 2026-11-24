@@ -9,6 +9,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import org.springframework.data.jpa.domain.Specification;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +42,7 @@ class AssetReadAuthorizationTest {
     }
     @Test void explicitInstalledBaseCapabilityAllowsReads() {
         signInJwt(false, false);
-        when(assets.findById(1L)).thenReturn(Optional.of(Asset.builder().id(1L).build()));
+        when(assets.findOne(any(Specification.class))).thenReturn(Optional.of(Asset.builder().id(1L).build()));
         query.list(null, null, null);
         query.get(1L);
         projection.history("asset");
@@ -48,7 +50,8 @@ class AssetReadAuthorizationTest {
         projection.installedBase("account", LocalDate.of(2026, 1, 1));
         reports.upcomingRenewals("account", LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null, null);
         reports.churn("account", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
-        verify(assets).findByDeletedFalse();
+        verify(assets).findAll(any(Specification.class));
+        verify(assets).findOne(any(Specification.class));
         verify(history).findByAssetId("asset");
         verify(history).findByEventType(AssetHistoryKind.SUPERSEDED);
         verify(history, times(3)).findByAccountId("account");
@@ -70,7 +73,8 @@ class AssetReadAuthorizationTest {
                 "caller", "n/a", List.of(new SimpleGrantedAuthority(role))));
     }
     private static void signInJwt(boolean appOnly, boolean explicitType) {
-        var builder = Jwt.withTokenValue("token").header("alg", "none").subject("caller").claim("azp", "client");
+        var builder = Jwt.withTokenValue("token").header("alg", "none").subject("caller").claim("azp", "client")
+                .claim("tid", "11111111-1111-4111-8111-111111111111");
         if (explicitType) builder.claim("idtyp", "app");
         if (!appOnly) builder.claim("scp", "access_as_user");
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(),
