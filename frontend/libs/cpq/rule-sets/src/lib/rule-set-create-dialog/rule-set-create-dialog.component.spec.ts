@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { RuleSetCreateDialogComponent } from './rule-set-create-dialog.component';
 import { RuleSetService } from '@frontend/cpq-pricing-data-access';
 import { MOCK_RULE_SETS } from '../rule-sets.mock';
@@ -48,6 +48,16 @@ describe('RuleSetCreateDialogComponent', () => {
     expect(component.form.invalid).toBe(true);
   });
 
+  it('rejects a whitespace-only name before sending a create request', () => {
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
+  });
+
   it('creates via RuleSetService.create and closes with result', () => {
     component.form.patchValue({
       name: 'New Set',
@@ -65,6 +75,38 @@ describe('RuleSetCreateDialogComponent', () => {
     });
     expect(dialogClose).toHaveBeenCalledWith(MOCK_RULE_SETS[0]);
     expect(component.saving()).toBe(false);
+  });
+
+  it('keeps Create and the progress indicator named during a pending request', () => {
+    const pending = new Subject<(typeof MOCK_RULE_SETS)[number]>();
+    createSpy.mockReturnValueOnce(pending);
+    component.form.controls.name.setValue('Draft rule set');
+    component.onSubmit();
+    fixture.detectChanges();
+
+    const actions = (fixture.nativeElement as HTMLElement).querySelector(
+      'mat-dialog-actions',
+    );
+    const submit = actions?.querySelector<HTMLButtonElement>(
+      'button[mat-raised-button]',
+    );
+    const cancel = actions?.querySelector<HTMLButtonElement>(
+      'button[mat-dialog-close]',
+    );
+    expect(submit?.getAttribute('aria-label')).toBe('Create');
+    expect(submit?.disabled).toBe(true);
+    expect(cancel?.disabled).toBe(true);
+    expect(
+      actions?.querySelector('[role="progressbar"]')?.getAttribute('aria-label'),
+    ).toBe('Creating rule set');
+    expect(dialogClose).not.toHaveBeenCalled();
+
+    component.onSubmit();
+    expect(createSpy).toHaveBeenCalledTimes(1);
+
+    pending.next(MOCK_RULE_SETS[0]);
+    pending.complete();
+    expect(dialogClose).toHaveBeenCalledWith(MOCK_RULE_SETS[0]);
   });
 
   it('surfaces create error in dialog banner', () => {

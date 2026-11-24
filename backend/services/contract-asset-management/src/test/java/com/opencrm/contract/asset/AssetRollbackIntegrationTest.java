@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Throwaway PostgreSQL 16 proof for the CAM V1_14 and V1_13 rollbacks.
  *
- * <p>The empty database is migrated to the latest CAM version. V1_14's rollback
+ * <p>The empty database is migrated to the historical V1_22 CAM baseline. V1_14's rollback
  * runs before V1_13's. Flyway 11 {@code repair()} does not forget a successful
  * version, and {@code clean()} would drop the rest of the schema, so this test
  * deletes only versions 1.13 and 1.14 from {@code contract.flyway_schema_history}
@@ -199,6 +199,7 @@ class AssetRollbackIntegrationTest {
                 .schemas(SCHEMA)
                 .defaultSchema(SCHEMA)
                 .locations("classpath:db/migration")
+                .target("1.22")
                 .outOfOrder(outOfOrder)
                 .load();
     }

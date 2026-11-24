@@ -11,6 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subscription } from 'rxjs';
 import { OrganizationType } from '@frontend/shared-models';
+import { FormValidators } from '@frontend/shared-utils';
 import { PageHeaderComponent } from '@frontend/shared-ui';
 import { ACCOUNT_INDUSTRIES } from '../account-industries';
 import { OrganizationService } from '../organization.service';
@@ -151,9 +152,10 @@ import { OrganizationService } from '../organization.service';
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
             <button mat-raised-button color="primary" type="submit"
-                    [disabled]="form.invalid || saving() || !readyForSave()">
+                    [disabled]="form.invalid || saving() || !readyForSave()"
+                    [attr.aria-label]="saving() ? (isEditMode() ? 'Update' : 'Create') : null">
               @if (saving()) {
-                <mat-spinner diameter="20"></mat-spinner>
+                <mat-spinner diameter="20" aria-label="Saving account"></mat-spinner>
               } @else {
                 {{ isEditMode() ? 'Update' : 'Create' }}
               }
@@ -198,7 +200,7 @@ export class OrganizationFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.form = this.fb.group({
-      name: ['', Validators.required],
+      name: ['', FormValidators.requiredTrimmed],
       industry: [''],
       website: [''],
       phone: [''],

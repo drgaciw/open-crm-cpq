@@ -76,7 +76,7 @@ const REGIONS: CustomerRegion[] = ['NA', 'EMEA', 'APAC', 'LATAM'];
             maxlength="100"
             autocomplete="off"
           />
-          @if (form.get('externalId')?.hasError('required')) {
+          @if (form.controls.externalId.hasError('required') || form.controls.externalId.hasError('pattern')) {
             <mat-error>External ID is required</mat-error>
           }
         </mat-form-field>
@@ -89,7 +89,7 @@ const REGIONS: CustomerRegion[] = ['NA', 'EMEA', 'APAC', 'LATAM'];
             maxlength="255"
             autocomplete="off"
           />
-          @if (form.get('name')?.hasError('required')) {
+          @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
             <mat-error>Name is required</mat-error>
           }
           @if (form.get('name')?.hasError('maxlength')) {
@@ -103,7 +103,7 @@ const REGIONS: CustomerRegion[] = ['NA', 'EMEA', 'APAC', 'LATAM'];
             <input
               matInput
               formControlName="type"
-              maxlength="50"
+              maxlength="30"
               placeholder="e.g. ACCOUNT"
               autocomplete="off"
             />
@@ -169,10 +169,11 @@ const REGIONS: CustomerRegion[] = ['NA', 'EMEA', 'APAC', 'LATAM'];
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? 'Create' : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Creating pricing customer" />
         } @else {
           Create
         }
@@ -234,9 +235,9 @@ export class PricingCustomerCreateDialogComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    externalId: ['', [Validators.required, Validators.maxLength(100)]],
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    type: [''],
+    externalId: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(100)]],
+    name: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
+    type: ['', Validators.maxLength(30)],
     segment: ['' as CustomerSegment | ''],
     region: ['' as CustomerRegion | ''],
     industry: [''],

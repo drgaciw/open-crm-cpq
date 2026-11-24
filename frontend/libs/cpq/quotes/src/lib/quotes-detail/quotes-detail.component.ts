@@ -16,6 +16,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import {
+  type AbstractControl,
   FormBuilder,
   ReactiveFormsModule,
   Validators,
@@ -42,6 +43,7 @@ import {
   StatusBadgeComponent,
 } from '@frontend/shared-ui';
 import { NotificationService } from '@frontend/shared-data-access';
+import { FormValidators } from '@frontend/shared-utils';
 import {
   APPROVAL_TIER_LABELS,
   JevSuggestionEnvelope,
@@ -108,9 +110,9 @@ function httpErrorMessage(err: unknown): string {
   template: `
     @if (loading() && !quote()) {
       <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40" />
+        <mat-spinner diameter="40" aria-label="Loading quote details" />
       </div>
-    } @else if (error(); as err) {
+    } @else if (!detailNotFound() && error(); as err) {
       <div class="error-banner" role="alert">
         <mat-icon>error_outline</mat-icon>
         <span>{{ err }}</span>
@@ -331,6 +333,8 @@ function httpErrorMessage(err: unknown): string {
           errorMessage="No suggestion available from the advisory service."
           [evidence]="tierEvidence()"
           [showActions]="tierAgentPanelState() === 'ready'"
+          (dismiss)="tierSuggestion.set(null)"
+          (acknowledge)="acknowledgeTierAdvisory()"
         >
           <div tools>
             <button
@@ -433,7 +437,7 @@ function httpErrorMessage(err: unknown): string {
                               <mat-checkbox
                                 [checked]="selectedLineIds().has(line.id)"
                                 (change)="toggleLineSelection(line)"
-                                [attr.aria-label]="'Select line ' + (line.productName || line.productExternalId)"
+                                [aria-label]="'Select line ' + (line.productName || line.productExternalId)"
                               ></mat-checkbox>
                             </span>
                           }
@@ -442,7 +446,7 @@ function httpErrorMessage(err: unknown): string {
                             <span role="cell">
                               <mat-form-field appearance="outline" class="edit-field">
                                 <mat-label>Name</mat-label>
-                                <input matInput [formControl]="editForm.controls.productName" />
+                                <input matInput [formControl]="editForm.controls.productName" [readonly]="actionBusy()" />
                               </mat-form-field>
                             </span>
                             <span role="cell">
@@ -453,6 +457,7 @@ function httpErrorMessage(err: unknown): string {
                                   type="number"
                                   min="1"
                                   [formControl]="editForm.controls.quantity"
+                                  [readonly]="actionBusy()"
                                 />
                               </mat-form-field>
                             </span>
@@ -465,6 +470,7 @@ function httpErrorMessage(err: unknown): string {
                                   min="0"
                                   step="0.01"
                                   [formControl]="editForm.controls.listPrice"
+                                  [readonly]="actionBusy()"
                                 />
                               </mat-form-field>
                             </span>
@@ -585,7 +591,10 @@ function httpErrorMessage(err: unknown): string {
                       </mat-form-field>
                       <mat-form-field appearance="outline">
                         <mat-label>Quantity</mat-label>
-                        <input matInput type="number" formControlName="quantity" min="1" />
+                        <input matInput type="number" formControlName="quantity" min="1" step="1" />
+                        @if (lineForm.controls.quantity.hasError('wholeNumber')) {
+                          <mat-error>Quantity must be a whole number</mat-error>
+                        }
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="notes-field">
                         <mat-label>Notes</mat-label>
@@ -661,7 +670,7 @@ function httpErrorMessage(err: unknown): string {
                     </div>
                     <div class="info-item full-width">
                       <span class="label">Description</span>
-                      <span class="value">{{ quote.description || '—' }}</span>
+                      <span class="value quote-description">{{ quote.description || '—' }}</span>
                     </div>
                   </div>
                 </mat-card-content>
@@ -811,6 +820,10 @@ function httpErrorMessage(err: unknown): string {
         color: #212121;
       }
 
+      .quote-description {
+        overflow-wrap: anywhere;
+      }
+
       .empty-lines {
         margin: 16px 0 0;
         color: #757575;
@@ -921,6 +934,10 @@ function httpErrorMessage(err: unknown): string {
       }
 
       @media (max-width: 768px) {
+        .line-table {
+          overflow-x: auto;
+        }
+
         .error-banner {
           margin: 16px;
         }
@@ -952,6 +969,10 @@ export class QuotesDetailComponent {
 
   readonly loading = computed(() => this.quoteService.loading());
   readonly error = computed(() => this.quoteService.error());
+  protected readonly detailNotFound = computed(() => {
+    const missing = this.quoteService.missingQuoteId();
+    return missing !== null && missing === this.numericId();
+  });
   readonly quote = computed(() => this.quoteService.selectedQuote());
   readonly lineItems = computed(() => this.quote()?.lineItems ?? []);
   readonly lineItemCount = computed(() => this.lineItems().length);
@@ -1063,10 +1084,14 @@ export class QuotesDetailComponent {
   });
 
   readonly lineForm = this.fb.nonNullable.group({
-    productExternalId: ['', Validators.required],
+    productExternalId: ['', FormValidators.requiredTrimmed],
     productName: [''],
     listPrice: [null as number | null, Validators.required],
-    quantity: [1 as number | null],
+    quantity: [
+      1 as number | null,
+      (control: AbstractControl<number | null>) =>
+        control.value == null || Number.isInteger(control.value) ? null : { wholeNumber: true },
+    ],
     notes: [''],
   });
 
@@ -1165,6 +1190,10 @@ export class QuotesDetailComponent {
         this.tierSuggestionLoading.set(false);
       },
     });
+  }
+
+  protected acknowledgeTierAdvisory(): void {
+    this.notifications.info('Advisory acknowledged (not a decision)');
   }
 
   onSubmit(): void {

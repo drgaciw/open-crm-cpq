@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   PriceBookEntryDialogComponent,
   PriceBookEntryDialogData,
@@ -95,6 +95,42 @@ describe('PriceBookEntryDialogComponent', () => {
     expect(dialogClose).toHaveBeenCalledWith(createdEntry);
     expect(component.saving()).toBe(false);
     expect(component.error()).toBeNull();
+  });
+
+  it.each([
+    { mode: 'create', action: 'Create', label: 'Creating price book entry' },
+    { mode: 'edit', action: 'Save', label: 'Saving price book entry' },
+  ])('names the disabled action and progress while $mode is pending', async ({ mode, action, label }) => {
+    const isEdit = mode === 'edit';
+    await setup({ bookId: 3, entry: isEdit ? createdEntry : undefined });
+    const pending = new Subject<PriceBookEntryDto>();
+    const request = isEdit ? updateEntrySpy : createEntrySpy;
+    request.mockReturnValue(pending);
+    component.form.patchValue({
+      productExternalId: ' NEW-SKU ',
+      listPrice: 150,
+      floorPrice: 0,
+      currency: 'gbp',
+    });
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    const [cancel, submit] = Array.from(view.querySelectorAll<HTMLButtonElement>('mat-dialog-actions button'));
+    expect(submit.textContent?.trim()).toBe(action);
+    submit.click();
+    fixture.detectChanges();
+
+    expect(cancel.disabled).toBe(true);
+    expect(submit.disabled).toBe(true);
+    expect(submit.getAttribute('aria-label')).toBe(action);
+    expect(view.querySelector('mat-dialog-actions mat-spinner')?.getAttribute('aria-label')).toBe(label);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(dialogClose).not.toHaveBeenCalled();
+
+    pending.next(createdEntry);
+    pending.complete();
+
+    expect(dialogClose).toHaveBeenCalledWith(createdEntry);
   });
 
   it('omits optional floorPrice and currency when empty on create', async () => {

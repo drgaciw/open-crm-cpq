@@ -3,7 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { ConfirmDialogComponent } from '@frontend/shared-ui';
 import { PricingCustomerDetailComponent } from './pricing-customer-detail.component';
 import { PricingCustomerService } from '@frontend/cpq-pricing-data-access';
@@ -28,6 +28,7 @@ describe('PricingCustomerDetailComponent', () => {
   );
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadFailure = signal<{ id: number; status: number; message: string } | null>(null);
 
   beforeEach(async () => {
     getByIdSpy = vi.fn((id: number) => {
@@ -51,6 +52,7 @@ describe('PricingCustomerDetailComponent', () => {
       selectedCustomer,
       loading,
       error,
+      detailReadFailure,
       getById: getByIdSpy,
       update: updateSpy,
       delete: deleteSpy,
@@ -79,6 +81,7 @@ describe('PricingCustomerDetailComponent', () => {
     selectedCustomer.set(MOCK_PRICING_CUSTOMERS[0]);
     loading.set(false);
     error.set(null);
+    detailReadFailure.set(null);
   });
 
   it('loads customer via PricingCustomerService.getById on init', () => {
@@ -87,6 +90,35 @@ describe('PricingCustomerDetailComponent', () => {
     expect(compiled.textContent).toContain('Acme Corp');
     expect(compiled.textContent).toContain('CUST-ACME');
     expect(compiled.textContent).toContain('Enterprise');
+  });
+
+  it('offers Retry for a transient read failure without saying the customer is missing', () => {
+    selectedCustomer.set(null);
+    detailReadFailure.set({ id: 1, status: 503, message: 'Customer service unavailable' });
+    error.set('Customer service unavailable');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const alert = host.querySelector('[role="alert"]');
+    expect(host.textContent).not.toContain('Pricing customer not found');
+    expect(alert?.textContent).toContain('Customer service unavailable');
+    getByIdSpy.mockClear();
+    const retry = [...(alert?.querySelectorAll('button') ?? [])].find(button => button.textContent?.trim() === 'Retry');
+    expect(retry).toBeTruthy();
+    retry?.click();
+    expect(getByIdSpy).toHaveBeenCalledOnce();
+    expect(getByIdSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('keeps the existing not-found card for an actual 404', () => {
+    selectedCustomer.set(null);
+    detailReadFailure.set({ id: 1, status: 404, message: 'Customer missing' });
+    error.set('Customer missing');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-empty-state')?.textContent).toContain('Pricing customer not found');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('enters edit mode and saves via PricingCustomerService.update', () => {
@@ -150,6 +182,64 @@ describe('PricingCustomerDetailComponent', () => {
     component.form.patchValue({ name: '' });
     component.onSave();
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { field: 'name', value: '   ', message: 'Name is required' } as const,
+    { field: 'type', value: 'T'.repeat(31), message: 'Type must be at most 30 characters' } as const,
+  ])('blocks Save for invalid $field before sending an update', ({ field, value, message }) => {
+    component.startEdit();
+    component.form.controls[field].setValue(value);
+    component.form.controls[field].markAsTouched();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const save = Array.from(host.querySelectorAll('button')).find((button) =>
+      button.textContent?.trim().endsWith('Save'),
+    );
+    expect(save?.disabled).toBe(true);
+    expect(host.textContent).toContain(message);
+
+    component.onSave();
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(component.editing()).toBe(true);
+  });
+
+  it('keeps accessible Save and progress names while the update is pending', () => {
+    const accepted = { ...MOCK_PRICING_CUSTOMERS[0], name: 'Updated', type: 'Channel' };
+    const pending = new Subject<PricingCustomerDto>();
+    updateSpy.mockReturnValueOnce(pending);
+    component.startEdit();
+    component.form.patchValue({
+      name: ' Updated ',
+      type: ' Channel ',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+
+    component.onSave();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const action = host.querySelector<HTMLButtonElement>('app-page-header button:has(mat-spinner)');
+    expect(action?.disabled).toBe(true);
+    expect(action?.getAttribute('aria-label')).toBe('Save');
+    expect(action?.querySelector('mat-spinner')?.getAttribute('aria-label'))
+      .toBe('Saving pricing customer');
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledWith(1, expect.objectContaining({
+      name: 'Updated',
+      type: 'Channel',
+      churnScore: 0,
+      annualRevenue: 0,
+    }));
+    expect(component.editing()).toBe(true);
+
+    pending.next(accepted);
+    pending.complete();
+
+    expect(selectedCustomer()).toEqual(accepted);
+    expect(component.editing()).toBe(false);
   });
 
   it('cancelEdit exits edit mode without calling update', () => {
@@ -278,4 +368,27 @@ describe('PricingCustomerDetailComponent', () => {
     component.goBack();
     expect(navigateSpy).toHaveBeenCalledWith(['/pricing-customers']);
   });
+
+  it('keeps Delete and its progress indicator named while the confirmed request is pending', () => {
+    const pending = new Subject<void>();
+    deleteSpy.mockReturnValueOnce(pending);
+
+    component.onDelete();
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    const spinner = view.querySelector('app-page-header button mat-spinner');
+    const button = spinner?.closest('button');
+    expect(button?.disabled).toBe(true);
+    expect(button?.getAttribute('aria-label')).toBe('Delete');
+    expect(spinner?.getAttribute('aria-label')).toBe('Deleting pricing customer');
+    expect(navigateSpy).not.toHaveBeenCalled();
+
+    pending.next();
+    pending.complete();
+    expect(deleteSpy).toHaveBeenCalledOnce();
+    expect(deleteSpy).toHaveBeenCalledWith(1);
+    expect(navigateSpy).toHaveBeenCalledWith(['/pricing-customers']);
+  });
+
 });

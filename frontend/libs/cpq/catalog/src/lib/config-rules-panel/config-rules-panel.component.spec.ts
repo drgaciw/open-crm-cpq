@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { ConfigRulesPanelComponent } from './config-rules-panel.component';
 import { ConfigurationRuleService } from '../configuration-rule.service';
 import { ConfigurationRuleDto } from '../configuration-rule.model';
@@ -78,6 +78,63 @@ describe('ConfigRulesPanelComponent', () => {
     expect(el.textContent).toContain('No configuration rules');
   });
 
+  it('blocks Add rule while the product rules request is pending', () => {
+    const pending = new Subject<ConfigurationRuleDto[]>();
+    listByProductSpy.mockReturnValueOnce(pending);
+    fixture.componentRef.setInput('productId', 2);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const add = el.querySelector<HTMLButtonElement>('.add-rule-btn');
+
+    component.openCreate();
+
+    expect(dialogOpen).not.toHaveBeenCalled();
+    expect(add?.disabled).toBe(true);
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    pending.next([]);
+    pending.complete();
+    fixture.detectChanges();
+    expect(add?.disabled).toBe(false);
+    expect(el.textContent).toContain('No configuration rules');
+  });
+
+  it('gives the pending rules progress indicator an accessible name', () => {
+    const pending = new Subject<ConfigurationRuleDto[]>();
+    listByProductSpy.mockReturnValueOnce(pending);
+    fixture.componentRef.setInput('productId', 2);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(
+      el.querySelector('[role="progressbar"]')?.getAttribute('aria-label'),
+    ).toBe('Loading configuration rules');
+  });
+
+  it('keeps the current product rows when an older product request settles', () => {
+    const pending = new Subject<ConfigurationRuleDto[]>();
+    listByProductSpy.mockReturnValueOnce(pending);
+    fixture.componentRef.setInput('productId', 2);
+    fixture.detectChanges();
+    const current = {
+      ...SAMPLE_RULE,
+      id: 83,
+      sourceProductId: 3,
+      name: 'Current product rule',
+    };
+    listByProductSpy.mockReturnValueOnce(of([current]));
+    fixture.componentRef.setInput('productId', 3);
+    fixture.detectChanges();
+
+    pending.next([
+      { ...SAMPLE_RULE, sourceProductId: 2, name: 'Earlier product rule' },
+    ]);
+    pending.complete();
+    fixture.detectChanges();
+
+    expect(component.rules()).toEqual([current]);
+  });
+
   it('opens create dialog and appends created rule', () => {
     const created: ConfigurationRuleDto = {
       id: 81,
@@ -139,8 +196,8 @@ describe('ConfigRulesPanelComponent', () => {
     expect(component.rules().some((r) => r.id === 80)).toBe(true);
   });
 
-  it('shows error when list fails', () => {
-    listByProductSpy.mockReturnValue(
+  it('offers Retry after a failed list and shows empty only after a successful read', () => {
+    listByProductSpy.mockReturnValueOnce(
       throwError(() => ({
         error: {
           message: 'Rules unavailable',
@@ -151,17 +208,35 @@ describe('ConfigRulesPanelComponent', () => {
     fixture.componentRef.setInput('productId', 9);
     fixture.detectChanges();
 
-    expect(component.error()).toBe(
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
       'Rules unavailable [CONFIG_RULES_UNAVAILABLE]',
     );
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
-      'Rules unavailable [CONFIG_RULES_UNAVAILABLE]',
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    const pending = new Subject<ConfigurationRuleDto[]>();
+    listByProductSpy.mockReturnValueOnce(pending);
+    const retry = [...el.querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === 'Retry',
     );
+    expect(retry).toBeDefined();
+    retry?.click();
+    fixture.detectChanges();
+    expect(listByProductSpy).toHaveBeenLastCalledWith(9);
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    pending.next([]);
+    pending.complete();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No configuration rules');
   });
 
   it('never exposes validate UI (product POST /validate)', () => {
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent?.toLowerCase()).not.toContain('validate configuration');
+    expect(el.textContent?.toLowerCase()).not.toContain(
+      'validate configuration',
+    );
     expect(el.querySelector('[data-validate], .validate-btn')).toBeNull();
     expect(el.querySelector('button.validate-btn')).toBeNull();
   });

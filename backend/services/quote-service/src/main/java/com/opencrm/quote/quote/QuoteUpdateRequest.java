@@ -35,6 +35,12 @@ public class QuoteUpdateRequest {
 
     private LocalDate endDate;
 
+    /** Explicitly clear the start date. Omitted or null date values still keep the stored date. */
+    private Boolean clearStartDate;
+
+    /** Explicitly clear the end date. Omitted or null date values still keep the stored date. */
+    private Boolean clearEndDate;
+
     /** ValidityPeriod: the date through which this quote is valid. Editable while the quote is DRAFT/REJECTED. */
     private LocalDate validUntil;
 

@@ -3,12 +3,12 @@
  * hand-written checks for status tabs, the priority filter, per-status row menus, the list's
  * Material confirmations, autocomplete pick/clear behaviour and the registered hypotheses.
  */
-import { goto } from '../../lib/browser.mjs';
+import { BASE, goto } from '../../lib/browser.mjs';
 import { runCheck, defect, waitUntil } from '../../lib/health.mjs';
 import { expectNoNativeDialog, confirmMatDialog, withNativeDialog } from '../../lib/dialogs.mjs';
 import { settleOverlays, expectNoSnackbar, dismissSnackbars } from '../../lib/overlays.mjs';
 import { scopeLocator, controlLocator, formFieldLocator, fillField, readField, selectOptions } from '../../lib/fields.mjs';
-import { ApiCallError } from '../../lib/api.mjs';
+import { ApiCallError, unwrap } from '../../lib/api.mjs';
 import { ensure, uniqueName } from '../fixtures.mjs';
 import { list, detail, STATUS_TABS, priorityFilter } from '../specs/leads.mjs';
 import { runShell } from '../runners/shell.mjs';
@@ -274,23 +274,45 @@ export default {
 
     for (const tab of STATUS_TABS.filter((t) => t.status)) {
       await runCheck(ctx, `leads.tabs.${tab.label}`, async () => {
-        await goto(page, list.path);
-        const requested = page.waitForRequest((r) => r.url().includes(`${API}?`) && r.url().includes(`status=${tab.status}`), { timeout: 8000 })
-          .catch(() => null);
+        const listUrl = new URL(list.path, BASE);
+        await page.goto(listUrl.href, { waitUntil: 'domcontentloaded' });
+        const responded = page.waitForResponse((response) => {
+          const url = new URL(response.url());
+          return response.request().method() === 'GET' && url.origin === listUrl.origin &&
+            url.pathname === API && url.searchParams.get('status') === tab.status;
+        }, { timeout: 8000 }).catch(() => null);
         await page.getByRole('tab', { name: tab.label, exact: true }).click();
-        if (!(await requested)) throw new Error(`selecting the tab did not request status=${tab.status}`);
-        await page.waitForLoadState('networkidle').catch(() => {});
-        const rows = page.locator('tr.mat-mdc-row');
-        const count = await waitUntil(() => rows.count(), (n) => n > 0, { timeoutMs: 4000 }).catch(() => 0);
-        if (!count) {
+        const response = await responded;
+        if (!response) throw new Error(`selecting the tab did not receive the status=${tab.status} response`);
+        if (!response.ok()) throw new Error(`status=${tab.status} returned HTTP ${response.status()}`);
+        const payload = unwrap(await response.json());
+        const leads = payload?.content ?? payload;
+        if (!Array.isArray(leads) || leads.some((lead) => lead.status !== tab.status)) {
+          throw new Error(`status=${tab.status} returned an invalid or mixed lead page`);
+        }
+        const rows = page.getByTestId('data-table').locator('tr.mat-mdc-row:visible');
+        if (!leads.length) {
           if (byStatus[tab.status]) throw new Error(`a ${tab.status} lead exists but the tab shows no rows`);
           await page.getByText('No matching leads', { exact: true }).waitFor({ state: 'visible' });
+          if (await rows.count()) throw new Error(`tab "${tab.label}" still renders rows for an empty response`);
           return 'no leads in this status — "No matching leads" shown';
         }
-        const badges = (await rows.locator('td:nth-child(2)').allInnerTexts()).map((t) => t.trim());
-        const wrong = badges.filter((b) => b !== tab.label);
-        if (wrong.length) throw new Error(`tab "${tab.label}" lists rows with status ${[...new Set(wrong)].join(', ')}`);
-        return `${count} row(s), all "${tab.label}"`;
+
+        // Angular can still display the previous tab after the filtered HTTP response arrives.
+        const expectedTitles = leads.map((lead) => lead.title).sort();
+        const rendered = await waitUntil(
+          () => rows.evaluateAll((items) => items.map((row) => ({
+            title: row.cells[0]?.innerText.trim(),
+            badge: row.cells[1]?.innerText.trim(),
+          }))),
+          (items) => items.every((row) => row.badge === tab.label) &&
+            JSON.stringify(items.map((row) => row.title).sort()) === JSON.stringify(expectedTitles),
+          {
+            timeoutMs: 4000,
+            describe: (items) => `tab "${tab.label}" did not render the ${leads.length} filtered rows with "${tab.label}" badges; visible statuses: ${[...new Set(items.map((row) => row.badge))].join(', ')}`,
+          },
+        );
+        return `${rendered.length} row(s), all "${tab.label}"`;
       });
     }
 

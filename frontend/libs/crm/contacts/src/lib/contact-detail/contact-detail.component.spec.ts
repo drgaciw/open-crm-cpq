@@ -11,6 +11,7 @@ import { ContactService } from '../contact.service';
 
 describe('ContactDetailComponent', () => {
   let fixture: ComponentFixture<ContactDetailComponent>;
+  const loading = signal(false);
   const selectedContact = signal<ContactDto | null>({
     id: 11,
     uuid: 'c-11',
@@ -24,6 +25,7 @@ describe('ContactDetailComponent', () => {
   });
 
   beforeEach(async () => {
+    loading.set(false);
     await TestBed.configureTestingModule({
       imports: [ContactDetailComponent],
       providers: [
@@ -33,7 +35,7 @@ describe('ContactDetailComponent', () => {
           provide: ContactService,
           useValue: {
             selectedContact,
-            loading: signal(false),
+            loading,
             error: signal<string | null>(null),
             getById: vi.fn(),
             delete: vi.fn(() => of(void 0)),
@@ -45,6 +47,17 @@ describe('ContactDetailComponent', () => {
     fixture = TestBed.createComponent(ContactDetailComponent);
     fixture.componentRef.setInput('id', '11');
     fixture.detectChanges();
+  });
+
+  it('names the progress indicator while contact detail is loading', () => {
+    loading.set(true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const status = host.querySelector('[role="status"]');
+    expect(status?.getAttribute('aria-live')).toBe('polite');
+    expect(status?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Loading contact');
+    expect(host.querySelector('h1')).toBeNull();
   });
 
   it('wires CopyButtonComponent for email and phone (DoD P1.2)', () => {

@@ -46,6 +46,7 @@ class ServiceSchemaIsolationIntegrationTest {
             "amendment_documents",
             "amendment_operation_receipts",
             "applied_quote_acceptances",
+            "asset_activation_receipts",
             "asset_history",
             "asset_lifecycle_changes",
             "assets",
@@ -111,11 +112,12 @@ class ServiceSchemaIsolationIntegrationTest {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getInt(1)).isZero();
             }
-            // V1_22 tables belong only in schema contract.
+            // In the shared database, these document and asset tables belong only in schema contract.
             List<String> leaked = new ArrayList<>();
             try (var result = statement.executeQuery("SELECT table_schema || '.' || table_name FROM information_schema.tables "
-                    + "WHERE table_schema IN ('public', 'configuration', 'approval', 'document') "
-                    + "AND table_name IN ('signature_envelopes', 'signature_envelope_events')")) {
+                    + "WHERE table_schema <> 'contract' "
+                    + "AND table_name IN ('signature_envelopes', 'signature_envelope_events', "
+                    + "'asset_activation_receipts', 'asset_history_replay_events')")) {
                 while (result.next()) {
                     leaked.add(result.getString(1));
                 }

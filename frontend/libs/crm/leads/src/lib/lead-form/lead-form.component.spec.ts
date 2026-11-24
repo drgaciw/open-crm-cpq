@@ -86,6 +86,29 @@ describe('LeadFormComponent linked records and validation (H-CRM-016, H-CRM-023,
     expect(leadService.update).toHaveBeenCalledWith(9, expect.objectContaining({ contactId: 5, organizationId: 7 }));
   });
 
+  it.each([
+    ['Create', undefined],
+    ['Update', '9'],
+  ])('keeps the %s action and save progress named while the request is pending', async (label, id) => {
+    await setup(id);
+    control('title').setValue('Lead ready to save');
+    fixture.detectChanges();
+
+    const submit: HTMLButtonElement = fixture.nativeElement.querySelector('button[type="submit"]');
+    expect(submit.textContent?.trim()).toBe(label);
+    expect(submit.disabled).toBe(false);
+
+    submit.click();
+    fixture.detectChanges();
+
+    expect(submit.disabled).toBe(true);
+    const progress = submit.querySelector('[role="progressbar"]');
+    expect([submit.getAttribute('aria-label'), progress?.getAttribute('aria-label')]).toEqual([
+      label,
+      'Saving lead',
+    ]);
+  });
+
   it('typed exact organization and contact names without picking still link them (H-CRM-023)', async () => {
     await setup();
     control('title').setValue('New lead');
