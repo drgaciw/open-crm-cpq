@@ -1,6 +1,7 @@
 package com.opencrm.contract.asset;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
@@ -40,9 +41,33 @@ public final class InMemoryAssetHistoryStore implements AssetHistoryStore {
     }
 
     @Override
+    public List<AssetHistoryEntry> findByAccountIdAndAssetIdIn(String accountId, Collection<String> assetIds) {
+        if (assetIds == null || assetIds.isEmpty()) {
+            return List.of();
+        }
+        return rows.stream()
+                .filter(row -> accountId.equals(row.getAccountId()) && assetIds.contains(row.getAssetId()))
+                .sorted(byEffectiveDate())
+                .map(InMemoryAssetHistoryStore::copy)
+                .toList();
+    }
+
+    @Override
     public List<AssetHistoryEntry> findByEventType(AssetHistoryKind eventType) {
         return rows.stream()
                 .filter(row -> eventType == row.getEventType())
+                .sorted(byEffectiveDate())
+                .map(InMemoryAssetHistoryStore::copy)
+                .toList();
+    }
+
+    @Override
+    public List<AssetHistoryEntry> findByEventTypeAndAssetIdIn(AssetHistoryKind eventType, Collection<String> assetIds) {
+        if (assetIds == null || assetIds.isEmpty()) {
+            return List.of();
+        }
+        return rows.stream()
+                .filter(row -> eventType == row.getEventType() && assetIds.contains(row.getAssetId()))
                 .sorted(byEffectiveDate())
                 .map(InMemoryAssetHistoryStore::copy)
                 .toList();

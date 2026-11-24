@@ -49,7 +49,7 @@ GitNexus: this checkout had no usable indexed repo (`list_repos` empty; no local
 | Clarification | Effect on this brief |
 |---|---|
 | Spec / first slice (add, update, remove) define **no** legal-review gate or change classes | Gate and classifier are design work under DRG-594; not landed. |
-| Adding or removing a product line is **not** in the free set under #6 unless product treats it as seats | Product confirmation is residual **OQ-594-1** (open). |
+| Adding or removing a product line is **not** in the free set under #6 unless product treats it as seats | Closed by **OQ-594-1** option B (drg owner ruling, 7:15 PM CT Nov 23 2026): a SaaS SKU already on the quote is a seat change. A new SaaS SKU stays NEEDS_OWNER with drg (594-F1-C). Non-SaaS add and remove still require review. |
 | General approvals (who / thresholds) stay parked on DRG-591 / PL-9 | This story only defines which changes can **bypass legal review**. Do **not** unpark DRG-591. |
 | Scope named on the issue | Classification from ChangeLine action codes ([DRG-552](https://linear.app/drgamtd-workspace/issue/DRG-552)) + edited header fields; gate on `DRAFT`→`IN_REVIEW` + V-rule; audit of classification and overrides. |
 
@@ -84,7 +84,7 @@ Do **not** rewrite [#666](https://github.com/drgaciw/open-crm-cpq/pull/666) or C
 
 ### Spine-dependent Proposed ACs (cite only)
 
-`verified by reading docs` ([specs/spine-dependent.md](specs/spine-dependent.md)): AC-594-1 same-SKU `UPDATE` free; AC-594-2 `ADD` refused with `LEGAL_REVIEW_REQUIRED`; AC-594-3 mixed document (governing-agreement header) refused. Fixtures authorize **no** runtime behavior. **594-F6** (whether a `CONTRACT_MODIFICATION` writer is added for legal) stays Proposed there and maps to residual **OQ-594-4** / boundary with DRG-560 below.
+`verified by reading docs` ([specs/spine-dependent.md](specs/spine-dependent.md)): AC-594-1 same-SKU `UPDATE` free; AC-594-2 a **new** SaaS SKU `ADD` refused with `LEGAL_REVIEW_REQUIRED` (594-F1-C NEEDS_OWNER with drg); AC-594-4 and AC-594-5 an existing SaaS SKU `ADD` or `REMOVE` skips; AC-594-3 mixed document (governing-agreement header) refused. Fixtures authorize **no** runtime behavior. **594-F6** (whether a `CONTRACT_MODIFICATION` writer is added for legal) stays Proposed there and maps to residual **OQ-594-4** / boundary with DRG-560 below.
 
 ## What the tree does today
 
@@ -102,15 +102,15 @@ Every row below is **Proposed, unaccepted, owner decision required**. Alternativ
 
 | ID | Question | Recommendation (Proposed) | Alternatives | Depends on / blocked by |
 |---|---|---|---|---|
-| **OQ-594-1** | Do **Add / Remove of SaaS product lines** count as seats (legal-free) or require legal review? | Require review for `ADD` of a SKU and `REMOVE` of a product line; same-SKU quantity `UPDATE` is seats (Cluster A 594-F1-A; matches AC-594-1/2 fixtures). | Same-SKU Add/Remove count as seats (594-F1-B); any quantity change including new SKU is free (594-F1-C). | Product confirmation on Linear body; DRG-552 action semantics. |
-| **OQ-594-2** | **Classification map**: which ChangeLine `action_code`s + which **edited header fields** are legal-free vs required? | Free line set = same-SKU `UPDATE` of quantity / unit price / term fields only. Free headers = price and term only. Whole-document rule: one out-of-set line or header → review required (594-F4-A). Map non-slice actions (`SWAP`, `CONVERT_METRIC`, `TERMINATE`, …) as **required**. | Per-line skip (594-F4-B); treat governing agreement / clauses as free (594-F4-C opposite); invent a new action taxonomy instead of DRG-552 tokens. | DRG-552; OQ-594-1; mid-term header field list. |
+| **OQ-594-1** | Do **Add / Remove of SaaS product lines** count as seats (legal-free) or require legal review? | **Closed, option B.** drg owner ruling, 7:15 PM CT Nov 23 2026. Adding or removing a line whose **SaaS SKU is already on the quote** is a seat change and skips legal review. A **new SaaS SKU** (not already on the quote, 594-F1-C) still requires legal review; that case stays NEEDS_OWNER with drg. Non-SaaS add and remove still require legal review. Same-SKU quantity `UPDATE` stays seats. | Superseded conservative reading (594-F1-A): every `ADD` and `REMOVE` requires review. 594-F1-C (a new SaaS SKU is also free) is NEEDS_OWNER with drg, not chosen. | Product confirmation on Linear body; DRG-552 action semantics. |
+| **OQ-594-2** | **Classification map**: which ChangeLine `action_code`s + which **edited header fields** are legal-free vs required? | Free line set = same-SKU `UPDATE` of quantity / unit price / term, plus an `ADD` or `REMOVE` whose SaaS SKU is already on the quote (OQ-594-1 option B). A new SaaS SKU, a non-SaaS add or remove, and any other out-of-set line still require review. Free headers = price and term only. Whole-document rule: one out-of-set line or header → review required (594-F4-A). Map non-slice actions (`SWAP`, `CONVERT_METRIC`, `TERMINATE`, …) as **required**. | Per-line skip (594-F4-B); treat governing agreement / clauses as free (594-F4-C opposite); invent a new action taxonomy instead of DRG-552 tokens. | DRG-552; OQ-594-1; mid-term header field list. |
 | **OQ-594-3** | **Gate shape**: where it bites; V-rule; audit of classification and overrides | Guard on `DRAFT`→`IN_REVIEW` only; **no** new status (594-F2-A). Refusal `409 LEGAL_REVIEW_REQUIRED` when required and no override. Named legal role may override with actor recorded; until role named, refuse; sales cannot override (594-F3-B). Append a **local** CAM classification/override audit event (type name provisional — see OQ-594-5); no S6 topic. | New `LEGAL_REVIEW` state (594-F2-B); stop before `APPROVED` after entering `IN_REVIEW` (594-F2-C); no override ever / sales override (594-F3-A/C). | S3 / DRG-581 auth for V-rule delivery; DRG-580 writer; OQ6 void-on-revision. |
 | **OQ-594-4** | **Boundary** vs [DRG-560](https://linear.app/drgamtd-workspace/issue/DRG-560) commercial approvals/revisions and parked [DRG-591](https://linear.app/drgamtd-workspace/issue/DRG-591) | Legal = classification guard only (**not** an `approval_requests` row). Commercial approvals stay on DRG-560 / #666 G1–G3 / OQ17. General category stays parked on DRG-591 / OQ25. Do **not** unpark DRG-591. Do **not** insert `CONTRACT_MODIFICATION` for legal (spine 594-F6-A). | Legal as a `TERMS` / `CONTRACT_MODIFICATION` approval row (#666 G4-B/C); fold legal into DRG-560; unpark DRG-591 for the legal role name. | DRG-560 Decision; #666 G-forks; OQ17; DRG-591 park. |
 | **OQ-594-5** | **Classification / override audit** event contract | Local CAM hash-chain + audit-outbox event(s); names provisional (`LEGAL_CLASSIFICATION_RECORDED` / `LEGAL_REVIEW_OVERRIDE`); payload includes free/required result, triggering action codes / header fields, actor, revision. No schema-registry topic until a separate event story. Aligns with #666 **G9** remaining open on the exact type. | Store classification only in `approval_requests.reason` (contradicts OQ-594-4 default); new CAM classification table migration now; S6 domain topic now. | #666 G7/G9; D-RACE “no new S6 topic” in delegated record; DRG-580. |
 | **OQ-594-6** | **First-slice timing** of the gate vs S1–S8 / S3 | Later increment; S1–S8 keep current signature cut (594-F5-B). Gate is **not** a prerequisite to start S3 unless the owner reopens with words + time. | Gate required before S3 starts (594-F5-A); soft-warn in slice 1 without hard refuse. | FR-08; DRG-581; DoD. |
 | **OQ-594-IMPL** | Implementation / migration / state-machine authorization | Separate implementation story **after** OQ-594-1..6 (or deferred subset) close; additive only; never edit landed V1_7/V1_8; no new status enum value unless OQ-594-3 picks 594-F2-B (not recommended). | Piggy-back on S3 migration before forks close; alter V1_7 in place (forbidden). | Owner implementation release; S3 auth; holds in [AGENT.md](../../../AGENT.md). |
 
-`Owner decision: ___ (drg, time)` for every row above.
+`Owner decision: ___ (drg, time)` for every row above except **OQ-594-1**, which is closed on option B.
 
 ---
 
@@ -120,17 +120,17 @@ Every row below is **Proposed, unaccepted, owner decision required**. Alternativ
 
 | Option | What the owner would be choosing |
 |---|---|
-| **A. ADD/REMOVE require review; same-SKU UPDATE is seats (Recommended, Proposed)** | Matches call #6 free-set + Cluster A 594-F1-A + AC-594-2. |
-| **B. Same-SKU Add/Remove count as seats** | Different SKU still requires review. |
-| **C. Any quantity change is free** | Includes new SKU; weakest reading of “seats”. |
+| **A. ADD/REMOVE require review; same-SKU UPDATE is seats** | The conservative reading. Superseded for SaaS lines by the ruling below. |
+| **B. A SaaS SKU already on the quote is a seat change (Chosen)** | Adding or removing that line skips legal review. A new SaaS SKU still requires review. Non-SaaS add and remove still require review. |
+| **C. Any quantity change is free** | Includes a new SaaS SKU. **Held.** Not chosen. |
 
-**Recommended (Proposed):** A. `Owner decision: ___ (drg, time)`.
+**Owner decision:** B. drg owner ruling, 7:15 PM CT Nov 23 2026. This supersedes the 7:07 PM CT wording where the two differ, and it supersedes the conservative 594-F1-A default. 594-F1-C stays NEEDS_OWNER with drg: a new SaaS SKU still requires legal review until Decision rules on it.
 
 ### OQ-594-2 — Classification map (lines + headers)
 
 | Option | What the owner would be choosing |
 |---|---|
-| **A. Whole-document; free = same-SKU UPDATE + price/term headers (Recommended, Proposed)** | One out-of-set edit → review. Non-slice actions require review. |
+| **A. Whole-document; free = same-SKU UPDATE, existing-SaaS ADD/REMOVE, and price/term headers (Recommended, Proposed)** | One out-of-set edit → review. A new SaaS SKU, a non-SaaS add or remove, and non-slice actions require review. OQ-594-1 option B is already decided. |
 | **B. Per-line skip** | Free lines proceed while others wait (diverges from document-level guard). |
 | **C. Broader free headers** | Governing agreement / clauses also free (contradicts call #6 examples). |
 
