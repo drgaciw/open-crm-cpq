@@ -1,6 +1,7 @@
 # ADR-037: Asset / installed base as its own bounded context
 
-**Status:** Proposed on 2026-11-11. drg can change this to Accepted at review or merge. Placement vs CAM (DRG-561) stays open.
+**Status:** Accepted on 2026-11-23. Placement vs CAM (DRG-561) stays open.
+**Acceptance note:** On 2026-11-23 at about 6:45 PM CT, drg directed by voice: "move ADR-037 to Accepted". This note records that direction as the file status. It does not change the decision text, and placement vs CAM (DRG-561) stays open. Context only: ADR-039 is still a draft in [PR #1066](https://github.com/drgaciw/open-crm-cpq/pull/1066) and does not change this decision.
 **Owner acceptance of the DRG-653 decision (context only, quoted verbatim):**
 - [DRG-653](https://linear.app/drgamtd-workspace/issue/DRG-653), issue description: "**Status: Accepted** (drg, 2026-10-29 14:11 Dublin, relayed by Projects Manager on [the delegation page](<https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82>))."
 - Notion [Delegation of authority](https://app.notion.com/p/402f7cb4e4df8167be33f86e92adfc82) (page 402f7cb4e4df8167be33f86e92adfc82), "Owner approvals relayed 2026-10-29 14:11 Dublin": "ADR DRG-653 (asset management): Accepted."
