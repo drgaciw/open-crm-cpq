@@ -1,6 +1,9 @@
--- Security H4. This migration owns approval_requests.tenant_id.
--- DRG-444 rebases onto this column and must not add tenant_id again.
--- Width is 128, the same as quote.quotes.tenant_id, so the backfill cannot overflow.
+-- Security H4. This migration owns the semantics of approval_requests.tenant_id.
+-- V1_14 (approval matrix, DRG-443) already created the column as VARCHAR(64) and the
+-- (tenant_id, status) index idx_approval_tenant_status; this migration does not add either again.
+-- It widens tenant_id to 128, the same as quote.quotes.tenant_id, so the backfill cannot overflow
+-- (a metadata-only change in PostgreSQL), and adds account_id.
+-- DRG-444 must not add tenant_id again.
 -- tenant_id is the Entra tid of the authenticated principal at create time.
 -- It is never taken from a request header or body.
 -- A caller whose tid differs, or a row whose tenant could not be backfilled, is 403 CROSS_TENANT.
@@ -17,14 +20,14 @@
 -- backfills nothing; the same null rule applies.
 -- An approval whose tenant_id is already set is left unchanged.
 
-ALTER TABLE approval_requests ADD COLUMN tenant_id VARCHAR(128);
+ALTER TABLE approval_requests ALTER COLUMN tenant_id TYPE VARCHAR(128);
 ALTER TABLE approval_requests ADD COLUMN account_id VARCHAR(255);
 
-CREATE INDEX idx_approval_tenant_status ON approval_requests (tenant_id, status);
+-- idx_approval_tenant_status (tenant_id, status) is created by V1_14.
 CREATE INDEX idx_approval_tenant_quote ON approval_requests (tenant_id, quote_id);
 
 COMMENT ON COLUMN approval_requests.tenant_id IS
-    'Entra tid of the principal that created the request. Null only when it could not be backfilled from quote.quotes, or for a dev-mode write with no verified token. A caller with a tenant never receives a null or different tenant.';
+    'Entra tid of the principal that created the request (or the quote tenant for a Kafka ramp binding, or the token tenant for a matrix route). Null only when it could not be backfilled from quote.quotes, or for a dev-mode write with no verified token. A caller with a tenant never receives a null or different tenant.';
 
 COMMENT ON COLUMN approval_requests.account_id IS
     'Account the approval belongs to when known: principal account_id claim, or quote.quotes.customer_external_id after backfill. Null when the account is not known. An account-scoped caller does not see a different account.';

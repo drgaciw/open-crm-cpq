@@ -144,6 +144,8 @@ class QuotePolicyEvaluationEndpointTest {
     void blockedSubmitReturnsTheReasonCode() throws Exception {
         Quote quote = quote(TENANT);
         when(quotes.findByIdAndDeletedFalse(42L)).thenReturn(Optional.of(quote));
+        // H4 (#1080): a caller with a tenant loads the quote through the tenant-scoped lookup.
+        when(quotes.findByIdAndTenantIdAndDeletedFalse(42L, TENANT)).thenReturn(Optional.of(quote));
         when(evaluation.evaluate(quote)).thenReturn(new QuotePolicyVerdict(true, "BLOCKED", 3L,
                 List.of(new QuotePolicyVerdict.Breach(7L, 1, "MARGIN_FLOOR", "unmeasured", "20", "MARGIN_UNKNOWN"))));
 

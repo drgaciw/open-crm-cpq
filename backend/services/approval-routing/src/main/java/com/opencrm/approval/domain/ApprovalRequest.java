@@ -31,8 +31,10 @@ public class ApprovalRequest extends BaseEntity {
     private String quoteId;
 
     /**
-     * Entra {@code tid} of the principal that created this request. H4 owns this column.
-     * Never taken from a header or body. DRG-444 rebases onto this definition and does not add another.
+     * Entra {@code tid} of the principal that created this request, or the quote's tenant for a Kafka ramp
+     * binding; a matrix route stamps it from the token too. Never taken from a header or body. The column is
+     * created by V1_14 (approval matrix) and widened to 128 by V1_15 (H4), which owns its semantics: a row with
+     * no tenant is refused to every tenant caller. DRG-444 does not add another definition.
      */
     @Column(name = "tenant_id", length = 128, updatable = false)
     private String tenantId;
@@ -71,6 +73,25 @@ public class ApprovalRequest extends BaseEntity {
 
     @Column(name = "governing_period")
     private Integer governingPeriod;
+
+    @Column(name = "matrix_id")
+    private Long matrixId;
+
+    @Column(name = "matrix_version")
+    private Integer matrixVersion;
+
+    @Column(name = "quote_version", length = 64)
+    private String quoteVersion;
+
+    @Column(name = "routing_step")
+    private Integer routingStep;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "step_mode", length = 16)
+    private MatrixStepMode stepMode;
+
+    @Column(name = "breach_types", length = 200)
+    private String breachTypes;
     
     @Column(name = "requester_id", nullable = false)
     private String requesterId;

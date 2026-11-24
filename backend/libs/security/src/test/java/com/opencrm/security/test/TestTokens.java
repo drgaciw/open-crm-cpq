@@ -122,6 +122,12 @@ public final class TestTokens {
             return this;
         }
 
+        /** Overrides the Entra {@code tid} claim. The default stays the made-up tenant in {@link #ISSUER}. */
+        public Builder tenantId(String tenantId) {
+            this.tenantId = tenantId;
+            return this;
+        }
+
         public Builder audience(String audience) {
             this.audience = audience;
             return this;
