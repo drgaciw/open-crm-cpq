@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -191,6 +192,51 @@ class PricingExecutionServiceTest {
         assertEquals(2, response.getSuccessfulRequests());
         assertEquals(0, response.getFailedRequests());
         assertEquals(2, response.getResults().size());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("simulateBulk() should retain successful rows around failed contexts in input order")
+    void simulateBulkShouldIsolateFailedContexts() {
+        PricingContext missing = PricingContext.builder()
+                .customerExternalId("CUST-MISSING")
+                .region("NA")
+                .durationInMonths(12)
+                .lineItems(defaultContext.getLineItems())
+                .build();
+        PricingContext unexpected = PricingContext.builder()
+                .customerExternalId("CUST-ERROR")
+                .region("NA")
+                .durationInMonths(12)
+                .lineItems(defaultContext.getLineItems())
+                .build();
+
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-001"))
+                .thenReturn(java.util.Optional.of(defaultCustomer));
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-MISSING"))
+                .thenReturn(java.util.Optional.empty());
+        when(customerRepository.findByExternalIdAndDeletedFalse("CUST-ERROR"))
+                .thenThrow(new IllegalStateException("internal repository detail"));
+        when(ruleSetRepository.findByStatusAndEffectiveDateLessThanEqualAndDeletedFalse(any(), any()))
+                .thenReturn(new ArrayList<>());
+        when(priceBookResolutionClient.resolveBatch(eq("NA"), eq(List.of("PROD-001"))))
+                .thenReturn(batchWithEntry(BigDecimal.valueOf(100.0)));
+        when(metricsCalculator.calculate(any(PricingResult.class), eq(12), eq(defaultCustomer)))
+                .thenReturn(defaultMetrics);
+
+        BulkPricingSimulationResponse response = executionService.simulateBulk(
+                Arrays.asList(defaultContext, missing, null, unexpected, defaultContext));
+
+        assertEquals(5, response.getTotalRequests());
+        assertEquals(2, response.getSuccessfulRequests());
+        assertEquals(3, response.getFailedRequests());
+        List<PricingResult> results = response.getResults();
+        assertEquals(List.of(true, false, false, false, true),
+                results.stream().map(PricingResult::isSuccess).toList());
+        assertEquals("RESOURCE_NOT_FOUND: Customer with external ID: CUST-MISSING", results.get(1).getErrorMessage());
+        assertEquals("INVALID_CONTEXT: Pricing context cannot be null", results.get(2).getErrorMessage());
+        assertEquals("PRICING_EXECUTION_ERROR: An unexpected error occurred during pricing calculation",
+                results.get(3).getErrorMessage());
         verify(auditLogRepository, never()).save(any());
     }
 

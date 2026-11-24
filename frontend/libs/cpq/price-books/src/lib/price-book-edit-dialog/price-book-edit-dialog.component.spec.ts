@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { PriceBookEditDialogComponent } from './price-book-edit-dialog.component';
 import { PriceBookService } from '@frontend/cpq-pricing-data-access';
 import {
@@ -95,6 +95,17 @@ describe('PriceBookEditDialogComponent', () => {
     });
   });
 
+  it('blocks a whitespace-only name before sending the update request', () => {
+    updateSpy.mockReturnValue(of(existingBook));
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
+  });
+
   it('requires name', () => {
     component.form.patchValue({ name: '' });
     expect(component.form.valid).toBe(false);
@@ -166,4 +177,30 @@ describe('PriceBookEditDialogComponent', () => {
     expect(component.error()).toContain('PRICE_BOOK_PUBLISHED_IMMUTABLE');
     expect(component.saving()).toBe(false);
   });
+
+  it('keeps Save and its progress indicator named during the pending update', () => {
+    const pending = new Subject<PriceBookDto>();
+    updateSpy.mockReturnValueOnce(pending);
+    component.form.patchValue({ region: '', expirationDate: '' });
+
+    component.onSubmit();
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    const save = view.querySelector<HTMLButtonElement>('button.save-btn');
+    expect(save?.disabled).toBe(true);
+    expect(save?.getAttribute('aria-label')).toBe('Save');
+    expect(save?.querySelector('mat-spinner')?.getAttribute('aria-label')).toBe('Saving price book');
+    expect(updateSpy).toHaveBeenCalledWith(3, expect.objectContaining({
+      clearRegion: true,
+      clearExpirationDate: true,
+    }));
+    expect(dialogClose).not.toHaveBeenCalled();
+
+    pending.next(updatedBook);
+    pending.complete();
+    expect(updateSpy).toHaveBeenCalledOnce();
+    expect(dialogClose).toHaveBeenCalledWith(updatedBook);
+  });
+
 });

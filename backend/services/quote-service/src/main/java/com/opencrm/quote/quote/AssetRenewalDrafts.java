@@ -25,10 +25,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -162,20 +164,32 @@ final class AssetRenewalDrafts {
                 || schedule.getCustomerId().isBlank()) {
             throw invalid("Target subscription has no term end to read assets against");
         }
+        if (!Objects.equals(request.getTargetSubscriptionNumber(), schedule.getSubscriptionNumber())
+                || !Objects.equals(request.getCustomerExternalId(), schedule.getCustomerId())
+                || !Objects.equals(request.getCurrency(), schedule.getCurrencyCode())
+                || !Objects.equals(request.getObservedRevision(), schedule.getCommercialRevision())) {
+            throw invalid("Target subscription customer, currency or observed revision has changed");
+        }
+        if (Boolean.FALSE.equals(schedule.getCanonicalLinkageVerified())) {
+            throw invalid("Target subscription has an inconsistent canonical contract line");
+        }
         LocalDate asOf = schedule.getEndDate();
-        UUID policyAccount = request.getRenewalPolicyAccountId() != null
-                ? request.getRenewalPolicyAccountId() : uuidOrNull(schedule.getCustomerId());
+        UUID policyAccount = renewalPolicyAccount(request, schedule);
         UUID policyAgreement = request.getRenewalPolicyAgreementId();
         if (policyAccount == null && policyAgreement == null) {
             throw invalid("Renewal policy needs an account or agreement id");
         }
-        List<InstalledAssetView> selected = select(assets.installedBase(schedule.getCustomerId(), asOf), schedule, request);
+        List<SelectedAsset> selected = select(assets.installedBase(schedule.getCustomerId(), asOf), schedule, request);
         Map<String, List<RenewalPolicyView>> rungsByLine = new HashMap<>();
         List<PricedLine> pricedLines = new ArrayList<>();
         List<QuoteContinuationPolicy.Period> periods = new ArrayList<>();
         BigDecimal tcv = BigDecimal.ZERO;
-        for (InstalledAssetView asset : selected) {
-            UUID lineKey = uuidOrNull(asset.contractLineId());
+        for (SelectedAsset selection : selected) {
+            InstalledAssetView asset = selection.asset();
+            SubscriptionScheduleView.Line source = selection.source();
+            UUID canonicalLineId = Boolean.TRUE.equals(schedule.getCanonicalLinkageVerified())
+                    ? source.getCanonicalContractLineId() : null;
+            UUID lineKey = canonicalLineId == null ? uuidOrNull(asset.contractLineId()) : canonicalLineId;
             String cacheKey = String.valueOf(policyAccount) + "|" + policyAgreement + "|" + lineKey;
             List<RenewalPolicyView> rungs = rungsByLine.computeIfAbsent(cacheKey,
                     ignored -> policies.fetchRungs(policyAccount, policyAgreement, lineKey, asOf));
@@ -183,21 +197,22 @@ final class AssetRenewalDrafts {
             if (policy == null) {
                 throw unresolved("Renewal policy did not resolve a mode");
             }
+            BigDecimal uplift = upliftOf(policy);
+            requireLocalPolicySupport(policy, rungs);
             int quantity = wholeQuantity(asset);
             QuoteContinuationRequest lineRequest = QuoteContinuationRequest.builder()
                     .operation(QuoteContinuationRequest.Operation.RENEWAL)
                     .targetSubscriptionNumber(schedule.getSubscriptionNumber())
-                    .sourceSubscriptionLineUuid(asset.contractLineId())
+                    .sourceSubscriptionLineUuid(source.getAcceptedLineUuid())
                     .observedRevision(schedule.getCommercialRevision())
                     .customerExternalId(schedule.getCustomerId())
                     .currency(schedule.getCurrencyCode())
                     .quantity(quantity)
                     .termMonths(request.getTermMonths())
                     .effectiveDate(request.getEffectiveDate())
-                    .upliftPercent(upliftOf(policy))
+                    .upliftPercent(uplift)
                     .build();
             QuoteContinuationPolicy.Plan linePlan = QuoteContinuationPolicy.plan(lineRequest, schedule);
-            SubscriptionScheduleView.Line source = QuoteContinuationPolicy.source(lineRequest, schedule);
             pricedLines.add(new PricedLine(asset, source, quantity, linePlan, policy));
             periods.add(linePlan.periods().getFirst());
             tcv = tcv.add(linePlan.tcv());
@@ -208,28 +223,58 @@ final class AssetRenewalDrafts {
         return new Priced(schedule, asOf, policyAccount, List.copyOf(pricedLines), plan);
     }
 
-    private List<InstalledAssetView> select(List<InstalledAssetView> installed, SubscriptionScheduleView schedule,
+    private static UUID renewalPolicyAccount(QuoteContinuationRequest request, SubscriptionScheduleView schedule) {
+        UUID requestedAccount = request.getRenewalPolicyAccountId();
+        if (!Boolean.TRUE.equals(schedule.getCanonicalLinkageVerified())) {
+            return requestedAccount == null ? uuidOrNull(schedule.getCustomerId()) : requestedAccount;
+        }
+        UUID canonicalAccount = schedule.getCanonicalCustomerAccountId();
+        if (canonicalAccount == null) {
+            throw invalid("Target subscription has no verified customer account");
+        }
+        if (requestedAccount != null && !requestedAccount.equals(canonicalAccount)) {
+            throw invalid("Renewal policy scope does not match the verified customer account");
+        }
+        if (request.getRenewalPolicyAgreementId() != null) {
+            throw invalid("Target subscription has no verified renewal-policy agreement");
+        }
+        return canonicalAccount;
+    }
+
+    private List<SelectedAsset> select(List<InstalledAssetView> installed, SubscriptionScheduleView schedule,
                                             QuoteContinuationRequest request) {
-        java.util.Set<String> contractLines = new java.util.HashSet<>();
+        Map<String, SubscriptionScheduleView.Line> sources = new HashMap<>();
+        boolean verified = Boolean.TRUE.equals(schedule.getCanonicalLinkageVerified());
+        boolean hasCanonicalSource = false;
         if (schedule.getLines() != null) {
             for (SubscriptionScheduleView.Line line : schedule.getLines()) {
                 if (line != null && line.getAcceptedLineUuid() != null && !line.getAcceptedLineUuid().isBlank()) {
-                    contractLines.add(line.getAcceptedLineUuid());
+                    registerSource(sources, line.getAcceptedLineUuid(), line);
+                    if (verified && line.getCanonicalContractLineId() != null) {
+                        registerSource(sources, line.getCanonicalContractLineId().toString(), line);
+                        hasCanonicalSource = true;
+                    }
                 }
             }
         }
+        if (verified && (!hasCanonicalSource || schedule.getSubscriptionId() == null)) {
+            throw invalid("Target subscription has incomplete canonical contract line evidence");
+        }
         String onlyLine = request.getContractLineId() == null || request.getContractLineId().isBlank()
                 ? null : request.getContractLineId();
-        List<InstalledAssetView> selected = new ArrayList<>();
-        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<SelectedAsset> selected = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        Set<String> seenAcceptedLines = new HashSet<>();
         for (InstalledAssetView asset : installed == null ? List.<InstalledAssetView>of() : installed) {
             if (asset == null || !installedNow(asset.status())) {
                 continue;
             }
-            if (asset.accountId() != null && !asset.accountId().equals(schedule.getCustomerId())) {
+            if (!Objects.equals(asset.accountId(), schedule.getCustomerId())
+                    || (schedule.getSubscriptionId() != null && !schedule.getSubscriptionId().equals(asset.subscriptionId()))) {
                 continue;
             }
-            if (asset.contractLineId() == null || !contractLines.contains(asset.contractLineId())) {
+            SubscriptionScheduleView.Line source = sources.get(asset.contractLineId());
+            if (source == null) {
                 continue;
             }
             if (onlyLine != null && !onlyLine.equals(asset.contractLineId())) {
@@ -238,14 +283,31 @@ final class AssetRenewalDrafts {
             if (asset.assetId() == null || asset.assetId().isBlank() || !seen.add(asset.assetId())) {
                 throw invalid("Active asset is missing a unique id");
             }
-            selected.add(asset);
+            if (verified && source.getCanonicalContractLineId() != null
+                    && !Objects.equals(source.getProductExternalId(), asset.productRef())) {
+                throw invalid("Active asset product does not match the canonical contract line");
+            }
+            if (!seenAcceptedLines.add(source.getAcceptedLineUuid())) {
+                throw invalid("Multiple active assets claim the same accepted source line");
+            }
+            selected.add(new SelectedAsset(asset, source));
         }
         if (selected.isEmpty()) {
             throw invalid("No active assets to renew as of the term end");
         }
-        selected.sort(Comparator.comparing(InstalledAssetView::assetId));
+        selected.sort(Comparator.comparing(selection -> selection.asset().assetId()));
         return selected;
     }
+
+    private static void registerSource(Map<String, SubscriptionScheduleView.Line> sources, String key,
+                                       SubscriptionScheduleView.Line line) {
+        SubscriptionScheduleView.Line existing = sources.putIfAbsent(key, line);
+        if (existing != null && existing != line) {
+            throw invalid("Target subscription has ambiguous canonical contract line evidence");
+        }
+    }
+
+    private record SelectedAsset(InstalledAssetView asset, SubscriptionScheduleView.Line source) {}
 
     private static boolean installedNow(String status) {
         return "ACTIVE".equals(status) || "AMENDED".equals(status);
@@ -295,6 +357,33 @@ final class AssetRenewalDrafts {
                     HttpStatus.UNPROCESSABLE_CONTENT,
                     "MODE_OUT_OF_SLICE");
         };
+    }
+
+    // The accepted price resolver owns field-by-field precedence and monetary bounds.
+    // The continuation schedule carries exit rates but no authoritative price-book pin.
+    // SAME and nonnegative exit-net uplift already respect notBelowExitNet.
+    private static void requireLocalPolicySupport(RenewalPolicyView selected, List<RenewalPolicyView> rungs) {
+        boolean upliftUsesBasis = "UPLIFT_PCT".equals(selected.mode());
+        for (RenewalPolicyView rung : rungs) {
+            if (rung == null) {
+                continue;
+            }
+            if (rung.maxDecreasePct() != null) {
+                throw unresolvedBasis("Maximum decrease has no accepted renewal pricing contract");
+            }
+            if (Boolean.TRUE.equals(rung.notAboveList())
+                    || (upliftUsesBasis && rung.basis() != null && !"CONTRACTED_NET".equals(rung.basis()))) {
+                throw unresolvedBasis("Renewal policy requires a validated basis, list unit and as-of price-book version");
+            }
+            if (rung.maxIncreasePct() != null || rung.minIncreasePct() != null || rung.minUnitAmount() != null
+                    || (rung.priceAsOf() != null && !"EFFECTIVE_DATE".equals(rung.priceAsOf()))) {
+                throw unresolvedBasis("Renewal price controls require the pricing resolver and a trusted as-of price-book version");
+            }
+        }
+    }
+
+    private static BusinessException unresolvedBasis(String message) {
+        return new BusinessException(message, HttpStatus.UNPROCESSABLE_CONTENT, "UNRESOLVED_BASIS");
     }
 
     private static int wholeQuantity(InstalledAssetView asset) {

@@ -116,6 +116,9 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDeal
               <input matInput [matDatepicker]="picker" formControlName="expectedCloseDate">
               <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
+              @if (form.get('expectedCloseDate')?.hasError('matDatepickerParse')) {
+                <mat-error>Enter a valid expected close date</mat-error>
+              }
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Owner</mat-label>
@@ -173,8 +176,9 @@ import { DEAL_STAGE_ORDER, DEAL_TYPES, dealStageLabel, dealTypeLabel, isOpenDeal
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
-              @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()"
+                    [attr.aria-label]="saving() ? (isEditMode ? 'Update' : 'Create') : null">
+              @if (saving()) { <mat-spinner diameter="20" aria-label="Saving opportunity"></mat-spinner> }
               @else { {{ isEditMode ? 'Update' : 'Create' }} }
             </button>
           </div>

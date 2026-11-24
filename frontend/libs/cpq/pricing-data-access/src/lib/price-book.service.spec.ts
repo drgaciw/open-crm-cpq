@@ -76,6 +76,64 @@ describe('PriceBookService', () => {
     );
   });
 
+  it('keeps the newer region rows and pagination after a superseded success', () => {
+    service.listByRegion('REGION-A');
+    const older = httpMock.expectOne(
+      (r) => r.url === '/api/v1/price-books' && r.params.get('region') === 'REGION-A',
+    );
+    service.listByRegion('REGION-B', 0, 10);
+    const current = httpMock.expectOne(
+      (r) => r.url === '/api/v1/price-books' && r.params.get('region') === 'REGION-B',
+    );
+    const currentRow = book({ id: 2, name: 'Current result', region: 'REGION-B' });
+    current.flush({ content: [currentRow], number: 0, size: 10, totalElements: 1, totalPages: 1 });
+    older.flush({
+      content: [book({ id: 1, name: 'Older result', region: 'REGION-A' })],
+      number: 0, size: 20, totalElements: 1, totalPages: 1,
+    });
+
+    expect(service.priceBooks()).toEqual([currentRow]);
+    expect(service.pagination()).toEqual({ page: 0, size: 10, totalElements: 1, totalPages: 1 });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBeNull();
+  });
+
+  it('keeps the current list loading and error when a superseded request fails', () => {
+    service.listByRegion('REGION-A');
+    const older = httpMock.expectOne(
+      (r) => r.url === '/api/v1/price-books' && r.params.get('region') === 'REGION-A',
+    );
+    service.listByRegion('REGION-B');
+    const current = httpMock.expectOne(
+      (r) => r.url === '/api/v1/price-books' && r.params.get('region') === 'REGION-B',
+    );
+
+    older.flush({ message: 'Superseded query failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+
+    current.flush({ message: 'Current query failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBe('Current query failed');
+  });
+
+  it('retains native status for a detail-read failure and resets it on the next detail request', () => {
+    service.getById(99);
+    httpMock.expectOne('/api/v1/price-books/99').flush(
+      { message: 'Temporarily unavailable' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.detailReadStatus()).toBe(503);
+
+    service.getById(100);
+    expect(service.detailReadStatus()).toBeNull();
+    httpMock.expectOne('/api/v1/price-books/100').flush(
+      { message: 'Missing fixture' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    expect(service.detailReadStatus()).toBe(404);
+  });
+
   it('getById error.set appends errorCode as message [CODE]', () => {
     service.getById(99);
     const req = httpMock.expectOne('/api/v1/price-books/99');

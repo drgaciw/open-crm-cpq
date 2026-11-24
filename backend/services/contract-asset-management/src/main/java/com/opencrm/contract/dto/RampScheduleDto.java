@@ -5,14 +5,19 @@ import com.opencrm.contract.domain.SubscriptionStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /** Public read facts, with absent legacy unit prices kept absent. */
 public record RampScheduleDto(String subscriptionNumber, String customerId, String currencyCode,
         SubscriptionStatus status, LocalDate startDate, LocalDate endDate, Long commercialRevision,
-        List<Line> lines, BigDecimal activeMrr, BigDecimal activeArr, BigDecimal exitMrr, BigDecimal exitArr) {
+        List<Line> lines, BigDecimal activeMrr, BigDecimal activeArr, BigDecimal exitMrr, BigDecimal exitArr,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Long subscriptionId,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean canonicalLinkageVerified,
+        @JsonInclude(JsonInclude.Include.NON_NULL) UUID canonicalCustomerAccountId) {
     public record Line(String acceptedLineUuid, String productExternalId, String productName, String provenance,
                        String productType, String lineItemType, String billingFrequency,
-                       LocalDate billingAnchorDate, List<Period> periods) {}
+                       LocalDate billingAnchorDate, List<Period> periods,
+                       @JsonInclude(JsonInclude.Include.NON_NULL) UUID canonicalContractLineId) {}
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Period(Integer sequence, Integer startMonth, Integer months, LocalDate startDate, LocalDate endDate,
             LocalDate contractedEndDate, BigDecimal quantity, BigDecimal netUnitPrice, BigDecimal netMonthly,

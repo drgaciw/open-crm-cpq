@@ -94,7 +94,7 @@ interface PriceBookTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (isEmpty()) {
       <app-empty-state
         icon="menu_book"
         [title]="
@@ -108,7 +108,7 @@ interface PriceBookTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Price Book'"
         (action)="openCreateDialog()"
       />
-    } @else {
+    } @else if (loading() || tableRows().length > 0) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -179,6 +179,7 @@ export class PriceBookListComponent implements OnInit {
 
   readonly regionFilter = signal('');
   readonly appliedRegion = signal('');
+  private readonly dismissedReadError = signal(false);
 
   readonly loading = computed(() => this.service.loading());
   readonly error = computed(() => this.service.error());
@@ -189,7 +190,8 @@ export class PriceBookListComponent implements OnInit {
   );
 
   readonly isEmpty = computed(
-    () => this.tableRows().length === 0 && !this.loading(),
+    () => !this.loading() && !this.error() && !this.dismissedReadError() &&
+      this.tableRows().length === 0,
   );
 
   ngOnInit(): void {
@@ -238,6 +240,9 @@ export class PriceBookListComponent implements OnInit {
   }
 
   clearError(): void {
+    if (this.error()) {
+      this.dismissedReadError.set(true);
+    }
     this.service.error.set(null);
   }
 
@@ -248,6 +253,7 @@ export class PriceBookListComponent implements OnInit {
   }
 
   private reload(page = 0, size = this.service.pagination().size || 20): void {
+    this.dismissedReadError.set(false);
     const region = this.appliedRegion().trim();
     const sort = this.sort();
     if (sort) {

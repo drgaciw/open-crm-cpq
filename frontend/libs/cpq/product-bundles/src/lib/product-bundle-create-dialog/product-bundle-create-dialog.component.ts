@@ -21,6 +21,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { finalize } from 'rxjs';
 import {
   DiscountType,
   ProductBundleUpdateRequest,
@@ -152,10 +153,11 @@ export interface ProductBundleDialogData {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? (existing ? 'Save' : 'Create') : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Saving product bundle" />
         } @else {
           {{ existing ? 'Save' : 'Create' }}
         }
@@ -250,13 +252,18 @@ export class ProductBundleCreateDialogComponent {
     const save = this.existing
       ? this.bundleService.update(this.existing.id, request)
       : this.bundleService.create({ ...request, productId });
-    save.subscribe({
+    this.form.disable({ emitEvent: false });
+    save.pipe(finalize(() => {
+      this.form.enable({ emitEvent: false });
+      if (this.existing) {
+        this.form.controls.productId.disable({ emitEvent: false });
+      }
+      this.saving.set(false);
+    })).subscribe({
       next: (bundle) => {
-        this.saving.set(false);
         this.dialogRef.close(bundle);
       },
       error: (err: unknown) => {
-        this.saving.set(false);
         this.error.set(
           bundleHttpErrorMessage(err, this.existing ? 'Failed to save product bundle' : 'Failed to create product bundle'),
         );

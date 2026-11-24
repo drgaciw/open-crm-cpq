@@ -97,9 +97,9 @@ function triggerBlobDownload(blob: Blob, fileName: string): void {
           <div class="loading" role="status" aria-live="polite">
             <mat-spinner diameter="32" />
           </div>
-        } @else if (documents().length === 0) {
+        } @else if (listReadConfirmed() && documents().length === 0) {
           <p class="empty-docs">No documents generated yet.</p>
-        } @else {
+        } @else if (documents().length > 0) {
           <div class="doc-table" role="table">
             <div class="doc-row doc-head" role="row">
               <span role="columnheader">Type</span>
@@ -217,6 +217,7 @@ export class QuoteDocumentsPanelComponent {
 
   readonly documentTypes = DOCUMENT_TYPES;
   readonly documents = signal<QuoteDocumentDto[]>([]);
+  protected readonly listReadConfirmed = signal(false);
   readonly loading = signal(false);
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
@@ -291,6 +292,7 @@ export class QuoteDocumentsPanelComponent {
   }
 
   private reload(): void {
+    this.listReadConfirmed.set(false);
     const id = this.quoteId();
     if (id == null) {
       this.documents.set([]);
@@ -302,9 +304,11 @@ export class QuoteDocumentsPanelComponent {
     this.quoteService.listDocuments(id).subscribe({
       next: (docs) => {
         this.documents.set(docs ?? []);
+        this.listReadConfirmed.set(true);
         this.loading.set(false);
       },
       error: (err) => {
+        this.listReadConfirmed.set(false);
         this.loading.set(false);
         this.documents.set([]);
         this.error.set(httpErrorMessage(err));

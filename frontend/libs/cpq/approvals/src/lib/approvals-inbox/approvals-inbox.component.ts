@@ -97,7 +97,7 @@ function httpErrorMessage(err: unknown): string {
 
     @if (loading() && pending().length === 0) {
       <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40" />
+        <mat-spinner diameter="40" aria-label="Loading approvals" />
       </div>
     } @else if (!loading() && isEmpty()) {
       <app-empty-state
@@ -105,7 +105,7 @@ function httpErrorMessage(err: unknown): string {
         title="No pending approvals"
         message="Approvals waiting for a decision will appear here."
       />
-    } @else {
+    } @else if (pending().length > 0) {
       <div class="table-container">
         <table mat-table [dataSource]="pending()" [trackBy]="trackById">
           <ng-container matColumnDef="id">

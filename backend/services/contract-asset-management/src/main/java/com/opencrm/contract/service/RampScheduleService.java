@@ -7,6 +7,7 @@ import com.opencrm.contract.domain.SubscriptionRatePeriod;
 import com.opencrm.contract.repository.SubscriptionRepository;
 import com.opencrm.contract.repository.SubscriptionRatePeriodRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -16,6 +17,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -23,20 +26,31 @@ import java.util.Map;
 public class RampScheduleService {
     private final SubscriptionRepository subscriptions;
     private final SubscriptionRatePeriodRepository periods;
+    private final JdbcTemplate jdbc;
 
     public RampScheduleDto byNumber(String number, LocalDate asOf) {
+        return byNumber(number, asOf, false);
+    }
+
+    public RampScheduleDto internalByNumber(String number, LocalDate asOf) {
+        return byNumber(number, asOf, true);
+    }
+
+    private RampScheduleDto byNumber(String number, LocalDate asOf, boolean internal) {
         Subscription subscription = subscriptions.findBySubscriptionNumberAndDeletedFalse(number)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription", number));
-        return map(subscription, asOf == null ? LocalDate.now(java.time.Clock.systemUTC()) : asOf);
+        return map(subscription, asOf == null ? LocalDate.now(java.time.Clock.systemUTC()) : asOf, internal);
     }
     public RampScheduleDto byId(Long id, LocalDate asOf) {
         Subscription subscription = subscriptions.findById(id).filter(value -> !value.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription", id));
-        return map(subscription, asOf == null ? LocalDate.now(java.time.Clock.systemUTC()) : asOf);
+        return map(subscription, asOf == null ? LocalDate.now(java.time.Clock.systemUTC()) : asOf, false);
     }
 
-    private RampScheduleDto map(Subscription subscription, LocalDate asOf) {
+    private RampScheduleDto map(Subscription subscription, LocalDate asOf, boolean internal) {
         List<SubscriptionRatePeriod> stored = periods.findBySubscriptionIdAndDeletedFalseOrderByStartDateAscAcceptedLineUuidAscSequenceAsc(subscription.getId());
+        boolean hasCanonicalLink = internal && subscription.getContractLineId() != null;
+        CanonicalLine canonical = hasCanonicalLink ? verifiedCanonicalLine(subscription) : null;
         Map<String, List<SubscriptionRatePeriod>> grouped = new LinkedHashMap<>();
         stored.forEach(period -> grouped.computeIfAbsent(period.getAcceptedLineUuid(), ignored -> new ArrayList<>()).add(period));
         List<RampScheduleDto.Line> lines = new ArrayList<>();
@@ -52,9 +66,15 @@ public class RampScheduleService {
                     period.getMonths(), period.getStartDate(), period.getEffectiveEndDate(), period.getEndDate(),
                     period.getQuantity(), period.getNetUnitPrice(), period.getNetMonthly(), period.getPeriodAmount(),
                     period.getGrossPeriodAmount(), period.getMigrationCredit(), period.isApplied(), period.isRetired())).toList();
+            UUID canonicalId = canonical != null && canonical.acceptedLineUuid().equals(entry.getKey())
+                    && ordered.stream().filter(period -> !period.isRetired()).allMatch(period ->
+                            "ACCEPTED_PRICED".equals(period.getProvenance())
+                                    && Objects.equals(canonical.productExternalId(), period.getProductExternalId()))
+                    && ordered.stream().anyMatch(period -> !period.isRetired()) ? canonical.id() : null;
             lines.add(new RampScheduleDto.Line(entry.getKey(), first.getProductExternalId(), first.getProductName(),
                     first.getProvenance(), first.getProductType(), first.getLineItemType(), first.getBillingFrequency(),
-                    first.getBillingAnchorDate() == null ? subscription.getStartDate() : first.getBillingAnchorDate(), visible));
+                    first.getBillingAnchorDate() == null ? subscription.getStartDate() : first.getBillingAnchorDate(), visible,
+                    canonicalId));
             for (var period : ordered) {
                 if (covers(period, asOf)) {
                     activeMrr = activeMrr.add(zero(period.getNetMonthly()));
@@ -66,10 +86,33 @@ public class RampScheduleService {
                 }
             }
         }
+        Boolean canonicalLinkageVerified = hasCanonicalLink
+                ? lines.stream().anyMatch(line -> line.canonicalContractLineId() != null) : null;
         return new RampScheduleDto(subscription.getSubscriptionNumber(), subscription.getCustomerId(), subscription.getCurrencyCode(),
                 subscription.getStatus(), subscription.getStartDate(), subscription.getEndDate(), subscription.getCommercialRevision(),
-                List.copyOf(lines), activeMrr, activeArr, exitMrr, exitArr);
+                List.copyOf(lines), activeMrr, activeArr, exitMrr, exitArr, internal ? subscription.getId() : null,
+                canonicalLinkageVerified, Boolean.TRUE.equals(canonicalLinkageVerified) ? canonical.customerAccountId() : null);
     }
+
+    private CanonicalLine verifiedCanonicalLine(Subscription subscription) {
+        return jdbc.query("""
+                SELECT l.id, l.accepted_line_uuid, l.product_external_id, c.customer_account_id
+                  FROM subscriptions s
+                  JOIN contract_lines l ON l.id = s.contract_line_id AND l.contract_id = s.contract_id
+                  JOIN contracts c ON c.id = s.contract_id
+                 WHERE s.id = ? AND NOT s.is_deleted AND s.contract_line_id = ?
+                   AND s.commercial_revision = ?
+                   AND s.tenant_id = c.tenant_id AND l.tenant_id = c.tenant_id
+                   AND s.customer_account_id = c.customer_account_id AND s.quote_id = l.quote_id
+                   AND c.status = 'ACTIVE' AND l.status = 'ACTIVE'
+                   AND btrim(l.accepted_line_uuid) NOT IN ('', 'legacy-aggregate')
+                """, (row, index) -> new CanonicalLine(row.getObject("id", UUID.class),
+                row.getString("accepted_line_uuid"), row.getString("product_external_id"),
+                row.getObject("customer_account_id", UUID.class)), subscription.getId(),
+                subscription.getContractLineId(), subscription.getCommercialRevision()).stream().findFirst().orElse(null);
+    }
+
+    private record CanonicalLine(UUID id, String acceptedLineUuid, String productExternalId, UUID customerAccountId) {}
     static boolean covers(SubscriptionRatePeriod period, LocalDate date) {
         return !period.isDeleted() && !period.isRetired() && !date.isBefore(period.getStartDate()) && !date.isAfter(period.getEffectiveEndDate());
     }

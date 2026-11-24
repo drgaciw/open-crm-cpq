@@ -113,9 +113,10 @@ function httpErrorMessage(
               type="button"
               (click)="onDelete()"
               [disabled]="deleting()"
+              [attr.aria-label]="deleting() ? 'Delete' : null"
             >
               @if (deleting()) {
-                <mat-spinner diameter="20" />
+                <mat-spinner diameter="20" aria-label="Deleting pricing customer" />
               } @else {
                 <ng-container>
                   <mat-icon>delete</mat-icon>
@@ -138,9 +139,10 @@ function httpErrorMessage(
               type="button"
               (click)="onSave()"
               [disabled]="form.invalid || saving()"
+              [attr.aria-label]="saving() ? 'Save' : null"
             >
               @if (saving()) {
-                <mat-spinner diameter="20" />
+                <mat-spinner diameter="20" aria-label="Saving pricing customer" />
               } @else {
                 <ng-container>
                   <mat-icon>save</mat-icon>
@@ -219,7 +221,7 @@ function httpErrorMessage(
                     maxlength="255"
                     autocomplete="off"
                   />
-                  @if (form.get('name')?.hasError('required')) {
+                  @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
                     <mat-error>Name is required</mat-error>
                   }
                   @if (form.get('name')?.hasError('maxlength')) {
@@ -233,9 +235,12 @@ function httpErrorMessage(
                     <input
                       matInput
                       formControlName="type"
-                      maxlength="50"
+                      maxlength="30"
                       autocomplete="off"
                     />
+                    @if (form.controls.type.hasError('maxlength')) {
+                      <mat-error>Type must be at most 30 characters</mat-error>
+                    }
                   </mat-form-field>
 
                   <mat-form-field appearance="outline" class="half">
@@ -300,6 +305,13 @@ function httpErrorMessage(
             }
           </mat-card-content>
         </mat-card>
+      </div>
+    } @else if (detailLoadError(); as message) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>Pricing customer could not be loaded. {{ message }}</span>
+        <button mat-button type="button" (click)="retryDetail()">Retry</button>
+        <button mat-button type="button" (click)="goBack()">Back to pricing customers</button>
       </div>
     } @else {
       <app-empty-state
@@ -428,10 +440,14 @@ export class PricingCustomerDetailComponent implements OnInit {
   readonly actionError = signal<string | null>(null);
 
   readonly loading = computed(() => this.service.loading() && !this.customer());
+  protected readonly detailLoadError = computed(() => {
+    const failure = this.service.detailReadFailure();
+    return failure && failure.id === Number(this.id()) && failure.status !== 404 ? failure.message : null;
+  });
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    type: [''],
+    name: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(255)]],
+    type: ['', Validators.maxLength(30)],
     segment: ['' as CustomerSegment | ''],
     region: ['' as CustomerRegion | ''],
     industry: [''],
@@ -460,6 +476,10 @@ export class PricingCustomerDetailComponent implements OnInit {
       return;
     }
     this.service.getById(numericId);
+  }
+
+  protected retryDetail(): void {
+    this.service.getById(Number(this.id()));
   }
 
   subtitle(customer: PricingCustomerDto): string {

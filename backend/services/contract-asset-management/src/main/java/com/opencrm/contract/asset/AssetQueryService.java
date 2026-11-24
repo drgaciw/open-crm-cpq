@@ -18,35 +18,21 @@ public class AssetQueryService {
     }
 
     public AssetDto get(Long id) {
-        InstalledBaseReadAccess.require();
-        Asset asset = assets.findById(id)
-                .filter(row -> !row.isDeleted())
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open()) {
+            throw new ResourceNotFoundException("Asset", id);
+        }
+        Asset asset = assets.findOne(InstalledBaseQueries.matching(scope.tenantId(), null, null, null, id))
                 .orElseThrow(() -> new ResourceNotFoundException("Asset", id));
         return mapper.toDto(asset);
     }
 
     public List<AssetDto> list(String accountId, Long subscriptionId, String contractLineId) {
-        InstalledBaseReadAccess.require();
-        List<Asset> rows;
-        if (subscriptionId != null && present(contractLineId)) {
-            rows = assets.findBySubscriptionIdAndContractLineIdAndDeletedFalse(subscriptionId, contractLineId)
-                    .map(List::of).orElseGet(List::of);
-        } else if (subscriptionId != null) {
-            rows = assets.findBySubscriptionIdAndDeletedFalse(subscriptionId);
-        } else if (present(contractLineId)) {
-            rows = assets.findByContractLineIdAndDeletedFalse(contractLineId);
-        } else if (present(accountId)) {
-            rows = assets.findByAccountIdAndDeletedFalse(accountId);
-        } else {
-            rows = assets.findByDeletedFalse();
+        InstalledBaseReadScope scope = InstalledBaseReadScope.current();
+        if (!scope.open()) {
+            return List.of();
         }
-        if (present(accountId)) {
-            rows = rows.stream().filter(asset -> accountId.equals(asset.getAccountId())).toList();
-        }
-        return mapper.toDtoList(rows);
-    }
-
-    private static boolean present(String value) {
-        return value != null && !value.isBlank();
+        return mapper.toDtoList(assets.findAll(
+                InstalledBaseQueries.matching(scope.tenantId(), accountId, subscriptionId, contractLineId, null)));
     }
 }

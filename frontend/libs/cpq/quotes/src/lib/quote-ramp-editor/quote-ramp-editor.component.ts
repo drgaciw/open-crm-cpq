@@ -122,10 +122,16 @@ export function validateRampSchedule(
   }
 
   for (const step of steps) {
-    if (!Number.isFinite(step.months) || step.months < 1) {
+    if (!Number.isInteger(step.months) || step.months < 1) {
       issues.push({
         code: 'RAMP_PERIOD_EMPTY',
         message: `RAMP_PERIOD_EMPTY: period ${step.sequence} must cover at least 1 whole month.`,
+      });
+    }
+    if (!Number.isInteger(step.quantity)) {
+      issues.push({
+        code: 'RAMP_PERIOD_EMPTY',
+        message: `RAMP_PERIOD_EMPTY: period ${step.sequence} must have a whole quantity.`,
       });
     }
     const negativePrice =
@@ -141,6 +147,15 @@ export function validateRampSchedule(
       issues.push({
         code: 'RAMP_PRICE_BASIS',
         message: `RAMP_PRICE_BASIS: period ${step.sequence} must set exactly one price field that matches its basis.`,
+      });
+    } else if (
+      step.priceBasis === 'DISCOUNT_FRACTION' &&
+      step.discountFraction != null &&
+      step.discountFraction > 1
+    ) {
+      issues.push({
+        code: 'RAMP_PRICE_BASIS',
+        message: `RAMP_PRICE_BASIS: period ${step.sequence} discount fraction must be between 0 and 1.`,
       });
     }
     if (!Number.isInteger(step.startMonth)) {
@@ -482,6 +497,7 @@ export class QuoteRampEditorComponent {
   });
 
   readonly canSave = computed(() => {
+    this.formRevision();
     if (!this.editable() || this.saving() || this.expanding() || this.extending() || this.quoteId() == null) {
       return false;
     }
@@ -638,6 +654,11 @@ export class QuoteRampEditorComponent {
       }),
     );
     steps.markAsDirty();
+  }
+
+  onPriceBasisChange(group: PeriodGroup, basis: RampPriceBasis): void {
+    const inactivePrice = basis === 'ABSOLUTE' ? group.controls.discountFraction : group.controls.unitPrice;
+    inactivePrice.setValue(null);
   }
 
   removePeriod(index: number): void {
