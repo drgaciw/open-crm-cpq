@@ -17,7 +17,13 @@ public record QuotePolicyVerdict(
         breaches = breaches == null ? List.of() : List.copyOf(breaches);
     }
 
-    public record Breach(Long policyId, Integer policyVersion, String thresholdType, String actual, String limit) {
+    public record Breach(
+            Long policyId,
+            Integer policyVersion,
+            String thresholdType,
+            String actual,
+            String limit,
+            String reasonCode) {
     }
 
     public static QuotePolicyVerdict notConfigured() {
@@ -27,6 +33,14 @@ public record QuotePolicyVerdict(
     /** A blocked quote must not be written to approval-routing. */
     public boolean refusesSubmission() {
         return configured && "BLOCKED".equals(verdict);
+    }
+
+    public List<String> reasonCodes() {
+        return breaches.stream()
+                .map(Breach::reasonCode)
+                .filter(code -> code != null && !code.isBlank())
+                .distinct()
+                .toList();
     }
 
     public String summary() {

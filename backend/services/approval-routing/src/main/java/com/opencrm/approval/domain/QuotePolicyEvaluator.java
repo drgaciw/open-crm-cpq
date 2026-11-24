@@ -118,20 +118,22 @@ public final class QuotePolicyEvaluator {
             BreachEffect whenBreached) {
         BigDecimal limit = threshold.getLimitValue();
         if (actual == null || limit == null) {
+            String code = actual == null ? unknownCode(threshold.getThresholdType()) : "THRESHOLD_LIMIT_UNKNOWN";
             return breach(policy, threshold, actual == null ? "unmeasured" : plain(actual),
-                    limit == null ? "unmeasured" : plain(limit), BreachEffect.BLOCKED);
+                    limit == null ? "unmeasured" : plain(limit), BreachEffect.BLOCKED, code);
         }
         boolean breached = overLimit ? actual.compareTo(limit) > 0 : actual.compareTo(limit) < 0;
         if (!breached) {
             return null;
         }
-        return breach(policy, threshold, plain(actual), plain(limit), whenBreached);
+        String code = whenBreached == BreachEffect.BLOCKED ? blockCode(threshold.getThresholdType()) : null;
+        return breach(policy, threshold, plain(actual), plain(limit), whenBreached, code);
     }
 
     private static PolicyBreach clause(CommercialPolicy policy, PolicyThreshold threshold, QuoteVersionFacts facts) {
         String restricted = threshold.getClauseCode();
         if (restricted == null || restricted.isBlank()) {
-            return breach(policy, threshold, "unmeasured", "unmeasured", BreachEffect.BLOCKED);
+            return breach(policy, threshold, "unmeasured", "unmeasured", BreachEffect.BLOCKED, "CLAUSE_UNKNOWN");
         }
         String present = null;
         for (String code : facts.clauseCodes()) {
@@ -143,7 +145,27 @@ public final class QuotePolicyEvaluator {
         if (present == null) {
             return null;
         }
-        return breach(policy, threshold, present, restricted.trim(), BreachEffect.REQUIRES_APPROVAL);
+        return breach(policy, threshold, present, restricted.trim(), BreachEffect.REQUIRES_APPROVAL, null);
+    }
+
+    /** A missing measurement. Margin uses the owner-confirmed code {@code MARGIN_UNKNOWN}. */
+    private static String unknownCode(ThresholdType type) {
+        return switch (type) {
+            case MARGIN_FLOOR -> "MARGIN_UNKNOWN";
+            case DISCOUNT_PERCENT -> "DISCOUNT_UNKNOWN";
+            case TERM_MONTHS -> "TERM_UNKNOWN";
+            case NON_STANDARD_CLAUSE -> "CLAUSE_UNKNOWN";
+        };
+    }
+
+    /** A measured value that fails a hard stop. */
+    private static String blockCode(ThresholdType type) {
+        return switch (type) {
+            case MARGIN_FLOOR -> "MARGIN_BELOW_FLOOR";
+            case DISCOUNT_PERCENT -> "DISCOUNT_PERCENT";
+            case TERM_MONTHS -> "TERM_MONTHS";
+            case NON_STANDARD_CLAUSE -> "NON_STANDARD_CLAUSE";
+        };
     }
 
     private static PolicyBreach breach(
@@ -151,14 +173,16 @@ public final class QuotePolicyEvaluator {
             PolicyThreshold threshold,
             String actual,
             String limit,
-            BreachEffect effect) {
+            BreachEffect effect,
+            String reasonCode) {
         return new PolicyBreach(
                 policy.getId(),
                 policy.getPolicyVersion(),
                 threshold.getThresholdType(),
                 actual,
                 limit,
-                effect);
+                effect,
+                reasonCode);
     }
 
     private static String plain(BigDecimal value) {

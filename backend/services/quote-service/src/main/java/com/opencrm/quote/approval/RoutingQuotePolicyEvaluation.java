@@ -36,7 +36,8 @@ public class RoutingQuotePolicyEvaluation implements QuotePolicyEvaluation {
                                 breach.getPolicyVersion(),
                                 breach.getThresholdType(),
                                 breach.getActual(),
-                                breach.getLimit()))
+                                breach.getLimit(),
+                                breach.getReasonCode()))
                         .toList();
         return new QuotePolicyVerdict(true, verdict.getVerdict(), verdict.getQuoteVersion(), breaches);
     }

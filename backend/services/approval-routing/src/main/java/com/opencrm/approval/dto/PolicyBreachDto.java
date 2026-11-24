@@ -20,4 +20,6 @@ public class PolicyBreachDto {
     private ThresholdType thresholdType;
     private String actual;
     private String limit;
+    /** Machine-readable Blocked cause, such as {@code MARGIN_UNKNOWN} or {@code MARGIN_BELOW_FLOOR}. */
+    private String reasonCode;
 }

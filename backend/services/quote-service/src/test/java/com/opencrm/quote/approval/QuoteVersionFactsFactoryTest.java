@@ -51,6 +51,16 @@ class QuoteVersionFactsFactoryTest {
     }
 
     @Test
+    void placeholderOnlyMarginIsNotMeasured() {
+        Quote quote = quote();
+        quote.setPricingWaterfallJson("{\"estimatedMarginPct\":40.0}");
+
+        QuotePolicyEvaluationRequest facts = factory.from(quote);
+
+        assertThat(facts.getMarginPercent()).isNull();
+    }
+
+    @Test
     void mixedProductFamiliesDoNotInventOneFamily() {
         Quote quote = quote();
         quote.setLineItems(List.of(line("0", "Software"), line("0.05", "Services")));
