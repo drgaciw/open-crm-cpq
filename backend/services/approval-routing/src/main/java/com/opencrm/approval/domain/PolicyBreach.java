@@ -10,5 +10,6 @@ public record PolicyBreach(
         ThresholdType thresholdType,
         String actual,
         String limit,
-        BreachEffect effect) {
+        BreachEffect effect,
+        String reasonCode) {
 }

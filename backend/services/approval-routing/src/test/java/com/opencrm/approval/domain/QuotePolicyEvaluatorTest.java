@@ -82,6 +82,7 @@ class QuotePolicyEvaluatorTest {
             assertThat(breach.actual()).isEqualTo("15");
             assertThat(breach.limit()).isEqualTo("20");
             assertThat(breach.effect()).isEqualTo(BreachEffect.BLOCKED);
+            assertThat(breach.reasonCode()).isEqualTo("MARGIN_BELOW_FLOOR");
         });
 
         QuotePolicyDecision both = QuotePolicyEvaluator.evaluateQuote(facts("32", "15", 12, List.of()),
@@ -94,7 +95,7 @@ class QuotePolicyEvaluatorTest {
     }
 
     @Test
-    @DisplayName("Blocked when a governed fact was not measured")
+    @DisplayName("Blocked when a governed fact was not measured, with a reason code per fact")
     void blockedWhenTheActualValueIsUnmeasured() {
         QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
                 facts(null, null, null, List.of()),
@@ -107,6 +108,43 @@ class QuotePolicyEvaluatorTest {
         });
         assertThat(decision.explainPolicyBreaches()).extracting(PolicyBreach::limit)
                 .containsExactly("25", "20", "36");
+        assertThat(decision.explainPolicyBreaches()).extracting(PolicyBreach::reasonCode)
+                .containsExactly("DISCOUNT_UNKNOWN", "MARGIN_UNKNOWN", "TERM_UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("Missing marginPercent is Blocked with MARGIN_UNKNOWN")
+    void missingMarginIsBlockedAsMarginUnknown() {
+        QuotePolicyDecision decision = QuotePolicyEvaluator.evaluateQuote(
+                facts("10", null, 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+
+        assertThat(decision.verdict()).isEqualTo(PolicyVerdict.BLOCKED);
+        assertThat(decision.explainPolicyBreaches()).singleElement().satisfies(breach -> {
+            assertThat(breach.thresholdType()).isEqualTo(ThresholdType.MARGIN_FLOOR);
+            assertThat(breach.actual()).isEqualTo("unmeasured");
+            assertThat(breach.limit()).isEqualTo("20");
+            assertThat(breach.reasonCode()).isEqualTo("MARGIN_UNKNOWN");
+        });
+    }
+
+    @Test
+    @DisplayName("Margin above the floor passes, and a discount breach then requires approval only")
+    void marginAboveTheFloorDoesNotBlock() {
+        QuotePolicyDecision above = QuotePolicyEvaluator.evaluateQuote(
+                facts("10", "21", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+        assertThat(above.verdict()).isEqualTo(PolicyVerdict.PASS);
+        assertThat(above.explainPolicyBreaches()).isEmpty();
+
+        QuotePolicyDecision discountOnly = QuotePolicyEvaluator.evaluateQuote(
+                facts("32", "21", 12, List.of()),
+                List.of(policy(limits("25", "20", "36", null))));
+        assertThat(discountOnly.verdict()).isEqualTo(PolicyVerdict.REQUIRES_APPROVAL);
+        assertThat(discountOnly.explainPolicyBreaches()).singleElement().satisfies(breach -> {
+            assertThat(breach.thresholdType()).isEqualTo(ThresholdType.DISCOUNT_PERCENT);
+            assertThat(breach.reasonCode()).isNull();
+        });
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.opencrm.quote.config;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.exception.BusinessException;
 import com.opencrm.common.exception.ResourceNotFoundException;
+import com.opencrm.quote.approval.PolicyBlockedException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,20 @@ public class GlobalExceptionHandler {
         logger.warn("Resource not found: {} [traceId={}]", ex.getMessage(), traceId);
         ApiResponse<Void> response = ApiResponse.error(ex.getMessage(), "RESOURCE_NOT_FOUND", traceId);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(PolicyBlockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePolicyBlocked(PolicyBlockedException ex) {
+        String traceId = MDC.get(TRACE_ID_KEY);
+        logger.warn("Policy blocked: {} {} [traceId={}]", ex.getReasonCodes(), ex.getMessage(), traceId);
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .success(false)
+                .message(ex.getMessage())
+                .errorCode(ex.getErrorCode())
+                .errors(ex.getReasonCodes())
+                .traceId(traceId)
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
     @ExceptionHandler(BusinessException.class)

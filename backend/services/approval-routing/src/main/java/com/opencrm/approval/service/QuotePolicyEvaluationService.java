@@ -159,6 +159,7 @@ public class QuotePolicyEvaluationService {
             row.put("thresholdType", breach.thresholdType().name());
             row.put("actual", breach.actual());
             row.put("limit", breach.limit());
+            row.put("reasonCode", breach.reasonCode());
             return row;
         }).toList());
         try {
@@ -174,7 +175,8 @@ public class QuotePolicyEvaluationService {
                 breach.policyVersion(),
                 breach.thresholdType().name(),
                 breach.actual(),
-                breach.limit());
+                breach.limit(),
+                breach.reasonCode());
     }
 
     private static PolicyBreachDto toDto(PolicyBreach breach) {
@@ -184,6 +186,7 @@ public class QuotePolicyEvaluationService {
                 .thresholdType(breach.thresholdType())
                 .actual(breach.actual())
                 .limit(breach.limit())
+                .reasonCode(breach.reasonCode())
                 .build();
     }
 

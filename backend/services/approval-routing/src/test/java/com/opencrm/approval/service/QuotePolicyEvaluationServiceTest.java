@@ -92,6 +92,7 @@ class QuotePolicyEvaluationServiceTest {
             assertThat(breach.getThresholdType()).isEqualTo(ThresholdType.MARGIN_FLOOR);
             assertThat(breach.getActual()).isEqualTo("15");
             assertThat(breach.getLimit()).isEqualTo("20");
+            assertThat(breach.getReasonCode()).isEqualTo("MARGIN_BELOW_FLOOR");
         });
 
         ArgumentCaptor<QuoteEvaluatedEvent> events = ArgumentCaptor.forClass(QuoteEvaluatedEvent.class);
@@ -118,8 +119,31 @@ class QuotePolicyEvaluationServiceTest {
             assertThat(command.principal()).isEqualTo("user:seller-oid");
             assertThat(command.tenantId()).isEqualTo("tenant-1");
         });
-        assertThat(audits.getAllValues().get(1).details()).contains("32").contains("25");
-        assertThat(audits.getAllValues().get(2).details()).contains("15").contains("20");
+        assertThat(events.getAllValues().get(2).breaches()).singleElement()
+                .extracting(QuoteEvaluatedEvent.BreachExplained::reasonCode)
+                .isEqualTo("MARGIN_BELOW_FLOOR");
+        assertThat(audits.getAllValues().get(2).details()).contains("15").contains("20").contains("MARGIN_BELOW_FLOOR");
+    }
+
+    @Test
+    @DisplayName("a missing margin is recorded as MARGIN_UNKNOWN")
+    void missingMarginIsRecordedAsMarginUnknown() {
+        when(repository.findByStatusAndDeletedFalse(PolicyStatus.ACTIVE)).thenReturn(List.of(policy()));
+        asUser("tenant-1", "seller-oid");
+        QuoteEvaluationRequest missingMargin = QuoteEvaluationRequest.builder()
+                .quoteId("42")
+                .quoteVersion(3L)
+                .tenantId("tenant-1")
+                .discountPercent(new BigDecimal("10"))
+                .termMonths(12)
+                .build();
+
+        QuoteEvaluationDto verdict = service.evaluate(missingMargin);
+
+        assertThat(verdict.getVerdict()).isEqualTo(PolicyVerdict.BLOCKED);
+        assertThat(verdict.getBreaches()).singleElement()
+                .extracting(com.opencrm.approval.dto.PolicyBreachDto::getReasonCode)
+                .isEqualTo("MARGIN_UNKNOWN");
     }
 
     @Test

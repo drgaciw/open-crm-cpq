@@ -28,6 +28,7 @@ public record QuoteEvaluatedEvent(
             Integer policyVersion,
             String thresholdType,
             String actual,
-            String limit) {
+            String limit,
+            String reasonCode) {
     }
 }
