@@ -166,7 +166,7 @@ AC-592-1 and AC-592-2 expect `error_code` null.
 | AC | Fixture | Input | Expected |
 |---|---|---|---|
 | AC-594-1 | `fixtures/spine-dependent/drg-594-same-sku-update-skips-legal-review.json` | From `DRAFT`. One line `UPDATE` of `SKU-A` to `SKU-A`, quantity 10 to 12. Header edits `price` and `term`. | `legal_review_required` false. Transition to `IN_REVIEW` allowed. Document state `IN_REVIEW`. `approval_row_written` false. `approval_type_written` null. `error_code` null. |
-| AC-594-2 | `fixtures/spine-dependent/drg-594-add-sku-requires-legal-review.json` | From `DRAFT`. Quote already contains SaaS `SKU-A`. One line `ADD` of new SaaS `SKU-B` (not on the quote). No header edit. 594-F1-C stays held, so this new SaaS SKU still requires review. | `legal_review_required` true. Transition refused. Document state stays `DRAFT`. HTTP 409. `error_code` `LEGAL_REVIEW_REQUIRED`. `approval_row_written` false. `approval_type_written` null. |
+| AC-594-2 | `fixtures/spine-dependent/drg-594-add-sku-requires-legal-review.json` | From `DRAFT`. Quote already contains SaaS `SKU-A`. One line `ADD` of new SaaS `SKU-B` (not on the quote). No header edit. 594-F1-C stays NEEDS_OWNER with drg, so this new SaaS SKU still requires review. | `legal_review_required` true. Transition refused. Document state stays `DRAFT`. HTTP 409. `error_code` `LEGAL_REVIEW_REQUIRED`. `approval_row_written` false. `approval_type_written` null. |
 | AC-594-3 | `fixtures/spine-dependent/drg-594-mixed-document-requires-review.json` | From `DRAFT`. One same-SKU `UPDATE` line, plus header edit `governing_agreement_ref`. | Whole document `legal_review_required` true. `per_line_skip` false. Document state stays `DRAFT`. HTTP 409. `error_code` `LEGAL_REVIEW_REQUIRED`. `approval_row_written` false. `approval_type_written` null. |
 | AC-594-4 | `fixtures/spine-dependent/drg-594-existing-saas-sku-add-skips-legal-review.json` | From `DRAFT`. Quote already contains SaaS `SKU-A`. One line `ADD` of `SKU-A`. Catalog type `SAAS_SEAT_NAMED`. | `legal_review_required` false. Transition to `IN_REVIEW` allowed. `error_code` null. |
 | AC-594-5 | `fixtures/spine-dependent/drg-594-existing-saas-sku-remove-skips-legal-review.json` | From `DRAFT`. Quote already contains SaaS `SKU-A`. One line `REMOVE` of `SKU-A`. Catalog type `SAAS_SEAT_NAMED`. | `legal_review_required` false. Transition to `IN_REVIEW` allowed. `error_code` null. |
@@ -222,11 +222,11 @@ The token is declared and allowed. Nothing on main writes it.
 |---|---|
 | A | A same-SKU quantity `UPDATE` is seats and is free, together with price and term. `ADD` of a SKU and `REMOVE` of a product line require review. Superseded for SaaS add and remove by the ruling below. |
 | B | Adding or removing a line whose SaaS SKU is already on the quote is a seat change and skips legal review. A new SaaS SKU still requires review. Non-SaaS add and remove still require review. |
-| C | Any quantity change is free, including a new SaaS SKU. Held. Not chosen. |
+| C | Any quantity change is free, including a new SaaS SKU. NEEDS_OWNER with drg. Not chosen. |
 
-**Default:** Option B, as ruled. Option C stays held.
+**Default:** Option B, as ruled. Option C stays NEEDS_OWNER with drg.
 
-**Status:** Decided for option B. Option C remains held.
+**Status:** Decided for option B. Option C remains NEEDS_OWNER with drg.
 
 **Owner decision:** B. drg owner ruling, 7:15 PM CT Nov 23 2026.
 

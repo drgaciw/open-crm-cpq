@@ -2,11 +2,11 @@
     "issue": "DRG-594",
     "ac_id": "AC-594-2",
     "case": "new-saas-sku-add-requires-legal-review",
-    "note": "594-F1-C stays held. drg owner ruling, 7:15 PM CT Nov 23 2026, option B: a new SaaS SKU that is not already on the quote still requires legal review. This fixture is that case, so the review expectation below stays.",
+    "note": "594-F1-C stays NEEDS_OWNER with drg. drg owner ruling, 7:15 PM CT Nov 23 2026, option B: a new SaaS SKU that is not already on the quote still requires legal review. This fixture is that case, so the review expectation below stays. Tracked as DRG-935.",
     "main_sha": "bf41c230f6309964a25ef5c2c12e84c41b0c37de",
     "status": "Decided",
     "owner_decision": "B. drg owner ruling, 7:15 PM CT Nov 23 2026",
-    "follows_proposed_option": "594-F1-B, 594-F1-C held, 594-F2-A, 594-F6-A",
+    "follows_proposed_option": "594-F1-B, 594-F1-C NEEDS_OWNER with drg, 594-F2-A, 594-F6-A",
     "input": {
         "document_state_before": "DRAFT",
         "quote_skus": ["SKU-A"],

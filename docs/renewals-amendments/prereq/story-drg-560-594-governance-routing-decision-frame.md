@@ -57,7 +57,7 @@ OQ5 option A stays the first-slice partial-apply rule (`read` register OQ5). The
 
 | Fork | Substantive choice this note uses |
 |---|---|
-| 594-F1 | drg owner ruling, 7:15 PM CT Nov 23 2026, option B. Adding or removing a line whose SaaS SKU is already on the quote is a seat change and skips legal review. A new SaaS SKU (594-F1-C) still requires legal review and stays held. Non-SaaS add and remove still require legal review. A same-SKU quantity `UPDATE` stays seats. This replaces the conservative default that every `ADD` and `REMOVE` required review. |
+| 594-F1 | drg owner ruling, 7:15 PM CT Nov 23 2026, option B. Adding or removing a line whose SaaS SKU is already on the quote is a seat change and skips legal review. A new SaaS SKU (594-F1-C) still requires legal review and stays NEEDS_OWNER with drg. Non-SaaS add and remove still require legal review. A same-SKU quantity `UPDATE` stays seats. This replaces the conservative default that every `ADD` and `REMOVE` required review. |
 | 594-F2 | A guard on `DRAFT` to `IN_REVIEW`. No new state. |
 | 594-F3 | A named legal role may override. Until that role is named the guard refuses. Sales cannot override. |
 | 594-F4 | One edit outside the free set makes the whole document require review. Free header fields are price and term. |

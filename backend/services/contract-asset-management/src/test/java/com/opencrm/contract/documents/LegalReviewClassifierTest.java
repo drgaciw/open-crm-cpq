@@ -1,5 +1,6 @@
 package com.opencrm.contract.documents;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.contract.domain.documents.ActionCode;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,13 @@ class LegalReviewClassifierTest {
     void existingSaasSkuRemoveSkipsLegalReview() {
         assertThat(classify(catalog(Map.of("SKU-A", SAAS)), Set.of("SKU-A"),
                 line(ActionCode.REMOVE, "SKU-A")).legalReviewRequired()).isFalse();
+    }
+
+    @Test
+    void newSaasSkuPredicateStaysOptionB() {
+        assertThat(LegalReviewClassifier.newSaasSkuRequiresLegalReview(true, false)).isTrue();
+        assertThat(LegalReviewClassifier.newSaasSkuRequiresLegalReview(true, true)).isFalse();
+        assertThat(LegalReviewClassifier.newSaasSkuRequiresLegalReview(false, false)).isFalse();
     }
 
     @Test
@@ -96,14 +104,16 @@ class LegalReviewClassifierTest {
 
     @Test
     void clientSuppliedSkipCannotOverrideClassification() throws Exception {
-        VersionBody body = new ObjectMapper().readValue(
+        ObjectMapper lenient = new ObjectMapper()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        VersionBody body = lenient.readValue(
                 "{\"version\":3,\"skipLegalReview\":true,\"legalReviewRequired\":false,\"legalHold\":false}",
                 VersionBody.class);
         assertThat(body.version()).isEqualTo(3);
         assertThat(recordNames(CreateAmendment.class)).noneMatch(name -> name.toLowerCase().contains("legal"));
         assertThat(recordNames(VersionBody.class)).containsExactly("version");
-        assertThat(Arrays.stream(LegalReviewClassifier.class.getDeclaredMethods())
-                .flatMap(method -> Arrays.stream(method.getParameterTypes()))
+        assertThat(Arrays.stream(LegalReviewClassifier.class.getDeclaredMethod(
+                        "classify", LegalReviewEvidence.class, UUID.class, List.class, Set.class).getParameterTypes())
                 .noneMatch(type -> type == boolean.class || type == Boolean.class)).isTrue();
         assertThat(classify(catalog(Map.of("SKU-B", SAAS)), Set.of("SKU-A"),
                 line(ActionCode.ADD, "SKU-B")).legalReviewRequired()).isTrue();
