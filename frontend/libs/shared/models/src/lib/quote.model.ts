@@ -390,6 +390,9 @@ export interface QuoteUpdateRequest {
   durationInMonths?: number;
   startDate?: string;
   endDate?: string;
+  /** Remove the corresponding existing date from an eligible quote. */
+  clearStartDate?: boolean;
+  clearEndDate?: boolean;
   validUntil?: string;
   notes?: string;
 }

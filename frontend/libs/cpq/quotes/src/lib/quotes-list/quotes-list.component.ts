@@ -110,7 +110,7 @@ interface QuoteTableRow {
       </div>
     }
 
-    @if (!loading() && !error() && isEmpty()) {
+    @if (!error() && !listErrorDismissed() && isEmpty()) {
       <app-empty-state
         icon="request_quote"
         [title]="hasActiveFilters() ? 'No matching quotes' : 'No quotes yet'"
@@ -122,7 +122,7 @@ interface QuoteTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Quote'"
         (action)="onNewQuote()"
       />
-    } @else if (!error() || tableRows().length > 0) {
+    } @else if ((!error() && loading()) || tableRows().length > 0) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -211,6 +211,7 @@ export class QuotesListComponent implements OnInit {
   readonly searchTerm = signal('');
   readonly statusFilter = signal('');
   readonly dealTypeFilter = signal('');
+  protected readonly listErrorDismissed = signal(false);
   /** Spring sort from a column header (`name,desc`); null keeps newest first. */
   readonly sort = signal<string | null>(null);
 
@@ -289,10 +290,12 @@ export class QuotesListComponent implements OnInit {
   }
 
   clearError(): void {
+    this.listErrorDismissed.set(true);
     this.quoteService.error.set(null);
   }
 
   private reload(page: number, size: number): void {
+    this.listErrorDismissed.set(false);
     const status = this.statusFilter();
     const dealType = this.dealTypeFilter();
     this.quoteService.list(page, size, this.sort() ?? 'createdAt,desc', {

@@ -4,7 +4,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -36,7 +35,4 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, JpaSpecific
     Page<Quote> findByDealTypeAndDeletedFalse(DealType dealType, Pageable pageable);
 
     Page<Quote> findByApprovalStateAndDeletedFalse(ApprovalState approvalState, Pageable pageable);
-
-    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(q.quoteNumber, 12) AS int)), 0) FROM Quote q WHERE q.quoteNumber LIKE :prefix")
-    int findMaxSequenceByPrefix(String prefix);
 }

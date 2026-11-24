@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -209,6 +210,39 @@ class LeadControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].status").value("CONTACTED"));
+    }
+
+    @Test
+    void listLeads_filtersTitleStatusAndPriorityBeforePaging() throws Exception {
+        Lead deleted = Lead.builder().title("Enterprise Deleted").priority(LeadPriority.HIGH).build();
+        deleted.softDelete();
+        leadRepository.saveAll(List.of(
+                Lead.builder().title("Enterprise Alpha").priority(LeadPriority.HIGH).build(),
+                Lead.builder().title("Enterprise Beta").priority(LeadPriority.HIGH).build(),
+                Lead.builder().title("Enterprise Low").priority(LeadPriority.LOW).build(),
+                Lead.builder().title("Enterprise Contacted").status(LeadStatus.CONTACTED)
+                        .priority(LeadPriority.HIGH).build(),
+                Lead.builder().title("Independent").priority(LeadPriority.HIGH).build(),
+                deleted));
+
+        for (int page = 0; page < 2; page++) {
+            mockMvc.perform(get("/api/v1/leads")
+                            .param("q", "  eNtErPrIsE  ")
+                            .param("status", "NEW")
+                            .param("priority", "HIGH")
+                            .param("sort", "title,asc")
+                            .param("size", "1")
+                            .param("page", Integer.toString(page)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.pagination.totalElements").value(2))
+                    .andExpect(jsonPath("$.pagination.totalPages").value(2))
+                    .andExpect(jsonPath("$.data", hasSize(1)))
+                    .andExpect(jsonPath("$.data[0].title").value(page == 0 ? "Enterprise Alpha" : "Enterprise Beta"));
+        }
+
+        mockMvc.perform(get("/api/v1/leads").param("status", "NEW").param("priority", "HIGH"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].title", containsInAnyOrder("Enterprise Alpha", "Enterprise Beta", "Independent")));
     }
 
     @Test

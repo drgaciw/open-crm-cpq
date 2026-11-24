@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -80,8 +82,10 @@ describe('PriceBookDetailComponent', () => {
       updatedAt: '',
     },
   ]);
-  const loading = signal(false);
+  const detailLoading = signal(false);
+  const entriesLoading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadStatus = signal<number | null>(null);
   const entriesPagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -90,6 +94,7 @@ describe('PriceBookDetailComponent', () => {
   });
 
   beforeEach(async () => {
+    detailReadStatus.set(null);
     getByIdSpy = vi.fn((id: number) => {
       selectedPriceBook.set(findMockPriceBook(id) ?? null);
     });
@@ -132,8 +137,10 @@ describe('PriceBookDetailComponent', () => {
     const serviceMock = {
       selectedPriceBook,
       entries,
-      loading,
+      detailLoading,
+      entriesLoading,
       error,
+      detailReadStatus,
       entriesPagination,
       getById: getByIdSpy,
       getEntries: getEntriesSpy,
@@ -178,7 +185,8 @@ describe('PriceBookDetailComponent', () => {
         updatedAt: '',
       },
     ]);
-    loading.set(false);
+    detailLoading.set(false);
+    entriesLoading.set(false);
     error.set(null);
   });
 
@@ -458,7 +466,22 @@ describe('PriceBookDetailComponent', () => {
     expect(compiled.textContent).toContain('No entries');
   });
 
-  it('shows not-found empty state when selected book is missing', () => {
+  it('shows a transient detail failure and retains Back after HTTP 503', () => {
+    selectedPriceBook.set(null);
+    detailLoading.set(false);
+    error.set('Controlled detail unavailable');
+    detailReadStatus.set(503);
+    fixture.detectChanges();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(card?.querySelector('.empty-state-title')?.textContent).toContain('Unable to load price book');
+    expect(card?.textContent).toContain('Controlled detail unavailable');
+    expect(card?.textContent).not.toContain('Price book not found');
+    expect(card?.querySelector('button')?.textContent).toContain('Back to price books');
+  });
+
+  it('shows the missing-price-book state after HTTP 404', () => {
+    detailReadStatus.set(404);
     selectedPriceBook.set(null);
     fixture.detectChanges();
 
@@ -501,5 +524,80 @@ describe('PriceBookDetailComponent', () => {
 
     component.openCreateEntry();
     expect(dialogOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe('PriceBookDetailComponent read lifecycle', () => {
+  const book = MOCK_PRICE_BOOKS[2];
+  const emptyEntries = { content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 };
+
+  async function showBook() {
+    await TestBed.configureTestingModule({
+      imports: [PriceBookDetailComponent],
+      providers: [
+        provideRouter([]),
+        provideNoopAnimations(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(PriceBookDetailComponent);
+    fixture.componentRef.setInput('id', String(book.id));
+    fixture.detectChanges();
+
+    const http = TestBed.inject(HttpTestingController);
+    const path = `/api/v1/price-books/${book.id}`;
+    const parent = http.expectOne(path);
+    const entries = http.expectOne((request) => request.url === `${path}/entries`);
+    return { fixture, parent, entries, view: fixture.nativeElement as HTMLElement };
+  }
+
+  afterEach(() => TestBed.inject(HttpTestingController).verify());
+
+  it('keeps the parent loading when the entries response finishes first', async () => {
+    const { fixture, parent, entries, view } = await showBook();
+    entries.flush(emptyEntries);
+    fixture.detectChanges();
+
+    expect(view.querySelector('.loading mat-spinner')).not.toBeNull();
+    expect(view.textContent).not.toContain('Unable to load price book');
+
+    parent.flush(book);
+    fixture.detectChanges();
+
+    expect(view.querySelector('.loading mat-spinner')).toBeNull();
+    expect(view.textContent).toContain(book.name);
+    expect(view.textContent).toContain('No entries');
+  });
+
+  it('keeps the entries loading when the parent response finishes first', async () => {
+    const { fixture, parent, entries, view } = await showBook();
+    parent.flush(book);
+    fixture.detectChanges();
+
+    expect(view.textContent).toContain(book.name);
+    expect(view.querySelector('.entries-loading mat-spinner')?.getAttribute('aria-label'))
+      .toBe('Loading price book entries');
+    expect(view.textContent).not.toContain('No entries');
+
+    entries.flush(emptyEntries);
+    fixture.detectChanges();
+
+    expect(view.querySelector('.entries-loading mat-spinner')).toBeNull();
+    expect(view.textContent).toContain('No entries');
+  });
+
+  it('names the initial progress indicator and preserves the 404 state', async () => {
+    const { fixture, parent, entries, view } = await showBook();
+    expect(view.querySelector('.loading mat-spinner')?.getAttribute('aria-label'))
+      .toBe('Loading price book');
+
+    parent.flush({ message: 'Missing book' }, { status: 404, statusText: 'Not Found' });
+    entries.flush({ message: 'Missing book' }, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(view.querySelector('.loading mat-spinner')).toBeNull();
+    expect(view.textContent).toContain('Price book not found');
+    expect(view.textContent).toContain('Back to price books');
   });
 });

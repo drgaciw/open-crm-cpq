@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, output } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,7 +27,13 @@ const NAV_SECTIONS: readonly NavSection[] = NAV_GROUPS.map((group) => ({
       @for (section of sections; track section.group) {
         <h3 class="nav-group">{{ section.group }}</h3>
         @for (item of section.items; track item.route) {
-          <a mat-list-item [routerLink]="item.route" routerLinkActive="active-link">
+          <a
+            mat-list-item
+            [routerLink]="item.route"
+            routerLinkActive="active-link"
+            ariaCurrentWhenActive="page"
+            (click)="onDestinationClick($event)"
+          >
             <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
             <span matListItemTitle>{{ item.label }}</span>
           </a>
@@ -69,4 +75,11 @@ const NAV_SECTIONS: readonly NavSection[] = NAV_GROUPS.map((group) => ({
 })
 export class SidebarComponent {
   readonly sections = NAV_SECTIONS;
+  readonly destinationSelected = output<void>();
+
+  onDestinationClick(event: MouseEvent): void {
+    if (event.button === 0 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      this.destinationSelected.emit();
+    }
+  }
 }

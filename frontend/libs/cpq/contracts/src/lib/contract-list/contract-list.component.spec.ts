@@ -1,7 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { SpringPageResponse, SubscriptionDto } from '@frontend/shared-models';
+import { Subject, of, throwError } from 'rxjs';
 import { ContractListComponent } from './contract-list.component';
 import { ContractService } from '../contract.service';
 import { MOCK_CONTRACTS } from '../contracts.mock';
@@ -35,6 +36,39 @@ describe('ContractListComponent', () => {
   it('loads page 0 of contracts on init', async () => {
     await render();
     expect(list).toHaveBeenCalledWith(0, 20, undefined);
+  });
+
+  it('keeps the latest sort results and pagination when the earlier sort finishes last', async () => {
+    await render();
+    const earlier = new Subject<SpringPageResponse<SubscriptionDto>>();
+    list.mockReturnValueOnce(earlier);
+    list.mockReturnValueOnce(page([MOCK_CONTRACTS[1]]));
+    fixture.componentInstance.onSort({ active: 'subscriptionNumber', direction: 'asc' });
+    fixture.componentInstance.onSort({ active: 'subscriptionNumber', direction: 'desc' });
+    expect(list).toHaveBeenLastCalledWith(0, 20, 'subscriptionNumber,desc');
+
+    earlier.next({ content: MOCK_CONTRACTS, number: 0, size: 20, totalElements: 2, totalPages: 1 });
+    fixture.detectChanges();
+
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain(MOCK_CONTRACTS[1].subscriptionNumber);
+    expect(fixture.componentInstance.pagination().totalElements).toBe(1);
+    expect(fixture.componentInstance.loading()).toBe(false);
+  });
+
+  it('keeps the current rows visible when an earlier sort fails', async () => {
+    await render();
+    const earlier = new Subject<never>();
+    list.mockReturnValueOnce(earlier);
+    list.mockReturnValueOnce(page([MOCK_CONTRACTS[1]]));
+    fixture.componentInstance.onSort({ active: 'subscriptionNumber', direction: 'asc' });
+    fixture.componentInstance.onSort({ active: 'subscriptionNumber', direction: 'desc' });
+
+    earlier.error({ message: 'Earlier sort failed' });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.error()).toBeNull();
+    expect(rows()).toHaveLength(1);
   });
 
   it('shows each contract by number, customer, plan, status label, term and ARR', async () => {

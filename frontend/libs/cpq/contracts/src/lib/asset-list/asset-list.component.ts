@@ -46,45 +46,47 @@ import { ContractService, isAccessDenied } from '../contract.service';
             message="Assets are created when a contract is activated."
           />
         } @else {
-          <table class="assets" aria-label="Assets">
-            <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col">Account</th>
-                <th scope="col">Quantity</th>
-                <th scope="col">Status</th>
-                <th scope="col">Start</th>
-                <th scope="col">End</th>
-                <th scope="col">Contract</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (a of assets(); track a.id) {
+          <div class="assets-scroll" role="region" aria-label="Asset columns" tabindex="0">
+            <table class="assets" aria-label="Assets">
+              <thead>
                 <tr>
-                  <td>{{ a.productRef ?? '—' }}</td>
-                  <td>{{ a.accountId }}</td>
-                  <td>{{ a.quantity ?? '—' }}</td>
-                  <td>{{ status(a) }}</td>
-                  <td>{{ a.effectiveStart ?? '—' }}</td>
-                  <td>{{ a.effectiveEnd ?? '—' }}</td>
-                  <td>
-                    @if (a.subscriptionId !== undefined && a.subscriptionId !== null) {
-                      <button
-                        mat-button
-                        type="button"
-                        [attr.aria-label]="'Open contract ' + a.subscriptionId"
-                        (click)="openContract(a.subscriptionId)"
-                      >
-                        Contract {{ a.subscriptionId }}
-                      </button>
-                    } @else {
-                      —
-                    }
-                  </td>
+                  <th scope="col">Product</th>
+                  <th scope="col">Account</th>
+                  <th scope="col">Quantity</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Start</th>
+                  <th scope="col">End</th>
+                  <th scope="col">Contract</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (a of assets(); track a.id) {
+                  <tr>
+                    <td>{{ a.productRef ?? '—' }}</td>
+                    <td>{{ a.accountId }}</td>
+                    <td>{{ a.quantity ?? '—' }}</td>
+                    <td>{{ status(a) }}</td>
+                    <td>{{ a.effectiveStart ?? '—' }}</td>
+                    <td>{{ a.effectiveEnd ?? '—' }}</td>
+                    <td>
+                      @if (a.subscriptionId !== undefined && a.subscriptionId !== null) {
+                        <button
+                          mat-button
+                          type="button"
+                          [attr.aria-label]="'Open contract ' + a.subscriptionId"
+                          (click)="openContract(a.subscriptionId)"
+                        >
+                          Contract {{ a.subscriptionId }}
+                        </button>
+                      } @else {
+                        —
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       }
     }
@@ -105,9 +107,12 @@ import { ContractService, isAccessDenied } from '../contract.service';
       .note {
         margin: 32px;
       }
-      .assets {
-        width: calc(100% - 64px);
+      .assets-scroll {
         margin: 0 32px;
+        overflow-x: auto;
+      }
+      .assets {
+        width: 100%;
         border-collapse: collapse;
       }
       .assets th,

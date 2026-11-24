@@ -16,23 +16,28 @@ export class ApprovalService {
   private readonly http = inject(HttpClient);
   /** Quote BFF base — do not point at approval-routing. */
   private readonly basePath = '/api/v1/quotes/approvals';
+  private readonly listReadConfirmed = signal(false);
 
   readonly pending = signal<ApprovalRequestDto[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly isEmpty = computed(
-    () => this.pending().length === 0 && !this.loading(),
+    () => this.listReadConfirmed() && this.pending().length === 0 && !this.loading(),
   );
 
   listPending(): void {
+    this.listReadConfirmed.set(false);
     this.error.set(null);
     this.loading.set(true);
     this.http
       .get<ApprovalRequestDto[]>(`${this.basePath}/pending`)
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (rows) => this.pending.set(rows ?? []),
+        next: (rows) => {
+          this.pending.set(rows ?? []);
+          this.listReadConfirmed.set(true);
+        },
         error: (err) => {
           this.error.set(
             err?.error?.message || err?.message || 'An error occurred',

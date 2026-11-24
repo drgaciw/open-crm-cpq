@@ -23,6 +23,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { QuoteDto, QuoteUpdateRequest } from '@frontend/shared-models';
+import { FormValidators } from '@frontend/shared-utils';
 import { QuoteService } from '../quote.service';
 
 function toDateInput(value: string | undefined | null): string {
@@ -312,6 +313,8 @@ export class QuoteHeaderEditComponent {
   private readonly fb = inject(FormBuilder);
   private readonly quoteService = inject(QuoteService);
   private readonly snackBar = inject(MatSnackBar);
+  private datesAtEditStart = { startDate: '', endDate: '' };
+  private optionalTextAtEditStart = { description: '', notes: '' };
 
   /** Quote whose header is being edited. */
   readonly quote = input.required<QuoteDto>();
@@ -326,7 +329,7 @@ export class QuoteHeaderEditComponent {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(255)]],
+    name: ['', [FormValidators.requiredTrimmed, Validators.maxLength(255)]],
     description: [''],
     dealExternalId: [''],
     subscriptionType: [''],
@@ -375,13 +378,24 @@ export class QuoteHeaderEditComponent {
       this.form.markAllAsTouched();
       return;
     }
-    const id = this.quote().id;
+    const { id, dealType, status, targetSubscriptionNumber, continuationOperation } = this.quote();
     const request = this.toRequest();
+    if ((request.clearStartDate || request.clearEndDate) &&
+        (dealType !== 'NEW' || targetSubscriptionNumber != null || continuationOperation != null ||
+         (status !== 'DRAFT' && status !== 'REJECTED'))) {
+      this.error.set('Quote dates can only be cleared on new draft or rejected quotes.');
+      return;
+    }
+
     this.saving.set(true);
     this.error.set(null);
     this.quoteService.update(id, request).subscribe({
       next: (updated) => {
         this.saving.set(false);
+        if ((request.clearStartDate && updated.startDate) || (request.clearEndDate && updated.endDate)) {
+          this.error.set('The server kept a date you cleared. Reload the quote before retrying.');
+          return;
+        }
         this.editing.set(false);
         this.saved.emit(updated);
         this.snackBar.open('Quote saved', 'Dismiss', { duration: 3000 });
@@ -395,17 +409,21 @@ export class QuoteHeaderEditComponent {
   }
 
   private patchFromQuote(q: QuoteDto): void {
+    this.datesAtEditStart = {
+      startDate: toDateInput(q.startDate),
+      endDate: toDateInput(q.endDate),
+    };
+    this.optionalTextAtEditStart = { description: q.description ?? '', notes: q.notes ?? '' };
     this.form.setValue({
       name: q.name ?? '',
-      description: q.description ?? '',
+      description: this.optionalTextAtEditStart.description,
       dealExternalId: q.dealExternalId ?? '',
       subscriptionType: q.subscriptionType ?? '',
       currency: q.currency ?? '',
       region: q.region ?? '',
       durationInMonths: q.durationInMonths ?? null,
-      startDate: toDateInput(q.startDate),
-      endDate: toDateInput(q.endDate),
-      notes: q.notes ?? '',
+      ...this.datesAtEditStart,
+      notes: this.optionalTextAtEditStart.notes,
     });
   }
 
@@ -414,8 +432,9 @@ export class QuoteHeaderEditComponent {
     const request: QuoteUpdateRequest = {
       name: raw.name.trim(),
     };
+    const initialText = this.optionalTextAtEditStart;
     const description = raw.description.trim();
-    if (description) {
+    if (description || (initialText.description !== '' && raw.description !== initialText.description)) {
       request.description = description;
     }
     const dealExternalId = raw.dealExternalId.trim();
@@ -439,12 +458,16 @@ export class QuoteHeaderEditComponent {
     }
     if (raw.startDate) {
       request.startDate = raw.startDate;
+    } else if (this.datesAtEditStart.startDate) {
+      request.clearStartDate = true;
     }
     if (raw.endDate) {
       request.endDate = raw.endDate;
+    } else if (this.datesAtEditStart.endDate) {
+      request.clearEndDate = true;
     }
     const notes = raw.notes.trim();
-    if (notes) {
+    if (notes || (initialText.notes !== '' && raw.notes !== initialText.notes)) {
       request.notes = notes;
     }
     return request;

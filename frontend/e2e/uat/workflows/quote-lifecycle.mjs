@@ -268,15 +268,24 @@ export async function runDetailStructure(ctx, quote) {
   });
 
   await runCheck(ctx, 'quotes.detail.unknown-id', async () => {
-    await goto(page, '/quotes/999999999');
-    const alert = page.getByRole('alert').first();
-    await alert.waitFor({ state: 'visible' });
-    const said = squash(await alert.innerText());
+    const missingId = 999999999;
+    const read = page.waitForResponse((response) =>
+      response.request().method() === 'GET' && new URL(response.url()).pathname === `${API}/${missingId}`,
+    );
+    const [response] = await Promise.all([read, goto(page, `/quotes/${missingId}`)]);
+    if (response.status() !== 404) throw new Error(`unknown quote GET returned HTTP ${response.status()}, expected 404`);
+
+    const heading = page.getByRole('heading', { name: 'Quote not found', exact: true });
+    const panel = page.getByRole('status').filter({ has: heading });
+    await panel.getByText('This quote could not be loaded from the API.', { exact: true }).waitFor({ state: 'visible' });
     await dismissSnackbars(page);
-    for (const name of ['Retry', 'Back to quotes']) {
-      await alert.getByRole('button', { name, exact: true }).waitFor({ state: 'visible' });
+    if (await panel.getByRole('button', { name: 'Retry', exact: true }).count()) {
+      throw new Error('unknown quote panel offers Retry for a 404');
     }
-    return said.slice(0, 120);
+    await panel.getByRole('button', { name: 'Back to quotes', exact: true }).click();
+    await page.waitForURL((url) => url.pathname === '/quotes');
+    await page.getByRole('heading', { name: 'Quotes', exact: true }).waitFor({ state: 'visible' });
+    return 'GET returned HTTP 404 · Quote not found · Back to quotes returns to /quotes';
   });
 }
 

@@ -1,6 +1,6 @@
 import { Service, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { Observable, Subscription, finalize } from 'rxjs';
 import {
   ProductDto,
   ProductCreateRequest,
@@ -34,11 +34,13 @@ function httpErrorMessage(err: unknown): string {
 export class ProductService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/products';
+  private listRequest?: Subscription;
 
   readonly products = signal<ProductDto[]>([]);
   readonly selectedProduct = signal<ProductDto | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly detailReadStatus = signal<number | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -58,8 +60,6 @@ export class ProductService {
       status?: ProductStatus;
     },
   ): void {
-    this.error.set(null);
-    this.loading.set(true);
     let params = new HttpParams()
       .set('page', page)
       .set('size', size)
@@ -74,28 +74,11 @@ export class ProductService {
       params = params.set('status', filters.status);
     }
 
-    this.http
-      .get<SpringPageResponse<ProductDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (p) => {
-          this.products.set(p.content ?? (p as unknown as ProductDto[]));
-          if (p.totalElements !== undefined) {
-            this.pagination.set({
-              page: p.number ?? 0,
-              size: p.size ?? size,
-              totalElements: p.totalElements ?? 0,
-              totalPages: p.totalPages ?? 0,
-            });
-          }
-        },
-        error: (err) => {
-          this.error.set(httpErrorMessage(err));
-        },
-      });
+    this.loadProducts(this.basePath, params, size);
   }
 
   getById(id: number): void {
+    this.detailReadStatus.set(null);
     this.error.set(null);
     this.loading.set(true);
     this.http
@@ -104,6 +87,7 @@ export class ProductService {
       .subscribe({
         next: (product) => this.selectedProduct.set(product),
         error: (err) => {
+          this.detailReadStatus.set(err instanceof HttpErrorResponse ? err.status : null);
           this.error.set(httpErrorMessage(err));
         },
       });
@@ -132,8 +116,6 @@ export class ProductService {
     sort?: string,
     filters?: { category?: ProductCategory; status?: ProductStatus },
   ): void {
-    this.error.set(null);
-    this.loading.set(true);
     let params = new HttpParams()
       .set('q', query)
       .set('page', page)
@@ -148,8 +130,16 @@ export class ProductService {
     if (filters?.status) {
       params = params.set('status', filters.status);
     }
-    this.http
-      .get<SpringPageResponse<ProductDto>>(`${this.basePath}/search`, { params })
+    this.loadProducts(`${this.basePath}/search`, params, size);
+  }
+
+  private loadProducts(path: string, params: HttpParams, size: number): void {
+    // Catalog list and search update the same rows and status. Finish the old read before setting new loading.
+    this.listRequest?.unsubscribe();
+    this.error.set(null);
+    this.loading.set(true);
+    this.listRequest = this.http
+      .get<SpringPageResponse<ProductDto>>(path, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
