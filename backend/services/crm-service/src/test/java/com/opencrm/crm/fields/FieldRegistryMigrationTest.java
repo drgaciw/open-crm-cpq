@@ -27,18 +27,19 @@ class FieldRegistryMigrationTest {
     void versionTwentyOneIsTheNextIntegerAfterEveryExistingCrmMigration() throws IOException, URISyntaxException {
         List<String> names = migrationNames();
 
-        assertThat(names).contains("V20__audit_entries.sql", "V21__field_registry.sql");
+        assertThat(names).contains("V20__audit_entries.sql", "V21__field_registry.sql",
+                "V22__strengthen_field_registry_integrity.sql");
         assertThat(names).allMatch(name -> name.matches("V\\d+__.+\\.sql"));
         assertThat(names.stream().map(FieldRegistryMigrationTest::versionOf).distinct()).hasSameSizeAs(names);
 
+        MigrationVersion registryVersion = MigrationVersion.fromVersion("21");
         MigrationVersion previousMax = names.stream()
-                .filter(name -> !name.startsWith("V21__"))
                 .map(FieldRegistryMigrationTest::versionOf)
+                .filter(version -> version.compareTo(registryVersion) < 0)
                 .max(Comparator.naturalOrder())
                 .orElseThrow();
         assertThat(previousMax).isEqualTo(MigrationVersion.fromVersion("20"));
-        assertThat(versionOf("V21__field_registry.sql")).isEqualTo(MigrationVersion.fromVersion("21"));
-        assertThat(versionOf("V21__field_registry.sql").compareTo(previousMax)).isPositive();
+        assertThat(versionOf("V21__field_registry.sql")).isEqualTo(registryVersion);
     }
 
     @Test

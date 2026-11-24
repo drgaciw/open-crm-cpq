@@ -64,6 +64,8 @@ interface BundleTableRow {
           <input
             matInput
             type="number"
+            min="1"
+            step="1"
             [value]="productIdFilter()"
             (input)="onProductIdInput($event)"
             (keyup.enter)="applyProductIdFilter()"
@@ -95,7 +97,7 @@ interface BundleTableRow {
       </div>
     }
 
-    @if (!loading() && isEmpty()) {
+    @if (!error() && !listErrorDismissed() && isEmpty()) {
       <app-empty-state
         icon="inventory"
         [title]="
@@ -109,7 +111,7 @@ interface BundleTableRow {
         [actionLabel]="hasActiveFilters() ? '' : 'New Bundle'"
         (action)="openCreateDialog()"
       />
-    } @else {
+    } @else if (!isEmpty()) {
       <app-data-table
         [columns]="columns"
         [data]="tableRows()"
@@ -178,9 +180,11 @@ export class ProductBundleListComponent implements OnInit {
 
   readonly productIdFilter = signal('');
   readonly appliedProductId = signal<number | null>(null);
+  protected readonly listErrorDismissed = signal(false);
+  private readonly filterError = signal<string | null>(null);
 
   readonly loading = computed(() => this.service.loading());
-  readonly error = computed(() => this.service.error());
+  readonly error = computed(() => this.filterError() ?? this.service.error());
   readonly pagination = computed(() => this.service.pagination());
 
   readonly tableRows = computed<BundleTableRow[]>(() =>
@@ -211,8 +215,8 @@ export class ProductBundleListComponent implements OnInit {
       return;
     }
     const id = Number(raw);
-    if (!Number.isFinite(id) || id <= 0) {
-      this.service.error.set('Product ID must be a positive number');
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      this.filterError.set('Product ID must be a positive whole number');
       return;
     }
     this.appliedProductId.set(id);
@@ -251,10 +255,17 @@ export class ProductBundleListComponent implements OnInit {
   }
 
   clearError(): void {
+    // Dismissing a list failure does not confirm an empty result.
+    if (this.service.error()) {
+      this.listErrorDismissed.set(true);
+    }
+    this.filterError.set(null);
     this.service.error.set(null);
   }
 
   private reload(page = 0, size = this.service.pagination().size || 20): void {
+    this.listErrorDismissed.set(false);
+    this.filterError.set(null);
     const productId = this.appliedProductId();
     if (productId !== null) {
       this.service.listByProductId(productId);

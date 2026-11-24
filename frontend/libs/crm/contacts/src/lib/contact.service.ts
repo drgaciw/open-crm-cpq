@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, Subject, finalize, takeUntil } from 'rxjs';
 import {
   ContactDto,
   ContactCreateRequest,
@@ -26,9 +26,11 @@ function httpErrorMessage(err: unknown): string {
 export class ContactService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/contacts';
+  private readonly listSuperseded = new Subject<void>();
 
   readonly contacts = signal<ContactDto[]>([]);
   readonly selectedContact = signal<ContactDto | null>(null);
+  readonly hasConfirmedPage = signal(false);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly pagination = signal<PaginationMeta>({
@@ -38,26 +40,9 @@ export class ContactService {
   readonly isEmpty = computed(() => this.contacts().length === 0 && !this.loading());
 
   list(page = 0, size = 20, sort = 'lastName,asc'): void {
-    this.error.set(null);
-    this.loading.set(true);
     const params = new HttpParams()
       .set('page', page).set('size', size).set('sort', sort);
-    this.http.get<SpringPageResponse<ContactDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (p) => {
-          this.contacts.set(p.content ?? p);
-          if (p.totalElements !== undefined) {
-            this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? size,
-              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
-            });
-          }
-        },
-        error: (err) => {
-          this.error.set(httpErrorMessage(err));
-        }
-      });
+    this.loadPage(this.basePath, params, size);
   }
 
   getById(id: number): void {
@@ -86,18 +71,25 @@ export class ContactService {
   }
 
   search(query: string): void {
+    this.loadPage(`${this.basePath}/search`, new HttpParams().set('q', query), 20);
+  }
+
+  private loadPage(path: string, params: HttpParams, size: number): void {
+    // Finalize the superseded page read before marking the current request as loading.
+    this.listSuperseded.next();
+    this.hasConfirmedPage.set(false);
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams().set('q', query);
     // Interceptor rebuilds List+PageInfo into SpringPageResponse
-    this.http.get<SpringPageResponse<ContactDto>>(`${this.basePath}/search`, { params })
-      .pipe(finalize(() => this.loading.set(false)))
+    this.http.get<SpringPageResponse<ContactDto>>(path, { params })
+      .pipe(takeUntil(this.listSuperseded), finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.contacts.set(p.content ?? p);
+          this.hasConfirmedPage.set(true);
           if (p.totalElements !== undefined) {
             this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? 20,
+              page: p.number ?? 0, size: p.size ?? size,
               totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
             });
           }

@@ -54,12 +54,15 @@ class HttpRenewalPolicyClientTest {
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer synthetic-service-token"))
                 .andRespond(withSuccess("""
                         {"success":true,"data":[{"id":"dddddddd-dddd-dddd-dddd-dddddddddddd","scopeKind":"ACCOUNT",
-                        "scopeRef":"cccccccc-cccc-cccc-cccc-cccccccccccc","policyVersion":1,"mode":"SAME"}]}
+                        "scopeRef":"cccccccc-cccc-cccc-cccc-cccccccccccc","policyVersion":1,"mode":"SAME",
+                        "status":"ACTIVE","maxIncreasePct":12,"notBelowExitNet":false}]}
                         """, MediaType.APPLICATION_JSON));
         var views = new HttpRenewalPolicyClient(builder.build())
                 .fetchRungs(account, null, null, LocalDate.of(2026, 11, 1));
         assertThat(views).hasSize(1);
         assertThat(views.getFirst().mode()).isEqualTo("SAME");
+        assertThat(views.getFirst().scopeRef()).isEqualTo(account);
+        assertThat(views.getFirst().maxIncreasePct()).isEqualByComparingTo("12");
         server.verify();
     }
 
@@ -69,6 +72,22 @@ class HttpRenewalPolicyClientTest {
         var server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo(org.hamcrest.Matchers.containsString("/internal/v1/renewal-policies")))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> new HttpRenewalPolicyClient(builder.build())
+                .fetchRungs(UUID.randomUUID(), null, null, null))
+                .isInstanceOf(BusinessException.class);
+        server.verify();
+    }
+
+    @Test
+    void additiveFieldsDoNotExcuseMissingRequiredPolicyFacts() {
+        var builder = RestClient.builder().baseUrl("http://cam.test");
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/internal/v1/renewal-policies")))
+                .andRespond(withSuccess("""
+                        {"success":true,"data":[{"scopeKind":"ACCOUNT",
+                        "scopeRef":"cccccccc-cccc-cccc-cccc-cccccccccccc","policyVersion":1,"mode":"SAME"}]}
+                        """, MediaType.APPLICATION_JSON));
+
         assertThatThrownBy(() -> new HttpRenewalPolicyClient(builder.build())
                 .fetchRungs(UUID.randomUUID(), null, null, null))
                 .isInstanceOf(BusinessException.class);

@@ -147,9 +147,10 @@ import { PageHeaderComponent } from '@frontend/shared-ui';
 
           <div class="form-actions">
             <button mat-button type="button" (click)="goBack()">Cancel</button>
-            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()">
+            <button mat-raised-button color="primary" type="submit" [disabled]="form.invalid || saving()"
+                    [attr.aria-label]="saving() ? (isEditMode ? 'Update' : 'Create') : null">
               @if (saving()) {
-                <mat-spinner diameter="20"></mat-spinner>
+                <mat-spinner diameter="20" aria-label="Saving lead"></mat-spinner>
               } @else {
                 {{ isEditMode ? 'Update' : 'Create' }}
               }

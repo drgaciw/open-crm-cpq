@@ -98,4 +98,45 @@ describe('RuleService', () => {
     req.flush(impact);
     await expect(promise).resolves.toMatchObject({ ruleId: 12 });
   });
+
+  it('retains a same-set refresh and clears foreign rows and pagination immediately on switch', () => {
+    const first = rule({ id: 1, ruleSetId: 4, name: 'Set four', ruleType: 'PRICING', status: 'DRAFT' });
+    service.listByRuleSet(4);
+    httpMock.expectOne(request => request.url === '/api/v1/rules/by-rule-set/4')
+      .flush({ content: [first], number: 0, size: 20, totalElements: 1, totalPages: 1 });
+
+    service.listByRuleSet(4, 0, 10);
+    const olderPage = httpMock.expectOne(request => request.url === '/api/v1/rules/by-rule-set/4');
+    expect(service.rules()).toEqual([first]);
+
+    service.listByRuleSet(8);
+    const latest = httpMock.expectOne(request => request.url === '/api/v1/rules/by-rule-set/8');
+    const pendingRows = service.rules();
+    const pendingTotal = service.pagination().totalElements;
+    latest.flush({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 });
+    if (!olderPage.cancelled) {
+      olderPage.flush({ content: [first], number: 0, size: 10, totalElements: 1, totalPages: 1 });
+    }
+
+    expect(pendingRows).toEqual([]);
+    expect(pendingTotal).toBe(0);
+    expect(service.rules()).toEqual([]);
+    expect(service.pagination().totalElements).toBe(0);
+  });
+
+  it('prevents a previous set failure from ending the current pending Rules read', () => {
+    service.listByRuleSet(4);
+    const previous = httpMock.expectOne(request => request.url === '/api/v1/rules/by-rule-set/4');
+    service.listByRuleSet(8);
+    const current = httpMock.expectOne(request => request.url === '/api/v1/rules/by-rule-set/8');
+    if (!previous.cancelled) {
+      previous.flush({ message: 'Previous set failed' }, { status: 503, statusText: 'Service Unavailable' });
+    }
+    const loading = service.loading();
+    const failure = service.error();
+    current.flush({ content: [], number: 0, size: 20, totalElements: 0, totalPages: 0 });
+    expect(loading).toBe(true);
+    expect(failure).toBeNull();
+  });
+
 });

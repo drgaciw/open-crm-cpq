@@ -14,6 +14,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -141,6 +143,25 @@ class SubscriptionServiceTest {
         assertEquals("FAILED", result.getErpSyncStatus());
         assertNull(result.getErpSubscriptionId());
         verify(erpAdapter).syncToErp(pendingSubscription);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t\n"})
+    void activateWithMissingErpIdPersistsActiveAndFailed(String acknowledgement) {
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pendingSubscription));
+        when(erpAdapter.syncToErp(pendingSubscription)).thenReturn(acknowledgement);
+        when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(subscriptionMapper.toDto(any(Subscription.class))).thenAnswer(inv -> dto(inv.getArgument(0)));
+
+        SubscriptionDto result = subscriptionService.activate(1L);
+
+        assertAll(
+                () -> assertEquals(SubscriptionStatus.ACTIVE, result.getStatus()),
+                () -> assertEquals("FAILED", result.getErpSyncStatus()),
+                () -> assertNull(result.getErpSubscriptionId()));
+        verify(rateApply).applyLocked(pendingSubscription);
+        verify(subscriptionRepository).save(pendingSubscription);
     }
 
     @Test

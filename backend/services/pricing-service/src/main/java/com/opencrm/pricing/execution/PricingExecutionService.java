@@ -129,7 +129,22 @@ public class PricingExecutionService {
         }
 
         List<PricingResult> results = contexts.stream()
-                .map(this::simulate)
+                .map(context -> {
+                    try {
+                        if (context == null) {
+                            throw new BusinessException("Pricing context cannot be null", "INVALID_CONTEXT");
+                        }
+                        return simulate(context);
+                    } catch (BusinessException error) {
+                        String message = error.getErrorCode() == null
+                                ? error.getMessage()
+                                : error.getErrorCode() + ": " + error.getMessage();
+                        return PricingResult.builder()
+                                .success(false)
+                                .errorMessage(message)
+                                .build();
+                    }
+                })
                 .toList();
 
         int successful = (int) results.stream().filter(PricingResult::isSuccess).count();

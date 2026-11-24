@@ -1,6 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, finalize } from 'rxjs';
+import { Observable, Subscription, finalize } from 'rxjs';
 import {
   DealDto,
   DealCreateRequest,
@@ -16,11 +16,14 @@ import { dealActionErrorMessage } from './deal-action-error';
 export class DealService {
   private readonly http = inject(HttpClient);
   private readonly basePath = '/api/v1/deals';
+  private listRequest?: Subscription;
 
   readonly deals = signal<DealDto[]>([]);
   readonly selectedDeal = signal<DealDto | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  /** Changes only when the current list or search response is successfully applied. */
+  readonly listResultVersion = signal(0);
   readonly pipelineSummary = signal<PipelineSummaryDto[] | null>(null);
   readonly pagination = signal<PaginationMeta>({
     page: 0, size: 20, totalElements: 0, totalPages: 0,
@@ -39,29 +42,12 @@ export class DealService {
     stage?: DealStage,
     organizationId?: number,
   ): void {
-    this.error.set(null);
-    this.loading.set(true);
     let params = new HttpParams()
       .set('page', page).set('size', size).set('sort', sort);
     if (stage) params = params.set('stage', stage);
     if (organizationId != null) params = params.set('organizationId', String(organizationId));
 
-    this.http.get<SpringPageResponse<DealDto>>(this.basePath, { params })
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (p) => {
-          this.deals.set(p.content ?? p);
-          if (p.totalElements !== undefined) {
-            this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? size,
-              totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
-            });
-          }
-        },
-        error: (err) => {
-          this.error.set(dealActionErrorMessage(err, 'An error occurred'));
-        }
-      });
+    this.loadList(this.basePath, params, size);
   }
 
   /**
@@ -110,25 +96,33 @@ export class DealService {
   }
 
   search(query: string): void {
+    const params = new HttpParams().set('q', query);
+    this.loadList(`${this.basePath}/search`, params, 20);
+  }
+
+  private loadList(path: string, params: HttpParams, defaultPageSize: number): void {
+    // List and search share the same state. Finish the older request before setting loading for this one.
+    this.listRequest?.unsubscribe();
     this.error.set(null);
     this.loading.set(true);
-    const params = new HttpParams().set('q', query);
-    // Interceptor rebuilds List+PageInfo into SpringPageResponse
-    this.http.get<SpringPageResponse<DealDto>>(`${this.basePath}/search`, { params })
+
+    // Interceptor rebuilds List+PageInfo into SpringPageResponse.
+    this.listRequest = this.http.get<SpringPageResponse<DealDto>>(path, { params })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (p) => {
           this.deals.set(p.content ?? p);
           if (p.totalElements !== undefined) {
             this.pagination.set({
-              page: p.number ?? 0, size: p.size ?? 20,
+              page: p.number ?? 0, size: p.size ?? defaultPageSize,
               totalElements: p.totalElements ?? 0, totalPages: p.totalPages ?? 0,
             });
           }
+          this.listResultVersion.update(version => version + 1);
         },
         error: (err) => {
           this.error.set(dealActionErrorMessage(err, 'An error occurred'));
-        }
+        },
       });
   }
 

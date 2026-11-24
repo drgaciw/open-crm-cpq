@@ -61,7 +61,7 @@ export interface BundleTreeNode {
   template: `
     @if (loading() && !bundle()) {
       <div class="loading" role="status" aria-live="polite">
-        <mat-spinner diameter="40"></mat-spinner>
+        <mat-spinner diameter="40" aria-label="Loading bundle details" />
       </div>
     } @else if (bundle(); as bundle) {
       <app-page-header [title]="bundle.name" [subtitle]="subtitle(bundle)">
@@ -154,6 +154,7 @@ export interface BundleTreeNode {
             [dataSource]="treeData()"
             [childrenAccessor]="treeChildrenAccessor"
             [trackBy]="trackTreeNode"
+            [expansionKey]="treeExpansionKey"
           >
             <cdk-nested-tree-node
               *cdkTreeNodeDef="let node"
@@ -267,6 +268,13 @@ export interface BundleTreeNode {
             </div>
           }
         </section>
+      </div>
+    } @else if (detailLoadError(); as message) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>Bundle could not be loaded. {{ message }}</span>
+        <button mat-button type="button" (click)="retryDetail()">Retry</button>
+        <button mat-button type="button" (click)="goBack()">Back to bundles</button>
       </div>
     } @else {
       <app-empty-state
@@ -498,6 +506,10 @@ export class ProductBundleDetailComponent implements OnInit {
   readonly bannerError = computed(
     () => this.actionError() ?? this.service.error(),
   );
+  protected readonly detailLoadError = computed(() => {
+    const failure = this.service.detailReadFailure();
+    return failure && failure.id === Number(this.id()) && failure.status !== 404 ? failure.message : null;
+  });
 
   readonly bundle = computed<ProductBundleDto | null>(() => {
     const selected = this.service.selectedBundle();
@@ -523,8 +535,10 @@ export class ProductBundleDetailComponent implements OnInit {
   readonly hasChild = (_index: number, node: BundleTreeNode): boolean =>
     (node.children?.length ?? 0) > 0;
 
-  readonly trackTreeNode = (_index: number, node: BundleTreeNode): string =>
-    node.id;
+  // Nested CDK views read child snapshots when created. Expansion follows the stable node ID.
+  readonly trackTreeNode = (_index: number, node: BundleTreeNode): BundleTreeNode => node;
+
+  readonly treeExpansionKey = (node: BundleTreeNode): string => node.id;
 
   readonly treeData = computed<BundleTreeNode[]>(() => {
     const bundle = this.bundle();
@@ -588,6 +602,10 @@ export class ProductBundleDetailComponent implements OnInit {
       return;
     }
     this.service.getById(numericId);
+  }
+
+  protected retryDetail(): void {
+    this.service.getById(Number(this.id()));
   }
 
   subtitle(bundle: ProductBundleDto): string {

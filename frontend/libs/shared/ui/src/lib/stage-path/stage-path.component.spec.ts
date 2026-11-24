@@ -65,6 +65,28 @@ describe('StagePathComponent', () => {
     expect(lostButton.textContent).toContain('Closed Lost');
   });
 
+  it('uses an explicit current stage for ARIA and the roving tab entry, independent of styling', () => {
+    fixture.componentRef.setInput('stages', [
+      ...sampleStages,
+      { id: 'LOST', label: 'Closed Lost', state: 'danger' },
+    ]);
+    fixture.componentRef.setInput('currentStageId', 'LOST');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const lost = host.querySelector('button[data-stage-id="LOST"]');
+    expect(lost?.classList.contains('stage-path__step--danger')).toBe(true);
+    expect(host.querySelector('[aria-current="step"]')).toBe(lost);
+    expect(host.querySelector('[tabindex="0"]')).toBe(lost);
+
+    fixture.componentRef.setInput('currentStageId', 'unknown');
+    fixture.detectChanges();
+
+    const active = host.querySelector('button[data-stage-id="PROPOSAL"]');
+    expect(host.querySelector('[aria-current="step"]')).toBe(active);
+    expect(host.querySelector('[tabindex="0"]')).toBe(active);
+  });
+
   it('emits stageSelect when a stage button is clicked', () => {
     const selected: string[] = [];
     fixture.componentInstance.stageSelect.subscribe((id) => selected.push(id));

@@ -20,7 +20,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Throwaway PostgreSQL 16 proof for the V21 rollback.
+ * Throwaway PostgreSQL 16 proof for the V21 rollback on a schema pinned to V21.
  *
  * <p>Flyway 11 {@code repair()} fixes checksums and drops failed entries. It does
  * not forget a successful version, so this test deletes only the V21 row from
@@ -188,6 +188,7 @@ class FieldRegistryRollbackIntegrationTest {
                 .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
                 .schemas("crm")
                 .locations("classpath:db/migration")
+                .target("21")
                 .placeholders(Map.of("crm_base_currency", "USD"))
                 .load();
     }

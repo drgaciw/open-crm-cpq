@@ -37,7 +37,8 @@ class LifecycleChangeMigrationGuardTest {
             "V1_16__ramp_escalator_compounding.sql",
             "V1_18__quote_valid_until.sql",
             "V1_19__quote_primary_flag.sql",
-            "V1_20__approval_submission_recovery.sql");
+            "V1_20__approval_submission_recovery.sql",
+            "V1_21__quote_number_counters.sql");
 
     @Test
     @DisplayName("quote-service has exactly these versions, including lifecycle validation evidence")

@@ -25,6 +25,7 @@ spring:
     properties:
       hibernate:
         default_schema: ${DB_SCHEMA:authorization}
+        auto_quote_keyword: true
   flyway:
     enabled: true
     # Existing standalone deployments must retain DB_NAME and set DB_SCHEMA=public.

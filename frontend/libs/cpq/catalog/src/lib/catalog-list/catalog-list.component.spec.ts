@@ -319,6 +319,38 @@ describe('CatalogListComponent', () => {
     expect(compiled.textContent).not.toContain('No products yet');
   });
 
+  it('keeps a failed first read out of the empty state until a new read succeeds', () => {
+    products.set([]);
+    loading.set(false);
+    error.set('Scoped list unavailable');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const alert = el.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Scoped list unavailable');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    listSpy.mockClear();
+    alert!.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(el.querySelector('app-data-table')).toBeNull();
+    expect(el.querySelector('h1')).toBeTruthy();
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listSpy.mockImplementationOnce(() => loading.set(true));
+    component.onCategoryChange('SUPPORT');
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    products.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')?.textContent).toContain('No matching products');
+    expect(el.querySelector('app-empty-state button')).toBeNull();
+  });
+
   it('shows error banner when ProductService.error is set', () => {
     error.set('Failed to load catalog');
     fixture.detectChanges();
