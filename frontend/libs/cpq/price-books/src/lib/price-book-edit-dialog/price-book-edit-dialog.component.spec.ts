@@ -95,6 +95,17 @@ describe('PriceBookEditDialogComponent', () => {
     });
   });
 
+  it('blocks a whitespace-only name before sending the update request', () => {
+    updateSpy.mockReturnValue(of(existingBook));
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
+  });
+
   it('requires name', () => {
     component.form.patchValue({ name: '' });
     expect(component.form.valid).toBe(false);

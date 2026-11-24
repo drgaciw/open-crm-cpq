@@ -28,6 +28,7 @@ describe('PricingCustomerDetailComponent', () => {
   );
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadFailure = signal<{ id: number; status: number; message: string } | null>(null);
 
   beforeEach(async () => {
     getByIdSpy = vi.fn((id: number) => {
@@ -51,6 +52,7 @@ describe('PricingCustomerDetailComponent', () => {
       selectedCustomer,
       loading,
       error,
+      detailReadFailure,
       getById: getByIdSpy,
       update: updateSpy,
       delete: deleteSpy,
@@ -79,6 +81,7 @@ describe('PricingCustomerDetailComponent', () => {
     selectedCustomer.set(MOCK_PRICING_CUSTOMERS[0]);
     loading.set(false);
     error.set(null);
+    detailReadFailure.set(null);
   });
 
   it('loads customer via PricingCustomerService.getById on init', () => {
@@ -87,6 +90,35 @@ describe('PricingCustomerDetailComponent', () => {
     expect(compiled.textContent).toContain('Acme Corp');
     expect(compiled.textContent).toContain('CUST-ACME');
     expect(compiled.textContent).toContain('Enterprise');
+  });
+
+  it('offers Retry for a transient read failure without saying the customer is missing', () => {
+    selectedCustomer.set(null);
+    detailReadFailure.set({ id: 1, status: 503, message: 'Customer service unavailable' });
+    error.set('Customer service unavailable');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const alert = host.querySelector('[role="alert"]');
+    expect(host.textContent).not.toContain('Pricing customer not found');
+    expect(alert?.textContent).toContain('Customer service unavailable');
+    getByIdSpy.mockClear();
+    const retry = [...(alert?.querySelectorAll('button') ?? [])].find(button => button.textContent?.trim() === 'Retry');
+    expect(retry).toBeTruthy();
+    retry?.click();
+    expect(getByIdSpy).toHaveBeenCalledOnce();
+    expect(getByIdSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('keeps the existing not-found card for an actual 404', () => {
+    selectedCustomer.set(null);
+    detailReadFailure.set({ id: 1, status: 404, message: 'Customer missing' });
+    error.set('Customer missing');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-empty-state')?.textContent).toContain('Pricing customer not found');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('enters edit mode and saves via PricingCustomerService.update', () => {

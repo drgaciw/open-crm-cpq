@@ -45,6 +45,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
   ]);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const listResultVersion = signal(0);
   const pipelineSummary = signal<PipelineSummaryDto[] | null>([
     { stage: 'PROSPECTING', count: 1, totalAmount: 1000, weightedAmount: 100, baseCurrency: 'USD', unconvertedCount: 0 },
     { stage: 'PROPOSAL', count: 1, totalAmount: 5000, weightedAmount: 2500, baseCurrency: 'USD', unconvertedCount: 0 },
@@ -52,7 +53,8 @@ describe('DealKanbanComponent pipeline wiring', () => {
   ]);
 
   beforeEach(async () => {
-    listSpy = vi.fn();
+    listResultVersion.set(0);
+    listSpy = vi.fn(() => listResultVersion.update(version => version + 1));
     loadPipelineSpy = vi.fn();
     advanceSpy = vi.fn(() => of(deal({ id: 1, name: 'A', stage: 'QUALIFICATION' })));
     markWonSpy = vi.fn(() => of(deal({ id: 2, name: 'B', stage: 'WON' })));
@@ -78,6 +80,7 @@ describe('DealKanbanComponent pipeline wiring', () => {
       deals,
       loading,
       error,
+      listResultVersion,
       pipelineSummary,
       isEmpty: computed(() => deals().length === 0 && !loading()),
       list: listSpy,
@@ -284,10 +287,11 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(component.canClose('NEGOTIATION')).toBe(true);
   });
 
-  it('shows error banner and hides board on failed load', () => {
-    deals.set([]);
-    loading.set(false);
-    error.set('Failed to load deals [DEALS_UNAVAILABLE]');
+  it('keeps an initial failed board unknown when the error is dismissed', () => {
+    // The shared service may still contain rows from the preceding Opportunity list.
+    fixture.destroy();
+    listSpy.mockImplementationOnce(() => error.set('Failed to load deals [DEALS_UNAVAILABLE]'));
+    fixture = TestBed.createComponent(DealKanbanComponent);
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
@@ -298,18 +302,45 @@ describe('DealKanbanComponent pipeline wiring', () => {
     expect(banner.textContent).toContain('Retry');
     expect(el.querySelector('.kanban-board')).toBeNull();
     expect(el.querySelector('.empty-column')).toBeNull();
-    expect(el.querySelector('app-empty-state')).toBeNull();
+    const dismiss = [...banner.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Dismiss');
+    expect(dismiss).toBeTruthy();
+    dismiss?.click();
+    fixture.detectChanges();
+    expect(el.querySelector('.error-banner')).toBeNull();
+    expect(el.querySelector('.kanban-board')).toBeNull();
+    expect(el.querySelector('.pipeline-totals')).toBeNull();
+    expect(el.querySelector('.empty-column')).toBeNull();
+  });
+
+  it('keeps previously confirmed rows usable when a board refresh fails', () => {
+    listSpy.mockImplementationOnce(() => error.set('Could not refresh deals'));
+    component.onRetry();
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.error-banner')?.textContent).toContain('Could not refresh deals');
+    const row = el.querySelector('.kanban-board .deal-card');
+    expect(row).toBeTruthy();
+    expect(row?.textContent).toContain('A');
+    expect(row?.querySelector('button')?.disabled).toBe(false);
+
+    component.clearError();
+    fixture.detectChanges();
+    expect(el.querySelector('.error-banner')).toBeNull();
+    expect(el.querySelector('.kanban-board .deal-card')?.textContent).toContain('A');
   });
 
   it('shows per-column empty state only when load succeeded', () => {
     deals.set([]);
     loading.set(false);
     error.set(null);
+    component.onRetry();
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.kanban-board')).toBeTruthy();
-    expect(el.querySelectorAll('.empty-column').length).toBeGreaterThan(0);
+    expect(el.querySelectorAll('.empty-column')).toHaveLength(7);
+    expect(el.querySelector('.pipeline-totals')?.textContent).toContain('0 open');
     expect(el.querySelector('.error-banner')).toBeNull();
   });
 

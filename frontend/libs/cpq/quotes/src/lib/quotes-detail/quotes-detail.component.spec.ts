@@ -8,7 +8,7 @@ import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { NotificationService } from '@frontend/shared-data-access';
 import { QuoteRejectDialogComponent } from '../quote-reject-dialog/quote-reject-dialog.component';
 import { CopyButtonComponent } from '@frontend/shared-ui';
@@ -701,6 +701,38 @@ describe('QuotesDetailComponent', () => {
     });
     expect(getByIdSpy).toHaveBeenCalledWith(1);
     expect(component.editingLineId()).toBeNull();
+  });
+
+  it('freezes the inline draft during a native save and unlocks it on error', () => {
+    const quote = selectedQuote()!;
+    const line = quote.lineItems![0];
+    const pending = new Subject<QuoteLineItemDto>();
+    updateLineItemSpy.mockReturnValueOnce(pending);
+    component.startLineEdit(line);
+    const draft = { productName: 'Saved draft line', listPrice: 175, quantity: 3 };
+    component.editForm.setValue(draft);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const fields = Array.from(host.querySelectorAll<HTMLInputElement>('[data-testid="quote-lines-table"] .edit-field input'));
+    expect(fields).toHaveLength(3);
+    expect(fields.map((field) => field.readOnly)).toEqual([false, false, false]);
+
+    component.onSaveLineEdit(line);
+    fixture.detectChanges();
+
+    expect(component.actionBusy()).toBe(true);
+    expect(fields.map((field) => field.readOnly)).toEqual([true, true, true]);
+    expect(component.editForm.getRawValue()).toEqual(draft);
+    expect(component.editForm.enabled).toBe(true);
+
+    pending.error({ status: 503, error: { message: 'Temporary unavailable' } });
+    fixture.detectChanges();
+
+    expect(component.actionBusy()).toBe(false);
+    expect(fields.map((field) => field.readOnly)).toEqual([false, false, false]);
+    expect(component.editingLineId()).toBe(line.id);
+    expect(component.editForm.getRawValue()).toEqual(draft);
   });
 
   it('removes a line item via removeLineItem and reloads', () => {

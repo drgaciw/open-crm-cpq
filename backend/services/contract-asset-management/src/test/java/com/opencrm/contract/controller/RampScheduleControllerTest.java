@@ -9,14 +9,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class RampScheduleControllerTest {
-    @Test void internalAndPublicAliasesUseTheSameDateAwareRead() throws Exception {
+    @Test void internalAliasUsesTheDateAwareLinkageRead() throws Exception {
         var service = mock(RampScheduleService.class);
         var mvc = MockMvcBuilders.standaloneSetup(new RampScheduleController(service)).build();
         mvc.perform(get("/api/v1/subscriptions/by-number/SUB-fixture/ramp-schedule").param("asOf", "2028-01-01"))
                 .andExpect(status().isOk());
         mvc.perform(get("/internal/v1/subscriptions/by-number/SUB-fixture/ramp-schedule").param("asOf", "2028-01-01"))
                 .andExpect(status().isOk());
-        verify(service, times(2)).byNumber("SUB-fixture", LocalDate.of(2028,1,1));
+        verify(service).byNumber("SUB-fixture", LocalDate.of(2028,1,1));
+        verify(service).internalByNumber("SUB-fixture", LocalDate.of(2028,1,1));
     }
     @Test void idReadAndInvalidIsoDateAreBoundedByTheController() throws Exception {
         var service = mock(RampScheduleService.class);

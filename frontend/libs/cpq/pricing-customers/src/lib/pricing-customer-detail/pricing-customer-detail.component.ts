@@ -301,6 +301,13 @@ function httpErrorMessage(
           </mat-card-content>
         </mat-card>
       </div>
+    } @else if (detailLoadError(); as message) {
+      <div class="error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>Pricing customer could not be loaded. {{ message }}</span>
+        <button mat-button type="button" (click)="retryDetail()">Retry</button>
+        <button mat-button type="button" (click)="goBack()">Back to pricing customers</button>
+      </div>
     } @else {
       <app-empty-state
         icon="search_off"
@@ -428,6 +435,10 @@ export class PricingCustomerDetailComponent implements OnInit {
   readonly actionError = signal<string | null>(null);
 
   readonly loading = computed(() => this.service.loading() && !this.customer());
+  protected readonly detailLoadError = computed(() => {
+    const failure = this.service.detailReadFailure();
+    return failure && failure.id === Number(this.id()) && failure.status !== 404 ? failure.message : null;
+  });
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
@@ -460,6 +471,10 @@ export class PricingCustomerDetailComponent implements OnInit {
       return;
     }
     this.service.getById(numericId);
+  }
+
+  protected retryDetail(): void {
+    this.service.getById(Number(this.id()));
   }
 
   subtitle(customer: PricingCustomerDto): string {

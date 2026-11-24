@@ -43,6 +43,12 @@ describe('AssetListComponent', () => {
     expect(row).toContain('2026-12-01');
   });
 
+  it('places the populated table in a named, keyboard-focusable scroll area', async () => {
+    await render();
+    const table = el().querySelector('table[aria-label="Assets"]');
+    expect(table?.closest('[role="region"][aria-label="Asset columns"][tabindex="0"]')).toBeTruthy();
+  });
+
   it('links an asset to its contract', async () => {
     await render();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

@@ -49,6 +49,16 @@ describe('SimulatorPageComponent', () => {
     expect(executeMock).not.toHaveBeenCalled();
   });
 
+  it('shows the Single and Bulk modes and opens Single by default', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const tabs = Array.from(compiled.querySelectorAll('[role="tab"]'));
+    expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(['Single', 'Bulk']);
+    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
+    expect(tabs[1]?.getAttribute('aria-selected')).toBe('false');
+    expect(compiled.textContent).toContain('No simulation yet');
+    expect(executeMock).not.toHaveBeenCalled();
+  });
+
   it('calls PricingExecutionService.execute and shows success panel', () => {
     const ok = mockExecuteOk({
       customerExternalId: 'CUST-GOLD-001',
@@ -211,4 +221,39 @@ describe('SimulatorPageComponent', () => {
     expect(component.result()).toBeNull();
     expect(component.form.invalid).toBe(true);
   });
+
+  it.each(['customerExternalId', 'productExternalId'] as const)(
+    'blocks Single simulation for whitespace-only %s',
+    (field) => {
+      executeMock.mockReturnValue(of(MOCK_PRICING_EXECUTE_OK));
+      component.form.controls[field].setValue(' \t ');
+      fixture.detectChanges();
+
+      const submit = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('app-page-header button');
+      expect(submit?.disabled).toBe(true);
+      component.onSimulate();
+      expect(executeMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('trims padded nonblank IDs when executing the default context', () => {
+    executeMock.mockReturnValue(of(MOCK_PRICING_EXECUTE_OK));
+    component.form.patchValue({
+      customerExternalId: '  CUST-GOLD-001  ',
+      productExternalId: '\tPROD-001 ',
+    });
+
+    expect(component.form.valid).toBe(true);
+    component.onSimulate();
+    expect(executeMock).toHaveBeenCalledWith({
+      customerExternalId: 'CUST-GOLD-001',
+      quoteExternalId: 'Q-SIM-001',
+      region: 'NA',
+      currency: 'USD',
+      durationInMonths: 12,
+      subscriptionType: 'NEW',
+      lineItems: [{ productExternalId: 'PROD-001', lineItemType: 'SUBSCRIPTION', quantity: 5 }],
+    } satisfies PricingContext);
+  });
+
 });

@@ -482,6 +482,7 @@ export class QuoteRampEditorComponent {
   });
 
   readonly canSave = computed(() => {
+    this.formRevision();
     if (!this.editable() || this.saving() || this.expanding() || this.extending() || this.quoteId() == null) {
       return false;
     }
@@ -638,6 +639,11 @@ export class QuoteRampEditorComponent {
       }),
     );
     steps.markAsDirty();
+  }
+
+  onPriceBasisChange(group: PeriodGroup, basis: RampPriceBasis): void {
+    const inactivePrice = basis === 'ABSOLUTE' ? group.controls.discountFraction : group.controls.unitPrice;
+    inactivePrice.setValue(null);
   }
 
   removePeriod(index: number): void {

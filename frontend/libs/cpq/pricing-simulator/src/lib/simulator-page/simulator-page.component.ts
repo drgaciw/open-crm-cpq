@@ -15,6 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import {
   CurrencyFormatPipe,
   EmptyStateComponent,
@@ -26,6 +27,7 @@ import {
   SubscriptionType,
 } from '@frontend/shared-models';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
+import { BulkSimulatorComponent } from '../bulk-simulator/bulk-simulator.component';
 import { MOCK_PRICING_CONTEXT } from '../pricing-simulator.mock';
 
 /** Prefer message; append errorCode when present (H1 shape). */
@@ -54,30 +56,40 @@ function httpErrorMessage(err: unknown, fallback: string): string {
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatTabsModule,
     PageHeaderComponent,
     EmptyStateComponent,
     CurrencyFormatPipe,
+    BulkSimulatorComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-page-header
       title="Pricing Simulator"
-      subtitle="What-if sandbox — POST /api/v1/pricing/execute"
+      subtitle="What-if sandbox — POST /api/v1/pricing/execute or POST /api/v1/pricing/simulate/bulk"
     >
-      <div actions>
-        <button
-          mat-raised-button
-          color="primary"
-          type="button"
-          [disabled]="form.invalid || loading()"
-          (click)="onSimulate()"
-        >
-          <mat-icon>play_arrow</mat-icon>
-          Simulate
-        </button>
-      </div>
+      @if (selectedMode() === 0) {
+        <div actions>
+          <button
+            mat-raised-button
+            color="primary"
+            type="button"
+            [disabled]="form.invalid || loading()"
+            (click)="onSimulate()"
+          >
+            <mat-icon>play_arrow</mat-icon>
+            Simulate
+          </button>
+        </div>
+      }
     </app-page-header>
 
+    <mat-tab-group
+      class="mode-tabs"
+      animationDuration="0ms"
+      (selectedIndexChange)="selectedMode.set($event)"
+    >
+      <mat-tab label="Single">
     <div class="simulator-layout">
       <mat-card class="panel form-panel" appearance="outlined">
         <mat-card-header>
@@ -223,14 +235,23 @@ function httpErrorMessage(err: unknown, fallback: string): string {
         </mat-card-content>
       </mat-card>
     </div>
+      </mat-tab>
+      <mat-tab label="Bulk">
+        <cpq-bulk-simulator />
+      </mat-tab>
+    </mat-tab-group>
   `,
   styles: [
     `
+      .mode-tabs {
+        padding: 0 32px;
+      }
+
       .simulator-layout {
         display: grid;
         grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
         gap: 24px;
-        padding: 0 32px 32px;
+        padding: 16px 0 32px;
       }
 
       .panel {
@@ -313,9 +334,13 @@ function httpErrorMessage(err: unknown, fallback: string): string {
       }
 
       @media (max-width: 960px) {
+        .mode-tabs {
+          padding: 0 16px;
+        }
+
         .simulator-layout {
           grid-template-columns: 1fr;
-          padding: 0 16px 24px;
+          padding: 16px 0 24px;
         }
 
         .form-grid {
@@ -333,6 +358,7 @@ export class SimulatorPageComponent {
   readonly currencies = ['USD', 'EUR', 'GBP'] as const;
   readonly subscriptionTypes: SubscriptionType[] = ['NEW', 'AMENDMENT', 'RENEWAL'];
 
+  readonly selectedMode = signal(0);
   readonly loading = signal(false);
   readonly result = signal<PricingResult | null>(null);
   readonly error = signal<string | null>(null);
@@ -340,11 +366,11 @@ export class SimulatorPageComponent {
   readonly form = this.fb.nonNullable.group({
     customerExternalId: [
       MOCK_PRICING_CONTEXT.customerExternalId,
-      [Validators.required, Validators.minLength(1)],
+      [Validators.required, Validators.pattern(/\S/)],
     ],
     productExternalId: [
       MOCK_PRICING_CONTEXT.lineItems[0]?.productExternalId ?? 'PROD-001',
-      [Validators.required],
+      [Validators.required, Validators.pattern(/\S/)],
     ],
     quantity: [
       MOCK_PRICING_CONTEXT.lineItems[0]?.quantity ?? 1,

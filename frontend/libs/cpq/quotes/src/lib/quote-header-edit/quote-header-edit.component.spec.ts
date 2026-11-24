@@ -189,6 +189,104 @@ describe('QuoteHeaderEditComponent', () => {
     expect(component.editing()).toBe(false);
   });
 
+  it.each([
+    ['startDate', 'clearStartDate', 'endDate', 'clearEndDate'],
+    ['endDate', 'clearEndDate', 'startDate', 'clearStartDate'],
+  ] as const)('clears only the previously populated %s and completes when the response omits it', (date, flag, other, otherFlag) => {
+    const quote = draftQuote({ dealType: 'NEW' });
+    fixture.componentRef.setInput('quote', quote);
+    updateSpy.mockReturnValueOnce(of({ ...quote, [date]: undefined }));
+    component.startEdit();
+    component.form.controls[date].setValue('');
+    const saved = vi.fn();
+    component.saved.subscribe(saved);
+
+    component.onSave();
+
+    expect(updateSpy).toHaveBeenCalledWith(quote.id, expect.objectContaining({
+      [flag]: true,
+      [other]: quote[other],
+      notes: quote.notes,
+    }));
+    const body = updateSpy.mock.calls[0][1];
+    expect(body).not.toHaveProperty(date);
+    expect(body).not.toHaveProperty(otherFlag);
+    expect(component.editing()).toBe(false);
+    expect(saved).toHaveBeenCalledOnce();
+    expect(getByIdSpy).toHaveBeenCalledWith(quote.id);
+    expect(notify).toHaveBeenCalledOnce();
+  });
+
+  it('omits an initially blank date and sends a date entered into an initially blank field', () => {
+    const quote = draftQuote({ dealType: 'NEW', startDate: undefined, endDate: undefined });
+    fixture.componentRef.setInput('quote', quote);
+    component.startEdit();
+    component.form.controls.endDate.setValue('2030-01-31');
+
+    component.onSave();
+
+    const body = updateSpy.mock.calls[0][1];
+    expect(body).toHaveProperty('endDate', '2030-01-31');
+    expect(body).not.toHaveProperty('startDate');
+    expect(body).not.toHaveProperty('clearStartDate');
+    expect(body).not.toHaveProperty('clearEndDate');
+  });
+
+  it('restores dates when Cancel discards a clear before saving', () => {
+    const quote = draftQuote({ dealType: 'NEW' });
+    fixture.componentRef.setInput('quote', quote);
+    component.startEdit();
+    component.form.patchValue({ startDate: '', endDate: '' });
+
+    component.cancelEdit();
+    component.startEdit();
+
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(component.form.controls.startDate.value).toBe(quote.startDate);
+    expect(component.form.controls.endDate.value).toBe(quote.endDate);
+  });
+
+  it('keeps edits open without confirming a save when the response retains a requested clear', () => {
+    const quote = draftQuote({ dealType: 'NEW' });
+    fixture.componentRef.setInput('quote', quote);
+    updateSpy.mockReturnValueOnce(of({ ...quote, startDate: undefined }));
+    component.startEdit();
+    component.form.patchValue({ startDate: '', endDate: '', notes: 'User edit' });
+    const saved = vi.fn();
+    component.saved.subscribe(saved);
+
+    component.onSave();
+    fixture.detectChanges();
+
+    expect(updateSpy).toHaveBeenCalledWith(quote.id, expect.objectContaining({
+      clearStartDate: true, clearEndDate: true, notes: 'User edit',
+    }));
+    expect(component.editing()).toBe(true);
+    expect(component.saving()).toBe(false);
+    expect(component.form.getRawValue()).toMatchObject({ startDate: '', endDate: '', notes: 'User edit' });
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')?.textContent)
+      .toContain('The server kept a date you cleared');
+    expect(saved).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(getByIdSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    draftQuote({ dealType: 'RENEWAL', continuationOperation: 'RENEWAL' }),
+    draftQuote({ dealType: 'NEW', targetSubscriptionNumber: 'SUB-1' }),
+    draftQuote({ dealType: 'NEW', status: 'PENDING_APPROVAL' }),
+  ])('preserves the date hold for $dealType $status quotes', (quote) => {
+    fixture.componentRef.setInput('quote', quote);
+    component.startEdit();
+    component.form.controls.startDate.setValue('');
+
+    component.onSave();
+
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(component.editing()).toBe(true);
+    expect(component.error()).toContain('only be cleared on new draft or rejected quotes');
+  });
+
   it('shows error banner including QUOTE_NOT_EDITABLE', () => {
     updateSpy.mockReturnValueOnce(
       throwError(() => ({

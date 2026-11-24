@@ -35,7 +35,7 @@ import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealSta
     }
 
     @if (service.loading()) {
-      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
+      <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40" aria-label="Loading opportunity"></mat-spinner></div>
     } @else if (service.selectedDeal(); as deal) {
       <div class="detail-header">
         <button mat-icon-button (click)="goBack()" aria-label="Go back to deals"><mat-icon>arrow_back</mat-icon></button>
@@ -52,7 +52,7 @@ import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealSta
           @if (canAdvance(deal.stage)) {
             <button mat-raised-button color="primary" (click)="onAdvance()" [disabled]="actionLoading()">
               @if (actionLoading()) {
-                <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+                <mat-spinner diameter="18" class="btn-spinner" aria-label="Updating opportunity stage"></mat-spinner>
               } @else {
                 <mat-icon>arrow_forward</mat-icon>
               }
@@ -73,6 +73,7 @@ import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealSta
       <app-stage-path
         class="deal-stage-path"
         [stages]="stagePathItems()"
+        [currentStageId]="deal.stage"
         ariaLabel="Opportunity stage progression"
       />
 
@@ -167,7 +168,7 @@ import { DEAL_STAGE_ORDER, canAdvanceDeal, canCloseDeal, dealStageColor, dealSta
     .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .win-btn { background: #4caf50; color: white; }
     .btn-spinner { display: inline-block; margin-right: 8px; }
-    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
     .full-width { grid-column: 1 / -1; }
     .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px 0; }
     .info-item { display: flex; flex-direction: column; gap: 4px; }

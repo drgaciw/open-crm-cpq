@@ -95,6 +95,14 @@ import { CommandPaletteService } from '@frontend/shared-ui/command-palette';
           display: none;
         }
       }
+      @media (max-width: 359.98px) {
+        mat-toolbar {
+          padding-inline: var(--crm-space-sm, 8px);
+        }
+        .toolbar-title {
+          font-size: 1rem;
+        }
+      }
     `,
   ],
 })

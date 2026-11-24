@@ -112,10 +112,11 @@ export interface BundleItemDialogData {
         color="primary"
         type="button"
         [disabled]="form.invalid || saving()"
+        [attr.aria-label]="saving() ? (editing ? 'Save' : 'Add') : null"
         (click)="onSubmit()"
       >
         @if (saving()) {
-          <mat-spinner diameter="20" />
+          <mat-spinner diameter="20" aria-label="Saving bundle item" />
         } @else {
           {{ editing ? 'Save' : 'Add' }}
         }

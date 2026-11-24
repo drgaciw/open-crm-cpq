@@ -101,7 +101,7 @@ export interface LeadTableRow {
         icon="trending_up"
         [title]="hasActiveFilters() ? 'No matching leads' : 'No leads yet'"
         [message]="hasActiveFilters()
-          ? 'Try another status or priority filter, or clear filters to see all leads.'
+          ? 'Try changing your search or filters.'
           : 'Add your first lead to start tracking opportunities.'"
         [actionLabel]="hasActiveFilters() ? '' : 'Create Lead'"
         (action)="onCreate()"
@@ -148,6 +148,7 @@ export class LeadListComponent implements OnInit {
   readonly service = inject(LeadService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly searchQuery = signal('');
   private readonly money = new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: 'USD',
@@ -215,6 +216,7 @@ export class LeadListComponent implements OnInit {
   selectedTabIndex = 0;
   private currentSort = 'createdAt,desc';
   private currentStatus?: LeadStatus;
+  private requestedPage = { page: 0, size: 20 };
 
   /** Tab order: All, New, Contacted, Qualified, Unqualified, Converted, Lost */
   private readonly statusMap: (LeadStatus | undefined)[] = [
@@ -236,11 +238,8 @@ export class LeadListComponent implements OnInit {
   }
 
   onSearch(q: string): void {
-    if (q.trim()) {
-      this.service.search(q.trim());
-    } else {
-      this.refreshList(0, 20);
-    }
+    this.searchQuery.set(q.trim());
+    this.refreshList(0, 20);
   }
 
   onPageChange(e: PageEvent): void {
@@ -398,7 +397,7 @@ export class LeadListComponent implements OnInit {
   }
 
   hasActiveFilters(): boolean {
-    return this.currentStatus !== undefined || this.currentPriority() !== undefined;
+    return this.currentStatus !== undefined || this.currentPriority() !== undefined || this.searchQuery() !== '';
   }
 
   clearError(): void {
@@ -406,7 +405,8 @@ export class LeadListComponent implements OnInit {
   }
 
   retry(): void {
-    this.refreshList(this.service.pagination().page, this.service.pagination().size || 20);
+    const { page, size } = this.requestedPage;
+    this.refreshList(page, size);
   }
 
   private toRow(lead: LeadDto): LeadTableRow {
@@ -425,6 +425,7 @@ export class LeadListComponent implements OnInit {
   }
 
   private refreshList(page: number, size: number): void {
-    this.service.list(page, size, this.currentSort, this.currentStatus, this.currentPriority());
+    this.requestedPage = { page, size };
+    this.service.list(page, size, this.currentSort, this.currentStatus, this.currentPriority(), this.searchQuery());
   }
 }

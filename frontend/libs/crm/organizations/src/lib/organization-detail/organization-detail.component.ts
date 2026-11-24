@@ -196,7 +196,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
 
         <mat-card class="full-width" data-testid="account-deals">
           <mat-card-header>
-            <mat-card-title>Deals</mat-card-title>
+            <mat-card-title>Opportunities</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             @if (orgService.relatedDealsLoading()) {
@@ -204,7 +204,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
             } @else if (orgService.relatedDealsError()) {
               <p class="empty-text" role="alert">{{ orgService.relatedDealsError() }}</p>
             } @else if (orgService.relatedDeals().length === 0) {
-              <p class="empty-text">No deals linked to this account.</p>
+              <p class="empty-text">No opportunities linked to this account.</p>
             } @else {
               <ul class="contact-list">
                 @for (deal of orgService.relatedDeals(); track deal.id) {
@@ -216,8 +216,8 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
               </ul>
             }
             <p class="section-links">
-              <a routerLink="/deals">Browse deals</a>
-              <a routerLink="/deals/new">New deal</a>
+              <a routerLink="/deals">Browse opportunities</a>
+              <a routerLink="/deals/new">New opportunity</a>
             </p>
           </mat-card-content>
         </mat-card>
@@ -348,7 +348,7 @@ import { CopyButtonComponent, PageHeaderComponent } from '@frontend/shared-ui';
     }
     .detail-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
       gap: var(--crm-space-md, 16px);
     }
     .full-width { grid-column: 1 / -1; }

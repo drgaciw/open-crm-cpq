@@ -105,7 +105,7 @@ function httpErrorMessage(err: unknown): string {
         title="No pending approvals"
         message="Approvals waiting for a decision will appear here."
       />
-    } @else {
+    } @else if (pending().length > 0) {
       <div class="table-container">
         <table mat-table [dataSource]="pending()" [trackBy]="trackById">
           <ng-container matColumnDef="id">

@@ -64,28 +64,30 @@ const ERP_SYNC_LABELS: Record<string, string> = {
             @if (assets().length === 0) {
               <p>No assets yet. Assets are created when the contract is activated.</p>
             } @else {
-              <table class="assets" aria-label="Assets on this contract">
-                <thead>
-                  <tr>
-                    <th scope="col">Product</th>
-                    <th scope="col">Quantity</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Start</th>
-                    <th scope="col">End</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (a of assets(); track a.id) {
+              <div class="assets-scroll" role="region" aria-label="Contract asset columns" tabindex="0">
+                <table class="assets" aria-label="Assets on this contract">
+                  <thead>
                     <tr>
-                      <td>{{ a.productRef ?? '—' }}</td>
-                      <td>{{ a.quantity ?? '—' }}</td>
-                      <td>{{ assetStatus(a) }}</td>
-                      <td>{{ a.effectiveStart ?? '—' }}</td>
-                      <td>{{ a.effectiveEnd ?? '—' }}</td>
+                      <th scope="col">Product</th>
+                      <th scope="col">Quantity</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Start</th>
+                      <th scope="col">End</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (a of assets(); track a.id) {
+                      <tr>
+                        <td>{{ a.productRef ?? '—' }}</td>
+                        <td>{{ a.quantity ?? '—' }}</td>
+                        <td>{{ assetStatus(a) }}</td>
+                        <td>{{ a.effectiveStart ?? '—' }}</td>
+                        <td>{{ a.effectiveEnd ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
           }
         }
@@ -121,6 +123,9 @@ const ERP_SYNC_LABELS: Record<string, string> = {
       }
       dd {
         margin: 2px 0 0;
+      }
+      .assets-scroll {
+        overflow-x: auto;
       }
       .assets {
         width: 100%;

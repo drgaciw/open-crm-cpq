@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { BundleItemDialogComponent } from './bundle-item-dialog.component';
 import { ProductBundleService } from '../product-bundle.service';
 import { MOCK_PRODUCT_BUNDLES } from '../product-bundles.mock';
@@ -84,6 +84,30 @@ describe('BundleItemDialogComponent', () => {
     expect(updateItemSpy).toHaveBeenCalledWith(1, 8, { quantity: 4, optional: true, sortOrder: 5 });
     expect(addItemSpy).not.toHaveBeenCalled();
     expect(dialogClose).toHaveBeenCalledWith(MOCK_PRODUCT_BUNDLES[0]);
+  });
+
+  it.each(['Add', 'Save'] as const)('keeps the pending %s button and progressbar named', (action) => {
+    const pending = new Subject<(typeof MOCK_PRODUCT_BUNDLES)[number]>();
+    if (action === 'Save') {
+      TestBed.inject(MAT_DIALOG_DATA).item = { id: 8, productId: 20, quantity: 2, optional: false, sortOrder: 3 };
+      fixture.destroy();
+      fixture = TestBed.createComponent(BundleItemDialogComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      updateItemSpy.mockReturnValueOnce(pending);
+    } else {
+      component.form.patchValue({ productId: 20 });
+      addItemSpy.mockReturnValueOnce(pending);
+    }
+
+    component.onSubmit();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const submit = host.querySelector<HTMLButtonElement>('mat-dialog-actions button:last-child');
+    expect(submit?.disabled).toBe(true);
+    expect(submit?.getAttribute('aria-label')).toBe(action);
+    expect(submit?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe('Saving bundle item');
   });
 
   it('surfaces BUNDLE_MAX_ITEMS_EXCEEDED on add failure', () => {

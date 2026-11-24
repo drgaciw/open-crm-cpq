@@ -77,7 +77,10 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Price basis</mat-label>
-                <mat-select formControlName="priceBasis">
+                <mat-select
+                  formControlName="priceBasis"
+                  (selectionChange)="onPriceBasisChange(group, $event.value)"
+                >
                   @for (basis of priceBases; track basis) {
                     <mat-option [value]="basis">{{ priceBasisLabels[basis] }}</mat-option>
                   }
@@ -232,9 +235,10 @@
                 data-testid="expand-escalator"
                 (click)="onExpand()"
                 [disabled]="!canExpand()"
+                [attr.aria-label]="expanding() ? 'Generate periods' : null"
               >
                 @if (expanding()) {
-                  <mat-spinner diameter="20" />
+                  <mat-spinner diameter="20" aria-label="Generating ramp periods" />
                 } @else {
                   <span>Generate periods</span>
                 }

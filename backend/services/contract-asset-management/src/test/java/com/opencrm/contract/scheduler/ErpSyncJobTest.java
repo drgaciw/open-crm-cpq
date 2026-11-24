@@ -12,6 +12,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -177,6 +180,21 @@ class ErpSyncJobTest {
         verify(repository).finishErpSyncClaim(5L, subscription.getErpSyncClaimToken(), 0L, ErpSyncStatus.FAILED, NOW);
         verify(repository, never()).save(any());
         assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.PENDING);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t\n"})
+    void missingAcknowledgementMarksFailedWithoutActivating(String acknowledgement) {
+        when(erpAdapter.syncToErp(subscription)).thenReturn(acknowledgement);
+
+        job.syncQueued();
+
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.PENDING);
+        assertThat(subscription.getErpSubscriptionId()).isNull();
+        verify(repository).finishErpSyncClaim(5L, subscription.getErpSyncClaimToken(), 0L, ErpSyncStatus.FAILED, NOW);
+        verify(rateApply, never()).applyLocked(any());
+        verify(repository, never()).save(any());
     }
 
     @Test

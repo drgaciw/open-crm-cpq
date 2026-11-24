@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { QuotesCreateComponent } from './quotes-create.component';
 import { QuoteService } from '../quote.service';
 import { QuoteDto } from '@frontend/shared-models';
@@ -55,6 +55,19 @@ describe('QuotesCreateComponent', () => {
     expect(component.form.valid).toBe(true);
   });
 
+  it.each([
+    ['name', 'Name is required'],
+    ['customerExternalId', 'Customer external ID is required'],
+  ] as const)('blocks whitespace-only %s before sending a create request', (field, message) => {
+    component.form.patchValue({ name: 'Owned draft', customerExternalId: 'cust-acme', [field]: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(message);
+  });
+
   it('shows New as the read-only commercial type on the standard create form', () => {
     const host = fixture.nativeElement as HTMLElement;
     const field = Array.from(host.querySelectorAll('mat-form-field'))
@@ -101,6 +114,20 @@ describe('QuotesCreateComponent', () => {
       name: 'Bare Quote',
       customerExternalId: 'cust-x',
     });
+  });
+
+  it('does not navigate for a successful response after leaving the create form', () => {
+    const response = new Subject<QuoteDto>();
+    createSpy.mockReturnValue(response);
+    component.form.patchValue({ name: 'Pending quote', customerExternalId: 'cust-acme' });
+    component.onSubmit();
+    expect(component.saving()).toBe(true);
+
+    fixture.destroy();
+    response.next(createdQuote);
+    response.complete();
+
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('shows inline error banner on HTTP failure', () => {

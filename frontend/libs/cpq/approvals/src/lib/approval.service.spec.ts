@@ -101,4 +101,26 @@ describe('ApprovalService', () => {
     expect(service.error()).toBeTruthy();
     expect(service.loading()).toBe(false);
   });
+
+  it('reports an empty inbox only after a successful pending read', () => {
+    const url = '/api/v1/quotes/approvals/pending';
+    expect(service.isEmpty()).toBe(false);
+
+    service.listPending();
+    httpMock.expectOne(url).flush([]);
+    expect(service.isEmpty()).toBe(true);
+
+    service.listPending();
+    httpMock.expectOne(url).flush(
+      { message: 'BFF unavailable' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(service.isEmpty()).toBe(false);
+    service.error.set(null);
+    expect(service.isEmpty()).toBe(false);
+
+    service.listPending();
+    httpMock.expectOne(url).flush([]);
+    expect(service.isEmpty()).toBe(true);
+  });
 });

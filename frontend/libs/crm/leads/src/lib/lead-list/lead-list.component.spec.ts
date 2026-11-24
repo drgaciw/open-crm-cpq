@@ -60,7 +60,6 @@ describe('LeadListComponent action wiring', () => {
       pagination,
       isEmpty: computed(() => leads().length === 0 && !loading()),
       list: listSpy,
-      search: vi.fn(),
       delete: vi.fn(() => of(void 0)),
       markContacted: markContactedSpy,
       qualify: qualifySpy,
@@ -112,7 +111,7 @@ describe('LeadListComponent action wiring', () => {
   });
 
   it('ngOnInit loads the lead list', () => {
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined, '');
   });
 
   it('onQualify calls LeadService.qualify and refreshes the list', () => {
@@ -122,7 +121,7 @@ describe('LeadListComponent action wiring', () => {
     component.onQualify(contacted);
 
     expect(qualifySpy).toHaveBeenCalledWith(5);
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined, '');
     expect(component.actionLoading()).toBe(false);
   });
 
@@ -195,14 +194,27 @@ describe('LeadListComponent action wiring', () => {
     // Tab order: All, New, Contacted, Qualified, Unqualified(4), Converted, Lost
     component.onTabChange(4);
 
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', 'UNQUALIFIED', undefined);
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', 'UNQUALIFIED', undefined, '');
   });
 
   it('priority filter forwards priority query to list', () => {
     listSpy.mockClear();
     component.onPriorityChange('HIGH');
 
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, 'HIGH');
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, 'HIGH', '');
+  });
+
+  it('retains the title, priority, and status when changing filters or pages', () => {
+    component.onPriorityChange('HIGH');
+    component.onTabChange(1);
+    component.onSearch('  Enterprise  ');
+    expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', 'NEW', 'HIGH', 'Enterprise');
+
+    component.onPriorityChange('LOW');
+    expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', 'NEW', 'LOW', 'Enterprise');
+
+    component.onPageChange({ pageIndex: 1, pageSize: 10, length: 11 });
+    expect(listSpy).toHaveBeenLastCalledWith(1, 10, 'createdAt,desc', 'NEW', 'LOW', 'Enterprise');
   });
 
   it('clears actionLoading when qualify fails', () => {
@@ -220,6 +232,37 @@ describe('LeadListComponent action wiring', () => {
     expect(fixture.nativeElement.querySelector('app-empty-state')).toBeNull();
   });
 
+  it('shows a no-match state when a search returns no leads', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    leads.set([lead({ id: 1, title: 'Existing lead', status: 'NEW' })]);
+    fixture.detectChanges();
+
+    component.onSearch('  no matches  ');
+    leads.set([]);
+    fixture.detectChanges();
+
+    const card = host.querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No matching leads');
+    expect(card?.querySelector('button')).toBeNull();
+    expect(host.querySelector('app-page-header')?.textContent).toContain('New Lead');
+    expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', undefined, undefined, 'no matches');
+  });
+
+  it('restores the first-lead action when search is cleared and the unfiltered list is empty', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    component.onSearch('no matches');
+    component.onSearch('  ');
+    fixture.detectChanges();
+
+    const card = host.querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No leads yet');
+    const create = card?.querySelector('button');
+    expect(create?.textContent).toContain('Create Lead');
+    create?.click();
+    expect(router.navigate).toHaveBeenCalledWith(['/leads', 'new']);
+    expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', undefined, undefined, '');
+  });
+
   it('clearError dismisses the banner', () => {
     error.set('List failed [LEAD_LIST_DENIED]');
     fixture.detectChanges();
@@ -235,7 +278,26 @@ describe('LeadListComponent action wiring', () => {
     listSpy.mockClear();
     error.set('List failed [LEAD_LIST_DENIED]');
     component.retry();
-    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined);
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'createdAt,desc', undefined, undefined, '');
+  });
+
+  it('retries the requested lead page after a filter change fails', () => {
+    const original = pagination();
+    try {
+      component.onTabChange(1);
+      component.onPriorityChange('HIGH');
+      component.onPageChange({ pageIndex: 1, pageSize: 10, length: 12 });
+      pagination.set({ page: 1, size: 10, totalElements: 12, totalPages: 2 });
+
+      component.onSearch('Enterprise');
+      expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', 'NEW', 'HIGH', 'Enterprise');
+      error.set('List failed');
+      component.retry();
+
+      expect(listSpy).toHaveBeenLastCalledWith(0, 20, 'createdAt,desc', 'NEW', 'HIGH', 'Enterprise');
+    } finally {
+      pagination.set(original);
+    }
   });
 
   it('renders shared DataTable when leads are loaded', () => {

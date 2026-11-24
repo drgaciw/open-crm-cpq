@@ -88,4 +88,53 @@ describe('PricingCustomerCreateDialogComponent', () => {
       (fixture.nativeElement as HTMLElement).textContent,
     ).toContain('Duplicate externalId');
   });
+
+  it.each([
+    ['externalId', 'External ID is required'],
+    ['name', 'Name is required'],
+  ] as const)('rejects whitespace-only %s with the required message', (field, message) => {
+    component.form.patchValue({ externalId: 'CUST-NEW', name: 'New Customer' });
+    component.form.controls[field].setValue(' \t ');
+    component.form.controls[field].markAsTouched();
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(component.form.invalid).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(message);
+  });
+
+  it('requires Type to fit the 30-character API contract', () => {
+    component.form.patchValue({ externalId: 'CUST-NEW', name: 'New Customer', type: 'T'.repeat(31) });
+    component.onSubmit();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(component.form.controls.type.hasError('maxlength')).toBe(true);
+    expect(fixture.nativeElement.querySelector('input[formControlName="type"]').maxLength).toBe(30);
+
+    const allowedType = 'T'.repeat(30);
+    component.form.controls.type.setValue(allowedType);
+    component.onSubmit();
+    expect(createSpy).toHaveBeenCalledWith({ externalId: 'CUST-NEW', name: 'New Customer', type: allowedType });
+  });
+
+  it('trims valid required fields and omits blank optionals without losing zeros', () => {
+    component.form.patchValue({
+      externalId: '  CUST-NEW  ',
+      name: '  New Customer  ',
+      type: '   ',
+      industry: '   ',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+    component.onSubmit();
+
+    expect(createSpy).toHaveBeenCalledWith({
+      externalId: 'CUST-NEW',
+      name: 'New Customer',
+      churnScore: 0,
+      annualRevenue: 0,
+    });
+  });
+
 });

@@ -106,6 +106,52 @@ describe('OrganizationListComponent SearchInput wiring', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.error-banner')).toBeNull();
   });
 
+  it('keeps an unresolved first page out of the empty state after Dismiss until a successful retry', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    organizations.set([]);
+    loading.set(false);
+    error.set('Failed to load organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+    listSpy.mockClear();
+
+    const dismiss = [...el.querySelectorAll<HTMLButtonElement>('[role="alert"] button')]
+      .find((button) => button.textContent?.trim() === 'Dismiss')!;
+    dismiss.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-empty-state')).toBeNull();
+    expect(el.querySelector('h1')?.textContent).toContain('Accounts');
+    expect(listSpy).not.toHaveBeenCalled();
+
+    listSpy.mockImplementationOnce(() => loading.set(true));
+    component.onRetry();
+    fixture.detectChanges();
+    expect(listSpy).toHaveBeenCalledWith(0, 20, 'name,asc');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+
+    organizations.set([]);
+    loading.set(false);
+    fixture.detectChanges();
+    expect(el.querySelector('.empty-state-title')?.textContent).toContain('No accounts yet');
+    expect(el.querySelector('.empty-state-action')?.textContent).toContain('Create Account');
+  });
+
+  it('keeps the loaded account visible when dismissing a later list error', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    organizations.set([org({ id: 12, name: 'Persisted account' })]);
+    loading.set(false);
+    error.set('Failed to refresh organizations [ORGS_UNAVAILABLE]');
+    fixture.detectChanges();
+
+    component.clearError();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('app-data-table')?.textContent).toContain('Persisted account');
+    expect(el.querySelector('app-empty-state')).toBeNull();
+  });
+
   it('onRetry reloads list when not searching', () => {
     listSpy.mockClear();
     error.set('Failed to load organizations [ORGS_UNAVAILABLE]');

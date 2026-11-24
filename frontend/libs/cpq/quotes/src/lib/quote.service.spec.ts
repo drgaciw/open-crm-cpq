@@ -88,6 +88,42 @@ describe('QuoteService', () => {
     expect(service.error()).toBe('List failed [QUOTE_LIST_DENIED]');
   });
 
+  it('keeps filtered rows and pagination after an older list response arrives', () => {
+    service.list(0, 20);
+    const older = httpMock.expectOne((request) =>
+      request.url === '/api/v1/quotes' && !request.params.has('status'));
+    service.list(2, 10, 'createdAt,desc', { status: 'DRAFT' });
+    const current = httpMock.expectOne((request) =>
+      request.url === '/api/v1/quotes' && request.params.get('status') === 'DRAFT');
+    const draft = quote({ id: 42, name: 'Draft', customerExternalId: 'cust-42' });
+    const cancelled = quote({ id: 41, name: 'Cancelled', status: 'CANCELLED', customerExternalId: 'cust-41' });
+    current.flush({ content: [draft], number: 2, size: 10, totalElements: 21, totalPages: 3 });
+
+    older.flush({ content: [cancelled, draft], number: 0, size: 20, totalElements: 44, totalPages: 3 });
+
+    expect(service.quotes()).toEqual([draft]);
+    expect(service.pagination()).toEqual({ page: 2, size: 10, totalElements: 21, totalPages: 3 });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBeNull();
+  });
+
+  it('keeps existing loading and error ownership when an older list fails', () => {
+    service.list();
+    const older = httpMock.expectOne((request) =>
+      request.url === '/api/v1/quotes' && !request.params.has('status'));
+    service.list(0, 20, 'createdAt,desc', { status: 'DRAFT' });
+    const current = httpMock.expectOne((request) =>
+      request.url === '/api/v1/quotes' && request.params.get('status') === 'DRAFT');
+
+    older.flush({ message: 'Older list failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+
+    current.flush({ message: 'Current list failed' }, { status: 503, statusText: 'Service Unavailable' });
+    expect(service.loading()).toBe(false);
+    expect(service.error()).toBe('Current list failed');
+  });
+
   it('getById error.set is message [CODE] when errorCode present', () => {
     service.getById(42);
     const req = httpMock.expectOne('/api/v1/quotes/42');
@@ -97,6 +133,64 @@ describe('QuoteService', () => {
     );
     expect(service.error()).toBe('Quote missing [QUOTE_NOT_FOUND]');
     expect(service.selectedQuote()).toBeNull();
+  });
+
+  it('keeps the newest quote selected when the older detail read settles last', () => {
+    service.getById(41);
+    const older = httpMock.expectOne('/api/v1/quotes/41');
+    service.getById(42);
+    const current = httpMock.expectOne('/api/v1/quotes/42');
+    const second = quote({ id: 42, name: 'Second', customerExternalId: 'cust-42' });
+    current.flush(second);
+
+    if (!older.cancelled) {
+      older.flush(quote({ id: 41, name: 'First', customerExternalId: 'cust-41' }));
+    }
+
+    expect(service.selectedQuote()).toEqual(second);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('cancels a pending detail read when the quote list opens', () => {
+    service.getById(41);
+    const detail = httpMock.expectOne('/api/v1/quotes/41');
+    service.list();
+    const list = httpMock.expectOne((request) => request.url === '/api/v1/quotes');
+
+    expect(detail.cancelled).toBe(true);
+    expect(service.loading()).toBe(true);
+    expect(service.error()).toBeNull();
+    list.flush({ content: [] });
+    expect(service.loading()).toBe(false);
+  });
+
+  it('keeps a newer detail loading while an older list response updates rows and pagination', () => {
+    service.list(1, 10);
+    const list = httpMock.expectOne((request) => request.url === '/api/v1/quotes');
+    service.getById(42);
+    const detail = httpMock.expectOne('/api/v1/quotes/42');
+    const first = quote({ id: 41, name: 'Listed quote', customerExternalId: 'cust-41' });
+    list.flush({ content: [first], number: 1, size: 10, totalElements: 11, totalPages: 2 });
+
+    expect(service.quotes()).toEqual([first]);
+    expect(service.pagination()).toEqual({ page: 1, size: 10, totalElements: 11, totalPages: 2 });
+    expect(service.loading()).toBe(true);
+    detail.flush(quote({ id: 42, name: 'Selected quote', customerExternalId: 'cust-42' }));
+    expect(service.selectedQuote()?.id).toBe(42);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('does not show an older list failure after the current detail opens', () => {
+    service.list();
+    const list = httpMock.expectOne((request) => request.url === '/api/v1/quotes');
+    service.getById(42);
+    const detail = httpMock.expectOne('/api/v1/quotes/42');
+    detail.flush(quote({ id: 42, name: 'Selected quote', customerExternalId: 'cust-42' }));
+
+    list.flush({ message: 'List failed' }, { status: 503, statusText: 'Service Unavailable' });
+
+    expect(service.error()).toBeNull();
+    expect(service.selectedQuote()?.id).toBe(42);
   });
 
   it('getTierSuggestion GETs the advisory endpoint and returns the envelope', () => {

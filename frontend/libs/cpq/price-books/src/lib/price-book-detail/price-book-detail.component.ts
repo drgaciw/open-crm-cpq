@@ -287,8 +287,8 @@ export function isPriceBookPublished(
       </div>
     } @else {
       <app-empty-state
-        icon="search_off"
-        title="Price book not found"
+        [icon]="service.detailReadStatus() === 404 ? 'search_off' : 'error_outline'"
+        [title]="service.detailReadStatus() === 404 ? 'Price book not found' : 'Unable to load price book'"
         [message]="
           bannerError() ||
           'This price book could not be loaded from /api/v1/price-books.'
@@ -485,6 +485,7 @@ export class PriceBookDetailComponent implements OnInit {
   ngOnInit(): void {
     const numericId = Number(this.id());
     if (!Number.isFinite(numericId)) {
+      this.service.detailReadStatus.set(null);
       this.service.selectedPriceBook.set(null);
       this.service.entries.set([]);
       this.service.error.set('Invalid price book id');

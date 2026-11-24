@@ -70,6 +70,17 @@ describe('PriceBookCreateDialogComponent', () => {
     }
   });
 
+  it('blocks a whitespace-only name before sending the create request', () => {
+    createSpy.mockReturnValue(of(createdBook));
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
+  });
+
   it('requires name', () => {
     expect(component.form.valid).toBe(false);
     component.form.patchValue({ name: 'North America Standard' });

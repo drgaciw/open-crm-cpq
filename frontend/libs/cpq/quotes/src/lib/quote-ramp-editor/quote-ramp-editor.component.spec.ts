@@ -273,6 +273,64 @@ describe('QuoteRampEditorComponent', () => {
     expect(text()).toContain('No periods yet.');
   });
 
+  it.each([
+    {
+      initial: { priceBasis: 'ABSOLUTE', unitPrice: 40, discountFraction: undefined },
+      nextLabel: 'Discount fraction off list',
+      nextControl: 'discountFraction', inactiveControl: 'unitPrice', entered: 0.05,
+    },
+    {
+      initial: { priceBasis: 'DISCOUNT_FRACTION', unitPrice: undefined, discountFraction: 0.05 },
+      nextLabel: 'Absolute unit price',
+      nextControl: 'unitPrice', inactiveControl: 'discountFraction', entered: 28.5,
+    },
+  ] as const)('clears the previous price when selecting $nextLabel', ({
+    initial, nextLabel, nextControl, inactiveControl, entered,
+  }) => {
+    fixture.componentRef.setInput('lines', [line({ schedule: { steps: [
+      step({ ...initial, months: 12, quantity: 2 }),
+      step({ sequence: 2, startMonth: 13, months: 24, unitPrice: 55 }),
+    ] } })]);
+    fixture.detectChanges();
+
+    const firstBasis = (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLElement>('mat-select[formcontrolname="priceBasis"]')!;
+    firstBasis.click();
+    fixture.detectChanges();
+    const option = Array.from(document.querySelectorAll<HTMLElement>('mat-option'))
+      .find((node) => node.textContent?.trim() === nextLabel);
+    expect(option).toBeDefined();
+    option!.click();
+    fixture.detectChanges();
+    const [first, other] = component.form.controls.steps.controls;
+    first.controls[nextControl].setValue(entered);
+    fixture.detectChanges();
+
+    expect(first.controls[inactiveControl].value).toBeNull();
+    expect(other.controls.unitPrice.value).toBe(55);
+    expect(component.issues()).toEqual([]);
+    expect(component.canSave()).toBe(true);
+  });
+
+  it.each(['quantity', 'everyMonths'] as const)('re-enables Save after repairing invalid %s', (field) => {
+    fill([{ months: 36, quantity: 3, unitPrice: 40 }]);
+    const save = fixture.nativeElement.querySelector('[data-testid="save-schedule"]') as HTMLButtonElement;
+    const control = field === 'quantity' ? component.form.controls.steps.at(0).controls.quantity
+      : component.form.controls.escalator.controls.everyMonths;
+    expect(save.disabled).toBe(false);
+
+    control.setValue(field === 'quantity' ? null : 0);
+    fixture.detectChanges();
+    expect(component.form.invalid).toBe(true);
+    expect(save.disabled).toBe(true);
+
+    control.setValue(field === 'quantity' ? 3 : 5);
+    fixture.detectChanges();
+    expect(component.form.valid).toBe(true);
+    expect(component.issues()).toEqual([]);
+    expect(save.disabled).toBe(false);
+  });
+
   it('shows inline gap, overlap, term, empty, and negative checks', () => {
     fill([
       { startMonth: 1, months: 12, quantity: 50, unitPrice: 40 },
@@ -352,6 +410,30 @@ describe('QuoteRampEditorComponent', () => {
       durationInMonths: 36,
       escalator: { startPrice: 40, mode: 'PERCENT', amount: 5, everyMonths: 10 },
     });
+  });
+
+  it('keeps Generate and its spinner named while a ramp preview is pending', () => {
+    const pending = new Subject<RampStep[]>();
+    expandRampSchedule.mockReturnValueOnce(pending);
+    component.form.controls.escalator.patchValue({ startPrice: 24, amount: 5, everyMonths: 5 });
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const button = host.querySelector<HTMLButtonElement>('[data-testid="expand-escalator"]')!;
+
+    button.click();
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-label')).toBe('Generate periods');
+    expect(button.querySelector('[role="progressbar"]')?.getAttribute('aria-label'))
+      .toBe('Generating ramp periods');
+
+    pending.error({ error: { errorCode: 'RAMP_NOT_SUPPORTED', message: 'Ramp preview unavailable' } });
+    fixture.detectChanges();
+
+    expect(button.disabled).toBe(false);
+    expect(button.textContent?.trim()).toBe('Generate periods');
+    expect(button.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('generates and saves a short tail with the explicit non-compounding option', () => {

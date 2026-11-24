@@ -312,6 +312,7 @@ export class QuoteHeaderEditComponent {
   private readonly fb = inject(FormBuilder);
   private readonly quoteService = inject(QuoteService);
   private readonly snackBar = inject(MatSnackBar);
+  private datesAtEditStart = { startDate: '', endDate: '' };
 
   /** Quote whose header is being edited. */
   readonly quote = input.required<QuoteDto>();
@@ -375,13 +376,24 @@ export class QuoteHeaderEditComponent {
       this.form.markAllAsTouched();
       return;
     }
-    const id = this.quote().id;
+    const { id, dealType, status, targetSubscriptionNumber, continuationOperation } = this.quote();
     const request = this.toRequest();
+    if ((request.clearStartDate || request.clearEndDate) &&
+        (dealType !== 'NEW' || targetSubscriptionNumber != null || continuationOperation != null ||
+         (status !== 'DRAFT' && status !== 'REJECTED'))) {
+      this.error.set('Quote dates can only be cleared on new draft or rejected quotes.');
+      return;
+    }
+
     this.saving.set(true);
     this.error.set(null);
     this.quoteService.update(id, request).subscribe({
       next: (updated) => {
         this.saving.set(false);
+        if ((request.clearStartDate && updated.startDate) || (request.clearEndDate && updated.endDate)) {
+          this.error.set('The server kept a date you cleared. Reload the quote before retrying.');
+          return;
+        }
         this.editing.set(false);
         this.saved.emit(updated);
         this.snackBar.open('Quote saved', 'Dismiss', { duration: 3000 });
@@ -395,6 +407,10 @@ export class QuoteHeaderEditComponent {
   }
 
   private patchFromQuote(q: QuoteDto): void {
+    this.datesAtEditStart = {
+      startDate: toDateInput(q.startDate),
+      endDate: toDateInput(q.endDate),
+    };
     this.form.setValue({
       name: q.name ?? '',
       description: q.description ?? '',
@@ -403,8 +419,7 @@ export class QuoteHeaderEditComponent {
       currency: q.currency ?? '',
       region: q.region ?? '',
       durationInMonths: q.durationInMonths ?? null,
-      startDate: toDateInput(q.startDate),
-      endDate: toDateInput(q.endDate),
+      ...this.datesAtEditStart,
       notes: q.notes ?? '',
     });
   }
@@ -439,9 +454,13 @@ export class QuoteHeaderEditComponent {
     }
     if (raw.startDate) {
       request.startDate = raw.startDate;
+    } else if (this.datesAtEditStart.startDate) {
+      request.clearStartDate = true;
     }
     if (raw.endDate) {
       request.endDate = raw.endDate;
+    } else if (this.datesAtEditStart.endDate) {
+      request.clearEndDate = true;
     }
     const notes = raw.notes.trim();
     if (notes) {

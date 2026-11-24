@@ -117,7 +117,74 @@ describe('ProductBundleListComponent', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('No product bundles yet');
+    const card = compiled.querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No product bundles yet');
+    expect(card?.querySelector('button')?.textContent?.trim()).toBe('New Bundle');
+  });
+
+  it('shows a confirmed product no-match without the first-bundle action', () => {
+    component.productIdFilter.set('999');
+    component.applyProductIdFilter();
+    fixture.detectChanges();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(card?.textContent).toContain('No matching bundles');
+    expect(card?.querySelector('button')).toBeNull();
+  });
+
+  it('shows the initial list error without claiming that there are no bundles', () => {
+    bundles.set([]);
+    error.set('Unable to load bundles');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Unable to load bundles');
+    expect(host.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('dismisses a failed first read without creating an empty state or reloading', () => {
+    bundles.set([]);
+    error.set('Unable to load bundles');
+    listSpy.mockClear();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const dismiss = host.querySelector<HTMLButtonElement>('[role="alert"] button');
+    expect(dismiss?.textContent?.trim()).toBe('Dismiss');
+    dismiss?.click();
+    fixture.detectChanges();
+
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('app-empty-state')).toBeNull();
+    expect(host.querySelector('app-data-table')).toBeNull();
+    expect(host.querySelector('app-page-header')?.textContent).toContain('New Bundle');
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the confirmed first-bundle action after dismissing invalid filter input', () => {
+    bundles.set([]);
+    component.productIdFilter.set('-1');
+    component.applyProductIdFilter();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Product ID must be a positive number');
+    component.clearError();
+    fixture.detectChanges();
+
+    expect(host.querySelector('app-empty-state button')?.textContent?.trim()).toBe('New Bundle');
+    expect(listByProductIdSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps rows already loaded after dismissing a refresh error', () => {
+    error.set('Unable to refresh bundles');
+    fixture.detectChanges();
+    component.clearError();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('app-data-table')?.textContent).toContain('Starter Pack');
   });
 
   it('shows error banner when service.error is set', () => {

@@ -53,7 +53,7 @@ interface KanbanColumn {
         <mat-icon>arrow_back</mat-icon>
       </button>
       <h1>Opportunity pipeline</h1>
-      @if (pipelineTotals(); as totals) {
+      @if (hasBoardResult() && !service.loading() && pipelineTotals(); as totals) {
         <div class="pipeline-totals" aria-label="Pipeline summary">
           <span class="total-chip">{{ totals.count }} open</span>
           <span class="total-chip amount">{{ totals.amount | currency:baseCurrency():'symbol':'1.0-0' }}</span>
@@ -89,7 +89,7 @@ interface KanbanColumn {
 
     @if (service.loading()) {
       <div class="loading" role="status" aria-live="polite"><mat-spinner diameter="40"></mat-spinner></div>
-    } @else if (!service.error()) {
+    } @else if (hasBoardResult()) {
       <div class="kanban-board" cdkDropListGroup>
         @for (col of columns(); track col.stage) {
           <div class="kanban-column">
@@ -249,6 +249,9 @@ export class DealKanbanComponent implements OnInit {
   readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly liveAnnouncer = inject(LiveAnnouncer);
+  // The shared array may still contain rows from the list route before the first board load.
+  private readonly initialListResultVersion = this.service.listResultVersion();
+  protected readonly hasBoardResult = computed(() => this.service.listResultVersion() !== this.initialListResultVersion);
 
   readonly actionLoading = signal(false);
   /** Error from Advance / Won / Lost; kept apart from the service's load error so the board stays visible. */

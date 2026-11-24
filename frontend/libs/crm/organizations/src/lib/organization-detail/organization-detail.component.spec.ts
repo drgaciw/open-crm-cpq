@@ -76,7 +76,7 @@ describe('OrganizationDetailComponent account UX', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Acme Account');
   });
 
-  it('links related contacts, deals, and quotes without dead ends', () => {
+  it('links related contacts, opportunities, and quotes without dead ends', () => {
     flushAccount();
     const deals = httpMock.expectOne(
       (r) => r.url === '/api/v1/deals' && r.params.get('organizationId') === '7',
@@ -125,6 +125,10 @@ describe('OrganizationDetailComponent account UX', () => {
     const quoteLink = el.querySelector('a[href="/quotes/9"]');
     const browseDeals = el.querySelector('a[href="/deals"]');
     const browseQuotes = el.querySelector('a[href="/quotes"]');
+    const opportunities = el.querySelector('[data-testid="account-deals"]');
+    expect(opportunities?.querySelector('mat-card-title')?.textContent).toBe('Opportunities');
+    expect(browseDeals?.textContent?.trim()).toBe('Browse opportunities');
+    expect(opportunities?.querySelector('a[href="/deals/new"]')?.textContent?.trim()).toBe('New opportunity');
     expect(dealLink?.textContent).toContain('Renewal');
     expect(quoteLink?.textContent).toContain('Platform quote');
     TestBed.inject(OrganizationService).relatedQuotesTruncated.set(true);

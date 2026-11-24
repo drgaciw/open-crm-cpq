@@ -48,6 +48,16 @@ describe('RuleSetCreateDialogComponent', () => {
     expect(component.form.invalid).toBe(true);
   });
 
+  it('rejects a whitespace-only name before sending a create request', () => {
+    component.form.patchValue({ name: '   ' });
+    component.onSubmit();
+    fixture.detectChanges();
+
+    expect(component.form.invalid).toBe(true);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Name is required');
+  });
+
   it('creates via RuleSetService.create and closes with result', () => {
     component.form.patchValue({
       name: 'New Set',

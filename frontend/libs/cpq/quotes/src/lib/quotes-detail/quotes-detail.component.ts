@@ -442,7 +442,7 @@ function httpErrorMessage(err: unknown): string {
                             <span role="cell">
                               <mat-form-field appearance="outline" class="edit-field">
                                 <mat-label>Name</mat-label>
-                                <input matInput [formControl]="editForm.controls.productName" />
+                                <input matInput [formControl]="editForm.controls.productName" [readonly]="actionBusy()" />
                               </mat-form-field>
                             </span>
                             <span role="cell">
@@ -453,6 +453,7 @@ function httpErrorMessage(err: unknown): string {
                                   type="number"
                                   min="1"
                                   [formControl]="editForm.controls.quantity"
+                                  [readonly]="actionBusy()"
                                 />
                               </mat-form-field>
                             </span>
@@ -465,6 +466,7 @@ function httpErrorMessage(err: unknown): string {
                                   min="0"
                                   step="0.01"
                                   [formControl]="editForm.controls.listPrice"
+                                  [readonly]="actionBusy()"
                                 />
                               </mat-form-field>
                             </span>
@@ -921,6 +923,10 @@ function httpErrorMessage(err: unknown): string {
       }
 
       @media (max-width: 768px) {
+        .line-table {
+          overflow-x: auto;
+        }
+
         .error-banner {
           margin: 16px;
         }

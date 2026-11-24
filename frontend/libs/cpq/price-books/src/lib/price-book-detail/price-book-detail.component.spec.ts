@@ -82,6 +82,7 @@ describe('PriceBookDetailComponent', () => {
   ]);
   const loading = signal(false);
   const error = signal<string | null>(null);
+  const detailReadStatus = signal<number | null>(null);
   const entriesPagination = signal<PaginationMeta>({
     page: 0,
     size: 20,
@@ -90,6 +91,7 @@ describe('PriceBookDetailComponent', () => {
   });
 
   beforeEach(async () => {
+    detailReadStatus.set(null);
     getByIdSpy = vi.fn((id: number) => {
       selectedPriceBook.set(findMockPriceBook(id) ?? null);
     });
@@ -134,6 +136,7 @@ describe('PriceBookDetailComponent', () => {
       entries,
       loading,
       error,
+      detailReadStatus,
       entriesPagination,
       getById: getByIdSpy,
       getEntries: getEntriesSpy,
@@ -458,7 +461,22 @@ describe('PriceBookDetailComponent', () => {
     expect(compiled.textContent).toContain('No entries');
   });
 
-  it('shows not-found empty state when selected book is missing', () => {
+  it('shows a transient detail failure and retains Back after HTTP 503', () => {
+    selectedPriceBook.set(null);
+    loading.set(false);
+    error.set('Controlled detail unavailable');
+    detailReadStatus.set(503);
+    fixture.detectChanges();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(card?.querySelector('.empty-state-title')?.textContent).toContain('Unable to load price book');
+    expect(card?.textContent).toContain('Controlled detail unavailable');
+    expect(card?.textContent).not.toContain('Price book not found');
+    expect(card?.querySelector('button')?.textContent).toContain('Back to price books');
+  });
+
+  it('shows the missing-price-book state after HTTP 404', () => {
+    detailReadStatus.set(404);
     selectedPriceBook.set(null);
     fixture.detectChanges();
 

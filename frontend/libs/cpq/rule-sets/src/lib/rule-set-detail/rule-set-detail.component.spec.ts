@@ -35,8 +35,10 @@ describe('RuleSetDetailComponent', () => {
   const selectedRuleSet = signal<RuleSetDto | null>(MOCK_RULE_SETS[0]);
   const ruleSetLoading = signal(false);
   const ruleSetError = signal<string | null>(null);
+  const detailReadUnavailableId = signal<number | null>(null);
 
   const rules = signal<RuleDto[]>(findMockRulesForSet(1));
+  const confirmedRuleSetId = signal<number | null>(1);
   const rulesLoading = signal(false);
   const rulesError = signal<string | null>(null);
   const rulesPagination = signal<PaginationMeta>({
@@ -48,6 +50,7 @@ describe('RuleSetDetailComponent', () => {
 
   // Angular TestBed compile can exceed Vitest's default 10s hookTimeout under load.
   beforeEach(async () => {
+    detailReadUnavailableId.set(null);
     getByIdSpy = vi.fn((id: number) => {
       selectedRuleSet.set(findMockRuleSet(id) ?? null);
       ruleSetLoading.set(false);
@@ -55,6 +58,7 @@ describe('RuleSetDetailComponent', () => {
     listByRuleSetSpy = vi.fn((ruleSetId: number) => {
       const next = findMockRulesForSet(ruleSetId);
       rules.set(next);
+      confirmedRuleSetId.set(ruleSetId);
       rulesPagination.set({
         page: 0,
         size: 20,
@@ -77,8 +81,9 @@ describe('RuleSetDetailComponent', () => {
 
     const ruleSetServiceMock = {
       selectedRuleSet,
-      loading: ruleSetLoading,
-      error: ruleSetError,
+      detailLoading: ruleSetLoading,
+      detailError: ruleSetError,
+      detailReadUnavailableId,
       getById: getByIdSpy,
       activate: activateSpy,
       deprecate: deprecateSpy,
@@ -86,6 +91,7 @@ describe('RuleSetDetailComponent', () => {
 
     const ruleServiceMock = {
       rules,
+      confirmedRuleSetId,
       loading: rulesLoading,
       error: rulesError,
       pagination: rulesPagination,
@@ -116,6 +122,7 @@ describe('RuleSetDetailComponent', () => {
     vi.restoreAllMocks();
     selectedRuleSet.set(MOCK_RULE_SETS[0]);
     rules.set(findMockRulesForSet(1));
+    confirmedRuleSetId.set(1);
     ruleSetLoading.set(false);
     rulesLoading.set(false);
     ruleSetError.set(null);
@@ -233,4 +240,45 @@ describe('RuleSetDetailComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Rule set not found');
   });
+
+  it('shows an unavailable state when the rule-set detail read fails temporarily', () => {
+    selectedRuleSet.set(null);
+    detailReadUnavailableId.set(Number(component.id()));
+    ruleSetError.set('Rule set temporarily unavailable');
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Could not load rule set');
+    expect(compiled.textContent).toContain('Rule set temporarily unavailable');
+    expect(compiled.textContent).toContain('Back to rule sets');
+    expect(compiled.textContent).not.toContain('Rule set not found');
+  });
+
+  it('loads set metadata and rules when Angular reuses the detail component for another ID', () => {
+    fixture.componentRef.setInput('id', '2');
+    fixture.detectChanges();
+    expect(getByIdSpy).toHaveBeenLastCalledWith(2);
+    expect(listByRuleSetSpy).toHaveBeenLastCalledWith(2);
+  });
+
+  it('hides a previous set row and refuses its actions while the current set rules are pending', () => {
+    const previous = component.ruleRows()[0];
+    const foreignRules = findMockRulesForSet(1);
+    fixture.componentRef.setInput('id', '2');
+    fixture.detectChanges();
+    selectedRuleSet.set({ ...MOCK_RULE_SETS[1], status: 'DRAFT' });
+    rules.set(foreignRules);
+    rulesLoading.set(true);
+    fixture.detectChanges();
+
+    const view = fixture.nativeElement as HTMLElement;
+    expect(view.querySelector('.rules-loading mat-spinner')).not.toBeNull();
+    expect(view.querySelector('.rules-table tbody')).not.toBeNull();
+    expect(view.textContent).not.toContain(previous.name);
+    dialogOpen.mockClear();
+    component.openEditRule(previous);
+    component.openRuleImpact(previous);
+    component.confirmDeleteRule(previous);
+    expect(dialogOpen).not.toHaveBeenCalled();
+  });
+
 });

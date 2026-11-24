@@ -297,7 +297,7 @@ export class OrganizationService {
         },
         error: (err) => {
           this.relatedDeals.set([]);
-          this.relatedDealsError.set(httpErrorMessage(err, 'Deals are unavailable'));
+          this.relatedDealsError.set(httpErrorMessage(err, 'Opportunities are unavailable'));
         },
       });
   }
