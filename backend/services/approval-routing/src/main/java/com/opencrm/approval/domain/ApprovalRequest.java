@@ -54,6 +54,29 @@ public class ApprovalRequest extends BaseEntity {
 
     @Column(name = "governing_period")
     private Integer governingPeriod;
+
+    /** Entra {@code tid} stamped from the token when a matrix route created this row. Null on legacy rows. */
+    @Column(name = "tenant_id", length = 64)
+    private String tenantId;
+
+    @Column(name = "matrix_id")
+    private Long matrixId;
+
+    @Column(name = "matrix_version")
+    private Integer matrixVersion;
+
+    @Column(name = "quote_version", length = 64)
+    private String quoteVersion;
+
+    @Column(name = "routing_step")
+    private Integer routingStep;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "step_mode", length = 16)
+    private MatrixStepMode stepMode;
+
+    @Column(name = "breach_types", length = 200)
+    private String breachTypes;
     
     @Column(name = "requester_id", nullable = false)
     private String requesterId;
