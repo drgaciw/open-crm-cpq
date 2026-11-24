@@ -93,6 +93,9 @@ public final class KafkaTopics {
     /** DRG-441 / BC-04-01. A commercial policy version (discount/margin/term/clause thresholds) is defined. */
     public static final String POLICY_DEFINED = "cpq.approval.policy.defined";
 
+    /** DRG-442 / BC-04-02. A quote version was evaluated against commercial policy. */
+    public static final String QUOTE_EVALUATED = "cpq.approval.quote.evaluated";
+
     /** DRG-307 / BC-19-03. AssignRole gave a principal a role. */
     public static final String ROLE_ASSIGNED = "cpq.authorization.role.assigned";
 

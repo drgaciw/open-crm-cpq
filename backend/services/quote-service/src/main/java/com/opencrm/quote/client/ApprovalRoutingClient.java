@@ -34,6 +34,8 @@ public class ApprovalRoutingClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<ApiResponse<List<RoutingApprovalDto>>> LIST =
             new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<ApiResponse<QuotePolicyVerdictDto>> VERDICT =
+            new ParameterizedTypeReference<>() {};
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RestClient approvalRoutingRestClient;
@@ -72,6 +74,43 @@ public class ApprovalRoutingClient {
         } catch (RestClientException ex) {
             throw new BusinessException(
                     "Failed to call approval-routing submit: " + ex.getMessage(),
+                    HttpStatus.BAD_GATEWAY,
+                    "APPROVAL_ROUTING_UNAVAILABLE"
+            );
+        }
+    }
+
+    public QuotePolicyVerdictDto evaluateQuote(QuotePolicyEvaluationRequest request) {
+        log.debug("Evaluating quote {} version {} against commercial policy", request.getQuoteId(), request.getQuoteVersion());
+        try {
+            ApiResponse<QuotePolicyVerdictDto> response = approvalRoutingRestClient.post()
+                    .uri("/api/v1/commercial-policies/evaluate")
+                    .body(request)
+                    .retrieve()
+                    .onStatus(ApprovalRoutingClient::isRefusal, (req, res) -> {
+                        throw refusal(res, "POLICY_EVALUATION_FAILED");
+                    })
+                    .onStatus(HttpStatusCode::isError, (req, res) -> {
+                        throw new BusinessException(
+                                "approval-routing evaluation failed with HTTP " + res.getStatusCode().value(),
+                                HttpStatus.BAD_GATEWAY,
+                                "POLICY_EVALUATION_FAILED"
+                        );
+                    })
+                    .body(VERDICT);
+            if (response == null || !response.isSuccess() || response.getData() == null
+                    || response.getData().getVerdict() == null) {
+                throw new BusinessException(
+                        "approval-routing evaluation returned an empty verdict",
+                        HttpStatus.BAD_GATEWAY,
+                        "POLICY_EVALUATION_FAILED");
+            }
+            return response.getData();
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            throw new BusinessException(
+                    "Failed to call approval-routing evaluation: " + ex.getMessage(),
                     HttpStatus.BAD_GATEWAY,
                     "APPROVAL_ROUTING_UNAVAILABLE"
             );
