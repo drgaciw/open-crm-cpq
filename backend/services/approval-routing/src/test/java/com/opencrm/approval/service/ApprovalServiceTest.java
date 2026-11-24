@@ -448,6 +448,31 @@ class ApprovalServiceTest {
             pendingRequest.setAccountId("acct-b");
         }
 
+        /**
+         * No 403-vs-404 oracle on decisions: the tenant check runs before the role, self-approval and
+         * people-only checks, so another tenant's id answers exactly like a missing id for every caller.
+         */
+        @Test
+        @DisplayName("C16: another tenant's id is 404 like a missing id even without the role, for the requester, and for a service")
+        void otherTenantDecisionLooksMissingBeforeRoleAndSelfChecks() {
+            when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
+            when(approvalRequestRepository.findById(99L)).thenReturn(Optional.empty());
+
+            signIn("someone", "CPQ.User");
+            for (long id : new long[] {1L, 99L}) {
+                assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.approve(id));
+                assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.reject(id, "no"));
+            }
+
+            signIn("rep-1", "DealDesk");
+            assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.approve(1L));
+
+            TestCallers.signInServiceInTenant("quote-service", TENANT, "Internal.Invoke");
+            assertRefused(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", () -> approvalService.approve(1L));
+
+            verify(approvalRequestRepository, never()).save(any());
+        }
+
         @Test
         @DisplayName("C16: tenant A cannot read, approve, reject, or see tenant B in the inbox")
         void otherTenantIsNotFound() {

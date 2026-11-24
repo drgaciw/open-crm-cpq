@@ -171,8 +171,10 @@ public class ApprovalService {
     }
 
     /**
-     * Who decides, after checking they may (ADR-016 decision 7). Refusals are 401 without a verified caller, and 403
-     * for a service, a role that does not satisfy the tier, or the requester deciding their own request.
+     * Who decides, after checking they may (ADR-016 decision 7). Refusals are 401 without a verified caller; then
+     * 404 for another tenant's row, exactly like a missing id (H4), before any other check so the answer cannot
+     * reveal that the id exists; then 403 for a service, a role that does not satisfy the tier, or the requester
+     * deciding their own request.
      */
     private String authorizeDecision(ApprovalRequest request) {
         Optional<Caller> caller = currentActor.caller();
@@ -185,6 +187,7 @@ public class ApprovalService {
                     request.getId(), currentActor.self());
             return currentActor.self();
         }
+        requireSameTenant(request);
         if (!(caller.get() instanceof Caller.User user)) {
             throw new BusinessException("Approvals are decided by people, not by services",
                     HttpStatus.FORBIDDEN, "APPROVER_MUST_BE_A_USER");
@@ -201,12 +204,13 @@ public class ApprovalService {
             throw new BusinessException("The requester cannot decide their own approval",
                     HttpStatus.FORBIDDEN, "SELF_APPROVAL");
         }
-        requireSameTenant(request);
         return user.actorId();
     }
 
     /**
-     * H4 owns this check. DRG-444 escalate must call it after the role check. A different tenant, a row with
+     * H4 owns this check. Decisions (and DRG-444 escalate) must call it BEFORE the role, self-approval and
+     * people-only checks, so a caller without the role cannot tell another tenant's id from a missing one
+     * (a 403 there would be an existence oracle). A different tenant, a row with
      * no tenant (so an unbackfilled row is not shared), and a different account when the caller is
      * account-scoped all answer 404, exactly like a missing id, so a caller cannot learn which ids exist in
      * another tenant (user decision, 2026-11-24). Dev mode returns before this method.
