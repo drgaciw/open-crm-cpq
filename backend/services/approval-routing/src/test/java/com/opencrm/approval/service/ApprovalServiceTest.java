@@ -11,6 +11,7 @@ import com.opencrm.approval.mapper.ApprovalRequestMapper;
 import com.opencrm.approval.repository.ApprovalRequestRepository;
 import com.opencrm.common.event.OutboxEventPublisher;
 import com.opencrm.common.exception.BusinessException;
+import com.opencrm.common.exception.ResourceNotFoundException;
 import com.opencrm.security.CurrentActor;
 import com.opencrm.security.test.TestCallers;
 import com.opencrm.security.test.TestTokens;
@@ -61,7 +62,13 @@ class ApprovalServiceTest {
     @InjectMocks
     private ApprovalService approvalService;
 
+    private static final String TENANT = "tenant-a";
+
     private ApprovalRequest pendingRequest;
+
+    private String signIn(String name, String... roles) {
+        return TestCallers.signInUserInTenant(name, TENANT, null, roles);
+    }
 
     @BeforeEach
     void setUp() {
@@ -99,7 +106,9 @@ class ApprovalServiceTest {
     }
 
     private void stubFind(ApprovalRequest request) {
-        when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+        request.setTenantId(TENANT);
+        lenient().when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+        lenient().when(approvalRequestRepository.findScopedById(1L, TENANT, null)).thenReturn(Optional.of(request));
     }
 
     private static void assertRefused(HttpStatus status, String code, Runnable action) {
@@ -111,7 +120,7 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("should approve a PENDING request, recording the authenticated approver's oid")
     void approvePendingRequest() {
-        String manager = TestCallers.signInUser("manager-1", "DealDesk");
+        String manager = signIn("manager-1", "DealDesk");
         stubFind(pendingRequest);
         when(approvalRequestRepository.save(any())).thenReturn(pendingRequest);
 
@@ -125,7 +134,7 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("should reject a PENDING request and publish outbox event")
     void rejectPendingRequest() {
-        String manager = TestCallers.signInUser("manager-1", "DealDesk");
+        String manager = signIn("manager-1", "DealDesk");
         stubFind(pendingRequest);
         when(approvalRequestRepository.save(any())).thenReturn(pendingRequest);
 
@@ -148,7 +157,7 @@ class ApprovalServiceTest {
     @DisplayName("should reject approving an already APPROVED request")
     void rejectDoubleApproval() {
         pendingRequest.approve(TestTokens.oidOf("manager-1"));
-        TestCallers.signInUser("manager-2", "DealDesk");
+        signIn("manager-2", "DealDesk");
         stubFind(pendingRequest);
 
         assertThrows(IllegalStateException.class, () -> approvalService.approve(1L));
@@ -157,7 +166,7 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("decision 9: a superseded request answers 409 APPROVAL_SUPERSEDED, naming its replacement")
     void supersededRequestCannotBeDecided() {
-        TestCallers.signInUser("manager-1", "DealDesk");
+        signIn("manager-1", "DealDesk");
         pendingRequest.supersede(2L);
         stubFind(pendingRequest);
 
@@ -172,7 +181,7 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("decision 9: a caller who may not decide gets 403, not 409, so a superseded request's state stays private")
     void supersededStateIsNotRevealedToWhoMayNotDecide() {
-        TestCallers.signInUser("someone", "CPQ.User");
+        signIn("someone", "CPQ.User");
         pendingRequest.supersede(2L);
         stubFind(pendingRequest);
 
@@ -182,7 +191,9 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("decision 9: superseded requests are not in the pending lists")
     void supersededRequestsAreNotPending() {
-        when(approvalRequestRepository.findByStatus(ApprovalStatus.PENDING)).thenReturn(List.of(pendingRequest));
+        signIn("manager-1", "DealDesk");
+        when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, null))
+                .thenReturn(List.of(pendingRequest));
 
         assertEquals(1, approvalService.getPendingApprovals().size());
         verify(approvalRequestRepository, never()).findByStatus(ApprovalStatus.SUPERSEDED);
@@ -211,7 +222,7 @@ class ApprovalServiceTest {
                 "SOMETHING_NEW, CFO, false"
         })
         void roleMustSatisfyTheTier(String tier, String role, boolean allowed) {
-            TestCallers.signInUser("approver", role);
+            signIn("approver", role);
             stubFind(pending(tier, TestTokens.oidOf("rep-1")));
             lenient().when(approvalRequestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -226,7 +237,7 @@ class ApprovalServiceTest {
         @Test
         @DisplayName("the requester cannot decide their own approval, even with the role")
         void noSelfApproval() {
-            TestCallers.signInUser("rep-1", "CFO");
+            signIn("rep-1", "CFO");
             stubFind(pendingRequest);
 
             assertRefused(HttpStatus.FORBIDDEN, "SELF_APPROVAL", () -> approvalService.approve(1L));
@@ -237,7 +248,7 @@ class ApprovalServiceTest {
         @Test
         @DisplayName("a service token cannot decide: approvals are human decisions")
         void servicesCannotDecide() {
-            TestCallers.signInService("quote-service", "Internal.Invoke");
+            TestCallers.signInServiceInTenant("quote-service", TENANT, "Internal.Invoke");
             stubFind(pendingRequest);
 
             assertRefused(HttpStatus.FORBIDDEN, "APPROVER_MUST_BE_A_USER", () -> approvalService.approve(1L));
@@ -266,7 +277,8 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("should list pending approvals")
     void listPendingApprovals() {
-        when(approvalRequestRepository.findByStatus(ApprovalStatus.PENDING))
+        signIn("manager-1", "DealDesk");
+        when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, null))
                 .thenReturn(List.of(pendingRequest));
 
         List<ApprovalRequestDto> result = approvalService.getPendingApprovals();
@@ -278,7 +290,8 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("should list pending approvals by tier")
     void listPendingByTier() {
-        when(approvalRequestRepository.findByApprovalTierAndStatus("MANAGER", ApprovalStatus.PENDING))
+        signIn("manager-1", "DealDesk");
+        when(approvalRequestRepository.findScopedByTierAndStatus("MANAGER", ApprovalStatus.PENDING, TENANT, null))
                 .thenReturn(List.of(pendingRequest));
 
         List<ApprovalRequestDto> result = approvalService.getPendingApprovalsByTier("MANAGER");
@@ -290,7 +303,7 @@ class ApprovalServiceTest {
     @Test
     @DisplayName("submit DEAL_DESK → PENDING QUOTE approval, requested by the authenticated user")
     void submitDealDeskCreatesPendingQuoteApproval() {
-        String rep = TestCallers.signInUser("rep-1", "CPQ.User");
+        String rep = signIn("rep-1", "CPQ.User");
         when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> {
             ApprovalRequest saved = invocation.getArgument(0);
             saved.setId(42L);
@@ -311,35 +324,46 @@ class ApprovalServiceTest {
         assertEquals("DEAL_DESK", result.getApprovalTier());
         assertEquals(ApprovalType.QUOTE, result.getApprovalType());
         assertEquals(rep, result.getRequesterId());
+        assertEquals(TENANT, savedTenant());
         assertEquals("Margin below 35%", result.getReason());
         assertNotNull(result.getSubmittedAt());
         verify(outboxEventPublisher, never()).publish(any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("submit by a service token records service:<client-id>; with no caller, this service")
+    @DisplayName("submit by a service token records service:<client-id> and that token's tenant")
     void submitRecordsServiceActors() {
         when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TestCallers.signInService("quote-client-id");
-        assertEquals("service:quote-client-id", approvalService.submit(ApprovalSubmitRequest.builder()
-                .quoteId("Q-77").tier(QuoteApprovalTier.SALES_VP).build()).getRequesterId());
+        TestCallers.signInServiceInTenant("quote-client-id", TENANT);
+        ApprovalRequestDto created = approvalService.submit(ApprovalSubmitRequest.builder()
+                .quoteId("Q-77").tier(QuoteApprovalTier.SALES_VP).build());
+        assertEquals("service:quote-client-id", created.getRequesterId());
+        assertEquals(TENANT, savedTenant());
 
         TestCallers.clear();
-        ApprovalRequestDto result = approvalService.submit(ApprovalSubmitRequest.builder()
-                .quoteId("Q-77")
-                .tier(QuoteApprovalTier.SALES_VP)
-                .build());
+        assertRefused(HttpStatus.FORBIDDEN, "TENANT_REQUIRED", () -> approvalService.submit(ApprovalSubmitRequest.builder()
+                .quoteId("Q-77").tier(QuoteApprovalTier.SALES_VP).build()));
+    }
 
-        assertEquals(ApprovalStatus.PENDING, result.getStatus());
-        assertEquals("SALES_VP", result.getApprovalTier());
-        assertEquals(ApprovalType.QUOTE, result.getApprovalType());
+    @Test
+    @DisplayName("dev mode: a submit with no caller records this service and a null tenant")
+    void devModeSubmitWithoutCallerStoresNullTenant() {
+        ApprovalService devService = new ApprovalService(approvalRequestRepository, outboxEventPublisher,
+                approvalRequestMapper, new CurrentActor("service:approval-routing", true));
+        when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ApprovalRequestDto result = devService.submit(ApprovalSubmitRequest.builder()
+                .quoteId("Q-77").tier(QuoteApprovalTier.SALES_VP).build());
+
         assertEquals("service:approval-routing", result.getRequesterId());
+        assertNull(savedTenant());
     }
 
     @Test
     @DisplayName("submit CFO → PENDING GOVERNANCE approval")
     void submitCfoCreatesPendingGovernanceApproval() {
+        signIn("cfo-1", "CFO");
         when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> {
             ApprovalRequest saved = invocation.getArgument(0);
             saved.setId(7L);
@@ -388,7 +412,8 @@ class ApprovalServiceTest {
                 .approvalType(ApprovalType.QUOTE).status(ApprovalStatus.APPROVED).build();
         ApprovalRequest rejected = ApprovalRequest.builder().id(3L).quoteId("Q-001")
                 .approvalType(ApprovalType.QUOTE).status(ApprovalStatus.REJECTED).build();
-        when(approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc("Q-001"))
+        signIn("manager-1", "DealDesk");
+        when(approvalRequestRepository.findScopedByQuoteId("Q-001", TENANT, null))
                 .thenReturn(List.of(pendingRequest, approved, rejected));
 
         List<ApprovalRequestDto> history = approvalService.getByQuoteId("Q-001");
@@ -401,9 +426,97 @@ class ApprovalServiceTest {
 
     @Test
     void historyForQuoteWithoutApprovalsIsEmpty() {
-        when(approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc("unknown"))
+        signIn("manager-1", "DealDesk");
+        when(approvalRequestRepository.findScopedByQuoteId("unknown", TENANT, null))
                 .thenReturn(List.of());
         assertTrue(approvalService.getByQuoteId("unknown").isEmpty());
+    }
+
+    private String savedTenant() {
+        ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(approvalRequestRepository, atLeastOnce()).save(captor.capture());
+        return captor.getValue().getTenantId();
+    }
+
+    @Nested
+    @DisplayName("H4 C16/C17 tenant and account isolation")
+    class TenantIsolation {
+
+        @BeforeEach
+        void ownRow() {
+            pendingRequest.setTenantId("tenant-b");
+            pendingRequest.setAccountId("acct-b");
+        }
+
+        @Test
+        @DisplayName("C16: tenant A cannot read, approve, reject, or see tenant B in the inbox")
+        void otherTenantIsCrossTenant() {
+            signIn("manager-1", "DealDesk");
+            when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
+            when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, null))
+                    .thenReturn(List.of());
+            when(approvalRequestRepository.findScopedByQuoteId("Q-001", TENANT, null)).thenReturn(List.of());
+
+            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.getById(1L));
+            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.approve(1L));
+            assertRefused(HttpStatus.FORBIDDEN, "CROSS_TENANT", () -> approvalService.reject(1L, "no"));
+            assertTrue(approvalService.getPendingApprovals().isEmpty());
+            assertTrue(approvalService.getByQuoteId("Q-001").isEmpty());
+            verify(approvalRequestRepository, never()).save(any());
+            verify(approvalRequestRepository, never()).findByStatus(any());
+        }
+
+        @Test
+        @DisplayName("C16: create stores the token tenant, not a value carried beside the command")
+        void createStoresTokenTenant() {
+            signIn("rep-1", "CPQ.User");
+            when(approvalRequestRepository.save(any(ApprovalRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            approvalService.submit(ApprovalSubmitRequest.builder()
+                    .quoteId("1001").tier(QuoteApprovalTier.DEAL_DESK).reason("tenant-b").build());
+
+            assertEquals(TENANT, savedTenant());
+            assertNull(savedAccount());
+        }
+
+        @Test
+        @DisplayName("C17: an account-scoped caller cannot read, decide, or list another account")
+        void otherAccountIsNotFound() {
+            pendingRequest.setTenantId(TENANT);
+            pendingRequest.setAccountId("acct-b");
+            TestCallers.signInUserInTenant("manager-1", TENANT, "acct-a", "DealDesk");
+            when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
+            when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, "acct-a"))
+                    .thenReturn(List.of());
+
+            assertThrows(ResourceNotFoundException.class, () -> approvalService.getById(1L));
+            assertThrows(ResourceNotFoundException.class, () -> approvalService.approve(1L));
+            assertThrows(ResourceNotFoundException.class, () -> approvalService.reject(1L, "no"));
+            assertTrue(approvalService.getPendingApprovals().isEmpty());
+            verify(approvalRequestRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("same tenant and account can read, approve, and see the inbox row")
+        void sameTenantAndAccountSucceed() {
+            pendingRequest.setTenantId(TENANT);
+            pendingRequest.setAccountId("acct-a");
+            TestCallers.signInUserInTenant("manager-1", TENANT, "acct-a", "DealDesk");
+            when(approvalRequestRepository.findById(1L)).thenReturn(Optional.of(pendingRequest));
+            when(approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, TENANT, "acct-a"))
+                    .thenReturn(List.of(pendingRequest));
+            when(approvalRequestRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            assertEquals(1L, approvalService.getById(1L).getId());
+            assertEquals(1, approvalService.getPendingApprovals().size());
+            assertEquals(ApprovalStatus.APPROVED, approvalService.approve(1L).getStatus());
+        }
+
+        private String savedAccount() {
+            ArgumentCaptor<ApprovalRequest> captor = ArgumentCaptor.forClass(ApprovalRequest.class);
+            verify(approvalRequestRepository, atLeastOnce()).save(captor.capture());
+            return captor.getValue().getAccountId();
+        }
     }
 
     private ApprovalRequestDto toDto(ApprovalRequest a) {

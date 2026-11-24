@@ -16,7 +16,9 @@ import java.time.Instant;
 @Table(name = "approval_requests", indexes = {
     @Index(name = "idx_approval_quote", columnList = "quote_id"),
     @Index(name = "idx_approval_status", columnList = "status"),
-    @Index(name = "idx_approval_type", columnList = "approval_type")
+    @Index(name = "idx_approval_type", columnList = "approval_type"),
+    @Index(name = "idx_approval_tenant_status", columnList = "tenant_id, status"),
+    @Index(name = "idx_approval_tenant_quote", columnList = "tenant_id, quote_id")
 })
 @Getter
 @Setter
@@ -27,6 +29,21 @@ public class ApprovalRequest extends BaseEntity {
     
     @Column(name = "quote_id", nullable = false)
     private String quoteId;
+
+    /**
+     * Entra {@code tid} of the principal that created this request. H4 owns this column.
+     * Never taken from a header or body. DRG-444 rebases onto this definition and does not add another.
+     */
+    @Column(name = "tenant_id", length = 128, updatable = false)
+    private String tenantId;
+
+    /**
+     * Account this request belongs to, when known: the principal {@code account_id} claim, or the owning
+     * quote's customer after backfill. Null when the account is not known. An account-scoped caller does
+     * not see a different account.
+     */
+    @Column(name = "account_id", length = 255, updatable = false)
+    private String accountId;
     
     @Column(name = "line_id")
     private String lineId;

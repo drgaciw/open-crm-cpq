@@ -38,6 +38,9 @@ public final class TestTokens {
     /** A tenant-specific Entra ID v2.0 issuer (a made-up tenant id). */
     public static final String ISSUER = "https://login.microsoftonline.com/00000000-0000-4000-8000-00000000c0de/v2.0";
 
+    /** Default {@code tid} claim on tokens from {@link #user} and {@link #service}. */
+    public static final String TENANT = "00000000-0000-4000-8000-00000000c0de";
+
     /** The API audience of ADR-016 decision 1. */
     public static final String AUDIENCE = "api://opencrm-api";
 
@@ -102,6 +105,8 @@ public final class TestTokens {
         private final boolean appOnly;
         private String issuer = ISSUER;
         private String audience = AUDIENCE;
+        private String tenantId = TENANT;
+        private String accountId;
         private Instant issuedAt = Instant.now().minusSeconds(5);
         private Instant expiresAt = issuedAt.plus(Duration.ofMinutes(10));
         private RSAKey signingKey = KEY;
@@ -119,6 +124,18 @@ public final class TestTokens {
 
         public Builder audience(String audience) {
             this.audience = audience;
+            return this;
+        }
+
+        /** Overrides the {@code tid} claim. Tenant is never taken from a request header or body. */
+        public Builder tenant(String tenantId) {
+            this.tenantId = tenantId;
+            return this;
+        }
+
+        /** Sets the optional {@code account_id} claim. Omit it when the caller is not account-scoped. */
+        public Builder account(String accountId) {
+            this.accountId = accountId;
             return this;
         }
 
@@ -145,8 +162,11 @@ public final class TestTokens {
                     .issuedAt(issuedAt)
                     .notBefore(issuedAt)
                     .expiresAt(expiresAt)
-                    .claim("tid", "00000000-0000-4000-8000-00000000c0de")
+                    .claim("tid", tenantId)
                     .claim("ver", "2.0");
+            if (accountId != null && !accountId.isBlank()) {
+                claims.claim("account_id", accountId);
+            }
             if (appOnly) {
                 claims.claim("oid", servicePrincipal).claim("azp", subject).claim("idtyp", "app");
             } else {

@@ -35,8 +35,9 @@ class DiscountApprovalRampBindingTest {
         consumer.handleDiscountApprovalRequired(record(event("b".repeat(64), true)));
         assertThat(older.getStatus()).isEqualTo(ApprovalStatus.SUPERSEDED);
         assertThat(older.getSupersededBy()).isEqualTo(200L);
+        older.setTenantId("tenant-a");
         when(repository.findById(100L)).thenReturn(Optional.of(older));
-        com.opencrm.security.test.TestCallers.signInUser("reviewer", "SalesVP");
+        com.opencrm.security.test.TestCallers.signInUserInTenant("reviewer", "tenant-a", null, "SalesVP");
         older.setApprovalTier("SALES_VP");
         ApprovalService routing = new ApprovalService(repository, mock(OutboxEventPublisher.class),
                 mock(ApprovalRequestMapper.class), new CurrentActor("service:approval-routing", false));

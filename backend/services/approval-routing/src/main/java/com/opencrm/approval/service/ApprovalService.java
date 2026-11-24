@@ -65,6 +65,7 @@ public class ApprovalService {
             throw new BusinessException("Invalid ramp approval binding", "INVALID_APPROVAL_SUBMIT");
         }
 
+        ApprovalPrincipal.Scope scope = writeScope();
         ApprovalRequest entity = ApprovalRequest.builder()
                 .quoteId(request.getQuoteId().trim())
                 .lineId(request.getLineId())
@@ -79,6 +80,8 @@ public class ApprovalService {
                 .submittedAt(Instant.now())
                 .approvalTier(mapped.approvalTier())
                 .reason(request.getReason() != null ? request.getReason() : "Quote approval submitted via BFF")
+                .tenantId(scope.tenantId())
+                .accountId(scope.accountId())
                 .build();
 
         ApprovalRequest saved = approvalRequestRepository.save(entity);
@@ -89,25 +92,38 @@ public class ApprovalService {
 
     @Transactional(readOnly = true)
     public ApprovalRequestDto getById(Long id) {
-        return approvalRequestMapper.toDto(findEntityById(id));
+        readScope();
+        ApprovalRequest entity = approvalRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
+        requireSameTenant(entity);
+        return approvalRequestMapper.toDto(entity);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getByQuoteId(String quoteId) {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(quoteId));
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByQuoteId(quoteId, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByQuoteIdAndDeletedFalseOrderBySubmittedAtDescIdDesc(quoteId);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovals() {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByStatus(ApprovalStatus.PENDING));
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByStatus(ApprovalStatus.PENDING, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByStatus(ApprovalStatus.PENDING);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     @Transactional(readOnly = true)
     public List<ApprovalRequestDto> getPendingApprovalsByTier(String tier) {
-        return approvalRequestMapper.toDtoList(
-                approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING));
+        ApprovalPrincipal.Scope scope = readScope();
+        List<ApprovalRequest> rows = scope.enforced()
+                ? approvalRequestRepository.findScopedByTierAndStatus(tier, ApprovalStatus.PENDING, scope.tenantId(), scope.accountId())
+                : approvalRequestRepository.findByApprovalTierAndStatus(tier, ApprovalStatus.PENDING);
+        return approvalRequestMapper.toDtoList(rows);
     }
 
     public ApprovalRequestDto approve(Long id) {
@@ -185,7 +201,28 @@ public class ApprovalService {
             throw new BusinessException("The requester cannot decide their own approval",
                     HttpStatus.FORBIDDEN, "SELF_APPROVAL");
         }
+        requireSameTenant(request);
         return user.actorId();
+    }
+
+    /**
+     * H4 owns this check. DRG-444 escalate must call it after the role check: a different tenant is 403
+     * {@code CROSS_TENANT} and the row is not returned. A row with no tenant is refused the same way, so an
+     * unbackfilled row is not shared. Dev mode returns before this method.
+     */
+    void requireSameTenant(ApprovalRequest request) {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (!scope.enforced()) {
+            return;
+        }
+        String owner = request.getTenantId() == null ? null : request.getTenantId().strip();
+        if (owner == null || owner.isEmpty() || !owner.equals(scope.tenantId())) {
+            throw new BusinessException("Approval belongs to another tenant",
+                    HttpStatus.FORBIDDEN, "CROSS_TENANT");
+        }
+        if (scope.accountId() != null && !scope.accountId().equals(request.getAccountId())) {
+            throw new ResourceNotFoundException("ApprovalRequest", request.getId());
+        }
     }
 
     /**
@@ -201,8 +238,41 @@ public class ApprovalService {
         }
     }
 
+    /**
+     * Writes require a tenant from the verified token. Dev mode, with no token, may still record a null tenant.
+     * A token without {@code tid} is refused. The request body is not a source.
+     */
+    private ApprovalPrincipal.Scope writeScope() {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant() || (!scope.enforced() && !currentActor.unverifiedCallersAllowed())) {
+            throw tenantRequired();
+        }
+        return scope;
+    }
+
+    /**
+     * Reads outside dev mode require a tenant. A different tenant, or a different account when the caller
+     * is account-scoped, is not found. Dev mode with no token keeps the unscoped queries.
+     */
+    private ApprovalPrincipal.Scope readScope() {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant() || (!scope.enforced() && !currentActor.unverifiedCallersAllowed())) {
+            throw tenantRequired();
+        }
+        return scope;
+    }
+
     private ApprovalRequest findEntityById(Long id) {
+        ApprovalPrincipal.Scope scope = ApprovalPrincipal.current();
+        if (scope.jwtWithoutTenant()) {
+            throw tenantRequired();
+        }
         return approvalRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ApprovalRequest", id));
+    }
+
+    private static BusinessException tenantRequired() {
+        return new BusinessException("Tenant is not on the verified token",
+                HttpStatus.FORBIDDEN, "TENANT_REQUIRED");
     }
 }
