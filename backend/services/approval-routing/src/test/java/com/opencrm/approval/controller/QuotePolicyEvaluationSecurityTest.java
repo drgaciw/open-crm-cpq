@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.opencrm.approval.config.GlobalExceptionHandler;
 import com.opencrm.approval.repository.CommercialPolicyRepository;
+import com.opencrm.approval.repository.PolicyExceptionRepository;
 import com.opencrm.approval.service.CommercialPolicyService;
 import com.opencrm.approval.service.QuotePolicyEvaluationService;
 import com.opencrm.audit.AuditTrailService;
@@ -84,6 +85,11 @@ class QuotePolicyEvaluationSecurityTest {
         @Bean
         CommercialPolicyRepository commercialPolicyRepository() {
             return Mockito.mock(CommercialPolicyRepository.class);
+        }
+
+        @Bean
+        PolicyExceptionRepository policyExceptionRepository() {
+            return Mockito.mock(PolicyExceptionRepository.class);
         }
 
         @Bean
