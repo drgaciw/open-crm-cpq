@@ -95,7 +95,16 @@ export default {
     /** Fill the create form, submit, ledger the new deal and return its id. */
     const createThroughUi = async (p, values) => {
       await goto(p, '/deals/new');
-      for (const [label, value] of Object.entries(values)) await fillField(p, formScope(p), field(label), value);
+      for (const [label, value] of Object.entries(values)) {
+        const control = field(label);
+        if (control.kind === 'autocomplete') {
+          await controlLocator(formScope(p), control).fill(value);
+          await p.getByRole('option', { name: value, exact: true }).click();
+          await settleOverlays(p);
+        } else {
+          await fillField(p, formScope(p), control, value);
+        }
+      }
       await formScope(p).getByRole('button', { name: 'Create', exact: true }).click();
       await p.waitForURL(DETAIL_URL, { timeout: 15000 });
       const id = p.url().match(DETAIL_URL)[1];
@@ -295,11 +304,14 @@ export default {
       await runCheck(ctx, `deals.tabs.${stage.label}`, async () => {
         await findStageFixture(stage.value);
         await goto(page, list.path);
-        const requested = page.waitForRequest((r) => r.url().includes(`${API}?`) && r.url().includes(`stage=${stage.value}`), { timeout: 8000 })
+        const requested = page.waitForResponse((response) => {
+          const url = new URL(response.url());
+          return url.pathname === API && url.searchParams.get('stage') === stage.value;
+        }, { timeout: 8000 })
           .catch(() => null);
         await page.getByRole('tab', { name: stage.label, exact: true }).click();
-        if (!(await requested)) throw new Error(`selecting the tab did not request stage=${stage.value}`);
-        await page.waitForLoadState('networkidle').catch(() => {});
+        const response = await requested;
+        if (!response?.ok()) throw new Error(`stage=${stage.value} did not load (HTTP ${response?.status() ?? 'none'})`);
         const rows = page.locator('tr.mat-mdc-row');
         await waitUntil(() => rows.count(), (n) => n > 0, { timeoutMs: 5000, describe: () => `a ${stage.value} deal exists but the tab shows no rows` });
         // Find the Stage column by its header: DRG-750 moved it (Opportunity | Organization | Owner | Amount | Stage | ...).
@@ -517,7 +529,7 @@ export default {
     }, { hypothesis: 'H-CRM-041' });
 
     await runCheck(ctx, 'deals.form.autocomplete-pick-persists', async () => {
-      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal'), Contact: contact.lastName, Organization: org.name });
+      const id = await createThroughUi(page, { Name: uniqueName(runId, 'deal'), Contact: contactName, Organization: org.name });
       const dto = await api.get(`${API}/${id}`);
       if (dto.primaryContactId !== contact.id) throw new Error(`primaryContactId is ${dto.primaryContactId}, picked ${contact.id}`);
       if (dto.organizationId !== org.id) throw new Error(`organizationId is ${dto.organizationId}, picked ${org.id}`);
@@ -529,18 +541,19 @@ export default {
       await goto(page, '/deals/new');
       await fillField(page, formScope(), field('Name'), uniqueName(runId, 'deal'));
       const responded = page.waitForResponse((r) => /organizations\/search/.test(r.url()), { timeout: 8000 }).catch(() => null);
-      await controlLocator(formScope(), field('Organization')).fill(org.name);
+      await controlLocator(formScope(), field('Organization')).fill(uniqueName(runId, 'missing-organization'));
       await responded;
       await page.keyboard.press('Escape');
       await settleOverlays(page);
       await formScope().getByRole('button', { name: 'Create', exact: true }).click();
-      await page.waitForURL(DETAIL_URL, { timeout: 15000 });
-      const id = page.url().match(DETAIL_URL)[1];
-      api.track('deal', id, `${API}/${id}`);
-      const dto = await api.get(`${API}/${id}`);
-      if (dto.organizationId == null) {
-        throw defect(`typed "${org.name}" (an exact match) without picking it: saved with organizationId=null and no warning`);
+      await page.waitForFunction(() => /\/deals\/\d+$/.test(location.pathname)
+        || document.body.innerText.includes('Pick an organization from the list, or clear the field.'));
+      const saved = page.url().match(DETAIL_URL);
+      if (saved) {
+        api.track('deal', saved[1], `${API}/${saved[1]}`);
+        throw defect('The opportunity saved despite the unresolved organization text');
       }
+      return 'unresolved organization text stayed on the form with a field error';
     }, { hypothesis: 'H-CRM-024' });
 
     // H-CRM-035: edit mode patches *names* into controls whose displayWith expects DTOs.

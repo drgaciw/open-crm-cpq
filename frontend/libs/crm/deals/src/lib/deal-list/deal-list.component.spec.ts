@@ -232,6 +232,21 @@ describe('DealListComponent action wiring', () => {
     expect(searchSpy).not.toHaveBeenCalled();
   });
 
+  it('hides rows from the previous tab while the selected stage loads', () => {
+    deals.set([
+      deal({ id: 1, name: 'Prospect', stage: 'PROSPECTING' }),
+      deal({ id: 2, name: 'Proposal', stage: 'PROPOSAL' }),
+    ]);
+    listSpy.mockImplementation(() => loading.set(true));
+    try {
+      component.onTabChange(4); // PROPOSAL
+      expect(loading()).toBe(true);
+      expect(component.visibleDeals().map(row => row.id)).toEqual([2]);
+    } finally {
+      loading.set(false);
+    }
+  });
+
   it('gates advance: open stages yes, NEGOTIATION/WON/LOST no', () => {
     expect(component.canAdvance('PROSPECTING')).toBe(true);
     expect(component.canAdvance('PROPOSAL')).toBe(true);

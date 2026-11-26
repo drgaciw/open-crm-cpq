@@ -17,7 +17,7 @@
  */
 import { launch, goto, BASE } from './lib/browser.mjs';
 import { safeLinks, linkCriteria, observeDialog, assertUnchanged } from './lib/observe.mjs';
-import { createDecider, choice, noul } from './lib/decide.mjs';
+import { AuthenticationError, createDecider, choice, noul } from './lib/decide.mjs';
 import { createReport } from './lib/report.mjs';
 import { runPreflight, blockedReason } from './lib/preflight.mjs';
 
@@ -35,8 +35,8 @@ const NAV_GOALS = [
 const PRODUCT = {
   sku: SKU,
   name: 'Jev UAT Product',
-  type: 'SAAS_FLAT_RATE',
-  category: 'SUBSCRIPTION',
+  type: 'SaaS Flat Rate',
+  category: 'Subscription',
   listPrice: '25',
   currency: 'USD',
 };
@@ -48,15 +48,10 @@ const UNTRUSTED =
 const report = createReport('jev-local-uat');
 const trace = [];
 
-const decider = createDecider({
-  minConfidence: MIN_CONFIDENCE,
-  onTrace: (event) =>
-    trace.push({
-      questionCount: event.questionCount,
-      latencyMs: event.latencyMs,
-      usage: event.usage,
-    }),
-});
+const transport = process.env.TYPESAFE_TRANSPORT ||
+  (process.env.TYPESAFE_API_KEY ? 'typesafe' : 'openrouter');
+const model = transport === 'typesafe' ? 'jev-latest' : 'typesafe/jev-1.14';
+let decider;
 
 /**
  * Navigate toward one goal by asking the model which visible link to follow.
@@ -182,7 +177,12 @@ async function verifyPersisted(page) {
     response.ok() &&
     payload.data?.content?.some(
       (row) =>
-        row.sku === SKU && row.listPrice === 25 && row.configurable === false && row.bundle === false,
+        row.sku === SKU &&
+        row.productType === 'SAAS_FLAT_RATE' &&
+        row.category === 'SUBSCRIPTION' &&
+        row.listPrice === 25 &&
+        row.configurable === false &&
+        row.bundle === false,
     ) === true
   );
 }
@@ -190,8 +190,20 @@ async function verifyPersisted(page) {
 let browser;
 let created = false;
 let createStatus = null;
+let authenticationBlocked = false;
 
 try {
+  decider = createDecider({
+    transport,
+    model,
+    minConfidence: MIN_CONFIDENCE,
+    onTrace: (event) =>
+      trace.push({
+        questionCount: event.questionCount,
+        latencyMs: event.latencyMs,
+        usage: event.usage,
+      }),
+  });
   const session = await launch();
   browser = session.browser;
   const { page } = session;
@@ -221,15 +233,20 @@ try {
     else report.fail('product persisted', `SKU ${SKU} absent after reload`);
   }
 } catch (error) {
-  report.fail('fatal', String(error.message || error));
+  if (error instanceof AuthenticationError) {
+    authenticationBlocked = true;
+    report.blocked('Jev authentication', error.message);
+  } else {
+    report.fail('fatal', String(error.message || error));
+  }
 } finally {
   await browser?.close();
 }
 
 const failures = report.finish({
   mode: 'live',
-  transport: decider.transport,
-  model: decider.model,
+  transport,
+  model,
   sku: SKU,
   minConfidence: MIN_CONFIDENCE,
   created,
@@ -238,4 +255,4 @@ const failures = report.finish({
   apiCalls: trace.filter((t) => t.questionCount).length,
 });
 
-process.exit(failures ? 1 : 0);
+process.exit(failures || authenticationBlocked ? 1 : 0);

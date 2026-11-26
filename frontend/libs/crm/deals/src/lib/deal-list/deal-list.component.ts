@@ -256,7 +256,7 @@ export class DealListComponent implements OnInit {
     const stage = this.stageFilter();
     const searching = this.searchQuery().trim().length > 0;
 
-    if (searching && stage) {
+    if (stage) {
       rows = rows.filter((row) => row.stage === stage);
     }
     if (org) {

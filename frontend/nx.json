@@ -16,7 +16,7 @@
     "@angular/build:application": {
       "cache": true,
       "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "inputs": ["production", "^production", "{workspaceRoot}/postcss.config.json"]
     },
     "@angular/build:unit-test": {
       "cache": true,

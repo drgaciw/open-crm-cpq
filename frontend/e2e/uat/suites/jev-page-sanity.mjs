@@ -11,7 +11,7 @@ import { noul } from '../../lib/decide.mjs';
 import { tracedDecider } from '../runners/jevDriver.mjs';
 
 export const ROUTES = ['/dashboard', '/organizations', '/contacts', '/leads', '/deals', '/deals/kanban', '/catalog', '/quotes',
-  '/approvals', '/price-books', '/pricing-customers', '/rule-sets', '/product-bundles', '/pricing/simulator'];
+  '/approvals', '/contracts', '/assets', '/price-books', '/pricing-customers', '/rule-sets', '/product-bundles', '/pricing/simulator'];
 
 const GARBAGE = /undefined|NaN|\[object Object\]|\{\{/;
 const FLAG = 0.7;
