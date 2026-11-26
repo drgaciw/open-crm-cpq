@@ -10,6 +10,22 @@
     "hindsight": {
       "type": "http",
       "url": "http://localhost:8888/mcp/open-crm-cpq"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.86"
+      ]
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.14.0"
+      ]
     }
   }
 }
