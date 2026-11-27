@@ -80,6 +80,23 @@ class HttpAssetReadClientTest {
     }
 
     @Test
+    void camNonAuth4xxMapsToBadGateway() {
+        var builder = RestClient.builder().baseUrl("http://cam.test");
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/api/v1/assets")))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> new HttpAssetReadClient(builder.build())
+                .installedBase("synthetic-customer", LocalDate.of(2029, 12, 31)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    var bex = (BusinessException) ex;
+                    assertThat(bex.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+                    assertThat(bex.getErrorCode()).isEqualTo("ASSET_READ_UNAVAILABLE");
+                });
+        server.verify();
+    }
+
+    @Test
     void camServerErrorMapsToBadGateway() {
         var builder = RestClient.builder().baseUrl("http://cam.test");
         var server = MockRestServiceServer.bindTo(builder).build();

@@ -48,7 +48,7 @@ public final class HttpAssetReadClient implements AssetReadClient {
         } catch (BusinessException ex) {
             throw ex;
         } catch (HttpClientErrorException ex) {
-            if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED || ex.getStatusCode() == HttpStatus.FORBIDDEN) {
+            if (ex.getStatusCode().value() == 401 || ex.getStatusCode().value() == 403) {
                 throw new BusinessException(
                         "Caller's token was refused by the asset service",
                         HttpStatus.FORBIDDEN,
