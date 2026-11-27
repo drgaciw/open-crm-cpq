@@ -35,7 +35,7 @@ These were raised in the #713 review and are documented in the residual evidence
   `productRef`, which is not a canonical product identity.
 - **No predecessor reconciliation:** the writer created new assets without checking or linking to any
   preexisting asset for the same subscription and contract line.
-- **No activation receipt:** the legacy writer did not create an `asset_activation_receipt` row. The
+- **No activation receipt:** the legacy writer did not create an `asset_activation_receipts` row. The
   `EffectiveAssetActivation` path (which does) was not active during the window. At the asset level,
   the `LEGACY_ASSET_LINE_ID` finding takes precedence over `ASSET_APPLIED_RECEIPT_MISSING` for
   window assets (see Reconciliation). At the acceptance level, `CANONICAL_LINE_MISSING` (an
@@ -85,12 +85,13 @@ WHERE created_at >= '2026-11-01T15:13:54Z'
 ### Count outbox events from the window
 
 ```sql
-SELECT topic, status, count(*) AS event_count
+-- topic is nullable (V1_4:9); relay falls back to event_type.
+SELECT coalesce(topic, event_type) AS resolved_topic, status, count(*) AS event_count
 FROM outbox_events
 WHERE created_at >= '2026-11-01T15:13:54Z'
   AND created_at < '2026-11-01T17:42:24Z'
-  AND topic IN ('cpq.asset.created', 'cpq.asset.audit')
-GROUP BY topic, status
+  AND coalesce(topic, event_type) IN ('cpq.asset.created', 'cpq.asset.audit')
+GROUP BY coalesce(topic, event_type), status
 ORDER BY topic, status;
 ```
 
@@ -144,7 +145,9 @@ matches not only the synthetic `legacy-aggregate` identity but also any `contrac
 equals the subscription's `origin_line_id` or any rate-period `accepted_line_uuid`. Because the
 writer used `acceptedLineUuid` directly, every window asset matches this branch — not only those
 with the `legacy-aggregate` synthetic id. `ASSET_APPLIED_RECEIPT_MISSING` (line 81–82) is masked
-by the earlier `LEGACY_ASSET_LINE_ID` match and will not surface for window assets.
+by the earlier `LEGACY_ASSET_LINE_ID` match and will not surface for window assets. This assumes
+the subscription's rate periods still exist; it is inferred from the schema and has not been
+executed against a database.
 
 At the acceptance level (`acceptance_findings`, lines 39–48), `identity_issue` is tested before
 `ACTIVATION_RECEIPT_MISSING`. Contract lines were not introduced until 2026-11-06 (`2e53ad0a`,
