@@ -4,6 +4,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import { TextFieldModule } from '@angular/cdk/text-field';
 import { MatButtonModule } from '@angular/material/button';
 import { PricingExecutionService } from '@frontend/cpq-pricing-data-access';
 import {
@@ -11,10 +13,12 @@ import {
   PricingContext,
   PricingResult,
 } from '@frontend/shared-models';
-import { DataTableComponent, TableColumn } from '@frontend/shared-ui';
+import { CopyButtonComponent, DataTableComponent, TableColumn } from '@frontend/shared-ui';
 import { MOCK_BULK_CONTEXTS } from '../pricing-simulator.mock';
 
 const BULK_SOFT_CAP = 50;
+const RESULT_ROW_HEIGHT = 40;
+const RESULT_VIEWPORT_MAX = 400;
 
 interface BulkResultRow {
   quoteExternalId: string;
@@ -98,7 +102,7 @@ function toRow(
 @Component({
   selector: 'cpq-bulk-simulator',
   standalone: true,
-  imports: [MatButtonModule, DataTableComponent],
+  imports: [MatButtonModule, DataTableComponent, CopyButtonComponent, ScrollingModule, TextFieldModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section data-testid="bulk-simulator" class="bulk-simulator">
@@ -107,7 +111,9 @@ function toRow(
         id="bulk-json-input"
         data-testid="bulk-json-input"
         class="json-input"
-        rows="12"
+        cdkTextareaAutosize
+        cdkAutosizeMinRows="4"
+        cdkAutosizeMaxRows="20"
         [value]="jsonText()"
         (input)="onJsonInput($event)"
         placeholder="Paste a JSON array of pricing contexts, or { &quot;contexts&quot;: [...] }"
@@ -158,16 +164,46 @@ function toRow(
           <p>Successful requests: {{ result.successfulRequests }}</p>
           <p>Failed requests: {{ result.failedRequests }}</p>
           <p>Total execution time: {{ result.totalExecutionTimeMs }} ms</p>
-          <button
-            mat-stroked-button
-            type="button"
-            data-testid="bulk-download-results"
-            (click)="downloadResults()"
-          >
-            Download results JSON
-          </button>
+          <div class="summary-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="bulk-download-results"
+              (click)="downloadResults()"
+            >
+              Download results JSON
+            </button>
+            <app-copy-button
+              [value]="resultsJson()"
+              label="Copy results JSON"
+              data-testid="bulk-copy-results"
+            />
+          </div>
         </div>
-        <app-data-table [columns]="columns" [data]="rows()" [clickable]="false" />
+
+        <div data-testid="data-table" class="virtual-table">
+          <div class="virtual-header" role="row">
+            @for (col of columns; track col.key) {
+              <span class="virtual-th" role="columnheader">{{ col.header }}</span>
+            }
+          </div>
+          <cdk-virtual-scroll-viewport
+            [itemSize]="rowHeight"
+            [style.height.px]="viewportHeight()"
+            class="virtual-viewport"
+            data-testid="bulk-virtual-viewport"
+          >
+            <table class="virtual-body">
+              <tbody>
+                <tr *cdkVirtualFor="let row of rows(); trackBy: trackByQuote" class="virtual-row">
+                  @for (col of columns; track col.key) {
+                    <td class="virtual-td">{{ $any(row)[col.key] }}</td>
+                  }
+                </tr>
+              </tbody>
+            </table>
+          </cdk-virtual-scroll-viewport>
+        </div>
       }
     </section>
   `,
@@ -208,16 +244,74 @@ function toRow(
 
       .validation {
         margin: 0;
-        color: #b71c1c;
+        color: var(--crm-color-danger);
       }
 
       .cap-warning {
         margin: 0;
-        color: #e65100;
+        color: var(--crm-color-warning);
       }
 
       .summary p {
         margin: 0 0 4px;
+      }
+
+      .summary-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .virtual-table {
+        border: 1px solid var(--crm-color-line);
+        border-radius: var(--crm-radius-sm);
+        overflow: hidden;
+      }
+
+      .virtual-header {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        background: var(--crm-color-canvas);
+        border-bottom: 1px solid var(--crm-color-line);
+      }
+
+      .virtual-th {
+        padding: 10px 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--crm-color-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .virtual-viewport {
+        overflow-y: auto;
+      }
+
+      .virtual-body {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      .virtual-row {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        border-bottom: 1px solid var(--crm-color-line);
+      }
+
+      .virtual-row:last-child {
+        border-bottom: none;
+      }
+
+      .virtual-td {
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        color: var(--crm-color-ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     `,
   ],
@@ -226,6 +320,7 @@ export class BulkSimulatorComponent {
   private readonly pricingExecution = inject(PricingExecutionService);
 
   readonly softCap = BULK_SOFT_CAP;
+  readonly rowHeight = RESULT_ROW_HEIGHT;
   readonly columns: TableColumn[] = [
     { key: 'quoteExternalId', header: 'Quote', sortable: false },
     { key: 'customerExternalId', header: 'Customer', sortable: false },
@@ -244,6 +339,13 @@ export class BulkSimulatorComponent {
   readonly overCap = signal(false);
   readonly response = signal<BulkPricingSimulationResponse | null>(null);
   readonly rows = signal<BulkResultRow[]>([]);
+  readonly resultsJson = signal('');
+
+  viewportHeight(): number {
+    return Math.min(this.rows().length * RESULT_ROW_HEIGHT, RESULT_VIEWPORT_MAX);
+  }
+
+  trackByQuote = (_: number, row: BulkResultRow) => row.quoteExternalId;
 
   onJsonInput(event: Event): void {
     const target = event.target;
@@ -285,6 +387,7 @@ export class BulkSimulatorComponent {
       );
       this.response.set(null);
       this.rows.set([]);
+      this.resultsJson.set('');
       this.overCap.set(false);
       return;
     }
@@ -297,10 +400,12 @@ export class BulkSimulatorComponent {
         this.rows.set(
           parsed.contexts.map((context, index) => toRow(context, response.results[index], index)),
         );
+        this.resultsJson.set(JSON.stringify(response, null, 2));
       },
       error: () => {
         this.response.set(null);
         this.rows.set([]);
+        this.resultsJson.set('');
         this.validationError.set('Bulk simulation failed.');
       },
     });

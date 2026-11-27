@@ -94,6 +94,10 @@ describe('BulkSimulatorComponent', () => {
     return wrapped.contexts ?? [];
   }
 
+  function component(): BulkSimulatorComponent {
+    return fixture.componentInstance;
+  }
+
   it('exposes the bulk simulator root and hides the result table before a run (BC-03-10A)', () => {
     // Arrange
     const root = host();
@@ -190,7 +194,7 @@ describe('BulkSimulatorComponent', () => {
     expect(alertText()).toBe('');
   });
 
-  it('renders summary counts and per-row success and failure for a partial bulk response (BC-03-10A)', () => {
+  it('renders summary counts and result rows for a partial bulk response (BC-03-10A)', () => {
     // Arrange
     const response = mockBulkPartialResponse();
     simulateBulkMock.mockReturnValue(of(response));
@@ -209,16 +213,17 @@ describe('BulkSimulatorComponent', () => {
     expect(summaryText).toMatch(/Successful requests:\s*1/);
     expect(summaryText).toMatch(/Failed requests:\s*1/);
 
-    const table = host().querySelector('[data-testid="data-table"]');
-    expect(table).toBeTruthy();
-    const tableText = table?.textContent ?? '';
-    expect(tableText).toContain('Q-SIM-001');
-    expect(tableText).toContain('Q-SIM-002');
-    expect(tableText).toMatch(/\bSuccess\b/);
-    expect(tableText).toMatch(/\bFailed\b/);
-    expect(tableText).toContain('PROD-001');
-    expect(tableText).toContain('No matching price book');
+    expect(host().querySelector('[data-testid="data-table"]')).toBeTruthy();
     expect(host().querySelector('[role="alert"]')).toBeNull();
+
+    const rows = component().rows();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].quoteExternalId).toBe('Q-SIM-001');
+    expect(rows[0].status).toBe('Success');
+    expect(rows[0].productExternalId).toBe('PROD-001');
+    expect(rows[1].quoteExternalId).toBe('Q-SIM-002');
+    expect(rows[1].status).toBe('Failed');
+    expect(rows[1].errorMessage).toBe('No matching price book');
   });
 
   it.each([
@@ -242,15 +247,15 @@ describe('BulkSimulatorComponent', () => {
     clickControl('bulk-simulate');
 
     expect(simulateBulkMock).toHaveBeenCalledExactlyOnceWith({ contexts });
-    const rows = host().querySelectorAll('[data-testid="data-table"] tbody tr');
+    const rows = component().rows();
     expect(rows).toHaveLength(2);
-    expect(rows[0]?.textContent).toContain('Q-SIM-001');
-    expect(rows[0]?.textContent).toContain('Success');
-    expect(rows[1]?.textContent).toContain(label);
-    expect(rows[1]?.textContent).toContain('Failed');
-    expect(rows[1]?.textContent).toContain('No matching price book');
+    expect(rows[0].quoteExternalId).toBe('Q-SIM-001');
+    expect(rows[0].status).toBe('Success');
+    expect(rows[1].quoteExternalId).toContain(label);
+    expect(rows[1].status).toBe('Failed');
+    expect(rows[1].errorMessage).toBe('No matching price book');
     if (product) {
-      expect(rows[1]?.textContent).toContain(product);
+      expect(rows[1].productExternalId).toContain(product);
     }
   });
 
@@ -309,5 +314,63 @@ describe('BulkSimulatorComponent', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  describe('CDK enhancements', () => {
+    it('applies cdkTextareaAutosize with min/max rows to the JSON input textarea', () => {
+      const textarea = jsonInput();
+      expect(textarea.hasAttribute('cdktextareaautosize')).toBe(true);
+      expect(textarea.getAttribute('cdkautosizeminrows')).toBe('4');
+      expect(textarea.getAttribute('cdkautosizemaxrows')).toBe('20');
+    });
+
+    it('renders app-copy-button in the summary with the results JSON after a run', () => {
+      simulateBulkMock.mockReturnValue(of(mockBulkPartialResponse()));
+      setJson(JSON.stringify(MOCK_BULK_CONTEXTS));
+      clickControl('bulk-simulate');
+
+      const copyBtn = host().querySelector('[data-testid="bulk-copy-results"]');
+      expect(copyBtn).toBeTruthy();
+      expect(component().resultsJson()).toBeTruthy();
+      expect(JSON.parse(component().resultsJson())).toEqual(mockBulkPartialResponse());
+    });
+
+    it('renders results inside a CdkVirtualScrollViewport', () => {
+      simulateBulkMock.mockReturnValue(of(mockBulkPartialResponse()));
+      setJson(JSON.stringify(MOCK_BULK_CONTEXTS));
+      clickControl('bulk-simulate');
+
+      const viewport = host().querySelector('[data-testid="bulk-virtual-viewport"]');
+      expect(viewport).toBeTruthy();
+      expect(viewport?.tagName.toLowerCase()).toBe('cdk-virtual-scroll-viewport');
+
+      const header = host().querySelector('[data-testid="data-table"] .virtual-header');
+      expect(header).toBeTruthy();
+      const headerText = header?.textContent ?? '';
+      expect(headerText).toContain('Quote');
+      expect(headerText).toContain('Status');
+      expect(headerText).toContain('Error');
+    });
+
+    it('sizes the virtual viewport height to fit rows up to 400px', () => {
+      expect(component().viewportHeight()).toBe(0);
+
+      simulateBulkMock.mockReturnValue(of(mockBulkPartialResponse()));
+      setJson(JSON.stringify(MOCK_BULK_CONTEXTS));
+      clickControl('bulk-simulate');
+
+      expect(component().viewportHeight()).toBe(2 * 40);
+    });
+
+    it('clears resultsJson when simulation fails', () => {
+      simulateBulkMock.mockReturnValue(of(mockBulkPartialResponse()));
+      setJson(JSON.stringify(MOCK_BULK_CONTEXTS));
+      clickControl('bulk-simulate');
+      expect(component().resultsJson()).toBeTruthy();
+
+      setJson('{bad');
+      clickControl('bulk-simulate');
+      expect(component().resultsJson()).toBe('');
+    });
   });
 });

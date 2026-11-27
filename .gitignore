@@ -5,6 +5,7 @@ Thumbs.db
 
 # Build artifacts
 **/target/
+**/target_test-classes/
 **/bin/
 **/dist/
 **/build/
