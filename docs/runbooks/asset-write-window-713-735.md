@@ -8,8 +8,8 @@
 
 | Event | Commit | Timestamp (CT) |
 | --- | --- | --- |
-| #713 merged (DRG-654: create asset when an order activates) | `aeb1993d` | 2026-11-01 09:13:54 CDT |
-| #735 merged (fix: hold acceptance-time writes by default) | `0e931728` | 2026-11-01 11:42:24 CDT |
+| #713 merged (DRG-654: create asset when an order activates) | `aeb1993d` | 2026-11-01 09:13:54 CST (15:13:54 UTC) |
+| #735 merged (fix: hold acceptance-time writes by default) | `0e931728` | 2026-11-01 11:42:24 CST (17:42:24 UTC) |
 | **Duration** | | **2 hours 28 minutes 30 seconds** |
 
 ## What was unheld
@@ -35,15 +35,17 @@ These were raised in the #713 review and are documented in the residual evidence
   `productRef`, which is not a canonical product identity.
 - **No predecessor reconciliation:** the writer created new assets without checking or linking to any
   preexisting asset for the same subscription and contract line.
+- **No activation receipt:** the legacy writer did not create an `asset_activation_receipt` row. The
+  `EffectiveAssetActivation` path (which does) was not active during the window. Any asset created
+  in this window will surface as `ACTIVATION_RECEIPT_MISSING` in the reconciliation procedure.
 - **Timing:** assets were created at quote acceptance, before ERP or manual subscription activation,
   and before future-effective rate periods could be verified.
 
 ## Environments
 
-The local development stack (Docker Compose: PostgreSQL on `localhost:5432`, Redis on
-`localhost:6379`, backend services on host ports) ran this code during the window. The `dev` Spring
-profile was the only active profile. No deployed (staging, production, or shared) environment ran
-this code — the project's Azure AKS infrastructure is target-state, not landed.
+No deployed (staging, production, or shared) environment ran this code — the project's Azure AKS
+infrastructure is target-state, not landed. Whether any local development instance processed a quote
+acceptance during the window is unknown; no execution evidence has been collected.
 
 Commits between #713 and #735 that also touched `contract-asset-management/`:
 
@@ -67,15 +69,13 @@ modify data and must not be run against a production database by a bot (S7 NO-GO
 ### Count assets created during the window
 
 ```sql
--- Assets created between the #713 merge (2026-11-01 14:13:54 UTC) and
--- the #735 merge (2026-11-01 16:42:24 UTC).
+-- Assets created between the #713 merge (2026-11-01 15:13:54 UTC) and
+-- the #735 merge (2026-11-01 17:42:24 UTC).
 SELECT count(*) AS asset_count,
-       count(*) FILTER (WHERE contract_line_id = 'legacy-aggregate') AS legacy_aggregate_count,
-       count(*) FILTER (WHERE product_ref NOT LIKE 'PROD-%'
-                          AND product_ref NOT LIKE 'SKU-%') AS suspect_product_ref_count
+       count(*) FILTER (WHERE contract_line_id = 'legacy-aggregate') AS legacy_aggregate_count
 FROM assets
-WHERE created_at >= '2026-11-01T14:13:54Z'
-  AND created_at < '2026-11-01T16:42:24Z'
+WHERE created_at >= '2026-11-01T15:13:54Z'
+  AND created_at < '2026-11-01T17:42:24Z'
   AND NOT is_deleted;
 ```
 
@@ -84,11 +84,25 @@ WHERE created_at >= '2026-11-01T14:13:54Z'
 ```sql
 SELECT topic, status, count(*) AS event_count
 FROM outbox_events
-WHERE created_at >= '2026-11-01T14:13:54Z'
-  AND created_at < '2026-11-01T16:42:24Z'
+WHERE created_at >= '2026-11-01T15:13:54Z'
+  AND created_at < '2026-11-01T17:42:24Z'
   AND topic IN ('cpq.asset.created', 'cpq.asset.audit')
 GROUP BY topic, status
 ORDER BY topic, status;
+```
+
+### Count assets missing an activation receipt
+
+```sql
+-- Window-created assets will have no activation receipt row.
+SELECT count(*) AS missing_receipt_count
+FROM assets a
+LEFT JOIN asset_activation_receipts r
+       ON r.asset_id = a.uuid
+WHERE a.created_at >= '2026-11-01T15:13:54Z'
+  AND a.created_at < '2026-11-01T17:42:24Z'
+  AND NOT a.is_deleted
+  AND r.id IS NULL;
 ```
 
 ### List affected subscriptions
@@ -98,8 +112,8 @@ SELECT s.id AS subscription_id, s.customer_id, s.contract_line_id, s.status,
        a.uuid AS asset_id, a.contract_line_id AS asset_line_id, a.product_ref, a.status AS asset_status
 FROM subscriptions s
 JOIN assets a ON a.subscription_id = s.id
-WHERE a.created_at >= '2026-11-01T14:13:54Z'
-  AND a.created_at < '2026-11-01T16:42:24Z'
+WHERE a.created_at >= '2026-11-01T15:13:54Z'
+  AND a.created_at < '2026-11-01T17:42:24Z'
   AND NOT a.is_deleted
 ORDER BY s.id, a.contract_line_id;
 ```
@@ -111,9 +125,9 @@ subscriptions). The hold on the legacy writer ([asset-write-hold.md](asset-write
 removes nor repairs incorrect asset rows or events already written.
 
 Before production reliance, inventory these rows alongside the full reconciliation procedure in
-[asset-reconciliation-inventory.md](asset-reconciliation-inventory.md). The `LEGACY_ASSET_LINE_ID`,
-`ASSET_PRODUCT_MISMATCH`, and `ASSET_APPLIED_RECEIPT_MISSING` finding categories are most likely to
-match window-created rows. Record unresolved cases and do not fabricate identities, delete history,
+[asset-reconciliation-inventory.md](asset-reconciliation-inventory.md). The `ACTIVATION_RECEIPT_MISSING` (primary — the legacy writer never created receipts),
+`ASSET_APPLIED_RECEIPT_MISSING`, `LEGACY_ASSET_LINE_ID`, and `ASSET_PRODUCT_MISMATCH` finding
+categories are most likely to match window-created rows. Record unresolved cases and do not fabricate identities, delete history,
 or publish retrospective events without the approved process.
 
 ## References
