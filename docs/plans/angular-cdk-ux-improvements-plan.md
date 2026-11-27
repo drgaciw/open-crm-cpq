@@ -1,5 +1,7 @@
 # Angular Material CDK UX/UI Improvements Plan
 
+> **Pane-map note (re-pinned 2026-11-27):** The `w3:p*` pane ids in this document are from the historical `w3` workspace, which no longer exists (`herdr workspace list` → only `w1`; `w3` → `workspace_not_found`). Live mapping: `pi-00` = `w1:p1`, `pi-01` = `w1:p7`, `agy` = `w1:p3`. `pi-decision` (was `w3:pA`), `architect` (was `w3:pB`) and `codex` (was `w3:p8`) have no live counterpart in this workspace — treat those references as historical. Do not resolve a `w3:p*` id against the current session.
+
 **Status:** Complete
 **Coordinator:** `pi-00` (`w3:p4`)  
 **Peers:** `pi-01` (`w3:p5`), `pi-decision` (`w3:pA`)  
