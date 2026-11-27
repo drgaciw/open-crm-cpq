@@ -11,10 +11,10 @@ No GitHub thread resolution without drg's approval. No status changes on existin
 | PR | Head on main | Verdict | Open findings | Fixed findings |
 | --- | --- | --- | --- | --- |
 | #713 (DRG-654) | `aeb1993d` | FAIL — 3 open P1s (held behind flag) | 3 P1 + 1 nit | 1 (read auth → #723) |
-| #719 (DRG-656) | `abafd089` | FAIL — 3 open P1 + 3 open P2 + 1 nit | 3 P1 + 3 P2 + 1 nit | 3 (auth → #723, tenant → #1077, rollback → #1070) |
+| #719 (DRG-656) | `abafd089` | FAIL — 1 P1 (conditional) + 1 design question + 1 P2 prereq + 1 P2 latent + 3 P2 + 1 known limitation + 1 nit | See regrades below | 3 (auth → #723, tenant → #1077, rollback → #1070) |
 | #741 (amend/terminate) | merge on main | FAIL — 2 open | 1 P1 + 1 P2 | 0 |
 | #742 (renewal quotes) | merge on main | FAIL — 2 open | 1 P1 (mitigated) + 1 P2 | 0 |
-| #740 (DRG-659) | `e53f90c1` | FAIL — 3 open P1 + 2 open P2 + 1 nit | 3 P1 + 2 P2 + 1 nit | 2 (test compile → #747, tenant → #1077) |
+| #740 (DRG-659) | `e53f90c1` | FAIL — 1 design question + 1 P2 prereq + 2 P2 + 1 known limitation + 1 nit | See regrades below | 2 (test compile → #747, tenant → #1077) |
 | #958 (ADR-037) | `e34443d3` | FAIL — mitigated, provisional | Owner approval ≠ lane verdict | 0 |
 | #1003 (DRG-761) | merge on main | FAIL — 1 open P2 | 1 P2 | 0 |
 
@@ -24,7 +24,7 @@ No GitHub thread resolution without drg's approval. No status changes on existin
 
 ### #713 — DRG-654: Create asset when an order activates
 
-**Merged head:** `aeb1993d` (2026-11-01 09:13:54 CDT)
+**Merged head:** `aeb1993d` (2026-11-01 15:13:54 UTC / 09:13:54 CST)
 
 | # | Finding | Severity | Status | Evidence |
 | --- | --- | --- | --- | --- |
@@ -32,10 +32,13 @@ No GitHub thread resolution without drg's approval. No status changes on existin
 | 2 | Synthetic `legacy-aggregate` line ID written to `acceptedLineUuid` | P1 | **STILL OPEN** | `AcceptedQuoteSubscriptionService.java:146` still writes `"legacy-aggregate"`. Downstream paths (`EffectiveAssetActivation`, `RampScheduleService`) filter it out, but the row is still written. |
 | 3 | No predecessor reconciliation on replacement | P1 | **STILL OPEN** | `AssetActivation.onActivated()` (lines 64-68) skips if an asset exists for the same subscription+contractLine, but performs no predecessor/replacement reconciliation. Held behind flag. |
 | 4 | `productName` fallback as `productRef` | nit | **STILL PRESENT (held)** | `AssetActivation.java:76-78` falls back from `productExternalId` to `productName`. Held behind flag. |
-| 5 | Coarse read auth on asset queries | P1 | **FIXED by #723** | `InstalledBaseReadScope` and `InstalledBaseReadAccess.require()` now gate all asset reads in `AssetQueryService`. Commit `47e34e5d`, merged 2026-11-01 09:50:43 CDT. |
+| 5 | Coarse read auth on asset queries | P1 | **FIXED by #723** | `InstalledBaseReadScope` and `InstalledBaseReadAccess.require()` now gate all asset reads in `AssetQueryService`. Commit `47e34e5d`, merged 2026-11-01 09:50:43 CST. |
 
-**Follow-ups under DRG-652:** Findings 1–4 are partly built under DRG-902 but not wired at
-`a877f90a`. The hold (`asset-write-hold.md`) prevents production exposure.
+**Follow-ups under DRG-652:** Finding 1 (acceptance-time writer) and finding 3 (no predecessor
+reconciliation) are partly built under DRG-902 but not wired at `a877f90a` (see DRG-902 wiring
+note below). Finding 2 (`legacy-aggregate` line ID) and finding 4 (`productName` fallback) are
+legacy writer defects in `AssetActivation` / `AcceptedQuoteSubscriptionService`, not DRG-902 work;
+they need their own follow-up. The hold (`asset-write-hold.md`) prevents production exposure.
 
 ### #719 — DRG-656: Queryable asset history and supersede chain
 
@@ -45,9 +48,11 @@ GitHub reviews. First CI run was post-merge `Main verify`.
 
 | # | Finding | Severity | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| 1 | Non-atomic check-then-insert and `maxAppliedOrder() + 1` concurrency race | P1 | **STILL OPEN** | `JpaAssetHistoryStore.java:18-25`: `existsByEventId` followed by `maxAppliedOrder() + 1` and `save()`. Under `READ COMMITTED`, concurrent appends compute identical `applied_order`; duplicate event IDs race into `uq_asset_history_event`. `applied_order` is local arrival order, not a producer causal sequence. |
-| 2 | `fold()` ignores `effectiveEnd` expiration and allows `AMENDED` to resurrect closed assets | P1 | **STILL OPEN** | `AssetHistoryProjection.java:311-372`: stores `end = row.getEffectiveEnd()` but never checks `asOf.isAfter(end)`, so expired assets stay `installed = true`. `case AMENDED` (lines 339-340) unconditionally sets `installed = true` even after `TERMINATED` or `SUPERSEDED`. |
-| 3 | No production Kafka consumer; `dropProjection()` is public and unguarded | P1 | **STILL OPEN** | No Kafka listener populates `asset_history`; `AssetActivation` does not write to `AssetHistoryProjection`. `dropProjection()` (line 160) is `public @Transactional` with no auth guard and executes `deleteAllInBatch()` across all tenants. Mitigated only by holds. |
+| 1 | Non-atomic check-then-insert and `maxAppliedOrder() + 1` concurrency race | P1 (no concurrent producer today; exposure conditional on hold-lift architecture — becomes critical if concurrent producers for one asset are possible post-lift) | **STILL OPEN** | `JpaAssetHistoryStore.java:18-25`: `existsByEventId` followed by `maxAppliedOrder() + 1` and `save()`. Under `READ COMMITTED`, concurrent appends compute identical `applied_order`; duplicate event IDs race into `uq_asset_history_event`. `applied_order` is local arrival order, not a producer causal sequence. |
+| 2a | `fold()` ignores `effectiveEnd` expiration — expired assets stay installed | Design question (was P1) | **BLOCKED on drg** | `AssetHistoryProjection.java:311-372`: stores `end = row.getEffectiveEnd()` but never checks `asOf.isAfter(end)`, so expired assets stay `installed = true`. Current behaviour may be intended — `docs/design/DRG-656-asset-history.md:23` and `AssetReportServiceTest.java:45-67` treat it as the design. This is a drg design decision on what `effectiveEnd` means, not a defect. |
+| 2b | `AMENDED` unconditionally resurrects `TERMINATED` / `SUPERSEDED` assets | P2; hold-lift prereq | **STILL OPEN** | `AssetHistoryProjection.java:339-340`: `case AMENDED` sets `installed = true` after `TERMINATED` or `SUPERSEDED`. Unreachable today: `AssetChangeApply.java:86,112,186` refuses closed assets and is behind the S4 hold. Must be resolved before hold lift. |
+| 3a | No production Kafka consumer or replay wiring | Known limitation (held state, documented) | **STILL OPEN** | No Kafka listener populates `asset_history`; `AssetActivation` does not write to `AssetHistoryProjection`. This is the asset write hold working as designed; the table is intentionally unpopulated until the hold lifts. |
+| 3b | `dropProjection()` is public and unguarded | P2 (latent) | **STILL OPEN** | `dropProjection()` (line 160) is `public @Transactional` with no auth guard and executes `deleteAllInBatch()` across all tenants. No caller in `src/main` at `a877f90a`; latent behind holds. |
 | 4 | Account-scope isolation (Q11) | P2 | **STILL OPEN** | `#723` added role auth, `#1077` added tenant scope, but tenant-wide access across all accounts remains open (`docs/runbooks/asset-read-access.md:5`). |
 | 5 | Invalid `direction` query param returns HTTP 500 | P2 | **STILL OPEN** | `AssetHistoryProjection.java:402` throws `IllegalArgumentException`. `GlobalExceptionHandler` has no handler for it, so invalid `?direction=foo` returns HTTP 500. |
 | 6 | Full-tenant `Asset` load into memory + unbounded `IN (:assetIds)` | P2 | **STILL OPEN** | `AssetHistoryProjection.java:174-183,243-259`: `visibleIds()` loads every non-deleted asset in the tenant into a `Set<String>` and passes it into `WHERE assetId IN :assetIds` (bind-parameter overflow risk at >32,767 assets). |
@@ -55,15 +60,18 @@ GitHub reviews. First CI run was post-merge `Main verify`.
 | 8 | `V1_14` shipped without rollback script | P2 (at merge) | **FIXED by #1070** | `#1070` (`95c3514e`) added `db/rollback/V1_14__drop_asset_history.sql`. Disposition tracked under DRG-924 / PR #1095. |
 | 9 | `walk()` omits `link.getAssetId()` fallback for null `predecessorAssetId` | nit | **STILL OPEN** | `AssetHistoryProjection.java:294` reads `getPredecessorAssetId()` directly without the `getAssetId()` fallback used at line 187, silently skipping predecessor hops. |
 
-**Hold-lift prerequisite:** `maxAppliedOrder() + 1` race (finding 1) and replay wiring (finding 3)
-are grouped — both concern the append path that must be reliable before hold lift.
-`dropProjection()` (finding 3) is a latent P2 behind holds. `fold()` / `effectiveEnd` / `AMENDED`
-resurrection (finding 2) is coupled with #740's churn double-counting (see #740 notes).
+**Hold-lift prerequisites:** Two groups must be resolved before hold lift:
+1. **Terminal-state integrity** (finding 2b): `AMENDED` resurrection of closed assets, coupled
+   with #740 finding 2 (churn double-counting). Both are P2 and unreachable today behind S4 hold.
+2. **Ordering and replay wiring** (finding 1 + finding 3a): `maxAppliedOrder() + 1` race and
+   no replay wiring. Both concern the append path that must be reliable before hold lift.
 
-**Follow-ups under DRG-652:** Findings 1–3 are partly built under DRG-902 but not wired at
-`a877f90a`. Finding 2 distinguishes event-defined installed state (the projection's `fold()`)
-from the unresolved drg lapse policy. Finding 4 is Q11 (account isolation). Findings 5–6 are
-targeted hardening.
+Finding 2a (`effectiveEnd`) is a drg design decision, not a prerequisite. Finding 3b
+(`dropProjection()`) is a latent P2 with no caller in `src/main`.
+
+**Follow-ups under DRG-652:** Findings 1 and 3a are not delivered by DRG-902 (see DRG-902 wiring
+note below); they need a new ticket. Finding 2a is blocked on drg design decision. Finding 4 is
+Q11 (account isolation). Findings 5–6 are targeted hardening.
 
 ### #741 — Amend, terminate, and supersede assets inside document apply
 
@@ -95,23 +103,26 @@ Code review lane verdicts at merge time.
 
 | # | Finding | Severity | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| 1 | `upcomingRenewals()` queries `installedBase(window.end())`, tightly coupled to #719's `effectiveEnd` bug | P1 | **STILL OPEN** | `AssetReportService.java:56-61`: for any asset ending before `windowEnd`, it is only returned because `fold()` fails to exclude expired assets. Fixing `fold()` will break `upcomingRenewals()` for all assets ending before `windowEnd`. |
-| 2 | `churn()` never marks asset closed or zeroes quantity on `TERMINATED` — double-counts and phantom downsizes | P1 | **STILL OPEN** | `AssetReportService.java:125-154`: `case TERMINATED` (lines 145-149) emits a churn event without resetting `quantity = 0` or recording a terminated guard. Duplicate `TERMINATED` double-counts; late `AMENDED` after `TERMINATED` emits phantom `DOWNSIZED`. Null `quantity` emits `quantityChurned = null`. Same-day `AMENDED` after `SUPERSEDED` still counts as downsize (strict `isBefore`, ignoring `appliedOrder`). |
-| 3 | Reports depend exclusively on `asset_history`, which has no live production producer | P1 | **STILL OPEN** | `AssetReportService.java:57,76` reads solely from `AssetHistoryProjection`. All producers are held or disabled. Both reports return empty/incomplete data. Documented in `docs/runbooks/asset-read-access.md:20`. |
+| 1 | `upcomingRenewals()` queries `installedBase(window.end())`, coupled to #719's `effectiveEnd` behaviour | Design question (was P1) | **BLOCKED on drg** | `AssetReportService.java:56-61`: for any asset ending before `windowEnd`, it is only returned because `fold()` does not exclude expired assets. Whether this is a bug depends on the drg design decision for `effectiveEnd` (#719 finding 2a). Not a hold-lift prerequisite. |
+| 2 | `churn()` never marks asset closed or zeroes quantity on `TERMINATED` — double-counts and phantom downsizes | P2; hold-lift prereq | **STILL OPEN** | `AssetReportService.java:125-154`: `case TERMINATED` (lines 145-149) emits a churn event without resetting `quantity = 0` or recording a terminated guard. Duplicate `TERMINATED` double-counts; late `AMENDED` after `TERMINATED` emits phantom `DOWNSIZED`. Unreachable today: `AssetChangeApply.java:86,112,186` refuses closed assets and is behind the S4 hold. Must be resolved before hold lift. |
+| 3 | Reports depend exclusively on `asset_history`, which has no live production producer | Known limitation (held state, documented) | **STILL OPEN** | `AssetReportService.java:57,76` reads solely from `AssetHistoryProjection`. All producers are held or disabled. Both reports return empty/incomplete data. This is the asset write hold working as designed. Documented in `docs/runbooks/asset-read-access.md:20`. |
 | 4 | `asOf` silently ignored when explicit `windowStart`/`windowEnd` supplied; no `withinDays` upper bound | P2 | **STILL OPEN** | `AssetReportService.java:208-233`: accepts `windowStart` + `windowEnd` + `asOf` and silently drops `asOf`. `withinDays` has no max-span guard. |
 | 5 | Unbounded in-memory account history load and unpaginated report responses | P2 | **STILL OPEN** | `AssetReportService.java:57,76` → `accountRows()` → `visibleIds()` loads all account assets into memory. Reports return unpaginated lists. |
 | 6 | Missing tenant scoping at merge time | P1 (at merge) | **FIXED by #1077** | `#740` called `store.findByAccountId()` directly. `#1077` switched to `history.accountRows()` with `InstalledBaseReadScope`. Residual Q11 account scope P2. |
 | 7 | Broken test compilation at merge time (fixtures removed by #741) | P2 (at merge) | **FIXED by #747** | `#747` (`4615b35c`) restored compilation against refactored fixtures. |
 | 8 | Unused `AssetHistoryStore store` field left in `AssetReportService` | nit | **STILL OPEN** | `AssetReportService.java:37,41,45`: `store` injected but never referenced after `#1077`. |
 
-**Hold-lift prerequisite:** Terminal-state resurrection (#719 finding 2: `fold()` / `AMENDED`
-resurrects closed assets) and churn double-counting (#740 finding 2: missing termination guard)
-are coupled — both must be resolved before hold lift, as fixing `fold()` alone breaks
-`upcomingRenewals()`.
+**Hold-lift prerequisite:** Finding 2 (`churn()` terminal-state handling) is coupled with #719
+finding 2b (`AMENDED` resurrection). Both are P2 and unreachable today behind S4 hold
+(`AssetChangeApply.java:86,112,186` refuses closed assets). Must be resolved before hold lift.
 
-**Follow-ups under DRG-652:** Findings 1–2 are hold-lift prerequisites (projection semantics +
-report logic, partly built under DRG-902 but not wired at `a877f90a`). Finding 3 shared with #719
-(no live producer). Findings 4–5 are targeted hardening.
+Finding 1 (`effectiveEnd` / `upcomingRenewals`) is a drg design decision (#719 finding 2a), not
+a prerequisite.
+
+**Follow-ups under DRG-652:** Finding 1 is blocked on drg design decision (#719 finding 2a).
+Finding 2 is not delivered by DRG-902 (see DRG-902 wiring note below); it needs a new ticket.
+Finding 3 is the hold working as designed, shared with #719 finding 3a. Findings 4–5 are targeted
+hardening.
 
 ### #958 — ADR-037 asset installed base (Proposed)
 
@@ -140,14 +151,16 @@ but the rubric requires the lane verdict as a separate artefact.
 
 | Finding | PR | Disposition |
 | --- | --- | --- |
-| Acceptance-time vs activation-time writer | #713 | Held behind flag; DRG-902 scope |
-| Synthetic `legacy-aggregate` line ID | #713 | Open; DRG-902 scope |
-| No predecessor reconciliation | #713 | Open; DRG-902 scope |
-| productName fallback | #713 | Open (nit); DRG-902 scope |
+| Acceptance-time vs activation-time writer | #713 | Held behind flag; not delivered by DRG-902, needs a new ticket |
+| Synthetic `legacy-aggregate` line ID | #713 | Open; legacy writer defect, not DRG-902 work, needs own follow-up |
+| No predecessor reconciliation | #713 | Open; not delivered by DRG-902, needs a new ticket |
+| productName fallback | #713 | Open (nit); legacy writer defect, not DRG-902 work, needs own follow-up |
 | Coarse read auth | #713 | **Fixed** by #723 (`47e34e5d`) |
-| Non-atomic append + `maxAppliedOrder() + 1` race | #719 | Open P1; hold-lift prereq (grouped with replay wiring) |
-| `fold()` ignores `effectiveEnd` / `AMENDED` resurrects closed | #719 | Open P1; hold-lift prereq (coupled with #740 churn) |
-| No production consumer; `dropProjection()` unguarded | #719 | Open P1; latent behind holds, partly built under DRG-902 |
+| Non-atomic append + `maxAppliedOrder() + 1` race | #719 | P1 conditional (P2 until concurrent producer); hold-lift prereq (grouped with replay wiring) |
+| `fold()` ignores `effectiveEnd` | #719 | Design question; blocked on drg (`docs/design/DRG-656-asset-history.md:23`) |
+| `AMENDED` resurrects closed assets | #719 | P2; hold-lift prereq (coupled with #740 churn); unreachable behind S4 hold |
+| No production consumer / replay wiring | #719 | Known limitation (hold working); not delivered by DRG-902, needs a new ticket |
+| `dropProjection()` unguarded | #719 | P2 latent; no caller in `src/main` |
 | Account-scope isolation (Q11) | #719 | Open P2; Q11 scope |
 | Invalid `direction` → HTTP 500 | #719 | Open P2; hardening |
 | Full-tenant `IN (:assetIds)` load | #719 | Open P2; hardening |
@@ -158,9 +171,9 @@ but the rubric requires the lane verdict as a separate artefact.
 | Replacement product executed price | #741 | Open; amendment lifecycle prerequisite |
 | RenewalPolicyClient shape mismatch | #742 | Mitigated (`@JsonIgnoreProperties`); `maxDecreasePct` data gap |
 | Stale observed identities | #742 | Open; needs freshness verification |
-| `upcomingRenewals()` coupled to `fold()` `effectiveEnd` bug | #740 | Open P1; hold-lift prereq (coupled with #719 finding 2) |
-| `churn()` missing termination guard / double-counting | #740 | Open P1; hold-lift prereq |
-| No live `asset_history` producer | #740 | Open P1; shared with #719 finding 3 |
+| `upcomingRenewals()` coupled to `effectiveEnd` behaviour | #740 | Design question; blocked on drg (#719 finding 2a) |
+| `churn()` missing termination guard / double-counting | #740 | P2; hold-lift prereq (coupled with #719 finding 2b); unreachable behind S4 hold |
+| No live `asset_history` producer | #740 | Known limitation (hold working); shared with #719 finding 3a |
 | `asOf` silently ignored + unbounded `withinDays` | #740 | Open P2; hardening |
 | Unbounded in-memory load + unpaginated responses | #740 | Open P2; hardening |
 | Tenant scoping at merge time | #740 | **Fixed** by #1077 (residual Q11 P2) |
@@ -168,6 +181,29 @@ but the rubric requires the lane verdict as a separate artefact.
 | Unused `store` field | #740 | Open nit |
 | Owner approval ≠ lane verdict | #958 | Provisional; docs-only, owner approved |
 | Subscription list unfiltered | #1003 | Open; needs status filtering |
+
+## Root-cause grouping
+
+| Group | Root cause | Findings | Disposition |
+| --- | --- | --- | --- |
+| A | `effectiveEnd` semantics — drg design decision | #719-2a, #740-1 | Blocked on drg; not a prerequisite |
+| B | Terminal-state integrity — `AMENDED` resurrects closed assets, churn double-counts | #719-2b, #740-2 | P2; hold-lift prerequisite (unreachable behind S4 hold) |
+| C | Ordering and replay wiring — `maxAppliedOrder() + 1` race, no consumer/replay | #719-1, #719-3a | P1 conditional / known limitation; hold-lift prerequisite |
+
+## DRG-902 wiring note
+
+DRG-902 is **Done** in Linear, but its first acceptance criterion (a durable, event-sourced asset
+lifecycle that replaces the held legacy paths) is **unmet on `main` at `a877f90a`**. The building
+blocks exist but are not wired:
+
+- `AssetLifecycleTransitions.java:13-18` — has no caller.
+- `AssetLifecycleReadiness.java:12-14` — returns `false`.
+- `AssetLifecycleChangeApplier.java:3-6` — interface with no implementations.
+- `OrderedAssetHistoryReplay.java:100-110` — `historyThrough()` has no caller; the ordered replay
+  table is never read into `asset_history`.
+
+Findings attributed to DRG-902 in earlier versions of this record are **not delivered by DRG-902**
+and need new tickets. This discrepancy (Done in Linear, first AC unmet) is flagged for drg.
 
 ## References
 
