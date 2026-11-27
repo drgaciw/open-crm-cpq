@@ -92,7 +92,7 @@ WHERE created_at >= '2026-11-01T15:13:54Z'
   AND created_at < '2026-11-01T17:42:24Z'
   AND coalesce(topic, event_type) IN ('cpq.asset.created', 'cpq.asset.audit')
 GROUP BY coalesce(topic, event_type), status
-ORDER BY topic, status;
+ORDER BY resolved_topic, status;
 ```
 
 ### Assets without an applied activation receipt
