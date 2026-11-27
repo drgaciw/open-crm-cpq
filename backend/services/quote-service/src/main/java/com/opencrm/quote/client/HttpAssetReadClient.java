@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opencrm.common.dto.ApiResponse;
 import com.opencrm.common.exception.BusinessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -46,6 +47,17 @@ public final class HttpAssetReadClient implements AssetReadClient {
             return List.copyOf(response.getData());
         } catch (BusinessException ex) {
             throw ex;
+        } catch (HttpClientErrorException ex) {
+            if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED || ex.getStatusCode() == HttpStatus.FORBIDDEN) {
+                throw new BusinessException(
+                        "Caller's token was refused by the asset service",
+                        HttpStatus.FORBIDDEN,
+                        "ASSET_READ_FORBIDDEN");
+            }
+            throw new BusinessException(
+                    "Cannot read active assets; retry or choose a valid account",
+                    HttpStatus.BAD_GATEWAY,
+                    "ASSET_READ_UNAVAILABLE");
         } catch (Exception ex) {
             throw new BusinessException(
                     "Cannot read active assets; retry or choose a valid account",
