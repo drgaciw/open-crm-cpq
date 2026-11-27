@@ -156,7 +156,7 @@ but the rubric requires the lane verdict as a separate artefact.
 | No predecessor reconciliation | #713 | Open; not delivered by DRG-902, needs a new ticket |
 | productName fallback | #713 | Open (nit); legacy writer defect, not DRG-902 work, needs own follow-up |
 | Coarse read auth | #713 | **Fixed** by #723 (`47e34e5d`) |
-| Non-atomic append + `maxAppliedOrder() + 1` race | #719 | P1 conditional (P2 until concurrent producer); hold-lift prereq (grouped with replay wiring) |
+| Non-atomic append + `maxAppliedOrder() + 1` race | #719 | P1 (no concurrent producer today; exposure conditional on hold-lift architecture — becomes critical if concurrent producers for one asset are possible post-lift); hold-lift prereq (grouped with replay wiring) |
 | `fold()` ignores `effectiveEnd` | #719 | Design question; blocked on drg (`docs/design/DRG-656-asset-history.md:23`) |
 | `AMENDED` resurrects closed assets | #719 | P2; hold-lift prereq (coupled with #740 churn); unreachable behind S4 hold |
 | No production consumer / replay wiring | #719 | Known limitation (hold working); not delivered by DRG-902, needs a new ticket |
@@ -192,9 +192,12 @@ but the rubric requires the lane verdict as a separate artefact.
 
 ## DRG-902 wiring note
 
-DRG-902 is **Done** in Linear, but its first acceptance criterion (a durable, event-sourced asset
-lifecycle that replaces the held legacy paths) is **unmet on `main` at `a877f90a`**. The building
-blocks exist but are not wired:
+DRG-902 is **Done** in Linear. Its first acceptance criterion reads: "Asset
+create/amend/terminate/supersede (and suspend once that story lands) honor effective dates;
+future-effective changes are not applied as immediate mutations." On `main` at `a877f90a` that is
+met only in part: create has an effective-dated path (`EffectiveAssetActivation`), off by default;
+amend, terminate and supersede have a schedule table and due runner but no applier, and readiness
+returns `false`. The building blocks exist but are not wired:
 
 - `AssetLifecycleTransitions.java:13-18` — has no caller.
 - `AssetLifecycleReadiness.java:12-14` — returns `false`.
