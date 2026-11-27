@@ -36,10 +36,11 @@ These were raised in the #713 review and are documented in the residual evidence
 - **No predecessor reconciliation:** the writer created new assets without checking or linking to any
   preexisting asset for the same subscription and contract line.
 - **No activation receipt:** the legacy writer did not create an `asset_activation_receipt` row. The
-  `EffectiveAssetActivation` path (which does) was not active during the window. Any acceptance
-  processed during this window will surface as `ACTIVATION_RECEIPT_MISSING` in the acceptance-level
-  reconciliation findings, and affected assets as `ASSET_APPLIED_RECEIPT_MISSING` in the asset-level
-  findings.
+  `EffectiveAssetActivation` path (which does) was not active during the window. At the asset level,
+  the `LEGACY_ASSET_LINE_ID` finding takes precedence over `ASSET_APPLIED_RECEIPT_MISSING` for
+  window assets (see Reconciliation). At the acceptance level, `CANONICAL_LINE_MISSING` (an
+  `identity_issue`) may precede `ACTIVATION_RECEIPT_MISSING` for window subscriptions that lack a
+  canonical contract line.
 - **Timing:** assets were created at quote acceptance, before ERP or manual subscription activation,
   and before future-effective rate periods could be verified.
 
@@ -93,19 +94,20 @@ GROUP BY topic, status
 ORDER BY topic, status;
 ```
 
-### Assets without an activation receipt
+### Assets without an applied activation receipt
 
-The legacy writer never created `asset_activation_receipt` rows. This query finds all assets
-lacking a receipt (unwindowed), then flags which fall inside the write window.
+The legacy writer never created `asset_activation_receipt` rows. A receipt in `PENDING` or
+`NEEDS_RECONCILIATION` status (or one whose `asset_id` points to a different asset) does not
+cover the asset. This query finds all assets lacking an `APPLIED` receipt for their own id
+(unwindowed), then flags which fall inside the write window.
 
 ```sql
-SELECT count(*) AS total_missing_receipt,
+SELECT count(*) AS total_missing_applied_receipt,
        count(*) FILTER (WHERE a.created_at >= '2026-11-01T15:13:54Z'
                            AND a.created_at < '2026-11-01T17:42:24Z') AS in_write_window
 FROM assets a
-JOIN subscriptions s ON s.id = a.subscription_id
 LEFT JOIN asset_activation_receipts r
-       ON r.subscription_id = s.id AND r.contract_line_id = s.contract_line_id
+       ON r.asset_id = a.uuid AND r.status = 'APPLIED'
 WHERE NOT a.is_deleted
   AND r.activation_id IS NULL;
 ```
@@ -130,12 +132,28 @@ subscriptions). The hold on the legacy writer ([asset-write-hold.md](asset-write
 removes nor repairs incorrect asset rows or events already written.
 
 Before production reliance, inventory these rows alongside the full reconciliation procedure in
-[asset-reconciliation-inventory.md](asset-reconciliation-inventory.md). At the asset level,
-`LEGACY_ASSET_LINE_ID` (synthetic `legacy-aggregate` contract line) and
-`ASSET_APPLIED_RECEIPT_MISSING` (no receipt linked to the asset) are the most likely findings for
-window-created rows. At the acceptance level, `ACTIVATION_RECEIPT_MISSING` flags subscriptions
-whose acceptance was processed without a receipt. Record unresolved cases and do not fabricate identities, delete history,
-or publish retrospective events without the approved process.
+[asset-reconciliation-inventory.md](asset-reconciliation-inventory.md).
+
+The reconciliation SQL (`ops/asset-reconciliation.sql:68-85`) assigns each asset a single finding
+from a first-match `CASE`: `LEGACY_ASSET_LINE_ID`, `ASSET_SUBSCRIPTION_IDENTITY_UNPROVEN`,
+`ASSET_CANONICAL_LINE_MISMATCH`, `ASSET_ACCOUNT_MISMATCH`, `ASSET_PRODUCT_MISMATCH`,
+`ASSET_APPLIED_RECEIPT_MISSING`, `ASSET_RECEIPT_EVIDENCE_MISMATCH`, `ASSET_SOFT_DELETED`. The
+legacy writer stored the `acceptedLineUuid` as the asset's `contract_line_id`
+(`AssetActivation.java:57-67,87` at `aeb1993d`). The `LEGACY_ASSET_LINE_ID` branch (lines 71–76)
+matches not only the synthetic `legacy-aggregate` identity but also any `contract_line_id` that
+equals the subscription's `origin_line_id` or any rate-period `accepted_line_uuid`. Because the
+writer used `acceptedLineUuid` directly, every window asset matches this branch — not only those
+with the `legacy-aggregate` synthetic id. `ASSET_APPLIED_RECEIPT_MISSING` (line 81–82) is masked
+by the earlier `LEGACY_ASSET_LINE_ID` match and will not surface for window assets.
+
+At the acceptance level (`acceptance_findings`, lines 39–48), `identity_issue` is tested before
+`ACTIVATION_RECEIPT_MISSING`. Contract lines were not introduced until 2026-11-06 (`2e53ad0a`,
+PR #805), so window subscriptions that have not had a canonical line added since will surface as
+`CANONICAL_LINE_MISSING` (a subset of `identity_issue`) rather than `ACTIVATION_RECEIPT_MISSING`.
+This precedence is inferred from the schema; it has not been executed against a database.
+
+Record unresolved cases and do not fabricate identities, delete history, or publish retrospective
+events without the approved process.
 
 ## References
 
