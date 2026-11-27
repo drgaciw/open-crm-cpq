@@ -6,7 +6,7 @@
 **CI verification:** Architect (w1:pB) verified `gh run list --branch` for all six PRs. No failing
 run found in retained branch-name history. This is a branch-name search over runs GitHub still
 retains; it was not cross-checked by commit SHA.
-**Disposition:** Pending — awaiting per-PR ruling from Decision (Jev).
+**Disposition:** All six PRs ruled C03 FAIL by Decision (Jev). drg waiver needed.
 
 ## C03 requirement
 
@@ -150,8 +150,24 @@ For future PRs under the DRG-652 workstream (Wave 1 and beyond), C03 requires:
 
 ## Disposition
 
-**Pending.** Decision (Jev) supplies the per-PR ruling: FAIL (stays on the residual scorecard) or
-WAIVED (with stated reason and any conditions for Wave 1).
+Decision (Jev) per-PR rulings, relayed by architect (w1:pB). Basis: retained branch-name history
+via `gh run list --branch`. Not a commit-SHA cross-check. Label: "no failing run found in retained
+branch-name history."
+
+| PR | Branch | Retained runs | Ruling |
+| --- | --- | --- | --- |
+| #713 (DRG-654) | `cursor/drg-654-asset-on-activation-a53d` | 4 PR check runs (heads `086daa3f`, `d308d5f8`, `344625f5`, `41069371`); 3 success, 1 cancelled (`41316844221`). No failing run. | **C03 FAIL** |
+| #719 (DRG-656) | `cursor/drg-656-asset-history-5ccc` | 0 runs. Feature-branch target; `pr-check` fires only for PRs into `main`. | **C03 FAIL** |
+| #741 (DRG-655) | `cursor/drg-655-asset-amend-supersede-58ab` | 1 run `41338079411`, success. | **C03 FAIL** |
+| #742 (DRG-658) | `cursor/drg-658-renewal-from-assets-58ab` | 1 run `41338081186`, success on `f657b169`. | **C03 FAIL** |
+| #740 (DRG-659) | `cursor/drg-659-installed-base-reporting-58ab` | 1 run `41338076686`, success on `cda999c6`. | **C03 FAIL** |
+| #1003 (DRG-761) | `drgamtd/drg-761-assets-contracts-ui` | 1 run `43721274542` on final head `f8daac53`, success. 5 RED-titled commits in `git log`, none with a CI run. | **C03 FAIL (partial)** — closest to waiver if drg accepts commit-title evidence |
+
+**Resolution:** drg waiver needed for all six.
+
+**Rubric question for drg:** the PR gate (`pr-check`) fires only once a PR into `main` exists, so
+C03 cannot be met for the first commit of any PR — the failing-first SHA predates the PR creation
+event that triggers CI.
 
 ## References
 
