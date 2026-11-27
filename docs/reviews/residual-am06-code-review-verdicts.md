@@ -206,7 +206,7 @@ returns `false`. The building blocks exist but are not wired:
   table is never read into `asset_history`.
 
 Findings attributed to DRG-902 in earlier versions of this record are **not delivered by DRG-902**
-and need new tickets. This discrepancy (Done in Linear, first AC unmet) is flagged for drg.
+and need new tickets. This discrepancy (Done in Linear, first AC met only in part) is flagged for drg.
 
 ## References
 
